@@ -1,0 +1,4 @@
+apiVersion: "networkoperator.openshift.io/v1"
+kind: "NetworkConfig"
+metadata:
+  name: "example"
