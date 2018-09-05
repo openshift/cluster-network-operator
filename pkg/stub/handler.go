@@ -3,7 +3,7 @@ package stub
 import (
 	"context"
 
-	"github.com/openshift/openshift-network-operator/pkg/apis/networkoperator/v1"
+	"github.com/openshift/openshift-network-operator/pkg/apis/networkoperator.openshift.io/v1"
 
 	"github.com/operator-framework/operator-sdk/pkg/sdk"
 	"github.com/sirupsen/logrus"
