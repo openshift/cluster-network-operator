@@ -5,9 +5,8 @@ import (
 	"runtime"
 	"time"
 
-	stub "github.com/openshift/openshift-network-operator/pkg/stub"
+	netop "github.com/openshift/openshift-network-operator/pkg/operator"
 	sdk "github.com/operator-framework/operator-sdk/pkg/sdk"
-	k8sutil "github.com/operator-framework/operator-sdk/pkg/util/k8sutil"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
 
 	"github.com/sirupsen/logrus"
@@ -23,17 +22,15 @@ func printVersion() {
 func main() {
 	printVersion()
 
-	sdk.ExposeMetricsPort()
+	//sdk.ExposeMetricsPort()
 
 	resource := "networkoperator.openshift.io/v1"
 	kind := "NetworkConfig"
-	namespace, err := k8sutil.GetWatchNamespace()
-	if err != nil {
-		logrus.Fatalf("failed to get watch namespace: %v", err)
-	}
-	resyncPeriod := time.Duration(5) * time.Second
+	namespace := "" //non namespaced
+
+	resyncPeriod := time.Duration(60) * time.Second
 	logrus.Infof("Watching %s, %s, %s, %d", resource, kind, namespace, resyncPeriod)
 	sdk.Watch(resource, kind, namespace, resyncPeriod)
-	sdk.Handle(stub.NewHandler())
+	sdk.Handle(netop.MakeHandler("./manifests"))
 	sdk.Run(context.TODO())
 }
