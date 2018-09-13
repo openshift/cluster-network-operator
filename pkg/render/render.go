@@ -15,9 +15,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
+type RenderData struct {
+	Funcs template.FuncMap
+	Data  map[string]interface{}
+}
+
+func MakeRenderData() RenderData {
+	return RenderData{
+		Funcs: template.FuncMap{},
+		Data:  map[string]interface{}{},
+	}
+}
+
 // RenderDir will render all manifests in a directory, descending in to subdirectories
 // It will perform template substitutions based on the data supplied by the RenderData
-func RenderDir(manifestDir string, d RenderData) ([]*unstructured.Unstructured, error) {
+func RenderDir(manifestDir string, d *RenderData) ([]*unstructured.Unstructured, error) {
 	out := []*unstructured.Unstructured{}
 
 	if err := filepath.Walk(manifestDir, func(path string, info os.FileInfo, err error) error {
@@ -48,11 +60,13 @@ func RenderDir(manifestDir string, d RenderData) ([]*unstructured.Unstructured, 
 
 // RenderTemplate reads, renders, and attempts to parse a yaml or
 // json file representing one or more k8s api objects
-func RenderTemplate(path string, d RenderData) ([]*unstructured.Unstructured, error) {
+func RenderTemplate(path string, d *RenderData) ([]*unstructured.Unstructured, error) {
 	tmpl := template.New(path).Option("missingkey=error")
-	if d != nil {
-		tmpl.Funcs(d.Funcs())
+	if d.Funcs != nil {
+		tmpl.Funcs(d.Funcs)
 	}
+
+	// Add universal functions
 	tmpl.Funcs(template.FuncMap{"getOr": getOr})
 
 	source, err := ioutil.ReadFile(path)
@@ -65,7 +79,7 @@ func RenderTemplate(path string, d RenderData) ([]*unstructured.Unstructured, er
 	}
 
 	rendered := bytes.Buffer{}
-	if err := tmpl.Execute(&rendered, d.Data()); err != nil {
+	if err := tmpl.Execute(&rendered, d.Data); err != nil {
 		return nil, errors.Wrapf(err, "failed to render manifest %s", path)
 	}
 

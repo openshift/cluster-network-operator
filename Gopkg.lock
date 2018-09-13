@@ -575,9 +575,15 @@
   ]
   revision = "e3762e86a74c878ffed47484592986685639c2cd"
 
+[[projects]]
+  name = "k8s.io/kubernetes"
+  packages = ["staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"]
+  revision = "a4529464e4629c21224b3d52edfe0ea91b072862"
+  version = "v1.11.3"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "44986e70993fb5622fc96f30f7733b733c5d271d04e388fd12889186a517ce3e"
+  inputs-digest = "b9ea49f5167848cc2593cbf43a62aa5c2d1c14131999027e68070d78c6769277"
   solver-name = "gps-cdcl"
   solver-version = 1
