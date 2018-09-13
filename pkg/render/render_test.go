@@ -10,7 +10,7 @@ import (
 func TestRenderSimple(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	d := MockRenderData{}
+	d := MakeRenderData()
 
 	o1, err := RenderTemplate("testdata/simple.yaml", &d)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -45,7 +45,7 @@ func TestRenderMultiple(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	p := "testdata/multiple.yaml"
-	d := MockRenderData{}
+	d := MakeRenderData()
 
 	o, err := RenderTemplate(p, &d)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -63,19 +63,19 @@ func TestTemplate(t *testing.T) {
 	p := "testdata/template.yaml"
 
 	// Test that missing variables are detected
-	d := MockRenderData{}
+	d := MakeRenderData()
 	_, err := RenderTemplate(p, &d)
 	g.Expect(err).To(HaveOccurred())
 	g.Expect(err.Error()).To(HaveSuffix(`function "fname" not defined`))
 
 	// Set expected function (but not variable)
-	d.setFunc("fname", func(s string) string { return "test-" + s })
+	d.Funcs["fname"] = func(s string) string { return "test-" + s }
 	_, err = RenderTemplate(p, &d)
 	g.Expect(err).To(HaveOccurred())
 	g.Expect(err.Error()).To(HaveSuffix(`has no entry for key "Namespace"`))
 
 	// now we can render
-	d.setKey("Namespace", "myns")
+	d.Data["Namespace"] = "myns"
 	o, err := RenderTemplate(p, &d)
 	g.Expect(err).NotTo(HaveOccurred())
 
@@ -88,9 +88,9 @@ func TestTemplate(t *testing.T) {
 func TestRenderDir(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	d := MockRenderData{}
-	d.setFunc("fname", func(s string) string { return s })
-	d.setKey("Namespace", "myns")
+	d := MakeRenderData()
+	d.Funcs["fname"] = func(s string) string { return s }
+	d.Data["Namespace"] = "myns"
 
 	o, err := RenderDir("testdata", &d)
 	g.Expect(err).NotTo(HaveOccurred())

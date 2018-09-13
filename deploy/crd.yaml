@@ -9,5 +9,5 @@ spec:
     listKind: NetworkConfigList
     plural: networkconfigs
     singular: networkconfig
-  scope: Namespaced
+  scope: Cluster
   version: v1
