@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: openshift-network-operator
+  name: openshift-network-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: openshift-network-operator
+  template:
+    metadata:
+      labels:
+        k8s-app: openshift-network-operator
+    spec:
+      containers:
+        - name: openshift-network-operator
+          image: localhost/openshift-network-operator:latest
+          imagePullPolicy: Never
+          resources:
+            requests:
+              cpu: 10m
+              memory: 50Mi
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      restartPolicy: Always
+      tolerations:
+        - key: "node-role.kubernetes.io/master"
+          operator: "Exists"
+          effect: "NoSchedule"
