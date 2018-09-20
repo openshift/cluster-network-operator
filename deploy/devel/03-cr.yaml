@@ -2,6 +2,7 @@ apiVersion: "networkoperator.openshift.io/v1"
 kind: "NetworkConfig"
 metadata:
   name: "example"
+  namespace: openshift-network-operator
 spec:
   defaultNetwork:
     type: OpenshiftSDN
