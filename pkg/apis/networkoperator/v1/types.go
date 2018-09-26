@@ -56,7 +56,7 @@ type NetworkConfigSpec struct {
 // Not all network providers support multiple ClusterNetworks
 type ClusterNetwork struct {
 	CIDR             string `json:"cidr"`
-	HostSubnetLength int    `json:"hostSubnetLength"`
+	HostSubnetLength uint32 `json:"hostSubnetLength"`
 }
 
 // NetworkDefinition represents a single network plugin's configuration.
