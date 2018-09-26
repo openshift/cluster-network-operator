@@ -17,29 +17,3 @@ spec:
           image: busybox
           command: ["/bin/sh", "-c", "while true; do echo dummy-dep-1; sleep 10; done"]
 
----
-
-apiVersion: apps/v1beta2
-kind: DaemonSet
-metadata:
-  name: dummy-ds
-  namespace: default
-  labels:
-    app: dummy-ds
-spec:
-  selector:
-    matchLabels:
-      app: dummy-ds
-  updateStrategy:
-    rollingUpdate:
-      maxUnavailable: 1
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        app: dummy-ds
-    spec:
-      containers:
-        - name: dummy
-          image: busybox
-          command: ["/bin/sh", "-c", "while true; do echo dummy-ds-1; sleep 10; done"]
