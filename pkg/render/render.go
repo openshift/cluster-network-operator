@@ -84,6 +84,12 @@ func RenderTemplate(path string, d *RenderData) ([]*unstructured.Unstructured, e
 	}
 
 	out := []*unstructured.Unstructured{}
+
+	// special case - if the entire file is whitespace, skip
+	if len(strings.TrimSpace(rendered.String())) == 0 {
+		return out, nil
+	}
+
 	decoder := yaml.NewYAMLOrJSONDecoder(&rendered, 4096)
 	for {
 		u := unstructured.Unstructured{}
