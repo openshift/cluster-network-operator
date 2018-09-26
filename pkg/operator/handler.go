@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func MakeHandler(manifestDir string) sdk.Handler {
+func MakeHandler(manifestDir string) *Handler {
 	return &Handler{ManifestDir: manifestDir}
 }
 
@@ -23,14 +23,17 @@ type Handler struct {
 	ManifestDir string
 }
 
+func (h *Handler) SetConfig(conf *v1.NetworkConfig) {
+	h.syncLock.Lock()
+	defer h.syncLock.Unlock()
+	h.config = conf
+}
+
 func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 	switch o := event.Object.(type) {
 	case *v1.NetworkConfig:
 		logrus.Info("Got new network configuration")
-
-		h.syncLock.Lock()
-		h.config = o
-		h.syncLock.Unlock()
+		h.SetConfig(o)
 
 		h.Sync(ctx)
 	}
