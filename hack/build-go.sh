@@ -3,7 +3,7 @@
 set -eu
 
 REPO=github.com/openshift/openshift-network-operator
-WHAT=${WHAT:-openshift-network-operator}
+CMDS=${CMDS:-openshift-network-operator openshift-network-renderer}
 GOFLAGS=${GOFLAGS:-}
 GLDFLAGS=${GLDFLAGS:-}
 
@@ -30,5 +30,7 @@ fi
 
 mkdir -p ${BIN_PATH}
 
-echo "Building ${REPO}/cmd/${WHAT} (${VERSION})"
-CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build ${GOFLAGS} -ldflags "${GLDFLAGS}" -o ${BIN_PATH}/${WHAT} ${REPO}/cmd/${WHAT}
+for cmd in ${CMDS}; do
+	echo "Building ${REPO}/cmd/${cmd} (${VERSION})"
+	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build ${GOFLAGS} -ldflags "${GLDFLAGS}" -o ${BIN_PATH}/${cmd} ${REPO}/cmd/${cmd}
+done
