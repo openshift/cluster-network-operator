@@ -2,7 +2,6 @@
 
 This is an operator that manages the networking components for an openshift cluster.
 
-
 ## Building
 
 You can build an image using buildah with
