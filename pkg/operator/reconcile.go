@@ -1,4 +1,4 @@
-package stub
+package operator
 
 import (
 	"context"

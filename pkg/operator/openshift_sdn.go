@@ -1,33 +1,98 @@
-package stub
+package operator
 
 import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
 
+	netv1 "github.com/openshift/api/network/v1"
+	"github.com/operator-framework/operator-sdk/pkg/util/k8sutil"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"github.com/openshift/openshift-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/openshift-network-operator/pkg/render"
-	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// renderOpenshiftSDN returns the manifests for the openshift-sdn.
+// This creates
+// - the ClusterNetwork object
+// - the sdn namespace
+// - the sdn daemonset
+// - the openvswitch daemonset
+// and some other small things.
 func (h *Handler) renderOpenshiftSDN(c *v1.OpenshiftSDNConfig) ([]*uns.Unstructured, error) {
-	// TODO: actually implement rendering openshift-sdn
+	operConfig := h.config.Spec
+	objs := []*uns.Unstructured{}
+
+	// generate master network configuration
+	ippools := []netv1.ClusterNetworkEntry{}
+	for _, net := range operConfig.ClusterNetworks {
+		ippools = append(ippools, netv1.ClusterNetworkEntry{CIDR: net.CIDR, HostSubnetLength: net.HostSubnetLength})
+	}
+
+	clusterNet := netv1.ClusterNetwork{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "network.openshift.io/v1",
+			Kind:       "ClusterNetwork",
+		},
+		ObjectMeta: metav1.ObjectMeta{Name: netv1.ClusterNetworkDefault},
+
+		ServiceNetwork:  operConfig.ServiceNetwork,
+		PluginName:      sdnPluginName(c.Mode),
+		ClusterNetworks: ippools,
+		VXLANPort:       c.VXLANPort,
+
+		Network:          ippools[0].CIDR,
+		HostSubnetLength: ippools[0].HostSubnetLength,
+	}
+	obj, err := k8sutil.UnstructuredFromRuntimeObject(&clusterNet)
+	if err != nil {
+		// This is very unlikely
+		return nil, errors.Wrap(err, "failed to transmutate ClusterNetwork")
+	}
+	objs = append(objs, obj)
+
+	// render the manifests on disk
 	data := render.MakeRenderData()
-	return render.RenderDir(filepath.Join(h.ManifestDir, "network/openshift-sdn"), &data)
+	data.Data["InstallOVS"] = (c.UseExternalOpenvswitch == nil || *c.UseExternalOpenvswitch == false)
+	// TODO: figure out where the image locations come from
+	data.Data["Image"] = "openshift/node:v3.10"
+
+	manifests, err := render.RenderDir(filepath.Join(h.ManifestDir, "network/openshift-sdn"), &data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to render manifests")
+	}
+
+	objs = append(objs, manifests...)
+	return objs, nil
 }
 
-func (h *Handler) validateOpenshiftSDN(c *v1.OpenshiftSDNConfig) []error {
+// validateOpenshiftSDN checks that the openshift-sdn specific configuration
+// is basically sane.
+func (h *Handler) validateOpenshiftSDN() []error {
 	out := []error{}
-	if sdnPluginName(c.Mode) == "" {
-		out = append(out, errors.Errorf("invalid openshift-sdn mode %s", c.Mode))
+	c := h.config.Spec
+	sc := c.DefaultNetwork.OpenshiftSDNConfig
+	if sc == nil {
+		out = append(out, errors.Errorf("OpenshiftSDNConfig cannot be nil"))
+		return out
 	}
 
-	if c.VXLANPort != nil && (*c.VXLANPort < 1 || *c.VXLANPort > 65535) {
-		out = append(out, errors.Errorf("invalid VXLANPort %d", *c.VXLANPort))
+	if len(c.ClusterNetworks) == 0 {
+		out = append(out, errors.Errorf("ClusterNetworks cannot be empty"))
 	}
 
-	if c.MTU != nil && (*c.MTU < 576 || *c.MTU > 65536) {
-		out = append(out, errors.Errorf("invalid MTU %d", *c.MTU))
+	if sdnPluginName(sc.Mode) == "" {
+		out = append(out, errors.Errorf("invalid openshift-sdn mode %q", sc.Mode))
+	}
+
+	if sc.VXLANPort != nil && (*sc.VXLANPort < 1 || *sc.VXLANPort > 65535) {
+		out = append(out, errors.Errorf("invalid VXLANPort %d", *sc.VXLANPort))
+	}
+
+	if sc.MTU != nil && (*sc.MTU < 576 || *sc.MTU > 65536) {
+		out = append(out, errors.Errorf("invalid MTU %d", *sc.MTU))
 	}
 
 	return out
