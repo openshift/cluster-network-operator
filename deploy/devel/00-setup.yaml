@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: cluster-network-operator
-  labels:
-    name: cluster-network-operator

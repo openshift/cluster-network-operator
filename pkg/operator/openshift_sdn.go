@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -56,8 +57,7 @@ func (h *Handler) renderOpenshiftSDN(c *v1.OpenshiftSDNConfig) ([]*uns.Unstructu
 	// render the manifests on disk
 	data := render.MakeRenderData()
 	data.Data["InstallOVS"] = (c.UseExternalOpenvswitch == nil || *c.UseExternalOpenvswitch == false)
-	// TODO: figure out where the image locations come from
-	data.Data["Image"] = "openshift/node:v3.10"
+	data.Data["Image"] = os.Getenv("SDN_IMAGE")
 
 	manifests, err := render.RenderDir(filepath.Join(h.ManifestDir, "network/openshift-sdn"), &data)
 	if err != nil {
