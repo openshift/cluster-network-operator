@@ -4,6 +4,10 @@ metadata:
   name: "example"
   namespace: openshift-network-operator
 spec:
+  serviceNetwork: "172.30.0.0/16"
+  clusterNetworks:
+    - cidr: "10.128.0.0/14"
+      hostSubnetLength: 9
   defaultNetwork:
     type: OpenshiftSDN
     openshiftSDNConfig:

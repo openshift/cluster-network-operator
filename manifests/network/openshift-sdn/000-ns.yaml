@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-sdn
+  labels:
+    name: openshift-sdn
+  annotations:
+    openshift.io/node-selector: "" #override default node selector
+    openshift.io/description: "OpenShift SDN components"
