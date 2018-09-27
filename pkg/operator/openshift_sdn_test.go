@@ -3,7 +3,7 @@ package operator
 import (
 	"testing"
 
-	netv1 "github.com/openshift/openshift-network-operator/pkg/apis/networkoperator/v1"
+	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 
 	. "github.com/onsi/gomega"
 )

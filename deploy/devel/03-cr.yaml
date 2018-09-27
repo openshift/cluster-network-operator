@@ -1,8 +1,8 @@
 apiVersion: "networkoperator.openshift.io/v1"
 kind: "NetworkConfig"
 metadata:
-  name: "example"
-  namespace: openshift-network-operator
+  name: "default"
+  namespace: cluster-network-operator
 spec:
   serviceNetwork: "172.30.0.0/16"
   clusterNetworks:

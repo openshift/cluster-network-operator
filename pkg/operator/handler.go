@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/openshift/openshift-network-operator/pkg/apis/networkoperator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/operator-framework/operator-sdk/pkg/sdk"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
