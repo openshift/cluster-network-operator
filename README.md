@@ -26,7 +26,26 @@ BUILDCMD="docker build" ./hack/build-image.sh
 There are some premade Kubernetes manifests to run a development build. After setting the image URL to something sane in the daemonset, do:
 
 ```
-kubectl create -f ./deploy/devel
+oc create -f ./install/*.yaml
 ```
 
-Then you can watch the daemonset with `kubectl -n cluster-network-operator logs <PODID>`.
+Then you can watch the daemonset with `kubectl -n openshift-cluster-network-operator logs <PODID>`.
+
+## Example configuration
+
+```yaml
+apiVersion: "networkoperator.openshift.io/v1"
+kind: "NetworkConfig"
+metadata:
+  name: "default"
+  namespace: cluster-network-operator
+spec:
+  serviceNetwork: "172.30.0.0/16"
+  clusterNetworks:
+    - cidr: "10.128.0.0/14"
+      hostSubnetLength: 9
+  defaultNetwork:
+    type: OpenshiftSDN
+    openshiftSDNConfig:
+      mode: Networkpolicy
+```

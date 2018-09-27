@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cluster-network-operator
+  namespace: openshift-cluster-network-operator
+  labels:
+    k8s-app: cluster-network-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: cluster-network-operator
+  template:
+    metadata:
+      labels:
+        k8s-app: cluster-network-operator
+    spec:
+      containers:
+      - name: cluster-network-operator
+        image: docker.io/openshift/origin-cluster-network-operator:v4.0.0
+        resources:
+          limits:
+            cpu: 20m
+            memory: 50Mi
+          requests:
+            cpu: 20m
+            memory: 50Mi
+        volumeMounts:
+        - name: root-ca
+          mountPath: /etc/ssl/kubernetes/ca.crt
+        - name: etcd-ca
+          mountPath: /etc/ssl/etcd/ca.crt
+        - name: images
+          mountPath: /etc/mco/images
+        env:
+        - name: SDN_IMAGE
+          value: "docker.io/openshift/origin-node:v4.0.0"
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      restartPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
