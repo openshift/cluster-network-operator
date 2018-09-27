@@ -1,11 +1,11 @@
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
-  name: default-account-openshift-network-operator
+  name: default-account-cluster-network-operator
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: openshift-network-operator
+  namespace: cluster-network-operator
 roleRef:
   kind: ClusterRole
   name: cluster-admin

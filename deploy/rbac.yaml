@@ -1,7 +1,7 @@
-kind: Role
+kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
-  name: openshift-network-operator
+  name: cluster-network-operator
 rules:
 - apiGroups:
   - networkoperator.openshift.io
@@ -36,11 +36,11 @@ rules:
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
-  name: default-account-openshift-network-operator
+  name: default-account-cluster-network-operator
 subjects:
 - kind: ServiceAccount
   name: default
 roleRef:
-  kind: Role
-  name: openshift-network-operator
+  kind: ClusterRole
+  name: cluster-network-operator
   apiGroup: rbac.authorization.k8s.io

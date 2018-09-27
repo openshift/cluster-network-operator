@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  namespace: openshift-network-operator
-  name: openshift-network-operator
+  namespace: cluster-network-operator
+  name: cluster-network-operator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      k8s-app: openshift-network-operator
+      k8s-app: cluster-network-operator
   template:
     metadata:
       labels:
-        k8s-app: openshift-network-operator
+        k8s-app: cluster-network-operator
     spec:
       containers:
-        - name: openshift-network-operator
-          image: localhost/openshift-network-operator:latest
+        - name: cluster-network-operator
+          image: localhost/cluster-network-operator:latest
           imagePullPolicy: Never
           resources:
             requests:

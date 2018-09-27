@@ -2,8 +2,8 @@
 
 set -eu
 
-REPO=github.com/openshift/openshift-network-operator
-CMDS=${CMDS:-openshift-network-operator openshift-network-renderer}
+REPO=github.com/openshift/cluster-network-operator
+CMDS=${CMDS:-cluster-network-operator cluster-network-renderer}
 GOFLAGS=${GOFLAGS:-}
 GLDFLAGS=${GLDFLAGS:-}
 
