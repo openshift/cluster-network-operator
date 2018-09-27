@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"time"
 
-	netop "github.com/openshift/openshift-network-operator/pkg/operator"
+	netop "github.com/openshift/cluster-network-operator/pkg/operator"
 	sdk "github.com/operator-framework/operator-sdk/pkg/sdk"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
 

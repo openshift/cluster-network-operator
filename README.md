@@ -1,4 +1,4 @@
-# Openshift Network Operator
+# Cluster Network Operator
 
 This is an operator that manages the networking components for an openshift cluster.
 
@@ -29,4 +29,4 @@ There are some premade Kubernetes manifests to run a development build. After se
 kubectl create -f ./deploy/devel
 ```
 
-Then you can watch the daemonset with `kubectl -n openshift-network-operator logs <PODID>`.
+Then you can watch the daemonset with `kubectl -n cluster-network-operator logs <PODID>`.

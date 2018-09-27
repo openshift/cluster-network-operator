@@ -5,7 +5,7 @@ package operator
 import (
 	"github.com/pkg/errors"
 
-	"github.com/openshift/openshift-network-operator/pkg/apis/networkoperator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 

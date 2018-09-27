@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 
-	netv1 "github.com/openshift/openshift-network-operator/pkg/apis/networkoperator/v1"
-	netop "github.com/openshift/openshift-network-operator/pkg/operator"
+	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	netop "github.com/openshift/cluster-network-operator/pkg/operator"
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"

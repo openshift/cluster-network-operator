@@ -4,7 +4,7 @@ repo_root=$(dirname $0)/..
 
 BUILDCMD=${BUILDCMD:-buildah bud}
 
-REPO=${REPO:-openshift-network-operator}
+REPO=${REPO:-cluster-network-operator}
 if [ -z ${VERSION+a} ]; then
 	VERSION=$(git describe --abbrev=8 --dirty --always)
 fi
