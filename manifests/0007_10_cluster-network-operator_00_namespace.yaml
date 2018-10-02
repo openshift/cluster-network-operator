@@ -4,4 +4,4 @@ metadata:
   name: openshift-cluster-network-operator
   labels:
     name: openshift-cluster-network-operator
-    openshift.io/run-level: "1"
+    openshift.io/run-level: "0"
