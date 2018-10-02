@@ -25,16 +25,14 @@ spec:
           requests:
             cpu: 20m
             memory: 50Mi
-        volumeMounts:
-        - name: root-ca
-          mountPath: /etc/ssl/kubernetes/ca.crt
-        - name: etcd-ca
-          mountPath: /etc/ssl/etcd/ca.crt
-        - name: images
-          mountPath: /etc/mco/images
         env:
         - name: SDN_IMAGE
           value: "docker.io/openshift/origin-node:v4.0.0"
+        - name: KUBERNETES_SERVICE_PORT # allows CVO to communicate with apiserver directly on same host.
+          value: "6443"
+        - name: KUBERNETES_SERVICE_HOST # allows CVO to communicate with apiserver directly on same host.
+          value: "127.0.0.1"
+      hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
       restartPolicy: Always

@@ -31,6 +31,6 @@ func main() {
 	resyncPeriod := time.Duration(60) * time.Second
 	logrus.Infof("Watching %s, %s, %s, %d", resource, kind, namespace, resyncPeriod)
 	sdk.Watch(resource, kind, namespace, resyncPeriod)
-	sdk.Handle(netop.MakeHandler("./manifests"))
+	sdk.Handle(netop.MakeHandler("./bindata"))
 	sdk.Run(context.TODO())
 }

@@ -13,4 +13,4 @@ spec:
   versions:
     - name: v1
       served: true
-      stored: true
+      storage: true
