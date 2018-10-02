@@ -1,6 +1,8 @@
 package v1
 
 import (
+	sdkK8sutil "github.com/operator-framework/operator-sdk/pkg/util/k8sutil"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -11,27 +13,15 @@ const (
 	GroupName = "networkoperator.openshift.io"
 )
 
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: Version}
-
-// Resource takes an unqualified resource and returns a Group qualified GroupResource
-func Resource(resource string) schema.GroupResource {
-	return SchemeGroupVersion.WithResource(resource).GroupResource()
-}
-
 var (
-	// SchemeBuilder is the scheme builder for MachineConfigPools
-	SchemeBuilder runtime.SchemeBuilder
-	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
-	localSchemeBuilder = &SchemeBuilder
-	// AddToScheme is the function alias for AddtoScheme
-	AddToScheme = localSchemeBuilder.AddToScheme
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+	// SchemeGroupVersion is the group version used to register these objects.
+	SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: Version}
 )
 
 func init() {
-	// We only register manually written functions here. The registration of the
-	// generated functions takes place in the generated files. The separation
-	// makes the code compile even when the generated files are missing.
-	localSchemeBuilder.Register(addKnownTypes)
+	sdkK8sutil.AddToSDKScheme(AddToScheme)
 }
 
 // addKnownTypes adds the set of types defined in this package to the supplied scheme.
