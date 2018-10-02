@@ -2,7 +2,7 @@
 
 repo_root=$(dirname $0)/..
 
-BUILDCMD=${BUILDCMD:-buildah bud}
+BUILDCMD=${BUILDCMD:-podman build}
 
 REPO=${REPO:-cluster-network-operator}
 if [ -z ${VERSION+a} ]; then

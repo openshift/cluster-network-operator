@@ -33,7 +33,7 @@ func render() error {
 
 	pflag.StringVar(&configPath, "config", "", "json or yaml representation of NetworkConfig object")
 	pflag.StringVar(&outPath, "out", "", "file to put rendered manifests")
-	pflag.StringVar(&manifestPath, "manifests", "./manifests", "directory containing network manifests")
+	pflag.StringVar(&manifestPath, "bindata", "./bindata", "directory containing network manifests")
 	pflag.Parse()
 
 	if configPath == "" {
