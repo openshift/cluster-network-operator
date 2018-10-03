@@ -8,6 +8,18 @@
   version = "v0.26.0"
 
 [[projects]]
+  name = "github.com/Masterminds/semver"
+  packages = ["."]
+  revision = "c7af12943936e8c39859482e61f0574c2fd7fc75"
+  version = "v1.4.2"
+
+[[projects]]
+  name = "github.com/Masterminds/sprig"
+  packages = ["."]
+  revision = "15f9564e7e9cf0da02a48e0d25f12a7b83559aa6"
+  version = "v2.16.0"
+
+[[projects]]
   name = "github.com/PuerkitoBio/purell"
   packages = ["."]
   revision = "0bcb03f4b4d0a9428594752bd2a3b9aa0a9d4bd4"
@@ -18,6 +30,12 @@
   name = "github.com/PuerkitoBio/urlesc"
   packages = ["."]
   revision = "de5bf2ad457846296e2031421a34e2568e304e35"
+
+[[projects]]
+  name = "github.com/aokoli/goutils"
+  packages = ["."]
+  revision = "3391d3790d23d03408670993e957e8f408993c34"
+  version = "v1.0.1"
 
 [[projects]]
   branch = "master"
@@ -104,6 +122,12 @@
   revision = "24818f796faf91cd76ec7bddd72458fbced7a6c1"
 
 [[projects]]
+  name = "github.com/google/uuid"
+  packages = ["."]
+  revision = "d460ce9f8df2e77fb1ba55ca87fafed96c607494"
+  version = "v1.0.0"
+
+[[projects]]
   name = "github.com/googleapis/gnostic"
   packages = [
     "OpenAPIv2",
@@ -127,6 +151,12 @@
   name = "github.com/howeyc/gopass"
   packages = ["."]
   revision = "bf9dde6d0d2c004a008c27aaee91170c786f6db8"
+
+[[projects]]
+  name = "github.com/huandu/xstrings"
+  packages = ["."]
+  revision = "f02667b379e2fb5916c3cda2cf31e0eb885d79f8"
+  version = "v1.2.0"
 
 [[projects]]
   name = "github.com/imdario/mergo"
@@ -188,10 +218,15 @@
   version = "v1.4.1"
 
 [[projects]]
-  branch = "release-3.11"
+  branch = "master"
   name = "github.com/openshift/api"
-  packages = ["network/v1"]
-  revision = "5ad8479f64f1b60ee9c62ce8ef1fe6638838725e"
+  packages = [
+    "build/v1",
+    "config/v1",
+    "openshiftcontrolplane/v1",
+    "osin/v1"
+  ]
+  revision = "c9d033a0b3c3dfca1c70722720c3aea184022496"
 
 [[projects]]
   branch = "master"
@@ -262,7 +297,11 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
-  packages = ["ssh/terminal"]
+  packages = [
+    "pbkdf2",
+    "scrypt",
+    "ssh/terminal"
+  ]
   revision = "182538f80094b6a8efaade63a8fd8e0d9d5843dd"
 
 [[projects]]
@@ -590,6 +629,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "043b3e9cfce67be5bd22bef87ef9a5f659e3e9bf71405c8480705fea74099421"
+  inputs-digest = "59c082e4ea55746bba517cd99703860134afec35ab376f4017d5aafc00db116d"
   solver-name = "gps-cdcl"
   solver-version = 1
