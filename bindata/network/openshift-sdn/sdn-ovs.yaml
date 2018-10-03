@@ -26,10 +26,9 @@ spec:
       serviceAccountName: sdn #needed to run privileged pods; not used for api access
       hostNetwork: true
       hostPID: true
-      priorityClassName: system-node-critical
       containers:
       - name: openvswitch
-        image: {{.Image}}
+        image: {{.NodeImage}}
         command:
         - /bin/bash
         - -c
@@ -108,4 +107,6 @@ spec:
       - name: host-config-openvswitch
         hostPath:
           path: /etc/origin/openvswitch
+      tolerations:
+      - operator: "Exists"
 {{- end}}

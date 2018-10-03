@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	. "github.com/onsi/gomega"
 )
@@ -49,27 +50,39 @@ func TestRenderOpenshiftSDN(t *testing.T) {
 	// Make sure the OVS daemonset isn't created
 	truth := true
 	sdnConfig.UseExternalOpenvswitch = &truth
-	objs, err := h.renderOpenshiftSDN(sdnConfig)
+	objs, err := h.renderOpenshiftSDN()
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "ovs")))
 
 	// enable openvswitch
 	sdnConfig.UseExternalOpenvswitch = nil
-	objs, err = h.renderOpenshiftSDN(sdnConfig)
+	objs, err = h.renderOpenshiftSDN()
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "ovs")))
 
-	// It's important that the namespace is before any namespaced types;
-	// for now, just test that it's the second item in the list, after
-	// the ClusterNetwork.
-	g.Expect(objs[0]).To(HaveKubernetesID("ClusterNetwork", "", "default"))
-	g.Expect(objs[1]).To(HaveKubernetesID("Namespace", "", "openshift-sdn"))
-
+	// It's important that the namespace is first
+	g.Expect(objs[0]).To(HaveKubernetesID("Namespace", "", "openshift-sdn"))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "openshift-sdn")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "openshift-sdn-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-sdn", "sdn")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "sdn")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-sdn", "sdn-controller")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "openshift-sdn")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "sdn")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-sdn", "sdn-controller")))
 
+	// make sure all deployments are in the master
+	for _, obj := range objs {
+		if obj.GetKind() != "Deployment" {
+			continue
+		}
+
+		sel, found, err := uns.NestedStringMap(obj.Object, "spec", "template", "spec", "nodeSelector")
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(found).To(BeTrue())
+
+		_, ok := sel["node-role.kubernetes.io/master"]
+		g.Expect(ok).To(BeTrue())
+	}
 }
 
 func TestValidateOpenshiftSDN(t *testing.T) {
