@@ -30,7 +30,7 @@ var OpenshiftSDNConfig = netv1.NetworkConfig{
 	},
 }
 
-var manifestDir = "../../manifests"
+var manifestDir = "../../bindata"
 
 // TestRenderOpenshiftSDN has some simple rendering tests
 func TestRenderOpenshiftSDN(t *testing.T) {
