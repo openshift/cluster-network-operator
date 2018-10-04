@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/Masterminds/sprig"
 	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -68,6 +69,7 @@ func RenderTemplate(path string, d *RenderData) ([]*unstructured.Unstructured, e
 
 	// Add universal functions
 	tmpl.Funcs(template.FuncMap{"getOr": getOr})
+	tmpl.Funcs(sprig.TxtFuncMap())
 
 	source, err := ioutil.ReadFile(path)
 	if err != nil {
