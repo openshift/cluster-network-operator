@@ -1,12 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: cluster-network-operator
   namespace: openshift-cluster-network-operator
   labels:
     k8s-app: cluster-network-operator
 spec:
-  replicas: 1
   selector:
     matchLabels:
       k8s-app: cluster-network-operator
@@ -18,9 +17,11 @@ spec:
       containers:
       - name: cluster-network-operator
         image: docker.io/openshift/origin-cluster-network-operator:v4.0.0
+        command:
+        - /bin/cluster-network-operator
         resources:
           limits:
-            cpu: 20m
+            cpu: 100m
             memory: 50Mi
           requests:
             cpu: 20m
@@ -32,6 +33,10 @@ spec:
           value: "6443"
         - name: KUBERNETES_SERVICE_HOST # allows CVO to communicate with apiserver directly on same host.
           value: "127.0.0.1"
+        - name: POD_NAME # The operator-sdk needs to know the pod name, but we're host network
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
