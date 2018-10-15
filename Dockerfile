@@ -10,6 +10,7 @@ COPY --from=build-env /go/src/github.com/openshift/cluster-network-operator/_out
 COPY --from=build-env /go/src/github.com/openshift/cluster-network-operator/_output/linux/amd64/cluster-network-renderer /bin/cluster-network-renderer
 COPY manifests /manifests
 COPY bindata /bindata
+COPY testbindata /testbindata
 
 ENV OPERATOR_NAME=cluster-network-operator
 CMD ["/bin/cluster-network-operator"]

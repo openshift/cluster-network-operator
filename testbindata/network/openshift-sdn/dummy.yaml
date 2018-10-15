@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sdn-e2e-test
+
+---
+apiVersion: apps/v1beta2
+kind: DaemonSet
+metadata:
+  name: test-ds
+  namespace: sdn-e2e-test
+spec:
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: test-ds
+  template:
+    metadata:
+      labels:
+        app: test-ds
+    spec:
+      containers:
+        - name: dummy
+          image: busybox
+          command: ["/bin/sh", "-c", "while true; do echo dummy-dep-1; sleep 10; done"]
+
