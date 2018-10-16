@@ -48,7 +48,10 @@ type NetworkConfigSpec struct {
 	// +optional
 	DeployKubeProxy *bool `json:"deployKubeProxy,omitempty"`
 
-	// TODO: KubeProxyConfig
+	// KubeProxyConfig lets us configure desired proxy configuration.
+	// If not specified, sensible defaults will be chosen by OpenShift directly.
+	// Not consumed by all network providers - currently only openshift-sdn.
+	KubeProxyConfig *ProxyConfig `json:"kubeProxyConfig,omitempty"`
 }
 
 // ClusterNetwork is a subnet from which to allocate PodIPs. A network of size
@@ -133,6 +136,21 @@ type OVNKubernetesConfig struct {
 
 // NetworkType describes the network plugin type to configure
 type NetworkType string
+
+// ProxyConfig defines the configuration knobs for kubeproxy
+// All of these are optional and have sensible defaults
+type ProxyConfig struct {
+	// The period that iptables rules are refreshed.
+	// Default: 30s
+	IptablesSyncPeriod string `json:"iptablesSyncPeriod,omitempty"`
+
+	// The address to "bind" on
+	// Defaults to 0.0.0.0
+	BindAddress string
+
+	// Any additional arguments to pass to the kubeproxy process
+	ProxyArguments map[string][]string
+}
 
 const (
 	// NetworkTypeOpenshiftSDN means the openshift-sdn plugin will be configured

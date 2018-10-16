@@ -18,3 +18,13 @@ func getOr(m map[string]interface{}, key, fallback string) interface{} {
 
 	return val
 }
+
+// isSet returns the value of m[key] if key exists, otherwise false
+// Different from getOr because it will return zero values.
+func isSet(m map[string]interface{}, key string) interface{} {
+	val, ok := m[key]
+	if !ok {
+		return false
+	}
+	return val
+}
