@@ -58,31 +58,11 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: sdn
+  name: openshift-sdn
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: sdn
-subjects:
-- kind: ServiceAccount
-  name: sdn
-  namespace: openshift-sdn
-
----
-# Rather than PATCHing the SecurityContextConstraints object, we can bind to 
-# it. This is undocumented, thanks to evb who showed me this trick
-# TODO: When the openshift-api control plane is splut out, we will need to
-# remove this and replace it with something (sigh) hardcoded
-apiVersion: authorization.openshift.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: sdn-privileged
-roleRef:
-  apiVersion: security.openshift.io/v1
-  kind: SecurityContextConstraints
-  name: privileged
-userNames: ["system:serviceaccount:openshift-sdn:sdn"] # needed when binding to scc
-groupNames: []
+  name: openshift-sdn
 subjects:
 - kind: ServiceAccount
   name: sdn

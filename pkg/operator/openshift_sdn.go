@@ -4,16 +4,21 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 
-	netv1 "github.com/openshift/api/network/v1"
-	"github.com/operator-framework/operator-sdk/pkg/util/k8sutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	legacyconfigv1 "github.com/openshift/api/legacyconfig/v1"
+	cpv1 "github.com/openshift/api/openshiftcontrolplane/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 )
+
+// NodeNameMagicString is substituted at runtime for the
+// real nodename
+const NodeNameMagicString = "%%NODENAME%%"
 
 // renderOpenshiftSDN returns the manifests for the openshift-sdn.
 // This creates
@@ -22,42 +27,29 @@ import (
 // - the sdn daemonset
 // - the openvswitch daemonset
 // and some other small things.
-func (h *Handler) renderOpenshiftSDN(c *v1.OpenshiftSDNConfig) ([]*uns.Unstructured, error) {
+func (h *Handler) renderOpenshiftSDN() ([]*uns.Unstructured, error) {
 	operConfig := h.config.Spec
+	c := operConfig.DefaultNetwork.OpenshiftSDNConfig
+
 	objs := []*uns.Unstructured{}
-
-	// generate master network configuration
-	ippools := []netv1.ClusterNetworkEntry{}
-	for _, net := range operConfig.ClusterNetworks {
-		ippools = append(ippools, netv1.ClusterNetworkEntry{CIDR: net.CIDR, HostSubnetLength: net.HostSubnetLength})
-	}
-
-	clusterNet := netv1.ClusterNetwork{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "network.openshift.io/v1",
-			Kind:       "ClusterNetwork",
-		},
-		ObjectMeta: metav1.ObjectMeta{Name: netv1.ClusterNetworkDefault},
-
-		ServiceNetwork:  operConfig.ServiceNetwork,
-		PluginName:      sdnPluginName(c.Mode),
-		ClusterNetworks: ippools,
-		VXLANPort:       c.VXLANPort,
-
-		Network:          ippools[0].CIDR,
-		HostSubnetLength: ippools[0].HostSubnetLength,
-	}
-	obj, err := k8sutil.UnstructuredFromRuntimeObject(&clusterNet)
-	if err != nil {
-		// This is very unlikely
-		return nil, errors.Wrap(err, "failed to transmutate ClusterNetwork")
-	}
-	objs = append(objs, obj)
 
 	// render the manifests on disk
 	data := render.MakeRenderData()
 	data.Data["InstallOVS"] = (c.UseExternalOpenvswitch == nil || *c.UseExternalOpenvswitch == false)
-	data.Data["Image"] = os.Getenv("SDN_IMAGE")
+	data.Data["NodeImage"] = os.Getenv("NODE_IMAGE")
+	data.Data["HypershiftImage"] = os.Getenv("HYPERSHIFT_IMAGE")
+
+	operCfg, err := h.controllerConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build controller config")
+	}
+	data.Data["NetworkControllerConfig"] = operCfg
+
+	nodeCfg, err := h.nodeConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build node config")
+	}
+	data.Data["NodeConfig"] = nodeCfg
 
 	manifests, err := render.RenderDir(filepath.Join(h.ManifestDir, "network/openshift-sdn"), &data)
 	if err != nil {
@@ -108,4 +100,90 @@ func sdnPluginName(n v1.SDNMode) string {
 		return "redhat/openshift-ovs-networkpolicy"
 	}
 	return ""
+}
+
+// controllerConfig builds the contents of controller-config.yaml
+// for the controller
+func (h *Handler) controllerConfig() (string, error) {
+	c := h.config.Spec.DefaultNetwork.OpenshiftSDNConfig
+
+	// generate master network configuration
+	ippools := []cpv1.ClusterNetworkEntry{}
+	for _, net := range h.config.Spec.ClusterNetworks {
+		ippools = append(ippools, cpv1.ClusterNetworkEntry{CIDR: net.CIDR, HostSubnetLength: net.HostSubnetLength})
+	}
+
+	var vxlanPort uint32 = 4789
+	if c.VXLANPort != nil {
+		vxlanPort = *c.VXLANPort
+	}
+
+	cfg := cpv1.OpenShiftControllerManagerConfig{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "openshiftcontrolplane.config.openshift.io/v1",
+			Kind:       "OpenShiftControllerManagerConfig",
+		},
+		// no ObjectMeta - not an API object
+
+		Network: cpv1.NetworkControllerConfig{
+			NetworkPluginName:  sdnPluginName(c.Mode),
+			ClusterNetworks:    ippools,
+			ServiceNetworkCIDR: h.config.Spec.ServiceNetwork,
+			VXLANPort:          vxlanPort,
+		},
+	}
+
+	buf, err := yaml.Marshal(cfg)
+	return string(buf), err
+}
+
+// nodeConfig builds the (yaml text of) the NodeConfig object
+// consumed by the sdn node process
+func (h *Handler) nodeConfig() (string, error) {
+	operConfig := h.config.Spec
+	c := h.config.Spec.DefaultNetwork.OpenshiftSDNConfig
+	kpc := operConfig.KubeProxyConfig
+
+	mtu := uint32(1450)
+	if c.MTU != nil {
+		mtu = *c.MTU
+	}
+
+	bindAddress := "0.0.0.0"
+	if kpc != nil && kpc.BindAddress != "" {
+		bindAddress = kpc.BindAddress
+	}
+
+	result := legacyconfigv1.NodeConfig{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "NodeConfig",
+		},
+		NodeName: NodeNameMagicString,
+		NetworkConfig: legacyconfigv1.NodeNetworkConfig{
+			NetworkPluginName: sdnPluginName(c.Mode),
+			MTU:               mtu,
+		},
+		// ServingInfo is used by both the proxy and metrics components
+		ServingInfo: legacyconfigv1.ServingInfo{
+			// These files are bind-mounted in at a hard-coded location
+			CertInfo: legacyconfigv1.CertInfo{
+				CertFile: "/etc/origin/node/server.crt",
+				KeyFile:  "/etc/origin/node/server.key",
+			},
+			ClientCA:    "/etc/origin/node/ca.crt",
+			BindAddress: bindAddress + ":10251", // port is unused
+		},
+	}
+
+	if kpc != nil && kpc.IptablesSyncPeriod != "" {
+		result.IPTablesSyncPeriod = kpc.IptablesSyncPeriod
+	}
+	if kpc != nil && len(kpc.ProxyArguments) > 0 {
+		result.ProxyArguments = kpc.ProxyArguments
+	}
+
+	buf, err := yaml.Marshal(result)
+	return string(buf), err
+
 }

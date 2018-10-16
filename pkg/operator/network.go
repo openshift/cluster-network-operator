@@ -31,7 +31,7 @@ func (h *Handler) RenderDefaultNetwork() ([]*uns.Unstructured, error) {
 
 	switch dn.Type {
 	case v1.NetworkTypeOpenshiftSDN:
-		return h.renderOpenshiftSDN(dn.OpenshiftSDNConfig)
+		return h.renderOpenshiftSDN()
 	}
 
 	return nil, errors.Errorf("unknown or unsupported NetworkType: %s", dn.Type)

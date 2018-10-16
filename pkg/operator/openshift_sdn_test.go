@@ -3,7 +3,9 @@ package operator
 import (
 	"testing"
 
+	yaml "github.com/ghodss/yaml"
 	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	. "github.com/onsi/gomega"
 )
@@ -49,27 +51,39 @@ func TestRenderOpenshiftSDN(t *testing.T) {
 	// Make sure the OVS daemonset isn't created
 	truth := true
 	sdnConfig.UseExternalOpenvswitch = &truth
-	objs, err := h.renderOpenshiftSDN(sdnConfig)
+	objs, err := h.renderOpenshiftSDN()
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "ovs")))
 
 	// enable openvswitch
 	sdnConfig.UseExternalOpenvswitch = nil
-	objs, err = h.renderOpenshiftSDN(sdnConfig)
+	objs, err = h.renderOpenshiftSDN()
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "ovs")))
 
-	// It's important that the namespace is before any namespaced types;
-	// for now, just test that it's the second item in the list, after
-	// the ClusterNetwork.
-	g.Expect(objs[0]).To(HaveKubernetesID("ClusterNetwork", "", "default"))
-	g.Expect(objs[1]).To(HaveKubernetesID("Namespace", "", "openshift-sdn"))
-
+	// It's important that the namespace is first
+	g.Expect(objs[0]).To(HaveKubernetesID("Namespace", "", "openshift-sdn"))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "openshift-sdn")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "openshift-sdn-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-sdn", "sdn")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "sdn")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-sdn", "sdn-controller")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "openshift-sdn")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "sdn")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "sdn-controller")))
 
+	// make sure all deployments are in the master
+	for _, obj := range objs {
+		if obj.GetKind() != "Deployment" {
+			continue
+		}
+
+		sel, found, err := uns.NestedStringMap(obj.Object, "spec", "template", "spec", "nodeSelector")
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(found).To(BeTrue())
+
+		_, ok := sel["node-role.kubernetes.io/master"]
+		g.Expect(ok).To(BeTrue())
+	}
 }
 
 func TestValidateOpenshiftSDN(t *testing.T) {
@@ -106,4 +120,71 @@ func TestValidateOpenshiftSDN(t *testing.T) {
 
 	config.ClusterNetworks = nil
 	errExpect("ClusterNetworks cannot be empty")
+}
+
+func TestProxyArgs(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	h := Handler{
+		config:      OpenshiftSDNConfig.DeepCopy(),
+		ManifestDir: manifestDir,
+	}
+	config := &h.config.Spec
+
+	// iter through all objects, finding the sdn config map
+	getSdnConfigFile := func(objs []*uns.Unstructured) *uns.Unstructured {
+		for _, obj := range objs {
+			if obj.GetKind() == "ConfigMap" && obj.GetName() == "sdn-config" {
+				val, ok, err := uns.NestedString(obj.Object, "data", "sdn-config.yaml.in")
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(ok).To(BeTrue())
+
+				out := uns.Unstructured{}
+				err = yaml.Unmarshal([]byte(val), &out)
+				g.Expect(err).NotTo(HaveOccurred())
+				t.Logf("%+v", out)
+
+				return &out
+			}
+		}
+		t.Fatal("failed to find sdn-config")
+		return nil //unreachable
+	}
+
+	// test default rendering
+	objs, err := h.renderOpenshiftSDN()
+	g.Expect(err).NotTo(HaveOccurred())
+	cfg := getSdnConfigFile(objs)
+	val, _, _ := uns.NestedString(cfg.Object, "servingInfo", "bindAddress")
+	g.Expect(val).To(Equal("0.0.0.0:10251"))
+	val, _, _ = uns.NestedString(cfg.Object, "iptablesSyncPeriod")
+	g.Expect(val).To(Equal(""))
+
+	// set sync period
+	config.KubeProxyConfig = &netv1.ProxyConfig{
+		IptablesSyncPeriod: "10s",
+		BindAddress:        "1.2.3.4",
+	}
+	objs, err = h.renderOpenshiftSDN()
+	g.Expect(err).NotTo(HaveOccurred())
+	cfg = getSdnConfigFile(objs)
+	g.Expect(cfg.Object).To(HaveKeyWithValue("iptablesSyncPeriod", "10s"))
+	val, _, _ = uns.NestedString(cfg.Object, "servingInfo", "bindAddress")
+	g.Expect(val).To(Equal("1.2.3.4:10251"))
+
+	//set proxy args
+	config.KubeProxyConfig.ProxyArguments = map[string][]string{
+		"a": []string{"b"},
+		"c": []string{"d", "e"},
+	}
+	objs, err = h.renderOpenshiftSDN()
+	g.Expect(err).NotTo(HaveOccurred())
+	cfg = getSdnConfigFile(objs)
+
+	arg, _, _ := uns.NestedStringSlice(cfg.Object, "proxyArguments", "a")
+	g.Expect(arg).To(Equal([]string{"b"}))
+
+	arg, _, _ = uns.NestedStringSlice(cfg.Object, "proxyArguments", "c")
+	g.Expect(arg).To(Equal([]string{"d", "e"}))
+
 }
