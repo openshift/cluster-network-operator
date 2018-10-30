@@ -12,7 +12,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // ReconcileObject takes a rendered desired object and ensures it exists on the apiserver
@@ -68,12 +67,11 @@ func (h *Handler) ReconcileObject(ctx context.Context, object *uns.Unstructured)
 }
 
 // MergeObjectForUpdate prepares a "desired" object to be updated.
-// Some objects, such as Deployments, Services, and Daemonsets require
+// Some objects, such as Deployments and Services require
 // some semantic-aware updates
 func MergeObjectForUpdate(current, updated *uns.Unstructured) error {
 	updated.SetResourceVersion(current.GetResourceVersion())
 
-	// todo: add service, daemonset
 	if err := MergeDeploymentForUpdate(current, updated); err != nil {
 		return err
 	}
@@ -81,6 +79,13 @@ func MergeObjectForUpdate(current, updated *uns.Unstructured) error {
 	if err := MergeServiceForUpdate(current, updated); err != nil {
 		return err
 	}
+
+	// For all object types, merge annotations.
+	// Run this last, in case any of the more specific merge logic has
+	// changed "updated"
+	mergeAnnotations(current, updated)
+	mergeLabels(current, updated)
+
 	return nil
 }
 
@@ -89,19 +94,26 @@ const (
 )
 
 // MergeDeploymentForUpdate updates Deployment objects.
-// The existing revision annotation needs to take precedence
+// We merge annotations, keeping ours except the Deployment Revision annotation.
 func MergeDeploymentForUpdate(current, updated *uns.Unstructured) error {
-	if (updated.GetAPIVersion() == "apps/v1" || updated.GetAPIVersion() == "v1beta2") && updated.GetKind() == "Deployment" {
+	gvk := updated.GroupVersionKind()
+	if gvk.Group == "apps" && gvk.Kind == "Deployment" {
+
+		// Copy over the revision annotation from current up to updated
+		// otherwise, updated would win, and this annotation is "special" and
+		// needs to be preserved
+		curAnnotations := current.GetAnnotations()
 		updatedAnnotations := updated.GetAnnotations()
 		if updatedAnnotations == nil {
 			updatedAnnotations = map[string]string{}
 		}
-		curAnnotations := current.GetAnnotations()
 
-		if curAnnotations != nil {
-			updatedAnnotations[deploymentRevisionAnnotation] = curAnnotations[deploymentRevisionAnnotation]
-			updated.SetAnnotations(updatedAnnotations)
+		anno, ok := curAnnotations[deploymentRevisionAnnotation]
+		if ok {
+			updatedAnnotations[deploymentRevisionAnnotation] = anno
 		}
+
+		updated.SetAnnotations(updatedAnnotations)
 	}
 
 	return nil
@@ -109,16 +121,51 @@ func MergeDeploymentForUpdate(current, updated *uns.Unstructured) error {
 
 // MergeServiceForUpdate ensures the clusterip is never written to
 func MergeServiceForUpdate(current, updated *uns.Unstructured) error {
-	if updated.GetAPIVersion() == "v1" && updated.GetKind() == "Service" {
-		clusterIP, found, err := unstructured.NestedString(current.Object, "spec", "clusterIP")
+	gvk := updated.GroupVersionKind()
+	if gvk.Group == "" && gvk.Kind == "Service" {
+		clusterIP, found, err := uns.NestedString(current.Object, "spec", "clusterIP")
 		if err != nil {
 			return err
 		}
 
 		if found {
-			return unstructured.SetNestedField(updated.Object, clusterIP, "spec", "clusterIP")
+			return uns.SetNestedField(updated.Object, clusterIP, "spec", "clusterIP")
 		}
 	}
 
 	return nil
+}
+
+// mergeAnnotations copies over any annotations from current to updated,
+// with updated winning if there's a conflict
+func mergeAnnotations(current, updated *uns.Unstructured) {
+	updatedAnnotations := updated.GetAnnotations()
+	curAnnotations := current.GetAnnotations()
+
+	if curAnnotations == nil {
+		curAnnotations = map[string]string{}
+	}
+
+	for k, v := range updatedAnnotations {
+		curAnnotations[k] = v
+	}
+
+	updated.SetAnnotations(curAnnotations)
+}
+
+// mergeLabels copies over any labels from current to updated,
+// with updated winning if there's a conflict
+func mergeLabels(current, updated *uns.Unstructured) {
+	updatedLabels := updated.GetLabels()
+	curLabels := current.GetLabels()
+
+	if curLabels == nil {
+		curLabels = map[string]string{}
+	}
+
+	for k, v := range updatedLabels {
+		curLabels[k] = v
+	}
+
+	updated.SetLabels(curLabels)
 }
