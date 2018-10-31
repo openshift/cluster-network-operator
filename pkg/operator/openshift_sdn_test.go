@@ -84,6 +84,21 @@ func TestRenderOpenshiftSDN(t *testing.T) {
 		_, ok := sel["node-role.kubernetes.io/master"]
 		g.Expect(ok).To(BeTrue())
 	}
+
+	// Make sure every obj is reasonable:
+	// - it is supported
+	// - it reconciles to itself (steady state)
+	for _, obj := range objs {
+		g.Expect(IsObjectSupported(obj)).NotTo(HaveOccurred())
+		cur := obj.DeepCopy()
+		upd := obj.DeepCopy()
+
+		err = MergeObjectForUpdate(cur, upd)
+		g.Expect(err).NotTo(HaveOccurred())
+
+		tweakMetaForCompare(cur)
+		g.Expect(cur).To(Equal(upd))
+	}
 }
 
 func TestValidateOpenshiftSDN(t *testing.T) {
