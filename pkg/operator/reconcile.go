@@ -14,7 +14,9 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// ReconcileObject takes a rendered desired object and ensures it exists on the apiserver
+// ReconcileObject takes a rendered desired object and ensures it exists on the
+// apiserver. If it already exists, it uses some logic to merge the desired object
+// with what already exists.
 func (h *Handler) ReconcileObject(ctx context.Context, object *uns.Unstructured) error {
 	name, namespace, err := k8sutil.GetNameAndNamespace(object)
 	if err != nil {
@@ -30,6 +32,11 @@ func (h *Handler) ReconcileObject(ctx context.Context, object *uns.Unstructured)
 	resourceClient, _, err := k8sclient.GetResourceClient(apiVersion, kind, namespace)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get resource client for %s", gvk.String())
+	}
+
+	err = IsObjectSupported(object)
+	if err != nil {
+		return errors.Wrapf(err, "obj %s is not supported", objDesc)
 	}
 
 	// Try and retrieve the existing oject from the apiserver
@@ -77,6 +84,10 @@ func MergeObjectForUpdate(current, updated *uns.Unstructured) error {
 	}
 
 	if err := MergeServiceForUpdate(current, updated); err != nil {
+		return err
+	}
+
+	if err := MergeServiceAccountForUpdate(current, updated); err != nil {
 		return err
 	}
 
@@ -136,6 +147,25 @@ func MergeServiceForUpdate(current, updated *uns.Unstructured) error {
 	return nil
 }
 
+// MergeServiceAccountForUpdate copies secrets from current to updated.
+// This is intended to preserve the auto-generated token.
+// Right now, we just copy current to updated and don't support supplying
+// any secrets ourselves.
+func MergeServiceAccountForUpdate(current, updated *uns.Unstructured) error {
+	gvk := updated.GroupVersionKind()
+	if gvk.Group == "" && gvk.Kind == "ServiceAccount" {
+		curSecrets, ok, err := uns.NestedSlice(current.Object, "secrets")
+		if err != nil {
+			return err
+		}
+
+		if ok {
+			uns.SetNestedField(updated.Object, curSecrets, "secrets")
+		}
+	}
+	return nil
+}
+
 // mergeAnnotations copies over any annotations from current to updated,
 // with updated winning if there's a conflict
 func mergeAnnotations(current, updated *uns.Unstructured) {
@@ -168,4 +198,27 @@ func mergeLabels(current, updated *uns.Unstructured) {
 	}
 
 	updated.SetLabels(curLabels)
+}
+
+// IsObjectSupported rejects objects with configurations we don't support.
+// This catches ServiceAccounts with secrets, which is valid but we don't
+// support reconciling them.
+func IsObjectSupported(obj *uns.Unstructured) error {
+	gvk := obj.GroupVersionKind()
+
+	// We cannot create ServiceAccounts with secrets because there's currently
+	// no need and the merging logic is complex.
+	// If you need this, please file an issue.
+	if gvk.Group == "" && gvk.Kind == "ServiceAccount" {
+		secrets, ok, err := uns.NestedSlice(obj.Object, "secrets")
+		if err != nil {
+			return err
+		}
+
+		if ok && len(secrets) > 0 {
+			return errors.Errorf("cannot create ServiceAccount with secrets")
+		}
+	}
+
+	return nil
 }
