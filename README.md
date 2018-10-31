@@ -5,7 +5,7 @@ This is an operator that manages the networking components for an openshift clus
 
 ## Building
 
-You can build an image using buildah with
+You can build an image using podman with
 
 ```
 ./hack/build-image.sh
@@ -13,7 +13,7 @@ You can build an image using buildah with
 
 You might need sudo:
 ```
-BUILDCMD="sudo buildah bud" ./hack/build-image.sh
+BUILDCMD="sudo podman build" ./hack/build-image.sh
 ```
 
 Or you could use a docker that supports multi-stage builds
@@ -26,7 +26,8 @@ BUILDCMD="docker build" ./hack/build-image.sh
 There are some premade Kubernetes manifests to run a development build. After setting the image URL to something sane in the daemonset, do:
 
 ```
-oc create -f ./install/*.yaml
+oc create -f manifests/
+oc create -f sample-config.yaml
 ```
 
 Then you can watch the daemonset with `kubectl -n openshift-cluster-network-operator logs <PODID>`.

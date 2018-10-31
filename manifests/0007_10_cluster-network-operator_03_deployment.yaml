@@ -26,8 +26,10 @@ spec:
             cpu: 20m
             memory: 50Mi
         env:
-        - name: SDN_IMAGE
+        - name: NODE_IMAGE
           value: "docker.io/openshift/origin-node:v4.0.0"
+        - name: HYPERSHIFT_IMAGE
+          value: "docker.io/openshift/origin-hypershift:v4.0.0"
         - name: KUBERNETES_SERVICE_PORT # allows CVO to communicate with apiserver directly on same host.
           value: "6443"
         - name: KUBERNETES_SERVICE_HOST # allows CVO to communicate with apiserver directly on same host.
@@ -43,3 +45,6 @@ spec:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"
         effect: "NoSchedule"
+      - key: "node.kubernetes.io/not-ready"
+        operator: Exists
+        effect: NoSchedule
