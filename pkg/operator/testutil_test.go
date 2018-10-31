@@ -1,10 +1,13 @@
 package operator
 
 import (
+	"bytes"
 	"fmt"
+	"testing"
 
 	"github.com/onsi/gomega/types"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 // Fun matcher for testing the presence of Kubernetes objects
@@ -53,4 +56,19 @@ func (k *KubeObjectMatcher) NegatedFailureMessage(actual interface{}) string {
 		k.kind, k.namespace, k.name,
 		obj.GetKind(), obj.GetNamespace(), obj.GetName())
 
+}
+
+// UnstructuredFromYaml creates an unstructured object from a raw yaml string
+func UnstructuredFromYaml(t *testing.T, obj string) *uns.Unstructured {
+	t.Helper()
+	buf := bytes.NewBufferString(obj)
+	decoder := yaml.NewYAMLOrJSONDecoder(buf, 4096)
+
+	u := uns.Unstructured{}
+	err := decoder.Decode(&u)
+	if err != nil {
+		t.Fatalf("failed to parse test yaml: %v", err)
+	}
+
+	return &u
 }
