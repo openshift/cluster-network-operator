@@ -224,3 +224,35 @@ spec:
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(ip).To(Equal("cur"))
 }
+
+func TestMergeServiceAccount(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	cur := UnstructuredFromYaml(t, `
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: d1
+  annotations:
+    a: cur
+secrets:
+- foo`)
+
+	upd := UnstructuredFromYaml(t, `
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: d1
+  annotations:
+    b: upd`)
+
+	err := IsObjectSupported(cur)
+	g.Expect(err).To(MatchError(ContainSubstring("cannot create ServiceAccount with secrets")))
+
+	err = MergeObjectForUpdate(cur, upd)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	s, ok, err := uns.NestedSlice(upd.Object, "secrets")
+	g.Expect(ok).To(BeTrue())
+	g.Expect(s).To(ConsistOf("foo"))
+}
