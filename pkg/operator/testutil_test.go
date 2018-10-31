@@ -72,3 +72,19 @@ func UnstructuredFromYaml(t *testing.T, obj string) *uns.Unstructured {
 
 	return &u
 }
+
+// tweakMetaForCompare adjust the metadata so that if you compare an object
+// reconciled with itself, it will come out DeepEqual
+// This is just because we always set some metadata, so it diverges in a way
+// that is kubernetes equivalent but not go equal.
+func tweakMetaForCompare(obj *uns.Unstructured) {
+	// Silly thing: we always set annotations and labels in Merge
+	// just a little overwrite to make Equals happy
+	if obj.GetLabels() == nil {
+		obj.SetLabels(map[string]string{})
+	}
+	if obj.GetAnnotations() == nil {
+		obj.SetAnnotations(map[string]string{})
+	}
+	obj.SetResourceVersion("")
+}
