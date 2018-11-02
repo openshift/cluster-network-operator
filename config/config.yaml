@@ -1,3 +1,0 @@
-apiVersion: networkoperator.openshift.io/v1
-kind: NetworkConfig
-projectName: cluster-network-operator
