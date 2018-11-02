@@ -1,12 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: cluster-network-operator
   namespace: openshift-cluster-network-operator
   labels:
     k8s-app: cluster-network-operator
 spec:
-  replicas: 1
   selector:
     matchLabels:
       k8s-app: cluster-network-operator
@@ -34,6 +33,10 @@ spec:
           value: "6443"
         - name: KUBERNETES_SERVICE_HOST # allows CVO to communicate with apiserver directly on same host.
           value: "127.0.0.1"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -43,8 +46,8 @@ spec:
         runAsUser: 65534
       tolerations:
       - key: "node-role.kubernetes.io/master"
-        operator: "Exists"
-        effect: "NoSchedule"
+        operator: Exists
+        effect: NoSchedule
       - key: "node.kubernetes.io/not-ready"
         operator: Exists
         effect: NoSchedule

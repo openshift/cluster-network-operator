@@ -1,4 +1,4 @@
-package operator
+package network
 
 import (
 	"os"
@@ -12,7 +12,7 @@ import (
 
 	legacyconfigv1 "github.com/openshift/api/legacyconfig/v1"
 	cpv1 "github.com/openshift/api/openshiftcontrolplane/v1"
-	"github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 )
 
@@ -27,8 +27,8 @@ const NodeNameMagicString = "%%NODENAME%%"
 // - the sdn daemonset
 // - the openvswitch daemonset
 // and some other small things.
-func (h *Handler) renderOpenshiftSDN() ([]*uns.Unstructured, error) {
-	operConfig := h.config.Spec
+func renderOpenshiftSDN(conf *netv1.NetworkConfig, manifestDir string) ([]*uns.Unstructured, error) {
+	operConfig := conf.Spec
 	c := operConfig.DefaultNetwork.OpenshiftSDNConfig
 
 	objs := []*uns.Unstructured{}
@@ -39,19 +39,19 @@ func (h *Handler) renderOpenshiftSDN() ([]*uns.Unstructured, error) {
 	data.Data["NodeImage"] = os.Getenv("NODE_IMAGE")
 	data.Data["HypershiftImage"] = os.Getenv("HYPERSHIFT_IMAGE")
 
-	operCfg, err := h.controllerConfig()
+	operCfg, err := controllerConfig(conf)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build controller config")
 	}
 	data.Data["NetworkControllerConfig"] = operCfg
 
-	nodeCfg, err := h.nodeConfig()
+	nodeCfg, err := nodeConfig(conf)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build node config")
 	}
 	data.Data["NodeConfig"] = nodeCfg
 
-	manifests, err := render.RenderDir(filepath.Join(h.ManifestDir, "network/openshift-sdn"), &data)
+	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/openshift-sdn"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render manifests")
 	}
@@ -62,9 +62,9 @@ func (h *Handler) renderOpenshiftSDN() ([]*uns.Unstructured, error) {
 
 // validateOpenshiftSDN checks that the openshift-sdn specific configuration
 // is basically sane.
-func (h *Handler) validateOpenshiftSDN() []error {
+func validateOpenshiftSDN(conf *netv1.NetworkConfig) []error {
 	out := []error{}
-	c := h.config.Spec
+	c := conf.Spec
 	sc := c.DefaultNetwork.OpenshiftSDNConfig
 	if sc == nil {
 		out = append(out, errors.Errorf("OpenshiftSDNConfig cannot be nil"))
@@ -90,13 +90,13 @@ func (h *Handler) validateOpenshiftSDN() []error {
 	return out
 }
 
-func sdnPluginName(n v1.SDNMode) string {
+func sdnPluginName(n netv1.SDNMode) string {
 	switch n {
-	case v1.SDNModeSubnet:
+	case netv1.SDNModeSubnet:
 		return "redhat/openshift-ovs-subnet"
-	case v1.SDNModeMultitenant:
+	case netv1.SDNModeMultitenant:
 		return "redhat/openshift-ovs-multitenant"
-	case v1.SDNModePolicy:
+	case netv1.SDNModePolicy:
 		return "redhat/openshift-ovs-networkpolicy"
 	}
 	return ""
@@ -104,12 +104,12 @@ func sdnPluginName(n v1.SDNMode) string {
 
 // controllerConfig builds the contents of controller-config.yaml
 // for the controller
-func (h *Handler) controllerConfig() (string, error) {
-	c := h.config.Spec.DefaultNetwork.OpenshiftSDNConfig
+func controllerConfig(conf *netv1.NetworkConfig) (string, error) {
+	c := conf.Spec.DefaultNetwork.OpenshiftSDNConfig
 
 	// generate master network configuration
 	ippools := []cpv1.ClusterNetworkEntry{}
-	for _, net := range h.config.Spec.ClusterNetworks {
+	for _, net := range conf.Spec.ClusterNetworks {
 		ippools = append(ippools, cpv1.ClusterNetworkEntry{CIDR: net.CIDR, HostSubnetLength: net.HostSubnetLength})
 	}
 
@@ -128,7 +128,7 @@ func (h *Handler) controllerConfig() (string, error) {
 		Network: cpv1.NetworkControllerConfig{
 			NetworkPluginName:  sdnPluginName(c.Mode),
 			ClusterNetworks:    ippools,
-			ServiceNetworkCIDR: h.config.Spec.ServiceNetwork,
+			ServiceNetworkCIDR: conf.Spec.ServiceNetwork,
 			VXLANPort:          vxlanPort,
 		},
 	}
@@ -139,9 +139,9 @@ func (h *Handler) controllerConfig() (string, error) {
 
 // nodeConfig builds the (yaml text of) the NodeConfig object
 // consumed by the sdn node process
-func (h *Handler) nodeConfig() (string, error) {
-	operConfig := h.config.Spec
-	c := h.config.Spec.DefaultNetwork.OpenshiftSDNConfig
+func nodeConfig(conf *netv1.NetworkConfig) (string, error) {
+	operConfig := conf.Spec
+	c := conf.Spec.DefaultNetwork.OpenshiftSDNConfig
 	kpc := operConfig.KubeProxyConfig
 
 	mtu := uint32(1450)

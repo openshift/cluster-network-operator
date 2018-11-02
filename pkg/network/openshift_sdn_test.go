@@ -1,10 +1,13 @@
-package operator
+package network
 
 import (
 	"testing"
 
 	yaml "github.com/ghodss/yaml"
+
 	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/apply"
+
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	. "github.com/onsi/gomega"
@@ -38,26 +41,23 @@ var manifestDir = "../../bindata"
 func TestRenderOpenshiftSDN(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	h := Handler{
-		config:      OpenshiftSDNConfig.DeepCopy(),
-		ManifestDir: manifestDir,
-	}
-	config := h.config.Spec
+	crd := OpenshiftSDNConfig.DeepCopy()
+	config := &crd.Spec
 	sdnConfig := config.DefaultNetwork.OpenshiftSDNConfig
 
-	errs := h.validateOpenshiftSDN()
+	errs := validateOpenshiftSDN(crd)
 	g.Expect(errs).To(HaveLen(0))
 
 	// Make sure the OVS daemonset isn't created
 	truth := true
 	sdnConfig.UseExternalOpenvswitch = &truth
-	objs, err := h.renderOpenshiftSDN()
+	objs, err := renderOpenshiftSDN(crd, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "ovs")))
 
 	// enable openvswitch
 	sdnConfig.UseExternalOpenvswitch = nil
-	objs, err = h.renderOpenshiftSDN()
+	objs, err = renderOpenshiftSDN(crd, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "ovs")))
 
@@ -89,11 +89,11 @@ func TestRenderOpenshiftSDN(t *testing.T) {
 	// - it is supported
 	// - it reconciles to itself (steady state)
 	for _, obj := range objs {
-		g.Expect(IsObjectSupported(obj)).NotTo(HaveOccurred())
+		g.Expect(apply.IsObjectSupported(obj)).NotTo(HaveOccurred())
 		cur := obj.DeepCopy()
 		upd := obj.DeepCopy()
 
-		err = MergeObjectForUpdate(cur, upd)
+		err = apply.MergeObjectForUpdate(cur, upd)
 		g.Expect(err).NotTo(HaveOccurred())
 
 		tweakMetaForCompare(cur)
@@ -104,33 +104,30 @@ func TestRenderOpenshiftSDN(t *testing.T) {
 func TestValidateOpenshiftSDN(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	h := Handler{
-		config:      OpenshiftSDNConfig.DeepCopy(),
-		ManifestDir: manifestDir,
-	}
-	config := &h.config.Spec
-	sdnconfig := config.DefaultNetwork.OpenshiftSDNConfig
+	crd := OpenshiftSDNConfig.DeepCopy()
+	config := &crd.Spec
+	sdnConfig := config.DefaultNetwork.OpenshiftSDNConfig
 
-	err := h.validateOpenshiftSDN()
+	err := validateOpenshiftSDN(crd)
 	g.Expect(err).To(BeEmpty())
 
 	errExpect := func(substr string) {
 		t.Helper()
-		g.Expect(h.validateOpenshiftSDN()).To(
+		g.Expect(validateOpenshiftSDN(crd)).To(
 			ContainElement(MatchError(
 				ContainSubstring(substr))))
 	}
 
 	// set mtu to insanity
 	mtu := uint32(70000)
-	sdnconfig.MTU = &mtu
+	sdnConfig.MTU = &mtu
 	errExpect("invalid MTU 70000")
 
-	sdnconfig.Mode = "broken"
+	sdnConfig.Mode = "broken"
 	errExpect("invalid openshift-sdn mode \"broken\"")
 
 	port := uint32(66666)
-	sdnconfig.VXLANPort = &port
+	sdnConfig.VXLANPort = &port
 	errExpect("invalid VXLANPort 66666")
 
 	config.ClusterNetworks = nil
@@ -140,11 +137,8 @@ func TestValidateOpenshiftSDN(t *testing.T) {
 func TestProxyArgs(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	h := Handler{
-		config:      OpenshiftSDNConfig.DeepCopy(),
-		ManifestDir: manifestDir,
-	}
-	config := &h.config.Spec
+	crd := OpenshiftSDNConfig.DeepCopy()
+	config := &crd.Spec
 
 	// iter through all objects, finding the sdn config map
 	getSdnConfigFile := func(objs []*uns.Unstructured) *uns.Unstructured {
@@ -167,7 +161,7 @@ func TestProxyArgs(t *testing.T) {
 	}
 
 	// test default rendering
-	objs, err := h.renderOpenshiftSDN()
+	objs, err := renderOpenshiftSDN(crd, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg := getSdnConfigFile(objs)
 	val, _, _ := uns.NestedString(cfg.Object, "servingInfo", "bindAddress")
@@ -180,7 +174,7 @@ func TestProxyArgs(t *testing.T) {
 		IptablesSyncPeriod: "10s",
 		BindAddress:        "1.2.3.4",
 	}
-	objs, err = h.renderOpenshiftSDN()
+	objs, err = renderOpenshiftSDN(crd, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg = getSdnConfigFile(objs)
 	g.Expect(cfg.Object).To(HaveKeyWithValue("iptablesSyncPeriod", "10s"))
@@ -189,10 +183,10 @@ func TestProxyArgs(t *testing.T) {
 
 	//set proxy args
 	config.KubeProxyConfig.ProxyArguments = map[string][]string{
-		"a": []string{"b"},
-		"c": []string{"d", "e"},
+		"a": {"b"},
+		"c": {"d", "e"},
 	}
-	objs, err = h.renderOpenshiftSDN()
+	objs, err = renderOpenshiftSDN(crd, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg = getSdnConfigFile(objs)
 
