@@ -4,21 +4,39 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +genclient
+// Important: Run hack/update-codegen.sh to regenerate code after modifying this file
+
+// register our type with the k8s api scheme
+func init() {
+	SchemeBuilder.Register(&NetworkConfig{}, &NetworkConfigList{})
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NetworkConfig describes the cluster's desired network configuration.
+// NetworkConfig describes the cluster's desired network configuration
+// +k8s:openapi-gen=true
 type NetworkConfig struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   NetworkConfigSpec   `json:"spec"`
+	Spec   NetworkConfigSpec   `json:"spec,omitempty"`
 	Status NetworkConfigStatus `json:"status,omitempty"`
 }
 
-// NetworkConfigStatus describes the plugin's status
+// NetworkConfigStatus defines the observed state of NetworkConfig
 type NetworkConfigStatus struct {
 	// TODO
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NetworkConfigList contains a list of NetworkConfig
+// We do not support more than one NetworkConfig, but the operator-sdk
+// requires this
+type NetworkConfigList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []NetworkConfig `json:"items"`
 }
 
 // NetworkConfigSpec is the top-level network configuration object.

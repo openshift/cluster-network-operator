@@ -1,18 +1,17 @@
 package main
 
 // Render all created objects to disk, rather than directly to the apiserver.
-// This is used for bootstrapping / install
+// This is used for debugging
 
 import (
 	"fmt"
 	"os"
 
 	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
-	netop "github.com/openshift/cluster-network-operator/pkg/operator"
+	"github.com/openshift/cluster-network-operator/pkg/network"
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
@@ -37,10 +36,10 @@ func render() error {
 	pflag.Parse()
 
 	if configPath == "" {
-		logrus.Error("--config must be specified")
+		return fmt.Errorf("--config must be specified")
 	}
 	if outPath == "" {
-		logrus.Error("--out must be specified")
+		return fmt.Errorf("--out must be specified")
 	}
 
 	conf, err := readConfigObject(configPath)
@@ -48,10 +47,7 @@ func render() error {
 		return err
 	}
 
-	handler := netop.MakeHandler(manifestPath)
-	handler.SetConfig(conf)
-
-	objs, err := handler.Render()
+	objs, err := network.Render(conf, manifestPath)
 	if err != nil {
 		return err
 	}

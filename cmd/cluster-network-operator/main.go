@@ -2,35 +2,69 @@ package main
 
 import (
 	"context"
+	"flag"
+	"log"
 	"runtime"
-	"time"
 
-	netop "github.com/openshift/cluster-network-operator/pkg/operator"
-	sdk "github.com/operator-framework/operator-sdk/pkg/sdk"
+	"github.com/openshift/cluster-network-operator/pkg/apis"
+	"github.com/openshift/cluster-network-operator/pkg/controller"
+	"github.com/operator-framework/operator-sdk/pkg/leader"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
-
-	"github.com/sirupsen/logrus"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
 func printVersion() {
-	logrus.Infof("Go Version: %s", runtime.Version())
-	logrus.Infof("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH)
-	logrus.Infof("operator-sdk Version: %v", sdkVersion.Version)
+	log.Printf("Go Version: %s", runtime.Version())
+	log.Printf("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH)
+	log.Printf("operator-sdk Version: %v", sdkVersion.Version)
 }
+
+const LOCK_NAME = "cluster-network-operator"
 
 func main() {
 	printVersion()
+	flag.Parse()
 
-	//sdk.ExposeMetricsPort()
+	namespace := "" // non-namespaced
 
-	resource := "networkoperator.openshift.io/v1"
-	kind := "NetworkConfig"
-	namespace := "" //non namespaced
+	// TODO: Expose metrics port after SDK uses controller-runtime's dynamic client
+	// sdk.ExposeMetricsPort()
 
-	resyncPeriod := time.Duration(60) * time.Second
-	logrus.Infof("Watching %s, %s, %s, %d", resource, kind, namespace, resyncPeriod)
-	sdk.Watch(resource, kind, namespace, resyncPeriod)
-	sdk.Handle(netop.MakeHandler("./bindata"))
-	sdk.Run(context.TODO())
+	// Get a config to talk to the apiserver
+	cfg, err := config.GetConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// become leader
+	err = leader.Become(context.TODO(), LOCK_NAME)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Create a new Cmd to provide shared dependencies and start components
+	mgr, err := manager.New(cfg, manager.Options{Namespace: namespace})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Print("Registering Components.")
+
+	// Setup Scheme for all resources
+	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Fatal(err)
+	}
+
+	// Setup all Controllers
+	if err := controller.AddToManager(mgr); err != nil {
+		log.Fatal(err)
+	}
+
+	log.Print("Starting the Cmd.")
+
+	// Start the Cmd
+	log.Fatal(mgr.Start(signals.SetupSignalHandler()))
 }
