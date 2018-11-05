@@ -27,7 +27,7 @@ func ApplyObject(ctx context.Context, client k8sclient.Client, obj *uns.Unstruct
 	log.Printf("reconciling %s", objDesc)
 
 	if err := IsObjectSupported(obj); err != nil {
-		return errors.Wrapf(err, "object %s unsupported")
+		return errors.Wrapf(err, "object %s unsupported", objDesc)
 	}
 
 	// Get existing
