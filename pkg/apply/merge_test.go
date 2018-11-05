@@ -102,6 +102,7 @@ metadata:
 		"a": "upd",
 		"b": "cur",
 		"c": "upd",
+
 		"deployment.kubernetes.io/revision": "cur",
 	}))
 }
