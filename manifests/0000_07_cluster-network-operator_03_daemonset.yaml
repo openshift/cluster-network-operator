@@ -29,14 +29,18 @@ spec:
           value: "docker.io/openshift/origin-node:v4.0.0"
         - name: HYPERSHIFT_IMAGE
           value: "docker.io/openshift/origin-hypershift:v4.0.0"
-        - name: KUBERNETES_SERVICE_PORT # allows CVO to communicate with apiserver directly on same host.
-          value: "6443"
-        - name: KUBERNETES_SERVICE_HOST # allows CVO to communicate with apiserver directly on same host.
-          value: "127.0.0.1"
         - name: POD_NAME
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        envFrom:
+        # this is a configmap that defines KUBERNETES_SERVICE_HOST|PORT
+        # it is created directly by the installer, so we can find the
+        # apiserver during bootstrap.
+        # Other operators can hard-code 127.0.0.1, but we run on the real masters
+        # while the apiserver is still on the bootstrap node.
+        - configMapRef:
+            name: "cluster-config"
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
