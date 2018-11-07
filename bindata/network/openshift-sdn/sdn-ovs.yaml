@@ -107,7 +107,7 @@ spec:
           path: /sys
       - name: host-config-openvswitch
         hostPath:
-          path: /etc/origin/openvswitch
+          path: /var/lib/openvswitch
       tolerations:
       - operator: "Exists"
 {{- end}}

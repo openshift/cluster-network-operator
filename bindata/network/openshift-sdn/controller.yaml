@@ -47,10 +47,12 @@ spec:
           name: config
           readOnly: true
         env:
+        # TODO: bind-mount the kubelet's kubeconfig like the openshift-sdn process
+        # need to get the `oc` binary in to the hypershift image first
         - name: KUBERNETES_SERVICE_PORT # allows the controller to communicate with apiserver directly on same host.
-          value: "6443"
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: KUBERNETES_SERVICE_HOST # allows the controller to communicate with apiserver directly on same host.
-          value: "127.0.0.1"
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""

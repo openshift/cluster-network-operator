@@ -40,6 +40,8 @@ func renderOpenshiftSDN(conf *netv1.NetworkConfig, manifestDir string) ([]*uns.U
 	data.Data["InstallOVS"] = (c.UseExternalOpenvswitch == nil || *c.UseExternalOpenvswitch == false)
 	data.Data["NodeImage"] = os.Getenv("NODE_IMAGE")
 	data.Data["HypershiftImage"] = os.Getenv("HYPERSHIFT_IMAGE")
+	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
+	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
 
 	operCfg, err := controllerConfig(conf)
 	if err != nil {
@@ -187,10 +189,10 @@ func nodeConfig(conf *netv1.NetworkConfig) (string, error) {
 		ServingInfo: legacyconfigv1.ServingInfo{
 			// These files are bind-mounted in at a hard-coded location
 			CertInfo: legacyconfigv1.CertInfo{
-				CertFile: "/etc/origin/node/server.crt",
-				KeyFile:  "/etc/origin/node/server.key",
+				CertFile: "/etc/kubernetes/pki/kubelet.crt",
+				KeyFile:  "/etc/kubernetes/pki/kubelet.key",
 			},
-			ClientCA:    "/etc/origin/node/ca.crt",
+			ClientCA:    "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
 			BindAddress: bindAddress + ":10251", // port is unused
 		},
 	}
