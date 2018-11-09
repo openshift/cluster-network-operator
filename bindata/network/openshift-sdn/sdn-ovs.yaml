@@ -36,6 +36,24 @@ spec:
           #!/bin/bash
           set -euo pipefail
 
+          # wait out the SELinux relabeling race on crio
+          retries=0
+          while true; do
+            if touch /etc/openvswitch/.test; then
+              break;
+            else
+              echo "Still waiting for SELinux relabeling"
+              (( retries += 1 ))
+              sleep 15
+            fi
+            if [[ "${retries}" -gt 40 ]]; then
+              echo "error: unable to create necessary host files, existing"
+              exit 1
+            fi
+          done
+          rm /etc/openvswitch/.test;
+
+
           # if another process is listening on the cni-server socket, wait until it exits
           trap 'kill $(jobs -p); exit 0' TERM
           retries=0
