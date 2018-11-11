@@ -18,7 +18,7 @@ spec:
       - name: cluster-network-operator
         image: docker.io/openshift/origin-cluster-network-operator:v4.0.0
         command:
-        - "/bin/cluster-network-operator"
+        - "/usr/bin/cluster-network-operator"
         - "--url-only-kubeconfig=/etc/kubernetes/kubeconfig"
         resources:
           limits:
