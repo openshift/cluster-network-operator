@@ -52,23 +52,6 @@ spec:
           # enable ip forwarding
           sysctl -w net.ipv4.ip_forward=1
 
-          # wait out the SELinux relabeling race on crio
-          retries=0
-          while true; do
-            if touch /host/opt/cni/bin/.test; then
-              break;
-            else
-              echo "Still waiting for SELinux relabeling"
-              (( retries += 1 ))
-              sleep 15
-            fi
-            if [[ "${retries}" -gt 40 ]]; then
-              echo "error: unable to create necessary host files, existing"
-              exit 1
-            fi
-          done
-          rm /host/opt/cni/bin/.test
-
           # if another process is listening on the cni-server socket, wait until it exits
           trap 'kill $(jobs -p); exit 0' TERM
           retries=0
@@ -103,8 +86,6 @@ spec:
           exec /bin/openshift-sdn --config=/tmp/sdn-config.yaml  --kubeconfig=/tmp/kubeconfig --loglevel=${DEBUG_LOGLEVEL:-2}
 
         securityContext:
-          runAsUser: 0
-          # Permission could be reduced by selecting an appropriate SELinux policy
           privileged: true
         volumeMounts:
         - mountPath: /config
