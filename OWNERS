@@ -1,6 +1,9 @@
+reviewers:
+  - JacobTanenbaum
+  - pecameron
 
 approvers:
   - squeed
   - dcbw
   - danwinship
-  - smarterclayton
+  - knobunc
