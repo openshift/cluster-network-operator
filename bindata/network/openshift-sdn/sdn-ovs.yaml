@@ -59,7 +59,7 @@ spec:
               exit 0
           }
           trap quit SIGTERM
-          /usr/share/openvswitch/scripts/ovs-ctl start --system-id=random
+          /usr/share/openvswitch/scripts/ovs-ctl start --no-ovs-vswitchd --system-id=random
 
           # Restrict the number of pthreads ovs-vswitchd creates to reduce the
           # amount of RSS it uses on hosts with many cores
@@ -69,7 +69,17 @@ spec:
               ovs-vsctl set Open_vSwitch . other_config:n-revalidator-threads=4
               ovs-vsctl set Open_vSwitch . other_config:n-handler-threads=10
           fi
-          while true; do sleep 5; done
+          /usr/share/openvswitch/scripts/ovs-ctl start --no-ovsdb-server --system-id=random
+
+          tail --follow=name /var/log/openvswitch/ovs-vswitchd.log /var/log/openvswitch/ovsdb-server.log &
+          sleep 20
+          while true; do
+            if ! /usr/share/openvswitch/scripts/ovs-ctl status &>/dev/null; then
+              echo "OVS seems to have crashed, exiting"
+              quit
+            fi
+            sleep 15
+          done
         securityContext:
           privileged: true
         volumeMounts:
