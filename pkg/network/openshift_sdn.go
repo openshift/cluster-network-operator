@@ -195,6 +195,12 @@ func nodeConfig(conf *netv1.NetworkConfig) (string, error) {
 			ClientCA:    "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
 			BindAddress: bindAddress + ":10251", // port is unused
 		},
+
+		// Openshift-sdn calls the CRI endpoint directly; point it to crio
+		KubeletArguments: legacyconfigv1.ExtendedArguments{
+			"container-runtime":          {"remote"},
+			"container-runtime-endpoint": {"/var/run/crio/crio.sock"},
+		},
 	}
 
 	if kpc != nil && kpc.IptablesSyncPeriod != "" {
