@@ -45,9 +45,9 @@ func main() {
 	// TODO: Expose metrics port after SDK uses controller-runtime's dynamic client
 	// sdk.ExposeMetricsPort()
 
-	// Hack: the network operator can't use the apiserver service ip, since theres
+	// Hack: the network operator can't use the apiserver service ip, since there's
 	// no network. We also can't hard-code it to 127.0.0.1, because we run during
-	// bootstrap. Instead, we bind-mount in the kubelets kubeconfig, but just
+	// bootstrap. Instead, we bind-mount in the kubelet's kubeconfig, but just
 	// use it to get the apiserver url.
 	if urlOnlyKubeconfig != "" {
 		kubeconfig, err := clientcmd.LoadFromFile(urlOnlyKubeconfig)
