@@ -26,7 +26,11 @@ func Render(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructu
 	// TODO: kube-proxy
 
 	// render additional networks
-	// TODO: extra networks
+	o, err = RenderAdditionalNetworks(conf, manifestDir)
+	if err != nil {
+		return nil, err
+	}
+	objs = append(objs, o...)
 
 	log.Printf("Render phase done, rendered %d objects", len(objs))
 	return objs, nil
@@ -149,4 +153,62 @@ func IsDefaultNetworkChangeSafe(prev, next *netv1.NetworkConfigSpec) []error {
 	default: // should be unreachable
 		return []error{errors.Errorf("unknown network type %s", prev.DefaultNetwork.Type)}
 	}
+}
+
+// ValidateAdditionalNetworks validates additional networks configs
+func ValidateAdditionalNetworks(conf *netv1.NetworkConfigSpec) [][]error {
+	out := [][]error{}
+	ans := conf.AdditionalNetworks
+	for _, an := range ans {
+		switch an.Type {
+		case netv1.NetworkTypeRaw:
+			if errs := validateRaw(&an); len(errs) > 0 {
+				out = append(out, errs)
+			}
+		default:
+			out = append(out, []error{errors.Errorf("unknown or unsupported NetworkType: %s", an.Type)})
+		}
+	}
+	return out
+}
+
+// RenderAdditionalNetworks generates the manifests of Multus and the requested
+// additional networks
+func RenderAdditionalNetworks(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructured, error) {
+	var err error
+	ans := conf.AdditionalNetworks
+	out := []*uns.Unstructured{}
+	objs := []*uns.Unstructured{}
+
+	// validate additional network configuration
+	if errs := ValidateAdditionalNetworks(conf); len(errs) > 0 {
+		return nil, errors.Errorf("invalid Additional Network Configuration: %v", errs)
+	}
+
+	// render Multus when additional networks is provided
+	if len(ans) > 0 {
+		objs, err := renderMultusConfig(manifestDir)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, objs...)
+	} else {
+		return nil, nil
+	}
+
+	// render additional network configuration
+	for _, an := range ans {
+		switch an.Type {
+		case netv1.NetworkTypeRaw:
+			objs, err = renderRawCNIConfig(&an, manifestDir)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, objs...)
+		default:
+			return nil, errors.Errorf("unknown or unsupported NetworkType: %s", an.Type)
+		}
+	}
+
+	return out, nil
 }
