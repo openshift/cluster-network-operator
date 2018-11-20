@@ -49,9 +49,6 @@ spec:
           #!/bin/bash
           set -euo pipefail
 
-          # enable ip forwarding
-          sysctl -w net.ipv4.ip_forward=1
-
           # if another process is listening on the cni-server socket, wait until it exits
           trap 'kill $(jobs -p); exit 0' TERM
           retries=0
