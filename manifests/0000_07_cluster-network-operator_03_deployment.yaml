@@ -1,11 +1,12 @@
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   name: cluster-network-operator
   namespace: openshift-cluster-network-operator
   labels:
     k8s-app: cluster-network-operator
 spec:
+  replicas: 1
   selector:
     matchLabels:
       k8s-app: cluster-network-operator
