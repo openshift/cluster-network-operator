@@ -46,7 +46,7 @@ spec:
     - cidr: "10.128.0.0/14"
       hostSubnetLength: 9
   defaultNetwork:
-    type: OpenshiftSDN
+    type: OpenShiftSDN
     openshiftSDNConfig:
-      mode: Networkpolicy
+      mode: NetworkPolicy
 ```

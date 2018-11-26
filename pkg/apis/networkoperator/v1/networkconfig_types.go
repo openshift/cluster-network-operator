@@ -42,7 +42,7 @@ type NetworkConfigList struct {
 // NetworkConfigSpec is the top-level network configuration object.
 type NetworkConfigSpec struct {
 	// IP address pool to use for pod IPs.
-	// Some network providers, e.g. Openshift-sdn, support multiple ClusterNetworks.
+	// Some network providers, e.g. OpenShift SDN, support multiple ClusterNetworks.
 	// Others only support one. This is equivalent to the cluster-cidr.
 	ClusterNetworks []ClusterNetwork `json:"clusterNetworks"`
 
@@ -61,7 +61,7 @@ type NetworkConfigSpec struct {
 	// DeployKubeProxy specifies whether or not a standalone kube-proxy should
 	// be deployed by the operator. Some network providers include kube-proxy
 	// or similar functionality. If unset, the plugin will attempt to select
-	// the correct value, which is false when Openshift-sdn and ovn-kubernetes are
+	// the correct value, which is false when OpenShift SDN and ovn-kubernetes are
 	// used and true otherwise.
 	// +optional
 	DeployKubeProxy *bool `json:"deployKubeProxy,omitempty"`
@@ -89,9 +89,9 @@ type DefaultNetworkDefinition struct {
 	// All NetworkTypes are supported except for NetworkTypeRaw
 	Type NetworkType `json:"type"`
 
-	// OpenshiftSDNConfig configures the openshift-sdn plugin
+	// OpenShiftSDNConfig configures the openshift-sdn plugin
 	// +optional
-	OpenshiftSDNConfig *OpenshiftSDNConfig `json:"openshiftSDNConfig,omitempty"`
+	OpenShiftSDNConfig *OpenShiftSDNConfig `json:"openshiftSDNConfig,omitempty"`
 
 	// OVNKubernetesConfig configures the ovn-kubernetes plugin
 	// +optional
@@ -121,9 +121,9 @@ type AdditionalNetworkDefinition struct {
 	RawCNIConfig string `json:"rawCNIConfig"`
 }
 
-// OpenshiftSDNConfig configures the three openshift-sdn plugins
-type OpenshiftSDNConfig struct {
-	// Mode is one of "multitenant", "subnet", or "networkpolicy"
+// OpenShiftSDNConfig configures the three openshift-sdn plugins
+type OpenShiftSDNConfig struct {
+	// Mode is one of "Multitenant", "Subnet", or "NetworkPolicy"
 	Mode SDNMode `json:"mode"`
 
 	// VXLANPort is the port to use for all vxlan packets. The default
@@ -171,8 +171,11 @@ type ProxyConfig struct {
 }
 
 const (
-	// NetworkTypeOpenshiftSDN means the openshift-sdn plugin will be configured
-	NetworkTypeOpenshiftSDN NetworkType = "OpenshiftSDN"
+	// NetworkTypeOpenShiftSDN means the openshift-sdn plugin will be configured
+	NetworkTypeOpenShiftSDN NetworkType = "OpenShiftSDN"
+
+	// NetworkTypeDeprecatedOpenshiftSDN is equivalent to NetworkTypeOpenShiftSDN, for compatibility
+	NetworkTypeDeprecatedOpenshiftSDN NetworkType = "OpenshiftSDN"
 
 	// NetworkTypeOVNKubernetes means the ovn-kubernetes project will be configured
 	NetworkTypeOVNKubernetes NetworkType = "OVNKubernetes"
@@ -191,9 +194,9 @@ const (
 type SDNMode string
 
 const (
-	SDNModeMultitenant SDNMode = "Multitenant"
+	SDNModeSubnet        SDNMode = "Subnet"
+	SDNModeMultitenant   SDNMode = "Multitenant"
+	SDNModeNetworkPolicy SDNMode = "NetworkPolicy"
 
-	SDNModeSubnet SDNMode = "Subnet"
-
-	SDNModePolicy SDNMode = "Networkpolicy"
+	SDNModeDeprecatedNetworkpolicy SDNMode = "Networkpolicy"
 )
