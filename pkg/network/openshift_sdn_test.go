@@ -13,7 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var OpenshiftSDNConfig = netv1.NetworkConfig{
+var OpenShiftSDNConfig = netv1.NetworkConfig{
 	Spec: netv1.NetworkConfigSpec{
 		ServiceNetwork: "172.30.0.0/16",
 		ClusterNetworks: []netv1.ClusterNetwork{
@@ -27,9 +27,9 @@ var OpenshiftSDNConfig = netv1.NetworkConfig{
 			},
 		},
 		DefaultNetwork: netv1.DefaultNetworkDefinition{
-			Type: netv1.NetworkTypeOpenshiftSDN,
-			OpenshiftSDNConfig: &netv1.OpenshiftSDNConfig{
-				Mode: netv1.SDNModePolicy,
+			Type: netv1.NetworkTypeOpenShiftSDN,
+			OpenShiftSDNConfig: &netv1.OpenShiftSDNConfig{
+				Mode: netv1.SDNModeNetworkPolicy,
 			},
 		},
 	},
@@ -37,28 +37,28 @@ var OpenshiftSDNConfig = netv1.NetworkConfig{
 
 var manifestDir = "../../bindata"
 
-// TestRenderOpenshiftSDN has some simple rendering tests
-func TestRenderOpenshiftSDN(t *testing.T) {
+// TestRenderOpenShiftSDN has some simple rendering tests
+func TestRenderOpenShiftSDN(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	crd := OpenshiftSDNConfig.DeepCopy()
+	crd := OpenShiftSDNConfig.DeepCopy()
 	config := &crd.Spec
-	sdnConfig := config.DefaultNetwork.OpenshiftSDNConfig
+	sdnConfig := config.DefaultNetwork.OpenShiftSDNConfig
 
-	errs := validateOpenshiftSDN(config)
+	errs := validateOpenShiftSDN(config)
 	g.Expect(errs).To(HaveLen(0))
 	FillDefaults(config)
 
 	// Make sure the OVS daemonset isn't created
 	truth := true
 	sdnConfig.UseExternalOpenvswitch = &truth
-	objs, err := renderOpenshiftSDN(config, manifestDir)
+	objs, err := renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "ovs")))
 
 	// enable openvswitch
 	sdnConfig.UseExternalOpenvswitch = nil
-	objs, err = renderOpenshiftSDN(config, manifestDir)
+	objs, err = renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "ovs")))
 
@@ -102,10 +102,10 @@ func TestRenderOpenshiftSDN(t *testing.T) {
 	}
 }
 
-func TestFillOpenshiftSDNDefaults(t *testing.T) {
+func TestFillOpenShiftSDNDefaults(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	crd := OpenshiftSDNConfig.DeepCopy()
+	crd := OpenShiftSDNConfig.DeepCopy()
 	conf := &crd.Spec
 
 	// vars
@@ -126,9 +126,9 @@ func TestFillOpenshiftSDNDefaults(t *testing.T) {
 			},
 		},
 		DefaultNetwork: netv1.DefaultNetworkDefinition{
-			Type: netv1.NetworkTypeOpenshiftSDN,
-			OpenshiftSDNConfig: &netv1.OpenshiftSDNConfig{
-				Mode:      netv1.SDNModePolicy,
+			Type: netv1.NetworkTypeOpenShiftSDN,
+			OpenShiftSDNConfig: &netv1.OpenShiftSDNConfig{
+				Mode:      netv1.SDNModeNetworkPolicy,
 				VXLANPort: &p,
 				MTU:       &m,
 			},
@@ -139,26 +139,26 @@ func TestFillOpenshiftSDNDefaults(t *testing.T) {
 		},
 	}
 
-	fillOpenshiftSDNDefaults(conf)
+	fillOpenShiftSDNDefaults(conf)
 
 	g.Expect(conf).To(Equal(&expected))
 
 }
 
-func TestValidateOpenshiftSDN(t *testing.T) {
+func TestValidateOpenShiftSDN(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	crd := OpenshiftSDNConfig.DeepCopy()
+	crd := OpenShiftSDNConfig.DeepCopy()
 	config := &crd.Spec
-	sdnConfig := config.DefaultNetwork.OpenshiftSDNConfig
+	sdnConfig := config.DefaultNetwork.OpenShiftSDNConfig
 
-	err := validateOpenshiftSDN(config)
+	err := validateOpenShiftSDN(config)
 	g.Expect(err).To(BeEmpty())
 	FillDefaults(config)
 
 	errExpect := func(substr string) {
 		t.Helper()
-		g.Expect(validateOpenshiftSDN(config)).To(
+		g.Expect(validateOpenShiftSDN(config)).To(
 			ContainElement(MatchError(
 				ContainSubstring(substr))))
 	}
@@ -182,7 +182,7 @@ func TestValidateOpenshiftSDN(t *testing.T) {
 func TestProxyArgs(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	crd := OpenshiftSDNConfig.DeepCopy()
+	crd := OpenShiftSDNConfig.DeepCopy()
 	config := &crd.Spec
 	FillDefaults(config)
 
@@ -207,7 +207,7 @@ func TestProxyArgs(t *testing.T) {
 	}
 
 	// test default rendering
-	objs, err := renderOpenshiftSDN(config, manifestDir)
+	objs, err := renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg := getSdnConfigFile(objs)
 	val, _, _ := uns.NestedString(cfg.Object, "servingInfo", "bindAddress")
@@ -220,7 +220,7 @@ func TestProxyArgs(t *testing.T) {
 		IptablesSyncPeriod: "10s",
 		BindAddress:        "1.2.3.4",
 	}
-	objs, err = renderOpenshiftSDN(config, manifestDir)
+	objs, err = renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg = getSdnConfigFile(objs)
 	g.Expect(cfg.Object).To(HaveKeyWithValue("iptablesSyncPeriod", "10s"))
@@ -232,7 +232,7 @@ func TestProxyArgs(t *testing.T) {
 		"a": {"b"},
 		"c": {"d", "e"},
 	}
-	objs, err = renderOpenshiftSDN(config, manifestDir)
+	objs, err = renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg = getSdnConfigFile(objs)
 
@@ -244,22 +244,22 @@ func TestProxyArgs(t *testing.T) {
 
 }
 
-func TestOpenshiftSDNIsSafe(t *testing.T) {
+func TestOpenShiftSDNIsSafe(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	prev := OpenshiftSDNConfig.Spec.DeepCopy()
+	prev := OpenShiftSDNConfig.Spec.DeepCopy()
 	FillDefaults(prev)
-	next := OpenshiftSDNConfig.Spec.DeepCopy()
+	next := OpenShiftSDNConfig.Spec.DeepCopy()
 	FillDefaults(next)
 
-	errs := isOpenshiftSDNChangeSafe(prev, next)
+	errs := isOpenShiftSDNChangeSafe(prev, next)
 	g.Expect(errs).To(BeEmpty())
 
 	// change the vxlan port
 	p := uint32(99)
-	next.DefaultNetwork.OpenshiftSDNConfig.VXLANPort = &p
+	next.DefaultNetwork.OpenShiftSDNConfig.VXLANPort = &p
 
-	errs = isOpenshiftSDNChangeSafe(prev, next)
+	errs = isOpenShiftSDNChangeSafe(prev, next)
 	g.Expect(errs).To(HaveLen(1))
 	g.Expect(errs[0]).To(MatchError("cannot change openshift-sdn configuration"))
 }
