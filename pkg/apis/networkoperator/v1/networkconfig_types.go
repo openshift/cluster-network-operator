@@ -164,10 +164,10 @@ type ProxyConfig struct {
 
 	// The address to "bind" on
 	// Defaults to 0.0.0.0
-	BindAddress string
+	BindAddress string `json:"bindAddress,omitempty"`
 
 	// Any additional arguments to pass to the kubeproxy process
-	ProxyArguments map[string][]string
+	ProxyArguments map[string][]string `json:"proxyArguments,omitempty"`
 }
 
 const (
