@@ -47,7 +47,14 @@ func render() error {
 		return err
 	}
 
-	objs, err := network.Render(conf, manifestPath)
+	err = network.Validate(&conf.Spec)
+	if err != nil {
+		return err
+	}
+
+	network.FillDefaults(&conf.Spec)
+
+	objs, err := network.Render(&conf.Spec, manifestPath)
 	if err != nil {
 		return err
 	}

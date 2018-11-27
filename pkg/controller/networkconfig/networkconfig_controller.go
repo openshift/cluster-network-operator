@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/network"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -102,15 +103,39 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 	}
 
 	// Validate the configuration
-	if err := network.Validate(instance); err != nil {
+	if err := network.Validate(&instance.Spec); err != nil {
 		return reconcile.Result{}, err
+	}
+	network.FillDefaults(&instance.Spec)
+
+	// Compare against previous applied configuration to see if this change
+	// is safe.
+	prev, err := GetAppliedConfiguration(context.TODO(), r.client, instance.ObjectMeta.Name)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	if prev != nil {
+		// We may need to fill defaults here -- sort of as a poor-man's
+		// upconversion scheme -- if we add additional fields to the config.
+		err = network.IsChangeSafe(prev, &instance.Spec)
+		if err != nil {
+			return reconcile.Result{},
+				errors.Wrapf(err, "not applying unsafe change")
+		}
 	}
 
 	// Generate the objects
-	objs, err := network.Render(instance, ManifestPath)
+	objs, err := network.Render(&instance.Spec, ManifestPath)
 	if err != nil {
 		return reconcile.Result{}, errors.Wrapf(err, "failed to render")
 	}
+
+	// The first object we create should be the record of our applied configuration
+	app, err := AppliedConfiguration(instance)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrapf(err, "failed to render applied")
+	}
+	objs = append([]*uns.Unstructured{app}, objs...)
 
 	// Apply the objects to the cluster
 	for _, obj := range objs {
