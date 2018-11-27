@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
@@ -29,9 +30,8 @@ const NodeNameMagicString = "%%NODENAME%%"
 // - the sdn daemonset
 // - the openvswitch daemonset
 // and some other small things.
-func renderOpenshiftSDN(conf *netv1.NetworkConfig, manifestDir string) ([]*uns.Unstructured, error) {
-	operConfig := conf.Spec
-	c := operConfig.DefaultNetwork.OpenshiftSDNConfig
+func renderOpenshiftSDN(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructured, error) {
+	c := conf.DefaultNetwork.OpenshiftSDNConfig
 
 	objs := []*uns.Unstructured{}
 
@@ -66,16 +66,15 @@ func renderOpenshiftSDN(conf *netv1.NetworkConfig, manifestDir string) ([]*uns.U
 
 // validateOpenshiftSDN checks that the openshift-sdn specific configuration
 // is basically sane.
-func validateOpenshiftSDN(conf *netv1.NetworkConfig) []error {
+func validateOpenshiftSDN(conf *netv1.NetworkConfigSpec) []error {
 	out := []error{}
-	c := conf.Spec
-	sc := c.DefaultNetwork.OpenshiftSDNConfig
+	sc := conf.DefaultNetwork.OpenshiftSDNConfig
 	if sc == nil {
 		out = append(out, errors.Errorf("OpenshiftSDNConfig cannot be nil"))
 		return out
 	}
 
-	if len(c.ClusterNetworks) == 0 {
+	if len(conf.ClusterNetworks) == 0 {
 		out = append(out, errors.Errorf("ClusterNetworks cannot be empty"))
 	}
 
@@ -94,6 +93,42 @@ func validateOpenshiftSDN(conf *netv1.NetworkConfig) []error {
 	return out
 }
 
+// isOpenshiftSDNChangeSafe currently returns an error if any changes are made.
+// In the future, we may support rolling out MTU or external openvswitch alterations.
+func isOpenshiftSDNChangeSafe(prev, next *netv1.NetworkConfigSpec) []error {
+	pn := prev.DefaultNetwork.OpenshiftSDNConfig
+	nn := next.DefaultNetwork.OpenshiftSDNConfig
+
+	if reflect.DeepEqual(pn, nn) {
+		return []error{}
+	}
+	return []error{errors.Errorf("cannot change openshift-sdn configuration")}
+}
+
+func fillOpenshiftSDNDefaults(conf *netv1.NetworkConfigSpec) {
+	if conf.DeployKubeProxy == nil {
+		prox := false
+		conf.DeployKubeProxy = &prox
+	}
+
+	if conf.KubeProxyConfig == nil {
+		conf.KubeProxyConfig = &netv1.ProxyConfig{}
+	}
+	if conf.KubeProxyConfig.BindAddress == "" {
+		conf.KubeProxyConfig.BindAddress = "0.0.0.0"
+	}
+
+	sc := conf.DefaultNetwork.OpenshiftSDNConfig
+	if sc.VXLANPort == nil {
+		var port uint32 = 4789
+		sc.VXLANPort = &port
+	}
+	if sc.MTU == nil {
+		var mtu uint32 = 1450
+		sc.MTU = &mtu
+	}
+}
+
 func sdnPluginName(n netv1.SDNMode) string {
 	switch n {
 	case netv1.SDNModeSubnet:
@@ -108,18 +143,13 @@ func sdnPluginName(n netv1.SDNMode) string {
 
 // controllerConfig builds the contents of controller-config.yaml
 // for the controller
-func controllerConfig(conf *netv1.NetworkConfig) (string, error) {
-	c := conf.Spec.DefaultNetwork.OpenshiftSDNConfig
+func controllerConfig(conf *netv1.NetworkConfigSpec) (string, error) {
+	c := conf.DefaultNetwork.OpenshiftSDNConfig
 
 	// generate master network configuration
 	ippools := []cpv1.ClusterNetworkEntry{}
-	for _, net := range conf.Spec.ClusterNetworks {
+	for _, net := range conf.ClusterNetworks {
 		ippools = append(ippools, cpv1.ClusterNetworkEntry{CIDR: net.CIDR, HostSubnetLength: net.HostSubnetLength})
-	}
-
-	var vxlanPort uint32 = 4789
-	if c.VXLANPort != nil {
-		vxlanPort = *c.VXLANPort
 	}
 
 	cfg := cpv1.OpenShiftControllerManagerConfig{
@@ -132,8 +162,8 @@ func controllerConfig(conf *netv1.NetworkConfig) (string, error) {
 		Network: cpv1.NetworkControllerConfig{
 			NetworkPluginName:  sdnPluginName(c.Mode),
 			ClusterNetworks:    ippools,
-			ServiceNetworkCIDR: conf.Spec.ServiceNetwork,
-			VXLANPort:          vxlanPort,
+			ServiceNetworkCIDR: conf.ServiceNetwork,
+			VXLANPort:          *c.VXLANPort,
 		},
 	}
 
@@ -150,7 +180,7 @@ func controllerConfig(conf *netv1.NetworkConfig) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	p := json.Number(fmt.Sprintf("%d", vxlanPort))
+	p := json.Number(fmt.Sprintf("%d", *c.VXLANPort))
 
 	uns.SetNestedField(obj.Object, p, "network", "vxLANPort")
 
@@ -160,20 +190,8 @@ func controllerConfig(conf *netv1.NetworkConfig) (string, error) {
 
 // nodeConfig builds the (yaml text of) the NodeConfig object
 // consumed by the sdn node process
-func nodeConfig(conf *netv1.NetworkConfig) (string, error) {
-	operConfig := conf.Spec
-	c := conf.Spec.DefaultNetwork.OpenshiftSDNConfig
-	kpc := operConfig.KubeProxyConfig
-
-	mtu := uint32(1450)
-	if c.MTU != nil {
-		mtu = *c.MTU
-	}
-
-	bindAddress := "0.0.0.0"
-	if kpc != nil && kpc.BindAddress != "" {
-		bindAddress = kpc.BindAddress
-	}
+func nodeConfig(conf *netv1.NetworkConfigSpec) (string, error) {
+	c := conf.DefaultNetwork.OpenshiftSDNConfig
 
 	result := legacyconfigv1.NodeConfig{
 		TypeMeta: metav1.TypeMeta{
@@ -183,7 +201,7 @@ func nodeConfig(conf *netv1.NetworkConfig) (string, error) {
 		NodeName: NodeNameMagicString,
 		NetworkConfig: legacyconfigv1.NodeNetworkConfig{
 			NetworkPluginName: sdnPluginName(c.Mode),
-			MTU:               mtu,
+			MTU:               *c.MTU,
 		},
 		// ServingInfo is used by both the proxy and metrics components
 		ServingInfo: legacyconfigv1.ServingInfo{
@@ -193,7 +211,7 @@ func nodeConfig(conf *netv1.NetworkConfig) (string, error) {
 				KeyFile:  "/etc/kubernetes/pki/kubelet.key",
 			},
 			ClientCA:    "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
-			BindAddress: bindAddress + ":10251", // port is unused
+			BindAddress: conf.KubeProxyConfig.BindAddress + ":10251", // port is unused but required
 		},
 
 		// Openshift-sdn calls the CRI endpoint directly; point it to crio
@@ -201,16 +219,11 @@ func nodeConfig(conf *netv1.NetworkConfig) (string, error) {
 			"container-runtime":          {"remote"},
 			"container-runtime-endpoint": {"/var/run/crio/crio.sock"},
 		},
-	}
 
-	if kpc != nil && kpc.IptablesSyncPeriod != "" {
-		result.IPTablesSyncPeriod = kpc.IptablesSyncPeriod
-	}
-	if kpc != nil && len(kpc.ProxyArguments) > 0 {
-		result.ProxyArguments = kpc.ProxyArguments
+		IPTablesSyncPeriod: conf.KubeProxyConfig.IptablesSyncPeriod,
+		ProxyArguments:     conf.KubeProxyConfig.ProxyArguments,
 	}
 
 	buf, err := yaml.Marshal(result)
 	return string(buf), err
-
 }
