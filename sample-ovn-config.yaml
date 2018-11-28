@@ -1,0 +1,14 @@
+apiVersion: "networkoperator.openshift.io/v1"
+kind: "NetworkConfig"
+metadata:
+  name: "default"
+spec:
+  serviceNetwork:
+    - "172.30.0.0/16"
+  clusterNetwork:
+    - cidr: "10.128.0.0/14"
+      hostPrefix: 23
+  defaultNetwork:
+    type: OVNKubernetes
+    ovnKubernetesConfig:
+      MTU: 1400

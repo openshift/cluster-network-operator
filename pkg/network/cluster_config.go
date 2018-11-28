@@ -59,13 +59,14 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec) error {
 	}
 
 	if clusterConfig.NetworkType == "" {
-		return errors.Errorf("spec.networkType is required")
+		// the type is required: OpenShiftSDN (default) or OVNKubernetes
+		return errors.Errorf("spec.networkType is required, such as OpenShiftSDN or OVNKubernetes")
 	}
 
 	return nil
 }
 
-// MergeClusterConfig merges the cluster configuration in to the real
+// MergeClusterConfig merges the cluster configuration into the real
 // CRD configuration.
 func MergeClusterConfig(operConf *operv1.NetworkSpec, clusterConf configv1.NetworkSpec) {
 	operConf.ServiceNetwork = clusterConf.ServiceNetwork
@@ -78,6 +79,7 @@ func MergeClusterConfig(operConf *operv1.NetworkSpec, clusterConf configv1.Netwo
 		})
 	}
 
+	// OpenShiftSDN (default), OVNKubenetes
 	operConf.DefaultNetwork.Type = operv1.NetworkType(clusterConf.NetworkType)
 }
 
@@ -111,6 +113,8 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec) configv1.NetworkStat
 	switch operConf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		status.ClusterNetworkMTU = int(*operConf.DefaultNetwork.OpenShiftSDNConfig.MTU)
+	case operv1.NetworkTypeOVNKubernetes:
+		status.ClusterNetworkMTU = int(*operConf.DefaultNetwork.OVNKubernetesConfig.MTU)
 	}
 
 	return status
