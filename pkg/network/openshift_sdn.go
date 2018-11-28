@@ -205,11 +205,6 @@ func nodeConfig(conf *netv1.NetworkConfigSpec) (string, error) {
 		},
 		// ServingInfo is used by both the proxy and metrics components
 		ServingInfo: legacyconfigv1.ServingInfo{
-			// These files are bind-mounted in at a hard-coded location
-			CertInfo: legacyconfigv1.CertInfo{
-				CertFile: "/etc/kubernetes/pki/kubelet.crt",
-				KeyFile:  "/etc/kubernetes/pki/kubelet.key",
-			},
 			ClientCA:    "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
 			BindAddress: conf.KubeProxyConfig.BindAddress + ":10251", // port is unused but required
 		},

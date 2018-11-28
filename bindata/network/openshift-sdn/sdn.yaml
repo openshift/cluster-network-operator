@@ -91,9 +91,6 @@ spec:
         - mountPath: /etc/kubernetes/kubeconfig
           name: host-kubeconfig
           readOnly: true
-        - mountPath: /etc/kubernetes/pki
-          readOnly: true
-          name: host-pki
         # Mount the entire run directory for socket access for Docker or CRI-o
         # TODO: remove
         - mountPath: /var/run
@@ -141,9 +138,6 @@ spec:
       - name: host-kubeconfig
         hostPath:
           path: /etc/kubernetes/kubeconfig
-      - name: host-pki
-        hostPath:
-          path: /var/lib/kubelet/pki
       - name: host-modules
         hostPath:
           path: /lib/modules
