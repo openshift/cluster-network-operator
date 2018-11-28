@@ -1,0 +1,237 @@
+---
+# ovnkube-node
+# daemonset version 3
+# starts node daemons for ovs and ovn, each in a separate container
+# it is run on all nodes
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: ovnkube-node
+  # namespace set up by install
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    kubernetes.io/description: |
+      This daemonset launches the ovn-kubernetes per node networking components.
+spec:
+  selector:
+    matchLabels:
+      app: ovnkube-node
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: ovnkube-node
+        component: network
+        type: infra
+        openshift.io/component: network
+        beta.kubernetes.io/os: "linux"
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      # Requires fairly broad permissions - ability to read all services and network functions as well
+      # as all pods.
+      serviceAccountName: ovn
+      hostNetwork: true
+      hostPID: true
+      containers:
+
+      # ovsdb-server and ovs-switchd daemons
+      - name: ovs-daemons
+        image: {{.OvnImage}}
+
+        command: ["/root/ovnkube.sh", "ovs-server"]
+
+        securityContext:
+          # Permission could be reduced by selecting an appropriate SELinux policy
+          privileged: true
+
+        volumeMounts:
+        - mountPath: /lib/modules
+          name: host-modules
+          readOnly: true
+        - mountPath: /run/openvswitch
+          name: host-run-ovs
+        - mountPath: /var/run/openvswitch
+          name: host-var-run-ovs
+        - mountPath: /sys
+          name: host-sys
+          readOnly: true
+        - mountPath: /etc/openvswitch
+          name: host-config-openvswitch
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+        env:
+        - name: OVN_DAEMONSET_VERSION
+          value: "3"
+
+
+      # firewall rules for ovn - assumed to be setup
+      # iptables -A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 6641 -j ACCEPT
+      # iptables -A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 6642 -j ACCEPT
+      # ovs flow for ovn (geneve)
+      # /usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
+      # The network container launches the ovn-k8s-cni-overlay process, the kube-proxy, and the local DNS service.
+      # It relies on an up to date node-config.yaml being present.
+      - name: ovn-controller
+        image: {{.OvnImage}}
+
+        command: ["/root/ovnkube.sh", "ovn-controller"]
+
+        securityContext:
+          # Permission could be reduced by selecting an appropriate SELinux policy
+          privileged: true
+
+        volumeMounts:
+        # Directory which contains the host configuration.
+        - mountPath: /var/lib/openvswitch/
+          name: host-var-lib-ovs
+        - mountPath: /var/run/openvswitch/
+          name: host-var-run-ovs
+        # CNI related mounts which we take over
+        - mountPath: /host/opt/cni/bin
+          name: host-opt-cni-bin
+        - mountPath: /etc/cni/net.d
+          name: host-etc-cni-netd
+        - mountPath: /var/lib/cni/networks/ovn-k8s-cni-overlay
+          name: host-var-lib-cni-networks-ovn-kubernetes
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+        env:
+        - name: OVN_DAEMONSET_VERSION
+          value: "3"
+        - name: OVNKUBE_LOGLEVEL
+          value: "4"
+        - name: OVN_NET_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: net_cidr
+        - name: OVN_SVC_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: svc_cidr
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: K8S_APISERVER
+          value: "{{.K8S_APISERVER}}"
+
+        ports:
+        - name: healthz
+          containerPort: 10258
+        # TODO: Temporarily disabled until we determine how to wait for clean default
+        # config
+        # livenessProbe:
+        #   initialDelaySeconds: 10
+        #   httpGet:
+        #     path: /healthz
+        #     port: 10258
+        #     scheme: HTTP
+        lifecycle:
+
+      - name: ovn-node
+        image: {{.OvnImage}}
+
+        command: ["/root/ovnkube.sh", "ovn-node"]
+
+        securityContext:
+          # Permission could be reduced by selecting an appropriate SELinux policy
+          privileged: true
+
+        volumeMounts:
+        # Directory which contains the host configuration.
+        - mountPath: /var/lib/openvswitch/
+          name: host-var-lib-ovs
+        - mountPath: /var/run/openvswitch/
+          name: host-var-run-ovs
+        # CNI related mounts which we take over
+        - mountPath: /host/opt/cni/bin
+          name: host-opt-cni-bin
+        - mountPath: /etc/cni/net.d
+          name: host-etc-cni-netd
+        - mountPath: /var/lib/cni/networks/ovn-k8s-cni-overlay
+          name: host-var-lib-cni-networks-ovn-kubernetes
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+        env:
+        - name: OVN_DAEMONSET_VERSION
+          value: "3"
+        - name: OVNKUBE_LOGLEVEL
+          value: "5"
+        - name: OVN_NET_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: net_cidr
+        - name: OVN_SVC_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: svc_cidr
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: K8S_APISERVER
+          value: "{{.K8S_APISERVER}}"
+
+        ports:
+        - name: healthz
+          containerPort: 10259
+        # TODO: Temporarily disabled until we determine how to wait for clean default
+        # config
+        # livenessProbe:
+        #   initialDelaySeconds: 10
+        #   httpGet:
+        #     path: /healthz
+        #     port: 10259
+        #     scheme: HTTP
+        lifecycle:
+
+      nodeSelector:
+        beta.kubernetes.io/os: "linux"
+      volumes:
+      # In bootstrap mode, the host config contains information not easily available
+      # from other locations.
+      - name: host-modules
+        hostPath:
+          path: /lib/modules
+
+      - name: host-var-lib-ovs
+        hostPath:
+          path: /var/lib/openvswitch
+      - name: host-run-ovs
+        hostPath:
+          path: /run/openvswitch
+      - name: host-var-run-ovs
+        hostPath:
+          path: /var/run/openvswitch
+      - name: host-sys
+        hostPath:
+          path: /sys
+
+      - name: host-opt-cni-bin
+        hostPath:
+          path: /opt/cni/bin
+      - name: host-etc-cni-netd
+        hostPath:
+          path: /etc/kubernetes/cni/net.d
+      - name: host-config-openvswitch
+        hostPath:
+          path: /etc/origin/openvswitch
+      - name: host-var-lib-cni-networks-ovn-kubernetes
+        hostPath:
+          path: /var/lib/cni/networks/ovn-k8s-cni-overlay
+      tolerations:
+      - operator: "Exists"
