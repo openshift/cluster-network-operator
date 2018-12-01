@@ -9,9 +9,9 @@ import (
 func TestIsChangeSafe(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	prev := OpenshiftSDNConfig.Spec.DeepCopy()
+	prev := OpenShiftSDNConfig.Spec.DeepCopy()
 	FillDefaults(prev)
-	next := OpenshiftSDNConfig.Spec.DeepCopy()
+	next := OpenShiftSDNConfig.Spec.DeepCopy()
 	FillDefaults(next)
 
 	err := IsChangeSafe(prev, next)
@@ -21,13 +21,13 @@ func TestIsChangeSafe(t *testing.T) {
 	err = IsChangeSafe(prev, next)
 	g.Expect(err).To(MatchError(ContainSubstring("cannot change ClusterNetworks")))
 
-	next = OpenshiftSDNConfig.Spec.DeepCopy()
+	next = OpenShiftSDNConfig.Spec.DeepCopy()
 	FillDefaults(next)
 	next.ServiceNetwork = "1.2.3.4/99"
 	err = IsChangeSafe(prev, next)
 	g.Expect(err).To(MatchError(ContainSubstring("cannot change ServiceNetwork")))
 
-	next = OpenshiftSDNConfig.Spec.DeepCopy()
+	next = OpenShiftSDNConfig.Spec.DeepCopy()
 	FillDefaults(next)
 	next.DefaultNetwork.Type = "Kuryr"
 	err = IsChangeSafe(prev, next)
