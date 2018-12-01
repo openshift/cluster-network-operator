@@ -23,15 +23,15 @@ import (
 // real nodename
 const NodeNameMagicString = "%%NODENAME%%"
 
-// renderOpenshiftSDN returns the manifests for the openshift-sdn.
+// renderOpenShiftSDN returns the manifests for the openshift-sdn.
 // This creates
 // - the ClusterNetwork object
 // - the sdn namespace
 // - the sdn daemonset
 // - the openvswitch daemonset
 // and some other small things.
-func renderOpenshiftSDN(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructured, error) {
-	c := conf.DefaultNetwork.OpenshiftSDNConfig
+func renderOpenShiftSDN(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructured, error) {
+	c := conf.DefaultNetwork.OpenShiftSDNConfig
 
 	objs := []*uns.Unstructured{}
 
@@ -64,13 +64,13 @@ func renderOpenshiftSDN(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*u
 	return objs, nil
 }
 
-// validateOpenshiftSDN checks that the openshift-sdn specific configuration
+// validateOpenShiftSDN checks that the openshift-sdn specific configuration
 // is basically sane.
-func validateOpenshiftSDN(conf *netv1.NetworkConfigSpec) []error {
+func validateOpenShiftSDN(conf *netv1.NetworkConfigSpec) []error {
 	out := []error{}
-	sc := conf.DefaultNetwork.OpenshiftSDNConfig
+	sc := conf.DefaultNetwork.OpenShiftSDNConfig
 	if sc == nil {
-		out = append(out, errors.Errorf("OpenshiftSDNConfig cannot be nil"))
+		out = append(out, errors.Errorf("OpenShiftSDNConfig cannot be nil"))
 		return out
 	}
 
@@ -93,11 +93,11 @@ func validateOpenshiftSDN(conf *netv1.NetworkConfigSpec) []error {
 	return out
 }
 
-// isOpenshiftSDNChangeSafe currently returns an error if any changes are made.
+// isOpenShiftSDNChangeSafe currently returns an error if any changes are made.
 // In the future, we may support rolling out MTU or external openvswitch alterations.
-func isOpenshiftSDNChangeSafe(prev, next *netv1.NetworkConfigSpec) []error {
-	pn := prev.DefaultNetwork.OpenshiftSDNConfig
-	nn := next.DefaultNetwork.OpenshiftSDNConfig
+func isOpenShiftSDNChangeSafe(prev, next *netv1.NetworkConfigSpec) []error {
+	pn := prev.DefaultNetwork.OpenShiftSDNConfig
+	nn := next.DefaultNetwork.OpenShiftSDNConfig
 
 	if reflect.DeepEqual(pn, nn) {
 		return []error{}
@@ -105,7 +105,7 @@ func isOpenshiftSDNChangeSafe(prev, next *netv1.NetworkConfigSpec) []error {
 	return []error{errors.Errorf("cannot change openshift-sdn configuration")}
 }
 
-func fillOpenshiftSDNDefaults(conf *netv1.NetworkConfigSpec) {
+func fillOpenShiftSDNDefaults(conf *netv1.NetworkConfigSpec) {
 	if conf.DeployKubeProxy == nil {
 		prox := false
 		conf.DeployKubeProxy = &prox
@@ -118,7 +118,7 @@ func fillOpenshiftSDNDefaults(conf *netv1.NetworkConfigSpec) {
 		conf.KubeProxyConfig.BindAddress = "0.0.0.0"
 	}
 
-	sc := conf.DefaultNetwork.OpenshiftSDNConfig
+	sc := conf.DefaultNetwork.OpenShiftSDNConfig
 	if sc.VXLANPort == nil {
 		var port uint32 = 4789
 		sc.VXLANPort = &port
@@ -135,7 +135,7 @@ func sdnPluginName(n netv1.SDNMode) string {
 		return "redhat/openshift-ovs-subnet"
 	case netv1.SDNModeMultitenant:
 		return "redhat/openshift-ovs-multitenant"
-	case netv1.SDNModePolicy:
+	case netv1.SDNModeNetworkPolicy, netv1.SDNModeDeprecatedNetworkpolicy:
 		return "redhat/openshift-ovs-networkpolicy"
 	}
 	return ""
@@ -144,7 +144,7 @@ func sdnPluginName(n netv1.SDNMode) string {
 // controllerConfig builds the contents of controller-config.yaml
 // for the controller
 func controllerConfig(conf *netv1.NetworkConfigSpec) (string, error) {
-	c := conf.DefaultNetwork.OpenshiftSDNConfig
+	c := conf.DefaultNetwork.OpenShiftSDNConfig
 
 	// generate master network configuration
 	ippools := []cpv1.ClusterNetworkEntry{}
@@ -191,7 +191,7 @@ func controllerConfig(conf *netv1.NetworkConfigSpec) (string, error) {
 // nodeConfig builds the (yaml text of) the NodeConfig object
 // consumed by the sdn node process
 func nodeConfig(conf *netv1.NetworkConfigSpec) (string, error) {
-	c := conf.DefaultNetwork.OpenshiftSDNConfig
+	c := conf.DefaultNetwork.OpenShiftSDNConfig
 
 	result := legacyconfigv1.NodeConfig{
 		TypeMeta: metav1.TypeMeta{
@@ -209,7 +209,7 @@ func nodeConfig(conf *netv1.NetworkConfigSpec) (string, error) {
 			BindAddress: conf.KubeProxyConfig.BindAddress + ":10251", // port is unused but required
 		},
 
-		// Openshift-sdn calls the CRI endpoint directly; point it to crio
+		// OpenShift SDN calls the CRI endpoint directly; point it to crio
 		KubeletArguments: legacyconfigv1.ExtendedArguments{
 			"container-runtime":          {"remote"},
 			"container-runtime-endpoint": {"/var/run/crio/crio.sock"},
