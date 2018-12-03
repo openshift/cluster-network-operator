@@ -2,6 +2,7 @@ package networkconfig
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -12,11 +13,14 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
+	"github.com/openshift/cluster-network-operator/pkg/util/clusteroperator"
 
+	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -37,18 +41,24 @@ var ManifestPath = "./bindata"
 
 // Add creates a new NetworkConfig Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, status *clusteroperator.StatusManager) error {
+	return add(mgr, newReconciler(mgr, status))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, status *clusteroperator.StatusManager) *ReconcileNetworkConfig {
 	configv1.Install(mgr.GetScheme())
-	return &ReconcileNetworkConfig{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileNetworkConfig{
+		client: mgr.GetClient(),
+		scheme: mgr.GetScheme(),
+		status: status,
+
+		daemonSetReconciler: newDaemonSetReconciler(status),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r *ReconcileNetworkConfig) error {
 	// Create a new controller
 	c, err := controller.New("networkconfig-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -57,6 +67,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to primary resource NetworkConfig
 	err = c.Watch(&source.Kind{Type: &networkoperatorv1.NetworkConfig{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
+	// Likewise for the DaemonSet reconciler
+	c, err = controller.New("daemonset-controller", mgr, controller.Options{Reconciler: r.daemonSetReconciler})
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -72,6 +92,9 @@ type ReconcileNetworkConfig struct {
 	// that reads objects from the cache and writes to the apiserver
 	client client.Client
 	scheme *runtime.Scheme
+	status *clusteroperator.StatusManager
+
+	daemonSetReconciler *ReconcileDaemonSets
 }
 
 // Reconcile updates the state of the cluster to match that which is desired
@@ -90,6 +113,7 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 	err := r.client.Get(context.TODO(), request.NamespacedName, operConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
+			r.status.SetConfigFailing("NoOperatorConfig", fmt.Errorf("NetworkConfig was deleted"))
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected, since we set
 			// the ownerReference (see https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/).
@@ -98,6 +122,7 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 		}
 		// Error reading the object - requeue the request.
 		log.Printf("Unable to retrieve NetworkConfig object: %v", err)
+		// FIXME: operator status?
 		return reconcile.Result{}, err
 	}
 
@@ -105,12 +130,14 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 	// This will also commit the change back to the apiserver.
 	if err := r.MergeClusterConfig(context.TODO(), operConfig); err != nil {
 		log.Printf("Failed to merge the cluster configuration: %v", err)
+		r.status.SetConfigFailing("MergeClusterConfig", err)
 		return reconcile.Result{}, err
 	}
 
 	// Validate the configuration
 	if err := network.Validate(&operConfig.Spec); err != nil {
 		log.Printf("Failed to validate NetworkConfig.Spec: %v", err)
+		r.status.SetConfigFailing("InvalidOperatorConfig", err)
 		return reconcile.Result{}, err
 	}
 
@@ -118,6 +145,7 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 	prev, err := GetAppliedConfiguration(context.TODO(), r.client, operConfig.ObjectMeta.Name)
 	if err != nil {
 		log.Printf("Failed to retrieve previously applied configuration: %v", err)
+		// FIXME: operator status?
 		return reconcile.Result{}, err
 	}
 
@@ -132,8 +160,9 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 		err = network.IsChangeSafe(prev, &operConfig.Spec)
 		if err != nil {
 			log.Printf("Not applying unsafe change: %v", err)
-			return reconcile.Result{},
-				errors.Wrapf(err, "not applying unsafe change")
+			errors.Wrapf(err, "not applying unsafe change")
+			r.status.SetConfigFailing("InvalidOperatorConfig", err)
+			return reconcile.Result{}, err
 		}
 	}
 
@@ -141,16 +170,30 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 	objs, err := network.Render(&operConfig.Spec, ManifestPath)
 	if err != nil {
 		log.Printf("Failed to render: %v", err)
-		return reconcile.Result{}, errors.Wrapf(err, "failed to render")
+		err = errors.Wrapf(err, "failed to render")
+		r.status.SetConfigFailing("RenderError", err)
+		return reconcile.Result{}, err
 	}
 
 	// The first object we create should be the record of our applied configuration. The last object we create is config.openshift.io/v1/Network.Status
 	app, err := AppliedConfiguration(operConfig)
 	if err != nil {
 		log.Printf("Failed to render applied: %v", err)
-		return reconcile.Result{}, errors.Wrapf(err, "failed to render applied")
+		err = errors.Wrapf(err, "failed to render applied")
+		r.status.SetConfigFailing("RenderError", err)
+		return reconcile.Result{}, err
 	}
 	objs = append([]*uns.Unstructured{app}, objs...)
+
+	// Set up the DaemonSet reconciler before we start creating the DaemonSets
+	r.status.SetConfigSuccess()
+	daemonSets := []types.NamespacedName{}
+	for _, obj := range objs {
+		if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "DaemonSet" {
+			daemonSets = append(daemonSets, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()})
+		}
+	}
+	r.daemonSetReconciler.SetDaemonSets(daemonSets)
 
 	// Apply the objects to the cluster
 	for _, obj := range objs {
@@ -158,6 +201,7 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 		if err := controllerutil.SetControllerReference(operConfig, obj, r.scheme); err != nil {
 			err = errors.Wrapf(err, "could not set reference for (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
 			log.Println(err)
+			r.status.SetConfigFailing("InternalError", err)
 			return reconcile.Result{}, err
 		}
 
@@ -165,6 +209,7 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 		if err := apply.ApplyObject(context.TODO(), r.client, obj); err != nil {
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
 			log.Println(err)
+			r.status.SetConfigFailing("ApplyOperatorConfig", err)
 			return reconcile.Result{}, err
 		}
 	}
@@ -174,6 +219,7 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 	if err != nil {
 		err = errors.Wrapf(err, "could not generate network status")
 		log.Println(err)
+		r.status.SetConfigFailing("StatusError", err)
 		return reconcile.Result{}, err
 	}
 	if status != nil {
@@ -182,6 +228,7 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 		if err := apply.ApplyObject(context.TODO(), r.client, status); err != nil {
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", status.GroupVersionKind(), status.GetNamespace(), status.GetName())
 			log.Println(err)
+			r.status.SetConfigFailing("StatusError", err)
 			return reconcile.Result{}, err
 		}
 	}
