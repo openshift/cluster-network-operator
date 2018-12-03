@@ -107,6 +107,7 @@ func TestFillOpenShiftSDNDefaults(t *testing.T) {
 
 	crd := OpenShiftSDNConfig.DeepCopy()
 	conf := &crd.Spec
+	conf.DefaultNetwork.OpenShiftSDNConfig = nil
 
 	// vars
 	f := false

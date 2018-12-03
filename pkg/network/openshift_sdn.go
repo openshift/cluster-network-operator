@@ -68,26 +68,23 @@ func renderOpenShiftSDN(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*u
 // is basically sane.
 func validateOpenShiftSDN(conf *netv1.NetworkConfigSpec) []error {
 	out := []error{}
-	sc := conf.DefaultNetwork.OpenShiftSDNConfig
-	if sc == nil {
-		out = append(out, errors.Errorf("OpenShiftSDNConfig cannot be nil"))
-		return out
-	}
 
 	if len(conf.ClusterNetworks) == 0 {
 		out = append(out, errors.Errorf("ClusterNetworks cannot be empty"))
 	}
+	sc := conf.DefaultNetwork.OpenShiftSDNConfig
+	if sc != nil {
+		if sdnPluginName(sc.Mode) == "" {
+			out = append(out, errors.Errorf("invalid openshift-sdn mode %q", sc.Mode))
+		}
 
-	if sdnPluginName(sc.Mode) == "" {
-		out = append(out, errors.Errorf("invalid openshift-sdn mode %q", sc.Mode))
-	}
+		if sc.VXLANPort != nil && (*sc.VXLANPort < 1 || *sc.VXLANPort > 65535) {
+			out = append(out, errors.Errorf("invalid VXLANPort %d", *sc.VXLANPort))
+		}
 
-	if sc.VXLANPort != nil && (*sc.VXLANPort < 1 || *sc.VXLANPort > 65535) {
-		out = append(out, errors.Errorf("invalid VXLANPort %d", *sc.VXLANPort))
-	}
-
-	if sc.MTU != nil && (*sc.MTU < 576 || *sc.MTU > 65536) {
-		out = append(out, errors.Errorf("invalid MTU %d", *sc.MTU))
+		if sc.MTU != nil && (*sc.MTU < 576 || *sc.MTU > 65536) {
+			out = append(out, errors.Errorf("invalid MTU %d", *sc.MTU))
+		}
 	}
 
 	return out
@@ -120,6 +117,10 @@ func fillOpenShiftSDNDefaults(conf, previous *netv1.NetworkConfigSpec, hostMTU i
 		conf.KubeProxyConfig.BindAddress = "0.0.0.0"
 	}
 
+	if conf.DefaultNetwork.OpenShiftSDNConfig == nil {
+		conf.DefaultNetwork.OpenShiftSDNConfig = &netv1.OpenShiftSDNConfig{}
+	}
+
 	sc := conf.DefaultNetwork.OpenShiftSDNConfig
 	if sc.VXLANPort == nil {
 		var port uint32 = 4789
@@ -135,6 +136,9 @@ func fillOpenShiftSDNDefaults(conf, previous *netv1.NetworkConfigSpec, hostMTU i
 			mtu = *previous.DefaultNetwork.OpenShiftSDNConfig.MTU
 		}
 		sc.MTU = &mtu
+	}
+	if sc.Mode == "" {
+		sc.Mode = netv1.SDNModeNetworkPolicy
 	}
 }
 
