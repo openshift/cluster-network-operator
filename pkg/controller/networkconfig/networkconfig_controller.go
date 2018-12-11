@@ -99,26 +99,34 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		log.Printf("Unable to retrieve NetworkConfig object: %v", err)
 		return reconcile.Result{}, err
 	}
 
 	// Validate the configuration
 	if err := network.Validate(&instance.Spec); err != nil {
+		log.Printf("Failed to validate NetworkConfig.Spec: %v", err)
 		return reconcile.Result{}, err
 	}
-	network.FillDefaults(&instance.Spec)
+
+	// Retrieve the previously applied configuration
+	prev, err := GetAppliedConfiguration(context.TODO(), r.client, instance.ObjectMeta.Name)
+	if err != nil {
+		log.Printf("Failed to retrieve previously applied configuration: %v", err)
+		return reconcile.Result{}, err
+	}
+
+	// Fill all defaults explicitly
+	network.FillDefaults(&instance.Spec, prev)
 
 	// Compare against previous applied configuration to see if this change
 	// is safe.
-	prev, err := GetAppliedConfiguration(context.TODO(), r.client, instance.ObjectMeta.Name)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
 	if prev != nil {
 		// We may need to fill defaults here -- sort of as a poor-man's
 		// upconversion scheme -- if we add additional fields to the config.
 		err = network.IsChangeSafe(prev, &instance.Spec)
 		if err != nil {
+			log.Printf("Not applying unsafe change: %v", err)
 			return reconcile.Result{},
 				errors.Wrapf(err, "not applying unsafe change")
 		}
@@ -127,12 +135,14 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 	// Generate the objects
 	objs, err := network.Render(&instance.Spec, ManifestPath)
 	if err != nil {
+		log.Printf("Failed to render: %v", err)
 		return reconcile.Result{}, errors.Wrapf(err, "failed to render")
 	}
 
 	// The first object we create should be the record of our applied configuration
 	app, err := AppliedConfiguration(instance)
 	if err != nil {
+		log.Printf("Failed to render applied: %v", err)
 		return reconcile.Result{}, errors.Wrapf(err, "failed to render applied")
 	}
 	objs = append([]*uns.Unstructured{app}, objs...)
@@ -140,12 +150,16 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 	// Apply the objects to the cluster
 	for _, obj := range objs {
 		if err := controllerutil.SetControllerReference(instance, obj, r.scheme); err != nil {
-			return reconcile.Result{}, errors.Wrapf(err, "could not set reference for (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
+			err = errors.Wrapf(err, "could not set reference for (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
+			log.Println(err)
+			return reconcile.Result{}, err
 		}
 
 		// Open question: should an error here indicate we will never retry?
 		if err := apply.ApplyObject(context.TODO(), r.client, obj); err != nil {
-			return reconcile.Result{}, errors.Wrapf(err, "could not apply (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
+			err = errors.Wrapf(err, "could not apply (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
+			log.Println(err)
+			return reconcile.Result{}, err
 		}
 	}
 

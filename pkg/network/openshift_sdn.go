@@ -105,7 +105,9 @@ func isOpenShiftSDNChangeSafe(prev, next *netv1.NetworkConfigSpec) []error {
 	return []error{errors.Errorf("cannot change openshift-sdn configuration")}
 }
 
-func fillOpenShiftSDNDefaults(conf *netv1.NetworkConfigSpec) {
+func fillOpenShiftSDNDefaults(conf, previous *netv1.NetworkConfigSpec, hostMTU int) {
+	// NOTE: If you change any defaults, and it's not a safe chang to roll out
+	// to existing clusters, you MUST use the value from previous instead.
 	if conf.DeployKubeProxy == nil {
 		prox := false
 		conf.DeployKubeProxy = &prox
@@ -123,8 +125,15 @@ func fillOpenShiftSDNDefaults(conf *netv1.NetworkConfigSpec) {
 		var port uint32 = 4789
 		sc.VXLANPort = &port
 	}
+
+	// MTU is currently the only field we pull from previous.
+	// If it's not supplied, we infer it from  the node on which we're running.
+	// However, this can never change, so we always prefer previous.
 	if sc.MTU == nil {
-		var mtu uint32 = 1450
+		var mtu uint32 = uint32(hostMTU) - 50 // 50 byte VXLAN header
+		if previous != nil {
+			mtu = *previous.DefaultNetwork.OpenShiftSDNConfig.MTU
+		}
 		sc.MTU = &mtu
 	}
 }
