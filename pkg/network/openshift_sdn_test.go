@@ -47,7 +47,7 @@ func TestRenderOpenShiftSDN(t *testing.T) {
 
 	errs := validateOpenShiftSDN(config)
 	g.Expect(errs).To(HaveLen(0))
-	FillDefaults(config)
+	FillDefaults(config, nil)
 
 	// Make sure the OVS daemonset isn't created
 	truth := true
@@ -111,7 +111,7 @@ func TestFillOpenShiftSDNDefaults(t *testing.T) {
 	// vars
 	f := false
 	p := uint32(4789)
-	m := uint32(1450)
+	m := uint32(8950)
 
 	expected := netv1.NetworkConfigSpec{
 		ServiceNetwork: "172.30.0.0/16",
@@ -139,7 +139,7 @@ func TestFillOpenShiftSDNDefaults(t *testing.T) {
 		},
 	}
 
-	fillOpenShiftSDNDefaults(conf)
+	fillOpenShiftSDNDefaults(conf, nil, 9000)
 
 	g.Expect(conf).To(Equal(&expected))
 
@@ -154,7 +154,7 @@ func TestValidateOpenShiftSDN(t *testing.T) {
 
 	err := validateOpenShiftSDN(config)
 	g.Expect(err).To(BeEmpty())
-	FillDefaults(config)
+	FillDefaults(config, nil)
 
 	errExpect := func(substr string) {
 		t.Helper()
@@ -184,7 +184,7 @@ func TestProxyArgs(t *testing.T) {
 
 	crd := OpenShiftSDNConfig.DeepCopy()
 	config := &crd.Spec
-	FillDefaults(config)
+	FillDefaults(config, nil)
 
 	// iter through all objects, finding the sdn config map
 	getSdnConfigFile := func(objs []*uns.Unstructured) *uns.Unstructured {
@@ -248,9 +248,9 @@ func TestOpenShiftSDNIsSafe(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	prev := OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(prev)
+	FillDefaults(prev, nil)
 	next := OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(next)
+	FillDefaults(next, nil)
 
 	errs := isOpenShiftSDNChangeSafe(prev, next)
 	g.Expect(errs).To(BeEmpty())
