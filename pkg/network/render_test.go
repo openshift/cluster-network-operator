@@ -10,9 +10,9 @@ func TestIsChangeSafe(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	prev := OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(prev)
+	FillDefaults(prev, nil)
 	next := OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(next)
+	FillDefaults(next, nil)
 
 	err := IsChangeSafe(prev, next)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -22,13 +22,13 @@ func TestIsChangeSafe(t *testing.T) {
 	g.Expect(err).To(MatchError(ContainSubstring("cannot change ClusterNetworks")))
 
 	next = OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(next)
+	FillDefaults(next, nil)
 	next.ServiceNetwork = "1.2.3.4/99"
 	err = IsChangeSafe(prev, next)
 	g.Expect(err).To(MatchError(ContainSubstring("cannot change ServiceNetwork")))
 
 	next = OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(next)
+	FillDefaults(next, nil)
 	next.DefaultNetwork.Type = "Kuryr"
 	err = IsChangeSafe(prev, next)
 	g.Expect(err).To(MatchError(ContainSubstring("cannot change default network type")))

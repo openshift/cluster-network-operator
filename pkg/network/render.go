@@ -47,12 +47,21 @@ func Validate(conf *netv1.NetworkConfigSpec) error {
 // FillDefaults computes any default values and applies them to the configuration
 // This is a mutating operation. It should be called after Validate.
 //
-// This is done as an explicit step so we can check if a change is safe. We
-// explicitly record all generated defaults at apply time, rather than leaving
-// them implicit, so that a change in code later won't accidentally introduce
-// an unsafe change.
-func FillDefaults(conf *netv1.NetworkConfigSpec) {
-	FillDefaultNetworkDefaults(conf)
+// Defaults are carried forward from previous if it is provided. This is so we
+// can change defaults as we move forward, but won't disrupt existing clusters.
+func FillDefaults(conf, previous *netv1.NetworkConfigSpec) {
+	hostMTU, err := GetDefaultMTU()
+	if hostMTU == 0 {
+		hostMTU = 1500
+	}
+	if previous == nil { // host mtu isn't used in subsequent runs, elide these logs
+		if err != nil {
+			log.Printf("Failed MTU probe, failling back to 1500: %v", err)
+		} else {
+			log.Printf("Detected uplink MTU %d", hostMTU)
+		}
+	}
+	FillDefaultNetworkDefaults(conf, previous, hostMTU)
 }
 
 // IsChangeSafe checks to see if the change between prev and next are allowed
@@ -119,10 +128,10 @@ func RenderDefaultNetwork(conf *netv1.NetworkConfigSpec, manifestDir string) ([]
 }
 
 // FillDefaultNetworkDefaults
-func FillDefaultNetworkDefaults(conf *netv1.NetworkConfigSpec) {
+func FillDefaultNetworkDefaults(conf, previous *netv1.NetworkConfigSpec, hostMTU int) {
 	switch conf.DefaultNetwork.Type {
 	case netv1.NetworkTypeOpenShiftSDN, netv1.NetworkTypeDeprecatedOpenshiftSDN:
-		fillOpenShiftSDNDefaults(conf)
+		fillOpenShiftSDNDefaults(conf, previous, hostMTU)
 	default:
 		// This case has already been excluded by Validate
 		panic("invalid network")

@@ -52,7 +52,7 @@ func render() error {
 		return err
 	}
 
-	network.FillDefaults(&conf.Spec)
+	network.FillDefaults(&conf.Spec, nil)
 
 	objs, err := network.Render(&conf.Spec, manifestPath)
 	if err != nil {
