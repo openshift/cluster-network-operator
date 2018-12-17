@@ -1,7 +1,9 @@
 package network
 
 import (
+	"fmt"
 	"log"
+	"net"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -35,6 +37,18 @@ func Render(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructu
 // Validate checks that the supplied configuration is reasonable.
 func Validate(conf *netv1.NetworkConfigSpec) error {
 	errs := []error{}
+
+	// validate cluster ip
+	// make sure it's at least 4 bits
+	_, net, err := net.ParseCIDR(conf.ServiceNetwork)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("Invalid ServiceNetwork: %v", err))
+		err = nil
+	}
+	ones, bits := net.Mask.Size()
+	if bits-ones < 4 {
+		errs = append(errs, fmt.Errorf("ServiceNetwork too small, must be at least 4 bits"))
+	}
 
 	errs = append(errs, ValidateDefaultNetwork(conf)...)
 

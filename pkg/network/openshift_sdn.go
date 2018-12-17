@@ -3,10 +3,12 @@ package network
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
 
+	"github.com/apparentlymart/go-cidr/cidr"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 
@@ -201,6 +203,10 @@ func controllerConfig(conf *netv1.NetworkConfigSpec) (string, error) {
 // consumed by the sdn node process
 func nodeConfig(conf *netv1.NetworkConfigSpec) (string, error) {
 	c := conf.DefaultNetwork.OpenShiftSDNConfig
+	dnsIP, err := clusterDNSIP(conf.ServiceNetwork)
+	if err != nil {
+		return "", err
+	}
 
 	result := legacyconfigv1.NodeConfig{
 		TypeMeta: metav1.TypeMeta{
@@ -212,6 +218,7 @@ func nodeConfig(conf *netv1.NetworkConfigSpec) (string, error) {
 			NetworkPluginName: sdnPluginName(c.Mode),
 			MTU:               *c.MTU,
 		},
+		DNSIP: dnsIP,
 		// ServingInfo is used by both the proxy and metrics components
 		ServingInfo: legacyconfigv1.ServingInfo{
 			ClientCA:    "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
@@ -230,4 +237,20 @@ func nodeConfig(conf *netv1.NetworkConfigSpec) (string, error) {
 
 	buf, err := yaml.Marshal(result)
 	return string(buf), err
+}
+
+// clusterDNSIP relies on the fact that the serviceIP for kube-dns is always the
+// 10th IP in the service cidr. This is used by the SDN in a very specific case:
+// the route is hard-coded so that pods with a macvlan interface never lose
+// access to DNS.
+func clusterDNSIP(iprange string) (string, error) {
+	_, network, err := net.ParseCIDR(iprange)
+	if err != nil {
+		return "", err
+	}
+	ip, err := cidr.Host(network, 10)
+	if err != nil {
+		return "", err
+	}
+	return ip.String(), nil
 }

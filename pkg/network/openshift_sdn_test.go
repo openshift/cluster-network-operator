@@ -214,6 +214,8 @@ func TestProxyArgs(t *testing.T) {
 	g.Expect(val).To(Equal("0.0.0.0:10251"))
 	val, _, _ = uns.NestedString(cfg.Object, "iptablesSyncPeriod")
 	g.Expect(val).To(Equal(""))
+	val, _, _ = uns.NestedString(cfg.Object, "dnsIP")
+	g.Expect(val).To(Equal("172.30.0.10"))
 
 	// set sync period
 	config.KubeProxyConfig = &netv1.ProxyConfig{
