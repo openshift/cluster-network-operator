@@ -50,6 +50,14 @@
   version = "v1.0.1"
 
 [[projects]]
+  digest = "1:1929b21a34400d463a99336f8e2908d2a154dc525c52411a8d99bb519942dc4c"
+  name = "github.com/apparentlymart/go-cidr"
+  packages = ["cidr"]
+  pruneopts = "NT"
+  revision = "b1115bf8e14a60131a196f908223e4506b0ddc35"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:4b8b5811da6970495e04d1f4e98bb89518cc3cfc3b3f456bdb876ed7b6c74049"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
@@ -846,6 +854,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/Masterminds/sprig",
+    "github.com/apparentlymart/go-cidr/cidr",
     "github.com/ghodss/yaml",
     "github.com/onsi/gomega",
     "github.com/onsi/gomega/types",
