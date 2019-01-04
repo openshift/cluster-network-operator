@@ -54,10 +54,6 @@ required = [
     non-go = false
 
 [[constraint]]
-  name="github.com/openshift/api"
-  revision="2699ad42427b7e7b2cad1daefc93b632c9c0bb6c"
-
-[[constraint]]
   name = "github.com/Masterminds/sprig"
   version = "^2"
 
