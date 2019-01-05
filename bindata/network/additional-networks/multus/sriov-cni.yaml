@@ -1,0 +1,48 @@
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: sriov-cni
+  namespace: multus
+  annotations:
+    kubernetes.io/description: |
+      This daemon set launches the SR-IOV CNI Plugin.
+spec:
+  selector:
+    matchLabels:
+      app: sriov-cni
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: sriov-cni
+        component: network
+        type: infra
+        openshift.io/component: network
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      tolerations:
+      - operator: Exists
+      serviceAccountName: sriov-cni
+      containers:
+      - name: sriov-cni
+        image: nfvpe/sriov-cni:latest
+        securityContext:
+          privileged: true
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "50Mi"
+          limits:
+            cpu: "100m"
+            memory: "50Mi"
+        volumeMounts:
+        - name: cnibin
+          mountPath: /host/opt/cni/bin
+      volumes:
+        - name: cnibin
+          hostPath:
+            path: /opt/cni/bin

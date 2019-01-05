@@ -116,6 +116,12 @@ type AdditionalNetworkDefinition struct {
 	// The name of the network. This will be populated in the resulting CRD
 	Name string `json:"name"`
 
+	// The namespace of the network. This will be populated in the resulting CRD
+	Namespace string `json:"namespace"`
+
+	// The annotations of the network. This will be populated in the resulting CRD
+	Annotations map[string]string `json:"annotations,omitEmpty"`
+
 	// RawCNIConfig is the raw CNI configuration json to create in the
 	// NetworkAttachmentDefinition CRD
 	RawCNIConfig string `json:"rawCNIConfig"`
@@ -150,6 +156,32 @@ type OVNKubernetesConfig struct {
 	// The MTU to use for the tunnel interface
 	// Default is 1400
 	MTU *uint32 `json:"mtu,omitempty"`
+}
+
+// MultusCNIConfig is the CNI configuration parameters for networks using the
+// multus network project
+type MultusCNIConfig struct {
+	// The Name set to use multus network name
+	Name string `json:"name"`
+
+	// The Type set to use multus network type
+	Type string `json:"type"`
+
+	// The Kubeconfig set to host kube config path
+	Kubeconfig string `json:"kubeconfig"`
+
+	// The Delegates set to multus delegate networks
+	Delegates []*MultusDelegate `json:"delegates"`
+}
+
+// MultusCNIConfig is the CNI delegate configuration for networks using the
+// multus network project
+type MultusDelegate struct {
+	// The Name set to use default network name
+	Name string `json:"name"`
+
+	// The Type set to use default network type
+	Type string `json:"type"`
 }
 
 // NetworkType describes the network plugin type to configure

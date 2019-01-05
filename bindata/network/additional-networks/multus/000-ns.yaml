@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: multus
+  labels:
+    name: multus
+    openshift.io/run-level: "0"
+  annotations:
+    openshift.io/node-selector: "" #override default node selector
+    openshift.io/description: "Multus components"

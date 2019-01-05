@@ -187,7 +187,7 @@ func RenderAdditionalNetworks(conf *netv1.NetworkConfigSpec, manifestDir string)
 
 	// render Multus when additional networks is provided
 	if len(ans) > 0 {
-		objs, err := renderMultusConfig(manifestDir)
+		objs, err := renderMultusConfig(conf, manifestDir)
 		if err != nil {
 			return nil, err
 		}

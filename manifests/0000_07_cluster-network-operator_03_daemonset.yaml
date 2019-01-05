@@ -32,6 +32,8 @@ spec:
           value: "docker.io/openshift/origin-node:v4.0.0"
         - name: HYPERSHIFT_IMAGE
           value: "docker.io/openshift/origin-hypershift:v4.0.0"
+        - name: HOST_KUBECONFIG
+          value: "/etc/kubernetes/kubeconfig"
         - name: POD_NAME
           valueFrom:
             fieldRef:

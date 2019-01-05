@@ -2,6 +2,13 @@ apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
   name: {{.AdditionalNetworkName}}
-  namespace: default
+{{if .ConfigAnnotation}}
+  annotations:
+{{range $k, $v := .AdditionalNetworkAnnotations}}
+{{$k | indent 4}}: {{$v}}
+{{end}}
+{{end}}
+  namespace: {{.AdditionalNetworkNamespace}}
 spec:
-  config: {{.AdditionalNetworkConfig}}
+  config: |-
+{{.AdditionalNetworkConfig | indent 4}}

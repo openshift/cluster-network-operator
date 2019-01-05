@@ -1,0 +1,57 @@
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: sriov-device-plugin
+  namespace: multus
+  annotations:
+    kubernetes.io/description: |
+      This daemon set launches the SR-IOV Network Device Plugin.
+spec:
+  selector:
+    matchLabels:
+      app: sriovdp
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: sriovdp
+        component: network
+        type: infra
+        openshift.io/component: network
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      tolerations:
+      - operator: Exists
+      serviceAccountName: sriov-device-plugin
+      containers:
+      - name: sriovdp
+        image: nfvpe/sriov-device-plugin:release-v1
+        args:
+        - --log-dir=sriovdp
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "50Mi"
+          limits:
+            cpu: "100m"
+            memory: "50Mi"
+        securityContext:
+          privileged: false
+        volumeMounts:
+        - name: devicesock
+          mountPath: /var/lib/kubelet/device-plugins/
+          readOnly: false
+        - name: net
+          mountPath: /sys/class/net
+          readOnly: true
+      volumes:
+        - name: devicesock
+          hostPath:
+            path: /var/lib/kubelet/device-plugins/
+        - name: net
+          hostPath:
+            path: /sys/class/net
