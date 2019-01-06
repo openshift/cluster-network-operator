@@ -14,3 +14,7 @@ spec:
     from:
       kind: DockerImage
       name: docker.io/openshift/origin-hypershift:v4.0.0
+  - name: multus
+    from:
+      kind: DockerImage
+      name: docker.io/nfvpe/multus:snapshot

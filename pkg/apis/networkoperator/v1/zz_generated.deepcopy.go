@@ -148,6 +148,11 @@ func (in *NetworkConfigSpec) DeepCopyInto(out *NetworkConfigSpec) {
 		*out = make([]AdditionalNetworkDefinition, len(*in))
 		copy(*out, *in)
 	}
+	if in.DisableMultiNetwork != nil {
+		in, out := &in.DisableMultiNetwork, &out.DisableMultiNetwork
+		*out = new(bool)
+		**out = **in
+	}
 	if in.DeployKubeProxy != nil {
 		in, out := &in.DeployKubeProxy, &out.DeployKubeProxy
 		*out = new(bool)
