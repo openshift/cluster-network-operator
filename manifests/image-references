@@ -14,3 +14,7 @@ spec:
     from:
       kind: DockerImage
       name: docker.io/openshift/origin-hypershift:v4.0.0
+  - name: multus-cni
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-multus-cni:v4.0.0
