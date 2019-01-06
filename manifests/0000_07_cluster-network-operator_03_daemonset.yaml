@@ -32,6 +32,8 @@ spec:
           value: "docker.io/openshift/origin-node:v4.0.0"
         - name: HYPERSHIFT_IMAGE
           value: "docker.io/openshift/origin-hypershift:v4.0.0"
+        - name: MULTUS_IMAGE
+          value: "docker.io/nfvpe/multus:snapshot"
         - name: POD_NAME
           valueFrom:
             fieldRef:
