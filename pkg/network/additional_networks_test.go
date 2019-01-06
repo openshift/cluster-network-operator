@@ -17,10 +17,10 @@ var NetworkAttachmentConfig = netv1.NetworkConfig{
 	},
 }
 
-func TestRenderMultusConfig(t *testing.T) {
+func TestRenderAdditionalNetworksCRD(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	objs, err := renderMultusConfig(manifestDir)
+	objs, err := renderAdditionalNetworksCRD(manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(HaveLen(1))
 }

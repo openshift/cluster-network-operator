@@ -1,0 +1,65 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: multus
+rules:
+- apiGroups: ["apiextensions.k8s.io"]
+  resources:
+  - customresourcedefinitions
+  - customresourcedefinitions/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: ["k8s.cni.cncf.io"]
+  resources: ["*"]
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: [""]
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: [""]
+  resources:
+  - pods
+  - pods/status
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+  - update
+- apiGroups: [""]
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: multus
+  namespace: multus
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: multus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: multus
+subjects:
+- kind: ServiceAccount
+  name: multus
+  namespace: multus
