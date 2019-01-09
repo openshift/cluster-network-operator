@@ -73,3 +73,7 @@ required = [
 [[constraint]]
   name = "k8s.io/kube-proxy"
   version = "kubernetes-1.12.3"
+
+[[constraint]]
+  name = "github.com/gophercloud/gophercloud"
+  revision="f27ceddc323ff01fdd909ac8377fb06b12db7f4f"

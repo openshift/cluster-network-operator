@@ -3,6 +3,8 @@ package staticpod
 import (
 	"fmt"
 
+	"github.com/openshift/library-go/pkg/operator/loglevel"
+
 	"github.com/openshift/library-go/pkg/operator/unsupportedconfigoverridescontroller"
 
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -36,6 +38,11 @@ type staticPodOperatorControllerBuilder struct {
 	revisionConfigMaps []revision.RevisionResource
 	revisionSecrets    []revision.RevisionResource
 
+	// cert information
+	certDir        string
+	certConfigMaps []revision.RevisionResource
+	certSecrets    []revision.RevisionResource
+
 	// versioner information
 	versionRecorder   status.VersionGetter
 	operatorNamespace string
@@ -68,6 +75,7 @@ type Builder interface {
 	WithServiceMonitor(dynamicClient dynamic.Interface) Builder
 	WithVersioning(operatorNamespace, operandName string, versionRecorder status.VersionGetter) Builder
 	WithResources(operandNamespace, staticPodName string, revisionConfigMaps, revisionSecrets []revision.RevisionResource) Builder
+	WithCerts(certDir string, certConfigMaps, certSecrets []revision.RevisionResource) Builder
 	WithInstaller(command []string) Builder
 	WithPruning(command []string, staticPodPrefix string) Builder
 	ToControllers() (*staticPodOperatorControllers, error)
@@ -98,6 +106,13 @@ func (b *staticPodOperatorControllerBuilder) WithResources(operandNamespace, sta
 	return b
 }
 
+func (b *staticPodOperatorControllerBuilder) WithCerts(certDir string, certConfigMaps, certSecrets []revision.RevisionResource) Builder {
+	b.certDir = certDir
+	b.certConfigMaps = certConfigMaps
+	b.certSecrets = certSecrets
+	return b
+}
+
 func (b *staticPodOperatorControllerBuilder) WithInstaller(command []string) Builder {
 	b.installCommand = command
 	return b
@@ -114,7 +129,7 @@ func (b *staticPodOperatorControllerBuilder) ToControllers() (*staticPodOperator
 
 	eventRecorder := b.eventRecorder
 	if eventRecorder == nil {
-		eventRecorder = events.NewLoggingEventRecorder()
+		eventRecorder = events.NewLoggingEventRecorder("static-pod-operator-controller")
 	}
 	versionRecorder := b.versionRecorder
 	if versionRecorder == nil {
@@ -151,6 +166,10 @@ func (b *staticPodOperatorControllerBuilder) ToControllers() (*staticPodOperator
 			configMapClient,
 			podClient,
 			eventRecorder,
+		).WithCerts(
+			b.certDir,
+			b.certConfigMaps,
+			b.certSecrets,
 		)
 	}
 
@@ -210,6 +229,7 @@ func (b *staticPodOperatorControllerBuilder) ToControllers() (*staticPodOperator
 	}
 
 	controllers.unsupportedConfigOverridesController = unsupportedconfigoverridescontroller.NewUnsupportedConfigOverridesController(b.staticPodOperatorClient, eventRecorder)
+	controllers.logLevelController = loglevel.NewClusterOperatorLoggingController(b.staticPodOperatorClient, eventRecorder)
 
 	errs := []error{}
 	if controllers.revisionController == nil {
@@ -240,6 +260,7 @@ type staticPodOperatorControllers struct {
 	backingResourceController            *backingresource.BackingResourceController
 	monitoringResourceController         *monitoring.MonitoringResourceController
 	unsupportedConfigOverridesController *unsupportedconfigoverridescontroller.UnsupportedConfigOverridesController
+	logLevelController                   *loglevel.LogLevelController
 }
 
 func (o *staticPodOperatorControllers) WithInstallerPodMutationFn(installerPodMutationFn installer.InstallerPodMutationFunc) *staticPodOperatorControllers {
@@ -256,6 +277,7 @@ func (o *staticPodOperatorControllers) Run(stopCh <-chan struct{}) {
 	go o.backingResourceController.Run(1, stopCh)
 	go o.monitoringResourceController.Run(1, stopCh)
 	go o.unsupportedConfigOverridesController.Run(1, stopCh)
+	go o.logLevelController.Run(1, stopCh)
 
 	<-stopCh
 }
