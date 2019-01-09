@@ -9,11 +9,12 @@ import (
 	"github.com/pkg/errors"
 
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func Render(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	log.Printf("Starting render phase")
 	objs := []*uns.Unstructured{}
 
@@ -25,7 +26,7 @@ func Render(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, 
 	objs = append(objs, o...)
 
 	// render default network
-	o, err = RenderDefaultNetwork(conf, manifestDir)
+	o, err = RenderDefaultNetwork(conf, bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, err
 	}
@@ -202,6 +203,8 @@ func ValidateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 		return validateOpenShiftSDN(conf)
 	case operv1.NetworkTypeOVNKubernetes:
 		return validateOVNKubernetes(conf)
+	case operv1.NetworkTypeKuryr:
+		return validateKuryr(conf)
 	default:
 		return nil
 	}
@@ -209,7 +212,7 @@ func ValidateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 
 // RenderDefaultNetwork generates the manifests corresponding to the requested
 // default network
-func RenderDefaultNetwork(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func RenderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	dn := conf.DefaultNetwork
 	if errs := ValidateDefaultNetwork(conf); len(errs) > 0 {
 		return nil, errors.Errorf("invalid Default Network configuration: %v", errs)
@@ -220,6 +223,8 @@ func RenderDefaultNetwork(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.
 		return renderOpenShiftSDN(conf, manifestDir)
 	case operv1.NetworkTypeOVNKubernetes:
 		return renderOVNKubernetes(conf, manifestDir)
+	case operv1.NetworkTypeKuryr:
+		return renderKuryr(conf, bootstrapResult, manifestDir)
 	default:
 		log.Printf("NOTICE: Unknown network type %s, ignoring", dn.Type)
 		return nil, nil
@@ -233,6 +238,8 @@ func FillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int)
 		fillOpenShiftSDNDefaults(conf, previous, hostMTU)
 	case operv1.NetworkTypeOVNKubernetes:
 		fillOVNKubernetesDefaults(conf, previous, hostMTU)
+	case operv1.NetworkTypeKuryr:
+		fillKuryrDefaults(conf)
 	default:
 	}
 }
@@ -247,6 +254,8 @@ func IsDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 		return isOpenShiftSDNChangeSafe(prev, next)
 	case operv1.NetworkTypeOVNKubernetes:
 		return isOVNKubernetesChangeSafe(prev, next)
+	case operv1.NetworkTypeKuryr:
+		return isKuryrChangeSafe(prev, next)
 	default:
 		return nil
 	}

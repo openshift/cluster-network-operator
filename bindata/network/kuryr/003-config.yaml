@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kuryr-config
+  namespace: openshift-kuryr
+data:
+  kuryr.conf: |+
+    [DEFAULT]
+    debug = false
+
+    [binding]
+    default_driver = kuryr.lib.binding.drivers.vlan
+    link_iface = eth0
+
+    [cni_daemon]
+    daemon_enabled = true
+    docker_mode = true
+    netns_proc_dir = /host_proc
+
+    [ingress]
+    #l7_router_uuid = <None>
+
+    [kubernetes]
+    api_root = ""
+    ssl_ca_crt_file = /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    token_file = /var/run/secrets/kubernetes.io/serviceaccount/token
+    ssl_verify_server_crt = true
+    controller_ha = false
+    controller_ha_elector_port = 16401
+    watch_retry_timeout = 3600
+    pod_vif_driver = nested-vlan
+    vif_pool_driver = nested
+    multi_vif_drivers = noop
+
+    enabled_handlers = vif,lb,lbaasspec,policy,pod_label,namespace,kuryrnetpolicy,kuryrnet
+    pod_security_groups_driver = policy
+    service_security_groups_driver = policy
+    pod_subnets_driver = namespace
+
+    [namespace_subnet]
+    pod_router = {{ .WorkerNodesRouter }}
+    pod_subnet_pool = {{ .PodSubnetpool }}
+
+    {{- $AuthInfo := .OpenStackCloud.AuthInfo }}
+    [neutron_defaults]
+    service_subnet = {{ .ServiceSubnet }}
+    project = {{ default "\"\"" $AuthInfo.ProjectID }}
+    pod_security_groups = {{ default "default" .PodSecurityGroups }}
+    resource_tags = [{{ default "" .ResourceTags }}]
+    #network_device_mtu = 1500
+
+    [neutron]
+    auth_type = {{ default "password" .OpenStackCloud.AuthType }}
+    auth_url = {{ $AuthInfo.AuthURL }}
+    insecure = {{ .OpenStackInsecureAPI }}
+    token = {{ default "\"\"" $AuthInfo.Token }}
+    password = {{ default "\"\"" $AuthInfo.Password }}
+    username = {{ default "\"\"" $AuthInfo.Username }}
+    project_domain_name = {{ default "\"\"" $AuthInfo.ProjectDomainName }}
+    project_domain_id = {{ default "\"\"" $AuthInfo.ProjectDomainID }}
+    project_id = {{ default "\"\"" $AuthInfo.ProjectID }}
+    project_name = {{ default "\"\"" $AuthInfo.ProjectName }}
+    user_domain_name = {{ default "\"\"" $AuthInfo.UserDomainName }}
+    user_domain_id = {{ default "\"\"" $AuthInfo.UserDomainID }}
+
+    [pod_vif_nested]
+    worker_nodes_subnet = {{ default "\"\"" .WorkerNodesSubnet }}
+
+    [vif_pool]
+    #ports_pool_max = 0
+    #ports_pool_min = 5
+    #ports_pool_batch = 10
+    #ports_pool_update_frequency = 20
+
+    [health_server]
+    port = {{ default 8082 .ControllerProbesPort }}
+
+    [cni_health_server]
+    port = {{ default 8090 .DaemonProbesPort }}

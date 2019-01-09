@@ -6,6 +6,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 )
 
 func TestIsChangeSafe(t *testing.T) {
@@ -69,7 +70,7 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	err = IsChangeSafe(prev, next)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	objs, err := Render(prev, manifestDir)
+	objs, err := Render(prev, &bootstrap.BootstrapResult{}, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Validate that openshift-sdn isn't rendered

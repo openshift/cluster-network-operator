@@ -43,3 +43,23 @@ func lastIP(subnet net.IPNet) net.IP {
 	}
 	return end
 }
+
+// lastUsableIP returns second to last IP of a subnet
+func LastUsableIP(subnet net.IPNet) net.IP {
+	// FIXME(dulek): This should have proper IPv6 support, but for now whatever, Kuryr doesn't support it yet.
+	// This gives us last IP of the subnet…
+	ip := lastIP(subnet)
+	// …and this will be second to last (last usable)
+	ip[len(ip)-1] -= 1
+	return ip
+}
+
+// FirstUsableIP returns second IP of a subnet
+func FirstUsableIP(subnet net.IPNet) net.IP {
+	// FIXME(dulek): This should have proper IPv6 support, but for now whatever, Kuryr doesn't support it yet.
+	// This is first IP of the subnet…
+	ip := subnet.IP
+	// …and this will be second one (first usable)
+	ip[len(ip)-1] += 1
+	return ip
+}
