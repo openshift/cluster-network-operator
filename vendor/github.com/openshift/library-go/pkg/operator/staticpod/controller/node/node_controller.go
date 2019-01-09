@@ -6,7 +6,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/labels"
@@ -44,7 +44,7 @@ func NewNodeController(
 ) *NodeController {
 	c := &NodeController{
 		operatorConfigClient: operatorConfigClient,
-		eventRecorder:        eventRecorder,
+		eventRecorder:        eventRecorder.WithComponentSuffix("node-controller"),
 		nodeListerSynced:     kubeInformersClusterScoped.Core().V1().Nodes().Informer().HasSynced,
 		nodeLister:           kubeInformersClusterScoped.Core().V1().Nodes().Lister(),
 
@@ -120,8 +120,8 @@ func (c *NodeController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting NodeController")
-	defer glog.Infof("Shutting down NodeController")
+	klog.Infof("Starting NodeController")
+	defer klog.Infof("Shutting down NodeController")
 	if !cache.WaitForCacheSync(stopCh, c.nodeListerSynced) {
 		return
 	}

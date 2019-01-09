@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -26,6 +26,8 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/loglevel"
+	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/openshift/library-go/pkg/operator/staticpod/controller/installer/bindata"
@@ -59,6 +61,11 @@ type InstallerController struct {
 	// command is the string to use for the installer pod command
 	command []string
 
+	// these are copied separately at the beginning to a fixed location
+	certConfigMaps []revision.RevisionResource
+	certSecrets    []revision.RevisionResource
+	certDir        string
+
 	operatorConfigClient v1helpers.StaticPodOperatorClient
 
 	configMapsGetter corev1client.ConfigMapsGetter
@@ -82,6 +89,13 @@ type InstallerPodMutationFunc func(pod *corev1.Pod, nodeName string, operatorSpe
 
 func (o *InstallerController) WithInstallerPodMutationFn(installerPodMutationFn InstallerPodMutationFunc) *InstallerController {
 	o.installerPodMutationFns = append(o.installerPodMutationFns, installerPodMutationFn)
+	return o
+}
+
+func (o *InstallerController) WithCerts(certDir string, certConfigMaps, certSecrets []revision.RevisionResource) *InstallerController {
+	o.certDir = certDir
+	o.certConfigMaps = certConfigMaps
+	o.certSecrets = certSecrets
 	return o
 }
 
@@ -119,7 +133,7 @@ func NewInstallerController(
 		operatorConfigClient: operatorConfigClient,
 		configMapsGetter:     configMapsGetter,
 		podsGetter:           podsGetter,
-		eventRecorder:        eventRecorder,
+		eventRecorder:        eventRecorder.WithComponentSuffix("installer-controller"),
 
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "InstallerController"),
 
@@ -285,7 +299,7 @@ func (c *InstallerController) manageInstallationPods(operatorSpec *operatorv1.St
 			// if we make a change to this status, we want to write it out to the API before we commence work on the next node.
 			// it's an extra write/read, but it makes the state debuggable from outside this process
 			if !equality.Semantic.DeepEqual(newCurrNodeState, currNodeState) {
-				glog.Infof("%q moving to %v", currNodeState.NodeName, spew.Sdump(*newCurrNodeState))
+				klog.Infof("%q moving to %v", currNodeState.NodeName, spew.Sdump(*newCurrNodeState))
 				newOperatorStatus, updated, updateError := v1helpers.UpdateStaticPodStatus(c.operatorConfigClient, setNodeStatusFn(newCurrNodeState), setAvailableProgressingNodeInstallerFailingConditions)
 				if updateError != nil {
 					return false, updateError
@@ -294,18 +308,18 @@ func (c *InstallerController) manageInstallationPods(operatorSpec *operatorv1.St
 						currNodeState.CurrentRevision, newCurrNodeState.CurrentRevision)
 				}
 				if err := c.updateRevisionStatus(newOperatorStatus); err != nil {
-					glog.Errorf("error updating revision status configmap: %v", err)
+					klog.Errorf("error updating revision status configmap: %v", err)
 				}
 				return false, nil
 			} else {
-				glog.V(2).Infof("%q is in transition to %d, but has not made progress", currNodeState.NodeName, currNodeState.TargetRevision)
+				klog.V(2).Infof("%q is in transition to %d, but has not made progress", currNodeState.NodeName, currNodeState.TargetRevision)
 			}
 			if !oom {
 				break
 			}
 
 			// OOM is special. We want to retry the installer pod by falling through here. Also we don't set LastFailedRevision.
-			glog.V(2).Infof("Retrying %q for revision %d because it was OOM killed", currNodeState.NodeName, currNodeState.TargetRevision)
+			klog.V(2).Infof("Retrying %q for revision %d because it was OOM killed", currNodeState.NodeName, currNodeState.TargetRevision)
 			installerPodName := getInstallerPodName(currNodeState.TargetRevision, currNodeState.NodeName)
 			if err := c.podsGetter.Pods(c.targetNamespace).Delete(installerPodName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 				return true, err
@@ -314,10 +328,10 @@ func (c *InstallerController) manageInstallationPods(operatorSpec *operatorv1.St
 
 		revisionToStart := c.getRevisionToStart(currNodeState, prevNodeState, operatorStatus)
 		if revisionToStart == 0 {
-			glog.V(4).Infof("%q does not need update", currNodeState.NodeName)
+			klog.V(4).Infof("%q does not need update", currNodeState.NodeName)
 			continue
 		}
-		glog.Infof("%q needs new revision %d", currNodeState.NodeName, revisionToStart)
+		klog.Infof("%q needs new revision %d", currNodeState.NodeName, revisionToStart)
 
 		newCurrNodeState := currNodeState.DeepCopy()
 		newCurrNodeState.TargetRevision = revisionToStart
@@ -326,7 +340,7 @@ func (c *InstallerController) manageInstallationPods(operatorSpec *operatorv1.St
 		// if we make a change to this status, we want to write it out to the API before we commence work on the next node.
 		// it's an extra write/read, but it makes the state debuggable from outside this process
 		if !equality.Semantic.DeepEqual(newCurrNodeState, currNodeState) {
-			glog.Infof("%q moving to %v", currNodeState.NodeName, spew.Sdump(*newCurrNodeState))
+			klog.Infof("%q moving to %v", currNodeState.NodeName, spew.Sdump(*newCurrNodeState))
 			if _, updated, updateError := v1helpers.UpdateStaticPodStatus(c.operatorConfigClient, setNodeStatusFn(newCurrNodeState), setAvailableProgressingNodeInstallerFailingConditions); updateError != nil {
 				return false, updateError
 			} else if updated && currNodeState.TargetRevision != newCurrNodeState.TargetRevision && newCurrNodeState.TargetRevision != 0 {
@@ -365,7 +379,7 @@ func (c *InstallerController) updateConfigMapForRevision(currentRevisions map[in
 	for currentRevision := range currentRevisions {
 		statusConfigMap, err := c.configMapsGetter.ConfigMaps(c.targetNamespace).Get(statusConfigMapNameForRevision(currentRevision), metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
-			glog.Infof("%s configmap not found, skipping update revision status", statusConfigMapNameForRevision(currentRevision))
+			klog.Infof("%s configmap not found, skipping update revision status", statusConfigMapNameForRevision(currentRevision))
 			continue
 		}
 		if err != nil {
@@ -463,6 +477,10 @@ func setAvailableProgressingNodeInstallerFailingConditions(newStatus *operatorv1
 	if len(failing) > 0 {
 		failingStrings := []string{}
 		for failingRevision, errorStrings := range failing {
+			// Do not report failing for nodes that are actually not failing.
+			if failingCount[failingRevision] == 0 {
+				continue
+			}
 			failingStrings = append(failingStrings, fmt.Sprintf("%d nodes are failing on revision %d:\n%v", failingCount[failingRevision], failingRevision, strings.Join(errorStrings, "\n")))
 		}
 		failingDescription := strings.Join(failingStrings, "; ")
@@ -607,8 +625,9 @@ func (c *InstallerController) ensureInstallerPod(nodeName string, operatorSpec *
 	if c.configMaps[0].Optional {
 		return fmt.Errorf("pod configmap %s is required, cannot be optional", c.configMaps[0].Name)
 	}
+
 	args := []string{
-		"-v=4", // TODO: Make this configurable?
+		fmt.Sprintf("-v=%d", loglevel.LogLevelToKlog(operatorSpec.LogLevel)),
 		fmt.Sprintf("--revision=%d", revision),
 		fmt.Sprintf("--namespace=%s", pod.Namespace),
 		fmt.Sprintf("--pod=%s", c.configMaps[0].Name),
@@ -629,6 +648,24 @@ func (c *InstallerController) ensureInstallerPod(nodeName string, operatorSpec *
 			args = append(args, fmt.Sprintf("--secrets=%s", s.Name))
 		}
 	}
+	if len(c.certDir) > 0 {
+		args = append(args, fmt.Sprintf("--cert-dir=%s", filepath.Join(hostResourceDirDir, c.certDir)))
+		for _, cm := range c.certConfigMaps {
+			if cm.Optional {
+				args = append(args, fmt.Sprintf("--optional-cert-configmaps=%s", cm.Name))
+			} else {
+				args = append(args, fmt.Sprintf("--cert-configmaps=%s", cm.Name))
+			}
+		}
+		for _, s := range c.certSecrets {
+			if s.Optional {
+				args = append(args, fmt.Sprintf("--optional-cert-secrets=%s", s.Name))
+			} else {
+				args = append(args, fmt.Sprintf("--cert-secrets=%s", s.Name))
+			}
+		}
+	}
+
 	pod.Spec.Containers[0].Args = args
 
 	// Some owners need to change aspects of the pod.  Things like arguments for instance
@@ -667,14 +704,7 @@ func (c InstallerController) sync() error {
 	}
 	operatorStatus := originalOperatorStatus.DeepCopy()
 
-	switch operatorSpec.ManagementState {
-	case operatorv1.Managed:
-	case operatorv1.Unmanaged:
-		return nil
-	case operatorv1.Removed:
-		// TODO probably just fail
-		return nil
-	default:
+	if !management.IsOperatorManaged(operatorSpec.ManagementState) {
 		return nil
 	}
 
@@ -708,8 +738,8 @@ func (c *InstallerController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting InstallerController")
-	defer glog.Infof("Shutting down InstallerController")
+	klog.Infof("Starting InstallerController")
+	defer klog.Infof("Shutting down InstallerController")
 
 	// doesn't matter what workers say, only start one.
 	go wait.Until(c.runWorker, time.Second, stopCh)

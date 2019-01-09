@@ -210,6 +210,42 @@
   version = "v0.2.0"
 
 [[projects]]
+  digest = "1:8668a312021349017dcd177a44cbe6499747bba3e80e78497a3bfbf7a371bd4b"
+  name = "github.com/gophercloud/gophercloud"
+  packages = [
+    ".",
+    "openstack",
+    "openstack/identity/v2/tenants",
+    "openstack/identity/v2/tokens",
+    "openstack/identity/v3/tokens",
+    "openstack/loadbalancer/v2/l7policies",
+    "openstack/loadbalancer/v2/listeners",
+    "openstack/loadbalancer/v2/loadbalancers",
+    "openstack/loadbalancer/v2/monitors",
+    "openstack/loadbalancer/v2/pools",
+    "openstack/networking/v2/extensions/attributestags",
+    "openstack/networking/v2/extensions/layer3/routers",
+    "openstack/networking/v2/extensions/security/groups",
+    "openstack/networking/v2/extensions/security/rules",
+    "openstack/networking/v2/extensions/subnetpools",
+    "openstack/networking/v2/networks",
+    "openstack/networking/v2/ports",
+    "openstack/networking/v2/subnets",
+    "openstack/utils",
+    "pagination",
+  ]
+  pruneopts = "NT"
+  revision = "f27ceddc323ff01fdd909ac8377fb06b12db7f4f"
+
+[[projects]]
+  branch = "master"
+  digest = "1:dc38c10fcce749fddc805b8fb3d7db639cc776e36b85ddf2dfe1cba533f10fd7"
+  name = "github.com/gophercloud/utils"
+  packages = ["openstack/clientconfig"]
+  pruneopts = "NT"
+  revision = "0bcc8e728cb54c9dce9ed46924688b817ab14f31"
+
+[[projects]]
   branch = "master"
   digest = "1:2a2caa63899dae26ed3e4510b806549fd416d94db24ad68279daa62881b26488"
   name = "github.com/gregjones/httpcache"
@@ -329,20 +365,18 @@
     "config/v1",
     "legacyconfig/v1",
     "network/v1",
-    "openshiftcontrolplane/v1",
     "operator/v1",
-    "osin/v1",
   ]
   pruneopts = "NT"
   revision = "c92b52cff80767bf400d945e090432c882122336"
 
 [[projects]]
   branch = "master"
-  digest = "1:4908099ee5960309cf5190ed9ba9756ee04cdfbd1e7eb6831f566808148264d0"
+  digest = "1:28fb66059b5aa885d232b8fa30345bf099a6d2ed584663411af757b77e2f33b2"
   name = "github.com/openshift/library-go"
   packages = ["pkg/config/clusteroperator/v1helpers"]
   pruneopts = "NT"
-  revision = "48c98921f370913db774def97bc74a3eaa873e39"
+  revision = "1b1cfee06f448d0a55ed7499ebe76e4ed254cfc1"
 
 [[projects]]
   digest = "1:c7b6faf294d8ef95f74c0467df72b8ffa103935462df294a9e7bc1d416a9f4d5"
@@ -923,12 +957,26 @@
   input-imports = [
     "github.com/Masterminds/sprig",
     "github.com/ghodss/yaml",
+    "github.com/gophercloud/gophercloud",
+    "github.com/gophercloud/gophercloud/openstack",
+    "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
+    "github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/listeners",
+    "github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/loadbalancers",
+    "github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools",
+    "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/attributestags",
+    "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers",
+    "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups",
+    "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules",
+    "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/subnetpools",
+    "github.com/gophercloud/gophercloud/openstack/networking/v2/networks",
+    "github.com/gophercloud/gophercloud/openstack/networking/v2/ports",
+    "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets",
+    "github.com/gophercloud/utils/openstack/clientconfig",
     "github.com/onsi/gomega",
     "github.com/onsi/gomega/types",
     "github.com/openshift/api/config/v1",
     "github.com/openshift/api/legacyconfig/v1",
     "github.com/openshift/api/network/v1",
-    "github.com/openshift/api/openshiftcontrolplane/v1",
     "github.com/openshift/api/operator/v1",
     "github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers",
     "github.com/operator-framework/operator-sdk/pkg/leader",
@@ -936,6 +984,7 @@
     "github.com/pkg/errors",
     "github.com/spf13/pflag",
     "github.com/vishvananda/netlink",
+    "gopkg.in/yaml.v2",
     "k8s.io/api/apps/v1",
     "k8s.io/api/core/v1",
     "k8s.io/apimachinery/pkg/api/equality",

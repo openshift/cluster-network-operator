@@ -1,69 +1,67 @@
 package installerpod
 
 import (
-	"time"
-
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
+
+	"github.com/openshift/library-go/pkg/operator/resource/retry"
 )
 
-// getSecretWithRetry will get a secret from API server.
-// It will retry on API server connection errors except not found error which is fatal for non-optional secrets.
-// In case the secret is optional and we fail to get it, no error is returned and the secret returning is nil.
-func (o *InstallOptions) getSecretWithRetry(ctx context.Context, secretNamePrefix string, isOptional bool) (*v1.Secret, error) {
+// getSecretWithRetry will attempt to get the secret from the API server and retry on any connection errors until
+// the context is not done or secret is returned or a HTTP client error is returned.
+// In case the optional flag is set, the 404 error is not reported and a nil object is returned instead.
+func (o *InstallOptions) getSecretWithRetry(ctx context.Context, name string, isOptional bool) (*v1.Secret, error) {
 	var secret *v1.Secret
-	retryErr := wait.PollImmediateUntil(200*time.Millisecond, func() (done bool, err error) {
-		secret, err = o.KubeClient.CoreV1().Secrets(o.Namespace).Get(o.nameFor(secretNamePrefix), metav1.GetOptions{})
-		switch {
-		case errors.IsNotFound(err):
-			// if secret is optional, report success even when the secret was not found
-			if isOptional {
-				err = nil
-			}
-			return true, err
-		case err != nil:
-			if !isOptional {
-				glog.Warningf("Failed to get secret %q: %v (will retry)", o.Namespace+"/"+o.nameFor(secretNamePrefix), err)
-			}
-			// if secret is optional, report success on any error and never retry
-			return isOptional, nil
-		default:
-			return true, nil
-		}
-	}, ctx.Done())
 
-	return secret, retryErr
+	err := retry.RetryOnConnectionErrors(ctx, func(ctx context.Context) (bool, error) {
+		var clientErr error
+		secret, clientErr = o.KubeClient.CoreV1().Secrets(o.Namespace).Get(name, metav1.GetOptions{})
+		if clientErr != nil {
+			klog.Infof("Failed to get secret %s/%s: %v", o.Namespace, name, clientErr)
+			return false, clientErr
+		}
+		return true, nil
+	})
+
+	switch {
+	case err == nil:
+		klog.Infof("Got secret %s/%s", o.Namespace, name)
+		return secret, nil
+	case errors.IsNotFound(err) && isOptional:
+		return nil, nil
+	default:
+		return nil, err
+	}
+
 }
 
-// getConfigMapWithRetry will get a config map from API server.
-// It will retry on API server connection errors except not found error which is fatal for non-optional secrets.
-// In case the config is optional and we fail to get it, no error is returned and the config returning is nil.
-func (o *InstallOptions) getConfigMapWithRetry(ctx context.Context, configNamePrefix string, isOptional bool) (*v1.ConfigMap, error) {
+// getConfigMapWithRetry will attempt to get the configMap from the API server and retry on any connection errors until
+// the context is not done or configMap is returned or a HTTP client error is returned.
+// In case the optional flag is set, the 404 error is not reported and a nil object is returned instead.
+func (o *InstallOptions) getConfigMapWithRetry(ctx context.Context, name string, isOptional bool) (*v1.ConfigMap, error) {
 	var config *v1.ConfigMap
-	retryErr := wait.PollImmediateUntil(200*time.Millisecond, func() (done bool, err error) {
-		config, err = o.KubeClient.CoreV1().ConfigMaps(o.Namespace).Get(o.nameFor(configNamePrefix), metav1.GetOptions{})
-		switch {
-		case errors.IsNotFound(err):
-			// if config is optional, report success even when the config was not found
-			if isOptional {
-				err = nil
-			}
-			return true, err
-		case err != nil:
-			if !isOptional {
-				glog.Warningf("Failed to get configMap %q: %v (will retry)", o.Namespace+"/"+o.nameFor(configNamePrefix), err)
-			}
-			// if config is optional, report success on any error and never retry
-			return isOptional, nil
-		default:
-			return true, nil
-		}
-	}, ctx.Done())
 
-	return config, retryErr
+	err := retry.RetryOnConnectionErrors(ctx, func(ctx context.Context) (bool, error) {
+		var clientErr error
+		config, clientErr = o.KubeClient.CoreV1().ConfigMaps(o.Namespace).Get(name, metav1.GetOptions{})
+		if clientErr != nil {
+			klog.Infof("Failed to get config map %s/%s: %v", o.Namespace, name, clientErr)
+			return false, clientErr
+		}
+		return true, nil
+	})
+
+	switch {
+	case err == nil:
+		klog.Infof("Got configMap %s/%s", o.Namespace, name)
+		return config, nil
+	case errors.IsNotFound(err) && isOptional:
+		return nil, nil
+	default:
+		return nil, err
+	}
 }
