@@ -177,8 +177,17 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 	}
 
+	// Bootstrap any resources
+	bootstrapResult, err := network.Bootstrap(&operConfig.Spec, r.client)
+	if err != nil {
+		log.Printf("Failed to reconcile platform networking resources: %v", err)
+		r.status.SetDegraded(statusmanager.OperatorConfig, "BootstrapError",
+			fmt.Sprintf("Internal error while reconciling platform networking resources: %v", err))
+		return reconcile.Result{}, err
+	}
+
 	// Generate the objects
-	objs, err := network.Render(&operConfig.Spec, ManifestPath)
+	objs, err := network.Render(&operConfig.Spec, bootstrapResult, ManifestPath)
 	if err != nil {
 		log.Printf("Failed to render: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "RenderError",

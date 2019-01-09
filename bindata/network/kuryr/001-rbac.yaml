@@ -1,0 +1,71 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kuryr
+rules:
+- apiGroups: [""]
+  resources:
+  - namespaces
+  - nodes
+  - endpoints
+  - services
+  - services/status
+  - pods
+  verbs:
+  - get
+  - watch
+  - list
+  - update
+  - patch
+- apiGroups: ["extensions"]
+  resources:
+  - networkpolicies
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: ["networking.k8s.io"]
+  resources:
+  - networkpolicies
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups: ["k8s.cni.cncf.io"]
+  resources:
+  - network-attachment-definitions
+  verbs:
+  - get
+- apiGroups: ["openstack.org"]
+  resources:
+  - kuryrnets
+  - kuryrnetpolicies
+  verbs: ["*"]
+- apiGroups: ["route.openshift.io"]
+  resources:
+  - routes
+  verbs: ["*"]
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kuryr
+  namespace: openshift-kuryr
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kuryr
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kuryr
+subjects:
+- kind: ServiceAccount
+  name: kuryr
+  namespace: openshift-kuryr

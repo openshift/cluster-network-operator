@@ -100,7 +100,10 @@ Users must select a default network provider. This cannot be changed. Different 
 
 The network type is always read from the Cluster configuration.
 
-Currently, the only understood values for network Type are `OpenShiftSDN` and `OVNKubernetes`.
+Currently, the understood values for `networkType` are:
+* `OpenShiftSDN`
+* `OVNKubernetes`
+* `Kuryr`
 
 Other values are ignored. If you wish to use use a third-party network provider not managed by the operator, set the network type to something meaningful to you. The operator will not install or upgrade a network provider, but all other Network Operator functionality remains.
 
@@ -139,6 +142,25 @@ spec:
     type: OVNKubernetes
     ovnKubernetesConfig:
       mtu: 1400
+```
+
+### Configuring Kuryr-Kubernetes
+Kuryr-Kubernetes is a CNI plugin that uses OpenStack Neutron to network OpenShift Pods, and OpenStack Octavia to create load balancers for Services. In general it is useful when OpenShift is running on an OpenStack cluster, as you can use the same SDN (OpenStack Neutron) to provide networking for both the VMs OpenShift is running on, and the Pods created by OpenShift. In such case avoidance of double encapsulation gives you two advantages: improved performace (in terms of both latency and throughput) and lower complexity of the networking architecture.
+
+For more information about Kuryr's design please refer to [its documentation](https://docs.openstack.org/kuryr-kubernetes). Please note that in terms of networking architecture cluster-network-operator uses Kuryr's "nested" networking mode. This means that the OpenStack cluster needs to have the "trunk ports" feature of Neutron enabled.
+
+Available options, all of which are optional:
+* `controllerProbesPort`: port to be used for liveness and readiness probes of kuryr-controller Pods. Note that kuryr-controller runs with host networking, so the option is useful when there is a port conflict with some other service running on OpenShift nodes.
+* `daemonProbesPort`: same as above, just for kuryr-daemon (kuryr-daemon runs as DaemonSet on every OpenShift node).
+
+Example:
+```yaml
+spec:
+  defaultNetwork:
+    type: Kuryr
+    kuryrConfig:
+      controllerProbesPort: 8082
+      daemonProbesPort: 8090
 ```
 
 ## Configuring kube-proxy

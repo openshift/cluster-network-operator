@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kuryr-controller
+  namespace: openshift-kuryr
+  annotations:
+    kubernetes.io/description: |
+      This deployment launches the kuryr-controller component.
+spec:
+  template:
+    metadata:
+      name: kuryr-controller
+      labels:
+        app: kuryr
+        component: network
+        type: infra
+        openshift.io/component: network
+    spec:
+      serviceAccountName: kuryr
+      hostNetwork: true
+      priorityClassName: system-cluster-critical
+      containers:
+      - image: {{ .ControllerImage }}
+        name: controller
+{{ if (default true .ControllerEnableProbes) eq "true" }}
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: {{ default 8082 .ControllerProbesPort }}
+            scheme: HTTP
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /alive
+            port: {{ default 8082 .ControllerProbesPort }}
+          initialDelaySeconds: 15
+{{ end }}
+        volumeMounts:
+        - name: config-volume
+          mountPath: "/etc/kuryr"
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoSchedule"
+      volumes:
+      - name: config-volume
+        configMap:
+          name: kuryr-config
