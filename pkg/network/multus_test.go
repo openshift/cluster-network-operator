@@ -6,8 +6,6 @@ import (
 	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 
-	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	. "github.com/onsi/gomega"
 )
 
@@ -59,20 +57,6 @@ func TestRenderMultus(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "multus", "multus")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "multus")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "multus", "multus")))
-
-	// make sure all deployments are in the master
-	for _, obj := range objs {
-		if obj.GetKind() != "Deployment" {
-			continue
-		}
-
-		sel, found, err := uns.NestedStringMap(obj.Object, "spec", "template", "spec", "nodeSelector")
-		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(found).To(BeTrue())
-
-		_, ok := sel["node-role.kubernetes.io/master"]
-		g.Expect(ok).To(BeTrue())
-	}
 
 	// Make sure every obj is reasonable:
 	// - it is supported
