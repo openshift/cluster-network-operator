@@ -14,23 +14,3 @@ spec:
     from:
       kind: DockerImage
       name: docker.io/openshift/origin-hypershift:v4.0.0
-  - name: multus
-    from:
-      kind: DockerImage
-      name: docker.io/nfvpe/multus:snapshot
-  - name: cni-plugins-supported
-    from:
-      kind: DockerImage
-      name: docker.io/nfvpe/container-networking-plugins-supported
-  - name: cni-plugins-unsupported
-    from:
-      kind: DockerImage
-      name: docker.io/nfvpe/container-networking-plugins-unsupported
-  - name: sriov-device-plugin
-    from:
-      kind: DockerImage
-      name: docker.io/nfvpe/sriov-device-plugin:release-v1
-  - name: sriov-cni
-    from:
-      kind: DockerImage
-      name: docker.io/nfvpe/sriov-cni:release-v1
