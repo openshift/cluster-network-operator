@@ -19,10 +19,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/render"
 )
 
-// NodeNameMagicString is substituted at runtime for the
-// real nodename
-const NodeNameMagicString = "%%NODENAME%%"
-
 // renderOpenShiftSDN returns the manifests for the openshift-sdn.
 // This creates
 // - the ClusterNetwork object
@@ -207,7 +203,6 @@ func nodeConfig(conf *netv1.NetworkConfigSpec) (string, error) {
 			APIVersion: "v1",
 			Kind:       "NodeConfig",
 		},
-		NodeName: NodeNameMagicString,
 		NetworkConfig: legacyconfigv1.NodeNetworkConfig{
 			NetworkPluginName: sdnPluginName(c.Mode),
 			MTU:               *c.MTU,

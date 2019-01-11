@@ -190,7 +190,7 @@ func TestProxyArgs(t *testing.T) {
 	getSdnConfigFile := func(objs []*uns.Unstructured) *uns.Unstructured {
 		for _, obj := range objs {
 			if obj.GetKind() == "ConfigMap" && obj.GetName() == "sdn-config" {
-				val, ok, err := uns.NestedString(obj.Object, "data", "sdn-config.yaml.in")
+				val, ok, err := uns.NestedString(obj.Object, "data", "sdn-config.yaml")
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(ok).To(BeTrue())
 
