@@ -50,15 +50,13 @@ func TestRenderMultus(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "multus", "multus")))
 
 	// It's important that the namespace is first
-	g.Expect(len(objs)).To(Equal(8))
+	g.Expect(len(objs)).To(Equal(6))
 	g.Expect(objs[0]).To(HaveKubernetesID("CustomResourceDefinition", "", "network-attachment-definitions.k8s.cni.cncf.io"))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Namespace", "", "multus")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "multus")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "multus", "multus")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "multus")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "multus", "multus")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "multus", "containernetworking-cni-plugins-supported")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "multus", "containernetworking-cni-plugins-unsupported")))
 
 	// Make sure every obj is reasonable:
 	// - it is supported
