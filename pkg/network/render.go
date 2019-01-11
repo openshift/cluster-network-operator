@@ -1,6 +1,7 @@
 package network
 
 import (
+	"encoding/json"
 	"log"
 	"reflect"
 
@@ -34,6 +35,13 @@ func Render(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructu
 
 	// render additional networks
 	o, err = RenderAdditionalNetworks(conf, manifestDir, netAttachDefCRDRendered)
+	if err != nil {
+		return nil, err
+	}
+	objs = append(objs, o...)
+
+	// render SRIOV Device Plugin if necessary
+	o, err = RenderSRIOVDevicePlugin(conf, manifestDir)
 	if err != nil {
 		return nil, err
 	}
@@ -266,4 +274,44 @@ func RenderMultus(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Uns
 	}
 	out = append(out, objs...)
 	return out, true, nil
+}
+
+func isSRIOVCNI(rawConfig string) bool {
+	var conf struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal([]byte(rawConfig), &conf); err != nil {
+		return false
+	}
+	return conf.Type == "sriov"
+}
+
+// RenderSRIOVDevicePlugin generates the manifests of the SRIOVDevicePlugin
+func RenderSRIOVDevicePlugin(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructured, error) {
+	// SRIOV Device Plugin only works as a secondary network with Multus
+	if *conf.DisableMultiNetwork {
+		return nil, nil
+	}
+
+	var found bool
+	for _, an := range conf.AdditionalNetworks {
+		found = isSRIOVCNI(an.RawCNIConfig)
+		if found {
+			break
+		}
+	}
+	if !found {
+		return nil, nil
+	}
+
+	var err error
+	out := []*uns.Unstructured{}
+	objs := []*uns.Unstructured{}
+
+	objs, err = renderSRIOVDevicePluginConfig(manifestDir)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, objs...)
+	return out, nil
 }

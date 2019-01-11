@@ -38,6 +38,10 @@ spec:
           value: "docker.io/nfvpe/container-networking-plugins-supported"
         - name: CNI_PLUGINS_UNSUPPORTED_IMAGE
           value: "docker.io/nfvpe/container-networking-plugins-unsupported"
+        - name: SRIOV_DEVICE_PLUGIN_IMAGE
+          value: "docker.io/nfvpe/sriov-device-plugin:release-v1"
+        - name: SRIOV_CNI_IMAGE
+          value: "docker.io/nfvpe/sriov-cni:release-v1"
         - name: POD_NAME
           valueFrom:
             fieldRef:

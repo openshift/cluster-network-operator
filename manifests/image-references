@@ -26,3 +26,11 @@ spec:
     from:
       kind: DockerImage
       name: docker.io/nfvpe/container-networking-plugins-unsupported
+  - name: sriov-device-plugin
+    from:
+      kind: DockerImage
+      name: docker.io/nfvpe/sriov-device-plugin:release-v1
+  - name: sriov-cni
+    from:
+      kind: DockerImage
+      name: docker.io/nfvpe/sriov-cni:release-v1
