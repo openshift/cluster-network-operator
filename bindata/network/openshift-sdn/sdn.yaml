@@ -4,7 +4,7 @@ metadata:
   namespace: openshift-sdn
   name: sdn-config
 data:
-  sdn-config.yaml.in: |-
+  sdn-config.yaml: |-
 {{.NodeConfig | indent 4}}
 ---
 kind: DaemonSet
@@ -14,7 +14,7 @@ metadata:
   namespace: openshift-sdn
   annotations:
     kubernetes.io/description: |
-      This daemon set launches the OpenShift networking components (kube-proxy, DNS, and openshift-sdn).
+      This daemon set launches the OpenShift networking components (kube-proxy and openshift-sdn).
       It expects that OVS is running on the node.
 spec:
   selector:
@@ -38,8 +38,6 @@ spec:
       hostNetwork: true
       hostPID: true
       containers:
-      # The network container launches the openshift-sdn process, the kube-proxy, and the local DNS service.
-      # It relies on an up to date node-config.yaml being present.
       - name: sdn
         image: {{.NodeImage}}
         command: 
@@ -66,22 +64,19 @@ spec:
             fi
           done
 
-          # Create the node config
-          sed "s/%%NODENAME%%/${NODENAME}/" /config/sdn-config.yaml.in > /tmp/sdn-config.yaml
+          # local environment overrides
+          if [[ -f /etc/sysconfig/openshift-sdn ]]; then
+            set -o allexport
+            source /etc/sysconfig/openshift-sdn
+            set +o allexport
+          fi
 
           # Take over network functions on the node
           rm -Rf /etc/cni/net.d/80-openshift-network.conf
           cp -Rf /opt/cni/bin/* /host/opt/cni/bin/
 
-          file=/etc/kubernetes/kubeconfig
-
-          # Use the same config as the node, but with the service account token
-          oc config "--config=${file}" view --flatten > /tmp/kubeconfig
-          oc config --config=/tmp/kubeconfig set-credentials sa "--token=$( cat /var/run/secrets/kubernetes.io/serviceaccount/token )"
-          oc config --config=/tmp/kubeconfig set-context "$( oc config --config=/tmp/kubeconfig current-context )" --user=sa
           # Launch the network process
-          exec /bin/openshift-sdn --config=/tmp/sdn-config.yaml  --kubeconfig=/tmp/kubeconfig --loglevel=${DEBUG_LOGLEVEL:-2}
-
+          exec /bin/openshift-sdn --config=/config/sdn-config.yaml  --url-only-kubeconfig=/etc/kubernetes/kubeconfig --loglevel=${DEBUG_LOGLEVEL:-2}
         securityContext:
           privileged: true
         volumeMounts:
@@ -115,6 +110,13 @@ spec:
           name: host-cni-netd
         - mountPath: /var/lib/cni/networks/openshift-sdn
           name: host-var-lib-cni-networks-openshift-sdn
+        # If iptables needs to load a module
+        - mountPath: /lib/modules
+          name: host-modules
+          readOnly: true
+        - mountPath: /etc/sysconfig/openshift-sdn
+          name: etc-sysconfig-openshift-sdn
+          readOnly: true
         resources:
           requests:
             cpu: 100m
@@ -122,7 +124,7 @@ spec:
         env:
         - name: OPENSHIFT_DNS_DOMAIN
           value: cluster.local
-        - name: NODENAME
+        - name: K8S_NODE_NAME
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
@@ -138,6 +140,9 @@ spec:
       - name: host-kubeconfig
         hostPath:
           path: /etc/kubernetes/kubeconfig
+      - name: etc-sysconfig-openshift-sdn
+        hostPath:
+          path: /etc/sysconfig/openshift-sdn
       - name: host-modules
         hostPath:
           path: /lib/modules
