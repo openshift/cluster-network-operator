@@ -1,0 +1,44 @@
+---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: containernetworking-cni-plugins-supported
+  namespace: multus
+  annotations:
+    kubernetes.io/description: |
+      This daemon set launches supported CNI plugins on each node.
+spec:
+  selector:
+    matchLabels:
+      app: containernetworking-cni-plugins-supported
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: containernetworking-cni-plugins-supported
+        component: network
+        type: infra
+        openshift.io/component: network
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: cni-plugins-supported
+        image: {{.CNIPluginsSupportedImage}}
+        command: ["/bin/sh"]
+        args: ["-c", "cp -rf /usr/src/plugins/bin/* /host/opt/cni/bin"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /host/opt/cni/bin
+          name: cnibin
+      volumes:
+      - name: cnibin
+        hostPath:
+          path: /var/lib/cni/bin
