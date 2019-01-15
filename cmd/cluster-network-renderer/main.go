@@ -69,6 +69,7 @@ func readConfigObject(path string) (*netv1.NetworkConfig, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to open NetworkConfig file %s", path)
 	}
+	defer f.Close()
 
 	decoder := k8syaml.NewYAMLOrJSONDecoder(f, 4096)
 	conf := netv1.NetworkConfig{}
