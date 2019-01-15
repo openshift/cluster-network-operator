@@ -7,11 +7,14 @@ import (
 
 	"github.com/pkg/errors"
 
+	configv1 "github.com/openshift/api/config/v1"
 	networkoperatorv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,9 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
-
-// Configuration objects must have a single name
-const CONFIG_OBJECT_NAME = "default"
 
 // The periodic resync interval.
 // We will re-run the reconciliation logic, even if the network configuration
@@ -43,6 +43,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+	configv1.Install(mgr.GetScheme())
 	return &ReconcileNetworkConfig{client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
@@ -73,28 +74,25 @@ type ReconcileNetworkConfig struct {
 	scheme *runtime.Scheme
 }
 
-// Reconcile reads that state of the cluster for a NetworkConfig object and makes changes based on the state read
-// and what is in the NetworkConfig.Spec
-//
-// Note:
-// The Controller will requeue the Request to be processed again if the returned error is non-nil or
-// Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
+// Reconcile updates the state of the cluster to match that which is desired
+// in the operator configuration (NetworkConfig.networkoperator.openshift.io)
 func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Printf("Reconciling NetworkConfig %s/%s\n", request.Namespace, request.Name)
+	log.Printf("Reconciling NetworkConfig.networkoperator.openshift.io %s\n", request.Name)
 
 	// We won't create more than one network
-	if request.Name != CONFIG_OBJECT_NAME {
+	if request.Name != names.OPERATOR_CONFIG {
 		log.Printf("Ignoring NetworkConfig without default name")
 		return reconcile.Result{}, nil
 	}
 
 	// Fetch the NetworkConfig instance
-	instance := &networkoperatorv1.NetworkConfig{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	operConfig := &networkoperatorv1.NetworkConfig{TypeMeta: metav1.TypeMeta{APIVersion: "networkoperator.openshift.io/v1", Kind: "NetworkConfig"}}
+	err := r.client.Get(context.TODO(), request.NamespacedName, operConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Owned objects are automatically garbage collected, since we set
+			// the ownerReference (see https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/).
 			// Return and don't requeue
 			return reconcile.Result{}, nil
 		}
@@ -103,28 +101,35 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
+	// Merge in the cluster configuration, in case the administrator has updated some "downstream" fields
+	// This will also commit the change back to the apiserver.
+	if err := r.MergeClusterConfig(context.TODO(), operConfig); err != nil {
+		log.Printf("Failed to merge the cluster configuration: %v", err)
+		return reconcile.Result{}, err
+	}
+
 	// Validate the configuration
-	if err := network.Validate(&instance.Spec); err != nil {
+	if err := network.Validate(&operConfig.Spec); err != nil {
 		log.Printf("Failed to validate NetworkConfig.Spec: %v", err)
 		return reconcile.Result{}, err
 	}
 
-	// Retrieve the previously applied configuration
-	prev, err := GetAppliedConfiguration(context.TODO(), r.client, instance.ObjectMeta.Name)
+	// Retrieve the previously applied operator configuration
+	prev, err := GetAppliedConfiguration(context.TODO(), r.client, operConfig.ObjectMeta.Name)
 	if err != nil {
 		log.Printf("Failed to retrieve previously applied configuration: %v", err)
 		return reconcile.Result{}, err
 	}
 
 	// Fill all defaults explicitly
-	network.FillDefaults(&instance.Spec, prev)
+	network.FillDefaults(&operConfig.Spec, prev)
 
 	// Compare against previous applied configuration to see if this change
 	// is safe.
 	if prev != nil {
 		// We may need to fill defaults here -- sort of as a poor-man's
 		// upconversion scheme -- if we add additional fields to the config.
-		err = network.IsChangeSafe(prev, &instance.Spec)
+		err = network.IsChangeSafe(prev, &operConfig.Spec)
 		if err != nil {
 			log.Printf("Not applying unsafe change: %v", err)
 			return reconcile.Result{},
@@ -133,14 +138,14 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 	}
 
 	// Generate the objects
-	objs, err := network.Render(&instance.Spec, ManifestPath)
+	objs, err := network.Render(&operConfig.Spec, ManifestPath)
 	if err != nil {
 		log.Printf("Failed to render: %v", err)
 		return reconcile.Result{}, errors.Wrapf(err, "failed to render")
 	}
 
-	// The first object we create should be the record of our applied configuration
-	app, err := AppliedConfiguration(instance)
+	// The first object we create should be the record of our applied configuration. The last object we create is config.openshift.io/v1/Network.Status
+	app, err := AppliedConfiguration(operConfig)
 	if err != nil {
 		log.Printf("Failed to render applied: %v", err)
 		return reconcile.Result{}, errors.Wrapf(err, "failed to render applied")
@@ -149,7 +154,8 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 
 	// Apply the objects to the cluster
 	for _, obj := range objs {
-		if err := controllerutil.SetControllerReference(instance, obj, r.scheme); err != nil {
+		// Mark the object to be GC'd if the owner is deleted.
+		if err := controllerutil.SetControllerReference(operConfig, obj, r.scheme); err != nil {
 			err = errors.Wrapf(err, "could not set reference for (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
 			log.Println(err)
 			return reconcile.Result{}, err
@@ -158,6 +164,23 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 		// Open question: should an error here indicate we will never retry?
 		if err := apply.ApplyObject(context.TODO(), r.client, obj); err != nil {
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
+			log.Println(err)
+			return reconcile.Result{}, err
+		}
+	}
+
+	// Update Network.config.openshift.io.Status
+	status, err := r.ClusterNetworkStatus(context.TODO(), operConfig)
+	if err != nil {
+		err = errors.Wrapf(err, "could not generate network status")
+		log.Println(err)
+		return reconcile.Result{}, err
+	}
+	if status != nil {
+		// Don't set the owner reference in this case -- we're updating
+		// the status of our owner.
+		if err := apply.ApplyObject(context.TODO(), r.client, status); err != nil {
+			err = errors.Wrapf(err, "could not apply (%s) %s/%s", status.GroupVersionKind(), status.GetNamespace(), status.GetName())
 			log.Println(err)
 			return reconcile.Result{}, err
 		}

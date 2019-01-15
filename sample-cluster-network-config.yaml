@@ -1,0 +1,10 @@
+apiVersion: config.openshift.io/v1
+kind: Network
+metadata:
+  name: cluster
+spec:
+  serviceNetwork: ["172.30.0.0/16"]
+  clusterNetwork: 
+    - cidr: "10.128.0.0/14"
+      hostPrefix: 23 
+  networkType: OpenShiftSDN
