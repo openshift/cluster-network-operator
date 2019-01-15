@@ -4,35 +4,79 @@ The Cluster Network Operator installs and upgrades the networking components on 
 
 It follows the [Controller pattern](https://godoc.org/github.com/kubernetes-sigs/controller-runtime/pkg#hdr-Controller): it reconciles the state of the cluster against a desired configuration. The configuration specified by a CustomResourceDefinition called `networkoperator.openshift.io/NetworkConfig/v1`, which has a corresponding [type](/openshift/cluster-network-operator/blob/master/pkg/apis/networkoperator/v1/networkconfig_types.go).
 
+Most users will be able to use the top-level OpenShift Config API, which has a [Network type](https://github.com/openshift/api/blob/master/config/v1/types_network.go#L26). The operator will automatically translate the `Network.config.openshift.io` object in to a `NetworkConfig.networkoperator.openshift.io`.
+
 When the controller has reconciled and all its dependent resources have converged, the cluster should have an installed SDN plugin and a working service network. In OpenShift, the Cluster Network Operator runs very early in the install process -- while the boostrap API server is still running.
 
 # Configuring
-The network operator has a complex configuration, but most parameters have a sensible default.
+The network operator gets its configuration from two objects: the Cluster and the Operator configuration. Most users only need to create the Cluster configuration - the operator will generate its configuration automatically. If you need finer-grained configuration of your network, you will need to create both configurations.
 
-The configuration must be called "default".
+Any changes to the Cluster configuration are propagated down in to the Operator configuration. In the event of conflicts, the Operator configuration will be updated to match the Cluster configuration.
 
-A configuration with minimum parameters set:
+For example, if you want to use the default VXLAN port for OpenShiftSDN, then you don't need to do anything. However, if you need to customize that port, you will need to create both objects and set the port in the Operator config.
 
+
+#### Configuration objects
+*Cluster config*
+- *Type Name*: `Network.config.openshift.io`
+- *Instance Name*: `cluster`
+- *View Command*: `oc get Network.config.openshift.io cluster -oyaml`
+
+*Operator config*
+- *Type Name*: `NetworkConfig.networkoperator.openshift.io`
+- *Instance Name*: `default`
+- *View Command*: `oc get NetworkConfig.networkoperator.openshift.io default -oyaml`
+
+#### Example configurations
+
+*Cluster Config*
 ```yaml
-apiVersion: "networkoperator.openshift.io/v1"
-kind: "NetworkConfig"
+apiVersion: config.openshift.io/v1
+kind: Network
 metadata:
-  name: "default"
+  name: cluster
 spec:
-  serviceNetwork: "172.30.0.0/16"
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  networkType: OpenShiftSDN
+  serviceNetwork:
+  - 172.30.0.0/16
+```
+
+*Corresponding Operator Config*
+This configuration is the auto-generated translation of the above Cluster configuration.
+```yaml
+apiVersion: networkoperator.openshift.io/v1
+kind: NetworkConfig
+metadata:
+  name: default
+spec:
+  additionalNetworks: null
   clusterNetworks:
-    - cidr: "10.128.0.0/14"
-      hostSubnetLength: 9
+  - cidr: 10.128.0.0/14
+    hostSubnetLength: 9
   defaultNetwork:
     type: OpenShiftSDN
+  serviceNetwork: 172.30.0.0/16
 ```
 
 ## Configuring IP address pools
 Users must supply at least two address pools - one for pods, and one for services. These are the ClusterNetworks and ServiceNetwork parameter. Some network plugins, such as OpenShiftSDN, support multiple ClusterNetworks. All address blocks must be non-overlapping. You should select address pools large enough to fit your anticipated workload.
 
+For future expansion, multiple `serviceNetwork` entries are allowed by the configuration but not actually supported by any network plugins. Supplying multiple addresses is invalid.
+
+Each `clusterNetwork` entry has an additional required parameter, `hostPrefix`, that specifies the address size to assign to assign to each individual node.  For example,
+```yaml
+cidr: 10.128.0.0/14
+hostPrefix: 23
+```
+means nodes would get blocks of size `/23`, or 512 addresses.
+
+IP address pools are always read from the Cluster configuration and propagated "downwards" in to the Operator configuration. Any changes to the Operator configuration will be ignored.
+
 Currently, changing the address pools once set is not supported. In the future, some network providers may support expanding the address pools.
 
-Each ClusterNetwork entry has an additional required parameter, `hostSubnetLength`, that specifies the address size to assign to assign to each individual node. Note that this is currently *reverse* from the usual CIDR notation - a hostSubnetLength of 9 means that the node will be assigned a /23.
 
 Example
 ```yaml
@@ -48,6 +92,8 @@ spec:
 ## Configuring the default network provider
 Users must select a default network provider. This cannot be changed. Different network providers have additional provider-specific settings.
 
+The network type is always read from the Cluster configuration.
+
 Currently, the only supported value for network Type is `OpenShiftSDN`.
 
 ### Configuring OpenShiftSDN
@@ -56,6 +102,8 @@ OpenShiftSDN supports the following configuration options, all of which are opti
 * `vxlanPort`: The port to use for the VXLAN overlay. The default is 4789
 * `MTU`: The MTU to use for the VXLAN overlay. The default is the MTU of the node that the cluster-network-operator is first run on, minus 50 bytes for overhead. If the nodes in your cluster don't all have the same MTU then you will need to set this explicitly.
 * `useExternalOpenvswitch`: boolean. If the nodes are already running openvswitch, and OpenShiftSDN should not install its own, set this to true. This only needed for certain advanced installations with DPDK or OpenStack.
+
+These configuration flags are only in the Operator configuration object.
 
 Example:
 ```yaml
@@ -76,7 +124,7 @@ Users may customize the kube-proxy configuration. None of these settings are req
 * `bindAddress`: The address to "bind" to - the address for which traffic will be redirected.
 * `proxyArguments`: additional command-line flags to pass to kube-proxy - see the [documentation](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/).
 
-Also, the top-level flag `deployKubeProxy` tells the network operator to explicitly deploy a kube-proxy process. Generally, you will not need to provide this; the operator will decide appropriately. For example, OpenShiftSDN includes an embedded service proxy, so this flag is automatically false in that case.
+The top-level flag `deployKubeProxy` tells the network operator to explicitly deploy a kube-proxy process. Generally, you will not need to provide this; the operator will decide appropriately. For example, OpenShiftSDN includes an embedded service proxy, so this flag is automatically false in that case.
 
 Example:
 

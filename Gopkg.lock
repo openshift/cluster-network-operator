@@ -313,7 +313,8 @@
   version = "v1.4.2"
 
 [[projects]]
-  digest = "1:b0ae0c8da48fe1f2ffee8238de4fb137453d6297304c771866043490ab057cdb"
+  branch = "master"
+  digest = "1:5e6c05b09392a59a3536bc9e07422ed201c24de8e5f238d5969e13ae713091f0"
   name = "github.com/openshift/api"
   packages = [
     "build/v1",
@@ -323,7 +324,7 @@
     "osin/v1",
   ]
   pruneopts = "NT"
-  revision = "2699ad42427b7e7b2cad1daefc93b632c9c0bb6c"
+  revision = "1a0ca44421509b47daf1e17f2e96025b3a314c3b"
 
 [[projects]]
   digest = "1:ee01ef8a6bac37c704936dfd61a59421a1a5e26b3f9f2c669c5eeb41dde9c5ca"
@@ -849,6 +850,7 @@
     "github.com/ghodss/yaml",
     "github.com/onsi/gomega",
     "github.com/onsi/gomega/types",
+    "github.com/openshift/api/config/v1",
     "github.com/openshift/api/legacyconfig/v1",
     "github.com/openshift/api/openshiftcontrolplane/v1",
     "github.com/operator-framework/operator-sdk/pkg/leader",
