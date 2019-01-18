@@ -35,11 +35,8 @@ spec:
         args:
         - "--config=/config/controller-config.yaml"
         resources:
-          limits:
-            cpu: 500m
-            memory: 50Mi
           requests:
-            cpu: 20m
+            cpu: 10m
             memory: 50Mi
         volumeMounts:
         - mountPath: /config
