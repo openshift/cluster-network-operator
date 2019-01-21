@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: cluster-network-operator
-  namespace: openshift-cluster-network-operator
+  name: network-operator
+  namespace: openshift-network-operator
   labels:
-    k8s-app: cluster-network-operator
+    name: network-operator
 spec:
   selector:
     matchLabels:
-      k8s-app: cluster-network-operator
+      name: network-operator
   template:
     metadata:
       labels:
-        k8s-app: cluster-network-operator
+        name: network-operator
     spec:
       containers:
-      - name: cluster-network-operator
+      - name: network-operator
         image: docker.io/openshift/origin-cluster-network-operator:v4.0.0
         command:
         - "/usr/bin/cluster-network-operator"
