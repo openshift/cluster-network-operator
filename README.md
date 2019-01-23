@@ -213,18 +213,22 @@ _output/linux/amd64/cluster-network-renderer --config sample-config.yaml --out o
 ```
 
 ## Running manually against a test cluster
-If you have a running cluster, you can run the operator manually. Just set the `KUBECONFIG` environment variable.
+If you have a running cluster, you can run the operator locally against that cluster. Just set the `KUBECONFIG` environment variable.
 
-Note that, like all operators installed by the Cluster Version Operator, it determines all pointers to dependent images via environment variables. You will have to set several environment varables to emulate how the CVO works.
+In addition to `KUBECONFIG`, you will also need to set several other variables:
 
-You can determine the current values of these environment variables by inspecting the valid deployed daemonset. Do this before you delete it...
+- `NODE_IMAGE` and `HYPERSHIFT_IMAGE` - These are normally set in the operator's environment by the Cluster Version Operator, pointing to the correct versions of the dependent images.
+- `KUBERNETES_SERVICE_HOST` and `KUBERNETES_SERVICE_PORT` - The Cluster Network Operator needs to provide the SDN controller pods with the host network address of the Kubernetes apiserver (since the `172.30.0.1` address may not be functioning when the SDN controller starts, and it is currently not possible for the SDN controller to get this information from its node in the way that the SDN node pods do).
+
+You can determine the correct values of these environment variables by inspecting the (working) cluster before you replace the operator:
 ```sh
-oc get -n openshift-network-operator daemonset cluster-network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{" "}' | tee images
+oc get -n openshift-network-operator deployment cluster-network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' | tee env.sh
+oc exec -n openshift-sdn $(oc get pods -n openshift-sdn -l app=sdn-controller -ojsonpath='{.items[0].metadata.name}') -- printenv | grep '^KUBERNETES_SERVICE_[A-Z]*=' | tee -a env.sh
 ```
 
 After stopping the deployed operator (see below), you can run the operator locally with
 ```sh
-env POD_NAME=LOCAL $(cat images) _output/linux/amd64/cluster-network-operator
+env POD_NAME=LOCAL $(cat env.sh) _output/linux/amd64/cluster-network-operator
 ```
 
 ### Stopping the deployed operators
