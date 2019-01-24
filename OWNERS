@@ -1,9 +1,12 @@
 reviewers:
-  - JacobTanenbaum
-  - pecameron
-
-approvers:
-  - squeed
-  - dcbw
   - danwinship
+  - dcbw
+  - JacobTanenbaum
   - knobunc
+  - pecameron
+  - squeed
+approvers:
+  - danwinship
+  - dcbw
+  - knobunc
+  - squeed
