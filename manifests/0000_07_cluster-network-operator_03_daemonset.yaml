@@ -33,6 +33,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /etc/kubernetes/kubeconfig
           name: host-kubeconfig

@@ -99,6 +99,7 @@ spec:
           requests:
             cpu: 100m
             memory: 300Mi
+        terminationMessagePolicy: FallbackToLogsOnError
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
