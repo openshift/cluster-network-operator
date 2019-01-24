@@ -49,6 +49,7 @@ spec:
           value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: KUBERNETES_SERVICE_HOST # allows the controller to communicate with apiserver directly on same host.
           value: "{{.KUBERNETES_SERVICE_HOST}}"
+        terminationMessagePolicy: FallbackToLogsOnError
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
