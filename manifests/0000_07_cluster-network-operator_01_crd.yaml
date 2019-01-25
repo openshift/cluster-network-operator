@@ -14,6 +14,87 @@ spec:
     - name: v1
       served: true
       storage: true
+  validation:
+    # Ensure we will be able to deserialize the object into the golang type
+    openAPIV3Schema:
+      properties:
+        spec:
+          type: object
+          required: ["clusterNetworks", "serviceNetwork", "defaultNetwork"]
+          properties:
+            clusterNetworks:
+              type: array
+              items:
+                type: object
+                required: ["cidr", "hostSubnetLength"]
+                properties:
+                  cidr:
+                    type: string
+                  hostSubnetLength:
+                    type: integer
+                    minimum: 0
+            serviceNetwork:
+              type: string
+            defaultNetwork:
+              type: object
+              required: ["type"]
+              properties:
+                type:
+                  type: string
+                openshiftSDNConfig:
+                  type: object
+                  required: ["mode"]
+                  properties:
+                    mode:
+                      type: string
+                    vxlanPort:
+                      type: integer
+                      minimum: 0
+                    mtu:
+                      type: integer
+                      minimum: 0
+                    useExternalOpenvswitch:
+                      type: boolean
+                ovnKubernetesConfig:
+                  type: object
+                  properties:
+                    genevePort:
+                      type: integer
+                      minimum: 0
+                    mtu:
+                      type: integer
+                      minimum: 0
+                otherConfig:
+                  type: object
+            additionalNetworks:
+              type: array
+              items:
+                type: object
+                required: ["type", "name", "rawCNIConfig"]
+                properties:
+                  type:
+                    type: string
+                  name:
+                    type: string
+                  rawCNIConfig:
+                    type: string
+            deployKubeProxy:
+              type: boolean
+            kubeProxyConfig:
+              type: object
+              properties:
+                iptablesSyncPeriod:
+                  type: string
+                bindAddress:
+                  type: string
+                proxyArguments:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+        status:
+          type: object
 
 ---
 
