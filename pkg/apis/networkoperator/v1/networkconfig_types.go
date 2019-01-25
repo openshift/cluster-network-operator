@@ -85,8 +85,7 @@ type ClusterNetwork struct {
 
 // NetworkDefinition represents a single network plugin's configuration.
 // Kind must be specified, along with exactly one "Config" that matches
-// the kind. Kinds that do not have a specific configuration parameter should
-// use OtherConfig
+// the kind.
 type DefaultNetworkDefinition struct {
 	// The type of network
 	// All NetworkTypes are supported except for NetworkTypeRaw
@@ -99,14 +98,6 @@ type DefaultNetworkDefinition struct {
 	// OVNKubernetesConfig configures the ovn-kubernetes plugin
 	// +optional
 	OVNKubernetesConfig *OVNKubernetesConfig `json:"ovnKubernetesConfig,omitempty"`
-
-	// OtherConfig is for network plugins that are supported by the operator
-	// but do not need their own type. These values will be passed directly
-	// to the manifest templates.
-	// This is used by calico and kuryr
-	// See the plugin-specific documentation for which values are required.
-	// +optional
-	OtherConfig map[string]string `json:"otherConfig,omitEmpty"`
 }
 
 // AdditionalNetworkDefinition is extra networks that are available but not
@@ -182,9 +173,6 @@ const (
 
 	// NetworkTypeOVNKubernetes means the ovn-kubernetes project will be configured
 	NetworkTypeOVNKubernetes NetworkType = "OVNKubernetes"
-
-	// NetworkTypeCalico means Calico will be configured
-	NetworkTypeCalico NetworkType = "Calico"
 
 	// NetworkType
 	NetworkTypeKuryr NetworkType = "Kuryr"

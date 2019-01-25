@@ -53,13 +53,6 @@ func (in *DefaultNetworkDefinition) DeepCopyInto(out *DefaultNetworkDefinition) 
 		*out = new(OVNKubernetesConfig)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.OtherConfig != nil {
-		in, out := &in.OtherConfig, &out.OtherConfig
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
 	return
 }
 
