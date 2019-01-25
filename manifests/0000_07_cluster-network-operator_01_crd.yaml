@@ -64,8 +64,6 @@ spec:
                     mtu:
                       type: integer
                       minimum: 0
-                otherConfig:
-                  type: object
             additionalNetworks:
               type: array
               items:
@@ -78,6 +76,8 @@ spec:
                     type: string
                   rawCNIConfig:
                     type: string
+            disableMultiNetwork:
+              type: boolean
             deployKubeProxy:
               type: boolean
             kubeProxyConfig:
