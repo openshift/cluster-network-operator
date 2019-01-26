@@ -52,11 +52,14 @@ type NetworkConfigSpec struct {
 	// The "default" network that all pods will receive
 	DefaultNetwork DefaultNetworkDefinition `json:"defaultNetwork"`
 
-	// Additional networks to make available to pods. If they are specified,
-	// pods can request them via annotations.
-	//
-	// Specifying any additionalNetworks will enable Multus across the cluster.
+	// Additional networks to make available to pods when multiple networks
+	// are enabled.
 	AdditionalNetworks []AdditionalNetworkDefinition `json:"additionalNetworks"`
+
+	// DisableMultiNetwork specifies whether or not multiple pod network
+	// support should be disabled. If unset, this property defaults to
+	// 'false' and multiple network support is enabled.
+	DisableMultiNetwork *bool `json:"disableMultiNetwork,omitempty"`
 
 	// DeployKubeProxy specifies whether or not a standalone kube-proxy should
 	// be deployed by the operator. Some network providers include kube-proxy

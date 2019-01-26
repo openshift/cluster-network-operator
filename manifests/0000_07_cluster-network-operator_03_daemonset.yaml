@@ -29,6 +29,12 @@ spec:
           value: "docker.io/openshift/origin-node:v4.0.0"
         - name: HYPERSHIFT_IMAGE
           value: "docker.io/openshift/origin-hypershift:v4.0.0"
+        - name: MULTUS_IMAGE
+          value: "quay.io/openshift/origin-multus-cni:v4.0.0"
+        - name: CNI_PLUGINS_SUPPORTED_IMAGE
+          value: "quay.io/openshift/origin-container-networking-plugins-supported:v4.0.0"
+        - name: CNI_PLUGINS_UNSUPPORTED_IMAGE
+          value: "quay.io/openshift/origin-container-networking-plugins-unsupported:v4.0.0"
         - name: POD_NAME
           valueFrom:
             fieldRef:

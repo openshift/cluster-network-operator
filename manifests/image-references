@@ -14,3 +14,15 @@ spec:
     from:
       kind: DockerImage
       name: docker.io/openshift/origin-hypershift:v4.0.0
+  - name: multus-cni
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-multus-cni:v4.0.0
+  - name: container-networking-plugins-supported
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-container-networking-plugins-supported:v4.0.0
+  - name: container-networking-plugins-unsupported
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-container-networking-plugins-unsupported:v4.0.0
