@@ -15,8 +15,15 @@ func Render(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructu
 	log.Printf("Starting render phase")
 	objs := []*uns.Unstructured{}
 
+	// render Multus
+	o, err := RenderMultus(conf, manifestDir)
+	if err != nil {
+		return nil, err
+	}
+	objs = append(objs, o...)
+
 	// render default network
-	o, err := RenderDefaultNetwork(conf, manifestDir)
+	o, err = RenderDefaultNetwork(conf, manifestDir)
 	if err != nil {
 		return nil, err
 	}
@@ -41,6 +48,7 @@ func Validate(conf *netv1.NetworkConfigSpec) error {
 	errs := []error{}
 
 	errs = append(errs, ValidateDefaultNetwork(conf)...)
+	errs = append(errs, ValidateMultus(conf)...)
 
 	if len(errs) > 0 {
 		return errors.Errorf("invalid configuration: %v", errs)
@@ -64,6 +72,11 @@ func FillDefaults(conf, previous *netv1.NetworkConfigSpec) {
 		} else {
 			log.Printf("Detected uplink MTU %d", hostMTU)
 		}
+	}
+	// DisableMultiNetwork defaults to false
+	if conf.DisableMultiNetwork == nil {
+		disable := false
+		conf.DisableMultiNetwork = &disable
 	}
 	FillDefaultNetworkDefaults(conf, previous, hostMTU)
 }
@@ -102,6 +115,22 @@ func IsChangeSafe(prev, next *netv1.NetworkConfigSpec) error {
 		return errors.Errorf("invalid configuration: %v", errs)
 	}
 	return nil
+}
+
+// ValidateMultus validates the combination of DisableMultiNetwork and AddtionalNetworks
+func ValidateMultus(conf *netv1.NetworkConfigSpec) []error {
+	// DisableMultiNetwork defaults to false
+	deployMultus := true
+	if conf.DisableMultiNetwork != nil && *conf.DisableMultiNetwork {
+		deployMultus = false
+	}
+
+	// Additional Networks are useless without Multus, so don't let them
+	// exist without Multus and confuse things (for now)
+	if !deployMultus && len(conf.AdditionalNetworks) > 0 {
+		return []error{errors.Errorf("additional networks cannot be specified without deploying Multus")}
+	}
+	return []error{}
 }
 
 // ValidateDefaultNetwork validates whichever network is specified
@@ -172,8 +201,7 @@ func ValidateAdditionalNetworks(conf *netv1.NetworkConfigSpec) [][]error {
 	return out
 }
 
-// RenderAdditionalNetworks generates the manifests of Multus and the requested
-// additional networks
+// RenderAdditionalNetworks generates the manifests of the requested additional networks
 func RenderAdditionalNetworks(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	var err error
 	ans := conf.AdditionalNetworks
@@ -185,14 +213,7 @@ func RenderAdditionalNetworks(conf *netv1.NetworkConfigSpec, manifestDir string)
 		return nil, errors.Errorf("invalid Additional Network Configuration: %v", errs)
 	}
 
-	// render Multus when additional networks is provided
-	if len(ans) > 0 {
-		objs, err := renderMultusConfig(manifestDir)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, objs...)
-	} else {
+	if len(ans) == 0 {
 		return nil, nil
 	}
 
@@ -210,5 +231,30 @@ func RenderAdditionalNetworks(conf *netv1.NetworkConfigSpec, manifestDir string)
 		}
 	}
 
+	return out, nil
+}
+
+// RenderMultus generates the manifests of Multus
+func RenderMultus(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructured, error) {
+	if *conf.DisableMultiNetwork {
+		return nil, nil
+	}
+
+	var err error
+	out := []*uns.Unstructured{}
+	objs := []*uns.Unstructured{}
+
+	// enabling Multus always renders the CRD since Multus uses it
+	objs, err = renderAdditionalNetworksCRD(manifestDir)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, objs...)
+
+	objs, err = renderMultusConfig(manifestDir)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, objs...)
 	return out, nil
 }

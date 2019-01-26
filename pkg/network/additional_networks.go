@@ -9,14 +9,14 @@ import (
 	"path/filepath"
 )
 
-// renderMultusConfig returns the manifests of Multus DaemonSet and NetworkAttachmentDefinition.
-func renderMultusConfig(manifestDir string) ([]*uns.Unstructured, error) {
+// renderAdditionalNetworksCRD returns the manifests of the NetworkAttachmentDefinition.
+func renderAdditionalNetworksCRD(manifestDir string) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 	// render the manifests on disk
 	data := render.MakeRenderData()
-	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/multus"), &data)
+	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/crd"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render manifests")
+		return nil, errors.Wrap(err, "failed to render additional network manifests")
 	}
 	objs = append(objs, manifests...)
 	return objs, nil

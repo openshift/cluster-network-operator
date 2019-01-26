@@ -4,4 +4,5 @@ metadata:
   name: {{.AdditionalNetworkName}}
   namespace: default
 spec:
-  config: {{.AdditionalNetworkConfig}}
+  config: |-
+{{.AdditionalNetworkConfig | indent 4}}
