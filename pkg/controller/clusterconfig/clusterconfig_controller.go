@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
+	"github.com/openshift/cluster-network-operator/pkg/util/clusteroperator"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,14 +23,14 @@ import (
 )
 
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, status *clusteroperator.StatusManager) error {
+	return add(mgr, newReconciler(mgr, status))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, status *clusteroperator.StatusManager) reconcile.Reconciler {
 	configv1.Install(mgr.GetScheme())
-	return &ReconcileClusterConfig{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileClusterConfig{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -57,6 +58,7 @@ type ReconcileClusterConfig struct {
 	// that reads objects from the cache and writes to the apiserver
 	client client.Client
 	scheme *runtime.Scheme
+	status *clusteroperator.StatusManager
 }
 
 // Reconcile propagates changes from the cluster config to the operator config.
@@ -83,6 +85,7 @@ func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile
 		}
 		// Error reading the object - requeue the request.
 		log.Println(err)
+		// FIXME: operator status?
 		return reconcile.Result{}, err
 	}
 
@@ -90,6 +93,7 @@ func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile
 	if err := network.ValidateClusterConfig(clusterConfig.Spec); err != nil {
 		err = errors.Wrapf(err, "failed to validate Network.Spec")
 		log.Println(err)
+		r.status.SetConfigFailing("InvalidClusterConfig", err)
 		return reconcile.Result{}, err
 	}
 
@@ -97,13 +101,18 @@ func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile
 	if err != nil {
 		err = errors.Wrapf(err, "failed to generate NetworkConfig CRD")
 		log.Println(err)
+		r.status.SetConfigFailing("UpdateOperatorConfig", err)
 		return reconcile.Result{}, err
 	}
+
+	// Clear any cluster config-related errors before applying operator config
+	r.status.SetConfigSuccess()
 
 	if operatorConfig != nil {
 		if err := apply.ApplyObject(context.TODO(), r.client, operatorConfig); err != nil {
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", operatorConfig.GroupVersionKind(), operatorConfig.GetNamespace(), operatorConfig.GetName())
 			log.Println(err)
+			r.status.SetConfigFailing("ApplyClusterConfig", err)
 			return reconcile.Result{}, err
 		}
 	}
