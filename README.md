@@ -160,7 +160,7 @@ It is safe to edit the following fields in `NetworkConfig.Spec`:
 Administrators may wish to forcefully apply a disruptive change to a cluster that is not serving production traffic. To do this, first they should make the desired configuration change to the CRD. Then, delete the network operator's understanding of the state of the system:
 
 ```
-oc -n openshift-cluster-network-operator delete configmap applied-default
+oc -n openshift-network-operator delete configmap applied-default
 ```
 
 Be warned: this is an unsafe operation! It may cause the entire cluster to lose connectivity or even be permanently broken. For example, changing the ServiceNetwork will cause existing services to be unreachable, as their ServiceIP won't be reassigned.
@@ -219,7 +219,7 @@ Note that, like all operators installed by the Cluster Version Operator, it dete
 
 You can determine the current values of these environment variables by inspecting the valid deployed daemonset. Do this before you delete it...
 ```sh
-oc get -n openshift-cluster-network-operator daemonset cluster-network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{" "}' | tee images
+oc get -n openshift-network-operator daemonset cluster-network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{" "}' | tee images
 ```
 
 After stopping the deployed operator (see below), you can run the operator locally with
@@ -234,7 +234,7 @@ To do this, just scale the CVO down to 0 replicas and delete the network-operato
 
 ```sh
 oc scale --replicas 0 -n openshift-cluster-version deployments/cluster-version-operator
-oc delete -n openshift-cluster-network-operator daemonset cluster-network-operator 
+oc delete -n openshift-network-operator daemonset cluster-network-operator
 ```
 
 ## Building images

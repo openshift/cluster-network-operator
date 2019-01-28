@@ -5,7 +5,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: openshift-cluster-network-operator
+  namespace: openshift-network-operator
 roleRef:
   kind: ClusterRole
   name: cluster-admin

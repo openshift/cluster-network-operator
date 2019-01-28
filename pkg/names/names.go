@@ -17,4 +17,4 @@ const APPLIED_PREFIX = "applied-"
 // APPLIED_NAMESPACE is the namespace where applied configuration
 // configmaps are stored.
 // Should match 00_namespace.yaml
-const APPLIED_NAMESPACE = "openshift-cluster-network-operator"
+const APPLIED_NAMESPACE = "openshift-network-operator"
