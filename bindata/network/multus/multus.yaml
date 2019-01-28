@@ -2,7 +2,7 @@ kind: DaemonSet
 apiVersion: apps/v1
 metadata:
   name: multus
-  namespace: multus
+  namespace: openshift-multus
   annotations:
     kubernetes.io/description: |
       This daemon set launches the Multus networking component on each node.
