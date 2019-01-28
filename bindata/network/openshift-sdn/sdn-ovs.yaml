@@ -72,13 +72,8 @@ spec:
           /usr/share/openvswitch/scripts/ovs-ctl start --no-ovsdb-server --system-id=random
 
           tail --follow=name /var/log/openvswitch/ovs-vswitchd.log /var/log/openvswitch/ovsdb-server.log &
-          sleep 20
           while true; do
-            if ! /usr/share/openvswitch/scripts/ovs-ctl status &>/dev/null; then
-              echo "OVS seems to have crashed, exiting"
-              quit
-            fi
-            sleep 15
+            sleep 10000
           done
         securityContext:
           privileged: true
@@ -97,9 +92,16 @@ spec:
           name: host-config-openvswitch
         resources:
           requests:
-            cpu: 100m
-            memory: 300Mi
+            cpu: 200m
+            memory: 400Mi
         terminationMessagePolicy: FallbackToLogsOnError
+        livenessProbe:
+          exec:
+            command:
+            - /usr/share/openvswitch/scripts/ovs-ctl
+            - status
+          initialDelaySeconds: 15
+          periodSeconds: 5
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
