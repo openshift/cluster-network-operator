@@ -54,7 +54,7 @@ type NetworkConfigSpec struct {
 
 	// Additional networks to make available to pods when multiple networks
 	// are enabled.
-	AdditionalNetworks []AdditionalNetworkDefinition `json:"additionalNetworks"`
+	AdditionalNetworks []AdditionalNetworkDefinition `json:"additionalNetworks,omitempty"`
 
 	// DisableMultiNetwork specifies whether or not multiple pod network
 	// support should be disabled. If unset, this property defaults to
