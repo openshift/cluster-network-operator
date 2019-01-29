@@ -115,8 +115,9 @@ func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile
 			r.status.SetConfigFailing("ApplyClusterConfig", err)
 			return reconcile.Result{}, err
 		}
+
+		log.Printf("successfully updated ClusterNetwork (%s) %s/%s", operatorConfig.GroupVersionKind(), operatorConfig.GetNamespace(), operatorConfig.GetName())
 	}
 
-	log.Printf("successfully updated ClusterNetwork (%s) %s/%s", operatorConfig.GroupVersionKind(), operatorConfig.GetNamespace(), operatorConfig.GetName())
 	return reconcile.Result{}, nil
 }
