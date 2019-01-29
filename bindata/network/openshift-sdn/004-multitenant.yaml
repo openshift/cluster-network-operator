@@ -1,0 +1,75 @@
+{{if eq .Mode "Multitenant"}}
+# Namespaces which must be reachable to all pods, or can reach all pods
+# - openshift-dns
+# - openshift-ingress
+# - openshift-monitoring
+# - openshift-kube-apiserver
+# - openshift-operator-lifecycle-manager
+# - openshift-image-registry
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-dns
+netid: 0
+netname: openshift-dns
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-ingress
+netid: 0
+netname: openshift-ingress
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-monitoring
+netid: 0
+netname: openshift-monitoring
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-kube-apiserver
+netid: 0
+netname: openshift-kube-apiserver
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-operator-lifecycle-manager
+netid: 0
+netname: openshift-operator-lifecycle-manager
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-image-registry
+netid: 0
+netname: openshift-image-registry
+
+---
+# Namespaces which are part of the "control plane" and need to reach each other:
+# - kube-system (etcd)
+# - openshift-apiserver
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-apiserver
+netid: 1
+netname: openshift-apiserver
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: kube-system
+netid: 1
+netname: kube-system
+
+{{- end}}
