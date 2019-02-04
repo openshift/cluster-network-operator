@@ -222,7 +222,7 @@ In addition to `KUBECONFIG`, you will also need to set several other variables:
 
 You can determine the correct values of these environment variables by inspecting the (working) cluster before you replace the operator:
 ```sh
-oc get -n openshift-network-operator deployment cluster-network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' | tee env.sh
+oc get -n openshift-network-operator deployment network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' | tee env.sh
 oc exec -n openshift-sdn $(oc get pods -n openshift-sdn -l app=sdn-controller -ojsonpath='{.items[0].metadata.name}') -- printenv | grep '^KUBERNETES_SERVICE_[A-Z]*=' | tee -a env.sh
 ```
 
@@ -238,7 +238,7 @@ To do this, just scale the CVO down to 0 replicas and delete the network-operato
 
 ```sh
 oc scale --replicas 0 -n openshift-cluster-version deployments/cluster-version-operator
-oc delete -n openshift-network-operator daemonset cluster-network-operator
+oc delete -n openshift-network-operator deployment network-operator
 ```
 
 ## Building images
