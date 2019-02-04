@@ -12,7 +12,7 @@ var AddToManagerFuncs []func(manager.Manager, *clusteroperator.StatusManager) er
 
 // AddToManager adds all Controllers to the Manager
 func AddToManager(m manager.Manager) error {
-	status := clusteroperator.NewStatusManager(m.GetClient(), "openshift-network-operator", operatorversion.Version)
+	status := clusteroperator.NewStatusManager(m.GetClient(), "network", operatorversion.Version)
 
 	for _, f := range AddToManagerFuncs {
 		if err := f(m, status); err != nil {
