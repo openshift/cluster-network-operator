@@ -179,9 +179,6 @@ func TestValidateOpenShiftSDN(t *testing.T) {
 	port := uint32(66666)
 	sdnConfig.VXLANPort = &port
 	errExpect("invalid VXLANPort 66666")
-
-	config.ClusterNetwork = nil
-	errExpect("ClusterNetwork cannot be empty")
 }
 
 func TestProxyArgs(t *testing.T) {

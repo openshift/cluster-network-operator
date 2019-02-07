@@ -78,5 +78,10 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	// validate that Multus is still rendered
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus")))
 
+	configCopy := config.DeepCopy()
+	configCopy.Spec.ClusterNetwork = nil
+	err = Validate(&configCopy.Spec)
+	g.Expect(err).To(MatchError(ContainSubstring("ClusterNetwork cannot be empty")))
+
 	// TODO(cdc) validate that kube-proxy is rendered
 }

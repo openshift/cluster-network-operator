@@ -68,14 +68,6 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 func validateOpenShiftSDN(conf *operv1.NetworkSpec) []error {
 	out := []error{}
 
-	if len(conf.ClusterNetwork) == 0 {
-		out = append(out, errors.Errorf("ClusterNetwork cannot be empty"))
-	}
-
-	if len(conf.ServiceNetwork) != 1 {
-		out = append(out, errors.Errorf("ServiceNetwork must have exactly 1 entry"))
-	}
-
 	sc := conf.DefaultNetwork.OpenShiftSDNConfig
 	if sc != nil {
 		if sdnPluginName(sc.Mode) == "" {

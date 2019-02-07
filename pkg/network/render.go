@@ -81,6 +81,14 @@ func Canonicalize(conf *operv1.NetworkSpec) {
 func Validate(conf *operv1.NetworkSpec) error {
 	errs := []error{}
 
+	if len(conf.ClusterNetwork) == 0 {
+		errs = append(errs, errors.Errorf("ClusterNetwork cannot be empty"))
+	}
+
+	if len(conf.ServiceNetwork) != 1 {
+		errs = append(errs, errors.Errorf("ServiceNetwork must have exactly 1 entry"))
+	}
+
 	errs = append(errs, ValidateIPPools(conf)...)
 	errs = append(errs, ValidateDefaultNetwork(conf)...)
 	errs = append(errs, ValidateMultus(conf)...)
