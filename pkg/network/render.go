@@ -140,7 +140,7 @@ func ValidateDefaultNetwork(conf *netv1.NetworkConfigSpec) []error {
 	case netv1.NetworkTypeOpenShiftSDN, netv1.NetworkTypeDeprecatedOpenshiftSDN:
 		return validateOpenShiftSDN(conf)
 	default:
-		return []error{errors.Errorf("unknown or unsupported NetworkType: %s", conf.DefaultNetwork.Type)}
+		return nil
 	}
 }
 
@@ -155,9 +155,10 @@ func RenderDefaultNetwork(conf *netv1.NetworkConfigSpec, manifestDir string) ([]
 	switch dn.Type {
 	case netv1.NetworkTypeOpenShiftSDN, netv1.NetworkTypeDeprecatedOpenshiftSDN:
 		return renderOpenShiftSDN(conf, manifestDir)
+	default:
+		log.Printf("NOTICE: Unknown network type %s, ignoring", dn.Type)
+		return nil, nil
 	}
-
-	return nil, errors.Errorf("unknown or unsupported NetworkType: %s", dn.Type)
 }
 
 // FillDefaultNetworkDefaults
@@ -166,8 +167,6 @@ func FillDefaultNetworkDefaults(conf, previous *netv1.NetworkConfigSpec, hostMTU
 	case netv1.NetworkTypeOpenShiftSDN, netv1.NetworkTypeDeprecatedOpenshiftSDN:
 		fillOpenShiftSDNDefaults(conf, previous, hostMTU)
 	default:
-		// This case has already been excluded by Validate
-		panic("invalid network")
 	}
 }
 
@@ -179,8 +178,8 @@ func IsDefaultNetworkChangeSafe(prev, next *netv1.NetworkConfigSpec) []error {
 	switch prev.DefaultNetwork.Type {
 	case netv1.NetworkTypeOpenShiftSDN, netv1.NetworkTypeDeprecatedOpenshiftSDN:
 		return isOpenShiftSDNChangeSafe(prev, next)
-	default: // should be unreachable
-		return []error{errors.Errorf("unknown network type %s", prev.DefaultNetwork.Type)}
+	default:
+		return nil
 	}
 }
 

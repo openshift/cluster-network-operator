@@ -94,7 +94,10 @@ Users must select a default network provider. This cannot be changed. Different 
 
 The network type is always read from the Cluster configuration.
 
-Currently, the only supported value for network Type is `OpenShiftSDN`.
+Currently, the only understood value for network Type is `OpenShiftSDN`.
+
+Other values are ignored. If you wish to use use a third-party network provider not managed by the operator, set the network type to something meaningful to you. The operator will not install or upgrade a network provider, but all other Network Operator functionality remains.
+
 
 ### Configuring OpenShiftSDN
 OpenShiftSDN supports the following configuration options, all of which are optional:
