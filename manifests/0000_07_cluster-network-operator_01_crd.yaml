@@ -58,9 +58,6 @@ spec:
                 ovnKubernetesConfig:
                   type: object
                   properties:
-                    genevePort:
-                      type: integer
-                      minimum: 0
                     mtu:
                       type: integer
                       minimum: 0
