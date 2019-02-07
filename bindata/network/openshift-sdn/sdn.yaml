@@ -29,14 +29,13 @@ spec:
         component: network
         type: infra
         openshift.io/component: network
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       # Requires fairly broad permissions - ability to read all services and network functions as well
       # as all pods.
       serviceAccountName: sdn
       hostNetwork: true
       hostPID: true
+      priorityClassName: system-node-critical
       containers:
       - name: sdn
         image: {{.NodeImage}}
