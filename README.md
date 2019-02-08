@@ -216,6 +216,9 @@ _output/linux/amd64/cluster-network-renderer --config sample-config.yaml --out o
 ```
 
 ## Running manually against a test cluster
+
+If you want to run the operator as part of an installer run, see INSTALLER-HACKING.md.
+
 If you have a running cluster, you can run the operator locally against that cluster. Just set the `KUBECONFIG` environment variable.
 
 In addition to `KUBECONFIG`, you will also need to set several other variables:
