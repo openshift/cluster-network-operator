@@ -1,0 +1,137 @@
+---
+# ovn-namespace.yaml
+#
+# Setup for Kubernetes to support the ovn-kubernetes plugin
+#
+# Create the namespace for ovn-kubernetes.
+#
+# This provisioning is done as part of installation after the cluster is
+# up and before the ovn daemonsets are created.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/node-selector: "beta.kubernetes.io/os=linux"
+  name: ovn-kubernetes
+
+---
+# ovn-policy.yaml
+#
+# Setup for Kubernetes to support the ovn-kubernetes plugin
+#
+# Create the service account and policies.
+# ovnkube interacts with kubernetes and the environment
+# must be properly set up.
+# 
+# This provisioning is done as part of installation after the cluster is
+# up and before the ovn daemonsets are created.
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ovn
+  namespace: ovn-kubernetes
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    rbac.authorization.k8s.io/system-only: "true"
+  name: system:ovn-reader
+rules:
+- apiGroups:
+  - ""
+  - extensions
+  resources:
+  - pods
+  - namespaces
+  - networkpolicies
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ovn-reader
+roleRef:
+  name: system:ovn-reader
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: ovn
+  namespace: ovn-kubernetes
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-admin-0
+roleRef:
+  name: cluster-admin
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: ovn
+  namespace: ovn-kubernetes
+
+---
+# service to expose the ovn-master pod
+# at present ovn-master is limited to a single instance so
+# when the cluster has multiple masters we can get to the
+# ovn-master via this service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ovnkube-master
+  namespace: ovn-kubernetes
+spec:
+  ports:
+  - name: north
+    port: 6641
+    protocol: TCP
+    targetPort: 6641
+  - name: south
+    port: 6642
+    protocol: TCP
+    targetPort: 6642
+  sessionAffinity: None
+  clusterIP: None
+  type: ClusterIP
+  selector:
+    name: ovnkube-master
+
+---
+# The network cidr and service cidr are set in the ovn-config configmap
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: ovn-config
+  namespace: ovn-kubernetes
+data:
+  net_cidr:      "{{ net_cidr | default('10.128.0.0/14/23') }}"
+  svc_cidr:      "{{ svc_cidr | default('172.30.0.0/16') }}"
+  k8s_apiserver: "{{ k8s_apiserver.stdout }}"
