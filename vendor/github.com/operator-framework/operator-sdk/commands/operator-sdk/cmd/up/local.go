@@ -16,31 +16,29 @@ package up
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
-	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
-	"time"
 
+	k8sInternal "github.com/operator-framework/operator-sdk/internal/util/k8sutil"
 	"github.com/operator-framework/operator-sdk/internal/util/projutil"
-	ansibleOperator "github.com/operator-framework/operator-sdk/pkg/ansible/operator"
-	proxy "github.com/operator-framework/operator-sdk/pkg/ansible/proxy"
+	"github.com/operator-framework/operator-sdk/pkg/ansible"
+	aoflags "github.com/operator-framework/operator-sdk/pkg/ansible/flags"
+	"github.com/operator-framework/operator-sdk/pkg/helm"
+	hoflags "github.com/operator-framework/operator-sdk/pkg/helm/flags"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"github.com/operator-framework/operator-sdk/pkg/scaffold"
-	ansibleScaffold "github.com/operator-framework/operator-sdk/pkg/scaffold/ansible"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
+// NewLocalCmd - up local command to run an operator loccally
 func NewLocalCmd() *cobra.Command {
 	upLocalCmd := &cobra.Command{
 		Use:   "local",
@@ -52,55 +50,60 @@ kubernetes cluster using a kubeconfig file.
 		Run: upLocalFunc,
 	}
 
-	upLocalCmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "The file path to kubernetes configuration file; defaults to $HOME/.kube/config")
+	upLocalCmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "The file path to kubernetes configuration file; defaults to location specified by $KUBECONFIG with a fallback to $HOME/.kube/config if not set")
 	upLocalCmd.Flags().StringVar(&operatorFlags, "operator-flags", "", "The flags that the operator needs. Example: \"--flag1 value1 --flag2=value2\"")
-	upLocalCmd.Flags().StringVar(&namespace, "namespace", "default", "The namespace where the operator watches for changes.")
-
+	upLocalCmd.Flags().StringVar(&namespace, "namespace", "", "The namespace where the operator watches for changes.")
+	upLocalCmd.Flags().StringVar(&ldFlags, "go-ldflags", "", "Set Go linker options")
+	switch projutil.GetOperatorType() {
+	case projutil.OperatorTypeAnsible:
+		ansibleOperatorFlags = aoflags.AddTo(upLocalCmd.Flags(), "(ansible operator)")
+	case projutil.OperatorTypeHelm:
+		helmOperatorFlags = hoflags.AddTo(upLocalCmd.Flags(), "(helm operator)")
+	}
 	return upLocalCmd
 }
 
 var (
-	kubeConfig    string
-	operatorFlags string
-	namespace     string
-)
-
-const (
-	defaultConfigPath = ".kube/config"
+	kubeConfig           string
+	operatorFlags        string
+	namespace            string
+	ldFlags              string
+	ansibleOperatorFlags *aoflags.AnsibleOperatorFlags
+	helmOperatorFlags    *hoflags.HelmOperatorFlags
 )
 
 func upLocalFunc(cmd *cobra.Command, args []string) {
-	mustKubeConfig()
+	log.Info("Running the operator locally.")
+
+	// get default namespace to watch if unset
+	if !cmd.Flags().Changed("namespace") {
+		_, defaultNamespace, err := k8sInternal.GetKubeconfigAndNamespace(kubeConfig)
+		if err != nil {
+			log.Fatalf("Failed to get kubeconfig and default namespace: %v", err)
+		}
+		namespace = defaultNamespace
+	}
+	log.Infof("Using namespace %s.", namespace)
+
 	switch projutil.GetOperatorType() {
 	case projutil.OperatorTypeGo:
 		projutil.MustInProjectRoot()
 		upLocal()
 	case projutil.OperatorTypeAnsible:
 		upLocalAnsible()
+	case projutil.OperatorTypeHelm:
+		upLocalHelm()
 	default:
-		log.Fatal("failed to determine operator type")
-	}
-}
-
-// mustKubeConfig checks if the kubeconfig file exists.
-func mustKubeConfig() {
-	// if kubeConfig is not specified, search for the default kubeconfig file under the $HOME/.kube/config.
-	if len(kubeConfig) == 0 {
-		usr, err := user.Current()
-		if err != nil {
-			log.Fatalf("failed to determine user's home dir: %v", err)
-		}
-		kubeConfig = filepath.Join(usr.HomeDir, defaultConfigPath)
-	}
-
-	_, err := os.Stat(kubeConfig)
-	if err != nil && os.IsNotExist(err) {
-		log.Fatalf("failed to find the kubeconfig file (%v): %v", kubeConfig, err)
+		log.Fatal("Failed to determine operator type")
 	}
 }
 
 func upLocal() {
-	args := []string{"run", filepath.Join(scaffold.ManagerDir, scaffold.CmdFile)}
+	args := []string{"run"}
+	if ldFlags != "" {
+		args = append(args, []string{"-ldflags", ldFlags}...)
+	}
+	args = append(args, filepath.Join(scaffold.ManagerDir, scaffold.CmdFile))
 	if operatorFlags != "" {
 		extraArgs := strings.Split(operatorFlags, " ")
 		args = append(args, extraArgs...)
@@ -112,53 +115,62 @@ func upLocal() {
 		<-c
 		err := dc.Process.Kill()
 		if err != nil {
-			log.Fatalf("failed to terminate the operator: %v", err)
+			log.Fatalf("Failed to terminate the operator: (%v)", err)
 		}
 		os.Exit(0)
 	}()
 	dc.Stdout = os.Stdout
 	dc.Stderr = os.Stderr
-	dc.Env = append(os.Environ(), fmt.Sprintf("%v=%v", k8sutil.KubeConfigEnvVar, kubeConfig), fmt.Sprintf("%v=%v", k8sutil.WatchNamespaceEnvVar, namespace))
+	dc.Env = os.Environ()
+	// only set env var if user explicitly specified a kubeconfig path
+	if kubeConfig != "" {
+		dc.Env = append(dc.Env, fmt.Sprintf("%v=%v", k8sutil.KubeConfigEnvVar, kubeConfig))
+	}
+	dc.Env = append(dc.Env, fmt.Sprintf("%v=%v", k8sutil.WatchNamespaceEnvVar, namespace))
 	err := dc.Run()
 	if err != nil {
-		log.Fatalf("failed to run operator locally: %v", err)
+		log.Fatalf("Failed to run operator locally: (%v)", err)
 	}
 }
 
 func upLocalAnsible() {
-	mgr, err := manager.New(config.GetConfigOrDie(), manager.Options{Namespace: namespace})
-	if err != nil {
-		log.Fatal(err)
+	// Set the kubeconfig that the manager will be able to grab
+	// only set env var if user explicitly specified a kubeconfig path
+	if kubeConfig != "" {
+		if err := os.Setenv(k8sutil.KubeConfigEnvVar, kubeConfig); err != nil {
+			log.Fatalf("Failed to set %s environment variable: (%v)", k8sutil.KubeConfigEnvVar, err)
+		}
+	}
+	// Set the namespace that the manager will be able to grab
+	if namespace != "" {
+		if err := os.Setenv(k8sutil.WatchNamespaceEnvVar, namespace); err != nil {
+			log.Fatalf("Failed to set %s environment variable: (%v)", k8sutil.WatchNamespaceEnvVar, err)
+		}
 	}
 
-	printVersion()
-	logrus.Infof("watching namespace: %s", namespace)
-	done := make(chan error)
+	ansible.Run(ansibleOperatorFlags)
+}
 
-	// start the proxy
-	err = proxy.Run(done, proxy.Options{
-		Address:    "localhost",
-		Port:       8888,
-		KubeConfig: mgr.GetConfig(),
-	})
-	if err != nil {
-		logrus.Fatalf("error starting proxy: %v", err)
+func upLocalHelm() {
+	// Set the kubeconfig that the manager will be able to grab
+	// only set env var if user explicitly specified a kubeconfig path
+	if kubeConfig != "" {
+		if err := os.Setenv(k8sutil.KubeConfigEnvVar, kubeConfig); err != nil {
+			log.Fatalf("Failed to set %s environment variable: (%v)", k8sutil.KubeConfigEnvVar, err)
+		}
+	}
+	// Set the namespace that the manager will be able to grab
+	if namespace != "" {
+		if err := os.Setenv(k8sutil.WatchNamespaceEnvVar, namespace); err != nil {
+			log.Fatalf("Failed to set %s environment variable: (%v)", k8sutil.WatchNamespaceEnvVar, err)
+		}
 	}
 
-	// start the operator
-	go ansibleOperator.Run(done, mgr, "./"+ansibleScaffold.WatchesYamlFile, time.Minute)
-
-	// wait for either to finish
-	err = <-done
-	if err == nil {
-		logrus.Info("Exiting")
-	} else {
-		logrus.Fatal(err.Error())
-	}
+	helm.Run(helmOperatorFlags)
 }
 
 func printVersion() {
-	logrus.Infof("Go Version: %s", runtime.Version())
-	logrus.Infof("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH)
-	logrus.Infof("operator-sdk Version: %v", sdkVersion.Version)
+	log.Infof("Go Version: %s", runtime.Version())
+	log.Infof("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH)
+	log.Infof("Version of operator-sdk: %v", sdkVersion.Version)
 }
