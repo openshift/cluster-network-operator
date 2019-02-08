@@ -137,10 +137,6 @@ type OpenShiftSDNConfig struct {
 // OVNKubernetesConfig is the configuration parameters for networks using the
 // ovn-kubernetes netwok project
 type OVNKubernetesConfig struct {
-	// The UDP port to use for geneve
-	// The default is 6081
-	GenevePort *uint32 `json:"genevePort,omitempty"`
-
 	// The MTU to use for the tunnel interface
 	// Default is 1400
 	MTU *uint32 `json:"mtu,omitempty"`
