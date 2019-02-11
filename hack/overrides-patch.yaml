@@ -1,0 +1,10 @@
+- op: add
+  path: /spec/overrides
+  value: []
+- op: add
+  path: /spec/overrides/-
+  value:
+    kind: Deployment
+    name: network-operator
+    namespace: openshift-network-operator
+    unmanaged: true
