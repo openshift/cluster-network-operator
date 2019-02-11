@@ -37,6 +37,8 @@ spec:
           value: "quay.io/openshift/origin-container-networking-plugins-supported:v4.0.0"
         - name: CNI_PLUGINS_UNSUPPORTED_IMAGE
           value: "quay.io/openshift/origin-container-networking-plugins-unsupported:v4.0.0"
+        - name: OVN_IMAGE
+          value: "docker.io/ovnkube/ovn-daemonset:latest"
         - name: POD_NAME
           valueFrom:
             fieldRef:

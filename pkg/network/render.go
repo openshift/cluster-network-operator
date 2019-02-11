@@ -208,6 +208,8 @@ func ValidateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 	switch conf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		return validateOpenShiftSDN(conf)
+	case operv1.NetworkTypeOVNKubernetes:
+		return validateOVNKubernetes(conf)
 	default:
 		return nil
 	}
@@ -224,6 +226,8 @@ func RenderDefaultNetwork(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.
 	switch dn.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		return renderOpenShiftSDN(conf, manifestDir)
+	case operv1.NetworkTypeOVNKubernetes:
+		return renderOVNKubernetes(conf, manifestDir)
 	default:
 		log.Printf("NOTICE: Unknown network type %s, ignoring", dn.Type)
 		return nil, nil
@@ -235,6 +239,8 @@ func FillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int)
 	switch conf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		fillOpenShiftSDNDefaults(conf, previous, hostMTU)
+	case operv1.NetworkTypeOVNKubernetes:
+		fillOVNKubernetesDefaults(conf, previous, hostMTU)
 	default:
 	}
 }
@@ -247,6 +253,8 @@ func IsDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	switch prev.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		return isOpenShiftSDNChangeSafe(prev, next)
+	case operv1.NetworkTypeOVNKubernetes:
+		return isOVNKubernetesChangeSafe(prev, next)
 	default:
 		return nil
 	}

@@ -31,15 +31,16 @@ spec:
     spec:
       # Requires fairly broad permissions - ability to read all services and network functions as well
       # as all pods.
-      serviceAccountName: ovn
+      serviceAccountName: ovn-kubernetes-node
       hostNetwork: true
       hostPID: true
+
       containers:
 
       # ovsdb-server and ovs-switchd daemons
       - name: ovs-daemons
-        image: "{{ ovn_image | default('docker.io/ovnkube/ovn-daemonset:latest') }}"
-        imagePullPolicy: "{{ ovn_image_pull_policy | default('IfNotPresent') }}"
+        image: "{{ .ovn_image }}"
+        imagePullPolicy: "{{ .ovn_image_pull_policy }}"
 
         command: ["/root/ovnkube.sh", "ovs-server"]
 
@@ -94,8 +95,8 @@ spec:
       # The network container launches the ovn-k8s-cni-overlay process, the kube-proxy, and the local DNS service.
       # It relies on an up to date node-config.yaml being present.
       - name: ovn-controller
-        image: "{{ ovn_image | default('docker.io/ovnkube/ovn-daemonset:latest') }}"
-        imagePullPolicy: "{{ ovn_image_pull_policy | default('IfNotPresent') }}"
+        image: "{{ .ovn_image }}"
+        imagePullPolicy: "{{ .ovn_image_pull_policy }}"
 
         command: ["/root/ovnkube.sh", "ovn-controller"]
 
@@ -132,9 +133,9 @@ spec:
           name: host-var-run-ovn-kubernetes
         # CNI related mounts which we take over
         - mountPath: /host/opt/cni/bin
-          name: host-opt-cni-bin
+          name: host-cni-bin
         - mountPath: /etc/cni/net.d
-          name: host-etc-cni-netd
+          name: host-cni-netd
         - mountPath: /var/lib/cni/networks/ovn-k8s-cni-overlay
           name: host-var-lib-cni-networks-ovn-kubernetes
 
@@ -181,8 +182,8 @@ spec:
         lifecycle:
 
       - name: ovn-node
-        image: "{{ ovn_image | default('docker.io/ovnkube/ovn-daemonset:latest') }}"
-        imagePullPolicy: "{{ ovn_image_pull_policy | default('IfNotPresent') }}"
+        image: "{{ .ovn_image }}"
+        imagePullPolicy: "{{ .ovn_image_pull_policy }}"
 
         command: ["/root/ovnkube.sh", "ovn-node"]
 
@@ -221,9 +222,9 @@ spec:
           name: host-var-run-ovn-kubernetes
         # CNI related mounts which we take over
         - mountPath: /host/opt/cni/bin
-          name: host-opt-cni-bin
+          name: host-cni-bin
         - mountPath: /etc/cni/net.d
-          name: host-etc-cni-netd
+          name: host-cni-netd
         - mountPath: /var/lib/cni/networks/ovn-k8s-cni-overlay
           name: host-var-lib-cni-networks-ovn-kubernetes
 
@@ -312,12 +313,12 @@ spec:
       - name: host-sys
         hostPath:
           path: /sys
-      - name: host-opt-cni-bin
+      - name: host-cni-bin
         hostPath:
-          path: /opt/cni/bin
-      - name: host-etc-cni-netd
+          path: /var/lib/cni/bin
+      - name: host-cni-netd
         hostPath:
-          path: /etc/cni/net.d
+          path: /etc/kubernetes/cni/net.d
       - name: host-config-openvswitch
         hostPath:
           path: /etc/origin/openvswitch

@@ -3,4 +3,7 @@ kind: Namespace
 metadata:
   annotations:
     openshift.io/node-selector: "beta.kubernetes.io/os=linux"
+  labels:
+    openshift.io/run-level: "0"
+  # NOTE: ovnkube.sh in the OVN image currently hardcodes this namespace name
   name: ovn-kubernetes

@@ -36,7 +36,7 @@ spec:
     spec:
       # Requires fairly broad permissions - ability to read all services and network functions as well
       # as all pods.
-      serviceAccountName: ovn
+      serviceAccountName: ovn-kubernetes-controller
       hostNetwork: true
       hostPID: true
       containers:
@@ -48,8 +48,8 @@ spec:
 
       # run-ovn-northd - v3
       - name: run-ovn-northd
-        image: "{{ ovn_image | default('docker.io/ovnkube/ovn-daemonset:latest') }}"
-        imagePullPolicy: "{{ ovn_image_pull_policy | default('IfNotPresent') }}"
+        image: "{{ .ovn_image }}"
+        imagePullPolicy: "{{ .ovn_image_pull_policy }}"
 
         command: ["/root/ovnkube.sh", "run-ovn-northd"]
 
@@ -139,8 +139,8 @@ spec:
 
       # nb-ovsdb - v3
       - name: nb-ovsdb
-        image: "{{ ovn_image | default('docker.io/ovnkube/ovn-daemonset:latest') }}"
-        imagePullPolicy: "{{ ovn_image_pull_policy | default('IfNotPresent') }}"
+        image: "{{ .ovn_image }}"
+        imagePullPolicy: "{{ .ovn_image_pull_policy }}"
 
         command: ["/root/ovnkube.sh", "nb-ovsdb"]
 
@@ -230,8 +230,8 @@ spec:
 
       # sb-ovsdb - v3
       - name: sb-ovsdb
-        image: "{{ ovn_image | default('docker.io/ovnkube/ovn-daemonset:latest') }}"
-        imagePullPolicy: "{{ ovn_image_pull_policy | default('IfNotPresent') }}"
+        image: "{{ .ovn_image }}"
+        imagePullPolicy: "{{ .ovn_image_pull_policy }}"
 
         command: ["/root/ovnkube.sh", "sb-ovsdb"]
 
@@ -320,8 +320,8 @@ spec:
       # end of container
 
       - name: ovnkube-master
-        image: "{{ ovn_image | default('docker.io/ovnkube/ovn-daemonset:latest') }}"
-        imagePullPolicy: "{{ ovn_image_pull_policy | default('IfNotPresent') }}"
+        image: "{{ .ovn_image }}"
+        imagePullPolicy: "{{ .ovn_image_pull_policy }}"
 
         command: ["/root/ovnkube.sh", "ovn-master"]
 
@@ -414,7 +414,7 @@ spec:
       # end of container
 
       nodeSelector:
-        node-role.kubernetes.io/master: "true"
+        node-role.kubernetes.io/master: ""
         beta.kubernetes.io/os: "linux"
       volumes:
       # In bootstrap mode, the host config contains information not easily available
@@ -460,4 +460,10 @@ spec:
         hostPath:
           path: /var/lib/cni/networks/ovn-k8s-cni-overlay
       tolerations:
-      - operator: "Exists"
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoSchedule"
+

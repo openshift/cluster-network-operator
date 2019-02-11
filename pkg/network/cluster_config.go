@@ -111,6 +111,8 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec) configv1.NetworkStat
 	switch operConf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		status.ClusterNetworkMTU = int(*operConf.DefaultNetwork.OpenShiftSDNConfig.MTU)
+	case operv1.NetworkTypeOVNKubernetes:
+		status.ClusterNetworkMTU = int(*operConf.DefaultNetwork.OVNKubernetesConfig.MTU)
 	}
 
 	return status
