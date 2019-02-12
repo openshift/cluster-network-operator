@@ -1,0 +1,31 @@
+# When doing rapid local development on libvirt, it's nice to remove
+# some of the more resource-heavy components.
+# To use this, set the environment variable HACK_MINIMIZE
+- op: add
+  path: /spec/overrides/-
+  value:
+    kind: Deployment
+    name: cluster-monitoring-operator
+    namespace: openshift-monitoring
+    unmanaged: true
+- op: add
+  path: /spec/overrides/-
+  value:
+    kind: Deployment
+    name: cluster-node-tuning-operator
+    namespace: openshift-cluster-node-tuning-operator
+    unmanaged: true
+- op: add
+  path: /spec/overrides/-
+  value:
+    kind: Deployment
+    name: cluster-samples-operator
+    namespace: openshift-cluster-samples-operator
+    unmanaged: true
+- op: add
+  path: /spec/overrides/-
+  value:
+    kind: Deployment
+    name: marketplace-operator
+    namespace: openshift-marketplace
+    unmanaged: true
