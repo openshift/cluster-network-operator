@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/ghodss/yaml"
 
 	configv1 "github.com/openshift/api/config/v1"
 
@@ -38,30 +38,35 @@ func (status *StatusManager) Set(conditions ...*configv1.ClusterOperatorStatusCo
 	err := status.client.Get(context.TODO(), types.NamespacedName{Name: status.name}, co)
 	isNotFound := errors.IsNotFound(err)
 	if err != nil && !isNotFound {
-		log.Printf("failed to get clusteroperator %s: %v", status.name, err)
-		return fmt.Errorf("failed to get clusteroperator %s: %v", status.name, err)
+		log.Printf("Failed to get ClusterOperator %q: %v", status.name, err)
+		return fmt.Errorf("failed to get ClusterOperator %s: %v", status.name, err)
 	}
 
 	oldConditions := co.Status.Conditions
 	for _, condition := range conditions {
 		co.Status.Conditions = SetStatusCondition(co.Status.Conditions, condition)
 	}
+	if ConditionsEqual(oldConditions, co.Status.Conditions) {
+		return nil
+	}
 
+	buf, err := yaml.Marshal(co.Status)
+	if err != nil {
+		buf = []byte(fmt.Sprintf("(failed to convert to YAML: %s)", err))
+	}
 	if isNotFound {
 		if err := status.client.Create(context.TODO(), co); err != nil {
-			log.Printf("failed to create clusteroperator %s: %v", co.Name, err)
-			return fmt.Errorf("failed to create clusteroperator %s: %v", co.Name, err)
+			log.Printf("Failed to create ClusterOperator %q: %v", co.Name, err)
+			return fmt.Errorf("failed to create ClusterOperator %q: %v", co.Name, err)
 		}
-		logrus.Infof("created clusteroperator: %#v", co)
+		log.Printf("Created ClusterOperator with status:\n%s", string(buf))
 	} else {
-		if !ConditionsEqual(oldConditions, co.Status.Conditions) {
-			err = status.client.Status().Update(context.TODO(), co)
-			if err != nil {
-				log.Printf("failed to update clusteroperator %s: %v", co.Name, err)
-				return fmt.Errorf("failed to update clusteroperator %s: %v", co.Name, err)
-			}
-			logrus.Infof("updated clusteroperator: %#v", co)
- 		}
+		err = status.client.Status().Update(context.TODO(), co)
+		if err != nil {
+			log.Printf("Failed to update ClusterOperator %q: %v", co.Name, err)
+			return fmt.Errorf("failed to update ClusterOperator %s: %v", co.Name, err)
+		}
+		log.Printf("Updated ClusterOperator with status:\n%s", string(buf))
 	}
 	return nil
 }
