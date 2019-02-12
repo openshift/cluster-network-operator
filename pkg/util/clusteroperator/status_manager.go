@@ -26,6 +26,9 @@ type StatusManager struct {
 	version string
 
 	configFailure bool
+
+	daemonSets  []types.NamespacedName
+	deployments []types.NamespacedName
 }
 
 func NewStatusManager(client client.Client, name, version string) *StatusManager {
@@ -114,17 +117,25 @@ func (status *StatusManager) SetFailing(reason string, err error) error {
 	)
 }
 
-// SetFromDaemonSets sets the operator status to Failing, Progressing, or Available, based
-// on the current status of the indicated DaemonSets. However, this is a no-op if the
-// StatusManager is currently marked as failing due to a configuration error.
-func (status *StatusManager) SetFromDaemonSets(daemonSets []types.NamespacedName) error {
+func (status *StatusManager) SetDaemonSets(daemonSets []types.NamespacedName) {
+	status.daemonSets = daemonSets
+}
+
+func (status *StatusManager) SetDeployments(deployments []types.NamespacedName) {
+	status.deployments = deployments
+}
+
+// SetFromPods sets the operator status to Failing, Progressing, or Available, based on
+// the current status of the manager's DaemonSets and Deployments. However, this is a
+// no-op if the StatusManager is currently marked as failing due to a configuration error.
+func (status *StatusManager) SetFromPods() error {
 	if status.configFailure {
 		return nil
 	}
 
 	progressing := []string{}
 
-	for _, dsName := range daemonSets {
+	for _, dsName := range status.daemonSets {
 		ns := &corev1.Namespace{}
 		if err := status.client.Get(context.TODO(), types.NamespacedName{Name: dsName.Namespace}, ns); err != nil {
 			if errors.IsNotFound(err) {
@@ -147,6 +158,32 @@ func (status *StatusManager) SetFromDaemonSets(daemonSets []types.NamespacedName
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not available (awaiting %d nodes)", dsName.String(), ds.Status.NumberUnavailable))
 		} else if ds.Status.NumberAvailable == 0 {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not yet scheduled on any nodes", dsName.String()))
+		}
+	}
+
+	for _, depName := range status.deployments {
+		ns := &corev1.Namespace{}
+		if err := status.client.Get(context.TODO(), types.NamespacedName{Name: depName.Namespace}, ns); err != nil {
+			if errors.IsNotFound(err) {
+				return status.SetFailing("NoNamespace", fmt.Errorf("Namespace %q does not exist", depName.Namespace))
+			} else {
+				return status.SetFailing("InternalError", err)
+			}
+		}
+
+		dep := &appsv1.Deployment{}
+		if err := status.client.Get(context.TODO(), depName, dep); err != nil {
+			if errors.IsNotFound(err) {
+				return status.SetFailing("NoDeployment", fmt.Errorf("Deployment %q does not exist", depName.String()))
+			} else {
+				return status.SetFailing("InternalError", err)
+			}
+		}
+
+		if dep.Status.UnavailableReplicas > 0 {
+			progressing = append(progressing, fmt.Sprintf("Deployment %q is not available (awaiting %d nodes)", depName.String(), dep.Status.UnavailableReplicas))
+		} else if dep.Status.AvailableReplicas == 0 {
+			progressing = append(progressing, fmt.Sprintf("Deployment %q is not yet scheduled on any nodes", depName.String()))
 		}
 	}
 
