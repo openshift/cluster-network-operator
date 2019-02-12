@@ -9,7 +9,7 @@ cd ${GOPATH}/src/${CNO_GO_PKG}
 
 if [ -z "$PKGS" ]; then
   # by default, test everything that's not in vendor
-  PKGS="$(go list ./... | grep -v vendor | xargs echo)"
+  PKGS="$(go list -f '{{if len .TestGoFiles}} {{.ImportPath}} {{end}}' ./...)"
 fi
 
 CGO_ENABLED=0 go test "${goflags[@]:+${goflags[@]}}" ${PKGS}
