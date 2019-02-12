@@ -209,6 +209,15 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 		if err := apply.ApplyObject(context.TODO(), r.client, obj); err != nil {
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
 			log.Println(err)
+
+			// Ignore errors if we've asked to do so.
+			anno := obj.GetAnnotations()
+			if anno != nil {
+				if _, ok := anno[names.IgnoreObjectErrorAnnotation]; ok {
+					log.Println("Object has ignore-errors annotation set, continuing")
+					continue
+				}
+			}
 			r.status.SetConfigFailing("ApplyOperatorConfig", err)
 			return reconcile.Result{}, err
 		}
