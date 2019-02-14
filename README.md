@@ -2,7 +2,7 @@
 
 The Cluster Network Operator installs and upgrades the networking components on an OpenShift Kubernetes cluster.
 
-It follows the [Controller pattern](https://godoc.org/github.com/kubernetes-sigs/controller-runtime/pkg#hdr-Controller): it reconciles the state of the cluster against a desired configuration. The configuration specified by a CustomResourceDefinition called `networkoperator.openshift.io/NetworkConfig/v1`, which has a corresponding [type](/openshift/cluster-network-operator/blob/master/pkg/apis/networkoperator/v1/networkconfig_types.go).
+It follows the [Controller pattern](https://godoc.org/github.com/kubernetes-sigs/controller-runtime/pkg#hdr-Controller): it reconciles the state of the cluster against a desired configuration. The configuration specified by a CustomResourceDefinition called `networkoperator.openshift.io/NetworkConfig/v1`, which has a corresponding [type](/pkg/apis/networkoperator/v1/networkconfig_types.go).
 
 Most users will be able to use the top-level OpenShift Config API, which has a [Network type](https://github.com/openshift/api/blob/master/config/v1/types_network.go#L26). The operator will automatically translate the `Network.config.openshift.io` object in to a `NetworkConfig.networkoperator.openshift.io`.
 
@@ -66,7 +66,7 @@ Users must supply at least two address pools - one for pods, and one for service
 
 For future expansion, multiple `serviceNetwork` entries are allowed by the configuration but not actually supported by any network plugins. Supplying multiple addresses is invalid.
 
-Each `clusterNetwork` entry has an additional required parameter, `hostPrefix`, that specifies the address size to assign to assign to each individual node.  For example,
+Each `clusterNetwork` entry has an additional required parameter, `hostPrefix`, that specifies the address size to assign to each individual node.  For example,
 ```yaml
 cidr: 10.128.0.0/14
 hostPrefix: 23
