@@ -38,6 +38,7 @@ func renderOpenShiftSDN(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*u
 	data.Data["HypershiftImage"] = os.Getenv("HYPERSHIFT_IMAGE")
 	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
+	data.Data["Mode"] = c.Mode
 
 	operCfg, err := controllerConfig(conf)
 	if err != nil {

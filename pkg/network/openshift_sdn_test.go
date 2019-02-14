@@ -72,6 +72,9 @@ func TestRenderOpenShiftSDN(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "sdn")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "sdn-controller")))
 
+	// No netnamespaces by default
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("NetNamespace", "", "openshift-ingress")))
+
 	// make sure all deployments are in the master
 	for _, obj := range objs {
 		if obj.GetKind() != "Deployment" {
@@ -264,4 +267,32 @@ func TestOpenShiftSDNIsSafe(t *testing.T) {
 	errs = isOpenShiftSDNChangeSafe(prev, next)
 	g.Expect(errs).To(HaveLen(1))
 	g.Expect(errs[0]).To(MatchError("cannot change openshift-sdn configuration"))
+}
+
+func TestOpenShiftSDNMultitenant(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OpenShiftSDNConfig.DeepCopy()
+	config := &crd.Spec
+	FillDefaults(config, nil)
+	config.DefaultNetwork.OpenShiftSDNConfig.Mode = "Multitenant"
+
+	objs, err := renderOpenShiftSDN(config, manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	// the full list of namespaces with a netns
+	netNS := []string{
+		"openshift-dns",
+		"openshift-ingress",
+		"openshift-monitoring",
+		"openshift-kube-apiserver",
+		"openshift-apiserver",
+		"kube-system",
+		"openshift-operator-lifecycle-manager",
+		"openshift-image-registry",
+	}
+
+	for _, ns := range netNS {
+		g.Expect(objs).To(ContainElement(HaveKubernetesID("NetNamespace", "", ns)))
+	}
 }
