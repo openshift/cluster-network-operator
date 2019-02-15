@@ -44,8 +44,10 @@ After destroying your cluster, you should delete your `$CLUSTER_DIR`.
 
 If you're using libvirt, you can use `./scripts/maintenance/virsh-cleanup.sh` in the installer repository to quickly delete the virtual machines instead of waiting for Terraform.
 
-### RBAC
+### RBAC & CVO
 This runs the operator with the `admin` role, so it will have full permissions. When run by the real installer, this will not be the case. Created objects, e.g. DaemonSets, will still have RBAC, though.
+
+In fact, **no** changes from `manifests/` will be picked up except image references.
 
 ### Saving install-config between runs
 If you're sick of answering all the questions over and over, you can shortcut the installer. Just do
@@ -58,4 +60,10 @@ Then, for subsequent installer runs, you can do
 ```
 rm -r $CLUSTER_DIR; mkdir -p $CLUSTER_DIR
 cp ~/.cache/openshift-install/install-config.yaml $CLUSTER_DIR/
+```
+
+### Paring-down installed components
+To reduce memory usage, you can remove some non-essential components from the cluster. This will cause some things (most notably, Prometheus) to be skipped. The installer process may or may not succeed, but you should be left with a functional control plane. This is fine for rapid network development. Just set:
+```
+export HACK_MINIMIZE=1
 ```
