@@ -21,6 +21,15 @@ function override() {
     kubectl --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f=${CLUSTER_DIR}/manifests/cvo-overrides.yaml -p "$(cat hack/overrides-patch.yaml)" -o yaml > ${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new
 
     mv ${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new ${CLUSTER_DIR}/manifests/cvo-overrides.yaml
+
+    # Optionally, tell the CVO to skip some unnecessary components
+    if [[ -n "${HACK_MINIMIZE:-}" ]]; then
+        echo "HACK_MINIMIZE set! This is only for rapid development!"
+        kubectl --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f=${CLUSTER_DIR}/manifests/cvo-overrides.yaml -p "$(cat hack/overrides-minimize-patch.yaml)" -o yaml > ${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new
+
+        mv ${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new ${CLUSTER_DIR}/manifests/cvo-overrides.yaml
+    fi
+
 }
 
 # Extract the image references from the release image.
@@ -43,20 +52,26 @@ function start_operator() {
         fi
     done
 
+
+    if [[ -n "${HACK_MINIMIZE:-}" ]]; then
+        echo "HACK_MINIMIZE set! This is only for development, and the installer will likely not succeed."
+        echo "You will still be left with a reasonably functional cluster."
+    fi
+
     # A few environment variables we set in the Daemonset
     export POD_NAME=LOCAL
     export KUBERNETES_SERVICE_PORT=6443
     export KUBERNETES_SERVICE_HOST=$(oc config view -o jsonpath='{.clusters[0].cluster.server}' | awk -F'[/:]' '{print $4}')
 
-    echo "Waiting for the apiserver to come up and for the network configuration to be rceated."
-    echo "You can ignore the error message 'error: the server doesn't have a resource type \"Network\"'"
+    echo "Waiting for the apiserver to come up and for the network operator namespace to be created."
+    echo "You can ignore error messages, they're just the apiserver coming up."
 
     while true; do 
-        if oc get Network.config.openshift.io cluster; then
-            echo "Network config exists, continuing"
+        if oc get namespace openshift-network-operator; then
+            echo "Namespace openshift-network-operator exists, continuing"
             break
         else
-            echo "No network config or apiserver not up yet, retrying"
+            echo "No namespace or apiserver not up yet, retrying"
             sleep 15
             continue
         fi
@@ -68,7 +83,7 @@ function start_operator() {
 function usage() {
     >&2 echo "Usage: $0 (prepare|start)
 
-Scaffoding for running a local build of the network operator with the installer.
+Scaffolding for running a local build of the network operator with the installer.
 For more info, see INSTALLER-HACKING.md
 
 Commands:
