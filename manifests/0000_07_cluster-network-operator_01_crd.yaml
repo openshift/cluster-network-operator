@@ -20,21 +20,23 @@ spec:
       properties:
         spec:
           type: object
-          required: ["clusterNetworks", "serviceNetwork", "defaultNetwork"]
+          required: ["clusterNetwork", "serviceNetwork", "defaultNetwork"]
           properties:
-            clusterNetworks:
+            clusterNetwork:
               type: array
               items:
                 type: object
-                required: ["cidr", "hostSubnetLength"]
+                required: ["cidr", "hostPrefix"]
                 properties:
                   cidr:
                     type: string
-                  hostSubnetLength:
+                  hostPrefix:
                     type: integer
                     minimum: 0
             serviceNetwork:
-              type: string
+              type: array
+              items:
+                type: string
             defaultNetwork:
               type: object
               required: ["type"]

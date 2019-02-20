@@ -48,7 +48,7 @@ func TestValidateClusterConfig(t *testing.T) {
 
 	// no service cidr
 	cc.ServiceNetwork = nil
-	haveError(cc, "spec.serviceNetwork must have length 1")
+	haveError(cc, "spec.serviceNetwork must have at least 1 entry")
 
 	// valid clustercidr
 	cc = *ClusterConfig.DeepCopy()
@@ -77,15 +77,15 @@ func TestMergeClusterConfig(t *testing.T) {
 
 	MergeClusterConfig(&oc, cc)
 	g.Expect(oc).To(Equal(netopv1.NetworkConfigSpec{
-		ServiceNetwork: "192.168.0.0/20",
-		ClusterNetworks: []netopv1.ClusterNetwork{
+		ServiceNetwork: []string{"192.168.0.0/20"},
+		ClusterNetwork: []netopv1.ClusterNetworkEntry{
 			{
-				CIDR:             "10.0.0.0/22",
-				HostSubnetLength: 8,
+				CIDR:       "10.0.0.0/22",
+				HostPrefix: 24,
 			},
 			{
-				CIDR:             "10.2.0.0/22",
-				HostSubnetLength: 9,
+				CIDR:       "10.2.0.0/22",
+				HostPrefix: 23,
 			},
 		},
 		DefaultNetwork: netopv1.DefaultNetworkDefinition{
