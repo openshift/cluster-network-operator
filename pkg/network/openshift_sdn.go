@@ -3,6 +3,7 @@ package network
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -66,9 +67,14 @@ func renderOpenShiftSDN(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*u
 func validateOpenShiftSDN(conf *netv1.NetworkConfigSpec) []error {
 	out := []error{}
 
-	if len(conf.ClusterNetworks) == 0 {
-		out = append(out, errors.Errorf("ClusterNetworks cannot be empty"))
+	if len(conf.ClusterNetwork) == 0 {
+		out = append(out, errors.Errorf("ClusterNetwork cannot be empty"))
 	}
+
+	if len(conf.ServiceNetwork) != 1 {
+		out = append(out, errors.Errorf("ServiceNetwork must have exactly 1 entry"))
+	}
+
 	sc := conf.DefaultNetwork.OpenShiftSDNConfig
 	if sc != nil {
 		if sdnPluginName(sc.Mode) == "" {
@@ -122,7 +128,7 @@ func fillOpenShiftSDNDefaults(conf, previous *netv1.NetworkConfigSpec, hostMTU i
 		conf.KubeProxyConfig.ProxyArguments = map[string][]string{}
 	}
 
-	if conf.KubeProxyConfig.ProxyArguments["metrics-bind-address"] == nil  {
+	if conf.KubeProxyConfig.ProxyArguments["metrics-bind-address"] == nil {
 		conf.KubeProxyConfig.ProxyArguments["metrics-bind-address"] = []string{"0.0.0.0:9101"}
 	}
 
@@ -153,7 +159,7 @@ func sdnPluginName(n netv1.SDNMode) string {
 		return "redhat/openshift-ovs-subnet"
 	case netv1.SDNModeMultitenant:
 		return "redhat/openshift-ovs-multitenant"
-	case netv1.SDNModeNetworkPolicy, netv1.SDNModeDeprecatedNetworkpolicy:
+	case netv1.SDNModeNetworkPolicy:
 		return "redhat/openshift-ovs-networkpolicy"
 	}
 	return ""
@@ -166,8 +172,14 @@ func controllerConfig(conf *netv1.NetworkConfigSpec) (string, error) {
 
 	// generate master network configuration
 	ippools := []cpv1.ClusterNetworkEntry{}
-	for _, net := range conf.ClusterNetworks {
-		ippools = append(ippools, cpv1.ClusterNetworkEntry{CIDR: net.CIDR, HostSubnetLength: net.HostSubnetLength})
+	for _, entry := range conf.ClusterNetwork {
+		_, cidr, err := net.ParseCIDR(entry.CIDR) // already validated
+		if err != nil {
+			return "", err
+		}
+		_, size := cidr.Mask.Size()
+
+		ippools = append(ippools, cpv1.ClusterNetworkEntry{CIDR: entry.CIDR, HostSubnetLength: uint32(size) - entry.HostPrefix})
 	}
 
 	cfg := cpv1.OpenShiftControllerManagerConfig{
@@ -180,7 +192,7 @@ func controllerConfig(conf *netv1.NetworkConfigSpec) (string, error) {
 		Network: cpv1.NetworkControllerConfig{
 			NetworkPluginName:  sdnPluginName(c.Mode),
 			ClusterNetworks:    ippools,
-			ServiceNetworkCIDR: conf.ServiceNetwork,
+			ServiceNetworkCIDR: conf.ServiceNetwork[0],
 			VXLANPort:          *c.VXLANPort,
 		},
 	}
