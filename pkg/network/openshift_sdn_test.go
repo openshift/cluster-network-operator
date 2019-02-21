@@ -15,15 +15,15 @@ import (
 
 var OpenShiftSDNConfig = netv1.NetworkConfig{
 	Spec: netv1.NetworkConfigSpec{
-		ServiceNetwork: []string{"172.30.0.0/16"},
-		ClusterNetwork: []netv1.ClusterNetworkEntry{
+		ServiceNetwork: "172.30.0.0/16",
+		ClusterNetworks: []netv1.ClusterNetwork{
 			{
-				CIDR:       "10.128.0.0/15",
-				HostPrefix: 23,
+				CIDR:             "10.128.0.0/15",
+				HostSubnetLength: 9,
 			},
 			{
-				CIDR:       "10.0.0.0/14",
-				HostPrefix: 24,
+				CIDR:             "10.0.0.0/14",
+				HostSubnetLength: 8,
 			},
 		},
 		DefaultNetwork: netv1.DefaultNetworkDefinition{
@@ -118,15 +118,15 @@ func TestFillOpenShiftSDNDefaults(t *testing.T) {
 	m := uint32(8950)
 
 	expected := netv1.NetworkConfigSpec{
-		ServiceNetwork: []string{"172.30.0.0/16"},
-		ClusterNetwork: []netv1.ClusterNetworkEntry{
+		ServiceNetwork: "172.30.0.0/16",
+		ClusterNetworks: []netv1.ClusterNetwork{
 			{
-				CIDR:       "10.128.0.0/15",
-				HostPrefix: 23,
+				CIDR:             "10.128.0.0/15",
+				HostSubnetLength: 9,
 			},
 			{
-				CIDR:       "10.0.0.0/14",
-				HostPrefix: 24,
+				CIDR:             "10.0.0.0/14",
+				HostSubnetLength: 8,
 			},
 		},
 		DefaultNetwork: netv1.DefaultNetworkDefinition{
@@ -139,7 +139,7 @@ func TestFillOpenShiftSDNDefaults(t *testing.T) {
 		},
 		DeployKubeProxy: &f,
 		KubeProxyConfig: &netv1.ProxyConfig{
-			BindAddress:    "0.0.0.0",
+			BindAddress: "0.0.0.0",
 			ProxyArguments: map[string][]string{"metrics-bind-address": []string{"0.0.0.0:9101"}},
 		},
 	}
@@ -180,8 +180,8 @@ func TestValidateOpenShiftSDN(t *testing.T) {
 	sdnConfig.VXLANPort = &port
 	errExpect("invalid VXLANPort 66666")
 
-	config.ClusterNetwork = nil
-	errExpect("ClusterNetwork cannot be empty")
+	config.ClusterNetworks = nil
+	errExpect("ClusterNetworks cannot be empty")
 }
 
 func TestProxyArgs(t *testing.T) {
@@ -215,7 +215,6 @@ func TestProxyArgs(t *testing.T) {
 	objs, err := renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg := getSdnConfigFile(objs)
-
 	val, _, _ := uns.NestedString(cfg.Object, "servingInfo", "bindAddress")
 	g.Expect(val).To(Equal("0.0.0.0:10251"))
 	val, _, _ = uns.NestedString(cfg.Object, "iptablesSyncPeriod")
@@ -296,137 +295,4 @@ func TestOpenShiftSDNMultitenant(t *testing.T) {
 	for _, ns := range netNS {
 		g.Expect(objs).To(ContainElement(HaveKubernetesID("NetNamespace", "", ns)))
 	}
-}
-
-func TestOpenshiftControllerConfig(t *testing.T) {
-	g := NewGomegaWithT(t)
-
-	crd := OpenShiftSDNConfig.DeepCopy()
-	config := &crd.Spec
-	FillDefaults(config, nil)
-
-	cfg, err := controllerConfig(config)
-	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(cfg).To(Equal(`apiVersion: openshiftcontrolplane.config.openshift.io/v1
-build:
-  additionalTrustedCA: ""
-  buildDefaults: null
-  buildOverrides: null
-  imageTemplateFormat:
-    format: ""
-    latest: false
-controllers: null
-deployer:
-  imageTemplateFormat:
-    format: ""
-    latest: false
-dockerPullSecret:
-  internalRegistryHostname: ""
-  registryURLs: null
-imageImport:
-  disableScheduledImport: false
-  maxScheduledImageImportsPerMinute: 0
-  scheduledImageImportMinimumIntervalSeconds: 0
-ingress:
-  ingressIPNetworkCIDR: ""
-kind: OpenShiftControllerManagerConfig
-kubeClientConfig:
-  connectionOverrides:
-    acceptContentTypes: ""
-    burst: 0
-    contentType: ""
-    qps: 0
-  kubeConfig: ""
-leaderElection:
-  leaseDuration: 0s
-  renewDeadline: 0s
-  retryPeriod: 0s
-network:
-  clusterNetworks:
-  - cidr: 10.128.0.0/15
-    hostSubnetLength: 9
-  - cidr: 10.0.0.0/14
-    hostSubnetLength: 8
-  networkPluginName: redhat/openshift-ovs-networkpolicy
-  serviceNetworkCIDR: 172.30.0.0/16
-  vxLANPort: 4789
-  vxlanPort: 4789
-resourceQuota:
-  concurrentSyncs: 0
-  minResyncPeriod: 0s
-  syncPeriod: 0s
-securityAllocator:
-  mcsAllocatorRange: ""
-  mcsLabelsPerProject: 0
-  uidAllocatorRange: ""
-serviceAccount:
-  managedNames: null
-serviceServingCert:
-  signer: null
-servingInfo: null
-`))
-}
-
-func TestOpenshiftNodeConfig(t *testing.T) {
-	g := NewGomegaWithT(t)
-
-	crd := OpenShiftSDNConfig.DeepCopy()
-	config := &crd.Spec
-	FillDefaults(config, nil)
-	// hard-code the mtu in case we run on other kinds of nodes
-	mtu := uint32(1450)
-	config.DefaultNetwork.OpenShiftSDNConfig.MTU = &mtu
-
-	cfg, err := nodeConfig(config)
-	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(cfg).To(Equal(`allowDisabledDocker: false
-apiVersion: v1
-authConfig:
-  authenticationCacheSize: 0
-  authenticationCacheTTL: ""
-  authorizationCacheSize: 0
-  authorizationCacheTTL: ""
-dnsBindAddress: ""
-dnsDomain: ""
-dnsIP: ""
-dnsNameservers: null
-dnsRecursiveResolvConf: ""
-dockerConfig:
-  dockerShimRootDirectory: ""
-  dockerShimSocket: ""
-  execHandlerName: ""
-enableUnidling: null
-imageConfig:
-  format: ""
-  latest: false
-iptablesSyncPeriod: ""
-kind: NodeConfig
-kubeletArguments:
-  container-runtime:
-  - remote
-  container-runtime-endpoint:
-  - /var/run/crio/crio.sock
-masterClientConnectionOverrides: null
-masterKubeConfig: ""
-networkConfig:
-  mtu: 1450
-  networkPluginName: redhat/openshift-ovs-networkpolicy
-nodeIP: ""
-nodeName: ""
-podManifestConfig: null
-proxyArguments:
-  metrics-bind-address:
-  - 0.0.0.0:9101
-servingInfo:
-  bindAddress: 0.0.0.0:10251
-  bindNetwork: ""
-  certFile: ""
-  clientCA: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-  keyFile: ""
-  namedCertificates: null
-volumeConfig:
-  localQuota:
-    perFSGroup: null
-volumeDirectory: ""
-`))
 }

@@ -2,7 +2,6 @@ package network
 
 import (
 	"log"
-	"net"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -48,7 +47,6 @@ func Render(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructu
 func Validate(conf *netv1.NetworkConfigSpec) error {
 	errs := []error{}
 
-	errs = append(errs, ValidateIPPools(conf)...)
 	errs = append(errs, ValidateDefaultNetwork(conf)...)
 	errs = append(errs, ValidateMultus(conf)...)
 
@@ -99,12 +97,12 @@ func IsChangeSafe(prev, next *netv1.NetworkConfigSpec) error {
 
 	// TODO: implement cluster network / service network expansion
 	// We don't support cluster network changes
-	if !reflect.DeepEqual(prev.ClusterNetwork, next.ClusterNetwork) {
+	if !reflect.DeepEqual(prev.ClusterNetworks, next.ClusterNetworks) {
 		errs = append(errs, errors.Errorf("cannot change ClusterNetworks"))
 	}
 
 	// Nor can you change service network
-	if !reflect.DeepEqual(prev.ServiceNetwork, next.ServiceNetwork) {
+	if prev.ServiceNetwork != next.ServiceNetwork {
 		errs = append(errs, errors.Errorf("cannot change ServiceNetwork"))
 	}
 
@@ -117,26 +115,6 @@ func IsChangeSafe(prev, next *netv1.NetworkConfigSpec) error {
 		return errors.Errorf("invalid configuration: %v", errs)
 	}
 	return nil
-}
-
-// ValidateIPPools checks that all IP addresses are valid
-// TODO: check for overlap
-func ValidateIPPools(conf *netv1.NetworkConfigSpec) []error {
-	errs := []error{}
-	for idx, pool := range conf.ClusterNetwork {
-		_, _, err := net.ParseCIDR(pool.CIDR)
-		if err != nil {
-			errs = append(errs, errors.Wrapf(err, "could not parse ClusterNetwork %d CIDR %q", idx, pool.CIDR))
-		}
-	}
-
-	for idx, pool := range conf.ServiceNetwork {
-		_, _, err := net.ParseCIDR(pool)
-		if err != nil {
-			errs = append(errs, errors.Wrapf(err, "could not parse ServiceNetwork %d CIDR %q", idx, pool))
-		}
-	}
-	return errs
 }
 
 // ValidateMultus validates the combination of DisableMultiNetwork and AddtionalNetworks
@@ -159,7 +137,7 @@ func ValidateMultus(conf *netv1.NetworkConfigSpec) []error {
 // as the default network.
 func ValidateDefaultNetwork(conf *netv1.NetworkConfigSpec) []error {
 	switch conf.DefaultNetwork.Type {
-	case netv1.NetworkTypeOpenShiftSDN:
+	case netv1.NetworkTypeOpenShiftSDN, netv1.NetworkTypeDeprecatedOpenshiftSDN:
 		return validateOpenShiftSDN(conf)
 	default:
 		return nil
@@ -175,7 +153,7 @@ func RenderDefaultNetwork(conf *netv1.NetworkConfigSpec, manifestDir string) ([]
 	}
 
 	switch dn.Type {
-	case netv1.NetworkTypeOpenShiftSDN:
+	case netv1.NetworkTypeOpenShiftSDN, netv1.NetworkTypeDeprecatedOpenshiftSDN:
 		return renderOpenShiftSDN(conf, manifestDir)
 	default:
 		log.Printf("NOTICE: Unknown network type %s, ignoring", dn.Type)
@@ -186,7 +164,7 @@ func RenderDefaultNetwork(conf *netv1.NetworkConfigSpec, manifestDir string) ([]
 // FillDefaultNetworkDefaults
 func FillDefaultNetworkDefaults(conf, previous *netv1.NetworkConfigSpec, hostMTU int) {
 	switch conf.DefaultNetwork.Type {
-	case netv1.NetworkTypeOpenShiftSDN:
+	case netv1.NetworkTypeOpenShiftSDN, netv1.NetworkTypeDeprecatedOpenshiftSDN:
 		fillOpenShiftSDNDefaults(conf, previous, hostMTU)
 	default:
 	}
@@ -198,7 +176,7 @@ func IsDefaultNetworkChangeSafe(prev, next *netv1.NetworkConfigSpec) []error {
 	}
 
 	switch prev.DefaultNetwork.Type {
-	case netv1.NetworkTypeOpenShiftSDN:
+	case netv1.NetworkTypeOpenShiftSDN, netv1.NetworkTypeDeprecatedOpenshiftSDN:
 		return isOpenShiftSDNChangeSafe(prev, next)
 	default:
 		return nil
