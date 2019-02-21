@@ -19,13 +19,13 @@ func TestIsChangeSafe(t *testing.T) {
 	err := IsChangeSafe(prev, next)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	next.ClusterNetwork[0].HostPrefix = 31
+	next.ClusterNetworks[0].HostSubnetLength = 1
 	err = IsChangeSafe(prev, next)
-	g.Expect(err).To(MatchError(ContainSubstring("cannot change ClusterNetwork")))
+	g.Expect(err).To(MatchError(ContainSubstring("cannot change ClusterNetworks")))
 
 	next = OpenShiftSDNConfig.Spec.DeepCopy()
 	FillDefaults(next, nil)
-	next.ServiceNetwork = []string{"1.2.3.4/99", "8.8.8.0/30"}
+	next.ServiceNetwork = "1.2.3.4/99"
 	err = IsChangeSafe(prev, next)
 	g.Expect(err).To(MatchError(ContainSubstring("cannot change ServiceNetwork")))
 
@@ -41,15 +41,15 @@ func TestRenderUnknownNetwork(t *testing.T) {
 
 	config := netv1.NetworkConfig{
 		Spec: netv1.NetworkConfigSpec{
-			ServiceNetwork: []string{"172.30.0.0/16"},
-			ClusterNetwork: []netv1.ClusterNetworkEntry{
+			ServiceNetwork: "172.30.0.0/16",
+			ClusterNetworks: []netv1.ClusterNetwork{
 				{
-					CIDR:       "10.128.0.0/15",
-					HostPrefix: 23,
+					CIDR:             "10.128.0.0/15",
+					HostSubnetLength: 9,
 				},
 				{
-					CIDR:       "10.0.0.0/14",
-					HostPrefix: 24,
+					CIDR:             "10.0.0.0/14",
+					HostSubnetLength: 8,
 				},
 			},
 			DefaultNetwork: netv1.DefaultNetworkDefinition{
