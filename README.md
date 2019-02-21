@@ -24,8 +24,8 @@ For example, if you want to use the default VXLAN port for OpenShiftSDN, then yo
 
 *Operator config*
 - *Type Name*: `NetworkConfig.networkoperator.openshift.io`
-- *Instance Name*: `cluster`
-- *View Command*: `oc get NetworkConfig.networkoperator.openshift.io cluster -oyaml`
+- *Instance Name*: `default`
+- *View Command*: `oc get NetworkConfig.networkoperator.openshift.io default -oyaml`
 
 #### Example configurations
 
@@ -50,20 +50,19 @@ This configuration is the auto-generated translation of the above Cluster config
 apiVersion: networkoperator.openshift.io/v1
 kind: NetworkConfig
 metadata:
-  name: cluster
+  name: default
 spec:
   additionalNetworks: null
-  clusterNetwork:
+  clusterNetworks:
   - cidr: 10.128.0.0/14
-    hostPrefix: 23
+    hostSubnetLength: 9
   defaultNetwork:
     type: OpenShiftSDN
-  serviceNetwork:
-  - 172.30.0.0/16
+  serviceNetwork: 172.30.0.0/16
 ```
 
 ## Configuring IP address pools
-Users must supply at least two address pools - one for pods, and one for services. These are the ClusterNetwork and ServiceNetwork parameter. Some network plugins, such as OpenShiftSDN, support multiple ClusterNetworks. All address blocks must be non-overlapping. You should select address pools large enough to fit your anticipated workload.
+Users must supply at least two address pools - one for pods, and one for services. These are the ClusterNetworks and ServiceNetwork parameter. Some network plugins, such as OpenShiftSDN, support multiple ClusterNetworks. All address blocks must be non-overlapping. You should select address pools large enough to fit your anticipated workload.
 
 For future expansion, multiple `serviceNetwork` entries are allowed by the configuration but not actually supported by any network plugins. Supplying multiple addresses is invalid.
 
@@ -82,13 +81,12 @@ Currently, changing the address pools once set is not supported. In the future, 
 Example
 ```yaml
 spec:
-  serviceNetwork:
-  - "172.30.0.0/16"
-  clusterNetwork:
+  serviceNetwork: "172.30.0.0/16"
+  clusterNetworks:
     - cidr: "10.128.0.0/14"
-      hostPrefix: 23
+      hostSubnetLength: 9
     - cidr: "192.168.0.0/18"
-      hostPrefix: 23
+      hostSubnetLength: 9
 ```
 
 ## Configuring the default network provider
@@ -148,7 +146,7 @@ The operator looks for a CRD of type `NetworkConfig` with the name `default`. Wh
 
 You can view and edit that object with
 ```
-oc edit networkconfig cluster
+oc edit networkconfig default
 ```
 
 and any changes will be automatically applied.
@@ -165,7 +163,7 @@ It is safe to edit the following fields in `NetworkConfig.Spec`:
 Administrators may wish to forcefully apply a disruptive change to a cluster that is not serving production traffic. To do this, first they should make the desired configuration change to the CRD. Then, delete the network operator's understanding of the state of the system:
 
 ```
-oc -n openshift-network-operator delete configmap applied-cluster
+oc -n openshift-network-operator delete configmap applied-default
 ```
 
 Be warned: this is an unsafe operation! It may cause the entire cluster to lose connectivity or even be permanently broken. For example, changing the ServiceNetwork will cause existing services to be unreachable, as their ServiceIP won't be reassigned.
