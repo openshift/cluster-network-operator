@@ -4,7 +4,7 @@ package names
 
 // OperatorConfig is the name of the CRD that defines the complete
 // operator configuration
-const OPERATOR_CONFIG = "cluster"
+const OPERATOR_CONFIG = "default"
 
 // CLUSTER_CONFIG is the name of the higher-level cluster configuration
 // and status object.

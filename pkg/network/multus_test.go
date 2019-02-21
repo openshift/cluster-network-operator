@@ -11,11 +11,11 @@ import (
 
 var MultusConfig = netv1.NetworkConfig{
 	Spec: netv1.NetworkConfigSpec{
-		ServiceNetwork: []string{"172.30.0.0/16"},
-		ClusterNetwork: []netv1.ClusterNetworkEntry{
+		ServiceNetwork: "172.30.0.0/16",
+		ClusterNetworks: []netv1.ClusterNetwork{
 			{
-				CIDR:       "10.128.0.0/15",
-				HostPrefix: 23,
+				CIDR:             "10.128.0.0/15",
+				HostSubnetLength: 9,
 			},
 		},
 		DefaultNetwork: netv1.DefaultNetworkDefinition{
