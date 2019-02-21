@@ -15,9 +15,9 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec) error {
 	// Check all networks for overlaps
 	pool := iputil.IPPool{}
 
-	if len(clusterConfig.ServiceNetwork) != 1 {
+	if len(clusterConfig.ServiceNetwork) == 0 {
 		// Right now we only support a single service network
-		return errors.Errorf("spec.serviceNetwork must have length 1")
+		return errors.Errorf("spec.serviceNetwork must have at least 1 entry")
 	}
 	for _, snet := range clusterConfig.ServiceNetwork {
 		_, cidr, err := net.ParseCIDR(snet)
@@ -68,17 +68,13 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec) error {
 // MergeClusterConfig merges the cluster configuration in to the real
 // CRD configuration.
 func MergeClusterConfig(operConf *netopv1.NetworkConfigSpec, clusterConf configv1.NetworkSpec) {
-	operConf.ServiceNetwork = clusterConf.ServiceNetwork[0]
+	operConf.ServiceNetwork = clusterConf.ServiceNetwork
 
-	operConf.ClusterNetworks = []netopv1.ClusterNetwork{}
+	operConf.ClusterNetwork = []netopv1.ClusterNetworkEntry{}
 	for _, cnet := range clusterConf.ClusterNetwork {
-		// convert proper prefix length in to bit size
-		_, cidr, _ := net.ParseCIDR(cnet.CIDR) // already validated
-		_, size := cidr.Mask.Size()
-
-		operConf.ClusterNetworks = append(operConf.ClusterNetworks, netopv1.ClusterNetwork{
-			CIDR:             cnet.CIDR,
-			HostSubnetLength: uint32(size) - cnet.HostPrefix,
+		operConf.ClusterNetwork = append(operConf.ClusterNetwork, netopv1.ClusterNetworkEntry{
+			CIDR:       cnet.CIDR,
+			HostPrefix: cnet.HostPrefix,
 		})
 	}
 
@@ -88,25 +84,21 @@ func MergeClusterConfig(operConf *netopv1.NetworkConfigSpec, clusterConf configv
 // StatusFromOperatorConfig generates the cluster NetworkStatus from the currently applied operator configuration.
 func StatusFromOperatorConfig(operConf *netopv1.NetworkConfigSpec) configv1.NetworkStatus {
 	status := configv1.NetworkStatus{
-		ServiceNetwork: []string{operConf.ServiceNetwork},
+		ServiceNetwork: operConf.ServiceNetwork,
 		NetworkType:    string(operConf.DefaultNetwork.Type),
 	}
 
-	// Flip flip flip the bits
-	for _, cnet := range operConf.ClusterNetworks {
-		_, cidr, _ := net.ParseCIDR(cnet.CIDR)
-		_, size := cidr.Mask.Size()
-
+	for _, cnet := range operConf.ClusterNetwork {
 		status.ClusterNetwork = append(status.ClusterNetwork,
 			configv1.ClusterNetworkEntry{
 				CIDR:       cnet.CIDR,
-				HostPrefix: uint32(size) - cnet.HostSubnetLength,
+				HostPrefix: cnet.HostPrefix,
 			})
 	}
 
 	// Determine the MTU from the provider
 	switch operConf.DefaultNetwork.Type {
-	case netopv1.NetworkTypeOpenShiftSDN, netopv1.NetworkTypeDeprecatedOpenshiftSDN:
+	case netopv1.NetworkTypeOpenShiftSDN:
 		status.ClusterNetworkMTU = int(*operConf.DefaultNetwork.OpenShiftSDNConfig.MTU)
 	}
 

@@ -44,10 +44,12 @@ type NetworkConfigSpec struct {
 	// IP address pool to use for pod IPs.
 	// Some network providers, e.g. OpenShift SDN, support multiple ClusterNetworks.
 	// Others only support one. This is equivalent to the cluster-cidr.
-	ClusterNetworks []ClusterNetwork `json:"clusterNetworks"`
+	ClusterNetwork []ClusterNetworkEntry `json:"clusterNetwork"`
 
-	// The CIDR to use for services
-	ServiceNetwork string `json:"serviceNetwork"`
+	// The CIDRs to use for services
+	// Currently, all existing network providers only support a single value
+	// here, but this is an array to allow for growth.
+	ServiceNetwork []string `json:"serviceNetwork"`
 
 	// The "default" network that all pods will receive
 	DefaultNetwork DefaultNetworkDefinition `json:"defaultNetwork"`
@@ -76,11 +78,11 @@ type NetworkConfigSpec struct {
 }
 
 // ClusterNetwork is a subnet from which to allocate PodIPs. A network of size
-// 2^HostSubnetLength will be allocated when nodes join the cluster.
+// HostPrefix (in CIDR notation) will be allocated when nodes join the cluster.
 // Not all network providers support multiple ClusterNetworks
-type ClusterNetwork struct {
-	CIDR             string `json:"cidr"`
-	HostSubnetLength uint32 `json:"hostSubnetLength"`
+type ClusterNetworkEntry struct {
+	CIDR       string `json:"cidr"`
+	HostPrefix uint32 `json:"hostPrefix"`
 }
 
 // NetworkDefinition represents a single network plugin's configuration.
@@ -164,9 +166,6 @@ const (
 	// NetworkTypeOpenShiftSDN means the openshift-sdn plugin will be configured
 	NetworkTypeOpenShiftSDN NetworkType = "OpenShiftSDN"
 
-	// NetworkTypeDeprecatedOpenshiftSDN is equivalent to NetworkTypeOpenShiftSDN, for compatibility
-	NetworkTypeDeprecatedOpenshiftSDN NetworkType = "OpenshiftSDN"
-
 	// NetworkTypeOVNKubernetes means the ovn-kubernetes project will be configured
 	NetworkTypeOVNKubernetes NetworkType = "OVNKubernetes"
 
@@ -184,6 +183,4 @@ const (
 	SDNModeSubnet        SDNMode = "Subnet"
 	SDNModeMultitenant   SDNMode = "Multitenant"
 	SDNModeNetworkPolicy SDNMode = "NetworkPolicy"
-
-	SDNModeDeprecatedNetworkpolicy SDNMode = "Networkpolicy"
 )
