@@ -134,6 +134,9 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
+	// Convert to a canonicalized form
+	network.Canonicalize(&operConfig.Spec)
+
 	// Validate the configuration
 	if err := network.Validate(&operConfig.Spec); err != nil {
 		log.Printf("Failed to validate NetworkConfig.Spec: %v", err)
