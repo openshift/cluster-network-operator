@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -44,7 +45,41 @@ func Render(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructu
 	return objs, nil
 }
 
+// Canonicalize converts configuration to a canonical form.
+// Currently we only care about case.
+func Canonicalize(conf *netv1.NetworkConfigSpec) {
+	switch strings.ToLower(string(conf.DefaultNetwork.Type)) {
+	case strings.ToLower(string(netv1.NetworkTypeOpenShiftSDN)):
+		conf.DefaultNetwork.Type = netv1.NetworkTypeOpenShiftSDN
+	case strings.ToLower(string(netv1.NetworkTypeOVNKubernetes)):
+		conf.DefaultNetwork.Type = netv1.NetworkTypeOVNKubernetes
+	case strings.ToLower(string(netv1.NetworkTypeKuryr)):
+		conf.DefaultNetwork.Type = netv1.NetworkTypeKuryr
+	}
+
+	if conf.DefaultNetwork.Type == netv1.NetworkTypeOpenShiftSDN &&
+		conf.DefaultNetwork.OpenShiftSDNConfig != nil {
+		sdnc := conf.DefaultNetwork.OpenShiftSDNConfig
+		switch strings.ToLower(string(sdnc.Mode)) {
+		case strings.ToLower(string(netv1.SDNModeMultitenant)):
+			sdnc.Mode = netv1.SDNModeMultitenant
+		case strings.ToLower(string(netv1.SDNModeNetworkPolicy)):
+			sdnc.Mode = netv1.SDNModeNetworkPolicy
+		case strings.ToLower(string(netv1.SDNModeSubnet)):
+			sdnc.Mode = netv1.SDNModeSubnet
+		}
+	}
+
+	for _, an := range conf.AdditionalNetworks {
+		switch strings.ToLower(string(an.Type)) {
+		case strings.ToLower(string(netv1.NetworkTypeRaw)):
+			an.Type = netv1.NetworkTypeRaw
+		}
+	}
+}
+
 // Validate checks that the supplied configuration is reasonable.
+// This should be called after Canonicalize
 func Validate(conf *netv1.NetworkConfigSpec) error {
 	errs := []error{}
 
