@@ -8,9 +8,9 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
+	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
-	"github.com/openshift/cluster-network-operator/pkg/util/clusteroperator"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,12 +23,12 @@ import (
 )
 
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *clusteroperator.StatusManager) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
 	return add(mgr, newReconciler(mgr, status))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *clusteroperator.StatusManager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) reconcile.Reconciler {
 	configv1.Install(mgr.GetScheme())
 	return &ReconcileClusterConfig{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status}
 }
@@ -58,7 +58,7 @@ type ReconcileClusterConfig struct {
 	// that reads objects from the cache and writes to the apiserver
 	client client.Client
 	scheme *runtime.Scheme
-	status *clusteroperator.StatusManager
+	status *statusmanager.StatusManager
 }
 
 // Reconcile propagates changes from the cluster config to the operator config.

@@ -1,4 +1,4 @@
-package clusteroperator
+package statusmanager
 
 import (
 	"context"
@@ -62,7 +62,7 @@ func conditionsEqual(oldConditions, newConditions []configv1.ClusterOperatorStat
 
 func TestStatusManagerSet(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := NewStatusManager(client, "testing", "1.2.3")
+	status := New(client, "testing", "1.2.3")
 
 	co, err := getCO(client, "testing")
 	if !errors.IsNotFound(err) {
@@ -134,7 +134,7 @@ func TestStatusManagerSet(t *testing.T) {
 
 func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := NewStatusManager(client, "testing", "1.2.3")
+	status := New(client, "testing", "1.2.3")
 
 	status.SetDaemonSets([]types.NamespacedName{
 		{Namespace: "one", Name: "alpha"},
@@ -314,7 +314,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 
 func TestStatusManagerSetFromPods(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := NewStatusManager(client, "testing", "1.2.3")
+	status := New(client, "testing", "1.2.3")
 
 	status.SetDeployments([]types.NamespacedName{
 		{Namespace: "one", Name: "alpha"},

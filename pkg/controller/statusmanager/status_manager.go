@@ -1,4 +1,4 @@
-package clusteroperator
+package statusmanager
 
 import (
 	"context"
@@ -33,7 +33,7 @@ type StatusManager struct {
 	deployments []types.NamespacedName
 }
 
-func NewStatusManager(client client.Client, name, version string) *StatusManager {
+func New(client client.Client, name, version string) *StatusManager {
 	return &StatusManager{client: client, name: name, version: version}
 }
 
