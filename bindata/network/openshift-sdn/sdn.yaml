@@ -70,6 +70,11 @@ spec:
             source /etc/sysconfig/openshift-sdn
             set +o allexport
           fi
+          #BUG: cdc accidentally mounted /etc/sysconfig/openshift-sdn as DirectoryOrCreate; clean it up so we can ultimately mount /etc/sysconfig/openshift-sdn as FileOrCreate
+          # Once this is released, then we can mount it properly
+          if [[ -d /etc/sysconfig/openshift-sdn ]]; then
+            rmdir /etc/sysconfig/openshift-sdn || true
+          fi
 
           # Take over network functions on the node
           rm -f /etc/cni/net.d/80-openshift-network.conf
@@ -116,8 +121,8 @@ spec:
         - mountPath: /lib/modules
           name: host-modules
           readOnly: true
-        - mountPath: /etc/sysconfig/openshift-sdn
-          name: etc-sysconfig-openshift-sdn
+        - mountPath: /etc/sysconfig
+          name: etc-sysconfig
           readOnly: true
         resources:
           requests:
@@ -153,9 +158,9 @@ spec:
       - name: host-kubeconfig
         hostPath:
           path: /etc/kubernetes/kubeconfig
-      - name: etc-sysconfig-openshift-sdn
+      - name: etc-sysconfig
         hostPath:
-          path: /etc/sysconfig/openshift-sdn
+          path: /etc/sysconfig
       - name: host-modules
         hostPath:
           path: /lib/modules
