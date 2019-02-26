@@ -144,11 +144,12 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := NewStatusManager(client, "testing", "1.2.3")
 
-	dsNames := []types.NamespacedName{
+	status.SetDaemonSets([]types.NamespacedName{
 		types.NamespacedName{Namespace: "one", Name: "alpha"},
 		types.NamespacedName{Namespace: "two", Name: "beta"},
-	}
-	err := status.SetFromDaemonSets(dsNames)
+	})
+
+	err := status.SetFromPods()
 	if err != nil {
 		t.Fatalf("error setting status: %v", err)
 	}
@@ -189,7 +190,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("error creating Namespace: %v", err)
 	}
 
-	err = status.SetFromDaemonSets(dsNames)
+	err = status.SetFromPods()
 	if err != nil {
 		t.Fatalf("error setting status: %v", err)
 	}
@@ -219,7 +220,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating DaemonSet: %v", err)
 	}
-	err = status.SetFromDaemonSets(dsNames)
+	err = status.SetFromPods()
 	if err != nil {
 		t.Fatalf("error setting status: %v", err)
 	}
@@ -264,7 +265,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error updating DaemonSet: %v", err)
 		}
-		err = status.SetFromDaemonSets(dsNames)
+		err = status.SetFromPods()
 		if err != nil {
 			t.Fatalf("error setting status: %v", err)
 		}
@@ -309,7 +310,262 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error updating DaemonSet: %v", err)
 	}
-	err = status.SetFromDaemonSets(dsNames)
+	err = status.SetFromPods()
+	if err != nil {
+		t.Fatalf("error setting status: %v", err)
+	}
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorFailing,
+			Status: configv1.ConditionFalse,
+		},
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionFalse,
+		},
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+}
+
+func TestStatusManagerSetFromPods(t *testing.T) {
+	client := fake.NewFakeClient()
+	status := NewStatusManager(client, "testing", "1.2.3")
+
+	status.SetDeployments([]types.NamespacedName{
+		types.NamespacedName{Namespace: "one", Name: "alpha"},
+	})
+
+	err := status.SetFromPods()
+	if err != nil {
+		t.Fatalf("error setting status: %v", err)
+	}
+
+	co, err := getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		configv1.ClusterOperatorStatusCondition{
+			Type:    configv1.OperatorFailing,
+			Status:  configv1.ConditionTrue,
+			Reason:  "NoNamespace",
+		},
+		configv1.ClusterOperatorStatusCondition{
+			Type:    configv1.OperatorProgressing,
+			Status:  configv1.ConditionFalse,
+			Reason:  "Failing",
+		},
+		configv1.ClusterOperatorStatusCondition{
+			Type:    configv1.OperatorAvailable,
+			Status:  configv1.ConditionFalse,
+			Reason:  "Failing",
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Create namespace, try again
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "one"}}
+	err = client.Create(context.TODO(), ns)
+	if err != nil {
+		t.Fatalf("error creating Namespace: %v", err)
+	}
+
+	err = status.SetFromPods()
+	if err != nil {
+		t.Fatalf("error setting status: %v", err)
+	}
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		configv1.ClusterOperatorStatusCondition{
+			Type:    configv1.OperatorFailing,
+			Status:  configv1.ConditionTrue,
+			Reason:  "NoDeployment",
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Create a Deployment that isn't the one we're looking for
+	depB := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "beta"},
+		Status: appsv1.DeploymentStatus{
+			UnavailableReplicas: 1,
+		},
+	}
+	err = client.Create(context.TODO(), depB)
+	if err != nil {
+		t.Fatalf("error creating Deployment: %v", err)
+	}
+	err = status.SetFromPods()
+	if err != nil {
+		t.Fatalf("error setting status: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		configv1.ClusterOperatorStatusCondition{
+			Type:    configv1.OperatorFailing,
+			Status:  configv1.ConditionTrue,
+			Reason:  "NoDeployment",
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Create minimal Deployment
+	depA := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha"}}
+	err = client.Create(context.TODO(), depA)
+	if err != nil {
+		t.Fatalf("error creating Deployment: %v", err)
+	}
+	err = status.SetFromPods()
+	if err != nil {
+		t.Fatalf("error setting status: %v", err)
+	}
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorFailing,
+			Status: configv1.ConditionFalse,
+		},
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+			Reason: "Deploying",
+		},
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionFalse,
+			Reason: "Deploying",
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Update to report expected deployment size
+	depA.Status.UnavailableReplicas = 0
+	depA.Status.AvailableReplicas = 1
+	err = client.Update(context.TODO(), depA)
+	if err != nil {
+		t.Fatalf("error updating Deployment: %v", err)
+	}
+	err = status.SetFromPods()
+	if err != nil {
+		t.Fatalf("error setting status: %v", err)
+	}
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorFailing,
+			Status: configv1.ConditionFalse,
+		},
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionFalse,
+		},
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Add more expected pods
+	status.SetDeployments([]types.NamespacedName{
+		types.NamespacedName{Namespace: "one", Name: "alpha"},
+		types.NamespacedName{Namespace: "one", Name: "beta"},
+	})
+	status.SetDaemonSets([]types.NamespacedName{
+		types.NamespacedName{Namespace: "one", Name: "gamma"},
+	})
+
+	err = status.SetFromPods()
+	if err != nil {
+		t.Fatalf("error setting status: %v", err)
+	}
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		configv1.ClusterOperatorStatusCondition{
+			Type:    configv1.OperatorFailing,
+			Status:  configv1.ConditionTrue,
+			Reason:  "NoDaemonSet",
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "gamma"},
+		Status: appsv1.DaemonSetStatus{
+			NumberUnavailable: 0,
+			NumberAvailable:   1,
+		},
+	}
+	err = client.Create(context.TODO(), ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSet: %v", err)
+	}
+	err = status.SetFromPods()
+	if err != nil {
+		t.Fatalf("error setting status: %v", err)
+	}
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	// We should now be progressing because both Deployments and the DaemonSet exist,
+	// but depB is still incomplete.
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorFailing,
+			Status: configv1.ConditionFalse,
+		},
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+		},
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	depB.Status.UnavailableReplicas = 0
+	depB.Status.AvailableReplicas = 1
+	err = client.Update(context.TODO(), depB)
+	if err != nil {
+		t.Fatalf("error updating Deployment: %v", err)
+	}
+	err = status.SetFromPods()
 	if err != nil {
 		t.Fatalf("error setting status: %v", err)
 	}

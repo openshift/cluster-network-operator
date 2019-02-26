@@ -53,7 +53,7 @@ func newReconciler(mgr manager.Manager, status *clusteroperator.StatusManager) *
 		scheme: mgr.GetScheme(),
 		status: status,
 
-		daemonSetReconciler: newDaemonSetReconciler(status),
+		podReconciler: newPodReconciler(status),
 	}
 }
 
@@ -71,12 +71,16 @@ func add(mgr manager.Manager, r *ReconcileNetworkConfig) error {
 		return err
 	}
 
-	// Likewise for the DaemonSet reconciler
-	c, err = controller.New("daemonset-controller", mgr, controller.Options{Reconciler: r.daemonSetReconciler})
+	// Likewise for the Pod reconciler
+	c, err = controller.New("pod-controller", mgr, controller.Options{Reconciler: r.podReconciler})
 	if err != nil {
 		return err
 	}
 	err = c.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -94,7 +98,7 @@ type ReconcileNetworkConfig struct {
 	scheme *runtime.Scheme
 	status *clusteroperator.StatusManager
 
-	daemonSetReconciler *ReconcileDaemonSets
+	podReconciler *ReconcilePods
 }
 
 // Reconcile updates the state of the cluster to match that which is desired
@@ -188,15 +192,24 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 	}
 	objs = append([]*uns.Unstructured{app}, objs...)
 
-	// Set up the DaemonSet reconciler before we start creating the DaemonSets
+	// Set up the Pod reconciler before we start creating DaemonSets/Deployments
 	r.status.SetConfigSuccess()
 	daemonSets := []types.NamespacedName{}
+	deployments := []types.NamespacedName{}
 	for _, obj := range objs {
 		if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "DaemonSet" {
 			daemonSets = append(daemonSets, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()})
+		} else if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "Deployment" {
+			deployments = append(deployments, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()})
 		}
 	}
-	r.daemonSetReconciler.SetDaemonSets(daemonSets)
+	r.status.SetDaemonSets(daemonSets)
+	r.status.SetDeployments(deployments)
+
+	allResources := []types.NamespacedName{}
+	allResources = append(allResources, daemonSets...)
+	allResources = append(allResources, deployments...)
+	r.podReconciler.SetResources(allResources)
 
 	// Apply the objects to the cluster
 	for _, obj := range objs {
