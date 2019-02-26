@@ -58,6 +58,9 @@ netname: openshift-image-registry
 # - kube-system (etcd)
 # - openshift-apiserver
 # - kube-service-catalog
+# - openshift-template-service-broker
+# - openshift-ansible-service-broker
+# - kube-service-catalog-controller-manager
 apiVersion: network.openshift.io/v1
 kind: NetNamespace
 metadata:
@@ -80,5 +83,29 @@ metadata:
   name: kube-service-catalog
 netid: 1
 netname: kube-service-catalog
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-template-service-broker
+netid: 1
+netname: openshift-template-service-broker
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-ansible-service-broker
+netid: 1
+netname: openshift-ansible-service-broker
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: kube-service-catalog-controller-manager
+netid: 1
+netname: kube-service-catalog-controller-manager
 
 {{- end}}
