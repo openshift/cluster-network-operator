@@ -3,14 +3,14 @@ package networkconfig
 import (
 	"log"
 
-	"github.com/openshift/cluster-network-operator/pkg/util/clusteroperator"
+	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // newPodReconciler returns a new reconcile.Reconciler
-func newPodReconciler(status *clusteroperator.StatusManager) *ReconcilePods {
+func newPodReconciler(status *statusmanager.StatusManager) *ReconcilePods {
 	return &ReconcilePods{status: status}
 }
 
@@ -18,7 +18,7 @@ var _ reconcile.Reconciler = &ReconcilePods{}
 
 // ReconcilePods watches for updates to specified resources and then updates its StatusManager
 type ReconcilePods struct {
-	status *clusteroperator.StatusManager
+	status *statusmanager.StatusManager
 
 	resources []types.NamespacedName
 }
