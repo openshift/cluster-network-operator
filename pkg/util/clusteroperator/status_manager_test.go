@@ -28,92 +28,8 @@ func getCO(client client.Client, name string) (*configv1.ClusterOperator, error)
 	return co, err
 }
 
-func TestStatusManagerSet(t *testing.T) {
-	client := fake.NewFakeClient()
-	status := NewStatusManager(client, "testing", "1.2.3")
-
-	co, err := getCO(client, "testing")
-	if !errors.IsNotFound(err) {
-		t.Fatalf("unexpected error (expected Not Found): %v", err)
-	}
-
-	condFail := configv1.ClusterOperatorStatusCondition{
-		Type:    configv1.OperatorFailing,
-		Status:  configv1.ConditionTrue,
-		Reason:  "Reason",
-		Message: "Message",
-	}
-	err = status.Set(&condFail)
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
-
-	co, err = getCO(client, "testing")
-	if err != nil {
-		t.Fatalf("error getting ClusterOperator: %v", err)
-	}
-	if !ConditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFail}) {
-		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
-	}
-
-	condProgress := configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorProgressing,
-		Status: configv1.ConditionTrue,
-	}
-	err = status.Set(&condProgress)
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
-
-	co, err = getCO(client, "testing")
-	if err != nil {
-		t.Fatalf("error getting ClusterOperator: %v", err)
-	}
-	if !ConditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFail, condProgress}) {
-		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
-	}
-
-	condNoFail := configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorFailing,
-		Status: configv1.ConditionFalse,
-	}
-	err = status.Set(&condNoFail)
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
-
-	co, err = getCO(client, "testing")
-	if err != nil {
-		t.Fatalf("error getting ClusterOperator: %v", err)
-	}
-	if !ConditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condNoFail, condProgress}) {
-		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
-	}
-
-	condNoProgress := configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorProgressing,
-		Status: configv1.ConditionFalse,
-	}
-	condAvailable := configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorAvailable,
-		Status: configv1.ConditionTrue,
-	}
-	err = status.Set(&condNoProgress, &condAvailable)
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
-
-	co, err = getCO(client, "testing")
-	if err != nil {
-		t.Fatalf("error getting ClusterOperator: %v", err)
-	}
-	if !ConditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condNoFail, condNoProgress, condAvailable}) {
-		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
-	}
-}
-
-// A weaker version of ConditionsEqual: basically "the parts of newConditions that are set match
-// what's in oldConditions, but there might also be other stuff in oldConditions"
+// Tests that the parts of newConditions that are set match what's in oldConditions (but
+// doesn't look at anything else in oldConditions)
 func conditionsInclude(oldConditions, newConditions []configv1.ClusterOperatorStatusCondition) bool {
 	for _, newCondition := range newConditions {
 		foundMatchingCondition := false
@@ -140,6 +56,82 @@ func conditionsInclude(oldConditions, newConditions []configv1.ClusterOperatorSt
 	return true
 }
 
+func conditionsEqual(oldConditions, newConditions []configv1.ClusterOperatorStatusCondition) bool {
+	return conditionsInclude(oldConditions, newConditions) && conditionsInclude(newConditions, oldConditions)
+}
+
+func TestStatusManagerSet(t *testing.T) {
+	client := fake.NewFakeClient()
+	status := NewStatusManager(client, "testing", "1.2.3")
+
+	co, err := getCO(client, "testing")
+	if !errors.IsNotFound(err) {
+		t.Fatalf("unexpected error (expected Not Found): %v", err)
+	}
+
+	condFail := configv1.ClusterOperatorStatusCondition{
+		Type:    configv1.OperatorFailing,
+		Status:  configv1.ConditionTrue,
+		Reason:  "Reason",
+		Message: "Message",
+	}
+	status.Set(condFail)
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFail}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	condProgress := configv1.ClusterOperatorStatusCondition{
+		Type:   configv1.OperatorProgressing,
+		Status: configv1.ConditionTrue,
+	}
+	status.Set(condProgress)
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFail, condProgress}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	condNoFail := configv1.ClusterOperatorStatusCondition{
+		Type:   configv1.OperatorFailing,
+		Status: configv1.ConditionFalse,
+	}
+	status.Set(condNoFail)
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condNoFail, condProgress}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	condNoProgress := configv1.ClusterOperatorStatusCondition{
+		Type:   configv1.OperatorProgressing,
+		Status: configv1.ConditionFalse,
+	}
+	condAvailable := configv1.ClusterOperatorStatusCondition{
+		Type:   configv1.OperatorAvailable,
+		Status: configv1.ConditionTrue,
+	}
+	status.Set(condNoProgress, condAvailable)
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condNoFail, condNoProgress, condAvailable}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+}
+
 func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := NewStatusManager(client, "testing", "1.2.3")
@@ -149,11 +141,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		{Namespace: "two", Name: "beta"},
 	})
 
-	err := status.SetFromPods()
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
-
+	status.SetFromPods()
 	co, err := getCO(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -190,11 +178,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("error creating Namespace: %v", err)
 	}
 
-	err = status.SetFromPods()
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
-
+	status.SetFromPods()
 	co, err = getCO(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -220,10 +204,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating DaemonSet: %v", err)
 	}
-	err = status.SetFromPods()
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
+	status.SetFromPods()
 
 	// Since the DaemonSet.Status reports no pods Available, the status should be Progressing
 	co, err = getCO(client, "testing")
@@ -265,10 +246,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error updating DaemonSet: %v", err)
 		}
-		err = status.SetFromPods()
-		if err != nil {
-			t.Fatalf("error setting status: %v", err)
-		}
+		status.SetFromPods()
 
 		co, err = getCO(client, "testing")
 		if err != nil {
@@ -310,10 +288,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error updating DaemonSet: %v", err)
 	}
-	err = status.SetFromPods()
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
+	status.SetFromPods()
 
 	co, err = getCO(client, "testing")
 	if err != nil {
@@ -345,10 +320,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 		{Namespace: "one", Name: "alpha"},
 	})
 
-	err := status.SetFromPods()
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
+	status.SetFromPods()
 
 	co, err := getCO(client, "testing")
 	if err != nil {
@@ -381,10 +353,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 		t.Fatalf("error creating Namespace: %v", err)
 	}
 
-	err = status.SetFromPods()
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
+	status.SetFromPods()
 
 	co, err = getCO(client, "testing")
 	if err != nil {
@@ -411,9 +380,11 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating Deployment: %v", err)
 	}
-	err = status.SetFromPods()
+	status.SetFromPods()
+
+	co, err = getCO(client, "testing")
 	if err != nil {
-		t.Fatalf("error setting status: %v", err)
+		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
@@ -431,10 +402,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating Deployment: %v", err)
 	}
-	err = status.SetFromPods()
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
+	status.SetFromPods()
 
 	co, err = getCO(client, "testing")
 	if err != nil {
@@ -466,10 +434,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error updating Deployment: %v", err)
 	}
-	err = status.SetFromPods()
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
+	status.SetFromPods()
 
 	co, err = getCO(client, "testing")
 	if err != nil {
@@ -501,10 +466,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 		{Namespace: "one", Name: "gamma"},
 	})
 
-	err = status.SetFromPods()
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
+	status.SetFromPods()
 
 	co, err = getCO(client, "testing")
 	if err != nil {
@@ -531,10 +493,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating DaemonSet: %v", err)
 	}
-	err = status.SetFromPods()
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
+	status.SetFromPods()
 
 	co, err = getCO(client, "testing")
 	if err != nil {
@@ -565,10 +524,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error updating Deployment: %v", err)
 	}
-	err = status.SetFromPods()
-	if err != nil {
-		t.Fatalf("error setting status: %v", err)
-	}
+	status.SetFromPods()
 
 	co, err = getCO(client, "testing")
 	if err != nil {
