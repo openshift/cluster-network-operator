@@ -21,8 +21,9 @@ type Build struct {
 type BuildSpec struct {
 	// AdditionalTrustedCA is a reference to a ConfigMap containing additional CAs that
 	// should be trusted for image pushes and pulls during builds.
+	// The namespace for this config map is openshift-config.
 	// +optional
-	AdditionalTrustedCA ConfigMapReference `json:"additionalTrustedCA,omitempty"`
+	AdditionalTrustedCA ConfigMapNameReference `json:"additionalTrustedCA,omitempty"`
 	// BuildDefaults controls the default information for Builds
 	// +optional
 	BuildDefaults BuildDefaults `json:"buildDefaults,omitempty"`
@@ -32,17 +33,20 @@ type BuildSpec struct {
 }
 
 type BuildDefaults struct {
-	// GitHTTPProxy is the location of the HTTPProxy for Git source
+	// DefaultProxy contains the default proxy settings for all build operations, including image pull/push
+	// and source download.
+	//
+	// Values can be overrode by setting the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment variables
+	// in the build config's strategy.
 	// +optional
-	GitHTTPProxy string `json:"gitHTTPProxy,omitempty"`
+	DefaultProxy *ProxySpec `json:"defaultProxy,omitempty"`
 
-	// GitHTTPSProxy is the location of the HTTPSProxy for Git source
+	// GitProxy contains the proxy settings for git operations only. If set, this will override
+	// any Proxy settings for all git commands, such as git clone.
+	//
+	// Values that are not set here will be inherited from DefaultProxy.
 	// +optional
-	GitHTTPSProxy string `json:"gitHTTPSProxy,omitempty"`
-
-	// GitNoProxy is the list of domains for which the proxy should not be used
-	// +optional
-	GitNoProxy string `json:"gitNoProxy,omitempty"`
+	GitProxy *ProxySpec `json:"gitProxy,omitempty"`
 
 	// Env is a set of default environment variables that will be applied to the
 	// build if the specified variables do not exist on the build
@@ -78,7 +82,7 @@ type BuildOverrides struct {
 
 	// NodeSelector is a selector which must be true for the build pod to fit on a node
 	// +optional
-	NodeSelector metav1.LabelSelector `json:"nodeSelector,omitempty"`
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// Tolerations is a list of Tolerations that will override any existing
 	// tolerations set on a build pod.

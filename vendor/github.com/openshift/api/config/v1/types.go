@@ -5,19 +5,26 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// ConfigMapReference references a configmap in the openshift-config namespace.
-type ConfigMapReference struct {
+// ConfigMapFileReference references a config map in a specific namespace.
+// The namespace must be specified at the point of use.
+type ConfigMapFileReference struct {
 	Name string `json:"name"`
 	// Key allows pointing to a specific key/value inside of the configmap.  This is useful for logical file references.
-	Key string `json:"filename,omitempty"`
+	Key string `json:"key,omitempty"`
 }
 
-// LocalSecretReference references a secret within the local namespace
-type LocalSecretReference struct {
-	// Name of the secret in the local namespace
+// ConfigMapNameReference references a config map in a specific namespace.
+// The namespace must be specified at the point of use.
+type ConfigMapNameReference struct {
+	// name is the metadata.name of the referenced config map
 	Name string `json:"name"`
-	// Key selects a specific key within the local secret. Must be a valid secret key.
-	Key string `json:"key,omitempty"`
+}
+
+// SecretNameReference references a secret in a specific namespace.
+// The namespace must be specified at the point of use.
+type SecretNameReference struct {
+	// name is the metadata.name of the referenced secret
+	Name string `json:"name"`
 }
 
 // HTTPServingInfo holds configuration for serving HTTP
@@ -130,6 +137,19 @@ type RemoteConnectionInfo struct {
 	CertInfo `json:",inline"`
 }
 
+type AdmissionConfig struct {
+	PluginConfig map[string]AdmissionPluginConfig `json:"pluginConfig"`
+
+	// enabledPlugins is a list of admission plugins that must be on in addition to the default list.
+	// Some admission plugins are disabled by default, but certain configurations require them.  This is fairly uncommon
+	// and can result in performance penalties and unexpected behavior.
+	EnabledAdmissionPlugins []string `json:"enabledPlugins"`
+
+	// disabledPlugins is a list of admission plugins that must be off.  Putting something in this list
+	// is almost always a mistake and likely to result in cluster instability.
+	DisabledAdmissionPlugins []string `json:"disabledPlugins"`
+}
+
 // AdmissionPluginConfig holds the necessary configuration options for admission plugins
 type AdmissionPluginConfig struct {
 	// Location is the path to a configuration file that contains the plugin's
@@ -213,18 +233,22 @@ type EtcdStorageConfig struct {
 
 // GenericAPIServerConfig is an inline-able struct for aggregated apiservers that need to store data in etcd
 type GenericAPIServerConfig struct {
-	// ServingInfo describes how to start serving
+	// servingInfo describes how to start serving
 	ServingInfo HTTPServingInfo `json:"servingInfo"`
 
-	// CORSAllowedOrigins
+	// corsAllowedOrigins
 	CORSAllowedOrigins []string `json:"corsAllowedOrigins"`
 
-	// AuditConfig describes how to configure audit information
+	// auditConfig describes how to configure audit information
 	AuditConfig AuditConfig `json:"auditConfig"`
 
-	// StorageConfig contains information about how to use
+	// storageConfig contains information about how to use
 	StorageConfig EtcdStorageConfig `json:"storageConfig"`
 
+	// admissionConfig holds information about how to configure admission.
+	AdmissionConfig AdmissionConfig `json:"admission"`
+
+	// TODO remove this.  We need a cut-over or we'll have a gap.
 	AdmissionPluginConfig map[string]AdmissionPluginConfig `json:"admissionPluginConfig"`
 
 	KubeClientConfig KubeClientConfig `json:"kubeClientConfig"`
@@ -252,12 +276,8 @@ type ClientConnectionOverrides struct {
 	Burst int32 `json:"burst"`
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // GenericControllerConfig provides information to configure a controller
 type GenericControllerConfig struct {
-	metav1.TypeMeta `json:",inline"`
-
 	// ServingInfo is the HTTP serving information for the controller's endpoints
 	ServingInfo HTTPServingInfo `json:"servingInfo,omitempty"`
 
