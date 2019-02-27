@@ -28,6 +28,7 @@ spec:
       labels:
         app: sdn-controller
     spec:
+      priorityClassName: system-node-critical
       containers:
       - name: sdn-controller
         image: {{.HypershiftImage}}
