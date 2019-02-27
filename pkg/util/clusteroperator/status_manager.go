@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"reflect"
 	"strings"
 
 	"github.com/ghodss/yaml"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -36,21 +38,21 @@ func NewStatusManager(client client.Client, name, version string) *StatusManager
 }
 
 // Set updates the ClusterOperator.Status with the provided conditions
-func (status *StatusManager) Set(conditions ...*configv1.ClusterOperatorStatusCondition) error {
+func (status *StatusManager) Set(conditions ...configv1.ClusterOperatorStatusCondition) {
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
 	err := status.client.Get(context.TODO(), types.NamespacedName{Name: status.name}, co)
 	isNotFound := errors.IsNotFound(err)
 	if err != nil && !isNotFound {
 		log.Printf("Failed to get ClusterOperator %q: %v", status.name, err)
-		return fmt.Errorf("failed to get ClusterOperator %s: %v", status.name, err)
+		return
 	}
 
-	oldConditions := co.Status.Conditions
+	oldStatus := co.Status.DeepCopy()
 	for _, condition := range conditions {
-		co.Status.Conditions = SetStatusCondition(co.Status.Conditions, condition)
+		v1helpers.SetStatusCondition(&co.Status.Conditions, condition)
 	}
-	if ConditionsEqual(oldConditions, co.Status.Conditions) {
-		return nil
+	if reflect.DeepEqual(oldStatus, co.Status) {
+		return
 	}
 
 	buf, err := yaml.Marshal(co.Status)
@@ -60,34 +62,33 @@ func (status *StatusManager) Set(conditions ...*configv1.ClusterOperatorStatusCo
 	if isNotFound {
 		if err := status.client.Create(context.TODO(), co); err != nil {
 			log.Printf("Failed to create ClusterOperator %q: %v", co.Name, err)
-			return fmt.Errorf("failed to create ClusterOperator %q: %v", co.Name, err)
+		} else {
+			log.Printf("Created ClusterOperator with status:\n%s", string(buf))
 		}
-		log.Printf("Created ClusterOperator with status:\n%s", string(buf))
 	} else {
 		err = status.client.Status().Update(context.TODO(), co)
 		if err != nil {
 			log.Printf("Failed to update ClusterOperator %q: %v", co.Name, err)
-			return fmt.Errorf("failed to update ClusterOperator %s: %v", co.Name, err)
+		} else {
+			log.Printf("Updated ClusterOperator with status:\n%s", string(buf))
 		}
-		log.Printf("Updated ClusterOperator with status:\n%s", string(buf))
 	}
-	return nil
 }
 
 // SetConfigFailure marks the operator as Failing due to a configuration problem. Attempts
 // to mark the operator as Progressing or Available will be ignored until SetConfigSuccess
 // is called to clear the config error.
-func (status *StatusManager) SetConfigFailing(reason string, err error) error {
+func (status *StatusManager) SetConfigFailing(reason string, err error) {
 	status.configFailure = true
-	return status.SetFailing(reason, err)
+	status.SetFailing(reason, err)
 }
 
 // SetConfigSuccess marks the operator as having a valid configuration, allowing it
 // to be set Progressing or Available.
-func (status *StatusManager) SetConfigSuccess() error {
+func (status *StatusManager) SetConfigSuccess() {
 	status.configFailure = false
-	return status.Set(
-		&configv1.ClusterOperatorStatusCondition{
+	status.Set(
+		configv1.ClusterOperatorStatusCondition{
 			Type:   configv1.OperatorFailing,
 			Status: configv1.ConditionFalse,
 		},
@@ -96,20 +97,20 @@ func (status *StatusManager) SetConfigSuccess() error {
 
 // SetFailing marks the operator as Failing, with the given reason and error message.
 // Unlike with SetConfigFailing, this failure is not persistent.
-func (status *StatusManager) SetFailing(reason string, err error) error {
-	return status.Set(
-		&configv1.ClusterOperatorStatusCondition{
+func (status *StatusManager) SetFailing(reason string, err error) {
+	status.Set(
+		configv1.ClusterOperatorStatusCondition{
 			Type:    configv1.OperatorFailing,
 			Status:  configv1.ConditionTrue,
 			Reason:  reason,
 			Message: err.Error(),
 		},
-		&configv1.ClusterOperatorStatusCondition{
+		configv1.ClusterOperatorStatusCondition{
 			Type:   configv1.OperatorProgressing,
 			Status: configv1.ConditionFalse,
 			Reason: "Failing",
 		},
-		&configv1.ClusterOperatorStatusCondition{
+		configv1.ClusterOperatorStatusCondition{
 			Type:   configv1.OperatorAvailable,
 			Status: configv1.ConditionFalse,
 			Reason: "Failing",
@@ -128,9 +129,9 @@ func (status *StatusManager) SetDeployments(deployments []types.NamespacedName) 
 // SetFromPods sets the operator status to Failing, Progressing, or Available, based on
 // the current status of the manager's DaemonSets and Deployments. However, this is a
 // no-op if the StatusManager is currently marked as failing due to a configuration error.
-func (status *StatusManager) SetFromPods() error {
+func (status *StatusManager) SetFromPods() {
 	if status.configFailure {
-		return nil
+		return
 	}
 
 	progressing := []string{}
@@ -139,19 +140,21 @@ func (status *StatusManager) SetFromPods() error {
 		ns := &corev1.Namespace{}
 		if err := status.client.Get(context.TODO(), types.NamespacedName{Name: dsName.Namespace}, ns); err != nil {
 			if errors.IsNotFound(err) {
-				return status.SetFailing("NoNamespace", fmt.Errorf("Namespace %q does not exist", dsName.Namespace))
+				status.SetFailing("NoNamespace", fmt.Errorf("Namespace %q does not exist", dsName.Namespace))
 			} else {
-				return status.SetFailing("InternalError", err)
+				status.SetFailing("InternalError", err)
 			}
+			return
 		}
 
 		ds := &appsv1.DaemonSet{}
 		if err := status.client.Get(context.TODO(), dsName, ds); err != nil {
 			if errors.IsNotFound(err) {
-				return status.SetFailing("NoDaemonSet", fmt.Errorf("DaemonSet %q does not exist", dsName.String()))
+				status.SetFailing("NoDaemonSet", fmt.Errorf("DaemonSet %q does not exist", dsName.String()))
 			} else {
-				return status.SetFailing("InternalError", err)
+				status.SetFailing("InternalError", err)
 			}
+			return
 		}
 
 		if ds.Status.NumberUnavailable > 0 {
@@ -165,19 +168,21 @@ func (status *StatusManager) SetFromPods() error {
 		ns := &corev1.Namespace{}
 		if err := status.client.Get(context.TODO(), types.NamespacedName{Name: depName.Namespace}, ns); err != nil {
 			if errors.IsNotFound(err) {
-				return status.SetFailing("NoNamespace", fmt.Errorf("Namespace %q does not exist", depName.Namespace))
+				status.SetFailing("NoNamespace", fmt.Errorf("Namespace %q does not exist", depName.Namespace))
 			} else {
-				return status.SetFailing("InternalError", err)
+				status.SetFailing("InternalError", err)
 			}
+			return
 		}
 
 		dep := &appsv1.Deployment{}
 		if err := status.client.Get(context.TODO(), depName, dep); err != nil {
 			if errors.IsNotFound(err) {
-				return status.SetFailing("NoDeployment", fmt.Errorf("Deployment %q does not exist", depName.String()))
+				status.SetFailing("NoDeployment", fmt.Errorf("Deployment %q does not exist", depName.String()))
 			} else {
-				return status.SetFailing("InternalError", err)
+				status.SetFailing("InternalError", err)
 			}
+			return
 		}
 
 		if dep.Status.UnavailableReplicas > 0 {
@@ -188,18 +193,18 @@ func (status *StatusManager) SetFromPods() error {
 	}
 
 	if len(progressing) > 0 {
-		return status.Set(
-			&configv1.ClusterOperatorStatusCondition{
+		status.Set(
+			configv1.ClusterOperatorStatusCondition{
 				Type:   configv1.OperatorFailing,
 				Status: configv1.ConditionFalse,
 			},
-			&configv1.ClusterOperatorStatusCondition{
+			configv1.ClusterOperatorStatusCondition{
 				Type:    configv1.OperatorProgressing,
 				Status:  configv1.ConditionTrue,
 				Reason:  "Deploying",
 				Message: strings.Join(progressing, "\n"),
 			},
-			&configv1.ClusterOperatorStatusCondition{
+			configv1.ClusterOperatorStatusCondition{
 				Type:    configv1.OperatorAvailable,
 				Status:  configv1.ConditionFalse,
 				Reason:  "Deploying",
@@ -207,16 +212,16 @@ func (status *StatusManager) SetFromPods() error {
 			},
 		)
 	} else {
-		return status.Set(
-			&configv1.ClusterOperatorStatusCondition{
+		status.Set(
+			configv1.ClusterOperatorStatusCondition{
 				Type:   configv1.OperatorFailing,
 				Status: configv1.ConditionFalse,
 			},
-			&configv1.ClusterOperatorStatusCondition{
+			configv1.ClusterOperatorStatusCondition{
 				Type:   configv1.OperatorProgressing,
 				Status: configv1.ConditionFalse,
 			},
-			&configv1.ClusterOperatorStatusCondition{
+			configv1.ClusterOperatorStatusCondition{
 				Type:   configv1.OperatorAvailable,
 				Status: configv1.ConditionTrue,
 			},
