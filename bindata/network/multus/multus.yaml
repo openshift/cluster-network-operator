@@ -6,6 +6,7 @@ metadata:
   annotations:
     kubernetes.io/description: |
       This daemon set launches the Multus networking component on each node.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
 spec:
   selector:
     matchLabels:
