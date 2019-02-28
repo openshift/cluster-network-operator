@@ -17,6 +17,7 @@ metadata:
   annotations:
     kubernetes.io/description: |
       This deployment runs the openshift SDN networking controller.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
   labels:
     app: sdn-controller
 spec:
