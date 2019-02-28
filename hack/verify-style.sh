@@ -31,7 +31,12 @@ GOFILES=$(find . -path ./vendor -prune -o -name '*.go' | grep -v vendor | grep -
 GOPKGS=$(go list ./... | grep -v '/vendor/' | grep -v '/generated/' | grep -v pkg/operator/assets)
 
 echo "Running gofmt..."
-gofmt -s -d $GOFILES
+fmt_files=$(gofmt -l -s $GOFILES)
+if [[ -n ${fmt_files} ]]; then
+	echo "gofmt failed. fix with"
+	echo gofmt -w -s $fmt_files
+    rc=1
+fi
 
 echo "Running go vet..."
 go vet $GOPKGS

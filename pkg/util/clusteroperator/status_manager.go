@@ -88,8 +88,8 @@ func (status *StatusManager) SetConfigSuccess() error {
 	status.configFailure = false
 	return status.Set(
 		&configv1.ClusterOperatorStatusCondition{
-			Type:    configv1.OperatorFailing,
-			Status:  configv1.ConditionFalse,
+			Type:   configv1.OperatorFailing,
+			Status: configv1.ConditionFalse,
 		},
 	)
 }
@@ -105,14 +105,14 @@ func (status *StatusManager) SetFailing(reason string, err error) error {
 			Message: err.Error(),
 		},
 		&configv1.ClusterOperatorStatusCondition{
-			Type:    configv1.OperatorProgressing,
-			Status:  configv1.ConditionFalse,
-			Reason:  "Failing",
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionFalse,
+			Reason: "Failing",
 		},
 		&configv1.ClusterOperatorStatusCondition{
-			Type:    configv1.OperatorAvailable,
-			Status:  configv1.ConditionFalse,
-			Reason:  "Failing",
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionFalse,
+			Reason: "Failing",
 		},
 	)
 }
