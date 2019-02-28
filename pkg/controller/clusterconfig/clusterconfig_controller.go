@@ -2,9 +2,8 @@ package clusterconfig
 
 import (
 	"context"
+	"fmt"
 	"log"
-
-	"github.com/pkg/errors"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
@@ -91,33 +90,29 @@ func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile
 
 	// Validate the cluster config
 	if err := network.ValidateClusterConfig(clusterConfig.Spec); err != nil {
-		err = errors.Wrapf(err, "failed to validate Network.Spec")
-		log.Println(err)
-		r.status.SetConfigFailing("InvalidClusterConfig", err)
+		log.Printf("Failed to validate Network.Spec: %v", err)
+		r.status.SetFailing(statusmanager.ClusterConfig, "InvalidClusterConfig",
+			fmt.Sprintf("The cluster configuration is invalid (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))
 		return reconcile.Result{}, err
 	}
 
 	operatorConfig, err := r.UpdateOperatorConfig(context.TODO(), *clusterConfig)
 	if err != nil {
-		err = errors.Wrapf(err, "failed to generate NetworkConfig CRD")
-		log.Println(err)
-		r.status.SetConfigFailing("UpdateOperatorConfig", err)
+		log.Printf("Failed to generate NetworkConfig CRD: %v", err)
+		r.status.SetFailing(statusmanager.ClusterConfig, "UpdateOperatorConfig",
+			fmt.Sprintf("Internal error while converting cluster configuration: %v", err))
 		return reconcile.Result{}, err
 	}
 
-	// Clear any cluster config-related errors before applying operator config
-	r.status.SetConfigSuccess()
-
 	if operatorConfig != nil {
 		if err := apply.ApplyObject(context.TODO(), r.client, operatorConfig); err != nil {
-			err = errors.Wrapf(err, "could not apply (%s) %s/%s", operatorConfig.GroupVersionKind(), operatorConfig.GetNamespace(), operatorConfig.GetName())
-			log.Println(err)
-			r.status.SetConfigFailing("ApplyClusterConfig", err)
+			log.Printf("Could not apply operator config: %v", err)
+			r.status.SetFailing(statusmanager.ClusterConfig, "ApplyOperatorConfig",
+				fmt.Sprintf("Error while trying to update operator configuration: %v", err))
 			return reconcile.Result{}, err
 		}
-
-		log.Printf("successfully updated ClusterNetwork (%s) %s/%s", operatorConfig.GroupVersionKind(), operatorConfig.GetNamespace(), operatorConfig.GetName())
 	}
 
+	r.status.SetNotFailing(statusmanager.ClusterConfig)
 	return reconcile.Result{}, nil
 }

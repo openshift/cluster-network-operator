@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -60,7 +61,7 @@ func conditionsEqual(oldConditions, newConditions []configv1.ClusterOperatorStat
 	return conditionsInclude(oldConditions, newConditions) && conditionsInclude(newConditions, oldConditions)
 }
 
-func TestStatusManagerSet(t *testing.T) {
+func TestStatusManager_set(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", "1.2.3")
 
@@ -132,6 +133,92 @@ func TestStatusManagerSet(t *testing.T) {
 	}
 }
 
+func TestStatusManagerSetFailing(t *testing.T) {
+	client := fake.NewFakeClient()
+	status := New(client, "testing", "1.2.3")
+
+	co, err := getCO(client, "testing")
+	if !errors.IsNotFound(err) {
+		t.Fatalf("unexpected error (expected Not Found): %v", err)
+	}
+
+	condFailCluster := configv1.ClusterOperatorStatusCondition{
+		Type:   configv1.OperatorFailing,
+		Status: configv1.ConditionTrue,
+		Reason: "Cluster",
+	}
+	condFailOperator := configv1.ClusterOperatorStatusCondition{
+		Type:   configv1.OperatorFailing,
+		Status: configv1.ConditionTrue,
+		Reason: "Operator",
+	}
+	condFailPods := configv1.ClusterOperatorStatusCondition{
+		Type:   configv1.OperatorFailing,
+		Status: configv1.ConditionTrue,
+		Reason: "Pods",
+	}
+
+	// Initial failure status
+	status.SetFailing(OperatorConfig, "Operator", "")
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailOperator}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Setting a higher-level status should override it
+	status.SetFailing(ClusterConfig, "Cluster", "")
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailCluster}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Setting a lower-level status should be ignored
+	status.SetFailing(PodDeployment, "Pods", "")
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailCluster}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Clearing an unseen status should have no effect
+	status.SetNotFailing(OperatorConfig)
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailCluster}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Clearing the currently-seen status should reveal the higher-level status
+	status.SetNotFailing(ClusterConfig)
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailPods}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Clearing all failing statuses should result in not failing
+	status.SetNotFailing(PodDeployment)
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !v1helpers.IsStatusConditionFalse(co.Status.Conditions, configv1.OperatorFailing) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+}
+
 func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", "1.2.3")
@@ -151,16 +238,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Type:   configv1.OperatorFailing,
 			Status: configv1.ConditionTrue,
 			Reason: "NoNamespace",
-		},
-		{
-			Type:   configv1.OperatorProgressing,
-			Status: configv1.ConditionFalse,
-			Reason: "Failing",
-		},
-		{
-			Type:   configv1.OperatorAvailable,
-			Status: configv1.ConditionFalse,
-			Reason: "Failing",
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
@@ -331,16 +408,6 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 			Type:   configv1.OperatorFailing,
 			Status: configv1.ConditionTrue,
 			Reason: "NoNamespace",
-		},
-		{
-			Type:   configv1.OperatorProgressing,
-			Status: configv1.ConditionFalse,
-			Reason: "Failing",
-		},
-		{
-			Type:   configv1.OperatorAvailable,
-			Status: configv1.ConditionFalse,
-			Reason: "Failing",
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
