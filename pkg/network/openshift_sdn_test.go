@@ -140,7 +140,7 @@ func TestFillOpenShiftSDNDefaults(t *testing.T) {
 		DeployKubeProxy: &f,
 		KubeProxyConfig: &netv1.ProxyConfig{
 			BindAddress:    "0.0.0.0",
-			ProxyArguments: map[string][]string{"metrics-bind-address": []string{"0.0.0.0:9101"}},
+			ProxyArguments: map[string][]string{"metrics-bind-address": {"0.0.0.0:9101"}},
 		},
 	}
 
