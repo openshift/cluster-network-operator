@@ -1,7 +1,7 @@
 apiVersion: "networkoperator.openshift.io/v1"
 kind: "NetworkConfig"
 metadata:
-  name: "default"
+  name: "cluster"
 spec:
   serviceNetwork:
     - "172.30.0.0/16"
