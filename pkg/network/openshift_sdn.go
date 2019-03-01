@@ -143,7 +143,10 @@ func fillOpenShiftSDNDefaults(conf, previous *netv1.NetworkConfigSpec, hostMTU i
 	// However, this can never change, so we always prefer previous.
 	if sc.MTU == nil {
 		var mtu uint32 = uint32(hostMTU) - 50 // 50 byte VXLAN header
-		if previous != nil {
+		if previous != nil &&
+			previous.DefaultNetwork.Type == netv1.NetworkTypeOpenShiftSDN &&
+			previous.DefaultNetwork.OpenShiftSDNConfig != nil &&
+			previous.DefaultNetwork.OpenShiftSDNConfig.MTU != nil {
 			mtu = *previous.DefaultNetwork.OpenShiftSDNConfig.MTU
 		}
 		sc.MTU = &mtu
