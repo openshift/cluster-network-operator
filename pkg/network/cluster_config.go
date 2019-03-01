@@ -81,8 +81,19 @@ func MergeClusterConfig(operConf *netopv1.NetworkConfigSpec, clusterConf configv
 	operConf.DefaultNetwork.Type = netopv1.NetworkType(clusterConf.NetworkType)
 }
 
-// StatusFromOperatorConfig generates the cluster NetworkStatus from the currently applied operator configuration.
+// StatusFromOperatorConfig generates the cluster NetworkStatus from the
+// currently applied operator configuration.
 func StatusFromOperatorConfig(operConf *netopv1.NetworkConfigSpec) configv1.NetworkStatus {
+	// Don't set status if we don't understand the network type
+	switch operConf.DefaultNetwork.Type {
+	case netopv1.NetworkTypeOpenShiftSDN:
+		// continue
+	default:
+		return configv1.NetworkStatus{}
+	}
+
+	// TODO: when we support expanding the service cidr or cluster cidr,
+	// don't actually update the status until the changes are rolled out.
 	status := configv1.NetworkStatus{
 		ServiceNetwork: operConf.ServiceNetwork,
 		NetworkType:    string(operConf.DefaultNetwork.Type),
