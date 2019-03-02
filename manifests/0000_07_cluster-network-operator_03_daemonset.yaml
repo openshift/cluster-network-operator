@@ -47,6 +47,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      priorityClassName: "system-cluster-critical"
       volumes:
         - name: host-kubeconfig
           hostPath:
