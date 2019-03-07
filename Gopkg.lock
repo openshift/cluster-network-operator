@@ -256,14 +256,6 @@
   version = "v1.1.5"
 
 [[projects]]
-  digest = "1:4059c14e87a2de3a434430340521b5feece186c1469eff0834c29a63870de3ed"
-  name = "github.com/konsorten/go-windows-terminal-sequences"
-  packages = ["."]
-  pruneopts = "NT"
-  revision = "5c8c8bd35d3832f5d134ae1e1e375b69a4d25242"
-  version = "v1.0.1"
-
-[[projects]]
   branch = "master"
   digest = "1:7d9fcac7f1228470c4ea0ee31cdfb662a758c44df691e39b3e76c11d3e12ba8f"
   name = "github.com/mailru/easyjson"
@@ -330,7 +322,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:5e6c05b09392a59a3536bc9e07422ed201c24de8e5f238d5969e13ae713091f0"
+  digest = "1:d81228aec193f40dc8ed219ebd607a88dac61bed2b12f8003a588ce5aa74c91d"
   name = "github.com/openshift/api"
   packages = [
     "build/v1",
@@ -340,7 +332,15 @@
     "osin/v1",
   ]
   pruneopts = "NT"
-  revision = "1a0ca44421509b47daf1e17f2e96025b3a314c3b"
+  revision = "c58918e29f89383d2e1467bad7156e2b0c49497f"
+
+[[projects]]
+  branch = "master"
+  digest = "1:4908099ee5960309cf5190ed9ba9756ee04cdfbd1e7eb6831f566808148264d0"
+  name = "github.com/openshift/library-go"
+  packages = ["pkg/config/clusteroperator/v1helpers"]
+  pruneopts = "NT"
+  revision = "48c98921f370913db774def97bc74a3eaa873e39"
 
 [[projects]]
   digest = "1:c7b6faf294d8ef95f74c0467df72b8ffa103935462df294a9e7bc1d416a9f4d5"
@@ -430,14 +430,6 @@
   ]
   pruneopts = "NT"
   revision = "488faf799f863e27e50c516468f76ae8f1da20a5"
-
-[[projects]]
-  digest = "1:cd2f2cba5b7ffafd0412fb647ff4bcff170292de57270f05fbbf391e3eb9566b"
-  name = "github.com/sirupsen/logrus"
-  packages = ["."]
-  pruneopts = "NT"
-  revision = "bcd833dfe83d3cebad139e4a29ed79cb2318bf95"
-  version = "v1.2.0"
 
 [[projects]]
   digest = "1:9d8420bbf131d1618bde6530af37c3799340d3762cc47210c1d9532a4c3a2779"
@@ -688,6 +680,7 @@
   digest = "1:868de7cbaa0ecde6dc231c1529a10ae01bb05916095c0c992186e2a5cac57e79"
   name = "k8s.io/apimachinery"
   packages = [
+    "pkg/api/equality",
     "pkg/api/errors",
     "pkg/api/meta",
     "pkg/api/resource",
@@ -924,23 +917,28 @@
     "github.com/openshift/api/config/v1",
     "github.com/openshift/api/legacyconfig/v1",
     "github.com/openshift/api/openshiftcontrolplane/v1",
+    "github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers",
     "github.com/operator-framework/operator-sdk/pkg/leader",
     "github.com/operator-framework/operator-sdk/version",
     "github.com/pkg/errors",
-    "github.com/sirupsen/logrus",
     "github.com/spf13/pflag",
     "github.com/vishvananda/netlink",
     "k8s.io/api/apps/v1",
     "k8s.io/api/core/v1",
     "k8s.io/apimachinery/pkg/api/errors",
+    "k8s.io/apimachinery/pkg/api/meta",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
     "k8s.io/apimachinery/pkg/types",
+    "k8s.io/apimachinery/pkg/util/runtime",
     "k8s.io/apimachinery/pkg/util/yaml",
+    "k8s.io/client-go/discovery",
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
+    "k8s.io/client-go/rest",
+    "k8s.io/client-go/restmapper",
     "k8s.io/client-go/tools/clientcmd",
     "k8s.io/code-generator/cmd/client-gen",
     "k8s.io/code-generator/cmd/conversion-gen",
