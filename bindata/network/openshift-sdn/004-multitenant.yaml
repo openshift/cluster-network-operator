@@ -57,10 +57,10 @@ netname: openshift-image-registry
 # Namespaces which are part of the "control plane" and need to reach each other:
 # - kube-system (etcd)
 # - openshift-apiserver
-# - kube-service-catalog
+# - openshift-service-catalog-apiserver
+# - openshift-service-catalog-controller-manager
 # - openshift-template-service-broker
 # - openshift-ansible-service-broker
-# - kube-service-catalog-controller-manager
 apiVersion: network.openshift.io/v1
 kind: NetNamespace
 metadata:
@@ -80,9 +80,9 @@ netname: kube-system
 apiVersion: network.openshift.io/v1
 kind: NetNamespace
 metadata:
-  name: kube-service-catalog
+  name: openshift-service-catalog-apiserver
 netid: 1
-netname: kube-service-catalog
+netname: openshift-service-catalog-apiserver
 
 ---
 apiVersion: network.openshift.io/v1
@@ -104,8 +104,8 @@ netname: openshift-ansible-service-broker
 apiVersion: network.openshift.io/v1
 kind: NetNamespace
 metadata:
-  name: kube-service-catalog-controller-manager
+  name: openshift-service-catalog-controller-manager
 netid: 1
-netname: kube-service-catalog-controller-manager
+netname: openshift-service-catalog-controller-manager
 
 {{- end}}
