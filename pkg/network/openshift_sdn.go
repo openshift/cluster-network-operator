@@ -34,6 +34,7 @@ func renderOpenShiftSDN(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*u
 
 	// render the manifests on disk
 	data := render.MakeRenderData()
+	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["InstallOVS"] = (c.UseExternalOpenvswitch == nil || *c.UseExternalOpenvswitch == false)
 	data.Data["NodeImage"] = os.Getenv("NODE_IMAGE")
 	data.Data["HypershiftImage"] = os.Getenv("HYPERSHIFT_IMAGE")
