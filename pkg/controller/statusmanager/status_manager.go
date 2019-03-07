@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"reflect"
 	"strings"
 
@@ -47,7 +48,7 @@ func New(client client.Client, name, version string) *StatusManager {
 }
 
 // Set updates the ClusterOperator.Status with the provided conditions
-func (status *StatusManager) Set(conditions ...configv1.ClusterOperatorStatusCondition) {
+func (status *StatusManager) Set(reachedAvailableLevel bool, conditions ...configv1.ClusterOperatorStatusCondition) {
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
 	err := status.client.Get(context.TODO(), types.NamespacedName{Name: status.name}, co)
 	isNotFound := errors.IsNotFound(err)
@@ -57,6 +58,16 @@ func (status *StatusManager) Set(conditions ...configv1.ClusterOperatorStatusCon
 	}
 
 	oldStatus := co.Status.DeepCopy()
+
+	if reachedAvailableLevel {
+		if releaseVersion := os.Getenv("RELEASE_VERSION"); len(releaseVersion) > 0 {
+			co.Status.Versions = []configv1.OperandVersion{
+				{Name: "operator", Version: releaseVersion},
+			}
+		} else {
+			co.Status.Versions = nil
+		}
+	}
 	for _, condition := range conditions {
 		v1helpers.SetStatusCondition(&co.Status.Conditions, condition)
 	}
@@ -88,14 +99,17 @@ func (status *StatusManager) Set(conditions ...configv1.ClusterOperatorStatusCon
 func (status *StatusManager) syncFailing() {
 	for _, c := range status.failing {
 		if c != nil {
-			status.Set(*c)
+			status.Set(false, *c)
 			return
 		}
 	}
-	status.Set(configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorFailing,
-		Status: configv1.ConditionFalse,
-	})
+	status.Set(
+		false,
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorFailing,
+			Status: configv1.ConditionFalse,
+		},
+	)
 }
 
 // SetFailing marks the operator as Failing with the given reason and message. If it
@@ -132,6 +146,10 @@ func (status *StatusManager) SetDeployments(deployments []types.NamespacedName) 
 // the current status of the manager's DaemonSets and Deployments. However, this is a
 // no-op if the StatusManager is currently marked as failing due to a configuration error.
 func (status *StatusManager) SetFromPods() {
+
+	targetLevel := os.Getenv("RELEASE_VERSION")
+	reachedAvailableLevel := (len(status.daemonSets) + len(status.deployments)) > 0
+
 	progressing := []string{}
 
 	for _, dsName := range status.daemonSets {
@@ -163,6 +181,10 @@ func (status *StatusManager) SetFromPods() {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not available (awaiting %d nodes)", dsName.String(), ds.Status.NumberUnavailable))
 		} else if ds.Status.NumberAvailable == 0 {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not yet scheduled on any nodes", dsName.String()))
+		}
+
+		if !(ds.Generation <= ds.Status.ObservedGeneration && ds.Status.UpdatedNumberScheduled == ds.Status.DesiredNumberScheduled && ds.Status.NumberUnavailable == 0 && ds.Annotations["release.openshift.io/version"] == targetLevel) {
+			reachedAvailableLevel = false
 		}
 	}
 
@@ -196,12 +218,17 @@ func (status *StatusManager) SetFromPods() {
 		} else if dep.Status.AvailableReplicas == 0 {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q is not yet scheduled on any nodes", depName.String()))
 		}
+
+		if !(dep.Generation <= dep.Status.ObservedGeneration && dep.Status.UpdatedReplicas == dep.Status.Replicas && dep.Status.AvailableReplicas > 0 && dep.Annotations["release.openshift.io/version"] == targetLevel) {
+			reachedAvailableLevel = false
+		}
 	}
 
 	status.SetNotFailing(PodDeployment)
 
 	if len(progressing) > 0 {
 		status.Set(
+			reachedAvailableLevel,
 			configv1.ClusterOperatorStatusCondition{
 				Type:    configv1.OperatorProgressing,
 				Status:  configv1.ConditionTrue,
@@ -217,6 +244,7 @@ func (status *StatusManager) SetFromPods() {
 		)
 	} else {
 		status.Set(
+			reachedAvailableLevel,
 			configv1.ClusterOperatorStatusCondition{
 				Type:   configv1.OperatorProgressing,
 				Status: configv1.ConditionFalse,
