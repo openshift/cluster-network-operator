@@ -42,9 +42,16 @@ var (
 // inside of the Spec struct for your particular operator.
 type OperatorSpec struct {
 	// managementState indicates whether and how the operator should manage the component
+	// +optional
 	ManagementState ManagementState `json:"managementState"`
 
+	// logLevel is an intent based logging for an overall component.  It does not give fine grained control, but it is a
+	// simple way to manage coarse grained logging choices that operators have to interpret for their operands.
+	// +optional
+	LogLevel LogLevel `json:"logLevel"`
+
 	// operandSpecs provide customization for functional units within the component
+	// +optional
 	OperandSpecs []OperandSpec `json:"operandSpecs"`
 
 	// unsupportedConfigOverrides holds a sparse config that will override any previously set options.  It only needs to be the fields to override
@@ -52,12 +59,31 @@ type OperatorSpec struct {
 	// 1. hardcoded defaults
 	// 2. observedConfig
 	// 3. unsupportedConfigOverrides
+	// +optional
 	UnsupportedConfigOverrides runtime.RawExtension `json:"unsupportedConfigOverrides"`
 
 	// observedConfig holds a sparse config that controller has observed from the cluster state.  It exists in spec because
 	// it is an input to the level for the operator
+	// +optional
 	ObservedConfig runtime.RawExtension `json:"observedConfig"`
 }
+
+type LogLevel string
+
+var (
+	// Normal is the default.  Normal, working log information, everything is fine, but helpful notices for auditing or common operations.  In kube, this is probably glog=2.
+	Normal LogLevel = "Normal"
+
+	// Debug is used when something went wrong.  Even common operations may be logged, and less helpful but more quantity of notices.  In kube, this is probably glog=4.
+	Debug LogLevel = "Debug"
+
+	// Trace is used when something went really badly and even more verbose logs are needed.  Logging every function call as part of a common operation, to tracing execution of a query.  In kube, this is probably glog=6.
+	Trace LogLevel = "Trace"
+
+	// TraceAll is used when something is broken at the level of API content/decoding.  It will dump complete body content.  If you turn this on in a production cluster
+	// prepare from serious performance issues and massive amounts of logs.  In kube, this is probably glog=8.
+	TraceAll LogLevel = "TraceAll"
+)
 
 // ResourcePatch is a way to represent the patch you would issue to `kubectl patch` in the API
 type ResourcePatch struct {
@@ -73,11 +99,13 @@ type OperandSpec struct {
 	Name string `json:"name"`
 
 	// operandContainerSpecs are per-container options
+	// +optional
 	OperandContainerSpecs []OperandContainerSpec `json:"operandContainerSpecs"`
 
 	// unsupportedResourcePatches are applied to the workload resource for this unit. This is an unsupported
 	// workaround if anything needs to be modified on the workload that is not otherwise configurable.
 	// TODO Decide: alternatively, we could simply include a RawExtension which is used in place of the "normal" default manifest
+	// +optional
 	UnsupportedResourcePatches []ResourcePatch `json:"unsupportedResourcePatches"`
 }
 
@@ -87,41 +115,6 @@ type OperandContainerSpec struct {
 
 	// resources are the requests and limits to place in the container.  Nil means to accept the defaults.
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
-
-	// logging contains parameters for setting log values on the operand. Nil means to accept the defaults.
-	Logging LoggingConfig `json:"logging,omitempty"`
-}
-
-// LoggingConfig holds information about configuring logging
-type LoggingConfig struct {
-	Type string `json:"type"`
-
-	Glog     *GlogConfig     `json:"glog,omitempty"`
-	CapnsLog *CapnsLogConfig `json:"capnsLog,omitempty"`
-	Java     *JavaLog        `json:"java,omitempty"`
-}
-
-// GlogConfig holds information about configuring logging
-type GlogConfig struct {
-	// level is passed to glog.
-	Level int64 `json:"level"`
-
-	// vmodule is passed to glog.
-	Vmodule string `json:"vmodule"`
-}
-
-type CapnsLogConfig struct {
-	// level is passed to capnslog: critical, error, warning, notice, info, debug, trace
-	Level string `json:"level"`
-
-	// TODO There is some kind of repo/package level thing for this
-}
-
-type JavaLog struct {
-	// level is passed to jsr47: fatal, error, warning, info, fine, finer, finest
-	Level string `json:"level"`
-
-	// TODO There is some kind of repo/package level thing for this.  might end up hierarchical
 }
 
 type OperatorStatus struct {
@@ -188,6 +181,18 @@ const (
 	ConditionFalse   ConditionStatus = "False"
 	ConditionUnknown ConditionStatus = "Unknown"
 )
+
+// StaticPodOperatorSpec is spec for controllers that manage static pods.
+type StaticPodOperatorSpec struct {
+	OperatorSpec           `json:",inline"`
+
+	// failedRevisionLimit is the number of failed static pod installer revisions to keep on disk and in the api
+	// -1 = unlimited, 0 or unset = 5 (default)
+	FailedRevisionLimit    int32 `json:"failedRevisionLimit,omitempty"`
+	// succeededRevisionLimit is the number of successful static pod installer revisions to keep on disk and in the api
+	// -1 = unlimited, 0 or unset = 5 (default)
+	SucceededRevisionLimit int32 `json:"succeededRevisionLimit,omitempty"`
+}
 
 // StaticPodOperatorStatus is status for controllers that manage static pods.  There are different needs because individual
 // node status must be tracked.

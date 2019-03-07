@@ -2,15 +2,14 @@ package clusterconfig
 
 import (
 	"context"
+	"fmt"
 	"log"
-
-	"github.com/pkg/errors"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
+	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
-	"github.com/openshift/cluster-network-operator/pkg/util/clusteroperator"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,12 +22,12 @@ import (
 )
 
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *clusteroperator.StatusManager) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
 	return add(mgr, newReconciler(mgr, status))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *clusteroperator.StatusManager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) reconcile.Reconciler {
 	configv1.Install(mgr.GetScheme())
 	return &ReconcileClusterConfig{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status}
 }
@@ -58,7 +57,7 @@ type ReconcileClusterConfig struct {
 	// that reads objects from the cache and writes to the apiserver
 	client client.Client
 	scheme *runtime.Scheme
-	status *clusteroperator.StatusManager
+	status *statusmanager.StatusManager
 }
 
 // Reconcile propagates changes from the cluster config to the operator config.
@@ -91,33 +90,29 @@ func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile
 
 	// Validate the cluster config
 	if err := network.ValidateClusterConfig(clusterConfig.Spec); err != nil {
-		err = errors.Wrapf(err, "failed to validate Network.Spec")
-		log.Println(err)
-		r.status.SetConfigFailing("InvalidClusterConfig", err)
+		log.Printf("Failed to validate Network.Spec: %v", err)
+		r.status.SetFailing(statusmanager.ClusterConfig, "InvalidClusterConfig",
+			fmt.Sprintf("The cluster configuration is invalid (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))
 		return reconcile.Result{}, err
 	}
 
 	operatorConfig, err := r.UpdateOperatorConfig(context.TODO(), *clusterConfig)
 	if err != nil {
-		err = errors.Wrapf(err, "failed to generate NetworkConfig CRD")
-		log.Println(err)
-		r.status.SetConfigFailing("UpdateOperatorConfig", err)
+		log.Printf("Failed to generate NetworkConfig CRD: %v", err)
+		r.status.SetFailing(statusmanager.ClusterConfig, "UpdateOperatorConfig",
+			fmt.Sprintf("Internal error while converting cluster configuration: %v", err))
 		return reconcile.Result{}, err
 	}
 
-	// Clear any cluster config-related errors before applying operator config
-	r.status.SetConfigSuccess()
-
 	if operatorConfig != nil {
 		if err := apply.ApplyObject(context.TODO(), r.client, operatorConfig); err != nil {
-			err = errors.Wrapf(err, "could not apply (%s) %s/%s", operatorConfig.GroupVersionKind(), operatorConfig.GetNamespace(), operatorConfig.GetName())
-			log.Println(err)
-			r.status.SetConfigFailing("ApplyClusterConfig", err)
+			log.Printf("Could not apply operator config: %v", err)
+			r.status.SetFailing(statusmanager.ClusterConfig, "ApplyOperatorConfig",
+				fmt.Sprintf("Error while trying to update operator configuration: %v", err))
 			return reconcile.Result{}, err
 		}
-
-		log.Printf("successfully updated ClusterNetwork (%s) %s/%s", operatorConfig.GroupVersionKind(), operatorConfig.GetNamespace(), operatorConfig.GetName())
 	}
 
+	r.status.SetNotFailing(statusmanager.ClusterConfig)
 	return reconcile.Result{}, nil
 }
