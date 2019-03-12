@@ -3,7 +3,6 @@ package controller
 import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	operatorversion "github.com/openshift/cluster-network-operator/version"
-
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 

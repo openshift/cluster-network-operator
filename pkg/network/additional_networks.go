@@ -2,11 +2,12 @@ package network
 
 import (
 	"encoding/json"
-	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	"path/filepath"
+
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/pkg/errors"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"path/filepath"
 )
 
 // renderAdditionalNetworksCRD returns the manifests of the NetworkAttachmentDefinition.
@@ -23,7 +24,7 @@ func renderAdditionalNetworksCRD(manifestDir string) ([]*uns.Unstructured, error
 }
 
 // renderRawCNIConfig returns the RawCNIConfig manifests
-func renderRawCNIConfig(conf *netv1.AdditionalNetworkDefinition, manifestDir string) ([]*uns.Unstructured, error) {
+func renderRawCNIConfig(conf *operv1.AdditionalNetworkDefinition, manifestDir string) ([]*uns.Unstructured, error) {
 	var err error
 	objs := []*uns.Unstructured{}
 
@@ -39,7 +40,7 @@ func renderRawCNIConfig(conf *netv1.AdditionalNetworkDefinition, manifestDir str
 }
 
 // validateRaw checks the AdditionalNetwork name and RawCNIConfig.
-func validateRaw(conf *netv1.AdditionalNetworkDefinition) []error {
+func validateRaw(conf *operv1.AdditionalNetworkDefinition) []error {
 	out := []error{}
 	var rawConfig map[string]interface{}
 	var err error

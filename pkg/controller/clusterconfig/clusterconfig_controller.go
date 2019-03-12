@@ -62,7 +62,7 @@ type ReconcileClusterConfig struct {
 
 // Reconcile propagates changes from the cluster config to the operator config.
 // In other words, it watches Network.config.openshift.io/v1/cluster and updates
-// NetworkConfig.networkoperator.openshift.io/v1/default.
+// Network.operator.openshift.io/v1/cluster.
 func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.Printf("Reconciling Network.config.openshift.io %s\n", request.Name)
 

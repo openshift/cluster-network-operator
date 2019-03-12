@@ -65,3 +65,7 @@ required = [
 [[constraint]]
   name = "github.com/vishvananda/netlink"
   version = "1.0.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/openshift/api"
