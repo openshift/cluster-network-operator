@@ -5,7 +5,7 @@ import (
 
 	yaml "github.com/ghodss/yaml"
 
-	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -13,10 +13,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var OpenShiftSDNConfig = netv1.NetworkConfig{
-	Spec: netv1.NetworkConfigSpec{
+var OpenShiftSDNConfig = operv1.Network{
+	Spec: operv1.NetworkSpec{
 		ServiceNetwork: []string{"172.30.0.0/16"},
-		ClusterNetwork: []netv1.ClusterNetworkEntry{
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
 			{
 				CIDR:       "10.128.0.0/15",
 				HostPrefix: 23,
@@ -26,10 +26,10 @@ var OpenShiftSDNConfig = netv1.NetworkConfig{
 				HostPrefix: 24,
 			},
 		},
-		DefaultNetwork: netv1.DefaultNetworkDefinition{
-			Type: netv1.NetworkTypeOpenShiftSDN,
-			OpenShiftSDNConfig: &netv1.OpenShiftSDNConfig{
-				Mode: netv1.SDNModeNetworkPolicy,
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOpenShiftSDN,
+			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
+				Mode: operv1.SDNModeNetworkPolicy,
 			},
 		},
 	},
@@ -117,9 +117,9 @@ func TestFillOpenShiftSDNDefaults(t *testing.T) {
 	p := uint32(4789)
 	m := uint32(8950)
 
-	expected := netv1.NetworkConfigSpec{
+	expected := operv1.NetworkSpec{
 		ServiceNetwork: []string{"172.30.0.0/16"},
-		ClusterNetwork: []netv1.ClusterNetworkEntry{
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
 			{
 				CIDR:       "10.128.0.0/15",
 				HostPrefix: 23,
@@ -129,16 +129,16 @@ func TestFillOpenShiftSDNDefaults(t *testing.T) {
 				HostPrefix: 24,
 			},
 		},
-		DefaultNetwork: netv1.DefaultNetworkDefinition{
-			Type: netv1.NetworkTypeOpenShiftSDN,
-			OpenShiftSDNConfig: &netv1.OpenShiftSDNConfig{
-				Mode:      netv1.SDNModeNetworkPolicy,
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOpenShiftSDN,
+			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
+				Mode:      operv1.SDNModeNetworkPolicy,
 				VXLANPort: &p,
 				MTU:       &m,
 			},
 		},
 		DeployKubeProxy: &f,
-		KubeProxyConfig: &netv1.ProxyConfig{
+		KubeProxyConfig: &operv1.ProxyConfig{
 			BindAddress:    "0.0.0.0",
 			ProxyArguments: map[string][]string{"metrics-bind-address": {"0.0.0.0:9101"}},
 		},
@@ -222,7 +222,7 @@ func TestProxyArgs(t *testing.T) {
 	g.Expect(val).To(Equal(""))
 
 	// set sync period
-	config.KubeProxyConfig = &netv1.ProxyConfig{
+	config.KubeProxyConfig = &operv1.ProxyConfig{
 		IptablesSyncPeriod: "10s",
 		BindAddress:        "1.2.3.4",
 	}

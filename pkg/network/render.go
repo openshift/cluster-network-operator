@@ -8,12 +8,12 @@ import (
 
 	"github.com/pkg/errors"
 
-	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func Render(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func Render(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	log.Printf("Starting render phase")
 	objs := []*uns.Unstructured{}
 
@@ -47,40 +47,38 @@ func Render(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructu
 
 // Canonicalize converts configuration to a canonical form.
 // Currently we only care about case.
-func Canonicalize(conf *netv1.NetworkConfigSpec) {
+func Canonicalize(conf *operv1.NetworkSpec) {
 	switch strings.ToLower(string(conf.DefaultNetwork.Type)) {
-	case strings.ToLower(string(netv1.NetworkTypeOpenShiftSDN)):
-		conf.DefaultNetwork.Type = netv1.NetworkTypeOpenShiftSDN
-	case strings.ToLower(string(netv1.NetworkTypeOVNKubernetes)):
-		conf.DefaultNetwork.Type = netv1.NetworkTypeOVNKubernetes
-	case strings.ToLower(string(netv1.NetworkTypeKuryr)):
-		conf.DefaultNetwork.Type = netv1.NetworkTypeKuryr
+	case strings.ToLower(string(operv1.NetworkTypeOpenShiftSDN)):
+		conf.DefaultNetwork.Type = operv1.NetworkTypeOpenShiftSDN
+	case strings.ToLower(string(operv1.NetworkTypeOVNKubernetes)):
+		conf.DefaultNetwork.Type = operv1.NetworkTypeOVNKubernetes
 	}
 
-	if conf.DefaultNetwork.Type == netv1.NetworkTypeOpenShiftSDN &&
+	if conf.DefaultNetwork.Type == operv1.NetworkTypeOpenShiftSDN &&
 		conf.DefaultNetwork.OpenShiftSDNConfig != nil {
 		sdnc := conf.DefaultNetwork.OpenShiftSDNConfig
 		switch strings.ToLower(string(sdnc.Mode)) {
-		case strings.ToLower(string(netv1.SDNModeMultitenant)):
-			sdnc.Mode = netv1.SDNModeMultitenant
-		case strings.ToLower(string(netv1.SDNModeNetworkPolicy)):
-			sdnc.Mode = netv1.SDNModeNetworkPolicy
-		case strings.ToLower(string(netv1.SDNModeSubnet)):
-			sdnc.Mode = netv1.SDNModeSubnet
+		case strings.ToLower(string(operv1.SDNModeMultitenant)):
+			sdnc.Mode = operv1.SDNModeMultitenant
+		case strings.ToLower(string(operv1.SDNModeNetworkPolicy)):
+			sdnc.Mode = operv1.SDNModeNetworkPolicy
+		case strings.ToLower(string(operv1.SDNModeSubnet)):
+			sdnc.Mode = operv1.SDNModeSubnet
 		}
 	}
 
 	for _, an := range conf.AdditionalNetworks {
 		switch strings.ToLower(string(an.Type)) {
-		case strings.ToLower(string(netv1.NetworkTypeRaw)):
-			an.Type = netv1.NetworkTypeRaw
+		case strings.ToLower(string(operv1.NetworkTypeRaw)):
+			an.Type = operv1.NetworkTypeRaw
 		}
 	}
 }
 
 // Validate checks that the supplied configuration is reasonable.
 // This should be called after Canonicalize
-func Validate(conf *netv1.NetworkConfigSpec) error {
+func Validate(conf *operv1.NetworkSpec) error {
 	errs := []error{}
 
 	errs = append(errs, ValidateIPPools(conf)...)
@@ -98,7 +96,7 @@ func Validate(conf *netv1.NetworkConfigSpec) error {
 //
 // Defaults are carried forward from previous if it is provided. This is so we
 // can change defaults as we move forward, but won't disrupt existing clusters.
-func FillDefaults(conf, previous *netv1.NetworkConfigSpec) {
+func FillDefaults(conf, previous *operv1.NetworkSpec) {
 	hostMTU, err := GetDefaultMTU()
 	if hostMTU == 0 {
 		hostMTU = 1500
@@ -120,7 +118,7 @@ func FillDefaults(conf, previous *netv1.NetworkConfigSpec) {
 
 // IsChangeSafe checks to see if the change between prev and next are allowed
 // FillDefaults and Validate should have been called.
-func IsChangeSafe(prev, next *netv1.NetworkConfigSpec) error {
+func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 	if prev == nil {
 		return nil
 	}
@@ -156,7 +154,7 @@ func IsChangeSafe(prev, next *netv1.NetworkConfigSpec) error {
 
 // ValidateIPPools checks that all IP addresses are valid
 // TODO: check for overlap
-func ValidateIPPools(conf *netv1.NetworkConfigSpec) []error {
+func ValidateIPPools(conf *operv1.NetworkSpec) []error {
 	errs := []error{}
 	for idx, pool := range conf.ClusterNetwork {
 		_, _, err := net.ParseCIDR(pool.CIDR)
@@ -175,7 +173,7 @@ func ValidateIPPools(conf *netv1.NetworkConfigSpec) []error {
 }
 
 // ValidateMultus validates the combination of DisableMultiNetwork and AddtionalNetworks
-func ValidateMultus(conf *netv1.NetworkConfigSpec) []error {
+func ValidateMultus(conf *operv1.NetworkSpec) []error {
 	// DisableMultiNetwork defaults to false
 	deployMultus := true
 	if conf.DisableMultiNetwork != nil && *conf.DisableMultiNetwork {
@@ -192,9 +190,9 @@ func ValidateMultus(conf *netv1.NetworkConfigSpec) []error {
 
 // ValidateDefaultNetwork validates whichever network is specified
 // as the default network.
-func ValidateDefaultNetwork(conf *netv1.NetworkConfigSpec) []error {
+func ValidateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 	switch conf.DefaultNetwork.Type {
-	case netv1.NetworkTypeOpenShiftSDN:
+	case operv1.NetworkTypeOpenShiftSDN:
 		return validateOpenShiftSDN(conf)
 	default:
 		return nil
@@ -203,14 +201,14 @@ func ValidateDefaultNetwork(conf *netv1.NetworkConfigSpec) []error {
 
 // RenderDefaultNetwork generates the manifests corresponding to the requested
 // default network
-func RenderDefaultNetwork(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func RenderDefaultNetwork(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	dn := conf.DefaultNetwork
 	if errs := ValidateDefaultNetwork(conf); len(errs) > 0 {
 		return nil, errors.Errorf("invalid Default Network configuration: %v", errs)
 	}
 
 	switch dn.Type {
-	case netv1.NetworkTypeOpenShiftSDN:
+	case operv1.NetworkTypeOpenShiftSDN:
 		return renderOpenShiftSDN(conf, manifestDir)
 	default:
 		log.Printf("NOTICE: Unknown network type %s, ignoring", dn.Type)
@@ -219,21 +217,21 @@ func RenderDefaultNetwork(conf *netv1.NetworkConfigSpec, manifestDir string) ([]
 }
 
 // FillDefaultNetworkDefaults
-func FillDefaultNetworkDefaults(conf, previous *netv1.NetworkConfigSpec, hostMTU int) {
+func FillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 	switch conf.DefaultNetwork.Type {
-	case netv1.NetworkTypeOpenShiftSDN:
+	case operv1.NetworkTypeOpenShiftSDN:
 		fillOpenShiftSDNDefaults(conf, previous, hostMTU)
 	default:
 	}
 }
 
-func IsDefaultNetworkChangeSafe(prev, next *netv1.NetworkConfigSpec) []error {
+func IsDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	if prev.DefaultNetwork.Type != next.DefaultNetwork.Type {
 		return []error{errors.Errorf("cannot change default network type")}
 	}
 
 	switch prev.DefaultNetwork.Type {
-	case netv1.NetworkTypeOpenShiftSDN:
+	case operv1.NetworkTypeOpenShiftSDN:
 		return isOpenShiftSDNChangeSafe(prev, next)
 	default:
 		return nil
@@ -241,12 +239,12 @@ func IsDefaultNetworkChangeSafe(prev, next *netv1.NetworkConfigSpec) []error {
 }
 
 // ValidateAdditionalNetworks validates additional networks configs
-func ValidateAdditionalNetworks(conf *netv1.NetworkConfigSpec) [][]error {
+func ValidateAdditionalNetworks(conf *operv1.NetworkSpec) [][]error {
 	out := [][]error{}
 	ans := conf.AdditionalNetworks
 	for _, an := range ans {
 		switch an.Type {
-		case netv1.NetworkTypeRaw:
+		case operv1.NetworkTypeRaw:
 			if errs := validateRaw(&an); len(errs) > 0 {
 				out = append(out, errs)
 			}
@@ -258,7 +256,7 @@ func ValidateAdditionalNetworks(conf *netv1.NetworkConfigSpec) [][]error {
 }
 
 // RenderAdditionalNetworks generates the manifests of the requested additional networks
-func RenderAdditionalNetworks(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func RenderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	var err error
 	ans := conf.AdditionalNetworks
 	out := []*uns.Unstructured{}
@@ -276,7 +274,7 @@ func RenderAdditionalNetworks(conf *netv1.NetworkConfigSpec, manifestDir string)
 	// render additional network configuration
 	for _, an := range ans {
 		switch an.Type {
-		case netv1.NetworkTypeRaw:
+		case operv1.NetworkTypeRaw:
 			objs, err = renderRawCNIConfig(&an, manifestDir)
 			if err != nil {
 				return nil, err
@@ -291,7 +289,7 @@ func RenderAdditionalNetworks(conf *netv1.NetworkConfigSpec, manifestDir string)
 }
 
 // RenderMultus generates the manifests of Multus
-func RenderMultus(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func RenderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	if *conf.DisableMultiNetwork {
 		return nil, nil
 	}

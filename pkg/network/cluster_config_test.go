@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
-	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 
 	. "github.com/onsi/gomega"
 )
@@ -73,12 +73,12 @@ func TestMergeClusterConfig(t *testing.T) {
 
 	cc := *ClusterConfig.DeepCopy()
 
-	oc := netopv1.NetworkConfigSpec{}
+	oc := operv1.NetworkSpec{}
 
 	MergeClusterConfig(&oc, cc)
-	g.Expect(oc).To(Equal(netopv1.NetworkConfigSpec{
+	g.Expect(oc).To(Equal(operv1.NetworkSpec{
 		ServiceNetwork: []string{"192.168.0.0/20"},
-		ClusterNetwork: []netopv1.ClusterNetworkEntry{
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
 			{
 				CIDR:       "10.0.0.0/22",
 				HostPrefix: 24,
@@ -88,7 +88,7 @@ func TestMergeClusterConfig(t *testing.T) {
 				HostPrefix: 23,
 			},
 		},
-		DefaultNetwork: netopv1.DefaultNetworkDefinition{
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: "None",
 		},
 	}))

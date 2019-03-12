@@ -1,4 +1,4 @@
-package networkconfig
+package operconfig
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"reflect"
 
 	configv1 "github.com/openshift/api/config/v1"
-	networkoperatorv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
@@ -21,7 +21,7 @@ import (
 
 // MergeClusterConfig merges in the existing cluster config in to the
 // operator config, overwriting any changes to the managed fields.
-func (r *ReconcileNetworkConfig) MergeClusterConfig(ctx context.Context, operConfig *networkoperatorv1.NetworkConfig) error {
+func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig *operv1.Network) error {
 	// fetch the cluster config
 	clusterConfig := &configv1.Network{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: names.CLUSTER_CONFIG}, clusterConfig)
@@ -49,9 +49,9 @@ func (r *ReconcileNetworkConfig) MergeClusterConfig(ctx context.Context, operCon
 
 	// If there are changes to the "downstream" networkconfig, commit it back
 	// to the apiserver
-	log.Println("WARNING: NetworkConfig.networkoperator.openshift.io has fields being overwritten by Network.config.openshift.io configuration")
+	log.Println("WARNING: Network.operator.openshift.io has fields being overwritten by Network.config.openshift.io configuration")
 	// Have to restore the typemeta due to some weird shared cache bug --cdc
-	operConfig.TypeMeta = metav1.TypeMeta{APIVersion: "networkoperator.openshift.io/v1", Kind: "NetworkConfig"}
+	operConfig.TypeMeta = metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}
 	us, err := k8sutil.ToUnstructured(operConfig)
 	if err != nil {
 		return errors.Wrapf(err, "failed to transmute operator config")
@@ -64,10 +64,10 @@ func (r *ReconcileNetworkConfig) MergeClusterConfig(ctx context.Context, operCon
 
 // ClusterNetworkStatus generates the cluster config Status based on the operator
 // config.
-func (r *ReconcileNetworkConfig) ClusterNetworkStatus(ctx context.Context, operConfig *networkoperatorv1.NetworkConfig) (*uns.Unstructured, error) {
+func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConfig *operv1.Network) (*uns.Unstructured, error) {
 	// retrieve the existing cluster config object
 	clusterConfig := &configv1.Network{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "config.openshift.io/v1", Kind: "Network"},
+		TypeMeta:   metav1.TypeMeta{APIVersion: configv1.GroupVersion.String(), Kind: "Network"},
 		ObjectMeta: metav1.ObjectMeta{Name: names.CLUSTER_CONFIG},
 	}
 
@@ -86,7 +86,7 @@ func (r *ReconcileNetworkConfig) ClusterNetworkStatus(ctx context.Context, operC
 		return nil, nil
 	}
 	clusterConfig.Status = status
-	clusterConfig.TypeMeta = metav1.TypeMeta{APIVersion: "config.openshift.io/v1", Kind: "Network"}
+	clusterConfig.TypeMeta = metav1.TypeMeta{APIVersion: configv1.GroupVersion.String(), Kind: "Network"}
 
 	return k8sutil.ToUnstructured(clusterConfig)
 }

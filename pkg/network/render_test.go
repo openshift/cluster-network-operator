@@ -5,7 +5,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 )
 
 func TestIsChangeSafe(t *testing.T) {
@@ -39,10 +39,10 @@ func TestIsChangeSafe(t *testing.T) {
 func TestRenderUnknownNetwork(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	config := netv1.NetworkConfig{
-		Spec: netv1.NetworkConfigSpec{
+	config := operv1.Network{
+		Spec: operv1.NetworkSpec{
 			ServiceNetwork: []string{"172.30.0.0/16"},
-			ClusterNetwork: []netv1.ClusterNetworkEntry{
+			ClusterNetwork: []operv1.ClusterNetworkEntry{
 				{
 					CIDR:       "10.128.0.0/15",
 					HostPrefix: 23,
@@ -52,7 +52,7 @@ func TestRenderUnknownNetwork(t *testing.T) {
 					HostPrefix: 24,
 				},
 			},
-			DefaultNetwork: netv1.DefaultNetworkDefinition{
+			DefaultNetwork: operv1.DefaultNetworkDefinition{
 				Type: "MyAwesomeThirdPartyPlugin",
 			},
 		},
