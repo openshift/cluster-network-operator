@@ -322,17 +322,18 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:d81228aec193f40dc8ed219ebd607a88dac61bed2b12f8003a588ce5aa74c91d"
+  digest = "1:80634274ffb798752b241ccd930a2f371e8c82aa0a10a50d723b40fe35f5769e"
   name = "github.com/openshift/api"
   packages = [
     "build/v1",
     "config/v1",
     "legacyconfig/v1",
     "openshiftcontrolplane/v1",
+    "operator/v1",
     "osin/v1",
   ]
   pruneopts = "NT"
-  revision = "c58918e29f89383d2e1467bad7156e2b0c49497f"
+  revision = "fb5c7e9aaf18be4888c03b8a4c9be78c613e2ef9"
 
 [[projects]]
   branch = "master"
@@ -894,7 +895,6 @@
     "pkg/recorder",
     "pkg/runtime/inject",
     "pkg/runtime/log",
-    "pkg/runtime/scheme",
     "pkg/runtime/signals",
     "pkg/source",
     "pkg/source/internal",
@@ -917,6 +917,7 @@
     "github.com/openshift/api/config/v1",
     "github.com/openshift/api/legacyconfig/v1",
     "github.com/openshift/api/openshiftcontrolplane/v1",
+    "github.com/openshift/api/operator/v1",
     "github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers",
     "github.com/operator-framework/operator-sdk/pkg/leader",
     "github.com/operator-framework/operator-sdk/version",
@@ -956,7 +957,6 @@
     "sigs.k8s.io/controller-runtime/pkg/handler",
     "sigs.k8s.io/controller-runtime/pkg/manager",
     "sigs.k8s.io/controller-runtime/pkg/reconcile",
-    "sigs.k8s.io/controller-runtime/pkg/runtime/scheme",
     "sigs.k8s.io/controller-runtime/pkg/runtime/signals",
     "sigs.k8s.io/controller-runtime/pkg/source",
   ]
