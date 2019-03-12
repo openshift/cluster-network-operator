@@ -3,16 +3,15 @@ package network
 import (
 	"testing"
 
-	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
-
 	. "github.com/onsi/gomega"
+	operv1 "github.com/openshift/api/operator/v1"
 )
 
-var NetworkAttachmentConfig = netv1.NetworkConfig{
-	Spec: netv1.NetworkConfigSpec{
-		AdditionalNetworks: []netv1.AdditionalNetworkDefinition{
-			{Type: netv1.NetworkTypeRaw, Name: "net-attach-1", RawCNIConfig: "{}"},
-			{Type: netv1.NetworkTypeRaw, Name: "net-attach-2", RawCNIConfig: "{}"},
+var NetworkAttachmentConfig = operv1.Network{
+	Spec: operv1.NetworkSpec{
+		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
+			{Type: operv1.NetworkTypeRaw, Name: "net-attach-1", RawCNIConfig: "{}"},
+			{Type: operv1.NetworkTypeRaw, Name: "net-attach-2", RawCNIConfig: "{}"},
 		},
 	},
 }

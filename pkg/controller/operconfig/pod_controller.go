@@ -1,4 +1,4 @@
-package networkconfig
+package operconfig
 
 import (
 	"log"

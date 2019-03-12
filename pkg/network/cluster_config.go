@@ -4,7 +4,7 @@ import (
 	"net"
 
 	configv1 "github.com/openshift/api/config/v1"
-	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 
 	"github.com/pkg/errors"
@@ -67,26 +67,26 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec) error {
 
 // MergeClusterConfig merges the cluster configuration in to the real
 // CRD configuration.
-func MergeClusterConfig(operConf *netopv1.NetworkConfigSpec, clusterConf configv1.NetworkSpec) {
+func MergeClusterConfig(operConf *operv1.NetworkSpec, clusterConf configv1.NetworkSpec) {
 	operConf.ServiceNetwork = clusterConf.ServiceNetwork
 
-	operConf.ClusterNetwork = []netopv1.ClusterNetworkEntry{}
+	operConf.ClusterNetwork = []operv1.ClusterNetworkEntry{}
 	for _, cnet := range clusterConf.ClusterNetwork {
-		operConf.ClusterNetwork = append(operConf.ClusterNetwork, netopv1.ClusterNetworkEntry{
+		operConf.ClusterNetwork = append(operConf.ClusterNetwork, operv1.ClusterNetworkEntry{
 			CIDR:       cnet.CIDR,
 			HostPrefix: cnet.HostPrefix,
 		})
 	}
 
-	operConf.DefaultNetwork.Type = netopv1.NetworkType(clusterConf.NetworkType)
+	operConf.DefaultNetwork.Type = operv1.NetworkType(clusterConf.NetworkType)
 }
 
 // StatusFromOperatorConfig generates the cluster NetworkStatus from the
 // currently applied operator configuration.
-func StatusFromOperatorConfig(operConf *netopv1.NetworkConfigSpec) configv1.NetworkStatus {
+func StatusFromOperatorConfig(operConf *operv1.NetworkSpec) configv1.NetworkStatus {
 	// Don't set status if we don't understand the network type
 	switch operConf.DefaultNetwork.Type {
-	case netopv1.NetworkTypeOpenShiftSDN:
+	case operv1.NetworkTypeOpenShiftSDN:
 		// continue
 	default:
 		return configv1.NetworkStatus{}
@@ -109,7 +109,7 @@ func StatusFromOperatorConfig(operConf *netopv1.NetworkConfigSpec) configv1.Netw
 
 	// Determine the MTU from the provider
 	switch operConf.DefaultNetwork.Type {
-	case netopv1.NetworkTypeOpenShiftSDN:
+	case operv1.NetworkTypeOpenShiftSDN:
 		status.ClusterNetworkMTU = int(*operConf.DefaultNetwork.OpenShiftSDNConfig.MTU)
 	}
 

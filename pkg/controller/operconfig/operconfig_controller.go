@@ -1,4 +1,4 @@
-package networkconfig
+package operconfig
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	configv1 "github.com/openshift/api/config/v1"
-	networkoperatorv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -39,16 +39,17 @@ var ResyncPeriod = 5 * time.Minute
 // bad, but there's no way to pass configuration to the reconciler right now
 var ManifestPath = "./bindata"
 
-// Add creates a new NetworkConfig Controller and adds it to the Manager. The Manager will set fields on the Controller
+// Add creates a new OperConfig Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
 	return add(mgr, newReconciler(mgr, status))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) *ReconcileNetworkConfig {
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) *ReconcileOperConfig {
 	configv1.Install(mgr.GetScheme())
-	return &ReconcileNetworkConfig{
+	operv1.Install(mgr.GetScheme())
+	return &ReconcileOperConfig{
 		client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
 		status: status,
@@ -58,15 +59,15 @@ func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) *Re
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r *ReconcileNetworkConfig) error {
+func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 	// Create a new controller
-	c, err := controller.New("networkconfig-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("operconfig-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
 
-	// Watch for changes to primary resource NetworkConfig
-	err = c.Watch(&source.Kind{Type: &networkoperatorv1.NetworkConfig{}}, &handler.EnqueueRequestForObject{})
+	// Watch for changes to primary resource Network
+	err = c.Watch(&source.Kind{Type: &operv1.Network{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -88,10 +89,10 @@ func add(mgr manager.Manager, r *ReconcileNetworkConfig) error {
 	return nil
 }
 
-var _ reconcile.Reconciler = &ReconcileNetworkConfig{}
+var _ reconcile.Reconciler = &ReconcileOperConfig{}
 
-// ReconcileNetworkConfig reconciles a NetworkConfig object
-type ReconcileNetworkConfig struct {
+// ReconcileOperConfig reconciles a Network.operator.openshift.io object
+type ReconcileOperConfig struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
 	client client.Client
@@ -102,18 +103,18 @@ type ReconcileNetworkConfig struct {
 }
 
 // Reconcile updates the state of the cluster to match that which is desired
-// in the operator configuration (NetworkConfig.networkoperator.openshift.io)
-func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Printf("Reconciling NetworkConfig.networkoperator.openshift.io %s\n", request.Name)
+// in the operator configuration (Network.operator.openshift.io)
+func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	log.Printf("Reconciling Network.operator.openshift.io %s\n", request.Name)
 
 	// We won't create more than one network
 	if request.Name != names.OPERATOR_CONFIG {
-		log.Printf("Ignoring NetworkConfig without default name")
+		log.Printf("Ignoring Network.operator.openshift.io without default name")
 		return reconcile.Result{}, nil
 	}
 
-	// Fetch the NetworkConfig instance
-	operConfig := &networkoperatorv1.NetworkConfig{TypeMeta: metav1.TypeMeta{APIVersion: "networkoperator.openshift.io/v1", Kind: "NetworkConfig"}}
+	// Fetch the Network.operator.openshift.io instance
+	operConfig := &operv1.Network{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}}
 	err := r.client.Get(context.TODO(), request.NamespacedName, operConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -126,7 +127,7 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		log.Printf("Unable to retrieve NetworkConfig object: %v", err)
+		log.Printf("Unable to retrieve Network.operator.openshift.io object: %v", err)
 		// FIXME: operator status?
 		return reconcile.Result{}, err
 	}
@@ -145,9 +146,9 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 
 	// Validate the configuration
 	if err := network.Validate(&operConfig.Spec); err != nil {
-		log.Printf("Failed to validate NetworkConfig.Spec: %v", err)
+		log.Printf("Failed to validate Network.operator.openshift.io.Spec: %v", err)
 		r.status.SetFailing(statusmanager.OperatorConfig, "InvalidOperatorConfig",
-			fmt.Sprintf("The operator configuration is invalid (%v). Use 'oc edit networkconfig.networkoperator.openshift.io cluster' to fix.", err))
+			fmt.Sprintf("The operator configuration is invalid (%v). Use 'oc edit network.operator.openshift.io cluster' to fix.", err))
 		return reconcile.Result{}, err
 	}
 
@@ -171,7 +172,7 @@ func (r *ReconcileNetworkConfig) Reconcile(request reconcile.Request) (reconcile
 		if err != nil {
 			log.Printf("Not applying unsafe change: %v", err)
 			r.status.SetFailing(statusmanager.OperatorConfig, "InvalidOperatorConfig",
-				fmt.Sprintf("Not applying unsafe configuration change: %v. Use 'oc edit networkconfig.networkoperator.openshift.io cluster' to undo the change.", err))
+				fmt.Sprintf("Not applying unsafe configuration change: %v. Use 'oc edit network.operator.openshift.io cluster' to undo the change.", err))
 			return reconcile.Result{}, err
 		}
 	}

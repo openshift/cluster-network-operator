@@ -8,7 +8,8 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/openshift/cluster-network-operator/pkg/apis"
+	configv1 "github.com/openshift/api/config/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/controller"
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
@@ -92,13 +93,15 @@ func main() {
 	}
 
 	log.Print("Registering Components.")
-
-	// Setup Scheme for all resources
-	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
+	if err := operv1.Install(mgr.GetScheme()); err != nil {
+		log.Fatal(err)
+	}
+	if err := configv1.Install(mgr.GetScheme()); err != nil {
 		log.Fatal(err)
 	}
 
 	// Setup all Controllers
+	log.Print("Configuring Controllers")
 	if err := controller.AddToManager(mgr); err != nil {
 		log.Fatal(err)
 	}

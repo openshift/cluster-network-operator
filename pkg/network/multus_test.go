@@ -3,25 +3,25 @@ package network
 import (
 	"testing"
 
-	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 
 	. "github.com/onsi/gomega"
 )
 
-var MultusConfig = netv1.NetworkConfig{
-	Spec: netv1.NetworkConfigSpec{
+var MultusConfig = operv1.Network{
+	Spec: operv1.NetworkSpec{
 		ServiceNetwork: []string{"172.30.0.0/16"},
-		ClusterNetwork: []netv1.ClusterNetworkEntry{
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
 			{
 				CIDR:       "10.128.0.0/15",
 				HostPrefix: 23,
 			},
 		},
-		DefaultNetwork: netv1.DefaultNetworkDefinition{
-			Type: netv1.NetworkTypeOpenShiftSDN,
-			OpenShiftSDNConfig: &netv1.OpenShiftSDNConfig{
-				Mode: netv1.SDNModeNetworkPolicy,
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOpenShiftSDN,
+			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
+				Mode: operv1.SDNModeNetworkPolicy,
 			},
 		},
 	},
