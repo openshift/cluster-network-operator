@@ -2,9 +2,9 @@
 
 The Cluster Network Operator installs and upgrades the networking components on an OpenShift Kubernetes cluster.
 
-It follows the [Controller pattern](https://godoc.org/github.com/kubernetes-sigs/controller-runtime/pkg#hdr-Controller): it reconciles the state of the cluster against a desired configuration. The configuration specified by a CustomResourceDefinition called `networkoperator.openshift.io/NetworkConfig/v1`, which has a corresponding [type](/pkg/apis/networkoperator/v1/networkconfig_types.go).
+It follows the [Controller pattern](https://godoc.org/github.com/kubernetes-sigs/controller-runtime/pkg#hdr-Controller): it reconciles the state of the cluster against a desired configuration. The configuration specified by a CustomResourceDefinition called `Network.config.openshift.io/v1`, which has a corresponding [type](https://github.com/openshift/api/blob/master/operator/v1/types_network.go).
 
-Most users will be able to use the top-level OpenShift Config API, which has a [Network type](https://github.com/openshift/api/blob/master/config/v1/types_network.go#L26). The operator will automatically translate the `Network.config.openshift.io` object in to a `NetworkConfig.networkoperator.openshift.io`.
+Most users will be able to use the top-level OpenShift Config API, which has a [Network type](https://github.com/openshift/api/blob/master/config/v1/types_network.go#L26). The operator will automatically translate the `Network.config.openshift.io` object in to a `Network.operator.openshift.io`.
 
 When the controller has reconciled and all its dependent resources have converged, the cluster should have an installed SDN plugin and a working service network. In OpenShift, the Cluster Network Operator runs very early in the install process -- while the boostrap API server is still running.
 
@@ -23,9 +23,9 @@ For example, if you want to use the default VXLAN port for OpenShiftSDN, then yo
 - *View Command*: `oc get Network.config.openshift.io cluster -oyaml`
 
 *Operator config*
-- *Type Name*: `NetworkConfig.networkoperator.openshift.io`
+- *Type Name*: `Network.operator.openshift.io`
 - *Instance Name*: `cluster`
-- *View Command*: `oc get NetworkConfig.networkoperator.openshift.io cluster -oyaml`
+- *View Command*: `oc get Network.operator.openshift.io cluster -oyaml`
 
 #### Example configurations
 
@@ -47,8 +47,8 @@ spec:
 *Corresponding Operator Config*
 This configuration is the auto-generated translation of the above Cluster configuration.
 ```yaml
-apiVersion: networkoperator.openshift.io/v1
-kind: NetworkConfig
+apiVersion: operator.openshift.io/v1
+kind: Network
 metadata:
   name: cluster
 spec:
@@ -144,20 +144,13 @@ spec:
 ```
 
 # Using
-The operator looks for a CRD of type `NetworkConfig` with the name `default`. Whenever this object is created or changed, the operator will apply those changes to the cluster (if they are valid and safe to do so).
-
-You can view and edit that object with
-```
-oc edit networkconfig cluster
-```
-
-and any changes will be automatically applied.
+The operator is expected to run as a pod (via a Deployment) inside a kubernetes cluster. It will retrieve the configuration above and reconcile the desired configuration. A suitable manifest for running the operator is located in `manifests/`.
 
 ## Unsafe changes
 Most network changes are unsafe to roll out to a production cluster. Therefore, the network operator will stop reconciling if it detects that an unsafe change has been requested. 
 
 ### Safe changes to apply:
-It is safe to edit the following fields in `NetworkConfig.Spec`:
+It is safe to edit the following fields in the Operator configuration:
 * deployKubeProxy
 * all of kubeProxyConfig
 

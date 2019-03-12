@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 
 	"github.com/ghodss/yaml"
@@ -66,7 +66,7 @@ func render() error {
 }
 
 // readConfigObject reads a NetworkConfig object from disk
-func readConfigObject(path string) (*netv1.NetworkConfig, error) {
+func readConfigObject(path string) (*operv1.Network, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to open NetworkConfig file %s", path)
@@ -74,7 +74,7 @@ func readConfigObject(path string) (*netv1.NetworkConfig, error) {
 	defer f.Close()
 
 	decoder := k8syaml.NewYAMLOrJSONDecoder(f, 4096)
-	conf := netv1.NetworkConfig{}
+	conf := operv1.Network{}
 	if err := decoder.Decode(&conf); err != nil {
 		return nil, errors.Wrapf(err, "failed to unmarshal NetworkConfig")
 	}

@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	configv1 "github.com/openshift/api/config/v1"
-	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
@@ -26,14 +26,14 @@ import (
 // in to the operator CRD.
 // This returns nil if no changes have been detected.
 func (r *ReconcileClusterConfig) UpdateOperatorConfig(ctx context.Context, clusterConfig configv1.Network) (*uns.Unstructured, error) {
-	operConfig := &netopv1.NetworkConfig{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "networkoperator.openshift.io/v1", Kind: "NetworkConfig"},
+	operConfig := &operv1.Network{
+		TypeMeta:   metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"},
 		ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
 	}
 
 	err := r.client.Get(ctx, types.NamespacedName{Name: names.OPERATOR_CONFIG}, operConfig)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, errors.Wrapf(err, "could not retrieve networkoperator.openshift.io/NetworkConfig %s", names.OPERATOR_CONFIG)
+		return nil, errors.Wrapf(err, "could not retrieve Network.operator.openshift.io/v1 %s", names.OPERATOR_CONFIG)
 	}
 
 	newOperConfig := operConfig.DeepCopy()

@@ -16,7 +16,7 @@ import (
 
 	legacyconfigv1 "github.com/openshift/api/legacyconfig/v1"
 	cpv1 "github.com/openshift/api/openshiftcontrolplane/v1"
-	netv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 )
 
@@ -27,7 +27,7 @@ import (
 // - the sdn daemonset
 // - the openvswitch daemonset
 // and some other small things.
-func renderOpenShiftSDN(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	c := conf.DefaultNetwork.OpenShiftSDNConfig
 
 	objs := []*uns.Unstructured{}
@@ -65,7 +65,7 @@ func renderOpenShiftSDN(conf *netv1.NetworkConfigSpec, manifestDir string) ([]*u
 
 // validateOpenShiftSDN checks that the openshift-sdn specific configuration
 // is basically sane.
-func validateOpenShiftSDN(conf *netv1.NetworkConfigSpec) []error {
+func validateOpenShiftSDN(conf *operv1.NetworkSpec) []error {
 	out := []error{}
 
 	if len(conf.ClusterNetwork) == 0 {
@@ -96,7 +96,7 @@ func validateOpenShiftSDN(conf *netv1.NetworkConfigSpec) []error {
 
 // isOpenShiftSDNChangeSafe currently returns an error if any changes are made.
 // In the future, we may support rolling out MTU or external openvswitch alterations.
-func isOpenShiftSDNChangeSafe(prev, next *netv1.NetworkConfigSpec) []error {
+func isOpenShiftSDNChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	pn := prev.DefaultNetwork.OpenShiftSDNConfig
 	nn := next.DefaultNetwork.OpenShiftSDNConfig
 
@@ -106,7 +106,7 @@ func isOpenShiftSDNChangeSafe(prev, next *netv1.NetworkConfigSpec) []error {
 	return []error{errors.Errorf("cannot change openshift-sdn configuration")}
 }
 
-func fillOpenShiftSDNDefaults(conf, previous *netv1.NetworkConfigSpec, hostMTU int) {
+func fillOpenShiftSDNDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 	// NOTE: If you change any defaults, and it's not a safe chang to roll out
 	// to existing clusters, you MUST use the value from previous instead.
 	if conf.DeployKubeProxy == nil {
@@ -115,14 +115,14 @@ func fillOpenShiftSDNDefaults(conf, previous *netv1.NetworkConfigSpec, hostMTU i
 	}
 
 	if conf.KubeProxyConfig == nil {
-		conf.KubeProxyConfig = &netv1.ProxyConfig{}
+		conf.KubeProxyConfig = &operv1.ProxyConfig{}
 	}
 	if conf.KubeProxyConfig.BindAddress == "" {
 		conf.KubeProxyConfig.BindAddress = "0.0.0.0"
 	}
 
 	if conf.DefaultNetwork.OpenShiftSDNConfig == nil {
-		conf.DefaultNetwork.OpenShiftSDNConfig = &netv1.OpenShiftSDNConfig{}
+		conf.DefaultNetwork.OpenShiftSDNConfig = &operv1.OpenShiftSDNConfig{}
 	}
 
 	if conf.KubeProxyConfig.ProxyArguments == nil {
@@ -145,7 +145,7 @@ func fillOpenShiftSDNDefaults(conf, previous *netv1.NetworkConfigSpec, hostMTU i
 	if sc.MTU == nil {
 		var mtu uint32 = uint32(hostMTU) - 50 // 50 byte VXLAN header
 		if previous != nil &&
-			previous.DefaultNetwork.Type == netv1.NetworkTypeOpenShiftSDN &&
+			previous.DefaultNetwork.Type == operv1.NetworkTypeOpenShiftSDN &&
 			previous.DefaultNetwork.OpenShiftSDNConfig != nil &&
 			previous.DefaultNetwork.OpenShiftSDNConfig.MTU != nil {
 			mtu = *previous.DefaultNetwork.OpenShiftSDNConfig.MTU
@@ -153,17 +153,17 @@ func fillOpenShiftSDNDefaults(conf, previous *netv1.NetworkConfigSpec, hostMTU i
 		sc.MTU = &mtu
 	}
 	if sc.Mode == "" {
-		sc.Mode = netv1.SDNModeNetworkPolicy
+		sc.Mode = operv1.SDNModeNetworkPolicy
 	}
 }
 
-func sdnPluginName(n netv1.SDNMode) string {
+func sdnPluginName(n operv1.SDNMode) string {
 	switch n {
-	case netv1.SDNModeSubnet:
+	case operv1.SDNModeSubnet:
 		return "redhat/openshift-ovs-subnet"
-	case netv1.SDNModeMultitenant:
+	case operv1.SDNModeMultitenant:
 		return "redhat/openshift-ovs-multitenant"
-	case netv1.SDNModeNetworkPolicy:
+	case operv1.SDNModeNetworkPolicy:
 		return "redhat/openshift-ovs-networkpolicy"
 	}
 	return ""
@@ -171,7 +171,7 @@ func sdnPluginName(n netv1.SDNMode) string {
 
 // controllerConfig builds the contents of controller-config.yaml
 // for the controller
-func controllerConfig(conf *netv1.NetworkConfigSpec) (string, error) {
+func controllerConfig(conf *operv1.NetworkSpec) (string, error) {
 	c := conf.DefaultNetwork.OpenShiftSDNConfig
 
 	// generate master network configuration
@@ -224,7 +224,7 @@ func controllerConfig(conf *netv1.NetworkConfigSpec) (string, error) {
 
 // nodeConfig builds the (yaml text of) the NodeConfig object
 // consumed by the sdn node process
-func nodeConfig(conf *netv1.NetworkConfigSpec) (string, error) {
+func nodeConfig(conf *operv1.NetworkSpec) (string, error) {
 	c := conf.DefaultNetwork.OpenShiftSDNConfig
 
 	result := legacyconfigv1.NodeConfig{
