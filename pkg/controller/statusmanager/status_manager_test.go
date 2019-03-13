@@ -88,7 +88,7 @@ func TestStatusManager_set(t *testing.T) {
 
 	condProgress := configv1.ClusterOperatorStatusCondition{
 		Type:   configv1.OperatorProgressing,
-		Status: configv1.ConditionTrue,
+		Status: configv1.ConditionUnknown,
 	}
 	status.Set(false, condProgress)
 
@@ -301,7 +301,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		{
 			Type:   configv1.OperatorAvailable,
 			Status: configv1.ConditionFalse,
-			Reason: "Deploying",
+			Reason: "Startup",
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
@@ -488,7 +488,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 		{
 			Type:   configv1.OperatorAvailable,
 			Status: configv1.ConditionFalse,
-			Reason: "Deploying",
+			Reason: "Startup",
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
@@ -567,7 +567,8 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
 	// We should now be progressing because both Deployments and the DaemonSet exist,
-	// but depB is still incomplete.
+	// but depB is still incomplete. We're still Available though because we were
+	// Available before
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
 			Type:   configv1.OperatorFailing,
@@ -579,7 +580,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 		},
 		{
 			Type:   configv1.OperatorAvailable,
-			Status: configv1.ConditionFalse,
+			Status: configv1.ConditionTrue,
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
