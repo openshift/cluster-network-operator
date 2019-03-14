@@ -71,6 +71,20 @@ func (status *StatusManager) Set(reachedAvailableLevel bool, conditions ...confi
 	for _, condition := range conditions {
 		v1helpers.SetStatusCondition(&co.Status.Conditions, condition)
 	}
+
+	progressingCondition := v1helpers.FindStatusCondition(co.Status.Conditions, configv1.OperatorProgressing)
+	availableCondition := v1helpers.FindStatusCondition(co.Status.Conditions, configv1.OperatorAvailable)
+	if availableCondition == nil && progressingCondition != nil && progressingCondition.Status == configv1.ConditionTrue {
+		v1helpers.SetStatusCondition(&co.Status.Conditions,
+			configv1.ClusterOperatorStatusCondition{
+				Type:    configv1.OperatorAvailable,
+				Status:  configv1.ConditionFalse,
+				Reason:  "Startup",
+				Message: "The network is starting up",
+			},
+		)
+	}
+
 	if reflect.DeepEqual(oldStatus, co.Status) {
 		return
 	}
@@ -232,12 +246,6 @@ func (status *StatusManager) SetFromPods() {
 			configv1.ClusterOperatorStatusCondition{
 				Type:    configv1.OperatorProgressing,
 				Status:  configv1.ConditionTrue,
-				Reason:  "Deploying",
-				Message: strings.Join(progressing, "\n"),
-			},
-			configv1.ClusterOperatorStatusCondition{
-				Type:    configv1.OperatorAvailable,
-				Status:  configv1.ConditionFalse,
 				Reason:  "Deploying",
 				Message: strings.Join(progressing, "\n"),
 			},
