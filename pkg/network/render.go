@@ -144,6 +144,12 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 	// Check the default network
 	errs = append(errs, IsDefaultNetworkChangeSafe(prev, next)...)
 
+	// Changing AdditionalNetworks is supported
+
+	if *prev.DisableMultiNetwork != *next.DisableMultiNetwork {
+		errs = append(errs, errors.Errorf("cannot change DisableMultiNetwork"))
+	}
+
 	// Changing KubeProxyConfig and DeployKubeProxy is allowed, so we don't check that
 
 	if len(errs) > 0 {
