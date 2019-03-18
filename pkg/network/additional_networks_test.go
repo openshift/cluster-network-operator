@@ -7,11 +7,27 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 )
 
-var NetworkAttachmentConfig = operv1.Network{
-	Spec: operv1.NetworkSpec{
-		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
-			{Type: operv1.NetworkTypeRaw, Name: "net-attach-1", RawCNIConfig: "{}"},
-			{Type: operv1.NetworkTypeRaw, Name: "net-attach-2", RawCNIConfig: "{}"},
+var NetworkAttachmentConfigRaw = netv1.NetworkConfig{
+	Spec: netv1.NetworkConfigSpec{
+		AdditionalNetworks: []netv1.AdditionalNetworkDefinition{
+			{Type: netv1.NetworkTypeRaw, Name: "net-attach-1", RawCNIConfig: "{}"},
+			{Type: netv1.NetworkTypeRaw, Name: "net-attach-2", RawCNIConfig: "{}"},
+		},
+	},
+}
+
+var NetworkAttachmentConfigMacVlan = netv1.NetworkConfig{
+	Spec: netv1.NetworkConfigSpec{
+		AdditionalNetworks: []netv1.AdditionalNetworkDefinition{
+			{
+				Type: netv1.NetworkTypeMacVlan,
+				Name: "net-attach-1",
+				MacVlanConfig: &netv1.MacVlanConfig{
+					Master: "eth0",
+					Ipam: "dhcp",
+				},
+			},
+
 		},
 	},
 }
@@ -27,7 +43,7 @@ func TestRenderAdditionalNetworksCRD(t *testing.T) {
 func TestRenderRawCNIConfig(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	for _, cfg := range NetworkAttachmentConfig.Spec.AdditionalNetworks {
+	for _, cfg := range NetworkAttachmentConfigRaw.Spec.AdditionalNetworks {
 		objs, err := renderRawCNIConfig(&cfg, manifestDir)
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(objs).To(HaveLen(1))
@@ -40,12 +56,12 @@ func TestRenderRawCNIConfig(t *testing.T) {
 func TestValidateRaw(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	for _, cfg := range NetworkAttachmentConfig.Spec.AdditionalNetworks {
+	for _, cfg := range NetworkAttachmentConfigRaw.Spec.AdditionalNetworks {
 		err := validateRaw(&cfg)
 		g.Expect(err).To(BeEmpty())
 	}
 
-	rawConfig := NetworkAttachmentConfig.Spec.AdditionalNetworks[0]
+	rawConfig := NetworkAttachmentConfigRaw.Spec.AdditionalNetworks[0]
 
 	errExpect := func(substr string) {
 		t.Helper()
@@ -60,3 +76,44 @@ func TestValidateRaw(t *testing.T) {
 	rawConfig.Name = ""
 	errExpect("Additional Network Name cannot be nil")
 }
+
+func TestRenderMacVlanConfig(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	for _, cfg := range NetworkAttachmentConfigMacVlan.Spec.AdditionalNetworks {
+		objs, err := renderMacVlanConfig(&cfg, manifestDir)
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(objs).To(HaveLen(1))
+		g.Expect(objs).To(
+			ContainElement(HaveKubernetesID(
+				"NetworkAttachmentDefinition", "default", cfg.Name)))
+	}
+}
+
+func TestValidateMacVlan(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	for _, cfg := range NetworkAttachmentConfigMacVlan.Spec.AdditionalNetworks {
+		err := validateMacVlanConfig(&cfg)
+		g.Expect(err).To(BeEmpty())
+	}
+
+	rawConfig := NetworkAttachmentConfigMacVlan.Spec.AdditionalNetworks[0]
+
+	errExpect := func(substr string) {
+		t.Helper()
+		g.Expect(validateMacVlanConfig(&rawConfig)).To(
+			ContainElement(MatchError(
+				ContainSubstring(substr))))
+	}
+
+	rawConfig.MacVlanConfig = &netv1.MacVlanConfig{ Master: "", }
+	errExpect("macVlan master cannot be nil")
+
+	rawConfig.MacVlanConfig = &netv1.MacVlanConfig{ Ipam: "", }
+	errExpect("macVlan ipam cannot be nil")
+
+	rawConfig.Name = ""
+	errExpect("Additional Network Name cannot be nil")
+}
+

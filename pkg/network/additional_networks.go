@@ -32,7 +32,7 @@ func renderRawCNIConfig(conf *operv1.AdditionalNetworkDefinition, manifestDir st
 	data := render.MakeRenderData()
 	data.Data["AdditionalNetworkName"] = conf.Name
 	data.Data["AdditionalNetworkConfig"] = conf.RawCNIConfig
-	objs, err = render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/cr"), &data)
+	objs, err = render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/cr-raw"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render additional network")
 	}
@@ -53,6 +53,53 @@ func validateRaw(conf *operv1.AdditionalNetworkDefinition) []error {
 	err = json.Unmarshal(confBytes, &rawConfig)
 	if err != nil {
 		out = append(out, errors.Errorf("Failed to Unmarshal RawCNIConfig: %v", confBytes))
+	}
+
+	return out
+}
+
+// renderMacVlanConfig returns the RawCNIConfig manifests
+func renderMacVlanConfig(conf *netv1.AdditionalNetworkDefinition, manifestDir string) ([]*uns.Unstructured, error) {
+	var err error
+	objs := []*uns.Unstructured{}
+	macVlanConfig := conf.MacVlanConfig
+
+	// render RawCNIConfig manifests
+	data := render.MakeRenderData()
+	data.Data["AdditionalNetworkName"] = conf.Name
+	data.Data["Master"] = macVlanConfig.Master
+	data.Data["Ipam"] = macVlanConfig.Ipam
+
+	if macVlanConfig.Mode != "" {
+		data.Data["Mode"] = macVlanConfig.Mode
+	}
+
+	if macVlanConfig.MTU != nil {
+		data.Data["MTU"] = macVlanConfig.MTU
+	}
+
+	objs, err = render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/cr-macvlan"), &data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to render macvlan additional network")
+	}
+	return objs, nil
+}
+
+// validateMacVlanConfig checks the M name and RawCNIConfig.
+func validateMacVlanConfig(conf *netv1.AdditionalNetworkDefinition) []error {
+	out := []error{}
+	macVlanConfig := conf.MacVlanConfig
+
+	if conf.Name == "" {
+		out = append(out, errors.Errorf("Additional Network Name cannot be nil"))
+	}
+
+	if macVlanConfig.Master == "" {
+		out = append(out, errors.Errorf("macVlan master cannot be nil"))
+	}
+
+	if macVlanConfig.Ipam == "" {
+		out = append(out, errors.Errorf("macVlan ipam cannot be nil"))
 	}
 
 	return out

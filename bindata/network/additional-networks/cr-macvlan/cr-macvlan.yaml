@@ -1,0 +1,21 @@
+---
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: {{.AdditionalNetworkName}}
+  namespace: default
+spec:
+  config: '{ 
+    "cniVersion": "0.3.0",
+    "type": "macvlan",
+    "master": "{{.Master}}",
+{{if (index . "Mode") }}
+    "mode": "{{.Mode}}",
+{{end}}{{if (index . "MTU") }}
+    "mtu": {{.MTU}},
+{{end}}
+    "ipam": {
+      "type": "{{.Ipam}}"
+      }
+  }'
+  
