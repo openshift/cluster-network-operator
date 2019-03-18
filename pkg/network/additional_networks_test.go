@@ -7,27 +7,26 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 )
 
-var NetworkAttachmentConfigRaw = netv1.NetworkConfig{
-	Spec: netv1.NetworkConfigSpec{
-		AdditionalNetworks: []netv1.AdditionalNetworkDefinition{
-			{Type: netv1.NetworkTypeRaw, Name: "net-attach-1", RawCNIConfig: "{}"},
-			{Type: netv1.NetworkTypeRaw, Name: "net-attach-2", RawCNIConfig: "{}"},
+var NetworkAttachmentConfigRaw = operv1.Network{
+	Spec: operv1.NetworkSpec{
+		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
+			{Type: operv1.NetworkTypeRaw, Name: "net-attach-1", RawCNIConfig: "{}"},
+			{Type: operv1.NetworkTypeRaw, Name: "net-attach-2", RawCNIConfig: "{}"},
 		},
 	},
 }
 
-var NetworkAttachmentConfigMacVlan = netv1.NetworkConfig{
-	Spec: netv1.NetworkConfigSpec{
-		AdditionalNetworks: []netv1.AdditionalNetworkDefinition{
+var NetworkAttachmentConfigMacVlan = operv1.Network{
+	Spec: operv1.NetworkSpec{
+		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
 			{
-				Type: netv1.NetworkTypeMacVlan,
+				Type: operv1.NetworkTypeMacVlan,
 				Name: "net-attach-1",
-				MacVlanConfig: &netv1.MacVlanConfig{
+				MacVlanConfig: &operv1.MacVlanConfig{
 					Master: "eth0",
-					Ipam: "dhcp",
+					Ipam:   "dhcp",
 				},
 			},
-
 		},
 	},
 }
@@ -107,13 +106,9 @@ func TestValidateMacVlan(t *testing.T) {
 				ContainSubstring(substr))))
 	}
 
-	rawConfig.MacVlanConfig = &netv1.MacVlanConfig{ Master: "", }
+	rawConfig.MacVlanConfig = &operv1.MacVlanConfig{Master: ""}
 	errExpect("macVlan master cannot be nil")
-
-	rawConfig.MacVlanConfig = &netv1.MacVlanConfig{ Ipam: "", }
-	errExpect("macVlan ipam cannot be nil")
 
 	rawConfig.Name = ""
 	errExpect("Additional Network Name cannot be nil")
 }
-

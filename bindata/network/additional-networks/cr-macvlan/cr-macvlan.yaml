@@ -5,7 +5,7 @@ metadata:
   name: {{.AdditionalNetworkName}}
   namespace: default
 spec:
-  config: '{ 
+  config: '{
     "cniVersion": "0.3.0",
     "type": "macvlan",
     "master": "{{.Master}}",
@@ -18,4 +18,3 @@ spec:
       "type": "{{.Ipam}}"
       }
   }'
-  

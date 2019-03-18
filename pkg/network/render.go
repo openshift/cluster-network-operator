@@ -70,10 +70,10 @@ func Canonicalize(conf *operv1.NetworkSpec) {
 
 	for _, an := range conf.AdditionalNetworks {
 		switch strings.ToLower(string(an.Type)) {
-		case strings.ToLower(string(netv1.NetworkTypeRaw)):
-			an.Type = netv1.NetworkTypeRaw
-		case strings.ToLower(string(netv1.NetworkTypeMacVlan)):
-			an.Type = netv1.NetworkTypeMacVlan
+		case strings.ToLower(string(operv1.NetworkTypeRaw)):
+			an.Type = operv1.NetworkTypeRaw
+		case strings.ToLower(string(operv1.NetworkTypeMacVlan)):
+			an.Type = operv1.NetworkTypeMacVlan
 		}
 	}
 }
@@ -256,7 +256,7 @@ func ValidateAdditionalNetworks(conf *operv1.NetworkSpec) [][]error {
 			if errs := validateRaw(&an); len(errs) > 0 {
 				out = append(out, errs)
 			}
-		case netv1.NetworkTypeMacVlan:
+		case operv1.NetworkTypeMacVlan:
 			if errs := validateMacVlanConfig(&an); len(errs) > 0 {
 				out = append(out, errs)
 			}
@@ -292,7 +292,7 @@ func RenderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 				return nil, err
 			}
 			out = append(out, objs...)
-		case netv1.NetworkTypeMacVlan:
+		case operv1.NetworkTypeMacVlan:
 			objs, err = renderMacVlanConfig(&an, manifestDir)
 			if err != nil {
 				return nil, err

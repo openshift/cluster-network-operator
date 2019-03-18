@@ -59,7 +59,7 @@ func validateRaw(conf *operv1.AdditionalNetworkDefinition) []error {
 }
 
 // renderMacVlanConfig returns the RawCNIConfig manifests
-func renderMacVlanConfig(conf *netv1.AdditionalNetworkDefinition, manifestDir string) ([]*uns.Unstructured, error) {
+func renderMacVlanConfig(conf *operv1.AdditionalNetworkDefinition, manifestDir string) ([]*uns.Unstructured, error) {
 	var err error
 	objs := []*uns.Unstructured{}
 	macVlanConfig := conf.MacVlanConfig
@@ -68,7 +68,11 @@ func renderMacVlanConfig(conf *netv1.AdditionalNetworkDefinition, manifestDir st
 	data := render.MakeRenderData()
 	data.Data["AdditionalNetworkName"] = conf.Name
 	data.Data["Master"] = macVlanConfig.Master
-	data.Data["Ipam"] = macVlanConfig.Ipam
+	data.Data["Ipam"] = "dhcp"
+
+	if macVlanConfig.Ipam != "" {
+		data.Data["Ipam"] = macVlanConfig.Ipam
+	}
 
 	if macVlanConfig.Mode != "" {
 		data.Data["Mode"] = macVlanConfig.Mode
@@ -86,7 +90,7 @@ func renderMacVlanConfig(conf *netv1.AdditionalNetworkDefinition, manifestDir st
 }
 
 // validateMacVlanConfig checks the M name and RawCNIConfig.
-func validateMacVlanConfig(conf *netv1.AdditionalNetworkDefinition) []error {
+func validateMacVlanConfig(conf *operv1.AdditionalNetworkDefinition) []error {
 	out := []error{}
 	macVlanConfig := conf.MacVlanConfig
 
@@ -96,10 +100,6 @@ func validateMacVlanConfig(conf *netv1.AdditionalNetworkDefinition) []error {
 
 	if macVlanConfig.Master == "" {
 		out = append(out, errors.Errorf("macVlan master cannot be nil"))
-	}
-
-	if macVlanConfig.Ipam == "" {
-		out = append(out, errors.Errorf("macVlan ipam cannot be nil"))
 	}
 
 	return out
