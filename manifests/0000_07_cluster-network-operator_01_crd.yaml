@@ -77,7 +77,7 @@ spec:
                     type: string
                   macVlanConfig:
                     type: object
-                    required: ["master", "ipam"]
+                    required: ["master" ]
                     properties:
                       master:
                         type: string
