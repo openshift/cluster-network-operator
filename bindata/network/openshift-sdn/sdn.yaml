@@ -103,6 +103,8 @@ spec:
         # We mount our socket here
         - mountPath: /var/run/openshift-sdn
           name: host-var-run-openshift-sdn
+        - mountPath: /host
+          name: host-slash
         # CNI related mounts which we take over
         - mountPath: /host/opt/cni/bin
           name: host-cni-bin
@@ -163,6 +165,9 @@ spec:
       - name: host-var-run-openshift-sdn
         hostPath:
           path: /var/run/openshift-sdn
+      - name: host-slash
+        hostPath:
+          path: /
       - name: host-cni-bin
         hostPath:
           path: /var/lib/cni/bin
