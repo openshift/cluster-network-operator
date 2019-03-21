@@ -76,7 +76,7 @@ spec:
           cp -Rf /opt/cni/bin/* /host/opt/cni/bin/
 
           # Launch the network process
-          exec /bin/openshift-sdn --config=/config/sdn-config.yaml  --url-only-kubeconfig=/etc/kubernetes/kubeconfig --loglevel=${DEBUG_LOGLEVEL:-2}
+          exec /usr/bin/openshift-sdn --config=/config/sdn-config.yaml  --url-only-kubeconfig=/etc/kubernetes/kubeconfig --loglevel=${DEBUG_LOGLEVEL:-2}
         securityContext:
           privileged: true
         volumeMounts:
