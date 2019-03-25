@@ -41,21 +41,19 @@ function build_env() {
 # start_operator waits for the cluster to come up, then launches
 # the operator locally.
 function start_operator() {
-    export KUBECONFIG="${CLUSTER_DIR}/auth/kubeconfig"
-
-    echo "Waiting for $KUBECONFIG"
-    while true; do 
-        if [[ ! -e "${KUBECONFIG}" ]]; then
-            sleep 10
-        else
-            break
-        fi
-    done
-
-
     if [[ -n "${HACK_MINIMIZE:-}" ]]; then
         echo "HACK_MINIMIZE set! This is only for development, and the installer will likely not succeed."
         echo "You will still be left with a reasonably functional cluster."
+    fi
+
+    export KUBECONFIG="${CLUSTER_DIR}/auth/kubeconfig"
+
+    if [[ ! -e "${KUBECONFIG}" ]]; then
+        echo "Waiting for installer to create a kubeconfig..."
+        while [[ ! -e "${KUBECONFIG}" ]]; do
+            sleep 5
+        done
+        echo "Found ${KUBECONFIG}"
     fi
 
     # A few environment variables we set in the Daemonset
@@ -63,20 +61,32 @@ function start_operator() {
     export KUBERNETES_SERVICE_PORT=6443
     export KUBERNETES_SERVICE_HOST=$(oc config view -o jsonpath='{.clusters[0].cluster.server}' | awk -F'[/:]' '{print $4}')
 
-    echo "Waiting for the apiserver to come up and for the network operator namespace to be created."
-    echo "You can ignore error messages, they're just the apiserver coming up."
+    if ! getent ahosts ${KUBERNETES_SERVICE_HOST} >& /dev/null; then
+        echo "Waiting for installer to create apiserver..."
+        while ! getent ahosts ${KUBERNETES_SERVICE_HOST} >& /dev/null; do
+            sleep 5
+        done
+        echo "Found ${KUBERNETES_SERVICE_HOST}"
+    fi
 
-    while true; do 
-        if oc get namespace openshift-network-operator; then
-            echo "Namespace openshift-network-operator exists, continuing"
-            break
-        else
-            echo "No namespace or apiserver not up yet, retrying"
-            sleep 15
-            continue
-        fi
-    done
-    echo "Starting operator"
+    if ! oc get namespace openshift-network-operator >& /dev/null; then
+        echo "Waiting for installer to create openshift-network-operator namespace..."
+        while ! oc get namespace openshift-network-operator >& /dev/null; do
+            sleep 5
+        done
+        echo "Found openshift-network-operator namespace"
+    fi
+
+    if ! oc get Network.config.openshift.io cluster >& /dev/null; then
+        echo "Waiting for installer to create network operator configuration..."
+        while ! oc get Network.config.openshift.io cluster >& /dev/null; do
+            sleep 5
+        done
+        echo "Found network operator configuration"
+    fi
+
+    echo ""
+    echo "Starting operator. (If this fails, try running '$0 start' again.)"
     env $(cat "${CLUSTER_DIR}/env.sh") _output/linux/amd64/cluster-network-operator
 }
 
