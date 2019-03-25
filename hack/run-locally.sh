@@ -9,7 +9,7 @@ set -o nounset
 
 # Install our overrides so the cluster doesn't run the network operator.
 function override() {
-    if [[ ! -e ${CLUSTER_DIR}/manifests/cvo-overrides.yaml ]]; then
+    if [[ ! -e "${CLUSTER_DIR}/manifests/cvo-overrides.yaml" ]]; then
         echo "cannot find cvo-overrides.yaml; please run"
         echo "openshift-install --dir=${CLUSTER_DIR} create manifests"
         exit 1
@@ -18,16 +18,16 @@ function override() {
     # Patch the CVO to not create the network operator
     echo "Applying overrides to ${CLUSTER_DIR}/manifests/cvo-overrides.yaml"
 
-    kubectl --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f=${CLUSTER_DIR}/manifests/cvo-overrides.yaml -p "$(cat hack/overrides-patch.yaml)" -o yaml > ${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new
+    kubectl --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f="${CLUSTER_DIR}/manifests/cvo-overrides.yaml" -p "$(cat hack/overrides-patch.yaml)" -o yaml > "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new"
 
-    mv ${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new ${CLUSTER_DIR}/manifests/cvo-overrides.yaml
+    mv "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new" "${CLUSTER_DIR}/manifests/cvo-overrides.yaml"
 
     # Optionally, tell the CVO to skip some unnecessary components
     if [[ -n "${HACK_MINIMIZE:-}" ]]; then
         echo "HACK_MINIMIZE set! This is only for rapid development!"
-        kubectl --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f=${CLUSTER_DIR}/manifests/cvo-overrides.yaml -p "$(cat hack/overrides-minimize-patch.yaml)" -o yaml > ${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new
+        kubectl --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f="${CLUSTER_DIR}/manifests/cvo-overrides.yaml" -p "$(cat hack/overrides-minimize-patch.yaml)" -o yaml > "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new"
 
-        mv ${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new ${CLUSTER_DIR}/manifests/cvo-overrides.yaml
+        mv "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new" "${CLUSTER_DIR}/manifests/cvo-overrides.yaml"
     fi
 
 }
@@ -35,17 +35,17 @@ function override() {
 # Extract the image references from the release image.
 function build_env() {
     echo "Writing image references to ${CLUSTER_DIR}/env.sh"
-    oc --kubeconfig=hack/null-kubeconfig convert --local=true -f manifests/0000_07_cluster-network-operator_03_daemonset.yaml -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > ${CLUSTER_DIR}/env.sh
+    oc --kubeconfig=hack/null-kubeconfig convert --local=true -f manifests/0000_07_cluster-network-operator_03_daemonset.yaml -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
 }
 
 # start_operator waits for the cluster to come up, then launches
 # the operator locally.
 function start_operator() {
-    export KUBECONFIG=${CLUSTER_DIR}/auth/kubeconfig
+    export KUBECONFIG="${CLUSTER_DIR}/auth/kubeconfig"
 
     echo "Waiting for $KUBECONFIG"
     while true; do 
-        if [[ ! -e ${KUBECONFIG} ]]; then
+        if [[ ! -e "${KUBECONFIG}" ]]; then
             sleep 10
         else
             break
@@ -77,7 +77,7 @@ function start_operator() {
         fi
     done
     echo "Starting operator"
-    env $(cat ${CLUSTER_DIR}/env.sh) _output/linux/amd64/cluster-network-operator
+    env $(cat "${CLUSTER_DIR}/env.sh") _output/linux/amd64/cluster-network-operator
 }
 
 function usage() {
@@ -108,12 +108,12 @@ case "${1:-""}" in
         build_env;
         ;;
     start)
-        if [[ ! -e ${CLUSTER_DIR}/env.sh ]]; then
+        if [[ ! -e "${CLUSTER_DIR}/env.sh" ]]; then
             echo "env.sh missing, run prepare first"
             exit 1
         fi
 
-        start_operator ${CLUSTER_DIR};
+        start_operator;
         ;;
     *)
         usage
