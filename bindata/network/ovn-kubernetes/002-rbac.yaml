@@ -49,4 +49,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: ovn-kubernetes-node
-  namespace: ovn-kubernetes
+  namespace: openshift-ovn-kubernetes
