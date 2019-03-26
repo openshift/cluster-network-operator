@@ -6,8 +6,7 @@ It follows the [Controller pattern](https://godoc.org/github.com/kubernetes-sigs
 
 Most users will be able to use the top-level OpenShift Config API, which has a [Network type](https://github.com/openshift/api/blob/master/config/v1/types_network.go#L26). The operator will automatically translate the `Network.config.openshift.io` object in to a `Network.operator.openshift.io`.
 
-When the controller has reconciled and all its dependent resources have converged, the cluster should have an installed  plugin and a working service network. In OpenShift, the Cluster Network Operator runs very early in the install process -- while the boostrap API server is still running.
-rk
+When the controller has reconciled and all its dependent resources have converged, the cluster should have an installed network plugin and a working service network. In OpenShift, the Cluster Network Operator runs very early in the install process -- while the boostrap API server is still running.
 
 # Configuring
 The network operator gets its configuration from two objects: the Cluster and the Operator configuration. Most users only need to create the Cluster configuration - the operator will generate its configuration automatically. If you need finer-grained configuration of your network, you will need to create both configurations.
@@ -44,7 +43,8 @@ spec:
   serviceNetwork:
   - 172.30.0.0/16
 ```
-Alternatively, OVN can be configured by changing networkType: OVNKubernetes.
+
+Alternatively, ovn-kubernetes can be configured by setting `networkType: OVNKubernetes`.
 
 *Corresponding Operator Config*
 This configuration is the auto-generated translation of the above Cluster configuration.
@@ -63,10 +63,11 @@ spec:
   serviceNetwork:
   - 172.30.0.0/16
 ```
-For OVN type: OVNKubernetes
+
+(For ovn-kubernetes, `type: OVNKubernetes`.)
 
 ## Configuring IP address pools
-Users must supply at least two address pools - one for pods, and one for services. These are the ClusterNetworks and ServiceNetwork parameter. Some network plugins, such as OpenShiftSDN, and OVNKubernetes, support multiple ClusterNetworks. All address blocks must be non-overlapping. You should select address pools large enough to fit your anticipated workload. Each pool must be able to hold 1 or more hostPrefix allocations.
+Users must supply at least two address pools - one for pods, and one for services. These are the ClusterNetwork and ServiceNetwork parameter. Some network plugins, such as OpenShiftSDN and OVNKubernetes, support multiple ClusterNetworks. All address blocks must be non-overlapping. You should select address pools large enough to fit your anticipated workload. Each pool must be able to hold 1 or more hostPrefix allocations.
 
 For future expansion, multiple `serviceNetwork` entries are allowed by the configuration but not actually supported by any network plugins. Supplying multiple addresses is invalid.
 
@@ -75,7 +76,7 @@ Each `clusterNetwork` entry has an additional required parameter, `hostPrefix`, 
 cidr: 10.128.0.0/14
 hostPrefix: 23
 ```
-means nodes would get blocks of size `/23`, or 512 addresses. This is converted into hostSubnetLength in the networkoperator.
+means nodes would get blocks of size `/23`, or 512 addresses.
 
 IP address pools are always read from the Cluster configuration and propagated "downwards" into the Operator configuration. Any changes to the Operator configuration are ignored.
 
@@ -99,7 +100,7 @@ Users must select a default network provider. This cannot be changed. Different 
 
 The network type is always read from the Cluster configuration.
 
-Currently, the only understood values for network Type are `OpenShiftSDN`, and `OVNKubernetes`.
+Currently, the only understood values for network Type are `OpenShiftSDN` and `OVNKubernetes`.
 
 Other values are ignored. If you wish to use use a third-party network provider not managed by the operator, set the network type to something meaningful to you. The operator will not install or upgrade a network provider, but all other Network Operator functionality remains.
 
@@ -141,7 +142,7 @@ spec:
 ```
 
 ## Configuring kube-proxy
-Some plugins (like OpenShift SDN) have a built-in kube-proxy, some plugins require a standalone kube-proxy to be deployed, and some (like OVN) don't use kube-proxy at all.
+Some plugins (like OpenShift SDN) have a built-in kube-proxy, some plugins require a standalone kube-proxy to be deployed, and some (like ovn-kubnernetes) don't use kube-proxy at all.
 
 The deployKubeProxy flag can be used to indicate whether CNO should deploy a standalone kube-proxy, but for supported network types, this will default to the correct value automatically.
 
