@@ -1,0 +1,62 @@
+{{if .RenderDHCP}}
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: dhcp-daemon
+  namespace: openshift-multus
+  annotations:
+    kubernetes.io/description: |
+      This daemon set launches the containernetworking plugins DHCP daemon on each node.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+    matchLabels:
+      app: dhcp-daemon
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: dhcp-daemon
+        component: network
+        type: infra
+        openshift.io/component: network
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      tolerations:
+      - operator: Exists
+      initContainers:
+      - name: dhcp-daemon-initialization
+        image: {{.CNIPluginsSupportedImage}}
+        command: ["/bin/sh"]
+        args: ["-c", "rm -f /var/run/cni/dhcp.sock"]
+        volumeMounts:
+        - name: socketpath
+          mountPath: /var/run/cni
+      containers:
+      - name: dhcp-daemon
+        # Based on: https://github.com/s1061123/cni-dhcp-daemon/blob/master/Dockerfile
+        image: {{.CNIPluginsSupportedImage}}
+        imagePullPolicy: Always
+        command: ["/usr/src/plugins/bin/dhcp"]
+        args:
+        - "daemon"
+        - "-hostprefix"
+        - "/host"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: socketpath
+          mountPath: /var/run/cni
+        - name: procpath
+          mountPath: /host/proc
+      volumes:
+        - name: socketpath
+          hostPath:
+            path: /var/run/cni
+        - name: procpath
+          hostPath:
+            path: /proc
+{{- end}}

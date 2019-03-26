@@ -311,7 +311,8 @@ func RenderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 	}
 	out = append(out, objs...)
 
-	objs, err = renderMultusConfig(manifestDir)
+	usedhcp := UseDHCP(conf)
+	objs, err = renderMultusConfig(manifestDir, usedhcp)
 	if err != nil {
 		return nil, err
 	}
