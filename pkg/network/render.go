@@ -247,8 +247,8 @@ func IsDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 		return isOpenShiftSDNChangeSafe(prev, next)
 	case operv1.NetworkTypeOVNKubernetes:
 		return isOVNKubernetesChangeSafe(prev, next)
-	default: // should be unreachable
-		return []error{errors.Errorf("unknown network type %s", prev.DefaultNetwork.Type)}
+	default:
+		return nil
 	}
 }
 
