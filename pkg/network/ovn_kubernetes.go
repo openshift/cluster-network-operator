@@ -6,13 +6,10 @@ import (
 	"path/filepath"
 	"reflect"
 
-	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	legacyconfigv1 "github.com/openshift/api/legacyconfig/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 )
@@ -118,30 +115,4 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 
 func networkPluginName() string {
 	return "ovn-kubernetes"
-}
-
-// nodeOVNConfig builds the (yaml text of) the NodeConfig object
-// consumed by the sdn node process
-func nodeOVNConfig(conf *operv1.NetworkSpec) (string, error) {
-	c := conf.DefaultNetwork.OVNKubernetesConfig
-
-	result := legacyconfigv1.NodeConfig{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "NodeConfig",
-		},
-		NetworkConfig: legacyconfigv1.NodeNetworkConfig{
-			NetworkPluginName: networkPluginName(),
-			MTU:               *c.MTU,
-		},
-
-		// Openshift-sdn calls the CRI endpoint directly; point it to crio
-		KubeletArguments: legacyconfigv1.ExtendedArguments{
-			"container-runtime":          {"remote"},
-			"container-runtime-endpoint": {"/var/run/crio/crio.sock"},
-		},
-	}
-
-	buf, err := yaml.Marshal(result)
-	return string(buf), err
 }
