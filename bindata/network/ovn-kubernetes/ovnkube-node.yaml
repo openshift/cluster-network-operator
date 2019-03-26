@@ -240,6 +240,4 @@ spec:
         hostPath:
           path: /var/lib/cni/networks/ovn-k8s-cni-overlay
       tolerations:
-      - key: "node.kubernetes.io/not-ready"
-        operator: "Exists"
-        effect: "NoSchedule"
+      - operator: "Exists"
