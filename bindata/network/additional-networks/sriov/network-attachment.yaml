@@ -1,0 +1,10 @@
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: {{.AdditionalNetworkName}}
+  namespace: default
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: openshift.io/sriov
+spec:
+  config: |-
+{{.AdditionalNetworkConfig | indent 4}}
