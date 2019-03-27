@@ -68,6 +68,8 @@ spec:
               items:
                 type: object
                 required: ["type", "name"]
+                minProperties: 3
+                maxProperties: 3
                 properties:
                   type:
                     type: string
@@ -77,7 +79,7 @@ spec:
                     type: string
                   macVlanConfig:
                     type: object
-                    required: ["master" ]
+                    required: ["master"]
                     properties:
                       master:
                         type: string
