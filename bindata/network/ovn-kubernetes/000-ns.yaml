@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  # NOTE: ovnkube.sh in the OVN image currently hardcodes this namespace name
+  name: openshift-ovn-kubernetes
+  labels:
+    openshift.io/run-level: "0"
+  annotations:
+    openshift.io/node-selector: "beta.kubernetes.io/os=linux"
+    openshift.io/description: "OVN Kubernetes components"
