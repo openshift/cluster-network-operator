@@ -10,7 +10,7 @@ import (
 )
 
 // renderMultusConfig returns the manifests of Multus
-func renderMultusConfig(manifestDir string) ([]*uns.Unstructured, error) {
+func renderMultusConfig(manifestDir string, useDHCP bool) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 
 	// render the manifests on disk
@@ -19,6 +19,7 @@ func renderMultusConfig(manifestDir string) ([]*uns.Unstructured, error) {
 	data.Data["MultusImage"] = os.Getenv("MULTUS_IMAGE")
 	data.Data["CNIPluginsSupportedImage"] = os.Getenv("CNI_PLUGINS_SUPPORTED_IMAGE")
 	data.Data["CNIPluginsUnsupportedImage"] = os.Getenv("CNI_PLUGINS_UNSUPPORTED_IMAGE")
+	data.Data["RenderDHCP"] = useDHCP
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus"), &data)
 	if err != nil {
