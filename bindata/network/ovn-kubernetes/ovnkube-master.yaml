@@ -1,0 +1,303 @@
+# ovnkube-master
+# daemonset version 3
+# starts master daemons, each in a separate container
+# it is run on the master node(s)
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: ovnkube-master
+  # namespace set up by install
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    kubernetes.io/description: |
+      This daemonset launches the ovn-kubernetes controller (master) networking components.
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: ovnkube-master
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: ovnkube-master
+        component: network
+        type: infra
+        openshift.io/component: network
+        beta.kubernetes.io/os: "linux"
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      # Requires fairly broad permissions - ability to read all services and network functions as well
+      # as all pods.
+      serviceAccountName: ovn-kubernetes-controller
+      hostNetwork: true
+      hostPID: true
+      containers:
+      # firewall rules for ovn - assumed to be setup
+      # iptables -A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 6641 -j ACCEPT
+      # iptables -A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 6642 -j ACCEPT
+      # ovs flow for ovn (geneve)
+      # /usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
+
+      # run-ovn-northd - v3
+      - name: run-ovn-northd
+        image: {{.OvnImage}}
+
+        command: ["/root/ovnkube.sh", "run-ovn-northd"]
+
+        volumeMounts:
+        # ovn db is stored in the pod in /etc/openvswitch (default ovs tool location)
+        # and on the host in /var/lib/openvswitch/
+        - mountPath: /etc/openvswitch/
+          name: host-var-lib-ovs
+        - mountPath: /var/lib/openvswitch/
+          name: host-var-lib-ovs
+        - mountPath: /var/run/openvswitch/
+          name: host-var-run-ovs
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+        env:
+        - name: OVN_DAEMONSET_VERSION
+          value: "3"
+        - name: OVN_LOG_NORTHD
+          value: "-vconsole:info"
+        - name: OVN_NET_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: net_cidr
+        - name: OVN_SVC_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: svc_cidr
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: K8S_APISERVER
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: k8s_apiserver
+        ports:
+        - name: healthz
+          containerPort: 10257
+        # TODO: Temporarily disabled until we determine how to wait for clean default
+        # config
+        # livenessProbe:
+        #   initialDelaySeconds: 10
+        #   httpGet:
+        #     path: /healthz
+        #     port: 10257
+        #     scheme: HTTP
+        lifecycle:
+      # end of container
+
+      # nb-ovsdb - v3
+      - name: nb-ovsdb
+        image: {{.OvnImage}}
+
+        command: ["/root/ovnkube.sh", "nb-ovsdb"]
+
+        volumeMounts:
+        # ovn db is stored in the pod in /etc/openvswitch (default ovs tool location)
+        # and on the host in /var/lib/openvswitch/
+        - mountPath: /etc/openvswitch/
+          name: host-var-lib-ovs
+        - mountPath: /var/lib/openvswitch/
+          name: host-var-lib-ovs
+        - mountPath: /var/run/openvswitch/
+          name: host-var-run-ovs
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+        env:
+        - name: OVN_DAEMONSET_VERSION
+          value: "3"
+        - name: OVN_LOG_NB
+          value: "-vconsole:info -vfile:info"
+        - name: OVN_NET_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: net_cidr
+        - name: OVN_SVC_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: svc_cidr
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: K8S_APISERVER
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: k8s_apiserver
+        ports:
+        - name: healthz
+          containerPort: 10256
+        # TODO: Temporarily disabled until we determine how to wait for clean default
+        # config
+        # livenessProbe:
+        #   initialDelaySeconds: 10
+        #   httpGet:
+        #     path: /healthz
+        #     port: 10256
+        #     scheme: HTTP
+        lifecycle:
+      # end of container
+
+      # sb-ovsdb - v3
+      - name: sb-ovsdb
+        image: {{.OvnImage}}
+
+        command: ["/root/ovnkube.sh", "sb-ovsdb"]
+
+        volumeMounts:
+        # ovn db is stored in the pod in /etc/openvswitch (default ovs tool location)
+        # and on the host in /var/lib/openvswitch/
+        - mountPath: /etc/openvswitch/
+          name: host-var-lib-ovs
+        - mountPath: /var/lib/openvswitch/
+          name: host-var-lib-ovs
+        - mountPath: /var/run/openvswitch/
+          name: host-var-run-ovs
+        - mountPath: /var/run/kubernetes/
+          name: host-var-run-kubernetes
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+        env:
+        - name: OVN_DAEMONSET_VERSION
+          value: "3"
+        - name: OVN_LOG_SB
+          value: "-vconsole:info -vfile:info"
+        - name: OVN_NET_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: net_cidr
+        - name: OVN_SVC_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: svc_cidr
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: K8S_APISERVER
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: k8s_apiserver
+        ports:
+        - name: healthz
+          containerPort: 10255
+        # TODO: Temporarily disabled until we determine how to wait for clean default
+        # config
+        # livenessProbe:
+        #   initialDelaySeconds: 10
+        #   httpGet:
+        #     path: /healthz
+        #     port: 10255
+        #     scheme: HTTP
+        lifecycle:
+      # end of container
+
+      - name: ovnkube-master
+        image: {{.OvnImage}}
+
+        command: ["/root/ovnkube.sh", "ovn-master"]
+
+        volumeMounts:
+        # ovn db is stored in the pod in /etc/openvswitch (default ovs tool location)
+        # and on the host in /var/lib/openvswitch/
+        - mountPath: /etc/openvswitch/
+          name: host-var-lib-ovs
+        - mountPath: /var/lib/openvswitch/
+          name: host-var-lib-ovs
+        - mountPath: /var/run/openvswitch/
+          name: host-var-run-ovs
+        - mountPath: /var/run/kubernetes/
+          name: host-var-run-kubernetes
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+        env:
+        - name: OVN_DAEMONSET_VERSION
+          value: "3"
+        - name: OVN_MASTER
+          value: "true"
+        - name: OVNKUBE_LOGLEVEL
+          value: "4"
+        - name: OVN_NET_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: net_cidr
+        - name: OVN_SVC_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: svc_cidr
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: K8S_APISERVER
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: k8s_apiserver
+        ports:
+        - name: healthz
+          containerPort: 10254
+        # TODO: Temporarily disabled until we determine how to wait for clean default
+        # config
+        # livenessProbe:
+        #   initialDelaySeconds: 10
+        #   httpGet:
+        #     path: /healthz
+        #     port: 10254
+        #     scheme: HTTP
+        lifecycle:
+      # end of container
+
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+        beta.kubernetes.io/os: "linux"
+      volumes:
+      - name: host-modules
+        hostPath:
+          path: /lib/modules
+      - name: host-var-lib-ovs
+        hostPath:
+          path: /var/lib/openvswitch
+      - name: host-var-run-ovs
+        hostPath:
+          path: /var/run/openvswitch
+      - name: host-var-run-kubernetes
+        hostPath:
+          path: /var/run/kubernetes
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoSchedule"

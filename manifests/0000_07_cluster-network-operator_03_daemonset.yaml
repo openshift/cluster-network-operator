@@ -41,6 +41,8 @@ spec:
           value: "quay.io/openshift/origin-sriov-cni:v4.0.0"
         - name: SRIOV_DEVICE_PLUGIN_IMAGE
           value: "quay.io/openshift/origin-sriov-network-device-plugin:v4.0.0"
+        - name: OVN_IMAGE
+          value: "quay.io/openshift/origin-ovn-kubernetes:v4.0.0"
         - name: POD_NAME
           valueFrom:
             fieldRef:
