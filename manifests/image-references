@@ -34,3 +34,7 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-sriov-network-device-plugin:v4.0.0
+  - name: ovn-kubernetes
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-ovn-kubernetes:v4.0.0
