@@ -144,8 +144,8 @@ func (status *StatusManager) SetFailing(level StatusLevel, reason, message strin
 func (status *StatusManager) SetNotFailing(level StatusLevel) {
 	if status.failing[level] != nil {
 		status.failing[level] = nil
-		status.syncFailing()
 	}
+	status.syncFailing()
 }
 
 func (status *StatusManager) SetDaemonSets(daemonSets []types.NamespacedName) {
