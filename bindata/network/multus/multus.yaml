@@ -65,6 +65,11 @@ spec:
           mountPath: /host/etc/cni/net.d
         - name: cnibin
           mountPath: /host/opt/cni/bin
+        env:
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
       volumes:
         - name: cni
           hostPath:
