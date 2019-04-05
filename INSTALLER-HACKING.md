@@ -8,34 +8,35 @@ This requires `oc` and `kubectl` in your $PATH.
 
 You will need to execute all steps for every installation, since the installer deletes the intermediate files we customize.
 
-1. In one window, prepare the cluster:
+1. If you haven't already, build the operator:
+
+```
+hack/build-go.sh
+```
+
+2. In one window, prepare the cluster:
 
 ```
 export CLUSTER_DIR=<your cluster directory>
 openshift-install --dir=$CLUSTER_DIR create manifests
 ```
 
-2. In another window, prepare the operator. This will apply some overrides that disable the default cluster-network-operator. It will also extract the release image.
+3. In another window, start the operator:
 
 ```
 export CLUSTER_DIR=<your cluster directory>
-hack/run-locally.sh prepare
-hack/build-go.sh
+hack/run-locally.sh
 ```
 
-3. Optionally, override image references. If you are doing downstream image development, e.g. working on openshift-sdn, you should build, publish, and edit `$CLUSTER_DIR/env.sh` to point to your development image.
+It will print status messages as it waits for the installer to make progress.
 
-4. In the installer window, create the cluster *and move on to the next step*
+4. Optionally, override image references. If you are doing downstream image development, e.g. working on openshift-sdn, you should build, publish, and edit `$CLUSTER_DIR/env.sh` to point to your development image.
+
+5. In the installer window, start the installer:
 
 ```
 openshift-install --dir=$CLUSTER_DIR create cluster
 ```
-
-5. In the operator window, *while the installer is running*, launch the operator locally
-```
-hack/run-locally.sh start
-```
-
 
 ## Tips, Tricks, & Limitations
 
