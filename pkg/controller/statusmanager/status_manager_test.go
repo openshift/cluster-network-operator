@@ -3,6 +3,7 @@ package statusmanager
 import (
 	"context"
 	"testing"
+	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
@@ -307,6 +308,17 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 
+	progressingTS := metav1.Now()
+	if cond := v1helpers.FindStatusCondition(co.Status.Conditions, configv1.OperatorProgressing); cond != nil {
+		if cond.LastTransitionTime.IsZero() {
+			t.Fatalf("progressing transition time was zero")
+		}
+		progressingTS = cond.LastTransitionTime
+	} else {
+		// unreachable
+		t.Fatalf("Progressing condition unexpectedly missing")
+	}
+
 	// Update to report expected deployment size
 	dsANodes := int32(1)
 	dsBNodes := int32(3)
@@ -342,6 +354,16 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 		}
 
+		// Validate that the transition time was not bumped
+		if cond := v1helpers.FindStatusCondition(co.Status.Conditions, configv1.OperatorProgressing); cond != nil {
+			if !progressingTS.Equal(&cond.LastTransitionTime) {
+				t.Fatalf("Progressing LastTransitionTime changed unnecessarily")
+			}
+		} else {
+			// unreachable
+			t.Fatalf("Progressing condition unexpectedly missing")
+		}
+
 		if dsA.Status.NumberUnavailable > 0 {
 			dsA.Status.NumberUnavailable--
 			dsA.Status.NumberAvailable++
@@ -365,6 +387,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error updating DaemonSet: %v", err)
 	}
+	time.Sleep(1 * time.Second) // minimum transition time fidelity
 	status.SetFromPods()
 
 	co, err = getCO(client, "testing")
@@ -386,6 +409,16 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Validate that the transition time was bumped
+	if cond := v1helpers.FindStatusCondition(co.Status.Conditions, configv1.OperatorProgressing); cond != nil {
+		if progressingTS.Equal(&cond.LastTransitionTime) {
+			t.Fatalf("Progressing LastTransitionTime didn't change when Progressing -> false")
+		}
+	} else {
+		// unreachable
+		t.Fatalf("Progressing condition unexpectedly missing")
 	}
 }
 
