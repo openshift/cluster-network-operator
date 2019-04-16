@@ -118,7 +118,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	err := r.client.Get(context.TODO(), request.NamespacedName, operConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			r.status.SetFailing(statusmanager.OperatorConfig, "NoOperatorConfig",
+			r.status.SetDegraded(statusmanager.OperatorConfig, "NoOperatorConfig",
 				fmt.Sprintf("Operator configuration %s was deleted", request.NamespacedName.String()))
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected, since we set
@@ -136,7 +136,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	// This will also commit the change back to the apiserver.
 	if err := r.MergeClusterConfig(context.TODO(), operConfig); err != nil {
 		log.Printf("Failed to merge the cluster configuration: %v", err)
-		r.status.SetFailing(statusmanager.OperatorConfig, "MergeClusterConfig",
+		r.status.SetDegraded(statusmanager.OperatorConfig, "MergeClusterConfig",
 			fmt.Sprintf("Internal error while merging cluster configuration and operator configuration: %v", err))
 		return reconcile.Result{}, err
 	}
@@ -147,7 +147,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	// Validate the configuration
 	if err := network.Validate(&operConfig.Spec); err != nil {
 		log.Printf("Failed to validate Network.operator.openshift.io.Spec: %v", err)
-		r.status.SetFailing(statusmanager.OperatorConfig, "InvalidOperatorConfig",
+		r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
 			fmt.Sprintf("The operator configuration is invalid (%v). Use 'oc edit network.operator.openshift.io cluster' to fix.", err))
 		return reconcile.Result{}, err
 	}
@@ -171,7 +171,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		err = network.IsChangeSafe(prev, &operConfig.Spec)
 		if err != nil {
 			log.Printf("Not applying unsafe change: %v", err)
-			r.status.SetFailing(statusmanager.OperatorConfig, "InvalidOperatorConfig",
+			r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
 				fmt.Sprintf("Not applying unsafe configuration change: %v. Use 'oc edit network.operator.openshift.io cluster' to undo the change.", err))
 			return reconcile.Result{}, err
 		}
@@ -181,7 +181,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	objs, err := network.Render(&operConfig.Spec, ManifestPath)
 	if err != nil {
 		log.Printf("Failed to render: %v", err)
-		r.status.SetFailing(statusmanager.OperatorConfig, "RenderError",
+		r.status.SetDegraded(statusmanager.OperatorConfig, "RenderError",
 			fmt.Sprintf("Internal error while rendering operator configuration: %v", err))
 		return reconcile.Result{}, err
 	}
@@ -190,7 +190,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	app, err := AppliedConfiguration(operConfig)
 	if err != nil {
 		log.Printf("Failed to render applied: %v", err)
-		r.status.SetFailing(statusmanager.OperatorConfig, "RenderError",
+		r.status.SetDegraded(statusmanager.OperatorConfig, "RenderError",
 			fmt.Sprintf("Internal error while recording new operator configuration: %v", err))
 		return reconcile.Result{}, err
 	}
@@ -220,7 +220,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		if err := controllerutil.SetControllerReference(operConfig, obj, r.scheme); err != nil {
 			err = errors.Wrapf(err, "could not set reference for (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
 			log.Println(err)
-			r.status.SetFailing(statusmanager.OperatorConfig, "InternalError",
+			r.status.SetDegraded(statusmanager.OperatorConfig, "InternalError",
 				fmt.Sprintf("Internal error while updating operator configuration: %v", err))
 			return reconcile.Result{}, err
 		}
@@ -238,7 +238,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 					continue
 				}
 			}
-			r.status.SetFailing(statusmanager.OperatorConfig, "ApplyOperatorConfig",
+			r.status.SetDegraded(statusmanager.OperatorConfig, "ApplyOperatorConfig",
 				fmt.Sprintf("Error while updating operator configuration: %v", err))
 			return reconcile.Result{}, err
 		}
@@ -248,7 +248,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	status, err := r.ClusterNetworkStatus(context.TODO(), operConfig)
 	if err != nil {
 		log.Printf("Could not generate network status: %v", err)
-		r.status.SetFailing(statusmanager.OperatorConfig, "StatusError",
+		r.status.SetDegraded(statusmanager.OperatorConfig, "StatusError",
 			fmt.Sprintf("Could not update cluster configuration status: %v", err))
 		return reconcile.Result{}, err
 	}
@@ -258,13 +258,13 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		if err := apply.ApplyObject(context.TODO(), r.client, status); err != nil {
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", status.GroupVersionKind(), status.GetNamespace(), status.GetName())
 			log.Println(err)
-			r.status.SetFailing(statusmanager.OperatorConfig, "StatusError",
+			r.status.SetDegraded(statusmanager.OperatorConfig, "StatusError",
 				fmt.Sprintf("Could not update cluster configuration status: %v", err))
 			return reconcile.Result{}, err
 		}
 	}
 
-	r.status.SetNotFailing(statusmanager.OperatorConfig)
+	r.status.SetNotDegraded(statusmanager.OperatorConfig)
 
 	// All was successful. Request that this be re-triggered after ResyncPeriod,
 	// so we can reconcile state again.
