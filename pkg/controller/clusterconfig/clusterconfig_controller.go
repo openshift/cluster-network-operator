@@ -91,7 +91,7 @@ func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile
 	// Validate the cluster config
 	if err := network.ValidateClusterConfig(clusterConfig.Spec); err != nil {
 		log.Printf("Failed to validate Network.Spec: %v", err)
-		r.status.SetFailing(statusmanager.ClusterConfig, "InvalidClusterConfig",
+		r.status.SetDegraded(statusmanager.ClusterConfig, "InvalidClusterConfig",
 			fmt.Sprintf("The cluster configuration is invalid (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))
 		return reconcile.Result{}, err
 	}
@@ -99,7 +99,7 @@ func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile
 	operatorConfig, err := r.UpdateOperatorConfig(context.TODO(), *clusterConfig)
 	if err != nil {
 		log.Printf("Failed to generate NetworkConfig CRD: %v", err)
-		r.status.SetFailing(statusmanager.ClusterConfig, "UpdateOperatorConfig",
+		r.status.SetDegraded(statusmanager.ClusterConfig, "UpdateOperatorConfig",
 			fmt.Sprintf("Internal error while converting cluster configuration: %v", err))
 		return reconcile.Result{}, err
 	}
@@ -107,12 +107,12 @@ func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile
 	if operatorConfig != nil {
 		if err := apply.ApplyObject(context.TODO(), r.client, operatorConfig); err != nil {
 			log.Printf("Could not apply operator config: %v", err)
-			r.status.SetFailing(statusmanager.ClusterConfig, "ApplyOperatorConfig",
+			r.status.SetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",
 				fmt.Sprintf("Error while trying to update operator configuration: %v", err))
 			return reconcile.Result{}, err
 		}
 	}
 
-	r.status.SetNotFailing(statusmanager.ClusterConfig)
+	r.status.SetNotDegraded(statusmanager.ClusterConfig)
 	return reconcile.Result{}, nil
 }
