@@ -139,8 +139,11 @@ func TestFillOpenShiftSDNDefaults(t *testing.T) {
 		},
 		DeployKubeProxy: &f,
 		KubeProxyConfig: &operv1.ProxyConfig{
-			BindAddress:    "0.0.0.0",
-			ProxyArguments: map[string][]string{"metrics-bind-address": {"0.0.0.0:9101"}},
+			BindAddress: "0.0.0.0",
+			ProxyArguments: map[string][]string{
+				"metrics-bind-address": {"0.0.0.0"},
+				"metrics-port":         {"9101"},
+			},
 		},
 	}
 
@@ -416,7 +419,9 @@ nodeName: ""
 podManifestConfig: null
 proxyArguments:
   metrics-bind-address:
-  - 0.0.0.0:9101
+  - 0.0.0.0
+  metrics-port:
+  - "9101"
 servingInfo:
   bindAddress: 0.0.0.0:10251
   bindNetwork: ""
