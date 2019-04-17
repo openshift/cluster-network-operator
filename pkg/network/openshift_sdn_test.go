@@ -349,7 +349,6 @@ network:
     hostSubnetLength: 8
   networkPluginName: redhat/openshift-ovs-networkpolicy
   serviceNetworkCIDR: 172.30.0.0/16
-  vxLANPort: 4789
   vxlanPort: 4789
 resourceQuota:
   concurrentSyncs: 0
