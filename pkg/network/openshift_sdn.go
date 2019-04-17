@@ -1,8 +1,6 @@
 package network
 
 import (
-	"encoding/json"
-	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -202,23 +200,6 @@ func controllerConfig(conf *operv1.NetworkSpec) (string, error) {
 	}
 
 	buf, err := yaml.Marshal(cfg)
-	if err != nil {
-		return "", err
-	}
-
-	// HACK: danw changed the capitalization of VXLANPort, but it's not yet
-	// merged in to origin. So just set both.
-	// Remove when origin merges api.
-	obj := &uns.Unstructured{}
-	err = yaml.Unmarshal(buf, obj)
-	if err != nil {
-		return "", err
-	}
-	p := json.Number(fmt.Sprintf("%d", *c.VXLANPort))
-
-	uns.SetNestedField(obj.Object, p, "network", "vxLANPort")
-
-	buf, err = yaml.Marshal(obj)
 	return string(buf), err
 }
 
