@@ -38,6 +38,17 @@ It will print status messages as it waits for the installer to make progress.
 openshift-install --dir=$CLUSTER_DIR create cluster
 ```
 
+## Attaching to an existing cluster
+
+If you have an already-up cluster you would like to take over, then you can instead run
+
+```
+ATTACH_RUNNING=1 hack/run-locally.sh
+```
+
+It will stop the deployed operator, set up the environment variables, and execute
+your local build of the operator.
+
 ## Tips, Tricks, & Limitations
 
 ### Cleaning up

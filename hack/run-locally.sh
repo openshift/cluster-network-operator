@@ -31,11 +31,28 @@ function override_install_manifests() {
     fi
 }
 
+# Install our overrides in to an existing cluster
+function stop_deployed_operator() {
+    echo "Telling the CVO to ignore the network operator"
+    kubectl patch --type=json -p "$(cat hack/overrides-patch.yaml)" clusterversion version
+
+    echo "Scaling the deployed network operator to 0"
+    kubectl scale deployment -n openshift-network-operator network-operator --replicas 0
+}
+
 # Extract environment variables for the CNO DaemonSet
 function setup_operator_env() {
     if [[ manifests/0000_07_cluster-network-operator_03_daemonset.yaml -nt "${CLUSTER_DIR}/env.sh" ]]; then
         echo "Copying environment variables from manifest to ${CLUSTER_DIR}/env.sh"
         oc --kubeconfig=hack/null-kubeconfig convert --local=true -f manifests/0000_07_cluster-network-operator_03_daemonset.yaml -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
+    fi
+}
+
+# Extract environment variables from an already-deployed cluster
+function setup_operator_env_running() {
+    if [[ ! -e "${CLUSTER_DIR}/env.sh" ]]; then
+        echo "Copying environment variables from manifest to ${CLUSTER_DIR}/env.sh"
+        kubectl get deployment -n openshift-network-operator network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
     fi
 }
 
@@ -89,18 +106,27 @@ if [[ -z "${CLUSTER_DIR:-}" ]]; then
     exit 1
 fi
 
-if [[ ! -e "${CLUSTER_DIR}/env.sh" && ! -e "${CLUSTER_DIR}/manifests/cvo-overrides.yaml" ]]; then
-    echo "error: cannot find installer state; please run"
-    echo "  openshift-install --dir=${CLUSTER_DIR} create manifests"
-    echo "For more info, see INSTALLER-HACKING.md"
-    exit 1
+# If the cluster doesn't exist yet, prepare the manifests.
+if [[ -z "${ATTACH_RUNNING:-}" ]]; then
+    if [[ ! -e "${CLUSTER_DIR}/env.sh" && ! -e "${CLUSTER_DIR}/manifests/cvo-overrides.yaml" ]]; then
+        echo "error: cannot find installer state; please run"
+        echo "  openshift-install --dir=${CLUSTER_DIR} create manifests"
+        echo "For more info, see INSTALLER-HACKING.md"
+        exit 1
+    fi
+
+    if [[ -e "${CLUSTER_DIR}/manifests/cvo-overrides.yaml" ]]; then
+        override_install_manifests
+    fi
+
+    setup_operator_env
 fi
 
-if [[ -e "${CLUSTER_DIR}/manifests/cvo-overrides.yaml" ]]; then
-    override_install_manifests
-fi
-
-setup_operator_env
 wait_for_cluster
+
+if [[ ! -z "${ATTACH_RUNNING:-}" ]]; then
+    setup_operator_env_running
+    stop_deployed_operator
+fi
 
 env $(cat "${CLUSTER_DIR}/env.sh") _output/linux/amd64/cluster-network-operator
