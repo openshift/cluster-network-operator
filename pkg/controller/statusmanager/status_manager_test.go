@@ -9,7 +9,6 @@ import (
 	"github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -236,36 +235,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorDegraded,
+			Type:   configv1.OperatorProgressing,
 			Status: configv1.ConditionTrue,
-			Reason: "NoNamespace",
-		},
-	}) {
-		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
-	}
-
-	// Create namespaces, try again
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "one"}}
-	err = client.Create(context.TODO(), ns)
-	if err != nil {
-		t.Fatalf("error creating Namespace: %v", err)
-	}
-	ns = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "two"}}
-	err = client.Create(context.TODO(), ns)
-	if err != nil {
-		t.Fatalf("error creating Namespace: %v", err)
-	}
-
-	status.SetFromPods()
-	co, err = getCO(client, "testing")
-	if err != nil {
-		t.Fatalf("error getting ClusterOperator: %v", err)
-	}
-	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
-		{
-			Type:   configv1.OperatorDegraded,
-			Status: configv1.ConditionTrue,
-			Reason: "NoDaemonSet",
+			Reason: "Deploying",
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
@@ -438,32 +410,9 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorDegraded,
+			Type:   configv1.OperatorProgressing,
 			Status: configv1.ConditionTrue,
-			Reason: "NoNamespace",
-		},
-	}) {
-		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
-	}
-
-	// Create namespace, try again
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "one"}}
-	err = client.Create(context.TODO(), ns)
-	if err != nil {
-		t.Fatalf("error creating Namespace: %v", err)
-	}
-
-	status.SetFromPods()
-
-	co, err = getCO(client, "testing")
-	if err != nil {
-		t.Fatalf("error getting ClusterOperator: %v", err)
-	}
-	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
-		{
-			Type:   configv1.OperatorDegraded,
-			Status: configv1.ConditionTrue,
-			Reason: "NoDeployment",
+			Reason: "Deploying",
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
@@ -488,9 +437,9 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorDegraded,
+			Type:   configv1.OperatorProgressing,
 			Status: configv1.ConditionTrue,
-			Reason: "NoDeployment",
+			Reason: "Deploying",
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
@@ -565,22 +514,6 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	status.SetDaemonSets([]types.NamespacedName{
 		{Namespace: "one", Name: "gamma"},
 	})
-
-	status.SetFromPods()
-
-	co, err = getCO(client, "testing")
-	if err != nil {
-		t.Fatalf("error getting ClusterOperator: %v", err)
-	}
-	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
-		{
-			Type:   configv1.OperatorDegraded,
-			Status: configv1.ConditionTrue,
-			Reason: "NoDaemonSet",
-		},
-	}) {
-		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
-	}
 
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "gamma"},

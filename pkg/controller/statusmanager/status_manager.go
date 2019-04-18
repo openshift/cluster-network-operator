@@ -166,28 +166,13 @@ func (status *StatusManager) SetFromPods() {
 	progressing := []string{}
 
 	for _, dsName := range status.daemonSets {
-		ns := &corev1.Namespace{}
-		if err := status.client.Get(context.TODO(), types.NamespacedName{Name: dsName.Namespace}, ns); err != nil {
-			if errors.IsNotFound(err) {
-				status.SetDegraded(PodDeployment, "NoNamespace",
-					fmt.Sprintf("Namespace %q does not exist", dsName.Namespace))
-			} else {
-				status.SetDegraded(PodDeployment, "InternalError",
-					fmt.Sprintf("Internal error deploying pods: %v", err))
-			}
-			return
-		}
-
 		ds := &appsv1.DaemonSet{}
 		if err := status.client.Get(context.TODO(), dsName, ds); err != nil {
-			if errors.IsNotFound(err) {
-				status.SetDegraded(PodDeployment, "NoDaemonSet",
-					fmt.Sprintf("Expected DaemonSet %q does not exist", dsName.String()))
-			} else {
-				status.SetDegraded(PodDeployment, "InternalError",
-					fmt.Sprintf("Internal error deploying pods: %v", err))
-			}
-			return
+			log.Printf("Error getting DaemonSet %q: %v", dsName.String(), err)
+			progressing = append(progressing, fmt.Sprintf("Waiting for DaemonSet %q to be created", dsName.String()))
+			// Assume the OperConfig Controller is in the process of reconciling
+			// things; it will set a Degraded status if it fails.
+			continue
 		}
 
 		if ds.Status.NumberUnavailable > 0 {
@@ -206,28 +191,13 @@ func (status *StatusManager) SetFromPods() {
 	}
 
 	for _, depName := range status.deployments {
-		ns := &corev1.Namespace{}
-		if err := status.client.Get(context.TODO(), types.NamespacedName{Name: depName.Namespace}, ns); err != nil {
-			if errors.IsNotFound(err) {
-				status.SetDegraded(PodDeployment, "NoNamespace",
-					fmt.Sprintf("Namespace %q does not exist", depName.Namespace))
-			} else {
-				status.SetDegraded(PodDeployment, "InternalError",
-					fmt.Sprintf("Internal error deploying pods: %v", err))
-			}
-			return
-		}
-
 		dep := &appsv1.Deployment{}
 		if err := status.client.Get(context.TODO(), depName, dep); err != nil {
-			if errors.IsNotFound(err) {
-				status.SetDegraded(PodDeployment, "NoDeployment",
-					fmt.Sprintf("Expected Deployment %q does not exist", depName.String()))
-			} else {
-				status.SetDegraded(PodDeployment, "InternalError",
-					fmt.Sprintf("Internal error deploying pods: %v", err))
-			}
-			return
+			log.Printf("Error getting Deployment %q: %v", depName.String(), err)
+			progressing = append(progressing, fmt.Sprintf("Waiting for Deployment %q to be created", depName.String()))
+			// Assume the OperConfig Controller is in the process of reconciling
+			// things; it will set a Degraded status if it fails.
+			continue
 		}
 
 		if dep.Status.UnavailableReplicas > 0 {
