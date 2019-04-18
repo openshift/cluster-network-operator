@@ -109,8 +109,8 @@ func (status *StatusManager) Set(reachedAvailableLevel bool, conditions ...confi
 	}
 }
 
-// syncFailing syncs the current Failing status
-func (status *StatusManager) syncFailing() {
+// syncDegraded syncs the current Degraded status
+func (status *StatusManager) syncDegraded() {
 	for _, c := range status.failing {
 		if c != nil {
 			status.Set(false, *c)
@@ -120,32 +120,32 @@ func (status *StatusManager) syncFailing() {
 	status.Set(
 		false,
 		configv1.ClusterOperatorStatusCondition{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionFalse,
 		},
 	)
 }
 
-// SetFailing marks the operator as Failing with the given reason and message. If it
+// SetDegraded marks the operator as Degraded with the given reason and message. If it
 // is not already failing for a lower-level reason, the operator's status will be updated.
-func (status *StatusManager) SetFailing(level StatusLevel, reason, message string) {
+func (status *StatusManager) SetDegraded(level StatusLevel, reason, message string) {
 	status.failing[level] = &configv1.ClusterOperatorStatusCondition{
-		Type:    configv1.OperatorFailing,
+		Type:    configv1.OperatorDegraded,
 		Status:  configv1.ConditionTrue,
 		Reason:  reason,
 		Message: message,
 	}
-	status.syncFailing()
+	status.syncDegraded()
 }
 
-// SetNotFailing marks the operator as not Failing at the given level. If the operator
+// SetNotDegraded marks the operator as not Degraded at the given level. If the operator
 // status previously indicated failure at this level, it will updated to show the next
 // higher-level failure, or else to show that the operator is no longer failing.
-func (status *StatusManager) SetNotFailing(level StatusLevel) {
+func (status *StatusManager) SetNotDegraded(level StatusLevel) {
 	if status.failing[level] != nil {
 		status.failing[level] = nil
 	}
-	status.syncFailing()
+	status.syncDegraded()
 }
 
 func (status *StatusManager) SetDaemonSets(daemonSets []types.NamespacedName) {
@@ -156,9 +156,8 @@ func (status *StatusManager) SetDeployments(deployments []types.NamespacedName) 
 	status.deployments = deployments
 }
 
-// SetFromPods sets the operator status to Failing, Progressing, or Available, based on
-// the current status of the manager's DaemonSets and Deployments. However, this is a
-// no-op if the StatusManager is currently marked as failing due to a configuration error.
+// SetFromPods sets the operator Degraded/Progressing/Available status, based on
+// the current status of the manager's DaemonSets and Deployments.
 func (status *StatusManager) SetFromPods() {
 
 	targetLevel := os.Getenv("RELEASE_VERSION")
@@ -170,10 +169,10 @@ func (status *StatusManager) SetFromPods() {
 		ns := &corev1.Namespace{}
 		if err := status.client.Get(context.TODO(), types.NamespacedName{Name: dsName.Namespace}, ns); err != nil {
 			if errors.IsNotFound(err) {
-				status.SetFailing(PodDeployment, "NoNamespace",
+				status.SetDegraded(PodDeployment, "NoNamespace",
 					fmt.Sprintf("Namespace %q does not exist", dsName.Namespace))
 			} else {
-				status.SetFailing(PodDeployment, "InternalError",
+				status.SetDegraded(PodDeployment, "InternalError",
 					fmt.Sprintf("Internal error deploying pods: %v", err))
 			}
 			return
@@ -182,10 +181,10 @@ func (status *StatusManager) SetFromPods() {
 		ds := &appsv1.DaemonSet{}
 		if err := status.client.Get(context.TODO(), dsName, ds); err != nil {
 			if errors.IsNotFound(err) {
-				status.SetFailing(PodDeployment, "NoDaemonSet",
+				status.SetDegraded(PodDeployment, "NoDaemonSet",
 					fmt.Sprintf("Expected DaemonSet %q does not exist", dsName.String()))
 			} else {
-				status.SetFailing(PodDeployment, "InternalError",
+				status.SetDegraded(PodDeployment, "InternalError",
 					fmt.Sprintf("Internal error deploying pods: %v", err))
 			}
 			return
@@ -210,10 +209,10 @@ func (status *StatusManager) SetFromPods() {
 		ns := &corev1.Namespace{}
 		if err := status.client.Get(context.TODO(), types.NamespacedName{Name: depName.Namespace}, ns); err != nil {
 			if errors.IsNotFound(err) {
-				status.SetFailing(PodDeployment, "NoNamespace",
+				status.SetDegraded(PodDeployment, "NoNamespace",
 					fmt.Sprintf("Namespace %q does not exist", depName.Namespace))
 			} else {
-				status.SetFailing(PodDeployment, "InternalError",
+				status.SetDegraded(PodDeployment, "InternalError",
 					fmt.Sprintf("Internal error deploying pods: %v", err))
 			}
 			return
@@ -222,10 +221,10 @@ func (status *StatusManager) SetFromPods() {
 		dep := &appsv1.Deployment{}
 		if err := status.client.Get(context.TODO(), depName, dep); err != nil {
 			if errors.IsNotFound(err) {
-				status.SetFailing(PodDeployment, "NoDeployment",
+				status.SetDegraded(PodDeployment, "NoDeployment",
 					fmt.Sprintf("Expected Deployment %q does not exist", depName.String()))
 			} else {
-				status.SetFailing(PodDeployment, "InternalError",
+				status.SetDegraded(PodDeployment, "InternalError",
 					fmt.Sprintf("Internal error deploying pods: %v", err))
 			}
 			return
@@ -250,7 +249,7 @@ func (status *StatusManager) SetFromPods() {
 		}
 	}
 
-	status.SetNotFailing(PodDeployment)
+	status.SetNotDegraded(PodDeployment)
 
 	if len(progressing) > 0 {
 		status.Set(
