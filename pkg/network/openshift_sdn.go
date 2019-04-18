@@ -128,7 +128,11 @@ func fillOpenShiftSDNDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 	}
 
 	if conf.KubeProxyConfig.ProxyArguments["metrics-bind-address"] == nil {
-		conf.KubeProxyConfig.ProxyArguments["metrics-bind-address"] = []string{"0.0.0.0:9101"}
+		conf.KubeProxyConfig.ProxyArguments["metrics-bind-address"] = []string{"0.0.0.0"}
+	}
+
+	if conf.KubeProxyConfig.ProxyArguments["metrics-port"] == nil {
+		conf.KubeProxyConfig.ProxyArguments["metrics-port"] = []string{"9101"}
 	}
 
 	sc := conf.DefaultNetwork.OpenShiftSDNConfig
