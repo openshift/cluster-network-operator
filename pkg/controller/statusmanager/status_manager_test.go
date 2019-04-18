@@ -72,7 +72,7 @@ func TestStatusManager_set(t *testing.T) {
 	}
 
 	condFail := configv1.ClusterOperatorStatusCondition{
-		Type:    configv1.OperatorFailing,
+		Type:    configv1.OperatorDegraded,
 		Status:  configv1.ConditionTrue,
 		Reason:  "Reason",
 		Message: "Message",
@@ -102,7 +102,7 @@ func TestStatusManager_set(t *testing.T) {
 	}
 
 	condNoFail := configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorFailing,
+		Type:   configv1.OperatorDegraded,
 		Status: configv1.ConditionFalse,
 	}
 	status.Set(false, condNoFail)
@@ -134,7 +134,7 @@ func TestStatusManager_set(t *testing.T) {
 	}
 }
 
-func TestStatusManagerSetFailing(t *testing.T) {
+func TestStatusManagerSetDegraded(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", "1.2.3")
 
@@ -144,23 +144,23 @@ func TestStatusManagerSetFailing(t *testing.T) {
 	}
 
 	condFailCluster := configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorFailing,
+		Type:   configv1.OperatorDegraded,
 		Status: configv1.ConditionTrue,
 		Reason: "Cluster",
 	}
 	condFailOperator := configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorFailing,
+		Type:   configv1.OperatorDegraded,
 		Status: configv1.ConditionTrue,
 		Reason: "Operator",
 	}
 	condFailPods := configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorFailing,
+		Type:   configv1.OperatorDegraded,
 		Status: configv1.ConditionTrue,
 		Reason: "Pods",
 	}
 
 	// Initial failure status
-	status.SetFailing(OperatorConfig, "Operator", "")
+	status.SetDegraded(OperatorConfig, "Operator", "")
 	co, err = getCO(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -170,7 +170,7 @@ func TestStatusManagerSetFailing(t *testing.T) {
 	}
 
 	// Setting a higher-level status should override it
-	status.SetFailing(ClusterConfig, "Cluster", "")
+	status.SetDegraded(ClusterConfig, "Cluster", "")
 	co, err = getCO(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -180,7 +180,7 @@ func TestStatusManagerSetFailing(t *testing.T) {
 	}
 
 	// Setting a lower-level status should be ignored
-	status.SetFailing(PodDeployment, "Pods", "")
+	status.SetDegraded(PodDeployment, "Pods", "")
 	co, err = getCO(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -190,7 +190,7 @@ func TestStatusManagerSetFailing(t *testing.T) {
 	}
 
 	// Clearing an unseen status should have no effect
-	status.SetNotFailing(OperatorConfig)
+	status.SetNotDegraded(OperatorConfig)
 	co, err = getCO(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -200,7 +200,7 @@ func TestStatusManagerSetFailing(t *testing.T) {
 	}
 
 	// Clearing the currently-seen status should reveal the higher-level status
-	status.SetNotFailing(ClusterConfig)
+	status.SetNotDegraded(ClusterConfig)
 	co, err = getCO(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -210,12 +210,12 @@ func TestStatusManagerSetFailing(t *testing.T) {
 	}
 
 	// Clearing all failing statuses should result in not failing
-	status.SetNotFailing(PodDeployment)
+	status.SetNotDegraded(PodDeployment)
 	co, err = getCO(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	if !v1helpers.IsStatusConditionFalse(co.Status.Conditions, configv1.OperatorFailing) {
+	if !v1helpers.IsStatusConditionFalse(co.Status.Conditions, configv1.OperatorDegraded) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 }
@@ -236,7 +236,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionTrue,
 			Reason: "NoNamespace",
 		},
@@ -263,7 +263,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionTrue,
 			Reason: "NoDaemonSet",
 		},
@@ -291,7 +291,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionFalse,
 		},
 		{
@@ -396,7 +396,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionFalse,
 		},
 		{
@@ -438,7 +438,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionTrue,
 			Reason: "NoNamespace",
 		},
@@ -461,7 +461,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionTrue,
 			Reason: "NoDeployment",
 		},
@@ -488,7 +488,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionTrue,
 			Reason: "NoDeployment",
 		},
@@ -510,7 +510,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionFalse,
 		},
 		{
@@ -542,7 +542,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionFalse,
 		},
 		{
@@ -574,7 +574,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionTrue,
 			Reason: "NoDaemonSet",
 		},
@@ -604,7 +604,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	// Available before
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionFalse,
 		},
 		{
@@ -633,7 +633,7 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	}
 	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 		{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionFalse,
 		},
 		{
