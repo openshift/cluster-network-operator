@@ -8,8 +8,9 @@ spec:
   version: v1
   scope: Namespaced
   names:
-    plural: network-attachment-definitions
-    singular: network-attachment-definition
+    plural: networkattachmentdefinitions
+    singular: networkattachmentdefinition
     kind: NetworkAttachmentDefinition
     shortNames:
     - net-attach-def
+    - network-attachment-definition
