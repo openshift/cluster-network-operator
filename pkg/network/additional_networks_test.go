@@ -10,7 +10,7 @@ import (
 var NetworkAttachmentConfigRaw = operv1.Network{
 	Spec: operv1.NetworkSpec{
 		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
-			{Type: operv1.NetworkTypeRaw, Name: "net-attach-1", RawCNIConfig: "{}"},
+			{Type: operv1.NetworkTypeRaw, Namespace: "foobar", Name: "net-attach-1", RawCNIConfig: "{}"},
 			{Type: operv1.NetworkTypeRaw, Name: "net-attach-2", RawCNIConfig: "{}"},
 		},
 	},
@@ -39,9 +39,14 @@ func TestRenderRawCNIConfig(t *testing.T) {
 		objs, err := renderRawCNIConfig(&cfg, manifestDir)
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(objs).To(HaveLen(1))
+
+		expectedNamespace := cfg.Namespace
+		if expectedNamespace == "" {
+			expectedNamespace = "default"
+		}
 		g.Expect(objs).To(
 			ContainElement(HaveKubernetesID(
-				"NetworkAttachmentDefinition", "default", cfg.Name)))
+				"NetworkAttachmentDefinition", expectedNamespace, cfg.Name)))
 	}
 }
 
