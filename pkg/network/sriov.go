@@ -38,6 +38,7 @@ func renderOpenShiftSRIOV(conf *operv1.AdditionalNetworkDefinition, manifestDir 
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["AdditionalNetworkName"] = conf.Name
+	data.Data["AdditionalNetworkNamespace"] = conf.Namespace
 	data.Data["AdditionalNetworkConfig"] = conf.RawCNIConfig
 	data.Data["SRIOVCNIImage"] = os.Getenv("SRIOV_CNI_IMAGE")
 	data.Data["SRIOVDevicePluginImage"] = os.Getenv("SRIOV_DEVICE_PLUGIN_IMAGE")
