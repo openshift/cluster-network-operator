@@ -138,6 +138,12 @@ spec:
           preStop:
             exec:
               command: ["rm","-f","/etc/cni/net.d/80-openshift-network.conf", "/host/opt/cni/bin/openshift-sdn"]
+        readinessProbe:
+          exec:
+            # openshift-sdn writes this file when it is ready to handle pod requests.
+            command: ["test", "-f", "/etc/cni/net.d/80-openshift-network.conf"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
