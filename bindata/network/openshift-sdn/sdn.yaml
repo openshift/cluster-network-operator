@@ -47,6 +47,9 @@ spec:
           #!/bin/bash
           set -euo pipefail
 
+          # tee all output to the host's journal
+          exec 1> >(logger -p user.info --size 4096 -s -t openshift-sdn/${K8S_POD_NAME}) 2>&1
+
           # if another process is listening on the cni-server socket, wait until it exits
           trap 'kill $(jobs -p); rm -f /etc/cni/net.d/80-openshift-network.conf ; exit 0' TERM
           retries=0
@@ -119,6 +122,8 @@ spec:
         - mountPath: /etc/sysconfig/openshift-sdn
           name: etc-sysconfig-openshift-sdn
           readOnly: true
+        - mountPath: /dev/log
+          name: host-dev-log
         resources:
           requests:
             cpu: 100m
@@ -130,6 +135,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: K8S_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         ports:
         - name: healthz
           containerPort: 10256
@@ -144,6 +153,11 @@ spec:
             command: ["test", "-f", "/etc/cni/net.d/80-openshift-network.conf"]
           initialDelaySeconds: 5
           periodSeconds: 5
+        # this comes from the kube-proxy code
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: healthz
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
@@ -187,5 +201,9 @@ spec:
       - name: host-var-lib-cni-networks-openshift-sdn
         hostPath:
           path: /var/lib/cni/networks/openshift-sdn
+      - name: host-dev-log
+        hostPath:
+          path: /dev/log
+          type: Socket
       tolerations:
       - operator: Exists

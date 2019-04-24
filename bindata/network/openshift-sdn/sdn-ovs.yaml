@@ -60,6 +60,7 @@ spec:
           }
           trap quit SIGTERM
           /usr/share/openvswitch/scripts/ovs-ctl start --no-ovs-vswitchd --system-id=random
+          tail --follow=name /var/log/openvswitch/ovsdb-server.log &
 
           # Restrict the number of pthreads ovs-vswitchd creates to reduce the
           # amount of RSS it uses on hosts with many cores
@@ -69,12 +70,9 @@ spec:
               ovs-vsctl --no-wait set Open_vSwitch . other_config:n-revalidator-threads=4
               ovs-vsctl --no-wait set Open_vSwitch . other_config:n-handler-threads=10
           fi
-          /usr/share/openvswitch/scripts/ovs-ctl start --no-ovsdb-server --system-id=random
+          /usr/share/openvswitch/scripts/ovs-ctl load-kmod
 
-          tail --follow=name /var/log/openvswitch/ovs-vswitchd.log /var/log/openvswitch/ovsdb-server.log &
-          while true; do
-            sleep 10000
-          done
+          exec ovs-vswitchd unix:/var/run/openvswitch/db.sock -vconsole:info -vsyslog:info --mlockall --no-chdir --pidfile=/var/run/openvswitch/ovs-vswitchd.pid --syslog-method=unix:/dev/log
         securityContext:
           privileged: true
         volumeMounts:
@@ -90,6 +88,8 @@ spec:
           readOnly: true
         - mountPath: /etc/openvswitch
           name: host-config-openvswitch
+        - mountPath: /dev/log
+          name: host-dev-log
         resources:
           requests:
             cpu: 200m
@@ -117,6 +117,10 @@ spec:
       - name: host-config-openvswitch
         hostPath:
           path: /var/lib/openvswitch
+      - name: host-dev-log
+        hostPath:
+          path: /dev/log
+          type: Socket
       tolerations:
       - operator: "Exists"
 {{- end}}
