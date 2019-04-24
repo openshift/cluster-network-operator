@@ -14,7 +14,6 @@ import (
 	"github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -206,12 +205,6 @@ func (status *StatusManager) SetFromPods() {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q is not yet scheduled on any nodes", depName.String()))
 		} else if dep.Status.ObservedGeneration < dep.Generation {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q update is being processed (generation %d, observed generation %d)", depName.String(), dep.Generation, dep.Status.ObservedGeneration))
-		}
-
-		for _, cond := range dep.Status.Conditions {
-			if cond.Type == appsv1.DeploymentProgressing && cond.Status == corev1.ConditionTrue {
-				progressing = append(progressing, fmt.Sprintf("Deployment %q is progressing (%q)", depName.String(), cond.Reason))
-			}
 		}
 
 		if !(dep.Generation <= dep.Status.ObservedGeneration && dep.Status.UpdatedReplicas == dep.Status.Replicas && dep.Status.AvailableReplicas > 0 && dep.Annotations["release.openshift.io/version"] == targetLevel) {
