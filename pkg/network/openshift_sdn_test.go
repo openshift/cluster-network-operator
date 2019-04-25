@@ -407,7 +407,7 @@ kubeletArguments:
   container-runtime:
   - remote
   container-runtime-endpoint:
-  - /var/run/crio/crio.sock
+  - unix:///var/run/crio/crio.sock
 masterClientConnectionOverrides: null
 masterKubeConfig: ""
 networkConfig:

@@ -230,7 +230,7 @@ func nodeConfig(conf *operv1.NetworkSpec) (string, error) {
 		// OpenShift SDN calls the CRI endpoint directly; point it to crio
 		KubeletArguments: legacyconfigv1.ExtendedArguments{
 			"container-runtime":          {"remote"},
-			"container-runtime-endpoint": {"/var/run/crio/crio.sock"},
+			"container-runtime-endpoint": {"unix:///var/run/crio/crio.sock"},
 		},
 
 		IPTablesSyncPeriod: conf.KubeProxyConfig.IptablesSyncPeriod,
