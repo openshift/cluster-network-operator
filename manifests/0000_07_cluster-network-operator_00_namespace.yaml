@@ -2,6 +2,8 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: openshift-network-operator
+  annotations:
+    openshift.io/node-selector: ""
   labels:
     name: openshift-network-operator
     openshift.io/run-level: "0"
