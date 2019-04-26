@@ -31,6 +31,7 @@ func renderRawCNIConfig(conf *operv1.AdditionalNetworkDefinition, manifestDir st
 	// render RawCNIConfig manifests
 	data := render.MakeRenderData()
 	data.Data["AdditionalNetworkName"] = conf.Name
+	data.Data["AdditionalNetworkNamespace"] = conf.Namespace
 	data.Data["AdditionalNetworkConfig"] = conf.RawCNIConfig
 	objs, err = render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/raw"), &data)
 	if err != nil {
