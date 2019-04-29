@@ -78,7 +78,7 @@ func MergeClusterConfig(operConf *operv1.NetworkSpec, clusterConf configv1.Netwo
 		})
 	}
 
-	// OpenShiftSDN (default), OVNKubenetes
+	// OpenShiftSDN (default), OVNKubernetes
 	operConf.DefaultNetwork.Type = operv1.NetworkType(clusterConf.NetworkType)
 }
 
@@ -88,6 +88,8 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec) configv1.NetworkStat
 	// Don't set status if we don't understand the network type
 	switch operConf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
+		// continue
+	case operv1.NetworkTypeOVNKubernetes:
 		// continue
 	default:
 		return configv1.NetworkStatus{}
