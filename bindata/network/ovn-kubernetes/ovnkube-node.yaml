@@ -147,6 +147,8 @@ spec:
           name: host-var-lib-ovs
         - mountPath: /var/run/openvswitch/
           name: host-var-run-ovs
+        - mountPath: /var/run/ovn-kubernetes/
+          name: host-var-run-ovn-kubernetes
         # CNI related mounts which we take over
         - mountPath: /host/opt/cni/bin
           name: host-cni-bin
@@ -218,6 +220,9 @@ spec:
       - name: host-var-run-ovs
         hostPath:
           path: /var/run/openvswitch
+      - name: host-var-run-ovn-kubernetes
+        hostPath:
+          path: /var/run/ovn-kubernetes
       - name: host-sys
         hostPath:
           path: /sys
