@@ -46,8 +46,6 @@ spec:
         - |
           #!/bin/bash
           set -euo pipefail
-          # tee all output to the host's journal
-          exec 1> >(logger -p user.info --size 4096 -s -t openshift-sdn/${K8S_POD_NAME}) 2>&1
 
           # if another process is listening on the cni-server socket, wait until it exits
           trap 'kill $(jobs -p); rm -f /etc/cni/net.d/80-openshift-network.conf ; exit 0' TERM
@@ -126,8 +124,6 @@ spec:
         - mountPath: /etc/sysconfig
           name: etc-sysconfig
           readOnly: true
-        - mountPath: /dev/log
-          name: host-dev-log
         resources:
           requests:
             cpu: 100m
@@ -139,10 +135,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: K8S_POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
         ports:
         - name: healthz
           containerPort: 10256
@@ -205,9 +197,5 @@ spec:
       - name: host-var-lib-cni-networks-openshift-sdn
         hostPath:
           path: /var/lib/cni/networks/openshift-sdn
-      - name: host-dev-log
-        hostPath:
-          path: /dev/log
-          type: Socket
       tolerations:
       - operator: Exists
