@@ -37,9 +37,10 @@ function setup_operator_env() {
         echo "Copying environment variables from manifest to ${CLUSTER_DIR}/env.sh"
         oc --kubeconfig=hack/null-kubeconfig convert --local=true -f manifests/0000_07_cluster-network-operator_03_daemonset.yaml -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
     fi
+    sed -i -e "s/^RELEASE_VERSION=.*/RELEASE_VERSION=${RELEASE_VERSION}/" "${CLUSTER_DIR}/env.sh"
 }
 
-# wait_for_cluster waits for the cluster to come up
+# wait_for_cluster waits for the cluster to come up and sets some variables
 function wait_for_cluster() {
     export KUBECONFIG="${CLUSTER_DIR}/auth/kubeconfig"
 
@@ -63,6 +64,16 @@ function wait_for_cluster() {
         done
         echo "Found ${KUBERNETES_SERVICE_HOST}"
     fi
+
+    if ! oc get clusterversion version >& /dev/null; then
+        echo "Waiting for cluster-version-operator to start..."
+    fi
+    # The object gets created first and then populated later, so the "oc get" may succeed
+    # but return an empty string. (But not for long.)
+    while RELEASE_VERSION="$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null)"; test -z "${RELEASE_VERSION}"; do
+        sleep 5
+    done
+    echo "Cluster version is ${RELEASE_VERSION}"
 
     if ! oc get namespace openshift-network-operator >& /dev/null; then
         echo "Waiting for installer to create openshift-network-operator namespace..."
@@ -89,7 +100,7 @@ if [[ -z "${CLUSTER_DIR:-}" ]]; then
     exit 1
 fi
 
-if [[ ! -e "${CLUSTER_DIR}/env.sh" && ! -e "${CLUSTER_DIR}/manifests/cvo-overrides.yaml" ]]; then
+if [[ ! -e "${CLUSTER_DIR}/manifests" && ! -e "${CLUSTER_DIR}/auth" ]]; then
     echo "error: cannot find installer state; please run"
     echo "  openshift-install --dir=${CLUSTER_DIR} create manifests"
     echo "For more info, see INSTALLER-HACKING.md"
@@ -100,7 +111,7 @@ if [[ -e "${CLUSTER_DIR}/manifests/cvo-overrides.yaml" ]]; then
     override_install_manifests
 fi
 
-setup_operator_env
 wait_for_cluster
+setup_operator_env
 
 env $(cat "${CLUSTER_DIR}/env.sh") _output/linux/amd64/cluster-network-operator
