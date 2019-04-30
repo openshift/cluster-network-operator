@@ -69,11 +69,9 @@ spec:
               ovs-vsctl --no-wait set Open_vSwitch . other_config:n-revalidator-threads=4
               ovs-vsctl --no-wait set Open_vSwitch . other_config:n-handler-threads=10
           fi
+          /usr/share/openvswitch/scripts/ovs-ctl start --no-ovsdb-server --system-id=random
 
-          /usr/share/openvswitch/scripts/ovs-ctl load-kmod
-          ovs-vswitchd unix:/var/run/openvswitch/db.sock -vconsole:info -vsyslog:info -vfile:info --mlockall --no-chdir --log-file=/var/log/openvswitch/ovs-vswitchd.log --pidfile=/var/run/openvswitch/ovs-vswitchd.pid --detach --monitor --syslog-method=unix:/dev/log
-
-          tail --follow=name /var/log/openvswitch/ovsdb-server.log &
+          tail --follow=name /var/log/openvswitch/ovs-vswitchd.log /var/log/openvswitch/ovsdb-server.log &
           while true; do
             sleep 10000
           done
@@ -92,8 +90,6 @@ spec:
           readOnly: true
         - mountPath: /etc/openvswitch
           name: host-config-openvswitch
-        - mountPath: /dev/log
-          name: host-dev-log
         resources:
           requests:
             cpu: 200m
@@ -121,10 +117,6 @@ spec:
       - name: host-config-openvswitch
         hostPath:
           path: /var/lib/openvswitch
-      - name: host-dev-log
-        hostPath:
-          path: /dev/log
-          type: Socket
       tolerations:
       - operator: "Exists"
 {{- end}}
