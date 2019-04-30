@@ -11,6 +11,7 @@ metadata:
   annotations:
     kubernetes.io/description: |
       This daemonset launches the ovn-kubernetes controller (master) networking components.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
 spec:
   replicas: 1
   selector:
