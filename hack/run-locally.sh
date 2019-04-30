@@ -35,7 +35,7 @@ function override_install_manifests() {
 function setup_operator_env() {
     if [[ manifests/0000_07_cluster-network-operator_03_daemonset.yaml -nt "${CLUSTER_DIR}/env.sh" ]]; then
         echo "Copying environment variables from manifest to ${CLUSTER_DIR}/env.sh"
-        oc --kubeconfig=hack/null-kubeconfig convert --local=true -f manifests/0000_07_cluster-network-operator_03_daemonset.yaml -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
+        oc --kubeconfig=hack/null-kubeconfig patch --local=true -f manifests/0000_07_cluster-network-operator_03_daemonset.yaml -p '{}' -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
     fi
     sed -i -e "s/^RELEASE_VERSION=.*/RELEASE_VERSION=${RELEASE_VERSION}/" "${CLUSTER_DIR}/env.sh"
 }
