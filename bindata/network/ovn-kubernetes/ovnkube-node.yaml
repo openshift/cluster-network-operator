@@ -12,6 +12,7 @@ metadata:
   annotations:
     kubernetes.io/description: |
       This daemonset launches the ovn-kubernetes per node networking components.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
 spec:
   selector:
     matchLabels:
@@ -90,13 +91,6 @@ spec:
           name: host-var-lib-ovs
         - mountPath: /var/run/openvswitch/
           name: host-var-run-ovs
-        # CNI related mounts which we take over
-        - mountPath: /host/opt/cni/bin
-          name: host-opt-cni-bin
-        - mountPath: /etc/cni/net.d
-          name: host-etc-cni-netd
-        - mountPath: /var/lib/cni/networks/ovn-k8s-cni-overlay
-          name: host-var-lib-cni-networks-ovn-kubernetes
 
         resources:
           requests:
@@ -138,10 +132,6 @@ spec:
         #     path: /healthz
         #     port: 10258
         #     scheme: HTTP
-        lifecycle:
-          preStop:
-            exec:
-              command: ["rm","-f","/etc/cni/net.d/10-ovn-kubernetes.conf", "/host/opt/cni/bin/ovn-k8s-cni-overlay"]
 
       - name: ovn-node
         image: {{.OvnImage}}
@@ -158,11 +148,13 @@ spec:
           name: host-var-lib-ovs
         - mountPath: /var/run/openvswitch/
           name: host-var-run-ovs
+        - mountPath: /var/run/ovn-kubernetes/
+          name: host-var-run-ovn-kubernetes
         # CNI related mounts which we take over
         - mountPath: /host/opt/cni/bin
-          name: host-opt-cni-bin
+          name: host-cni-bin
         - mountPath: /etc/cni/net.d
-          name: host-etc-cni-netd
+          name: host-cni-netd
         - mountPath: /var/lib/cni/networks/ovn-k8s-cni-overlay
           name: host-var-lib-cni-networks-ovn-kubernetes
 
@@ -207,6 +199,9 @@ spec:
         #     port: 10259
         #     scheme: HTTP
         lifecycle:
+          preStop:
+            exec:
+              command: ["rm","-f","/etc/cni/net.d/10-ovn-kubernetes.conf", "/host/opt/cni/bin/ovn-k8s-cni-overlay"]
 
       nodeSelector:
         beta.kubernetes.io/os: "linux"
@@ -226,14 +221,17 @@ spec:
       - name: host-var-run-ovs
         hostPath:
           path: /var/run/openvswitch
+      - name: host-var-run-ovn-kubernetes
+        hostPath:
+          path: /var/run/ovn-kubernetes
       - name: host-sys
         hostPath:
           path: /sys
 
-      - name: host-opt-cni-bin
+      - name: host-cni-bin
         hostPath:
-          path: /opt/cni/bin
-      - name: host-etc-cni-netd
+          path: /var/lib/cni/bin
+      - name: host-cni-netd
         hostPath:
           path: /etc/kubernetes/cni/net.d
       - name: host-config-openvswitch
