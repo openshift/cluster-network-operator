@@ -109,5 +109,7 @@ func main() {
 	log.Print("Starting the Cmd.")
 
 	// Start the Cmd
-	log.Fatal(mgr.Start(signals.SetupSignalHandler()))
+	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+		log.Fatal(err)
+	}
 }
