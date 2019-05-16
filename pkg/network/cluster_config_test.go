@@ -104,7 +104,7 @@ func TestStatusFromConfig(t *testing.T) {
 	crd.Spec.DefaultNetwork.OpenShiftSDNConfig.MTU = &mtu
 
 	status := StatusFromOperatorConfig(&crd.Spec)
-	g.Expect(status).To(Equal(configv1.NetworkStatus{
+	g.Expect(status).To(Equal(&configv1.NetworkStatus{
 		ClusterNetwork: []configv1.ClusterNetworkEntry{
 			{
 				CIDR:       "10.128.0.0/15",
@@ -120,4 +120,8 @@ func TestStatusFromConfig(t *testing.T) {
 
 		NetworkType: "OpenShiftSDN",
 	}))
+
+	crd.Spec.DefaultNetwork.Type = "nasa"
+	status = StatusFromOperatorConfig(&crd.Spec)
+	g.Expect(status).To(BeNil())
 }
