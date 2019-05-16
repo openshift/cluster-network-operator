@@ -84,7 +84,7 @@ func MergeClusterConfig(operConf *operv1.NetworkSpec, clusterConf configv1.Netwo
 
 // StatusFromOperatorConfig generates the cluster NetworkStatus from the
 // currently applied operator configuration.
-func StatusFromOperatorConfig(operConf *operv1.NetworkSpec) configv1.NetworkStatus {
+func StatusFromOperatorConfig(operConf *operv1.NetworkSpec) *configv1.NetworkStatus {
 	// Don't set status if we don't understand the network type
 	switch operConf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
@@ -92,7 +92,7 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec) configv1.NetworkStat
 	case operv1.NetworkTypeOVNKubernetes:
 		// continue
 	default:
-		return configv1.NetworkStatus{}
+		return nil
 	}
 
 	// TODO: when we support expanding the service cidr or cluster cidr,
@@ -118,5 +118,5 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec) configv1.NetworkStat
 		status.ClusterNetworkMTU = int(*operConf.DefaultNetwork.OVNKubernetesConfig.MTU)
 	}
 
-	return status
+	return &status
 }
