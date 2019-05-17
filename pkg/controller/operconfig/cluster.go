@@ -82,10 +82,10 @@ func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConf
 
 	// Update the cluster config status
 	status := network.StatusFromOperatorConfig(&operConfig.Spec)
-	if reflect.DeepEqual(status, clusterConfig.Status) {
+	if status == nil || reflect.DeepEqual(*status, clusterConfig.Status) {
 		return nil, nil
 	}
-	clusterConfig.Status = status
+	clusterConfig.Status = *status
 	clusterConfig.TypeMeta = metav1.TypeMeta{APIVersion: configv1.GroupVersion.String(), Kind: "Network"}
 
 	return k8sutil.ToUnstructured(clusterConfig)
