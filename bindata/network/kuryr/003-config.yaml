@@ -26,7 +26,7 @@ data:
     ssl_ca_crt_file = /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
     token_file = /var/run/secrets/kubernetes.io/serviceaccount/token
     ssl_verify_server_crt = true
-    controller_ha = false
+    controller_ha = true
     controller_ha_elector_port = 16401
     watch_retry_timeout = 3600
     pod_vif_driver = nested-vlan

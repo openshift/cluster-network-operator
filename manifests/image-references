@@ -42,3 +42,7 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-kuryr-controller:4.2
+  - name: leader-elector
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-leader-elector:v4.2

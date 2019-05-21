@@ -45,6 +45,8 @@ spec:
           value: "quay.io/openshift/origin-kuryr-cni:4.2"
         - name: KURYR_CONTROLLER_IMAGE
           value: "quay.io/openshift/origin-kuryr-controller:4.2"
+        - name: LEADER_ELECTOR_IMAGE
+          value: "quay.io/openshift/origin-leader-elector:4.2"
         - name: POD_NAME
           valueFrom:
             fieldRef:

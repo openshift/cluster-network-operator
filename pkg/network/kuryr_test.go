@@ -65,7 +65,7 @@ func TestRenderKuryr(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "kuryr")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-kuryr", "kuryr")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "kuryr")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-kuryr", "kuryr-controller")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-kuryr", "kuryr-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-kuryr", "kuryr-cni")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ConfigMap", "openshift-kuryr", "kuryr-config")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("CustomResourceDefinition", "", "kuryrnets.openstack.org")))

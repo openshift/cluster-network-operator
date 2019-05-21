@@ -1,11 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: kuryr-controller
   namespace: openshift-kuryr
   annotations:
     kubernetes.io/description: |
-      This deployment launches the kuryr-controller component.
+      This daemonset launches the kuryr-controller component.
     release.openshift.io/version: "{{.ReleaseVersion}}"
 spec:
   selector:
@@ -51,6 +51,16 @@ spec:
         volumeMounts:
         - name: config-volume
           mountPath: "/etc/kuryr"
+      - image: {{ .LeaderElectorImage }}
+        name: leader-elector
+        args:
+        - "--election=kuryr-controller"
+        - "--http=0.0.0.0:16401"
+        - "--election-namespace=kuryr"
+        - "--ttl=5s"
+        ports:
+        - containerPort: 16401
+          protocol: TCP
       nodeSelector:
         node-role.kubernetes.io/master: ""
       tolerations:
