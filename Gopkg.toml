@@ -6,34 +6,33 @@ required = [
   "k8s.io/code-generator/cmd/client-gen",
   "k8s.io/code-generator/cmd/lister-gen",
   "k8s.io/code-generator/cmd/informer-gen",
-  "k8s.io/code-generator/cmd/openapi-gen",
   "k8s.io/gengo/args",
 ]
 
 [[override]]
   name = "k8s.io/code-generator"
-  # revision for tag "kubernetes-1.12.3"
-  revision = "3dcf91f64f638563e5106f21f50c31fa361c918d"
+  # revision for tag "kubernetes-1.14.0"
+  revision = "50b561225d70b3eb79a1faafd3dfe7b1a62cbe73"
 
 [[override]]
   name = "k8s.io/api"
-  # revision for tag "kubernetes-1.12.3"
-  revision = "b503174bad5991eb66f18247f52e41c3258f6348"
+  # revision for tag "kubernetes-1.14.0"
+  revision = "40a48860b5abbba9aa891b02b32da429b08d96a0"
 
 [[override]]
   name = "k8s.io/apiextensions-apiserver"
-  # revision for tag "kubernetes-1.12.3"
-  revision = "0cd23ebeb6882bd1cdc2cb15fc7b2d72e8a86a5b"
+  # revision for tag "kubernetes-1.14.0"
+  revision = "53c4693659ed354d76121458fb819202dd1635fa"
 
 [[override]]
   name = "k8s.io/apimachinery"
-  # revision for tag "kubernetes-1.12.3"
-  revision = "eddba98df674a16931d2d4ba75edc3a389bf633a"
+  # revision for tag "kubernetes-1.14.0"
+  revision = "d7deff9243b165ee192f5551710ea4285dcfd615"
 
 [[override]]
   name = "k8s.io/client-go"
-  # revision for tag "kubernetes-1.12.3"
-  revision = "d082d5923d3cc0bfbb066ee5fbdea3d0ca79acf8"
+  # revision for tag "kubernetes-1.14.0"
+  revision = "6ee68ca5fd8355d024d02f9db0b3b667e8357a0f"
 
 [[override]]
   name = "github.com/coreos/prometheus-operator"
@@ -41,7 +40,7 @@ required = [
 
 [[override]]
   name = "sigs.k8s.io/controller-runtime"
-  version = "=v0.1.8"
+  version = "=v0.2.0-beta.1"
 
 [[constraint]]
   name = "github.com/operator-framework/operator-sdk"

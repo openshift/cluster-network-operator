@@ -26,11 +26,12 @@ import (
 	"syscall"
 	"testing"
 
-	"k8s.io/client-go/tools/clientcmd"
-
+	"github.com/operator-framework/operator-sdk/internal/pkg/scaffold"
+	"github.com/operator-framework/operator-sdk/internal/util/projutil"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
-	"github.com/operator-framework/operator-sdk/pkg/scaffold"
+
 	log "github.com/sirupsen/logrus"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
@@ -63,10 +64,17 @@ func MainEntry(m *testing.M) {
 	var localCmd *exec.Cmd
 	var localCmdOutBuf, localCmdErrBuf bytes.Buffer
 	if *localOperator {
-		// TODO: make a generic 'up-local' function to deduplicate shared code between this and cmd/up/local
-		// taken from commands/operator-sdk/cmd/up/local.go
-		runArgs := append([]string{"run"}, []string{filepath.Join(scaffold.ManagerDir, scaffold.CmdFile)}...)
-		localCmd = exec.Command("go", runArgs...)
+		projectName := filepath.Base(projutil.MustGetwd())
+		outputBinName := filepath.Join(scaffold.BuildBinDir, projectName+"-local")
+		opts := projutil.GoCmdOptions{
+			BinName:     outputBinName,
+			PackagePath: filepath.Join(scaffold.ManagerDir, scaffold.CmdFile),
+			GoMod:       projutil.IsDepManagerGoMod(),
+		}
+		if err := projutil.GoBuild(opts); err != nil {
+			log.Fatalf("Failed to build local operator binary: %s", err)
+		}
+		localCmd = exec.Command(outputBinName)
 		localCmd.Stdout = &localCmdOutBuf
 		localCmd.Stderr = &localCmdErrBuf
 		c := make(chan os.Signal)
@@ -110,18 +118,16 @@ func MainEntry(m *testing.M) {
 			log.Infof("Local operator stdout: %s", string(localCmdOutBuf.Bytes()))
 			log.Infof("Local operator stderr: %s", string(localCmdErrBuf.Bytes()))
 		}
-		ctx.CleanupNoT()
+		ctx.Cleanup()
 		os.Exit(exitCode)
 	}()
 	// create crd
-	if *kubeconfigPath != "incluster" {
-		globalYAML, err := ioutil.ReadFile(*globalManPath)
-		if err != nil {
-			log.Fatalf("Failed to read global resource manifest: %v", err)
-		}
-		err = ctx.createFromYAML(globalYAML, true, &CleanupOptions{TestContext: ctx})
-		if err != nil {
-			log.Fatalf("Failed to create resource(s) in global resource manifest: %v", err)
-		}
+	globalYAML, err := ioutil.ReadFile(*globalManPath)
+	if err != nil {
+		log.Fatalf("Failed to read global resource manifest: %v", err)
+	}
+	err = ctx.createFromYAML(globalYAML, true, &CleanupOptions{TestContext: ctx})
+	if err != nil {
+		log.Fatalf("Failed to create resource(s) in global resource manifest: %v", err)
 	}
 }
