@@ -17,7 +17,6 @@ rules:
 - apiGroups: [""]
   resources:
   - namespaces
-  - nodes
   - endpoints
   - services
   - pods
@@ -25,6 +24,14 @@ rules:
   - get
   - list
   - watch
+- apiGroups: [""]
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
 - apiGroups: ["extensions"]
   resources:
   - networkpolicies
