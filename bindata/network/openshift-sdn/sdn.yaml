@@ -6,6 +6,9 @@ metadata:
 data:
   sdn-config.yaml: |-
 {{.NodeConfig | indent 4}}
+  80-openshift.conflist: |-
+{{.CNIConfig | indent 4}}
+
 ---
 kind: DaemonSet
 apiVersion: apps/v1
@@ -48,7 +51,6 @@ spec:
           set -euo pipefail
 
           # if another process is listening on the cni-server socket, wait until it exits
-          trap 'kill $(jobs -p); rm -f /etc/cni/net.d/80-openshift-network.conf ; exit 0' TERM
           retries=0
           while true; do
             if echo 'test' | socat - UNIX-CONNECT:/var/run/openshift-sdn/cni-server.sock &>/dev/null; then
@@ -64,24 +66,27 @@ spec:
             fi
           done
 
-          # local environment overrides
+          # Allow DEBUG_LOGLEVEL to be configured per-host.
           if [[ -f /etc/sysconfig/openshift-sdn ]]; then
             set -o allexport
             source /etc/sysconfig/openshift-sdn
             set +o allexport
           fi
-          #BUG: cdc accidentally mounted /etc/sysconfig/openshift-sdn as DirectoryOrCreate; clean it up so we can ultimately mount /etc/sysconfig/openshift-sdn as FileOrCreate
-          # Once this is released, then we can mount it properly
+
+          {{/* BUG: cdc accidentally mounted /etc/sysconfig/openshift-sdn as DirectoryOrCreate;
+            clean it up so we can ultimately mount /etc/sysconfig/openshift-sdn as FileOrCreate
+            Once this is released, then we can mount it properly */}}
           if [[ -d /etc/sysconfig/openshift-sdn ]]; then
             rmdir /etc/sysconfig/openshift-sdn || true
           fi
 
-          # Take over network functions on the node
-          rm -f /etc/cni/net.d/80-openshift-network.conf
+          # Remove current and old (v4.1) configuration files.
+          # The SDN process will write its CNI configuration file when the network is ready.
+          rm -f /etc/cni/net.d/80-openshift-network.conf {{.CNIPath}}
           cp -f /opt/cni/bin/* /host/opt/cni/bin/
 
           # Launch the network process
-          exec /usr/bin/openshift-sdn --config=/config/sdn-config.yaml  --url-only-kubeconfig=/etc/kubernetes/kubeconfig --loglevel=${DEBUG_LOGLEVEL:-2}
+          exec /usr/bin/openshift-sdn --config=/config/sdn-config.yaml  --url-only-kubeconfig=/etc/kubernetes/kubeconfig --loglevel=${DEBUG_LOGLEVEL:-2} --cni-config-file-in=/config/80-openshift.conflist --cni-config-file-out={{.CNIPath}}
         securityContext:
           privileged: true
         volumeMounts:
@@ -142,7 +147,7 @@ spec:
         lifecycle:
           preStop:
             exec:
-              command: ["rm","-f","/etc/cni/net.d/80-openshift-network.conf", "/host/opt/cni/bin/openshift-sdn"]
+              command: ["rm","-f","{{.CNIPath}}", "/host/opt/cni/bin/openshift-sdn"]
         # this comes from the kube-proxy code
         livenessProbe:
           httpGet:
@@ -151,7 +156,7 @@ spec:
         readinessProbe:
           exec:
             # openshift-sdn writes this file when it is ready to handle pod requests.
-            command: ["test", "-f", "/etc/cni/net.d/80-openshift-network.conf"]
+            command: ["test", "-f", "{{.CNIPath}}"]
           initialDelaySeconds: 5
           periodSeconds: 5
       nodeSelector:

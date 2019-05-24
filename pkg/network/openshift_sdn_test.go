@@ -434,3 +434,60 @@ volumeConfig:
 volumeDirectory: ""
 `))
 }
+
+func TestCNIConfig(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OpenShiftSDNConfig.DeepCopy()
+	config := &crd.Spec
+	FillDefaults(config, nil)
+
+	// iter through all objects, finding the sdn config map
+	getCNIConfigFile := func(objs []*uns.Unstructured) string {
+		for _, obj := range objs {
+			if obj.GetKind() == "ConfigMap" && obj.GetName() == "sdn-config" {
+				val, ok, err := uns.NestedString(obj.Object, "data", "80-openshift.conflist")
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(ok).To(BeTrue())
+				return val
+
+			}
+		}
+		t.Fatal("failed to find sdn-config")
+		return "" //unreachable
+	}
+
+	// test default rendering
+	objs, err := renderOpenShiftSDN(config, manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+	cfg := getCNIConfigFile(objs)
+
+	g.Expect(cfg).To(MatchJSON(`
+{
+	"name": "openshift",
+	"cniVersion": "0.3.1",
+	"plugins": [
+		{ "type": "openshift-sdn" }
+	]
+}`))
+
+	config.DefaultNetwork.ChainedPlugins = []operv1.ChainedPluginEntry{
+		{RawCNIConfig: `{"type": "foo"}`},
+		{RawCNIConfig: `{"type": "bar"}`},
+	}
+
+	objs, err = renderOpenShiftSDN(config, manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+	cfg = getCNIConfigFile(objs)
+
+	g.Expect(cfg).To(MatchJSON(`
+{
+	"name": "openshift",
+	"cniVersion": "0.3.1",
+	"plugins": [
+		{ "type": "openshift-sdn" },
+		{ "type": "foo" },
+		{ "type": "bar" }
+	]
+}`))
+}

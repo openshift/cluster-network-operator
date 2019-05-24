@@ -104,6 +104,19 @@ Currently, the only understood values for network Type are `OpenShiftSDN` and `O
 
 Other values are ignored. If you wish to use use a third-party network provider not managed by the operator, set the network type to something meaningful to you. The operator will not install or upgrade a network provider, but all other Network Operator functionality remains.
 
+### Adding chained plugins
+You can add raw CNI configuration snippets to be installed as CNI chained plugins. These will be included in the CNI configuration file used by the default network provider. Note that these are *not* multus multiple networks. Rather, they are for plugins that manipulate the container's existing network. For example, if you want to adjust your container's sysctls, you can configure
+
+```yaml
+spec:
+  defaultNetwork:
+    type: OpenShiftSDN
+    openshiftSDNConfig: {}
+    chainedPlugins:
+      - '{"name": "tuning", "sysctl": { "net.core.somaxconn": "500"}}`
+```
+
+Not all default networks support chained plugins. Currently, only OpenShiftSDN does.
 
 ### Configuring OpenShiftSDN
 OpenShiftSDN supports the following configuration options, all of which are optional:
@@ -116,14 +129,7 @@ These configuration flags are only in the Operator configuration object.
 
 Example:
 ```yaml
-spec:
-  defaultNetwork:
-    type: OpenShiftSDN
-    openshiftSDNConfig:
-      mode: NetworkPolicy
-      vxlanPort: 4789
-      mtu: 1450
-      useExternalOpenvswitch: false
+
 ```
 
 ### Configuring OVNKubernetes

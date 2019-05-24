@@ -39,6 +39,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
 	data.Data["Mode"] = c.Mode
+	data.Data["CNIPath"] = CNIConfigPath
 
 	operCfg, err := controllerConfig(conf)
 	if err != nil {
@@ -51,6 +52,9 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 		return nil, errors.Wrap(err, "failed to build node config")
 	}
 	data.Data["NodeConfig"] = nodeCfg
+
+	data.Data["CNIConfig"] = makeCNIConfig(conf, CNINetworkName, "0.3.1",
+		`{"type": "openshift-sdn"}`)
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/openshift-sdn"), &data)
 	if err != nil {
@@ -105,7 +109,7 @@ func isOpenShiftSDNChangeSafe(prev, next *operv1.NetworkSpec) []error {
 }
 
 func fillOpenShiftSDNDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
-	// NOTE: If you change any defaults, and it's not a safe chang to roll out
+	// NOTE: If you change any defaults, and it's not a safe change to roll out
 	// to existing clusters, you MUST use the value from previous instead.
 	if conf.DeployKubeProxy == nil {
 		prox := false

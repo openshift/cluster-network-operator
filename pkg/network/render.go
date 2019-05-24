@@ -197,13 +197,15 @@ func ValidateMultus(conf *operv1.NetworkSpec) []error {
 // ValidateDefaultNetwork validates whichever network is specified
 // as the default network.
 func ValidateDefaultNetwork(conf *operv1.NetworkSpec) []error {
+	out := validateChainedPlugins(conf)
+
 	switch conf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
-		return validateOpenShiftSDN(conf)
+		return append(out, validateOpenShiftSDN(conf)...)
 	case operv1.NetworkTypeOVNKubernetes:
-		return validateOVNKubernetes(conf)
+		return append(out, validateOVNKubernetes(conf)...)
 	default:
-		return nil
+		return out
 	}
 }
 
@@ -241,6 +243,8 @@ func IsDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	if prev.DefaultNetwork.Type != next.DefaultNetwork.Type {
 		return []error{errors.Errorf("cannot change default network type")}
 	}
+
+	// It is allowed to change Spec.DefaultNetwork.ChainedPlugins
 
 	switch prev.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
