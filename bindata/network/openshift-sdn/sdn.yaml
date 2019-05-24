@@ -110,6 +110,7 @@ spec:
           name: host-var-run-openshift-sdn
         - mountPath: /host
           name: host-slash
+          readOnly: true
         # CNI related mounts which we take over
         - mountPath: /host/opt/cni/bin
           name: host-cni-bin
