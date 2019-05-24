@@ -72,6 +72,8 @@ func Canonicalize(conf *operv1.NetworkSpec) {
 		switch strings.ToLower(string(an.Type)) {
 		case strings.ToLower(string(operv1.NetworkTypeRaw)):
 			an.Type = operv1.NetworkTypeRaw
+		case strings.ToLower(string(operv1.NetworkTypeMacvlan)):
+			an.Type = operv1.NetworkTypeMacvlan
 		}
 	}
 }
@@ -262,6 +264,10 @@ func ValidateAdditionalNetworks(conf *operv1.NetworkSpec) [][]error {
 			if errs := validateRaw(&an); len(errs) > 0 {
 				out = append(out, errs)
 			}
+		case operv1.NetworkTypeMacvlan:
+			if errs := validateMacvlanConfig(&an); len(errs) > 0 {
+				out = append(out, errs)
+			}
 		default:
 			out = append(out, []error{errors.Errorf("unknown or unsupported NetworkType: %s", an.Type)})
 		}
@@ -294,6 +300,12 @@ func RenderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 			} else {
 				objs, err = renderRawCNIConfig(&an, manifestDir)
 			}
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, objs...)
+		case operv1.NetworkTypeMacvlan:
+			objs, err = renderMacvlanConfig(&an, manifestDir)
 			if err != nil {
 				return nil, err
 			}

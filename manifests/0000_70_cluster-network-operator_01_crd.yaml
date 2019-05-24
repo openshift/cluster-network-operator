@@ -67,7 +67,7 @@ spec:
               type: array
               items:
                 type: object
-                required: ["type", "name", "rawCNIConfig"]
+                required: ["type", "name"]
                 properties:
                   type:
                     type: string
@@ -77,6 +77,19 @@ spec:
                     type: string
                   rawCNIConfig:
                     type: string
+                  macvlanConfig:
+                    type: object
+                    required: ["master"]
+                    properties:
+                      master:
+                        type: string
+                      ipam:
+                        type: string
+                      mode:
+                        type: string
+                      mtu:
+                        type: integer
+                        minimum: 0
             disableMultiNetwork:
               type: boolean
             deployKubeProxy:

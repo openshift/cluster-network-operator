@@ -58,3 +58,50 @@ func validateRaw(conf *operv1.AdditionalNetworkDefinition) []error {
 
 	return out
 }
+
+// renderMacvlanConfig returns the RawCNIConfig manifests
+func renderMacvlanConfig(conf *operv1.AdditionalNetworkDefinition, manifestDir string) ([]*uns.Unstructured, error) {
+	var err error
+	objs := []*uns.Unstructured{}
+	macvlanConfig := conf.MacvlanConfig
+
+	// render RawCNIConfig manifests
+	data := render.MakeRenderData()
+	data.Data["AdditionalNetworkName"] = conf.Name
+	data.Data["Master"] = macvlanConfig.Master
+	data.Data["IPAM"] = "dhcp"
+
+	if macvlanConfig.IPAM != "" {
+		data.Data["IPAM"] = macvlanConfig.IPAM
+	}
+
+	if macvlanConfig.Mode != "" {
+		data.Data["Mode"] = macvlanConfig.Mode
+	}
+
+	if macvlanConfig.MTU != nil {
+		data.Data["MTU"] = macvlanConfig.MTU
+	}
+
+	objs, err = render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/macvlan"), &data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to render macvlan additional network")
+	}
+	return objs, nil
+}
+
+// validateMacvlanConfig checks the M name and RawCNIConfig.
+func validateMacvlanConfig(conf *operv1.AdditionalNetworkDefinition) []error {
+	out := []error{}
+	macvlanConfig := conf.MacvlanConfig
+
+	if conf.Name == "" {
+		out = append(out, errors.Errorf("Additional Network Name cannot be nil"))
+	}
+
+	if macvlanConfig.Master == "" {
+		out = append(out, errors.Errorf("macvlan master cannot be nil"))
+	}
+
+	return out
+}
