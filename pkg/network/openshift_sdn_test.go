@@ -304,11 +304,11 @@ func TestOpenShiftSDNMultitenant(t *testing.T) {
 func TestOpenshiftControllerConfig(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	crd := OpenShiftSDNConfig.DeepCopy()
-	config := &crd.Spec
+	copy := OpenShiftSDNConfig.DeepCopy()
+	config := &copy.Spec
 	FillDefaults(config, nil)
 
-	cfg, err := controllerConfig(config)
+	cfg, crd, err := controllerConfig(config)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(cfg).To(Equal(`apiVersion: openshiftcontrolplane.config.openshift.io/v1
 build:
@@ -366,6 +366,22 @@ serviceAccount:
 serviceServingCert:
   signer: null
 servingInfo: null
+`))
+	g.Expect(crd).To(Equal(`apiVersion: network.openshift.io/v1
+clusterNetworks:
+- CIDR: 10.128.0.0/15
+  hostSubnetLength: 9
+- CIDR: 10.0.0.0/14
+  hostSubnetLength: 8
+hostsubnetlength: 9
+kind: ClusterNetwork
+metadata:
+  creationTimestamp: null
+  name: default
+network: 10.128.0.0/15
+pluginName: redhat/openshift-ovs-networkpolicy
+serviceNetwork: 172.30.0.0/16
+vxlanPort: 4789
 `))
 }
 
