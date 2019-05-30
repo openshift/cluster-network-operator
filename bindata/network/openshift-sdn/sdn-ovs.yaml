@@ -71,9 +71,10 @@ spec:
           fi
           /usr/share/openvswitch/scripts/ovs-ctl start --no-ovsdb-server --system-id=random
 
-          tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
-          tail -F --pid=$(cat /var/run/openvswitch/ovsdb-server.pid) /var/log/openvswitch/ovsdb-server.log &
-          wait
+          tail --follow=name /var/log/openvswitch/ovs-vswitchd.log /var/log/openvswitch/ovsdb-server.log &
+          while true; do
+            sleep 10000
+          done
         securityContext:
           privileged: true
         volumeMounts:
@@ -101,18 +102,6 @@ spec:
             - status
           initialDelaySeconds: 15
           periodSeconds: 5
-        readinessProbe:
-          exec:
-            command:
-            - /usr/share/openvswitch/scripts/ovs-ctl
-            - status
-          initialDelaySeconds: 15
-          periodSeconds: 5
-        lifecycle:
-          preStop:
-            exec:
-              command: ["/usr/share/openvswitch/scripts/ovs-ctl", "stop"]
-        terminationGracePeriodSeconds: 10
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
