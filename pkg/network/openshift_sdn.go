@@ -13,6 +13,7 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	legacyconfigv1 "github.com/openshift/api/legacyconfig/v1"
+	netv1 "github.com/openshift/api/network/v1"
 	cpv1 "github.com/openshift/api/openshiftcontrolplane/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -40,11 +41,12 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
 	data.Data["Mode"] = c.Mode
 
-	operCfg, err := controllerConfig(conf)
+	operCfg, clusterNetwork, err := controllerConfig(conf)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build controller config")
 	}
 	data.Data["NetworkControllerConfig"] = operCfg
+	data.Data["ClusterNetwork"] = clusterNetwork
 
 	nodeCfg, err := nodeConfig(conf)
 	if err != nil {
@@ -171,22 +173,27 @@ func sdnPluginName(n operv1.SDNMode) string {
 	return ""
 }
 
-// controllerConfig builds the contents of controller-config.yaml
+// controllerConfig builds the contents of controller-config.yaml and ClusterNetwork
 // for the controller
-func controllerConfig(conf *operv1.NetworkSpec) (string, error) {
+func controllerConfig(conf *operv1.NetworkSpec) (string, string, error) {
 	c := conf.DefaultNetwork.OpenShiftSDNConfig
 
 	// generate master network configuration
-	ippools := []cpv1.ClusterNetworkEntry{}
+	cfgNetworks := []cpv1.ClusterNetworkEntry{}
+	crdNetworks := []netv1.ClusterNetworkEntry{}
 	for _, entry := range conf.ClusterNetwork {
 		_, cidr, err := net.ParseCIDR(entry.CIDR) // already validated
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		_, size := cidr.Mask.Size()
+		hostSubnetLength := uint32(size) - entry.HostPrefix
 
-		ippools = append(ippools, cpv1.ClusterNetworkEntry{CIDR: entry.CIDR, HostSubnetLength: uint32(size) - entry.HostPrefix})
+		cfgNetworks = append(cfgNetworks, cpv1.ClusterNetworkEntry{CIDR: entry.CIDR, HostSubnetLength: hostSubnetLength})
+		crdNetworks = append(crdNetworks, netv1.ClusterNetworkEntry{CIDR: entry.CIDR, HostSubnetLength: hostSubnetLength})
 	}
+
+	pluginName := sdnPluginName(c.Mode)
 
 	cfg := cpv1.OpenShiftControllerManagerConfig{
 		TypeMeta: metav1.TypeMeta{
@@ -196,15 +203,39 @@ func controllerConfig(conf *operv1.NetworkSpec) (string, error) {
 		// no ObjectMeta - not an API object
 
 		Network: cpv1.NetworkControllerConfig{
-			NetworkPluginName:  sdnPluginName(c.Mode),
-			ClusterNetworks:    ippools,
+			NetworkPluginName:  pluginName,
+			ClusterNetworks:    cfgNetworks,
 			ServiceNetworkCIDR: conf.ServiceNetwork[0],
 			VXLANPort:          *c.VXLANPort,
 		},
 	}
+	cfgBuf, err := yaml.Marshal(cfg)
+	if err != nil {
+		return "", "", err
+	}
 
-	buf, err := yaml.Marshal(cfg)
-	return string(buf), err
+	crd := netv1.ClusterNetwork{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "network.openshift.io/v1",
+			Kind:       "ClusterNetwork",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: netv1.ClusterNetworkDefault,
+		},
+
+		PluginName:       pluginName,
+		Network:          crdNetworks[0].CIDR,
+		HostSubnetLength: crdNetworks[0].HostSubnetLength,
+		ClusterNetworks:  crdNetworks,
+		ServiceNetwork:   conf.ServiceNetwork[0],
+		VXLANPort:        c.VXLANPort,
+	}
+	crdBuf, err := yaml.Marshal(crd)
+	if err != nil {
+		return "", "", err
+	}
+
+	return string(cfgBuf), string(crdBuf), nil
 }
 
 // nodeConfig builds the (yaml text of) the NodeConfig object

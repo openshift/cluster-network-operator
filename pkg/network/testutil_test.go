@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onsi/gomega/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -69,4 +70,5 @@ func tweakMetaForCompare(obj *uns.Unstructured) {
 		obj.SetAnnotations(map[string]string{})
 	}
 	obj.SetResourceVersion("")
+	obj.SetCreationTimestamp(metav1.Time{})
 }
