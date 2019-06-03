@@ -6,7 +6,7 @@ set -o nounset
 function get_group_id() {
     name="$1"
 
-    id=$(aws ec2 describe-security-groups --filters="Name=tag:Name,Values=${name}" | \
+    id=$(aws --output json ec2 describe-security-groups --filters="Name=tag:Name,Values=${name}" | \
 	     jq -r .SecurityGroups[0].GroupId)
     if [[ "${id}" == "null" ]]; then
 	echo "error: security group '${name}' does not (yet?) exist" 1>&2
