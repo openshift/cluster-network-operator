@@ -2,7 +2,7 @@
 
 # run-locally.sh is some scaffolding around running a local instance of the
 # network operator with the installer.
-# See INSTALLER-HACKING.md
+# See HACKING.md
 
 set -o errexit
 set -o nounset
@@ -31,13 +31,43 @@ function override_install_manifests() {
     fi
 }
 
-# Extract environment variables for the CNO DaemonSet
-function setup_operator_env() {
+# Extract environment from a running cluster
+function extract_environment_from_running_cluster() {
+    if [[ ! -e "${CLUSTER_DIR}/env.sh" ]]; then
+        echo "Copying environment variables from manifest to ${CLUSTER_DIR}/env.sh"
+        kubectl get deployment -n openshift-network-operator network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
+    fi
+}
+
+# Extract environment from the installer's cluster-network-operator manifests
+function extract_environment_from_manifests() {
     if [[ manifests/0000_70_cluster-network-operator_03_daemonset.yaml -nt "${CLUSTER_DIR}/env.sh" ]]; then
         echo "Copying environment variables from manifest to ${CLUSTER_DIR}/env.sh"
         oc --kubeconfig=hack/null-kubeconfig patch --local=true -f manifests/0000_70_cluster-network-operator_03_daemonset.yaml -p '{}' -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
     fi
+}
+
+# Update cluster-network-operator environment variables
+function setup_operator_env() {
+    local image_env_key="$1"
+    local plugin_image="$2"
+
     sed -i -e "s/^RELEASE_VERSION=.*/RELEASE_VERSION=${RELEASE_VERSION}/" "${CLUSTER_DIR}/env.sh"
+
+    if [[ -n "${plugin_image}" ]]; then
+        sed -i -e "s#^${image_env_key}=.*#${image_env_key}=${plugin_image}#" "${CLUSTER_DIR}/env.sh"
+    fi
+}
+
+# Patch the CNO out of the cluster-version-operator and scale it down to zero so
+# we can run our local CNO instead
+function stop_deployed_operator() {
+    kubectl patch --type=json -p "$(cat hack/overrides-patch.yaml)" clusterversion version
+
+    if [[ -n "$(kubectl get deployments -n openshift-network-operator 2> /dev/null | grep network-operator)" ]]; then
+        echo "Scaling the deployed network operator to 0"
+        kubectl scale deployment -n openshift-network-operator network-operator --replicas 0
+    fi
 }
 
 # wait_for_cluster waits for the cluster to come up and sets some variables
@@ -94,24 +124,170 @@ function wait_for_cluster() {
     fi
 }
 
+# Copy an existing install-config into CLUSTER_DIR, or create a new one there
+function ensure_install_config() {
+    if [[ -z "${INSTALL_CONFIG}" ]]; then
+        # Create a new install-config.yaml if none was given and none exists in CLUSTER_DIR
+        if [[ ! -f "${CLUSTER_DIR}/install-config.yaml" ]]; then
+            echo "Creating install config..."
+            "${INSTALLER_PATH}" --dir="${CLUSTER_DIR}" create install-config
+        fi
+    else
+        cp "${INSTALL_CONFIG}" "${CLUSTER_DIR}/install-config.yaml"
+    fi
+}
+
+# Create installer manifests and substitute the requested network plugin
+function create_manifests_with_network_plugin() {
+    sed -i -e "s/networkType: [a-zA-Z]*$/networkType: $NETWORK_PLUGIN/" "${CLUSTER_DIR}/install-config.yaml"
+    echo "Creating install manifests..."
+    "${INSTALLER_PATH}" --dir="${CLUSTER_DIR}" create manifests
+}
+
+# Run the installer to create a new cluster
+function create_cluster() {
+    "${INSTALLER_PATH}" --dir="${CLUSTER_DIR}" create cluster &
+    ID=$!
+    echo "Started cluster installer PID ${ID}"
+    trap "trap - TERM && kill -- -$$" INT TERM EXIT
+}
+
+# Fix up the AWS firewall so network plugin components can talk to each other
+function open_aws_ports() {
+    if [[ "${NETWORK_PLUGIN}" == "OVNKubernetes" ]]; then
+        echo "Attempting to open OVN ports for AWS..."
+        CLUSTER_DIR="${CLUSTER_DIR}" hack/open-ovn-ports.sh
+        echo "Opened OVN ports for AWS"
+    fi
+}
+
+function print_usage() {
+    >&2 echo "Usage: $0 [-c <cluster-dir>] [options]
+
+$0 detects whether the cluster given by the '-c' option does not yet exist or
+is already running. If it does not yet exist the cluster will be created using
+the options supplied below. If it is already running, any running
+cluster-network-operator will be stopped, plugin image overrides applied, and
+a local cluster-network-operator started.
+
+The following options are accepted for both new and existing clusters:
+
+ -c               the cluster installation temporary directory (can also be given via CLUSTER_DIR); required
+ -m               custom network plugin container image name
+
+The following options are always accepted but only used for new clusters:
+
+ -f               the path to an openshift-install-created install-config.yaml file; if not given one will be created
+ -i               path to the openshift-install binary; if not given PATH will be searched
+ -n [net plugin]  the name of the network plugin to deploy; one of [sdn|OpenShiftSDN|ovn|OVNKubernetes]
+ -w               pause after creating manifests to allow manual overrides
+
+The following environment variables are honored:
+ - CLUSTER_DIR: the cluster installation temp directory
+ - INSTALLER_PATH: the path to the openshift-install binary for 'new' mode
+ - INSTALL_CONFIG: the path to the install-config.yaml file for 'new' mode
+"
+}
+
+PLUGIN_IMAGE="${PLUGIN_IMAGE:-}"
+NETWORK_PLUGIN=
+IMAGE_ENV_KEY=
+CLUSTER_DIR="${CLUSTER_DIR:-}"
+INSTALLER_PATH="${INSTALLER_PATH:-}"
+INSTALL_CONFIG="${INSTALL_CONFIG:-}"
+WAIT_FOR_MANIFEST_UPDATES="${WAIT_FOR_MANIFEST_UPDATES:-}"
+
+while getopts "c:f:i:m:n:w" opt; do
+    case $opt in
+        c) CLUSTER_DIR="${OPTARG}";;
+        f) INSTALL_CONFIG="${OPTARG}";;
+        i) INSTALLER_PATH="${OPTARG}";;
+        m) PLUGIN_IMAGE="${OPTARG}";;
+        n)
+            case ${OPTARG} in
+                ovn|OVNKubernetes)
+                    NETWORK_PLUGIN="OVNKubernetes"
+                    IMAGE_ENV_KEY="OVN_IMAGE"
+                    ;;
+                sdn|OpenShiftSDN)
+                    NETWORK_PLUGIN="OpenShiftSDN"
+                    IMAGE_ENV_KEY="NODE_IMAGE"
+                    ;;
+                *)
+                    echo "Unknown network plugin ${OPTARG}" >&2
+                    exit 1
+                ;;
+            esac
+            ;;
+        w)
+            WAIT_FOR_MANIFEST_UPDATES=1
+            ;;
+        \?)
+            echo "Invalid option: -${OPTARG}" >&2
+            exit 1
+            ;;
+        :)
+            echo "Option -${OPTARG} requires an argument." >&2
+            exit 1
+            ;;
+        *)
+            print_usage
+            exit 2
+            ;;
+    esac
+done
+
 if [[ -z "${CLUSTER_DIR:-}" ]]; then
-    echo "error: CLUSTER_DIR must be set"
-    echo "For more info, see INSTALLER-HACKING.md"
+    echo "error: CLUSTER_DIR must be set or '-c <cluster-dir>' must be given"
+    echo "For more info, see HACKING.md"
+    exit 1
+fi
+mkdir -p "${CLUSTER_DIR}" >& /dev/null
+
+if [[ -z "$(which oc 2> /dev/null || exit 0)" ]]; then
+    echo "could not find 'oc' in PATH" >&2
     exit 1
 fi
 
-if [[ ! -e "${CLUSTER_DIR}/manifests" && ! -e "${CLUSTER_DIR}/auth" ]]; then
-    echo "error: cannot find installer state; please run"
-    echo "  openshift-install --dir=${CLUSTER_DIR} create manifests"
-    echo "For more info, see INSTALLER-HACKING.md"
-    exit 1
-fi
+# Autodetect the state of the cluster to determine which mode to run in
+if [[ -z "$(ls -A ${CLUSTER_DIR} 2> /dev/null | grep -v install-config.yaml | grep -v .openshift_install | grep -v env.sh)" ]]; then
+    echo "Creating new cluster..."
 
-if [[ -e "${CLUSTER_DIR}/manifests/cvo-overrides.yaml" ]]; then
+    # Find openshift-install if not explicitly given
+    if [[ -z "${INSTALLER_PATH}" ]]; then
+        INSTALLER_PATH="$(which openshift-installer 2> /dev/null || exit 0)"
+        if [[ -z "${INSTALLER_PATH}" ]]; then
+            echo "could not find openshift-installer in PATH for building a new cluster" >&2
+            exit 1
+        fi
+    fi
+
+    rm -f "${CLUSTER_DIR}/env.sh"
+    ensure_install_config
+    create_manifests_with_network_plugin
     override_install_manifests
+
+    # Wait for user to update manifests if requested
+    if [[ -n "${WAIT_FOR_MANIFEST_UPDATES}" ]]; then
+        read -n 1 -p "Pausing for manual manifest updates; press any key to continue..."
+    fi
+
+    extract_environment_from_manifests
+    create_cluster
+    wait_for_cluster
+    open_aws_ports
+elif [[ -n "$(ls -A ${CLUSTER_DIR}/terraform.* 2> /dev/null)" ]]; then
+    echo "Attaching to already running cluster..."
+
+    wait_for_cluster
+    open_aws_ports
+    stop_deployed_operator
+    extract_environment_from_running_cluster
+else
+    echo "could not detect cluster state" >&2
+    exit 1
 fi
 
-wait_for_cluster
-setup_operator_env
+setup_operator_env "${IMAGE_ENV_KEY}" "${PLUGIN_IMAGE}"
 
 env $(cat "${CLUSTER_DIR}/env.sh") _output/linux/amd64/cluster-network-operator
