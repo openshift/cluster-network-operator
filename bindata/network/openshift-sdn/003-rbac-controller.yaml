@@ -1,22 +1,3 @@
-# We need to create this because the controller expects it to exist, and we're
-# the first openshift-specific code running. Other code will manipulate the
-# namespace later.
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: openshift-infra
-  annotations:
-    openshift.io/node-selector: ""
-
----
-# The controller also requires a service account in openshift-infra
-# It will use this manually, regardless of which account is configured in the pod
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: sdn-controller
-  namespace: openshift-infra
-
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -50,6 +31,7 @@ rules:
   - create
   - update
   - patch
+  - delete
 - apiGroups: [""]
   resources:
   - nodes
@@ -71,21 +53,6 @@ subjects:
 - kind: ServiceAccount
   name: sdn-controller
   namespace: openshift-sdn
-
----
-# bind the openshift-sdn-controller role to the service-account in openshift-infra
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: openshift-sdn-controller-infra
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: openshift-sdn-controller
-subjects:
-- kind: ServiceAccount
-  name: sdn-controller
-  namespace: openshift-infra
 
 ---
 # Only grant access to the specific config map for leader election
@@ -124,39 +91,6 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: openshift-sdn-controller-leaderelection
-subjects:
-- kind: ServiceAccount
-  name: sdn-controller
-  namespace: openshift-sdn
-
----
-# The controller synthesizes its own authentication, so we need to let it
-# read *and* list secrets
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: openshift-sdn-controller-account
-  namespace: openshift-infra
-rules:
-- apiGroups: [""]
-  resources:
-  - serviceaccounts
-  - secrets
-  verbs:
-  - get
-  - list
-
----
-# bind secret access
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: openshift-sdn-controller-account
-  namespace: openshift-infra
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: openshift-sdn-controller-account
 subjects:
 - kind: ServiceAccount
   name: sdn-controller
