@@ -307,6 +307,9 @@ func TestClusterNetwork(t *testing.T) {
 	copy := OpenShiftSDNConfig.DeepCopy()
 	config := &copy.Spec
 	FillDefaults(config, nil)
+	// hard-code the mtu in case we run on other kinds of nodes
+	mtu := uint32(1450)
+	config.DefaultNetwork.OpenShiftSDNConfig.MTU = &mtu
 
 	cn, err := clusterNetwork(config)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -321,6 +324,7 @@ kind: ClusterNetwork
 metadata:
   creationTimestamp: null
   name: default
+mtu: 1450
 network: 10.128.0.0/15
 pluginName: redhat/openshift-ovs-networkpolicy
 serviceNetwork: 172.30.0.0/16
