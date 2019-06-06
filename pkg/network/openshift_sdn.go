@@ -202,6 +202,7 @@ func clusterNetwork(conf *operv1.NetworkSpec) (string, error) {
 		ClusterNetworks:  networks,
 		ServiceNetwork:   conf.ServiceNetwork[0],
 		VXLANPort:        c.VXLANPort,
+		MTU:              c.MTU,
 	}
 	cnBuf, err := yaml.Marshal(cn)
 	if err != nil {
