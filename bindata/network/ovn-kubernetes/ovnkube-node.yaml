@@ -187,6 +187,12 @@ spec:
           preStop:
             exec:
               command: ["rm","-f","/etc/cni/net.d/10-ovn-kubernetes.conf", "/host/opt/cni/bin/ovn-k8s-cni-overlay"]
+        readinessProbe:
+          exec:
+            # ovnkube --node writes this file when it is ready to handle pod requests.
+            command: ["test", "-f", "/etc/cni/net.d/10-ovn-kubernetes.conf"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
 
       nodeSelector:
         beta.kubernetes.io/os: "linux"
