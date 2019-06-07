@@ -1,0 +1,41 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: k8s
+    role: alert-rules
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+  name: networking-rules
+  namespace: openshift-sdn
+spec:
+  groups:
+  - name: general.rules
+    rules:
+    - alert: NodeWithoutOVSPod
+      annotations:
+        message: |
+          All nodes should be running an ovs pod, {{"{{"}} $labels.node {{"}}"}} is not.
+      expr: |
+        (kube_node_info unless on(node) kube_pod_info{namespace="openshift-sdn",  pod=~"ovs.*"}) > 0
+      for: 20m
+      labels:
+        severity: warning
+    - alert: NodeWithoutSDNPod
+      annotations:
+        message: |
+          All nodes should be running an sdn pod, {{"{{"}} $labels.node {{"}}"}} is not.
+      expr: |
+        (kube_node_info unless on(node) kube_pod_info{namespace="openshift-sdn",  pod=~"sdn.*"}) > 0
+      for: 20m
+      labels:
+        severity: warning
+    - alert: NetworkPodsCrashLooping
+      annotations:
+        message: Pod {{"{{"}} $labels.namespace{{"}}"}}/{{"{{"}} $labels.pod{{"}}"}} ({{"{{"}} $labels.container
+          {{"}}"}}) is restarting {{"{{"}} printf "%.2f" $value {{"}}"}} times / 5 minutes.
+      expr: |
+        rate(kube_pod_container_status_restarts_total{namespace="openshift-sdn"}[15m]) * 60 * 5 > 0
+      for: 1h
+      labels:
+        severity: critical
