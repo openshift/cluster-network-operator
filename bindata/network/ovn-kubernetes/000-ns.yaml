@@ -6,5 +6,5 @@ metadata:
   labels:
     openshift.io/run-level: "0"
   annotations:
-    openshift.io/node-selector: "beta.kubernetes.io/os=linux"
+    openshift.io/node-selector: "kubernetes.io/os=linux"
     openshift.io/description: "OVN Kubernetes components"

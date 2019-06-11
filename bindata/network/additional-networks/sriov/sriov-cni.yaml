@@ -23,7 +23,7 @@ spec:
         openshift.io/component: network
     spec:
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
       tolerations:
       - operator: Exists
       serviceAccountName: sriov-cni

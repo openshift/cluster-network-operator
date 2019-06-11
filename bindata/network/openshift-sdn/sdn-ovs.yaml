@@ -114,7 +114,7 @@ spec:
               command: ["/usr/share/openvswitch/scripts/ovs-ctl", "stop"]
         terminationGracePeriodSeconds: 10
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
       volumes:
       - name: host-modules
         hostPath:
