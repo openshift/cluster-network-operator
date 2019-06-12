@@ -301,73 +301,19 @@ func TestOpenShiftSDNMultitenant(t *testing.T) {
 	}
 }
 
-func TestOpenshiftControllerConfig(t *testing.T) {
+func TestClusterNetwork(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	copy := OpenShiftSDNConfig.DeepCopy()
 	config := &copy.Spec
 	FillDefaults(config, nil)
+	// hard-code the mtu in case we run on other kinds of nodes
+	mtu := uint32(1450)
+	config.DefaultNetwork.OpenShiftSDNConfig.MTU = &mtu
 
-	cfg, crd, err := controllerConfig(config)
+	cn, err := clusterNetwork(config)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(cfg).To(Equal(`apiVersion: openshiftcontrolplane.config.openshift.io/v1
-build:
-  additionalTrustedCA: ""
-  buildDefaults: null
-  buildOverrides: null
-  imageTemplateFormat:
-    format: ""
-    latest: false
-controllers: null
-deployer:
-  imageTemplateFormat:
-    format: ""
-    latest: false
-dockerPullSecret:
-  internalRegistryHostname: ""
-  registryURLs: null
-imageImport:
-  disableScheduledImport: false
-  maxScheduledImageImportsPerMinute: 0
-  scheduledImageImportMinimumIntervalSeconds: 0
-ingress:
-  ingressIPNetworkCIDR: ""
-kind: OpenShiftControllerManagerConfig
-kubeClientConfig:
-  connectionOverrides:
-    acceptContentTypes: ""
-    burst: 0
-    contentType: ""
-    qps: 0
-  kubeConfig: ""
-leaderElection:
-  leaseDuration: 0s
-  renewDeadline: 0s
-  retryPeriod: 0s
-network:
-  clusterNetworks:
-  - cidr: 10.128.0.0/15
-    hostSubnetLength: 9
-  - cidr: 10.0.0.0/14
-    hostSubnetLength: 8
-  networkPluginName: redhat/openshift-ovs-networkpolicy
-  serviceNetworkCIDR: 172.30.0.0/16
-  vxlanPort: 4789
-resourceQuota:
-  concurrentSyncs: 0
-  minResyncPeriod: 0s
-  syncPeriod: 0s
-securityAllocator:
-  mcsAllocatorRange: ""
-  mcsLabelsPerProject: 0
-  uidAllocatorRange: ""
-serviceAccount:
-  managedNames: null
-serviceServingCert:
-  signer: null
-servingInfo: null
-`))
-	g.Expect(crd).To(Equal(`apiVersion: network.openshift.io/v1
+	g.Expect(cn).To(Equal(`apiVersion: network.openshift.io/v1
 clusterNetworks:
 - CIDR: 10.128.0.0/15
   hostSubnetLength: 9
@@ -378,6 +324,7 @@ kind: ClusterNetwork
 metadata:
   creationTimestamp: null
   name: default
+mtu: 1450
 network: 10.128.0.0/15
 pluginName: redhat/openshift-ovs-networkpolicy
 serviceNetwork: 172.30.0.0/16

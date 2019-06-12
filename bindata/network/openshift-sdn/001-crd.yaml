@@ -47,6 +47,10 @@ spec:
           type: integer
           minimum: 1
           maximum: 65535
+        mtu:
+          type: integer
+          minimum: 576
+          maximum: 65536
   additionalPrinterColumns:
   - name: Cluster Network
     type: string
