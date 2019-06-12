@@ -322,18 +322,19 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:f0d91aa2c20f5806c77aa0850576a285b4df25effc8b646c41be02ee316636f6"
+  digest = "1:421d284b32d0d08769b317e84469348d1aa53b86cc01a7783338f1b5736c5e41"
   name = "github.com/openshift/api"
   packages = [
     "build/v1",
     "config/v1",
     "legacyconfig/v1",
+    "network/v1",
     "openshiftcontrolplane/v1",
     "operator/v1",
     "osin/v1",
   ]
   pruneopts = "NT"
-  revision = "77b8897ec79a562e85920134fc65b63300c4d27a"
+  revision = "c92b52cff80767bf400d945e090432c882122336"
 
 [[projects]]
   branch = "master"
@@ -916,6 +917,7 @@
     "github.com/onsi/gomega/types",
     "github.com/openshift/api/config/v1",
     "github.com/openshift/api/legacyconfig/v1",
+    "github.com/openshift/api/network/v1",
     "github.com/openshift/api/openshiftcontrolplane/v1",
     "github.com/openshift/api/operator/v1",
     "github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers",
@@ -926,6 +928,7 @@
     "github.com/vishvananda/netlink",
     "k8s.io/api/apps/v1",
     "k8s.io/api/core/v1",
+    "k8s.io/apimachinery/pkg/api/equality",
     "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/api/meta",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
