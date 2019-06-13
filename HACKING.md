@@ -64,43 +64,43 @@ BUILDCMD="docker build" ./hack/build-image.sh
 
 # Running local builds with the installer
 
-If you want to run a local build with the installer, you need to do a bit of hacking. There is a script that will do most of the dirty work for you. It will modify the installer so the network operator doesn't run, and spin up a local copy of the network operator.
+If you want to run a local build with the installer, you need to do a bit of hacking. There is a script that will do most of the dirty work for you. It will modify the installer so the network operator doesn't run, and spin up a local copy of the network operator. This script will either create a new cluster and run openshift-install for you, or attach to an existing cluster and restart the network operator with overrides.
 
 This requires `oc` and `kubectl` in your $PATH.
 
-## Steps
+The OpenShift installer is available from https://github.com/openshift/installer and may be built from git.
 
-You will need to execute all steps for every installation, since the installer deletes the intermediate files we customize.
+## Steps for creating a new cluster
 
-1. If you haven't already, build the operator:
+This mode also requires `openshift-install` in your $PATH or explicitly passed to `hack/run-locally.sh` with the `-i <installer binary>` option.
+
+1. If you haven't already, build the cluster-network-operator:
 
 ```
 hack/build-go.sh
 ```
 
-2. In one window, prepare the cluster:
+2. Run `hack/run-locally.sh`, optionally passing an existing install-config.yaml (`-f` option), network plugin to use (`-n` option), a network plugin container development image (`-m` option), and a request to wait after creating manifests (`-w` option) for additional manual overrides. Available network plugins are `sdn`/`OpenShiftSDN` and `ovn`/`OVNKubernetes`.
 
 ```
 export CLUSTER_DIR=<your cluster directory>
-openshift-install --dir=$CLUSTER_DIR create manifests
+hack/run-locally.sh -n OpenShiftSDN -m "docker.io/myawesome/origin-node:latest"
 ```
 
-3. In another window, start the operator:
+It will print status messages as it waits for the installer to make progress.
+
+Passing the `-w` option will wait after creating manifests to allow for additional manual overrides before the cluster is started.
+
+## Steps for "attach" mode
+
+If you have an already-up cluster you would like to take over, then you can instead run:
 
 ```
 export CLUSTER_DIR=<your cluster directory>
 hack/run-locally.sh
 ```
 
-It will print status messages as it waits for the installer to make progress.
-
-4. Optionally, override image references. If you are doing downstream image development, e.g. working on openshift-sdn, you should build, publish, and edit `$CLUSTER_DIR/env.sh` to point to your development image.
-
-5. In the installer window, start the installer:
-
-```
-openshift-install --dir=$CLUSTER_DIR create cluster
-```
+It will stop the deployed operator, set up the environment variables, and execute your local build of the operator. A network plugin containter development image (`-m` option) may also be given.
 
 ## Tips, Tricks, & Limitations
 
