@@ -135,6 +135,9 @@ spec:
           privileged: true
 
         volumeMounts:
+        - mountPath: /host
+          name: host-slash
+          readOnly: true
         # Directory which contains the host configuration.
         - mountPath: /var/lib/openvswitch/
           name: host-var-lib-ovs
@@ -197,12 +200,12 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: "linux"
       volumes:
-      # In bootstrap mode, the host config contains information not easily available
-      # from other locations.
+      - name: host-slash
+        hostPath:
+          path: /
       - name: host-modules
         hostPath:
           path: /lib/modules
-
       - name: host-var-lib-ovs
         hostPath:
           path: /var/lib/openvswitch
@@ -218,7 +221,6 @@ spec:
       - name: host-sys
         hostPath:
           path: /sys
-
       - name: host-cni-bin
         hostPath:
           path: /var/lib/cni/bin
