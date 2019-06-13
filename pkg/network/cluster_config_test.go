@@ -125,3 +125,19 @@ func TestStatusFromConfig(t *testing.T) {
 	status = StatusFromOperatorConfig(&crd.Spec)
 	g.Expect(status).To(BeNil())
 }
+
+func TestValidateNetworkType(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	supportedTypes := []string{"openshiftsdn", "ovnkubernetes", "kuryr", "raw", ""}
+	for _, networkType := range supportedTypes {
+		err := ValidateNetworkType(networkType)
+		g.Expect(err).NotTo(HaveOccurred())
+	}
+
+	unsupportedTypes := []string{"customsdn1", "customsnd2"}
+	for _, networkType := range unsupportedTypes {
+		err := ValidateNetworkType(networkType)
+		g.Expect(err).To(HaveOccurred())
+	}
+}

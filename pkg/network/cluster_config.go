@@ -2,6 +2,7 @@ package network
 
 import (
 	"net"
+	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
@@ -119,4 +120,27 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec) *configv1.NetworkSta
 	}
 
 	return &status
+}
+
+//ValidateNetworkType returns an error if network is not managed by
+//one of the supported types
+func ValidateNetworkType(networkType string) error {
+
+	if len(networkType) == 0 {
+		//not sure if this is a valid scenario
+		return nil
+	}
+
+	switch strings.ToLower(networkType) {
+	case strings.ToLower(string(operv1.NetworkTypeOpenShiftSDN)):
+		return nil
+	case strings.ToLower(string(operv1.NetworkTypeOVNKubernetes)):
+		return nil
+	case strings.ToLower(string(operv1.NetworkTypeKuryr)):
+		return nil
+	case strings.ToLower(string(operv1.NetworkTypeRaw)):
+		return nil
+	default:
+		return errors.Errorf("Unsupported NetworkType %s", networkType)
+	}
 }

@@ -132,6 +132,11 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	if err := network.ValidateNetworkType(string(operConfig.Spec.DefaultNetwork.Type)); err != nil {
+		log.Printf("Unsupport network type: %v", err)
+		return reconcile.Result{}, err
+	}
+
 	// Merge in the cluster configuration, in case the administrator has updated some "downstream" fields
 	// This will also commit the change back to the apiserver.
 	if err := r.MergeClusterConfig(context.TODO(), operConfig); err != nil {

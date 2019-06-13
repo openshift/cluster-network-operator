@@ -88,6 +88,11 @@ func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
+	if err := network.ValidateNetworkType(clusterConfig.Spec.NetworkType); err != nil {
+		log.Printf("Unsupported NetworkType specified: %v", err)
+		return reconcile.Result{}, err
+	}
+
 	// Validate the cluster config
 	if err := network.ValidateClusterConfig(clusterConfig.Spec); err != nil {
 		log.Printf("Failed to validate Network.Spec: %v", err)
