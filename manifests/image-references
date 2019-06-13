@@ -10,6 +10,10 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-node:4.2
+  - name: kube-proxy
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-kube-proxy:4.2
   - name: hypershift
     from:
       kind: DockerImage

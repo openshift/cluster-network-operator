@@ -32,7 +32,11 @@ func Render(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, 
 	objs = append(objs, o...)
 
 	// render kube-proxy
-	// TODO: kube-proxy
+	o, err = RenderStandaloneKubeProxy(conf, manifestDir)
+	if err != nil {
+		return nil, err
+	}
+	objs = append(objs, o...)
 
 	// render additional networks
 	o, err = RenderAdditionalNetworks(conf, manifestDir)
@@ -84,6 +88,7 @@ func Validate(conf *operv1.NetworkSpec) error {
 	errs = append(errs, ValidateIPPools(conf)...)
 	errs = append(errs, ValidateDefaultNetwork(conf)...)
 	errs = append(errs, ValidateMultus(conf)...)
+	errs = append(errs, ValidateStandaloneKubeProxy(conf)...)
 
 	if len(errs) > 0 {
 		return errors.Errorf("invalid configuration: %v", errs)
@@ -114,6 +119,7 @@ func FillDefaults(conf, previous *operv1.NetworkSpec) {
 		conf.DisableMultiNetwork = &disable
 	}
 	FillDefaultNetworkDefaults(conf, previous, hostMTU)
+	FillKubeProxyDefaults(conf, previous)
 }
 
 // IsChangeSafe checks to see if the change between prev and next are allowed
@@ -150,7 +156,8 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 		errs = append(errs, errors.Errorf("cannot change DisableMultiNetwork"))
 	}
 
-	// Changing KubeProxyConfig and DeployKubeProxy is allowed, so we don't check that
+	// Check kube-proxy
+	errs = append(errs, IsKubeProxyChangeSafe(prev, next)...)
 
 	if len(errs) > 0 {
 		return errors.Errorf("invalid configuration: %v", errs)
