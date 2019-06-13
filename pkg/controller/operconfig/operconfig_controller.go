@@ -133,7 +133,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	if err := network.ValidateNetworkType(string(operConfig.Spec.DefaultNetwork.Type)); err != nil {
-		log.Printf("Unsupport network type: %v", err)
+		log.Printf("Failed to validate NetworkType: %v", err)
 		return reconcile.Result{}, err
 	}
 
