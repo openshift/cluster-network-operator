@@ -1,0 +1,44 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openshift-kube-proxy
+rules:
+- apiGroups: [""]
+  resources:
+  - namespaces
+  - endpoints
+  - services
+  - pods
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: [""]
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openshift-kube-proxy
+  namespace: openshift-kube-proxy
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openshift-kube-proxy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openshift-kube-proxy
+subjects:
+- kind: ServiceAccount
+  name: openshift-kube-proxy
+  namespace: openshift-kube-proxy
