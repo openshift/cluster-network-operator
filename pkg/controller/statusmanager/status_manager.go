@@ -38,8 +38,9 @@ type StatusManager struct {
 
 	failing [maxStatusLevel]*configv1.ClusterOperatorStatusCondition
 
-	daemonSets  []types.NamespacedName
-	deployments []types.NamespacedName
+	daemonSets     []types.NamespacedName
+	deployments    []types.NamespacedName
+	relatedObjects []configv1.ObjectReference
 }
 
 func New(client client.Client, name, version string) *StatusManager {
@@ -57,6 +58,7 @@ func (status *StatusManager) Set(reachedAvailableLevel bool, conditions ...confi
 	}
 
 	oldStatus := co.Status.DeepCopy()
+	co.Status.RelatedObjects = status.relatedObjects
 
 	if reachedAvailableLevel {
 		if releaseVersion := os.Getenv("RELEASE_VERSION"); len(releaseVersion) > 0 {
@@ -153,6 +155,10 @@ func (status *StatusManager) SetDaemonSets(daemonSets []types.NamespacedName) {
 
 func (status *StatusManager) SetDeployments(deployments []types.NamespacedName) {
 	status.deployments = deployments
+}
+
+func (status *StatusManager) SetRelatedObjects(relatedObjects []configv1.ObjectReference) {
+	status.relatedObjects = relatedObjects
 }
 
 // SetFromPods sets the operator Degraded/Progressing/Available status, based on
