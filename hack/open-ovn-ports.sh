@@ -22,7 +22,8 @@ function open_port() {
     port="$4"
 
     aws ec2 authorize-security-group-ingress --group-id "${dest_group}" \
-	--source-group "${src_group}" --protocol "${protocol}" --port "${port}"
+	--source-group "${src_group}" --protocol "${protocol}" --port "${port}" \
+	|| true # if we got this far, the only likely error is "acl already exists"
 }
 
 if [[ -z "${CLUSTER_DIR:-}" ]]; then
@@ -32,6 +33,11 @@ fi
 
 if [[ ! -f "${CLUSTER_DIR}/metadata.json" ]]; then
     echo "error: Could not find ${CLUSTER_DIR}/metadata.json" 1>&2
+    exit 1
+fi
+
+if ! jq -e .aws  "${CLUSTER_DIR}/metadata.json" >/dev/null; then
+    echo "error: not using AWS. Don't know how to open OVN ports" 1>&2
     exit 1
 fi
 
