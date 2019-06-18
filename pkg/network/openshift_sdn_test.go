@@ -238,18 +238,18 @@ func TestProxyArgs(t *testing.T) {
 
 	//set proxy args
 	config.KubeProxyConfig.ProxyArguments = map[string][]string{
-		"a": {"b"},
-		"c": {"d", "e"},
+		"cluster-cidr":       {"1.2.3.4/5"},
+		"config-sync-period": {"1s", "2s"},
 	}
 	objs, err = renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg = getSdnConfigFile(objs)
 
-	arg, _, _ := uns.NestedStringSlice(cfg.Object, "proxyArguments", "a")
-	g.Expect(arg).To(Equal([]string{"b"}))
+	arg, _, _ := uns.NestedStringSlice(cfg.Object, "proxyArguments", "cluster-cidr")
+	g.Expect(arg).To(Equal([]string{"1.2.3.4/5"}))
 
-	arg, _, _ = uns.NestedStringSlice(cfg.Object, "proxyArguments", "c")
-	g.Expect(arg).To(Equal([]string{"d", "e"}))
+	arg, _, _ = uns.NestedStringSlice(cfg.Object, "proxyArguments", "config-sync-period")
+	g.Expect(arg).To(Equal([]string{"1s", "2s"}))
 
 }
 

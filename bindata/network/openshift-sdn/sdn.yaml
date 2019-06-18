@@ -6,6 +6,8 @@ metadata:
 data:
   sdn-config.yaml: |-
 {{.NodeConfig | indent 4}}
+  kube-proxy-config.yaml: |-
+{{.KubeProxyConfig | indent 4}}
 ---
 kind: DaemonSet
 apiVersion: apps/v1
