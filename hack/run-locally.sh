@@ -255,9 +255,9 @@ if [[ -z "$(ls -A ${CLUSTER_DIR} 2> /dev/null | grep -v install-config.yaml | gr
 
     # Find openshift-install if not explicitly given
     if [[ -z "${INSTALLER_PATH}" ]]; then
-        INSTALLER_PATH="$(which openshift-installer 2> /dev/null || exit 0)"
+        INSTALLER_PATH="$(which openshift-install 2> /dev/null || exit 0)"
         if [[ -z "${INSTALLER_PATH}" ]]; then
-            echo "could not find openshift-installer in PATH for building a new cluster" >&2
+            echo "could not find openshift-install in PATH for building a new cluster" >&2
             exit 1
         fi
     fi
