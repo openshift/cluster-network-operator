@@ -69,3 +69,7 @@ required = [
 [[constraint]]
   branch = "master"
   name = "github.com/openshift/api"
+
+[[constraint]]
+  name = "k8s.io/kube-proxy"
+  version = "kubernetes-1.12.3"

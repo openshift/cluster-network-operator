@@ -30,7 +30,6 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 
 	objs := []*uns.Unstructured{}
 
-	// render the manifests on disk
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["InstallOVS"] = (c.UseExternalOpenvswitch == nil || *c.UseExternalOpenvswitch == false)
@@ -51,6 +50,18 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 		return nil, errors.Wrap(err, "failed to build node config")
 	}
 	data.Data["NodeConfig"] = nodeCfg
+
+	kpcDefaults := map[string][]string{
+		"metrics-bind-address":    {"0.0.0.0"},
+		"metrics-port":            {"9101"},
+		"proxy-mode":              {"iptables"},
+		"iptables-masquerade-bit": {"0"},
+	}
+	kpc, err := kubeProxyConfiguration(conf, kpcDefaults)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build kube-proxy config")
+	}
+	data.Data["KubeProxyConfig"] = kpc
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/openshift-sdn"), &data)
 	if err != nil {
@@ -88,6 +99,9 @@ func validateOpenShiftSDN(conf *operv1.NetworkSpec) []error {
 			out = append(out, errors.Errorf("invalid MTU %d", *sc.MTU))
 		}
 	}
+
+	proxyErrs := validateKubeProxy(conf)
+	out = append(out, proxyErrs...)
 
 	return out
 }
