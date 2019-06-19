@@ -191,11 +191,11 @@ func TestProxyArgs(t *testing.T) {
 	config := &crd.Spec
 	FillDefaults(config, nil)
 
-	// iter through all objects, finding the sdn config map
-	getSdnConfigFile := func(objs []*uns.Unstructured) *uns.Unstructured {
+	// iter through all objects, finding the kube-proxy config map
+	getProxyConfigFile := func(objs []*uns.Unstructured) *uns.Unstructured {
 		for _, obj := range objs {
 			if obj.GetKind() == "ConfigMap" && obj.GetName() == "sdn-config" {
-				val, ok, err := uns.NestedString(obj.Object, "data", "sdn-config.yaml")
+				val, ok, err := uns.NestedString(obj.Object, "data", "kube-proxy-config.yaml")
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(ok).To(BeTrue())
 
@@ -214,12 +214,12 @@ func TestProxyArgs(t *testing.T) {
 	// test default rendering
 	objs, err := renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
-	cfg := getSdnConfigFile(objs)
+	cfg := getProxyConfigFile(objs)
 
-	val, _, _ := uns.NestedString(cfg.Object, "servingInfo", "bindAddress")
-	g.Expect(val).To(Equal("0.0.0.0:10251"))
-	val, _, _ = uns.NestedString(cfg.Object, "iptablesSyncPeriod")
-	g.Expect(val).To(Equal(""))
+	val, _, _ := uns.NestedString(cfg.Object, "bindAddress")
+	g.Expect(val).To(Equal("0.0.0.0"))
+	val, _, _ = uns.NestedString(cfg.Object, "iptables", "syncPeriod")
+	g.Expect(val).To(Equal("0s"))
 
 	// set sync period
 	config.KubeProxyConfig = &operv1.ProxyConfig{
@@ -229,10 +229,11 @@ func TestProxyArgs(t *testing.T) {
 	}
 	objs, err = renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
-	cfg = getSdnConfigFile(objs)
-	g.Expect(cfg.Object).To(HaveKeyWithValue("iptablesSyncPeriod", "10s"))
-	val, _, _ = uns.NestedString(cfg.Object, "servingInfo", "bindAddress")
-	g.Expect(val).To(Equal("1.2.3.4:10251"))
+	cfg = getProxyConfigFile(objs)
+	val, _, _ = uns.NestedString(cfg.Object, "iptables", "syncPeriod")
+	g.Expect(val).To(Equal("10s"))
+	val, _, _ = uns.NestedString(cfg.Object, "bindAddress")
+	g.Expect(val).To(Equal("1.2.3.4"))
 
 	//set proxy args
 	config.KubeProxyConfig.ProxyArguments = map[string][]string{
@@ -241,13 +242,13 @@ func TestProxyArgs(t *testing.T) {
 	}
 	objs, err = renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
-	cfg = getSdnConfigFile(objs)
+	cfg = getProxyConfigFile(objs)
 
-	arg, _, _ := uns.NestedStringSlice(cfg.Object, "proxyArguments", "cluster-cidr")
-	g.Expect(arg).To(Equal([]string{"1.2.3.4/5"}))
+	arg, _, _ := uns.NestedString(cfg.Object, "clusterCIDR")
+	g.Expect(arg).To(Equal("1.2.3.4/5"))
 
-	arg, _, _ = uns.NestedStringSlice(cfg.Object, "proxyArguments", "config-sync-period")
-	g.Expect(arg).To(Equal([]string{"1s", "2s"}))
+	arg, _, _ = uns.NestedString(cfg.Object, "configSyncPeriod")
+	g.Expect(arg).To(Equal("2s"))
 
 }
 
@@ -327,74 +328,6 @@ network: 10.128.0.0/15
 pluginName: redhat/openshift-ovs-networkpolicy
 serviceNetwork: 172.30.0.0/16
 vxlanPort: 4789
-`))
-}
-
-func TestOpenshiftNodeConfig(t *testing.T) {
-	g := NewGomegaWithT(t)
-
-	crd := OpenShiftSDNConfig.DeepCopy()
-	config := &crd.Spec
-	FillDefaults(config, nil)
-	// hard-code the mtu in case we run on other kinds of nodes
-	mtu := uint32(1450)
-	config.DefaultNetwork.OpenShiftSDNConfig.MTU = &mtu
-
-	cfg, err := nodeConfig(config)
-	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(cfg).To(MatchYAML(`allowDisabledDocker: false
-apiVersion: v1
-authConfig:
-  authenticationCacheSize: 0
-  authenticationCacheTTL: ""
-  authorizationCacheSize: 0
-  authorizationCacheTTL: ""
-dnsBindAddress: ""
-dnsDomain: ""
-dnsIP: ""
-dnsNameservers: null
-dnsRecursiveResolvConf: ""
-dockerConfig:
-  dockerShimRootDirectory: ""
-  dockerShimSocket: ""
-  execHandlerName: ""
-enableUnidling: null
-imageConfig:
-  format: ""
-  latest: false
-iptablesSyncPeriod: ""
-kind: NodeConfig
-kubeletArguments:
-  container-runtime:
-  - remote
-  container-runtime-endpoint:
-  - unix:///var/run/crio/crio.sock
-masterClientConnectionOverrides: null
-masterKubeConfig: ""
-networkConfig:
-  mtu: 1450
-  networkPluginName: redhat/openshift-ovs-networkpolicy
-nodeIP: ""
-nodeName: ""
-podManifestConfig: null
-proxyArguments:
-  metrics-bind-address:
-  - 0.0.0.0
-  metrics-port:
-  - "9101"
-  healthz-port:
-  - "10256"
-servingInfo:
-  bindAddress: 0.0.0.0:10251
-  bindNetwork: ""
-  certFile: ""
-  clientCA: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-  keyFile: ""
-  namedCertificates: null
-volumeConfig:
-  localQuota:
-    perFSGroup: null
-volumeDirectory: ""
 `))
 }
 

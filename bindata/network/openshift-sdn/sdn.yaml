@@ -4,8 +4,6 @@ metadata:
   namespace: openshift-sdn
   name: sdn-config
 data:
-  sdn-config.yaml: |-
-{{.NodeConfig | indent 4}}
   kube-proxy-config.yaml: |-
 {{.KubeProxyConfig | indent 4}}
 ---
@@ -83,7 +81,7 @@ spec:
           cp -f /opt/cni/bin/* /host/opt/cni/bin/
 
           # Launch the network process
-          exec /usr/bin/openshift-sdn --config=/config/sdn-config.yaml  --url-only-kubeconfig=/etc/kubernetes/kubeconfig --v=${DEBUG_LOGLEVEL:-2}
+          exec /usr/bin/openshift-sdn --proxy-config=/config/kube-proxy-config.yaml --url-only-kubeconfig=/etc/kubernetes/kubeconfig --v=${DEBUG_LOGLEVEL:-2}
         securityContext:
           privileged: true
         volumeMounts:

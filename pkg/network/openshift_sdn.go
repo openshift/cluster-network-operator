@@ -12,7 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	legacyconfigv1 "github.com/openshift/api/legacyconfig/v1"
 	netv1 "github.com/openshift/api/network/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -44,12 +43,6 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 		return nil, errors.Wrap(err, "failed to build ClusterNetwork")
 	}
 	data.Data["ClusterNetwork"] = clusterNetwork
-
-	nodeCfg, err := nodeConfig(conf)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to build node config")
-	}
-	data.Data["NodeConfig"] = nodeCfg
 
 	kpcDefaults := map[string][]string{
 		"metrics-bind-address":    {"0.0.0.0"},
@@ -217,42 +210,4 @@ func clusterNetwork(conf *operv1.NetworkSpec) (string, error) {
 	}
 
 	return string(cnBuf), nil
-}
-
-// nodeConfig builds the (yaml text of) the NodeConfig object
-// consumed by the sdn node process
-func nodeConfig(conf *operv1.NetworkSpec) (string, error) {
-	c := conf.DefaultNetwork.OpenShiftSDNConfig
-
-	result := legacyconfigv1.NodeConfig{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "NodeConfig",
-		},
-		NetworkConfig: legacyconfigv1.NodeNetworkConfig{
-			NetworkPluginName: sdnPluginName(c.Mode),
-			MTU:               *c.MTU,
-		},
-		// ServingInfo is used by both the proxy and metrics components
-		ServingInfo: legacyconfigv1.ServingInfo{
-			ClientCA:    "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
-			BindAddress: conf.KubeProxyConfig.BindAddress + ":10251", // port is unused but required
-		},
-
-		// OpenShift SDN calls the CRI endpoint directly; point it to crio
-		KubeletArguments: legacyconfigv1.ExtendedArguments{
-			"container-runtime":          {"remote"},
-			"container-runtime-endpoint": {"unix:///var/run/crio/crio.sock"},
-		},
-
-		IPTablesSyncPeriod: conf.KubeProxyConfig.IptablesSyncPeriod,
-		ProxyArguments:     conf.KubeProxyConfig.ProxyArguments,
-	}
-
-	result.ProxyArguments["metrics-bind-address"] = []string{"0.0.0.0"}
-	result.ProxyArguments["metrics-port"] = []string{"9101"}
-	result.ProxyArguments["healthz-port"] = []string{"10256"}
-
-	buf, err := yaml.Marshal(result)
-	return string(buf), err
 }
