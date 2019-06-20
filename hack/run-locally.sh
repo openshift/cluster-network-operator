@@ -122,6 +122,8 @@ function wait_for_cluster() {
         echo ""
         echo "Ready to start operator. (If this fails, try running '$0' again.)"
     fi
+
+    detect_platform
 }
 
 # Copy an existing install-config into CLUSTER_DIR, or create a new one there
@@ -152,9 +154,20 @@ function create_cluster() {
     trap "trap - TERM && kill -- -$$" INT TERM EXIT
 }
 
+function detect_platform() {
+    if [[ -n "$(grep '\"type\": \"libvirt_' ${CLUSTER_DIR}/terraform.tfstate)" ]]; then
+        PLATFORM=libvirt
+    elif [[ -n "$(grep '\"type\": \"aws_' ${CLUSTER_DIR}/terraform.tfstate)" ]]; then
+        PLATFORM=aws
+    else
+        echo "could not detect install platform from terraform.tfstate" >&2
+        exit 1
+    fi
+}
+
 # Fix up the AWS firewall so network plugin components can talk to each other
 function open_aws_ports() {
-    if [[ "${NETWORK_PLUGIN}" == "OVNKubernetes" ]]; then
+    if [[ "${NETWORK_PLUGIN}" == "OVNKubernetes" && "${PLATFORM}" == "aws" ]]; then
         echo "Attempting to open OVN ports for AWS..."
         CLUSTER_DIR="${CLUSTER_DIR}" hack/open-ovn-ports.sh
         echo "Opened OVN ports for AWS"
@@ -239,7 +252,8 @@ done
 
 if [[ -z "${CLUSTER_DIR:-}" ]]; then
     echo "error: CLUSTER_DIR must be set or '-c <cluster-dir>' must be given"
-    echo "For more info, see HACKING.md"
+    echo
+    print_usage
     exit 1
 fi
 mkdir -p "${CLUSTER_DIR}" >& /dev/null
@@ -249,6 +263,7 @@ if [[ -z "$(which oc 2> /dev/null || exit 0)" ]]; then
     exit 1
 fi
 
+PLATFORM="aws"
 # Autodetect the state of the cluster to determine which mode to run in
 if [[ -z "$(ls -A ${CLUSTER_DIR} 2> /dev/null | grep -v install-config.yaml | grep -v .openshift_install | grep -v env.sh)" ]]; then
     echo "Creating new cluster..."
