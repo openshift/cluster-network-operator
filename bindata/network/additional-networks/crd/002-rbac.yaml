@@ -1,0 +1,15 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+  name: multus:view
+rules:
+- apiGroups: ["k8s.cni.cncf.io"]
+  resources: ["*"]
+  verbs:
+  - get
+  - list
+  - watch
+
