@@ -2,13 +2,32 @@ package network
 
 import (
 	"net"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/render"
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
 )
+
+// ShouldDeployKubeProxy determines if the desired network type should
+// install kube-proxy.
+// openshift-sdn and OVN-Kubernetes deploy their own kube-proxy. All other
+// network providers are assumed to require kube-proxy
+func ShouldDeployKubeProxy(conf *operv1.NetworkSpec) bool {
+	switch conf.DefaultNetwork.Type {
+	case operv1.NetworkTypeOpenShiftSDN:
+		return false
+	case operv1.NetworkTypeOVNKubernetes:
+		return false
+	default:
+		return true
+	}
+}
 
 // kubeProxyConfiguration builds the (yaml text of) the kube-proxy config object
 func kubeProxyConfiguration(conf *operv1.NetworkSpec, pluginDefaults map[string][]string) (string, error) {
@@ -27,8 +46,18 @@ func kubeProxyConfiguration(conf *operv1.NetworkSpec, pluginDefaults map[string]
 	return k8sutil.GenerateKubeProxyConfiguration(args)
 }
 
+// ValidateStandaloneKubeProxy validates the kube-proxy configuration if
+// installation is requested.
+func ValidateStandaloneKubeProxy(conf *operv1.NetworkSpec) []error {
+	if ShouldDeployKubeProxy(conf) {
+		return validateKubeProxy(conf)
+	}
+	return nil
+}
+
 // validateKubeProxy checks that the kube-proxy specific configuration
 // is basically sane.
+// This is called either if DeployKubeProxy is true *or* by openshift-sdn
 func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 	out := []error{}
 	p := conf.KubeProxyConfig
@@ -49,5 +78,82 @@ func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 		}
 	}
 
+	// Don't allow ports to be overridden
+	if p.ProxyArguments != nil {
+		if val, ok := p.ProxyArguments["metrics-port"]; ok {
+			if !(len(val) == 1 && val[0] == "9101") {
+				out = append(out, errors.Errorf("kube-proxy --metrics-port must be 9101"))
+			}
+		}
+
+		if val, ok := p.ProxyArguments["healthz-port"]; ok {
+			if !(len(val) == 1 && val[0] == "10256") {
+				out = append(out, errors.Errorf("kube-proxy --healthz-port must be 10256"))
+			}
+		}
+	}
+
 	return out
+}
+
+// FillKubeProxyDefaults inserts kube-proxy defaults, but only if
+// kube-proxy will be deployed explicitly.
+func FillKubeProxyDefaults(conf, previous *operv1.NetworkSpec) {
+	if conf.DeployKubeProxy == nil {
+		v := ShouldDeployKubeProxy(conf)
+		conf.DeployKubeProxy = &v
+	}
+
+	if !*conf.DeployKubeProxy {
+		return
+	}
+
+	if conf.KubeProxyConfig == nil {
+		conf.KubeProxyConfig = &operv1.ProxyConfig{}
+	}
+
+	if conf.KubeProxyConfig.BindAddress == "" {
+		conf.KubeProxyConfig.BindAddress = "0.0.0.0"
+	}
+}
+
+// IsKubeProxyChangeSafe is noop, but it would check if the proposed kube-proxy
+// change is safe.
+func IsKubeProxyChangeSafe(prev, next *operv1.NetworkSpec) []error {
+	// At present, all kube-proxy changes are safe to deploy
+	return nil
+}
+
+// RenderStandaloneKubeProxy renders the standalone kube-proxy if installation was
+// requested.
+func RenderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+	if !*conf.DeployKubeProxy {
+		return nil, nil
+	}
+
+	kpcDefaults := map[string][]string{
+		"metrics-bind-address": {"0.0.0.0"},
+		"metrics-port":         {"9101"},
+		"healthz-port":         {"10256"},
+		"proxy-mode":           {"iptables"},
+	}
+
+	kpc, err := kubeProxyConfiguration(conf, kpcDefaults)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to generate kube-proxy configuration file")
+	}
+
+	data := render.MakeRenderData()
+	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
+	data.Data["KubeProxyImage"] = os.Getenv("KUBE_PROXY_IMAGE")
+	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
+	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
+	data.Data["KubeProxyConfig"] = kpc
+
+	manifests, err := render.RenderDir(filepath.Join(manifestDir, "kube-proxy"), &data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to render kube-proxy manifests")
+	}
+
+	return manifests, nil
 }

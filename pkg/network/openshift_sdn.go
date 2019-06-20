@@ -54,6 +54,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 	kpcDefaults := map[string][]string{
 		"metrics-bind-address":    {"0.0.0.0"},
 		"metrics-port":            {"9101"},
+		"healthz-port":            {"10256"},
 		"proxy-mode":              {"iptables"},
 		"iptables-masquerade-bit": {"0"},
 	}
@@ -139,14 +140,6 @@ func fillOpenShiftSDNDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 
 	if conf.KubeProxyConfig.ProxyArguments == nil {
 		conf.KubeProxyConfig.ProxyArguments = map[string][]string{}
-	}
-
-	if conf.KubeProxyConfig.ProxyArguments["metrics-bind-address"] == nil {
-		conf.KubeProxyConfig.ProxyArguments["metrics-bind-address"] = []string{"0.0.0.0"}
-	}
-
-	if conf.KubeProxyConfig.ProxyArguments["metrics-port"] == nil {
-		conf.KubeProxyConfig.ProxyArguments["metrics-port"] = []string{"9101"}
 	}
 
 	sc := conf.DefaultNetwork.OpenShiftSDNConfig
@@ -255,6 +248,10 @@ func nodeConfig(conf *operv1.NetworkSpec) (string, error) {
 		IPTablesSyncPeriod: conf.KubeProxyConfig.IptablesSyncPeriod,
 		ProxyArguments:     conf.KubeProxyConfig.ProxyArguments,
 	}
+
+	result.ProxyArguments["metrics-bind-address"] = []string{"0.0.0.0"}
+	result.ProxyArguments["metrics-port"] = []string{"9101"}
+	result.ProxyArguments["healthz-port"] = []string{"10256"}
 
 	buf, err := yaml.Marshal(result)
 	return string(buf), err

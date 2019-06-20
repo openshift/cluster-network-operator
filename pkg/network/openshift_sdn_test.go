@@ -139,11 +139,8 @@ func TestFillOpenShiftSDNDefaults(t *testing.T) {
 		},
 		DeployKubeProxy: &f,
 		KubeProxyConfig: &operv1.ProxyConfig{
-			BindAddress: "0.0.0.0",
-			ProxyArguments: map[string][]string{
-				"metrics-bind-address": {"0.0.0.0"},
-				"metrics-port":         {"9101"},
-			},
+			BindAddress:    "0.0.0.0",
+			ProxyArguments: map[string][]string{},
 		},
 	}
 
@@ -228,6 +225,7 @@ func TestProxyArgs(t *testing.T) {
 	config.KubeProxyConfig = &operv1.ProxyConfig{
 		IptablesSyncPeriod: "10s",
 		BindAddress:        "1.2.3.4",
+		ProxyArguments:     map[string][]string{},
 	}
 	objs, err = renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -344,7 +342,7 @@ func TestOpenshiftNodeConfig(t *testing.T) {
 
 	cfg, err := nodeConfig(config)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(cfg).To(Equal(`allowDisabledDocker: false
+	g.Expect(cfg).To(MatchYAML(`allowDisabledDocker: false
 apiVersion: v1
 authConfig:
   authenticationCacheSize: 0
@@ -384,6 +382,8 @@ proxyArguments:
   - 0.0.0.0
   metrics-port:
   - "9101"
+  healthz-port:
+  - "10256"
 servingInfo:
   bindAddress: 0.0.0.0:10251
   bindNetwork: ""
@@ -396,4 +396,72 @@ volumeConfig:
     perFSGroup: null
 volumeDirectory: ""
 `))
+}
+
+func TestOpenshiftSDNProxyConfig(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OpenShiftSDNConfig.DeepCopy()
+	config := &crd.Spec
+	FillDefaults(config, nil)
+	// hard-code the mtu in case we run on other kinds of nodes
+	mtu := uint32(1450)
+	config.DefaultNetwork.OpenShiftSDNConfig.MTU = &mtu
+
+	// iter through all objects, finding the sdn config map
+	getProxyConfig := func(objs []*uns.Unstructured) string {
+		for _, obj := range objs {
+			if obj.GetKind() == "ConfigMap" && obj.GetName() == "sdn-config" {
+				val, ok, err := uns.NestedString(obj.Object, "data", "kube-proxy-config.yaml")
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(ok).To(BeTrue())
+				return val
+			}
+		}
+		t.Fatal("failed to find sdn-config")
+		return "" //unreachable
+	}
+
+	// test default rendering
+	objs, err := renderOpenShiftSDN(config, manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(getProxyConfig(objs)).To(MatchYAML(`
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+bindAddress: 0.0.0.0
+clientConnection:
+  acceptContentTypes: ""
+  burst: 0
+  contentType: ""
+  kubeconfig: ""
+  qps: 0
+clusterCIDR: ""
+configSyncPeriod: 0s
+conntrack:
+  max: null
+  maxPerCore: null
+  min: null
+  tcpCloseWaitTimeout: null
+  tcpEstablishedTimeout: null
+enableProfiling: false
+healthzBindAddress: 0.0.0.0:10256
+hostnameOverride: ""
+iptables:
+  masqueradeAll: false
+  masqueradeBit: 0
+  minSyncPeriod: 0s
+  syncPeriod: 0s
+ipvs:
+  excludeCIDRs: null
+  minSyncPeriod: 0s
+  scheduler: ""
+  syncPeriod: 0s
+kind: KubeProxyConfiguration
+metricsBindAddress: 0.0.0.0:9101
+mode: iptables
+nodePortAddresses: null
+oomScoreAdj: null
+portRange: ""
+resourceContainer: ""
+udpIdleTimeout: 0s`))
+
 }
