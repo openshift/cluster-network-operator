@@ -8,6 +8,7 @@ import (
 	"os"
 
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 
 	"github.com/ghodss/yaml"
@@ -56,7 +57,8 @@ func render() error {
 
 	network.FillDefaults(&conf.Spec, nil)
 
-	objs, err := network.Render(&conf.Spec, manifestPath)
+	//TODO(dulek): We might want to be able to read bootstrap data from file.
+	objs, err := network.Render(&conf.Spec, &bootstrap.BootstrapResult{}, manifestPath)
 	if err != nil {
 		return err
 	}

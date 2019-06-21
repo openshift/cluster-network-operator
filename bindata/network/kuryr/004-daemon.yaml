@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kuryr-cni
+  namespace: openshift-kuryr
+  annotations:
+    kubernetes.io/description: |
+      This DaemonSet launches the kuryr-daemon component.
+spec:
+  template:
+    metadata:
+      name: kuryr-cni
+      labels:
+        app: kuryr
+        component: network
+        type: infra
+        openshift.io/component: network
+    spec:
+      hostNetwork: true
+      serviceAccountName: kuryr
+      priorityClassName: system-node-critical
+      initContainers:
+      - name: install-cni-plugins
+        image: {{ .NodeImage }}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -ex
+          # Take over network functions on the node
+          cp -Rf /opt/cni/bin/* /host-cni-bin/
+        volumeMounts:
+        - name: bin
+          mountPath: /host-cni-bin
+        securityContext:
+          privileged: true
+      containers:
+      - name: kuryr-cni
+        image: {{ .DaemonImage }}
+        env:
+        - name: CNI_DAEMON
+          value: "True"
+        - name: KUBERNETES_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: KURYR_CNI_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: bin
+          mountPath: /opt/cni/bin
+        - name: net-conf
+          mountPath: /etc/cni/net.d
+        - name: config-volume
+          mountPath: /etc/kuryr
+        - name: proc
+          mountPath: /host_proc
+        - name: openvswitch
+          mountPath: /var/run/openvswitch
+{{ if (default true .DaemonEnableProbes) eq "true" }}
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: {{ default 8090 .DaemonProbesPort }}
+            scheme: HTTP
+          initialDelaySeconds: 15
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /alive
+            port: {{ default 8090 .DaemonProbesPort }}
+          initialDelaySeconds: 15
+{{ end }}
+      volumes:
+      - name: bin
+        hostPath:
+          path: /var/lib/cni/bin
+      - name: net-conf
+        hostPath:
+          path: /etc/kubernetes/cni/net.d
+      - name: config-volume
+        configMap:
+          name: kuryr-config
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: openvswitch
+        hostPath:
+          path: /var/run/openvswitch
+      tolerations:
+        - operator: Exists

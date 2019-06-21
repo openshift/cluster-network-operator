@@ -5,9 +5,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -62,7 +63,7 @@ func NewMonitoringResourceController(
 	c := &MonitoringResourceController{
 		targetNamespace:      targetNamespace,
 		operatorConfigClient: operatorConfigClient,
-		eventRecorder:        eventRecorder,
+		eventRecorder:        eventRecorder.WithComponentSuffix("monitoring-resource-controller"),
 		serviceMonitorName:   serviceMonitorName,
 
 		clusterRoleBindingLister: kubeInformersForTargetNamespace.Rbac().V1().ClusterRoleBindings().Lister(),
@@ -98,14 +99,7 @@ func (c MonitoringResourceController) sync() error {
 		return err
 	}
 
-	switch operatorSpec.ManagementState {
-	case operatorv1.Managed:
-	case operatorv1.Unmanaged:
-		return nil
-	case operatorv1.Removed:
-		// TODO probably just fail
-		return nil
-	default:
+	if !management.IsOperatorManaged(operatorSpec.ManagementState) {
 		return nil
 	}
 
@@ -156,8 +150,8 @@ func (c *MonitoringResourceController) Run(workers int, stopCh <-chan struct{}) 
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting MonitoringResourceController")
-	defer glog.Infof("Shutting down MonitoringResourceController")
+	klog.Infof("Starting MonitoringResourceController")
+	defer klog.Infof("Shutting down MonitoringResourceController")
 	if !cache.WaitForCacheSync(stopCh, c.preRunCachesSynced...) {
 		return
 	}
