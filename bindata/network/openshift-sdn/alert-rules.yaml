@@ -38,4 +38,4 @@ spec:
         rate(kube_pod_container_status_restarts_total{namespace="openshift-sdn"}[15m]) * 60 * 5 > 0
       for: 1h
       labels:
-        severity: critical
+        severity: warning
