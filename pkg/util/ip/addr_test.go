@@ -121,3 +121,51 @@ func TestLastIP(t *testing.T) {
 		g.Expect(lastIP(*cidr).String()).To(Equal(tc.expected))
 	}
 }
+
+func TestLastUsableIP(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	testcases := []struct {
+		cidr     string
+		expected string
+	}{
+		{
+			"10.0.0.0/24",
+			"10.0.0.254",
+		},
+		{
+			"10.0.0.128/30",
+			"10.0.0.130",
+		},
+	}
+
+	for _, tc := range testcases {
+		_, cidr, err := net.ParseCIDR(tc.cidr)
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(LastUsableIP(*cidr).String()).To(Equal(tc.expected))
+	}
+}
+
+func TestFirstUsableIP(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	testcases := []struct {
+		cidr     string
+		expected string
+	}{
+		{
+			"10.0.0.0/24",
+			"10.0.0.1",
+		},
+		{
+			"10.0.0.128/30",
+			"10.0.0.129",
+		},
+	}
+
+	for _, tc := range testcases {
+		_, cidr, err := net.ParseCIDR(tc.cidr)
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(FirstUsableIP(*cidr).String()).To(Equal(tc.expected))
+	}
+}

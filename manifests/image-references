@@ -42,3 +42,11 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-ovn-kubernetes:4.2
+  - name: kuryr-cni
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-kuryr-cni:4.2
+  - name: kuryr-controller
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-kuryr-controller:4.2

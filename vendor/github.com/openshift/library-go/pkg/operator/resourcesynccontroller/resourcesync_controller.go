@@ -1,11 +1,13 @@
 package resourcesynccontroller
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"sort"
+	"strings"
 	"sync"
 	"time"
-
-	"github.com/golang/glog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,10 +17,12 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 )
@@ -65,7 +69,7 @@ func NewResourceSyncController(
 ) *ResourceSyncController {
 	c := &ResourceSyncController{
 		operatorConfigClient: operatorConfigClient,
-		eventRecorder:        eventRecorder,
+		eventRecorder:        eventRecorder.WithComponentSuffix("resource-sync-controller"),
 
 		configMapSyncRules:         map[ResourceLocation]ResourceLocation{},
 		secretSyncRules:            map[ResourceLocation]ResourceLocation{},
@@ -134,14 +138,7 @@ func (c *ResourceSyncController) sync() error {
 		return err
 	}
 
-	switch operatorSpec.ManagementState {
-	case operatorv1.Managed:
-	case operatorv1.Unmanaged:
-		return nil
-	case operatorv1.Removed:
-		// TODO probably just fail
-		return nil
-	default:
+	if !management.IsOperatorManaged(operatorSpec.ManagementState) {
 		return nil
 	}
 
@@ -204,8 +201,8 @@ func (c *ResourceSyncController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting ResourceSyncController")
-	defer glog.Infof("Shutting down ResourceSyncController")
+	klog.Infof("Starting ResourceSyncController")
+	defer klog.Infof("Shutting down ResourceSyncController")
 	if !cache.WaitForCacheSync(stopCh, c.preRunCachesSynced...) {
 		return
 	}
@@ -247,4 +244,71 @@ func (c *ResourceSyncController) eventHandler() cache.ResourceEventHandler {
 		UpdateFunc: func(old, new interface{}) { c.queue.Add(controllerWorkQueueKey) },
 		DeleteFunc: func(obj interface{}) { c.queue.Add(controllerWorkQueueKey) },
 	}
+}
+
+func NewDebugHandler(controller *ResourceSyncController) http.Handler {
+	return &debugHTTPHandler{controller: controller}
+}
+
+type debugHTTPHandler struct {
+	controller *ResourceSyncController
+}
+
+type ResourceSyncRule struct {
+	Source      ResourceLocation `json:"source"`
+	Destination ResourceLocation `json:"destination"`
+}
+
+type ResourceSyncRuleList []ResourceSyncRule
+
+func (l ResourceSyncRuleList) Len() int      { return len(l) }
+func (l ResourceSyncRuleList) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
+func (l ResourceSyncRuleList) Less(i, j int) bool {
+	if strings.Compare(l[i].Source.Namespace, l[j].Source.Namespace) < 0 {
+		return true
+	}
+	if strings.Compare(l[i].Source.Namespace, l[j].Source.Namespace) > 0 {
+		return false
+	}
+	if strings.Compare(l[i].Source.Name, l[j].Source.Name) < 0 {
+		return true
+	}
+	return false
+}
+
+type ControllerSyncRules struct {
+	Secrets ResourceSyncRuleList `json:"secrets"`
+	Configs ResourceSyncRuleList `json:"configs"`
+}
+
+// ServeSyncRules provides a handler function to return the sync rules of the controller
+func (h *debugHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	syncRules := ControllerSyncRules{ResourceSyncRuleList{}, ResourceSyncRuleList{}}
+
+	h.controller.syncRuleLock.RLock()
+	defer h.controller.syncRuleLock.RUnlock()
+	syncRules.Secrets = append(syncRules.Secrets, resourceSyncRuleList(h.controller.secretSyncRules)...)
+	syncRules.Configs = append(syncRules.Configs, resourceSyncRuleList(h.controller.configMapSyncRules)...)
+
+	data, err := json.Marshal(syncRules)
+	if err != nil {
+		w.Write([]byte(err.Error()))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(data)
+	w.WriteHeader(http.StatusOK)
+}
+
+func resourceSyncRuleList(syncRules map[ResourceLocation]ResourceLocation) ResourceSyncRuleList {
+	rules := make(ResourceSyncRuleList, 0, len(syncRules))
+	for src, dest := range syncRules {
+		rule := ResourceSyncRule{
+			Source:      src,
+			Destination: dest,
+		}
+		rules = append(rules, rule)
+	}
+	sort.Sort(rules)
+	return rules
 }

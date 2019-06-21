@@ -5,9 +5,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -62,7 +63,7 @@ func NewBackingResourceController(
 	c := &BackingResourceController{
 		targetNamespace:      targetNamespace,
 		operatorConfigClient: operatorConfigClient,
-		eventRecorder:        eventRecorder,
+		eventRecorder:        eventRecorder.WithComponentSuffix("backing-resource-controller"),
 
 		saListerSynced: kubeInformersForTargetNamespace.Core().V1().ServiceAccounts().Informer().HasSynced,
 		saLister:       kubeInformersForTargetNamespace.Core().V1().ServiceAccounts().Lister(),
@@ -97,14 +98,7 @@ func (c BackingResourceController) sync() error {
 		return err
 	}
 
-	switch operatorSpec.ManagementState {
-	case operatorv1.Managed:
-	case operatorv1.Unmanaged:
-		return nil
-	case operatorv1.Removed:
-		// TODO probably just fail
-		return nil
-	default:
+	if !management.IsOperatorManaged(operatorSpec.ManagementState) {
 		return nil
 	}
 
@@ -145,8 +139,8 @@ func (c *BackingResourceController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting BackingResourceController")
-	defer glog.Infof("Shutting down BackingResourceController")
+	klog.Infof("Starting BackingResourceController")
+	defer klog.Infof("Shutting down BackingResourceController")
 	if !cache.WaitForCacheSync(stopCh, c.saListerSynced) {
 		return
 	}

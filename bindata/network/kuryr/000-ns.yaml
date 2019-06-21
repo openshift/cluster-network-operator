@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-kuryr
+  labels:
+    name: openshift-kuryr
+    openshift.io/run-level: "0"
+  annotations:
+    openshift.io/node-selector: "" #override default node selector
+    openshift.io/description: "Kuryr-Kubernetes components"
