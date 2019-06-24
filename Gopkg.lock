@@ -361,9 +361,7 @@
   digest = "1:421d284b32d0d08769b317e84469348d1aa53b86cc01a7783338f1b5736c5e41"
   name = "github.com/openshift/api"
   packages = [
-    "build/v1",
     "config/v1",
-    "legacyconfig/v1",
     "network/v1",
     "operator/v1",
   ]
@@ -975,7 +973,6 @@
     "github.com/onsi/gomega",
     "github.com/onsi/gomega/types",
     "github.com/openshift/api/config/v1",
-    "github.com/openshift/api/legacyconfig/v1",
     "github.com/openshift/api/network/v1",
     "github.com/openshift/api/operator/v1",
     "github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers",
@@ -995,6 +992,8 @@
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
     "k8s.io/apimachinery/pkg/types",
+    "k8s.io/apimachinery/pkg/util/errors",
+    "k8s.io/apimachinery/pkg/util/net",
     "k8s.io/apimachinery/pkg/util/runtime",
     "k8s.io/apimachinery/pkg/util/yaml",
     "k8s.io/client-go/discovery",
