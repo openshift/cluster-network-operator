@@ -16,9 +16,10 @@ if [[ ! $(which golint) ]]; then
   echo "go get -u github.com/golang/lint/golint"
   exit 1
 fi
-if [[ ! $(which operator-sdk) ]]; then
-  echo "operator-sdk not found on PATH. To install:"
-  echo "go get -u github.com/operator-framework/operator-sdk/commands/operator-sdk"
+if [[ ! $(which dep) ]]; then
+  echo "dep not found on PATH. To install:"
+  echo "curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh"
+  exit 1
 fi
 
 rc=0
@@ -41,9 +42,8 @@ fi
 echo "Running go vet..."
 go vet $GOPKGS
 
-# Temporariy disabled because it breaks openshift-ci
-#echo "Running verify code-generators"
-#(cd hack && ./verify-codegen.sh)
+echo "Running dep check..."
+dep check
 
 echo "Done!"
 exit ${rc}
