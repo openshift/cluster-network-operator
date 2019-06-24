@@ -7,11 +7,14 @@ metadata:
     kubernetes.io/description: |
       This deployment launches the kuryr-controller component.
 spec:
+  selector:
+    matchLabels:
+      app: kuryr-controller
   template:
     metadata:
       name: kuryr-controller
       labels:
-        app: kuryr
+        app: kuryr-controller
         component: network
         type: infra
         openshift.io/component: network
