@@ -30,14 +30,6 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-container-networking-plugins-unsupported:4.2
-  - name: sriov-cni
-    from:
-      kind: DockerImage
-      name: quay.io/openshift/origin-sriov-cni:4.2
-  - name: sriov-network-device-plugin
-    from:
-      kind: DockerImage
-      name: quay.io/openshift/origin-sriov-network-device-plugin:4.2
   - name: ovn-kubernetes
     from:
       kind: DockerImage

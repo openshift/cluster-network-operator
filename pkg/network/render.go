@@ -305,11 +305,7 @@ func RenderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 	for _, an := range ans {
 		switch an.Type {
 		case operv1.NetworkTypeRaw:
-			if isOpenShiftSRIOV(&an) {
-				objs, err = renderOpenShiftSRIOV(&an, manifestDir)
-			} else {
-				objs, err = renderRawCNIConfig(&an, manifestDir)
-			}
+			objs, err = renderRawCNIConfig(&an, manifestDir)
 			if err != nil {
 				return nil, err
 			}
