@@ -33,7 +33,11 @@ func ShouldDeployKubeProxy(conf *operv1.NetworkSpec) bool {
 }
 
 // kubeProxyConfiguration builds the (yaml text of) the kube-proxy config object
-func kubeProxyConfiguration(conf *operv1.NetworkSpec, pluginDefaults map[string]operv1.ProxyArgumentList) (string, error) {
+// It merges multiple sources of arguments. The precedence order is:
+// - pluginDefaults
+// - conf.KubeProxyConfig.ProxyArguments
+// - pluginOverrides
+func kubeProxyConfiguration(pluginDefaults map[string]operv1.ProxyArgumentList, conf *operv1.NetworkSpec, pluginOverrides map[string]operv1.ProxyArgumentList) (string, error) {
 	p := conf.KubeProxyConfig
 
 	args := map[string]operv1.ProxyArgumentList{}
@@ -45,6 +49,7 @@ func kubeProxyConfiguration(conf *operv1.NetworkSpec, pluginDefaults map[string]
 
 	args = k8sutil.MergeKubeProxyArguments(args, pluginDefaults)
 	args = k8sutil.MergeKubeProxyArguments(args, p.ProxyArguments)
+	args = k8sutil.MergeKubeProxyArguments(args, pluginOverrides)
 
 	return k8sutil.GenerateKubeProxyConfiguration(args)
 }
@@ -141,7 +146,7 @@ func RenderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]
 		"proxy-mode":           {"iptables"},
 	}
 
-	kpc, err := kubeProxyConfiguration(conf, kpcDefaults)
+	kpc, err := kubeProxyConfiguration(kpcDefaults, conf, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to generate kube-proxy configuration file")
 	}

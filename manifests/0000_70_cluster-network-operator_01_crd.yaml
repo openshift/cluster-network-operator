@@ -57,6 +57,8 @@ spec:
                       minimum: 0
                     useExternalOpenvswitch:
                       type: boolean
+                    enableUnidling:
+                      type: boolean
                 ovnKubernetesConfig:
                   type: object
                   properties:
