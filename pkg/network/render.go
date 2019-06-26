@@ -131,7 +131,8 @@ func FillDefaults(conf, previous *operv1.NetworkSpec) {
 }
 
 // IsChangeSafe checks to see if the change between prev and next are allowed
-// FillDefaults and Validate should have been called.
+// FillDefaults and Validate should have been called, but beware that prev may
+// be from an older version.
 func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 	if prev == nil {
 		return nil
@@ -160,7 +161,7 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 
 	// Changing AdditionalNetworks is supported
 
-	if *prev.DisableMultiNetwork != *next.DisableMultiNetwork {
+	if !reflect.DeepEqual(prev.DisableMultiNetwork, next.DisableMultiNetwork) {
 		errs = append(errs, errors.Errorf("cannot change DisableMultiNetwork"))
 	}
 

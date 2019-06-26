@@ -113,7 +113,7 @@ func isOpenShiftSDNChangeSafe(prev, next *operv1.NetworkSpec) []error {
 }
 
 func fillOpenShiftSDNDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
-	// NOTE: If you change any defaults, and it's not a safe chang to roll out
+	// NOTE: If you change any defaults, and it's not a safe change to roll out
 	// to existing clusters, you MUST use the value from previous instead.
 	if conf.DeployKubeProxy == nil {
 		prox := false
