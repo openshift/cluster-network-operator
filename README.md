@@ -114,6 +114,7 @@ OpenShiftSDN supports the following configuration options, all of which are opti
 * `vxlanPort`: The port to use for the VXLAN overlay. The default is 4789
 * `MTU`: The MTU to use for the VXLAN overlay. The default is the MTU of the node that the cluster-network-operator is first run on, minus 50 bytes for overhead. If the nodes in your cluster don't all have the same MTU then you will need to set this explicitly.
 * `useExternalOpenvswitch`: boolean. If the nodes are already running openvswitch, and OpenShiftSDN should not install its own, set this to true. This only needed for certain advanced installations with DPDK or OpenStack.
+* `enableUnidling`: boolean. Whether the service proxy should allow idling and unidling of services.
 
 These configuration flags are only in the Operator configuration object.
 
@@ -126,6 +127,7 @@ spec:
       mode: NetworkPolicy
       vxlanPort: 4789
       mtu: 1450
+      enableUnidling: true
       useExternalOpenvswitch: false
 ```
 
@@ -201,6 +203,7 @@ Most network changes are unsafe to roll out to a production cluster. Therefore, 
 It is safe to edit the following fields in the Operator configuration:
 * deployKubeProxy
 * all of kubeProxyConfig
+* OpenshiftSDN enableUnidling, useExternalOpenvswitch.
 
 ### Force-applying an unsafe change
 Administrators may wish to forcefully apply a disruptive change to a cluster that is not serving production traffic. To do this, first they should make the desired configuration change to the CRD. Then, delete the network operator's understanding of the state of the system:
