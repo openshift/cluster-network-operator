@@ -1,6 +1,6 @@
 ---
 # ovnkube-node
-# daemonset version 3
+# daemonset version 4
 # starts node daemons for ovs and ovn, each in a separate container
 # it is run on all nodes
 kind: DaemonSet
@@ -37,9 +37,17 @@ spec:
       containers:
       # ovsdb-server and ovs-switchd daemons
       - name: ovs-daemons
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
 
         command: ["/root/ovnkube.sh", "ovs-server"]
+
+        livenessProbe:
+          exec:
+            command:
+            - /usr/share/openvswitch/scripts/ovs-ctl
+            - status
+          initialDelaySeconds: 15
+          periodSeconds: 5
 
         securityContext:
           # Permission could be reduced by selecting an appropriate SELinux policy
@@ -58,14 +66,15 @@ spec:
           readOnly: true
         - mountPath: /etc/openvswitch
           name: host-config-openvswitch
+        - mountPath: /var/run/ovn-config
+          name: ovn-config-mount
         resources:
           requests:
             cpu: 100m
             memory: 300Mi
         env:
         - name: OVN_DAEMONSET_VERSION
-          value: "3"
-
+          value: "4"
 
       # firewall rules for ovn - assumed to be setup
       # iptables -A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 6641 -j ACCEPT
@@ -75,7 +84,7 @@ spec:
       # The network container launches the ovn-k8s-cni-overlay process, the kube-proxy, and the local DNS service.
       # It relies on an up to date node-config.yaml being present.
       - name: ovn-controller
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
 
         command: ["/root/ovnkube.sh", "ovn-controller"]
 
@@ -89,6 +98,8 @@ spec:
           name: host-var-lib-ovs
         - mountPath: /var/run/openvswitch/
           name: host-var-run-ovs
+        - mountPath: /var/run/ovn-config
+          name: ovn-config-mount
 
         resources:
           requests:
@@ -96,35 +107,14 @@ spec:
             memory: 300Mi
         env:
         - name: OVN_DAEMONSET_VERSION
-          value: "3"
-        - name: OVNKUBE_LOGLEVEL
           value: "4"
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
         - name: K8S_NODE
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: K8S_APISERVER
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: k8s_apiserver
-        - name: OVN_KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
 
       - name: ovn-node
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
 
         command: ["/root/ovnkube.sh", "ovn-node"]
 
@@ -150,6 +140,10 @@ spec:
           name: host-cni-netd
         - mountPath: /var/lib/cni/networks/ovn-k8s-cni-overlay
           name: host-var-lib-cni-networks-ovn-kubernetes
+        - mountPath: /var/run/ovn-config
+          name: ovn-config-mount
+        - mountPath: /var/run/ovnkube-config
+          name: ovnkube-config-mount
 
         resources:
           requests:
@@ -157,35 +151,11 @@ spec:
             memory: 300Mi
         env:
         - name: OVN_DAEMONSET_VERSION
-          value: "3"
-        - name: OVNKUBE_LOGLEVEL
           value: "4"
-        - name: OVN_GATEWAY_MODE
-          value: local
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
         - name: K8S_NODE
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: K8S_APISERVER
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: k8s_apiserver
-        - name: OVN_KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-
         lifecycle:
           preStop:
             exec:
@@ -233,5 +203,11 @@ spec:
       - name: host-var-lib-cni-networks-ovn-kubernetes
         hostPath:
           path: /var/lib/cni/networks/ovn-k8s-cni-overlay
+      - configMap:
+          name: ovn-config
+        name: ovn-config-mount
+      - configMap:
+          name: ovnkube-config
+        name: ovnkube-config-mount
       tolerations:
       - operator: "Exists"

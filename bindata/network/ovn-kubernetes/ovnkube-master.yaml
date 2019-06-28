@@ -1,5 +1,5 @@
 # ovnkube-master
-# daemonset version 3
+# daemonset version 4
 # starts master daemons, each in a separate container
 # it is run on the master node(s)
 kind: Deployment
@@ -43,7 +43,7 @@ spec:
 
       # run-ovn-northd - v3
       - name: run-ovn-northd
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
 
         command: ["/root/ovnkube.sh", "run-ovn-northd"]
 
@@ -56,6 +56,8 @@ spec:
           name: host-var-lib-ovs
         - mountPath: /var/run/openvswitch/
           name: host-var-run-ovs
+        - mountPath: /var/run/ovn-config
+          name: ovn-config-mount
 
         resources:
           requests:
@@ -63,37 +65,16 @@ spec:
             memory: 300Mi
         env:
         - name: OVN_DAEMONSET_VERSION
-          value: "3"
-        - name: OVN_LOG_NORTHD
-          value: "-vconsole:info"
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
+          value: "4"
         - name: K8S_NODE
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: K8S_APISERVER
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: k8s_apiserver
-        - name: OVN_KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
       # end of container
 
       # nb-ovsdb - v3
       - name: nb-ovsdb
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
 
         command: ["/root/ovnkube.sh", "nb-ovsdb"]
 
@@ -106,6 +87,8 @@ spec:
           name: host-var-lib-ovs
         - mountPath: /var/run/openvswitch/
           name: host-var-run-ovs
+        - mountPath: /var/run/ovn-config
+          name: ovn-config-mount
 
         resources:
           requests:
@@ -113,37 +96,16 @@ spec:
             memory: 300Mi
         env:
         - name: OVN_DAEMONSET_VERSION
-          value: "3"
-        - name: OVN_LOG_NB
-          value: "-vconsole:info -vfile:info"
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
+          value: "4"
         - name: K8S_NODE
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: K8S_APISERVER
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: k8s_apiserver
-        - name: OVN_KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
       # end of container
 
       # sb-ovsdb - v3
       - name: sb-ovsdb
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
 
         command: ["/root/ovnkube.sh", "sb-ovsdb"]
 
@@ -158,6 +120,8 @@ spec:
           name: host-var-run-ovs
         - mountPath: /var/run/kubernetes/
           name: host-var-run-kubernetes
+        - mountPath: /var/run/ovn-config
+          name: ovn-config-mount
 
         resources:
           requests:
@@ -165,36 +129,15 @@ spec:
             memory: 300Mi
         env:
         - name: OVN_DAEMONSET_VERSION
-          value: "3"
-        - name: OVN_LOG_SB
-          value: "-vconsole:info -vfile:info"
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
+          value: "4"
         - name: K8S_NODE
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: K8S_APISERVER
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: k8s_apiserver
-        - name: OVN_KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
       # end of container
 
       - name: ovnkube-master
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
 
         command: ["/root/ovnkube.sh", "ovn-master"]
 
@@ -209,6 +152,10 @@ spec:
           name: host-var-run-ovs
         - mountPath: /var/run/kubernetes/
           name: host-var-run-kubernetes
+        - mountPath: /var/run/ovn-config
+          name: ovn-config-mount
+        - mountPath: /var/run/ovnkube-config
+          name: ovnkube-config-mount
 
         resources:
           requests:
@@ -216,34 +163,11 @@ spec:
             memory: 300Mi
         env:
         - name: OVN_DAEMONSET_VERSION
-          value: "3"
-        - name: OVN_MASTER
-          value: "true"
-        - name: OVNKUBE_LOGLEVEL
           value: "4"
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
         - name: K8S_NODE
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: K8S_APISERVER
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: k8s_apiserver
-        - name: OVN_KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
       # end of container
 
       nodeSelector:
@@ -262,6 +186,13 @@ spec:
       - name: host-var-run-kubernetes
         hostPath:
           path: /var/run/kubernetes
+      - configMap:
+          name: ovn-config
+        name: ovn-config-mount
+      - configMap:
+          name: ovnkube-config
+        name: ovnkube-config-mount
+
       tolerations:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"

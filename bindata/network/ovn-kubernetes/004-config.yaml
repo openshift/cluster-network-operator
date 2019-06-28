@@ -6,6 +6,5 @@ metadata:
   name: ovn-config
   namespace: openshift-ovn-kubernetes
 data:
-  net_cidr:   {{.OVN_cidr}}
-  svc_cidr:   {{.OVN_service_cidr}}
   k8s_apiserver: "{{.K8S_APISERVER}}"
+  namespace:  "openshift-ovn-kubernetes"

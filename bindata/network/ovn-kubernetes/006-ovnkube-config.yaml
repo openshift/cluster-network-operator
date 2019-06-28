@@ -1,0 +1,25 @@
+---
+# The config file used by ovnkube is passed as a configmap.
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: ovnkube-config
+  namespace: openshift-ovn-kubernetes
+data:
+  ovn_k8s.conf:   |-
+    [default]
+    mtu="{{.MTU}}"
+    cluster-subnets="{{.K8S_cluster_subnets}}"
+
+    [kubernetes]
+    service-cidr="{{.OVN_service_cidr}}"
+    ovn-config-namespace="openshift-ovn-kubernetes"
+    apiserver="{{.K8S_APISERVER}}"
+
+    [logging]
+    loglevel="{{.OVNKUBE_loglevel}}"
+
+    [gateway]
+    mode=local
+    nodeport=true
+

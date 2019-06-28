@@ -41,7 +41,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.U
 		}
 		ippools += fmt.Sprintf("%s/%d", net.CIDR, net.HostPrefix)
 	}
-	data.Data["OVN_cidr"] = ippools
 
 	var svcpools string
 	for _, net := range conf.ServiceNetwork {
@@ -51,6 +50,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.U
 		svcpools += fmt.Sprintf("%s", net)
 	}
 	data.Data["OVN_service_cidr"] = svcpools
+
+	// ovnkube config file
+	data.Data["K8S_cluster_subnets"] = ippools
+	data.Data["OVNKUBE_loglevel"] = 4
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/ovn-kubernetes"), &data)
 	if err != nil {
