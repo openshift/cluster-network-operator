@@ -89,10 +89,10 @@ spec:
       volumes:
       - name: bin
         hostPath:
-          path: /var/lib/cni/bin
+          path: {{.CNIBinDir}}
       - name: net-conf
         hostPath:
-          path: /etc/kubernetes/cni/net.d
+          path: {{.CNIConfDir}}
       - name: config-volume
         configMap:
           name: kuryr-config
