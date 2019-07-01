@@ -44,6 +44,7 @@ spec:
         command: ["/entrypoint.sh"]
         args:
         - "--multus-conf-file=auto"
+        - "--multus-autoconfig-dir=/host/var/run/multus/cni/net.d"
         - "--multus-kubeconfig-file-host=/etc/kubernetes/cni/net.d/multus.d/multus.kubeconfig"
         - "--namespace-isolation=true"
         - "--multus-log-level=verbose"
@@ -55,8 +56,10 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
-        - name: cni
+        - name: system-cni-dir
           mountPath: /host/etc/cni/net.d
+        - name: multus-cni-dir
+          mountPath: /host/var/run/multus/cni/net.d
         - name: cnibin
           mountPath: /host/opt/cni/bin
         env:
@@ -65,9 +68,12 @@ spec:
         - name: KUBERNETES_SERVICE_HOST
           value: "{{.KUBERNETES_SERVICE_HOST}}"
       volumes:
-        - name: cni
+        - name: system-cni-dir
           hostPath:
-            path: /etc/kubernetes/cni/net.d
+            path: {{ .SystemCNIConfDir }}
+        - name: multus-cni-dir
+          hostPath:
+            path: {{ .MultusCNIConfDir }}
         - name: cnibin
           hostPath:
             path: /var/lib/cni/bin
