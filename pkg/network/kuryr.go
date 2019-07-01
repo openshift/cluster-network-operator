@@ -60,6 +60,8 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["ControllerImage"] = os.Getenv("KURYR_CONTROLLER_IMAGE")
 	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
+	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
+	data.Data["CNIBinDir"] = CNIBinDir
 
 	// DNS mutating webhook
 	data.Data["AdmissionControllerSecret"] = names.KURYR_ADMISSION_CONTROLLER_SECRET
