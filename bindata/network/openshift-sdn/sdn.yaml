@@ -115,7 +115,7 @@ spec:
         - mountPath: /host/opt/cni/bin
           name: host-cni-bin
         - mountPath: /etc/cni/net.d
-          name: host-cni-netd
+          name: host-cni-conf
         - mountPath: /var/lib/cni/networks/openshift-sdn
           name: host-var-lib-cni-networks-openshift-sdn
         # If iptables needs to load a module
@@ -191,10 +191,10 @@ spec:
           path: /
       - name: host-cni-bin
         hostPath:
-          path: /var/lib/cni/bin
-      - name: host-cni-netd
+          path: {{.CNIBinDir}}
+      - name: host-cni-conf
         hostPath:
-          path: /etc/kubernetes/cni/net.d
+          path: {{.CNIConfDir}}
       - name: host-var-lib-cni-networks-openshift-sdn
         hostPath:
           path: /var/lib/cni/networks/openshift-sdn

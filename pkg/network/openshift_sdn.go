@@ -37,6 +37,8 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
 	data.Data["Mode"] = c.Mode
+	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
+	data.Data["CNIBinDir"] = CNIBinDir
 
 	clusterNetwork, err := clusterNetwork(conf)
 	if err != nil {

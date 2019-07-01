@@ -53,6 +53,8 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["NodeImage"] = os.Getenv("NODE_IMAGE")
 	data.Data["DaemonImage"] = os.Getenv("KURYR_DAEMON_IMAGE")
 	data.Data["ControllerImage"] = os.Getenv("KURYR_CONTROLLER_IMAGE")
+	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
+	data.Data["CNIBinDir"] = CNIBinDir
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/kuryr"), &data)
 	if err != nil {
