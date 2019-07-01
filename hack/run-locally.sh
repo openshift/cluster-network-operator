@@ -135,6 +135,9 @@ function ensure_install_config() {
     else
         cp "${INSTALL_CONFIG}" "${CLUSTER_DIR}/install-config.yaml"
     fi
+    # since the install-config is consumed by the installer, back it up for
+    # subsequent re-use
+    cp "${CLUSTER_DIR}/install-config.yaml" "${CLUSTER_DIR}/install-config.yaml.bak.$(date '+%s')"
 }
 
 # Create installer manifests and substitute the requested network plugin
@@ -154,7 +157,8 @@ function create_cluster() {
 
 # Fix up the AWS firewall so network plugin components can talk to each other
 function open_aws_ports() {
-    if [[ "${NETWORK_PLUGIN}" == "OVNKubernetes" ]]; then
+    local platform=$(oc get infrastructure cluster -o jsonpath='{.status.platform}')
+    if [[ "${NETWORK_PLUGIN}" == "OVNKubernetes" && "${platform}" == "AWS" ]]; then
         echo "Attempting to open OVN ports for AWS..."
         CLUSTER_DIR="${CLUSTER_DIR}" hack/open-ovn-ports.sh
         echo "Opened OVN ports for AWS"
@@ -239,7 +243,8 @@ done
 
 if [[ -z "${CLUSTER_DIR:-}" ]]; then
     echo "error: CLUSTER_DIR must be set or '-c <cluster-dir>' must be given"
-    echo "For more info, see HACKING.md"
+    echo
+    print_usage
     exit 1
 fi
 mkdir -p "${CLUSTER_DIR}" >& /dev/null
