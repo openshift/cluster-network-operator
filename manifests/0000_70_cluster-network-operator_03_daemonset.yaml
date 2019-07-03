@@ -35,6 +35,8 @@ spec:
           value: "quay.io/openshift/origin-kube-proxy:4.2"
         - name: MULTUS_IMAGE
           value: "quay.io/openshift/origin-multus-cni:4.2"
+        - name: MULTUS_ADMISSION_CONTROLLER_IMAGE
+          value: "quay.io/openshift/origin-multus-admission-controller:4.2"
         - name: CNI_PLUGINS_SUPPORTED_IMAGE
           value: "quay.io/openshift/origin-container-networking-plugins-supported:4.2"
         - name: CNI_PLUGINS_UNSUPPORTED_IMAGE
