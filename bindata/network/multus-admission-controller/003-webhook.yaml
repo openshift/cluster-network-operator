@@ -1,0 +1,19 @@
+---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{.MultusValidatingWebhookName}}
+  labels:
+    app: multus-admission-controller
+webhooks:
+  - name: multus-validating-config.k8s.io
+    clientConfig:
+      service:
+        name: multus-admission-controller
+        namespace: openshift-multus
+        path: "/validate"
+    rules:
+      - operations: [ "CREATE" ]
+        apiGroups: ["k8s.cni.cncf.io"]
+        apiVersions: ["v1"]
+        resources: ["network-attachment-definitions"]

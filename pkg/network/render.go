@@ -25,6 +25,13 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	}
 	objs = append(objs, o...)
 
+	// render MultusAdmissionController
+	o, err = RenderMultusAdmissionController(conf, manifestDir)
+	if err != nil {
+		return nil, err
+	}
+	objs = append(objs, o...)
+
 	// render default network
 	o, err = RenderDefaultNetwork(conf, bootstrapResult, manifestDir)
 	if err != nil {
@@ -337,6 +344,24 @@ func RenderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 
 	usedhcp := UseDHCP(conf)
 	objs, err = renderMultusConfig(manifestDir, usedhcp)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, objs...)
+	return out, nil
+}
+
+// RenderMultusAdmissionController generates the manifests of Multus Admission Controller
+func RenderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+	if *conf.DisableMultiNetwork {
+		return nil, nil
+	}
+
+	var err error
+	out := []*uns.Unstructured{}
+	objs := []*uns.Unstructured{}
+
+	objs, err = renderMultusAdmissonControllerConfig(manifestDir)
 	if err != nil {
 		return nil, err
 	}
