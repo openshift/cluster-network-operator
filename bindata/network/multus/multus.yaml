@@ -20,8 +20,6 @@ spec:
         component: network
         type: infra
         openshift.io/component: network
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       hostNetwork: true
       nodeSelector:

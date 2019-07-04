@@ -27,14 +27,13 @@ spec:
         type: infra
         openshift.io/component: network
         kubernetes.io/os: "linux"
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       # Requires fairly broad permissions - ability to read all services and network functions as well
       # as all pods.
       serviceAccountName: ovn-kubernetes-controller
       hostNetwork: true
       hostPID: true
+      priorityClassName: "system-cluster-critical"
       containers:
       # firewall rules for ovn - assumed to be setup
       # iptables -A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 6641 -j ACCEPT
