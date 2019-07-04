@@ -86,6 +86,7 @@ func readConfigObject(path string) (*operv1.Network, error) {
 
 // writeObjects serializes the list of objects as a single yaml file
 func writeObjects(path string, objs []*uns.Unstructured) error {
+	// #nosec
 	fp, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return errors.Wrapf(err, "could not open output file %s", path)
