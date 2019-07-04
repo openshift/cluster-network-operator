@@ -84,5 +84,28 @@ Example to Perform an Operation on a Node
 		panic(err)
 	}
 
+Example to Recover a Node
+
+	nodeID := "b7b870e3-d3c5-4a93-b9d7-846c53b2c2da"
+	check := true
+	recoverOpts := nodes.RecoverOpts{
+		Operation:     nodes.RebuildRecovery,
+		Check:         &check,
+	}
+	actionID, err := nodes.Recover(computeClient, nodeID, recoverOpts).Extract()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("action=", actionID)
+
+Example to Check a Node
+
+	nodeID := "b7b870e3-d3c5-4a93-b9d7-846c53b2c2da"
+	actionID, err := nodes.Check(serviceClient, nodeID).Extract()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("action=", actionID)
+
 */
 package nodes

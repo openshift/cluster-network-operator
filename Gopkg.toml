@@ -76,4 +76,4 @@ required = [
 
 [[constraint]]
   name = "github.com/gophercloud/gophercloud"
-  revision="f27ceddc323ff01fdd909ac8377fb06b12db7f4f"
+  revision="17584a22adf89c48eb1f2518e71326b3b01ba573"
