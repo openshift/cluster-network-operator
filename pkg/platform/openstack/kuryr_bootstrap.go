@@ -47,7 +47,8 @@ const (
 	CloudName             = "openstack"
 	CloudsSecretKey       = "clouds.yaml"
 	// NOTE(dulek): This one is hardcoded in openshift/installer.
-	InfrastructureCRDName = "cluster"
+	InfrastructureCRDName           = "cluster"
+	MinOctaviaVersionWithTagSupport = "v2.5"
 )
 
 func GetClusterID(kubeClient client.Client) (string, error) {
@@ -419,11 +420,9 @@ func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix
 	}
 	_, err := rules.Create(client, opts).Extract()
 	if err != nil {
-		if errCode, ok := err.(gophercloud.ErrUnexpectedResponseCode); ok {
-			if errCode.Actual == 409 {
-				// Ignoring 409 Conflict as that means the rule is already there.
-				return nil
-			}
+		if _, ok := err.(gophercloud.ErrDefault409); ok {
+			// Ignoring 409 Conflict as that means the rule is already there.
+			return nil
 		}
 		return errors.Wrap(err, "failed to create SG rule")
 	}
@@ -447,12 +446,28 @@ func waitForOpenStackLb(client *gophercloud.ServiceClient, lbId string) error {
 
 // Looks for a Octavia load balancer by name, address and subnet ID. If it does
 // not exist creates it. Will fail if multiple LB's are matching all criteria.
-func ensureOpenStackLb(client *gophercloud.ServiceClient, name, vipAddress, vipSubnetId string) (string, error) {
-	page, err := loadbalancers.List(client, loadbalancers.ListOpts{
+func ensureOpenStackLb(client *gophercloud.ServiceClient, name, vipAddress, vipSubnetId, tag string) (string, error) {
+	// We need to figure out if Octavia supports tags and use description field if it's too old. To do that
+	// we list available API versions and look for 2.5. This is because we support Queens and Rocky releases of
+	// OpenStack and those were before tags got implemented.
+	// TODO(dulek): This workaround can be removed once we stop supporting Queens and Rocky OpenStack releases.
+	octaviaTagSupport, err := IsOctaviaVersionSupported(client, MinOctaviaVersionWithTagSupport)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to determine if Octavia supports tags")
+	}
+
+	opts := loadbalancers.ListOpts{
 		Name:        name,
 		VipAddress:  vipAddress,
 		VipSubnetID: vipSubnetId,
-	}).AllPages()
+	}
+	if octaviaTagSupport {
+		opts.Tags = []string{tag}
+	} else {
+		opts.Description = tag
+	}
+
+	page, err := loadbalancers.List(client, opts).AllPages()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get LB list")
 	}
@@ -461,7 +476,7 @@ func ensureOpenStackLb(client *gophercloud.ServiceClient, name, vipAddress, vipS
 		return "", errors.Wrap(err, "failed to extract LB list")
 	}
 	if len(lbs) > 1 {
-		return "", errors.Errorf("found multiple LB matching name %s, cannot proceed", name)
+		return "", errors.Errorf("found multiple LB matching name %s, tag %s, cannot proceed", name, tag)
 	} else if len(lbs) == 1 {
 		return lbs[0].ID, nil
 	} else {
@@ -469,6 +484,11 @@ func ensureOpenStackLb(client *gophercloud.ServiceClient, name, vipAddress, vipS
 			Name:        name,
 			VipAddress:  vipAddress,
 			VipSubnetID: vipSubnetId,
+		}
+		if octaviaTagSupport {
+			opts.Tags = []string{tag}
+		} else {
+			opts.Description = tag
 		}
 		lb, err := loadbalancers.Create(client, opts).Extract()
 		if err != nil {
@@ -620,6 +640,10 @@ func getProjectID(keystone *gophercloud.ServiceClient, username, projectName str
 	return proj.ID, nil
 }
 
+func generateName(name, clusterID string) string {
+	return fmt.Sprintf("%s-%s", clusterID, name)
+}
+
 // Logs into OpenStack and creates all the resources that are required to run
 // Kuryr based on conf NetworkConfigSpec. Basically this includes service
 // network and subnet, pods subnetpool, security group and load balancer for
@@ -683,7 +707,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	log.Printf("Using %s as resources tag", tag)
 
 	log.Print("Ensuring services network")
-	svcNetId, err := ensureOpenStackNetwork(client, "kuryr-service-network", tag)
+	svcNetId, err := ensureOpenStackNetwork(client, generateName("kuryr-service-network", clusterID), tag)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create service network")
 	}
@@ -699,7 +723,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	ip := iputil.LastUsableIP(*svcNet)
 	ipStr := ip.String()
 	log.Printf("Ensuring services subnet with %s CIDR and %s gateway", conf.ServiceNetwork[0], ipStr)
-	svcSubnetId, err := ensureOpenStackSubnet(client, "kuryr-service-subnet", tag,
+	svcSubnetId, err := ensureOpenStackSubnet(client, generateName("kuryr-service-subnet", clusterID), tag,
 		svcNetId, conf.ServiceNetwork[0], &ipStr)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create service subnet")
@@ -715,18 +739,19 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	//              we need to validate if all of them are the same - that's how it can work in OpenStack.
 	prefixLen := conf.ClusterNetwork[0].HostPrefix
 	log.Printf("Ensuring pod subnetpool with following CIDRs: %v", podSubnetCidrs)
-	podSubnetpoolId, err := ensureOpenStackSubnetpool(client, "kuryr-pod-subnetpool", tag, podSubnetCidrs, prefixLen)
+	podSubnetpoolId, err := ensureOpenStackSubnetpool(client, generateName("kuryr-pod-subnetpool", clusterID), tag,
+		podSubnetCidrs, prefixLen)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create pod subnetpool")
 	}
 	log.Printf("Pod subnetpool %s present", podSubnetpoolId)
 
-	workerSubnet, err := findOpenStackSubnet(client, fmt.Sprintf("%s-nodes", clusterID), tag)
+	workerSubnet, err := findOpenStackSubnet(client, generateName("nodes", clusterID), tag)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes subnet")
 	}
 	log.Printf("Found worker nodes subnet %s", workerSubnet.ID)
-	routerId, err := findOpenStackRouterId(client, fmt.Sprintf("%s-external-router", clusterID), tag)
+	routerId, err := findOpenStackRouterId(client, generateName("external-router", clusterID), tag)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes router")
 	}
@@ -738,7 +763,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 
 	if !lookupOpenStackPort(ps, svcSubnetId) {
 		log.Printf("Ensuring service subnet router port with %s IP", ipStr)
-		portId, err := ensureOpenStackPort(client, "kuryr-service-subnet-router-port", tag,
+		portId, err := ensureOpenStackPort(client, generateName("kuryr-service-subnet-router-port", clusterID), tag,
 			svcNetId, svcSubnetId, ipStr)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create service subnet router port")
@@ -750,19 +775,19 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		}
 	}
 
-	masterSgId, err := findOpenStackSgId(client, fmt.Sprintf("%s-master", clusterID), tag)
+	masterSgId, err := findOpenStackSgId(client, generateName("master", clusterID), tag)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find master nodes security group")
 	}
 	log.Printf("Found master nodes security group %s", masterSgId)
-	workerSgId, err := findOpenStackSgId(client, fmt.Sprintf("%s-worker", clusterID), tag)
+	workerSgId, err := findOpenStackSgId(client, generateName("worker", clusterID), tag)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes security group")
 	}
 	log.Printf("Found worker nodes security group %s", workerSgId)
 
 	log.Print("Ensuring pods security group")
-	podSgId, err := ensureOpenStackSg(client, "kuryr-pods-security-group", tag)
+	podSgId, err := ensureOpenStackSg(client, generateName("kuryr-pods-security-group", clusterID), tag)
 	log.Printf("Pods security group %s present", podSgId)
 
 	log.Print("Allowing traffic from masters and nodes to pods")
@@ -793,21 +818,22 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	ip = iputil.FirstUsableIP(*svcNet)
 	ipStr = ip.String()
 	log.Printf("Creating OpenShift API loadbalancer with IP %s", ipStr)
-	lbId, err := ensureOpenStackLb(lbClient, "kuryr-api-loadbalancer", ipStr, svcSubnetId)
+	lbId, err := ensureOpenStackLb(lbClient, generateName("kuryr-api-loadbalancer", clusterID), ipStr, svcSubnetId, tag)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create OpenShift API loadbalancer")
 	}
 	log.Printf("OpenShift API loadbalancer %s present", lbId)
 
 	log.Print("Creating OpenShift API loadbalancer pool")
-	poolId, err := ensureOpenStackLbPool(lbClient, "kuryr-api-loadbalancer-pool", lbId)
+	poolId, err := ensureOpenStackLbPool(lbClient, generateName("kuryr-api-loadbalancer-pool", clusterID), lbId)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create OpenShift API loadbalancer pool")
 	}
 	log.Printf("OpenShift API loadbalancer pool %s present", poolId)
 
 	log.Print("Creating OpenShift API loadbalancer listener")
-	listenerId, err := ensureOpenStackLbListener(lbClient, "kuryr-api-loadbalancer-listener", lbId, poolId, 443)
+	listenerId, err := ensureOpenStackLbListener(lbClient, generateName("kuryr-api-loadbalancer-listener", clusterID),
+		lbId, poolId, 443)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create OpenShift API loadbalancer listener")
 	}

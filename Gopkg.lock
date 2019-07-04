@@ -954,6 +954,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/Masterminds/semver",
     "github.com/Masterminds/sprig",
     "github.com/ghodss/yaml",
     "github.com/gophercloud/gophercloud",
