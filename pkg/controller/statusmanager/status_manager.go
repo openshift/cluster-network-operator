@@ -86,6 +86,13 @@ func (status *StatusManager) Set(reachedAvailableLevel bool, conditions ...confi
 		)
 	}
 
+	v1helpers.SetStatusCondition(&co.Status.Conditions,
+		configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+	)
+
 	if reflect.DeepEqual(oldStatus, co.Status) {
 		return
 	}
