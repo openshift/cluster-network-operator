@@ -27,16 +27,14 @@ spec:
         type: infra
         openshift.io/component: network
         kubernetes.io/os: "linux"
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       # Requires fairly broad permissions - ability to read all services and network functions as well
       # as all pods.
       serviceAccountName: ovn-kubernetes-node
       hostNetwork: true
       hostPID: true
+      priorityClassName: "system-node-critical"
       containers:
-
       # ovsdb-server and ovs-switchd daemons
       - name: ovs-daemons
         image: {{.OvnImage}}
