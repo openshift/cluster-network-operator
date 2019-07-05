@@ -67,10 +67,10 @@ data:
     worker_nodes_subnet = {{ default "\"\"" .WorkerNodesSubnet }}
 
     [vif_pool]
-    #ports_pool_max = 0
-    #ports_pool_min = 5
-    #ports_pool_batch = 10
-    #ports_pool_update_frequency = 20
+    ports_pool_max = 0
+    ports_pool_min = 1
+    ports_pool_batch = 3
+    ports_pool_update_frequency = 30
 
     [health_server]
     port = {{ default 8082 .ControllerProbesPort }}
