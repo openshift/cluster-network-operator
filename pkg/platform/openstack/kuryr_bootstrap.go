@@ -18,6 +18,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/listeners"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/loadbalancers"
+	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/monitors"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/attributestags"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
@@ -49,12 +50,13 @@ const (
 	CloudName             = "openstack"
 	CloudsSecretKey       = "clouds.yaml"
 	// NOTE(dulek): This one is hardcoded in openshift/installer.
-	InfrastructureCRDName           = "cluster"
-	MinOctaviaVersionWithTagSupport = "v2.5"
-	MinOctaviaVersionWithTimeouts   = "v2.1"
-	KubernetesEndpointsName         = "kubernetes"
-	KubernetesEndpointsNamespace    = "default"
-	KuryrNamespace                  = "openshift-kuryr"
+	InfrastructureCRDName              = "cluster"
+	MinOctaviaVersionWithHTTPSMonitors = "v2.10"
+	MinOctaviaVersionWithTagSupport    = "v2.5"
+	MinOctaviaVersionWithTimeouts      = "v2.1"
+	KubernetesEndpointsName            = "kubernetes"
+	KubernetesEndpointsNamespace       = "default"
+	KuryrNamespace                     = "openshift-kuryr"
 )
 
 func GetClusterID(kubeClient client.Client) (string, error) {
@@ -557,6 +559,56 @@ func ensureOpenStackLbPool(client *gophercloud.ServiceClient, name, lbId string)
 	}
 }
 
+// Looks for Octavia load balancer health monitor by name and pool ID. If it does
+// not exist creates it. Will fail if multiple LB health monitors are matching all criteria.
+func ensureOpenStackLbMonitor(client *gophercloud.ServiceClient, name, poolId string) (string, error) {
+	octaviaHTTPSMonitors, err := IsOctaviaVersionSupported(client, MinOctaviaVersionWithHTTPSMonitors)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to determine if Octavia supports HTTPS health monitors")
+	}
+
+	page, err := monitors.List(client, monitors.ListOpts{
+		Name:   name,
+		PoolID: poolId,
+	}).AllPages()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get LB monitors list")
+	}
+	monitorsList, err := monitors.ExtractMonitors(page)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to extract LB monitors list")
+	}
+	if len(monitorsList) > 1 {
+		return "", errors.Errorf("found multiple LB monitors matching name %s, pool %s, cannot proceed", name, poolId)
+	} else if len(monitorsList) == 1 {
+		return monitorsList[0].ID, nil
+	} else {
+		opts := monitors.CreateOpts{
+			Name:       name,
+			PoolID:     poolId,
+			Type:       monitors.TypeTCP,
+			MaxRetries: 3,
+			Delay:      10,
+			Timeout:    10,
+		}
+		if octaviaHTTPSMonitors {
+			// TODO(dulek): Octavia is a wild animal. So in OpenStack Stein the meaning of HTTPS type of health monitor
+			//              changed. Before, it was a simple TLS handshake. Now it's really doing an HTTPS connection to
+			//              a certain URL and TLS-HELLO is the new HTTPS. We're going to stick with the simple TCP check
+			//              for Octavia's prior to Stein and in Stein we switch to proper HTTPS healthcheck. The former
+			//              behavior can be removed once we stop supporting OpenStack Queens and Rocky.
+			opts.URLPath = "/healthz"
+			opts.Type = monitors.TypeHTTPS
+		}
+		monitorObj, err := monitors.Create(client, opts).Extract()
+		if err != nil {
+			return "", errors.Wrap(err, "failed to create LB monitor")
+		}
+
+		return monitorObj.ID, nil
+	}
+}
+
 // Looks for a Octavia load balancer pool member by name, address and port. If
 // it does not exist creates it. Will fail if multiple LB pool members are
 // matching all criteria.
@@ -975,6 +1027,13 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		return nil, errors.Wrap(err, "failed to create OpenShift API loadbalancer pool")
 	}
 	log.Printf("OpenShift API loadbalancer pool %s present", poolId)
+
+	log.Print("Creating OpenShift API loadbalancer health monitor")
+	monitorId, err := ensureOpenStackLbMonitor(lbClient, "kuryr-api-loadbalancer-monitor", poolId)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create OpenShift API loadbalancer health monitor")
+	}
+	log.Printf("OpenShift API loadbalancer health monitor %s present", monitorId)
 
 	log.Print("Creating OpenShift API loadbalancer listener")
 	listenerId, err := ensureOpenStackLbListener(lbClient, generateName("kuryr-api-loadbalancer-listener", clusterID),
