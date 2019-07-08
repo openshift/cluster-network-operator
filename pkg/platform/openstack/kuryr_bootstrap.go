@@ -410,12 +410,18 @@ func ensureOpenStackSg(client *gophercloud.ServiceClient, name, tag string) (str
 
 // Tries to create an OpenStack security group rule on sgId SG. Ignores an
 // error if such rule already exists.
-func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix string) error {
+func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix string, portMin, portMax int) error {
 	opts := rules.CreateOpts{
 		SecGroupID:     sgId,
 		EtherType:      rules.EtherType4,
 		Direction:      rules.DirIngress,
 		RemoteIPPrefix: remotePrefix,
+	}
+	// Let's just assume that we're getting passed -1 when we aren't supposed to set those
+	if portMin >= 0 && portMax >= 0 {
+		opts.PortRangeMin = portMin
+		opts.PortRangeMax = portMax
+		opts.Protocol = rules.ProtocolTCP
 	}
 	_, err := rules.Create(client, opts).Extract()
 	if err != nil {
@@ -767,19 +773,26 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 
 	log.Print("Allowing traffic from masters and nodes to pods")
 	// Seems like openshift/installer puts masters on worker subnet, so only this is needed.
-	err = ensureOpenStackSgRule(client, podSgId, workerSubnet.CIDR)
+	err = ensureOpenStackSgRule(client, podSgId, workerSubnet.CIDR, -1, -1)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to add rule opening traffic from workers and masters")
 	}
 	for _, cidr := range podSubnetCidrs {
-		err = ensureOpenStackSgRule(client, masterSgId, cidr)
+		err = ensureOpenStackSgRule(client, masterSgId, cidr, -1, -1)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to add rule opening traffic to masters on %s", cidr)
 		}
-		err = ensureOpenStackSgRule(client, workerSgId, cidr)
+		err = ensureOpenStackSgRule(client, workerSgId, cidr, -1, -1)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to add rule opening traffic to workers on %s", cidr)
 		}
+	}
+	// We need to open traffic from service subnet to masters for API LB to work.
+	// Port range is taken from how openshift/installer opens traffic to the API,
+	// though just 6443 should probably be enough for us.
+	err = ensureOpenStackSgRule(client, masterSgId, conf.ServiceNetwork[0], 6443, 6445)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to add rule opening traffic to masters from service subnet %s", conf.ServiceNetwork[0])
 	}
 	log.Print("All requried traffic allowed")
 
