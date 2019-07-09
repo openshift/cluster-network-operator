@@ -46,7 +46,7 @@ data:
     service_subnet = {{ .ServiceSubnet }}
     project = {{ default "\"\"" $AuthInfo.ProjectID }}
     pod_security_groups = {{ default "default" .PodSecurityGroups }}
-    resource_tags = [{{ default "" .ResourceTags }}]
+    resource_tags = {{ default "" .ResourceTags }}
     #network_device_mtu = 1500
 
     [neutron]
