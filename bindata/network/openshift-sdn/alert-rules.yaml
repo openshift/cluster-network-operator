@@ -41,7 +41,7 @@ spec:
         severity: warning
     - alert: IPTableSyncSDNPod
       annotations:
-        message: SDN pod {{"{{"}} $labls.pod {{"}}"}} on node {{"{{"}} labels.node {{"}}"}} takes too long to sync iptables rules.
+        message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} labels.node {{"}}"}} takes too long to sync iptables rules.
       expr: |
         histogram_quantile(.95, kubeproxy_sync_proxy_rules_duration_seconds_bucket) * on(pod) group_right kube_pod_info{namespace="openshift-sdn",  pod=~"sdn-[^-]*"} > 15
       labels:
