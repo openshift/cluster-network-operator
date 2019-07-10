@@ -29,17 +29,8 @@ spec:
       - operator: Exists
       serviceAccountName: multus
       initContainers:
-      - name: cni-plugins-supported
-        image: {{.CNIPluginsSupportedImage}}
-        command: ["/bin/sh"]
-        args: ["-c", "cp -rf /usr/src/plugins/bin/* /host/opt/cni/bin"]
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - mountPath: /host/opt/cni/bin
-          name: cnibin
-      - name: cni-plugins-unsupported
-        image: {{.CNIPluginsUnsupportedImage}}
+      - name: cni-plugins
+        image: {{.CNIPluginsImage}}
         command: ["/bin/sh"]
         args: ["-c", "cp -rf /usr/src/plugins/bin/* /host/opt/cni/bin"]
         securityContext:
