@@ -16,13 +16,16 @@ import (
 
 // ShouldDeployKubeProxy determines if the desired network type should
 // install kube-proxy.
-// openshift-sdn and OVN-Kubernetes deploy their own kube-proxy. All other
+// openshift-sdn deploys its own kube-proxy. ovn-kubernetes and
+// Kuryr-Kubernetes handle services on their own. All other
 // network providers are assumed to require kube-proxy
 func ShouldDeployKubeProxy(conf *operv1.NetworkSpec) bool {
 	switch conf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		return false
 	case operv1.NetworkTypeOVNKubernetes:
+		return false
+	case operv1.NetworkTypeKuryr:
 		return false
 	default:
 		return true
