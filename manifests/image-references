@@ -26,14 +26,10 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-multus-admission-controller:4.2
-  - name: container-networking-plugins-supported
+  - name: container-networking-plugins
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-container-networking-plugins-supported:4.2
-  - name: container-networking-plugins-unsupported
-    from:
-      kind: DockerImage
-      name: quay.io/openshift/origin-container-networking-plugins-unsupported:4.2
+      name: quay.io/openshift/origin-container-networking-plugins:4.2
   - name: ovn-kubernetes
     from:
       kind: DockerImage
