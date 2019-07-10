@@ -10,7 +10,7 @@ data:
 
     [binding]
     default_driver = kuryr.lib.binding.drivers.vlan
-    link_iface = eth0
+    link_iface = ens3
 
     [cni_daemon]
     daemon_enabled = true
