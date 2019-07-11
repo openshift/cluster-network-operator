@@ -91,6 +91,8 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec) *configv1.NetworkSta
 		// continue
 	case operv1.NetworkTypeOVNKubernetes:
 		// continue
+	case operv1.NetworkTypeKuryr:
+		// continue
 	default:
 		return nil
 	}
