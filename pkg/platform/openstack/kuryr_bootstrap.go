@@ -835,7 +835,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 			portIp := port.FixedIPs[0].IPAddress
 			log.Printf("Found port %s with IP %s", port.ID, portIp)
 			memberId, err := ensureOpenStackLbPoolMember(lbClient, port.Name, lbId,
-				poolId, portIp, workerSubnet.ID, 6443)
+				poolId, portIp, svcSubnetId, 6443)
 			if err != nil {
 				log.Printf("Failed to add port %s to LB pool %s: %s", port.ID, poolId, err)
 				continue
