@@ -42,6 +42,11 @@ spec:
       - name: kuryr-cni
         image: {{ .DaemonImage }}
         env:
+        # Tell daemon to talk to the apiserver directly.
+        - name: KUBERNETES_SERVICE_PORT_HTTPS
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
         - name: CNI_DAEMON
           value: "True"
         - name: KUBERNETES_NODE_NAME
