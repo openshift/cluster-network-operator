@@ -210,7 +210,7 @@
   version = "v0.2.0"
 
 [[projects]]
-  digest = "1:8668a312021349017dcd177a44cbe6499747bba3e80e78497a3bfbf7a371bd4b"
+  digest = "1:b75616aafac5d462dad2ca1a9bc82d29ed7e28a8aa93f2f433e9660945c4a5fe"
   name = "github.com/gophercloud/gophercloud"
   packages = [
     ".",
@@ -218,6 +218,7 @@
     "openstack/identity/v2/tenants",
     "openstack/identity/v2/tokens",
     "openstack/identity/v3/tokens",
+    "openstack/loadbalancer/v2/apiversions",
     "openstack/loadbalancer/v2/l7policies",
     "openstack/loadbalancer/v2/listeners",
     "openstack/loadbalancer/v2/loadbalancers",
@@ -235,7 +236,7 @@
     "pagination",
   ]
   pruneopts = "NT"
-  revision = "f27ceddc323ff01fdd909ac8377fb06b12db7f4f"
+  revision = "17584a22adf89c48eb1f2518e71326b3b01ba573"
 
 [[projects]]
   branch = "master"
@@ -953,11 +954,13 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/Masterminds/semver",
     "github.com/Masterminds/sprig",
     "github.com/ghodss/yaml",
     "github.com/gophercloud/gophercloud",
     "github.com/gophercloud/gophercloud/openstack",
     "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
+    "github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/apiversions",
     "github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/listeners",
     "github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/loadbalancers",
     "github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools",
