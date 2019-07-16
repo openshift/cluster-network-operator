@@ -99,4 +99,22 @@ func TestValidateKuryr(t *testing.T) {
 		},
 	}
 	errExpect("clusterNetwork must have exactly 1 entry")
+
+	config.ServiceNetwork = []string{"172.30.0.0/16"}
+	config.ClusterNetwork = []operv1.ClusterNetworkEntry{
+		{
+			CIDR:       "172.31.0.0/16",
+			HostPrefix: 16,
+		},
+	}
+	errExpect("will overlap with cluster network")
+
+	config.ServiceNetwork = []string{"172.31.0.0/16"}
+	config.ClusterNetwork = []operv1.ClusterNetworkEntry{
+		{
+			CIDR:       "172.30.0.0/16",
+			HostPrefix: 16,
+		},
+	}
+	errExpect("will overlap with cluster network")
 }

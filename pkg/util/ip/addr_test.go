@@ -1,6 +1,7 @@
 package ip
 
 import (
+	"fmt"
 	"net"
 	"testing"
 
@@ -89,7 +90,7 @@ func TestNetsOverlap(t *testing.T) {
 		_, c2, err := net.ParseCIDR(tc.cidr2)
 		g.Expect(err).NotTo(HaveOccurred())
 
-		g.Expect(netsOverlap(*c1, *c2)).To(Equal(tc.expected))
+		g.Expect(NetsOverlap(*c1, *c2)).To(Equal(tc.expected))
 
 	}
 }
@@ -167,5 +168,46 @@ func TestFirstUsableIP(t *testing.T) {
 		_, cidr, err := net.ParseCIDR(tc.cidr)
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(FirstUsableIP(*cidr).String()).To(Equal(tc.expected))
+	}
+}
+
+func TestExpandNet(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	testcases := []struct {
+		cidr           string
+		expectedDouble string
+		expectedOther  string
+	}{
+		{
+			"10.0.0.0/24",
+			"10.0.0.0/23",
+			"10.0.1.0/24",
+		},
+		{
+			"10.0.0.128/28",
+			"10.0.0.128/27",
+			"10.0.0.144/28",
+		},
+		{
+			"172.30.0.0/16",
+			"172.30.0.0/15",
+			"172.31.0.0/16",
+		},
+		{
+			"10.0.1.0/24",
+			"10.0.0.0/23",
+			"10.0.0.0/24",
+		},
+	}
+
+	for _, tc := range testcases {
+		_, cidr, err := net.ParseCIDR(tc.cidr)
+		g.Expect(err).NotTo(HaveOccurred())
+		double, other := ExpandNet(*cidr)
+		o, _ := double.Mask.Size()
+		g.Expect(fmt.Sprintf("%s/%d", double.IP.String(), o)).To(Equal(tc.expectedDouble))
+		o, _ = other.Mask.Size()
+		g.Expect(fmt.Sprintf("%s/%d", other.IP.String(), o)).To(Equal(tc.expectedOther))
 	}
 }

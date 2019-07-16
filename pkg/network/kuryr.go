@@ -1,6 +1,7 @@
 package network
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,6 +14,7 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 )
 
 // renderKuryr returns manifests for Kuryr SDN.
@@ -77,6 +79,24 @@ func validateKuryr(conf *operv1.NetworkSpec) []error {
 	// TODO(dulek): We should be able to drop this constraint once we test subnetpools with multiple CIDRs.
 	if len(conf.ClusterNetwork) != 1 {
 		out = append(out, errors.Errorf("clusterNetwork must have exactly 1 entry"))
+	}
+
+	_, svcNet, err := net.ParseCIDR(conf.ServiceNetwork[0])
+	if err != nil {
+		out = append(out, errors.Errorf("cannot parse serviceNetwork[0] CIDR"))
+	}
+
+	_, clusterNet, err := net.ParseCIDR(conf.ClusterNetwork[0].CIDR)
+	if err != nil {
+		out = append(out, errors.Errorf("cannot parse clusterNetwork[0].CIDR CIDR"))
+	}
+
+	expandedNet, _ := iputil.ExpandNet(*svcNet)
+	if iputil.NetsOverlap(expandedNet, *clusterNet) {
+		svcPrefixLen, _ := expandedNet.Mask.Size()
+		out = append(out, errors.Errorf("expanded service network %s/%d will overlap with cluster network %s "+
+			"(Kuryr needs to expand the service network to reserve space for Octavia Amphora VRRP ports)",
+			expandedNet.IP.String(), svcPrefixLen, conf.ClusterNetwork[0].CIDR))
 	}
 
 	return out
