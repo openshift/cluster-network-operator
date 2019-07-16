@@ -1,6 +1,7 @@
 package network
 
 import (
+	"log"
 	"net"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -102,6 +103,15 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec) *configv1.NetworkSta
 	status := configv1.NetworkStatus{
 		ServiceNetwork: operConf.ServiceNetwork,
 		NetworkType:    string(operConf.DefaultNetwork.Type),
+	}
+
+	// With Kuryr we're dividing ServiceNetwork into two halves and only use the lower part as
+	// ServiceNetwork in Status, because the upper part is reserved for Octavia VRRP ports.
+	if operConf.DefaultNetwork.Type == operv1.NetworkTypeKuryr {
+		_, serviceNet, _ := net.ParseCIDR(status.ServiceNetwork[0]) // ignore error, this was validated already.
+		lower, _ := iputil.SplitNet(*serviceNet)
+		status.ServiceNetwork[0] = lower.String()
+		log.Printf("Overriding ServiceNetwork[0] to %s for Kuryr", lower.String())
 	}
 
 	for _, cnet := range operConf.ClusterNetwork {

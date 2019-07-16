@@ -169,3 +169,65 @@ func TestFirstUsableIP(t *testing.T) {
 		g.Expect(FirstUsableIP(*cidr).String()).To(Equal(tc.expected))
 	}
 }
+
+func TestSplitNet(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	testcases := []struct {
+		cidr           string
+		expectedDouble string
+		expectedOther  string
+	}{
+		{
+			"10.0.0.0/24",
+			"10.0.0.0/25",
+			"10.0.0.128/25",
+		},
+		{
+			"10.0.0.128/28",
+			"10.0.0.128/29",
+			"10.0.0.136/29",
+		},
+		{
+			"172.30.0.0/16",
+			"172.30.0.0/17",
+			"172.30.128.0/17",
+		},
+		{
+			"10.0.128.0/23",
+			"10.0.128.0/24",
+			"10.0.129.0/24",
+		},
+	}
+
+	for _, tc := range testcases {
+		_, cidr, err := net.ParseCIDR(tc.cidr)
+		g.Expect(err).NotTo(HaveOccurred())
+		lower, upper := SplitNet(*cidr)
+		g.Expect(lower.String()).To(Equal(tc.expectedDouble))
+		g.Expect(upper.String()).To(Equal(tc.expectedOther))
+		g.Expect(IterateIP4(lastIP(lower), 1)).To(Equal(upper.IP))
+		g.Expect(lastIP(lower)).To(Equal(lastIP(*cidr)))
+	}
+}
+
+func TestIterateIP4(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	testcases := []struct {
+		ip       string
+		n        int
+		expected string
+	}{
+		{"10.0.0.0", 1, "10.0.0.1"},
+		{"10.0.0.129", 1, "10.0.0.130"},
+		{"10.0.0.1", -1, "10.0.0.0"},
+		{"172.30.255.254", -1, "172.30.255.253"},
+		{"10.0.0.0", -1, "9.255.255.255"},
+	}
+
+	for _, tc := range testcases {
+		ip := net.ParseIP(tc.ip)
+		g.Expect(IterateIP4(ip, tc.n).String()).To(Equal(tc.expected))
+	}
+}

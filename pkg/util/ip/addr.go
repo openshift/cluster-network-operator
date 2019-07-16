@@ -44,6 +44,20 @@ func lastIP(subnet net.IPNet) net.IP {
 	return end
 }
 
+// IterateIP returns n-th next IP4; n can be negative
+func IterateIP4(ip net.IP, n int) net.IP {
+	i := ip.To4()
+	v := uint(i[0])<<24 + uint(i[1])<<16 + uint(i[2])<<8 + uint(i[3])
+
+	if n >= 0 {
+		v += uint(n)
+	} else {
+		v -= uint(-n)
+	}
+
+	return net.IPv4(byte((v>>24)&0xFF), byte((v>>16)&0xFF), byte((v>>8)&0xFF), byte(v&0xFF)).To4()
+}
+
 // lastUsableIP returns second to last IP of a subnet
 func LastUsableIP(subnet net.IPNet) net.IP {
 	// FIXME(dulek): This should have proper IPv6 support, but for now whatever, Kuryr doesn't support it yet.
@@ -62,4 +76,23 @@ func FirstUsableIP(subnet net.IPNet) net.IP {
 	// …and this will be second one (first usable)
 	ip[len(ip)-1] += 1
 	return ip
+}
+
+// This function splits given subnet into two even halves
+func SplitNet(subnet net.IPNet) (net.IPNet, net.IPNet) {
+	ones, _ := subnet.Mask.Size()
+	posByte := uint(ones / 8)  // byte in which host part starts
+	posBit := 7 - uint(ones%8) // bit of posByte in which the host part starts
+
+	// This will effectively do `prefix += 1` on subnet by setting one more mask bit.
+	// This gets us the "lower" part of the subnet.
+	subnet.Mask[posByte] |= 1 << posBit
+
+	// And for the "upper" part we just copy it and set that one added bit on the Address
+	upper := net.IPNet{IP: make(net.IP, 4), Mask: make(net.IPMask, 4)}
+	copy(upper.IP, subnet.IP)
+	copy(upper.Mask, subnet.Mask)
+	upper.IP[posByte] |= 1 << posBit
+
+	return subnet, upper
 }

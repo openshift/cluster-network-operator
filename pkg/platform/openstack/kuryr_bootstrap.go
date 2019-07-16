@@ -207,14 +207,14 @@ func findOpenStackSubnet(client *gophercloud.ServiceClient, name, tag string) (s
 // Looks for a Neutron subnet by name, tag, network ID, CIDR and optionally
 // gateway IP, if it does not exist creates it. Will fail if two subnets match
 // all the criteria.
-func ensureOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, netId, cidr string, gatewayIp *string) (string, error) {
+func ensureOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, netId, cidr, gatewayIp, rangeStart, rangeEnd string) (string, error) {
 	dhcp := false
 	page, err := subnets.List(client, subnets.ListOpts{
 		Name:       name,
 		Tags:       tag,
 		NetworkID:  netId,
 		CIDR:       cidr,
-		GatewayIP:  *gatewayIp,
+		GatewayIP:  gatewayIp,
 		IPVersion:  4,
 		EnableDHCP: &dhcp,
 	}).AllPages()
@@ -234,9 +234,15 @@ func ensureOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, netId, 
 			Name:       name,
 			NetworkID:  netId,
 			CIDR:       cidr,
-			GatewayIP:  gatewayIp,
+			GatewayIP:  &gatewayIp,
 			IPVersion:  gophercloud.IPv4,
 			EnableDHCP: &dhcp,
+			AllocationPools: []subnets.AllocationPool{
+				{
+					Start: rangeStart,
+					End:   rangeEnd,
+				},
+			},
 		}
 		subnetObj, err := subnets.Create(client, opts).Extract()
 		if err != nil {
@@ -771,7 +777,13 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 	log.Printf("Services network %s present", svcNetId)
 
-	// Service subnet
+	// Service subnet. This is a bit problematic as OpenStack Octavia will reserve 2 IP's from the service subnet
+	// for each load balancer - the requested one and a "random" one for VRRP port. Obviously OpenShift will not know
+	// about the latter and it'll lead to conflicts. To work this around we will create a Neutron subnet with whole
+	// conf.ServiceNetwork[0] CIDR, but tell OpenShift to use only the lower part and request OpenStack (through
+	// Neutron's allocation ranges) to only reserve the upper part for "random" port allocations that Octavia will use
+	// for its VRRP ports.
+
 	// We need last usable IP from this CIDR. We use first subnet, we don't support multiple entries in Kuryr.
 	_, svcNet, err := net.ParseCIDR(conf.ServiceNetwork[0])
 	if err != nil {
@@ -780,9 +792,15 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 
 	ip := iputil.LastUsableIP(*svcNet)
 	ipStr := ip.String()
-	log.Printf("Ensuring services subnet with %s CIDR and %s gateway", conf.ServiceNetwork[0], ipStr)
+	_, vrrpNet := iputil.SplitNet(*svcNet)
+	vrrpNetStart := iputil.FirstUsableIP(vrrpNet).String()
+	vrrpNetEnd := iputil.IterateIP4(ip, -1).String() // End pool before the gateway on last usable IP.
+
+	log.Printf("Ensuring services subnet with %s CIDR and %s gateway with allocation pools <%s; %s>",
+		conf.ServiceNetwork[0], ipStr, vrrpNetStart, vrrpNetEnd)
 	svcSubnetId, err := ensureOpenStackSubnet(client, generateName("kuryr-service-subnet", clusterID), tag,
-		svcNetId, conf.ServiceNetwork[0], &ipStr)
+		svcNetId, conf.ServiceNetwork[0], ipStr, vrrpNetStart, vrrpNetEnd)
+
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create service subnet")
 	}
@@ -933,9 +951,6 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 
 	log.Print("Kuryr bootstrap finished")
-	if err != nil {
-		return nil, errors.Wrap(err, "failed get OpenShift cluster ID")
-	}
 
 	res := bootstrap.BootstrapResult{
 		Kuryr: bootstrap.KuryrBootstrapResult{
