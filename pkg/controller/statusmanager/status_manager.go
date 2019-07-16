@@ -26,6 +26,7 @@ type StatusLevel int
 const (
 	ClusterConfig  StatusLevel = iota
 	OperatorConfig StatusLevel = iota
+	ProxyConfig    StatusLevel = iota
 	PodDeployment  StatusLevel = iota
 	maxStatusLevel StatusLevel = iota
 )
