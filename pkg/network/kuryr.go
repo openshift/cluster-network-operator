@@ -1,6 +1,7 @@
 package network
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,6 +14,7 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 )
 
 // renderKuryr returns manifests for Kuryr SDN.
@@ -68,6 +70,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 // validateKuryr checks that the Kuryr specific configuration is basically sane.
 func validateKuryr(conf *operv1.NetworkSpec) []error {
 	out := []error{}
+	kc := conf.DefaultNetwork.KuryrConfig
 
 	// NOTE(dulek): Dropping this constraint would require changes in Kuryr.
 	if len(conf.ServiceNetwork) != 1 {
@@ -77,6 +80,50 @@ func validateKuryr(conf *operv1.NetworkSpec) []error {
 	// TODO(dulek): We should be able to drop this constraint once we test subnetpools with multiple CIDRs.
 	if len(conf.ClusterNetwork) != 1 {
 		out = append(out, errors.Errorf("clusterNetwork must have exactly 1 entry"))
+	}
+
+	_, svcNet, err := net.ParseCIDR(conf.ServiceNetwork[0])
+	if err != nil {
+		out = append(out, errors.Errorf("cannot parse serviceNetwork[0] CIDR"))
+	}
+
+	_, clusterNet, err := net.ParseCIDR(conf.ClusterNetwork[0].CIDR)
+	if err != nil {
+		out = append(out, errors.Errorf("cannot parse clusterNetwork[0].CIDR CIDR"))
+	}
+
+	var octaviaServiceNet *net.IPNet
+	if kc != nil && kc.OpenStackServiceNetwork != "" {
+		_, octaviaServiceNet, err = net.ParseCIDR(kc.OpenStackServiceNetwork)
+		if err != nil {
+			out = append(out, errors.Errorf("cannot parse defaultNetwork.kuryrConfig.octaviaServiceNetwork CIDR"))
+		}
+	} else {
+		octaviaServiceNetObj := iputil.ExpandNet(*svcNet)
+		octaviaServiceNet = &octaviaServiceNetObj
+	}
+
+	if octaviaServiceNet != nil {
+		if clusterNet != nil && iputil.NetsOverlap(*octaviaServiceNet, *clusterNet) {
+			out = append(out, errors.Errorf("octaviaServiceNetwork %s will overlap with cluster network %s "+
+				octaviaServiceNet.String(), conf.ClusterNetwork[0].CIDR))
+		}
+
+		if svcNet != nil {
+			if !iputil.NetIncludes(*octaviaServiceNet, *svcNet) {
+				out = append(out, errors.Errorf("octaviaServiceNetwork %s does not include serviceNetwork %s "+
+					"(the octaviaServiceNetwork needs to be twice the size of serviceNetwork and include it)",
+					octaviaServiceNet.String(), svcNet.String()))
+			}
+
+			octaviaNetPrefixLen, _ := octaviaServiceNet.Mask.Size()
+			svcNetPrefixLen, _ := svcNet.Mask.Size()
+			if octaviaNetPrefixLen >= svcNetPrefixLen {
+				out = append(out, errors.Errorf("octaviaServiceNetwork %s is too small comparing to serviceNetwork %s "+
+					"(the octaviaServiceNetwork needs to be twice the size of the serviceNetwork and include it)",
+					octaviaServiceNet.String(), svcNet.String()))
+			}
+		}
 	}
 
 	return out
@@ -97,7 +144,7 @@ func isKuryrChangeSafe(prev, next *operv1.NetworkSpec) []error {
 
 func fillKuryrDefaults(conf *operv1.NetworkSpec) {
 	if conf.DefaultNetwork.KuryrConfig == nil {
-		// We don't have anything important in KuryrConfig yet, so we can just create it if needed.
+		// We don't have anything required in KuryrConfig yet, so we can just create it if needed.
 		conf.DefaultNetwork.KuryrConfig = &operv1.KuryrConfig{}
 	}
 	kc := conf.DefaultNetwork.KuryrConfig
@@ -110,5 +157,11 @@ func fillKuryrDefaults(conf *operv1.NetworkSpec) {
 	if kc.ControllerProbesPort == nil {
 		var port uint32 = 8082
 		kc.ControllerProbesPort = &port
+	}
+
+	if kc.OpenStackServiceNetwork == "" {
+		_, svcNet, _ := net.ParseCIDR(conf.ServiceNetwork[0])
+		octaviaServiceNet := iputil.ExpandNet(*svcNet)
+		kc.OpenStackServiceNetwork = octaviaServiceNet.String()
 	}
 }
