@@ -13,6 +13,7 @@ type Proxy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Spec holds user-settable values for the proxy configuration
+	// +kubebuilder:validation:Required
 	// +required
 	Spec ProxySpec `json:"spec"`
 	// status holds observed values from the cluster. They may not be overridden.
@@ -31,12 +32,13 @@ type ProxySpec struct {
 	HTTPSProxy string `json:"httpsProxy,omitempty"`
 
 	// noProxy is a comma-separated list of hostnames and/or CIDRs for which the proxy should not be used.
-	// Each name is matched as either a domain which contains the host name as a suffix, or the host name itself.
-	// For instance, example.com would match example.com, example.com:80, and www.example.com.
-	// Wildcard(*) characters are not accepted, except a single * character which matches all hosts
-	// and effectively disables the proxy. Empty means unset and will not result in an env var.
+	// Empty means unset and will not result in an env var.
 	// +optional
 	NoProxy string `json:"noProxy,omitempty"`
+
+	// readinessEndpoints is a list of endpoints used to verify readiness of the proxy.
+	// +optional
+	ReadinessEndpoints []string `json:"readinessEndpoints,omitempty"`
 }
 
 // ProxyStatus shows current known state of the cluster proxy.
