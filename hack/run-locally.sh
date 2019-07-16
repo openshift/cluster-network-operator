@@ -155,16 +155,6 @@ function create_cluster() {
     trap "trap - TERM && kill -- -$$" INT TERM EXIT
 }
 
-# Fix up the AWS firewall so network plugin components can talk to each other
-function open_aws_ports() {
-    local platform=$(oc get infrastructure cluster -o jsonpath='{.status.platform}')
-    if [[ "${NETWORK_PLUGIN}" == "OVNKubernetes" && "${platform}" == "AWS" ]]; then
-        echo "Attempting to open OVN ports for AWS..."
-        CLUSTER_DIR="${CLUSTER_DIR}" hack/open-ovn-ports.sh
-        echo "Opened OVN ports for AWS"
-    fi
-}
-
 function print_usage() {
     >&2 echo "Usage: $0 [-c <cluster-dir>] [options]
 
@@ -280,12 +270,10 @@ if [[ -z "$(ls -A ${CLUSTER_DIR} 2> /dev/null | grep -v install-config.yaml | gr
     extract_environment_from_manifests
     create_cluster
     wait_for_cluster
-    open_aws_ports
 elif [[ -n "$(ls -A ${CLUSTER_DIR}/terraform.* 2> /dev/null)" ]]; then
     echo "Attaching to already running cluster..."
 
     wait_for_cluster
-    open_aws_ports
     stop_deployed_operator
     extract_environment_from_running_cluster
 else
