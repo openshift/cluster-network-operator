@@ -117,6 +117,14 @@ spec:
     type: string
     description: The CIDR range of the overlay network assigned to the node for its pods
     JSONPath: .subnet
+  - name: Egress CIDRs
+    type: string
+    description: The network egress CIDRs
+    JSONPath: .egressCIDRs
+  - name: Egress IPs
+    type: string
+    description: The network egress IP addresses
+    JSONPath: .egressIPs
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -153,6 +161,10 @@ spec:
     type: integer
     description: The network identifier of the network namespace
     JSONPath: .netid
+  - name: Egress IPs
+    type: string
+    description: The network egress IP addresses
+    JSONPath: .egressIPs
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
