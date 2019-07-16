@@ -17,6 +17,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,10 +51,10 @@ func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) *Re
 	configv1.Install(mgr.GetScheme())
 	operv1.Install(mgr.GetScheme())
 	return &ReconcileOperConfig{
-		client: mgr.GetClient(),
-		scheme: mgr.GetScheme(),
-		status: status,
-
+		client:        mgr.GetClient(),
+		scheme:        mgr.GetScheme(),
+		status:        status,
+		mapper:        mgr.GetRESTMapper(),
 		podReconciler: newPodReconciler(status),
 	}
 }
@@ -95,10 +96,10 @@ var _ reconcile.Reconciler = &ReconcileOperConfig{}
 type ReconcileOperConfig struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
-	status *statusmanager.StatusManager
-
+	client        client.Client
+	scheme        *runtime.Scheme
+	status        *statusmanager.StatusManager
+	mapper        meta.RESTMapper
 	podReconciler *ReconcilePods
 }
 
@@ -208,15 +209,28 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	// Set up the Pod reconciler before we start creating DaemonSets/Deployments
 	daemonSets := []types.NamespacedName{}
 	deployments := []types.NamespacedName{}
+	relatedObjects := []configv1.ObjectReference{}
 	for _, obj := range objs {
 		if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "DaemonSet" {
 			daemonSets = append(daemonSets, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()})
 		} else if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "Deployment" {
 			deployments = append(deployments, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()})
 		}
+		restMapping, err := r.mapper.RESTMapping(obj.GroupVersionKind().GroupKind())
+		if err != nil {
+			log.Printf("Failed to get REST mapping for storing related object: %v", err)
+			continue
+		}
+		relatedObjects = append(relatedObjects, configv1.ObjectReference{
+			Group:     obj.GetObjectKind().GroupVersionKind().Group,
+			Resource:  restMapping.Resource.Resource,
+			Name:      obj.GetName(),
+			Namespace: obj.GetNamespace(),
+		})
 	}
 	r.status.SetDaemonSets(daemonSets)
 	r.status.SetDeployments(deployments)
+	r.status.SetRelatedObjects(relatedObjects)
 
 	allResources := []types.NamespacedName{}
 	allResources = append(allResources, daemonSets...)
