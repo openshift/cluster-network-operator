@@ -10,6 +10,9 @@ const OPERATOR_CONFIG = "cluster"
 // and status object.
 const CLUSTER_CONFIG = "cluster"
 
+// PROXY_CONFIG is the name of the default proxy object.
+const PROXY_CONFIG = "cluster"
+
 // APPLIED_PREFIX is the prefix applied to the config maps
 // where we store previously applied configuration
 const APPLIED_PREFIX = "applied-"
