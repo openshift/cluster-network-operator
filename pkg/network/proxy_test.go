@@ -19,7 +19,7 @@ var config = operv1.NetworkSpec{
 	KubeProxyConfig: &operv1.ProxyConfig{
 		BindAddress:        "0.0.0.0",
 		IptablesSyncPeriod: "1m",
-		ProxyArguments: map[string][]string{
+		ProxyArguments: map[string]operv1.ProxyArgumentList{
 			// string
 			"proxy-mode": {"blah"},
 
@@ -41,7 +41,7 @@ func TestKubeProxyConfig(t *testing.T) {
 	errs := validateKubeProxy(&config)
 	g.Expect(errs).To(HaveLen(0))
 
-	cfg, err := kubeProxyConfiguration(&config, map[string][]string{
+	cfg, err := kubeProxyConfiguration(&config, map[string]operv1.ProxyArgumentList{
 		// special address+port combo
 		"metrics-bind-address": {"1.2.3.4"},
 		"metrics-port":         {"999"},
@@ -123,7 +123,7 @@ func TestValidateKubeProxy(t *testing.T) {
 		KubeProxyConfig: &operv1.ProxyConfig{
 			BindAddress:        "1.2.3.4",
 			IptablesSyncPeriod: "30s",
-			ProxyArguments: map[string][]string{
+			ProxyArguments: map[string]operv1.ProxyArgumentList{
 				"foo": {"bar"},
 			},
 		},
