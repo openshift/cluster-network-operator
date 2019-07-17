@@ -48,6 +48,7 @@ const (
 	// NOTE(dulek): This one is hardcoded in openshift/installer.
 	InfrastructureCRDName           = "cluster"
 	MinOctaviaVersionWithTagSupport = "v2.5"
+	MinOctaviaVersionWithTimeouts   = "v2.1"
 	KubernetesEndpointsName         = "kubernetes"
 	KubernetesEndpointsNamespace    = "default"
 )
@@ -661,6 +662,19 @@ func ensureOpenStackLbListener(client *gophercloud.ServiceClient, name, lbId, po
 			DefaultPoolID:  poolId,
 			LoadbalancerID: lbId,
 		}
+
+		// NOTE(dulek): If Octavia supports setting data timeouts in listeners (Rocky+) we set them to 1 hour as this
+		//              LB will be used for watching the Kubernetes API, that shouldn't time out after the default 50 seconds.
+		timeoutSupport, err := IsOctaviaVersionSupported(client, MinOctaviaVersionWithTimeouts)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to determine if Octavia supports listener timeouts API")
+		}
+		timeout := 3600000
+		if timeoutSupport {
+			opts.TimeoutClientData = &timeout
+			opts.TimeoutMemberData = &timeout
+		}
+
 		listenerObj, err := listeners.Create(client, opts).Extract()
 		if err != nil {
 			return "", errors.Wrap(err, "failed to create LB listener")
