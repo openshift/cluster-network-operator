@@ -33,10 +33,10 @@ func ShouldDeployKubeProxy(conf *operv1.NetworkSpec) bool {
 }
 
 // kubeProxyConfiguration builds the (yaml text of) the kube-proxy config object
-func kubeProxyConfiguration(conf *operv1.NetworkSpec, pluginDefaults map[string][]string) (string, error) {
+func kubeProxyConfiguration(conf *operv1.NetworkSpec, pluginDefaults map[string]operv1.ProxyArgumentList) (string, error) {
 	p := conf.KubeProxyConfig
 
-	args := map[string][]string{}
+	args := map[string]operv1.ProxyArgumentList{}
 	args["bind-address"] = []string{p.BindAddress}
 	if len(conf.ClusterNetwork) == 1 {
 		args["cluster-cidr"] = []string{conf.ClusterNetwork[0].CIDR}
@@ -134,7 +134,7 @@ func RenderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]
 		return nil, nil
 	}
 
-	kpcDefaults := map[string][]string{
+	kpcDefaults := map[string]operv1.ProxyArgumentList{
 		"metrics-bind-address": {"0.0.0.0"},
 		"metrics-port":         {"9101"},
 		"healthz-port":         {"10256"},

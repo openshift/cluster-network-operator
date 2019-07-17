@@ -44,7 +44,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 	}
 	data.Data["ClusterNetwork"] = clusterNetwork
 
-	kpcDefaults := map[string][]string{
+	kpcDefaults := map[string]operv1.ProxyArgumentList{
 		"metrics-bind-address":    {"0.0.0.0"},
 		"metrics-port":            {"9101"},
 		"healthz-port":            {"10256"},
@@ -132,7 +132,7 @@ func fillOpenShiftSDNDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 	}
 
 	if conf.KubeProxyConfig.ProxyArguments == nil {
-		conf.KubeProxyConfig.ProxyArguments = map[string][]string{}
+		conf.KubeProxyConfig.ProxyArguments = map[string]operv1.ProxyArgumentList{}
 	}
 
 	sc := conf.DefaultNetwork.OpenShiftSDNConfig

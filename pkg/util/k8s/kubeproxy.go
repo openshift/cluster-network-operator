@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	operv1 "github.com/openshift/api/operator/v1"
+
 	"github.com/ghodss/yaml"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,8 +19,8 @@ import (
 
 // MergeKubeProxyArguments merges a set of default kube-proxy command-line arguments with
 // a set of overrides, keeping only the last-specified copy of each argument.
-func MergeKubeProxyArguments(defaults, overrides map[string][]string) map[string][]string {
-	args := map[string][]string{}
+func MergeKubeProxyArguments(defaults, overrides map[string]operv1.ProxyArgumentList) map[string]operv1.ProxyArgumentList {
+	args := map[string]operv1.ProxyArgumentList{}
 	for key, val := range defaults {
 		if len(val) > 0 {
 			args[key] = []string{val[len(val)-1]}
@@ -34,7 +36,7 @@ func MergeKubeProxyArguments(defaults, overrides map[string][]string) map[string
 
 // GenerateKubeProxyConfiguration takes a set of defaults and a set of overrides in the
 // form of kube-proxy command-line arguments, and returns a YAML kube-proxy config file.
-func GenerateKubeProxyConfiguration(args map[string][]string) (string, error) {
+func GenerateKubeProxyConfiguration(args map[string]operv1.ProxyArgumentList) (string, error) {
 	// We use MergeKubeProxyArguments here to force a copy
 	ka := &kpcArgs{args: MergeKubeProxyArguments(args, nil)}
 
@@ -92,7 +94,7 @@ func GenerateKubeProxyConfiguration(args map[string][]string) (string, error) {
 // kpcArgs is a helper to build the KubeProxyConfiguration. In particular, it
 // keeps track of which arguments have been used, and whether an error occurred
 type kpcArgs struct {
-	args map[string][]string
+	args map[string]operv1.ProxyArgumentList
 	errs []error
 }
 
