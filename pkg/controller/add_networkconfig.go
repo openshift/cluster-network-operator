@@ -10,5 +10,6 @@ func init() {
 	AddToManagerFuncs = append(AddToManagerFuncs,
 		operconfig.Add,
 		clusterconfig.Add,
+		operconfig.AddConfigMapReconciler,
 	)
 }
