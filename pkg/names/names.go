@@ -23,3 +23,11 @@ const APPLIED_NAMESPACE = "openshift-network-operator"
 // to signal to the reconciler that we don't care if they fail to create
 // or update. Useful when we want to make a CR for which the CRD may not exist yet.
 const IgnoreObjectErrorAnnotation = "networkoperator.openshift.io/ignore-errors"
+
+// SERVICE_CA_CONFIGMAP is the name of the ConfigMap that contains service CA bundle
+// that is used in multus admission controller deployment
+const SERVICE_CA_CONFIGMAP = "openshift-service-ca"
+
+// MULTUS_VALIDATING_WEBHOOK is the name of the ValidatingWebhookConfiguration for multus-admission-controller
+// that is used in multus admission controller deployment
+const MULTUS_VALIDATING_WEBHOOK = "multus.openshift.io"
