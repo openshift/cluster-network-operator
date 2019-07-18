@@ -140,7 +140,7 @@ func TestFillOpenShiftSDNDefaults(t *testing.T) {
 		DeployKubeProxy: &f,
 		KubeProxyConfig: &operv1.ProxyConfig{
 			BindAddress:    "0.0.0.0",
-			ProxyArguments: map[string][]string{},
+			ProxyArguments: map[string]operv1.ProxyArgumentList{},
 		},
 	}
 
@@ -225,7 +225,7 @@ func TestProxyArgs(t *testing.T) {
 	config.KubeProxyConfig = &operv1.ProxyConfig{
 		IptablesSyncPeriod: "10s",
 		BindAddress:        "1.2.3.4",
-		ProxyArguments:     map[string][]string{},
+		ProxyArguments:     map[string]operv1.ProxyArgumentList{},
 	}
 	objs, err = renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -236,7 +236,7 @@ func TestProxyArgs(t *testing.T) {
 	g.Expect(val).To(Equal("1.2.3.4"))
 
 	//set proxy args
-	config.KubeProxyConfig.ProxyArguments = map[string][]string{
+	config.KubeProxyConfig.ProxyArguments = map[string]operv1.ProxyArgumentList{
 		"cluster-cidr":       {"1.2.3.4/5"},
 		"config-sync-period": {"1s", "2s"},
 	}

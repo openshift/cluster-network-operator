@@ -3,10 +3,12 @@ package k8s
 import (
 	"strings"
 	"testing"
+
+	operv1 "github.com/openshift/api/operator/v1"
 )
 
 func TestGenerateKubeProxyConfiguration(t *testing.T) {
-	defaults := map[string][]string{
+	defaults := map[string]operv1.ProxyArgumentList{
 		"bind-address":            {"0.0.0.0"},
 		"metrics-bind-address":    {"0.0.0.0"},
 		"metrics-port":            {"9101"},
@@ -16,7 +18,7 @@ func TestGenerateKubeProxyConfiguration(t *testing.T) {
 
 	tests := []struct {
 		description string
-		overrides   map[string][]string
+		overrides   map[string]operv1.ProxyArgumentList
 		output      string
 		err         string
 	}{
@@ -65,7 +67,7 @@ udpIdleTimeout: 0s
 		},
 		{
 			description: "full overrides",
-			overrides: map[string][]string{
+			overrides: map[string]operv1.ProxyArgumentList{
 				"bind-address":            {"1.2.3.4"},
 				"metrics-bind-address":    {"5.6.7.8"},
 				"metrics-port":            {"9999"},
@@ -114,7 +116,7 @@ udpIdleTimeout: 0s
 		},
 		{
 			description: "metrics-bind-address only",
-			overrides: map[string][]string{
+			overrides: map[string]operv1.ProxyArgumentList{
 				"metrics-bind-address": {"5.6.7.8"},
 			},
 			output: `
@@ -159,7 +161,7 @@ udpIdleTimeout: 0s
 		},
 		{
 			description: "metrics-port only",
-			overrides: map[string][]string{
+			overrides: map[string]operv1.ProxyArgumentList{
 				"metrics-port": {"9999"},
 			},
 			output: `
@@ -204,7 +206,7 @@ udpIdleTimeout: 0s
 		},
 		{
 			description: "misc",
-			overrides: map[string][]string{
+			overrides: map[string]operv1.ProxyArgumentList{
 				"masquerade-all":           {"true"},
 				"iptables-min-sync-period": {"10s"},
 				"ipvs-exclude-cidrs":       {"1.2.3.4/8,5.6.7.8/16"},
@@ -254,56 +256,56 @@ udpIdleTimeout: 0s
 		},
 		{
 			description: "bad address",
-			overrides: map[string][]string{
+			overrides: map[string]operv1.ProxyArgumentList{
 				"bind-address": {"foo"},
 			},
 			err: `invalid bind-address "foo"`,
 		},
 		{
 			description: "bad port",
-			overrides: map[string][]string{
+			overrides: map[string]operv1.ProxyArgumentList{
 				"metrics-port": {"foo"},
 			},
 			err: `invalid metrics-port "foo"`,
 		},
 		{
 			description: "bad cidr",
-			overrides: map[string][]string{
+			overrides: map[string]operv1.ProxyArgumentList{
 				"cluster-cidr": {"foo"},
 			},
 			err: `invalid cluster-cidr "foo"`,
 		},
 		{
 			description: "bad int",
-			overrides: map[string][]string{
+			overrides: map[string]operv1.ProxyArgumentList{
 				"iptables-masquerade-bit": {"foo"},
 			},
 			err: `invalid iptables-masquerade-bit "foo"`,
 		},
 		{
 			description: "bad bool",
-			overrides: map[string][]string{
+			overrides: map[string]operv1.ProxyArgumentList{
 				"masquerade-all": {"maybe"},
 			},
 			err: `invalid masquerade-all "maybe"`,
 		},
 		{
 			description: "bad duration",
-			overrides: map[string][]string{
+			overrides: map[string]operv1.ProxyArgumentList{
 				"iptables-sync-period": {"foo"},
 			},
 			err: `invalid iptables-sync-period "foo"`,
 		},
 		{
 			description: "bad port range",
-			overrides: map[string][]string{
+			overrides: map[string]operv1.ProxyArgumentList{
 				"proxy-port-range": {"foo"},
 			},
 			err: `invalid proxy-port-range "foo"`,
 		},
 		{
 			description: "extra args",
-			overrides: map[string][]string{
+			overrides: map[string]operv1.ProxyArgumentList{
 				"masquerade-all":           {"true"},
 				"iptables-min-sync-period": {"10s"},
 				"ipvs-exclude-cidrs":       {"1.2.3.4/8,5.6.7.8/16"},
