@@ -57,6 +57,36 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	return objs, nil
 }
 
+// CanonicalizeIPAMConfig converts configuration to a canonical form.
+// Currently we only care about case.
+func CanonicalizeIPAMConfig(conf *operv1.IPAMConfig) {
+	switch strings.ToLower(string(conf.Type)) {
+	case strings.ToLower(string(operv1.IPAMTypeDHCP)):
+		conf.Type = operv1.IPAMTypeDHCP
+	case strings.ToLower(string(operv1.IPAMTypeStatic)):
+		conf.Type = operv1.IPAMTypeStatic
+	}
+}
+
+// CanonicalizeSimpleMacvlanConfig converts configuration to a canonical form.
+// Currently we only care about case.
+func CanonicalizeSimpleMacvlanConfig(conf *operv1.SimpleMacvlanConfig) {
+	switch strings.ToLower(string(conf.Mode)) {
+	case strings.ToLower(string(operv1.MacvlanModeBridge)):
+		conf.Mode = operv1.MacvlanModeBridge
+	case strings.ToLower(string(operv1.MacvlanModePrivate)):
+		conf.Mode = operv1.MacvlanModePrivate
+	case strings.ToLower(string(operv1.MacvlanModeVEPA)):
+		conf.Mode = operv1.MacvlanModeVEPA
+	case strings.ToLower(string(operv1.MacvlanModePassthru)):
+		conf.Mode = operv1.MacvlanModePassthru
+	}
+
+	if conf.IPAMConfig != nil {
+		CanonicalizeIPAMConfig(conf.IPAMConfig)
+	}
+}
+
 // Canonicalize converts configuration to a canonical form.
 // Currently we only care about case.
 func Canonicalize(conf *operv1.NetworkSpec) {
@@ -80,10 +110,16 @@ func Canonicalize(conf *operv1.NetworkSpec) {
 		}
 	}
 
-	for _, an := range conf.AdditionalNetworks {
+	for idx, an := range conf.AdditionalNetworks {
 		switch strings.ToLower(string(an.Type)) {
 		case strings.ToLower(string(operv1.NetworkTypeRaw)):
-			an.Type = operv1.NetworkTypeRaw
+			conf.AdditionalNetworks[idx].Type = operv1.NetworkTypeRaw
+		case strings.ToLower(string(operv1.NetworkTypeSimpleMacvlan)):
+			conf.AdditionalNetworks[idx].Type = operv1.NetworkTypeSimpleMacvlan
+		}
+
+		if an.Type == operv1.NetworkTypeSimpleMacvlan && an.SimpleMacvlanConfig != nil {
+			CanonicalizeSimpleMacvlanConfig(conf.AdditionalNetworks[idx].SimpleMacvlanConfig)
 		}
 	}
 }
@@ -276,17 +312,21 @@ func IsDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 }
 
 // ValidateAdditionalNetworks validates additional networks configs
-func ValidateAdditionalNetworks(conf *operv1.NetworkSpec) [][]error {
-	out := [][]error{}
+func ValidateAdditionalNetworks(conf *operv1.NetworkSpec) []error {
+	out := []error{}
 	ans := conf.AdditionalNetworks
 	for _, an := range ans {
 		switch an.Type {
 		case operv1.NetworkTypeRaw:
 			if errs := validateRaw(&an); len(errs) > 0 {
-				out = append(out, errs)
+				out = append(out, errs...)
+			}
+		case operv1.NetworkTypeSimpleMacvlan:
+			if errs := validateSimpleMacvlanConfig(&an); len(errs) > 0 {
+				out = append(out, errs...)
 			}
 		default:
-			out = append(out, []error{errors.Errorf("unknown or unsupported NetworkType: %s", an.Type)})
+			out = append(out, errors.Errorf("unknown or unsupported NetworkType: %s", an.Type))
 		}
 	}
 	return out
@@ -313,6 +353,12 @@ func RenderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 		switch an.Type {
 		case operv1.NetworkTypeRaw:
 			objs, err = renderRawCNIConfig(&an, manifestDir)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, objs...)
+		case operv1.NetworkTypeSimpleMacvlan:
+			objs, err = renderSimpleMacvlanConfig(&an, manifestDir)
 			if err != nil {
 				return nil, err
 			}
