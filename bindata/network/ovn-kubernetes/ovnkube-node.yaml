@@ -63,6 +63,8 @@ spec:
             cpu: 100m
             memory: 300Mi
         env:
+        - name: OVS_USER_ID
+          value: "openvswitch:openvswitch"
         - name: OVN_DAEMONSET_VERSION
           value: "3"
 
@@ -95,6 +97,8 @@ spec:
             cpu: 100m
             memory: 300Mi
         env:
+        - name: OVS_USER_ID
+          value: "openvswitch:openvswitch"
         - name: OVN_DAEMONSET_VERSION
           value: "3"
         - name: OVNKUBE_LOGLEVEL
@@ -156,6 +160,8 @@ spec:
             cpu: 100m
             memory: 300Mi
         env:
+        - name: OVS_USER_ID
+          value: "openvswitch:openvswitch"
         - name: OVN_DAEMONSET_VERSION
           value: "3"
         - name: OVNKUBE_LOGLEVEL
