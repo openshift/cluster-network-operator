@@ -166,14 +166,14 @@ a local cluster-network-operator started.
 
 The following options are accepted for both new and existing clusters:
 
- -c               the cluster installation temporary directory (can also be given via CLUSTER_DIR); required
- -m               custom network plugin container image name
+ -c DIR           the cluster installation temporary directory (can also be given via CLUSTER_DIR); required
+ -m IMAGE         custom network plugin container image name
 
 The following options are always accepted but only used for new clusters:
 
- -f               the path to an openshift-install-created install-config.yaml file; if not given one will be created
- -i               path to the openshift-install binary; if not given PATH will be searched
- -n [net plugin]  the name of the network plugin to deploy; one of [sdn|OpenShiftSDN|ovn|OVNKubernetes]
+ -f CONFIG        the path to an openshift-install-created install-config.yaml file; if not given one will be created
+ -i INSTALLER     path to the openshift-install binary; if not given PATH will be searched
+ -n PLUGIN        the name of the network plugin to deploy; one of [sdn|OpenShiftSDN|ovn|OVNKubernetes]
  -w               pause after creating manifests to allow manual overrides
 
 The following environment variables are honored:
@@ -215,14 +215,6 @@ while getopts "c:f:i:m:n:w" opt; do
             ;;
         w)
             WAIT_FOR_MANIFEST_UPDATES=1
-            ;;
-        \?)
-            echo "Invalid option: -${OPTARG}" >&2
-            exit 1
-            ;;
-        :)
-            echo "Option -${OPTARG} requires an argument." >&2
-            exit 1
             ;;
         *)
             print_usage
