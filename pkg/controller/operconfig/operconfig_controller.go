@@ -160,6 +160,10 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		// FIXME: operator status?
 		return reconcile.Result{}, err
 	}
+	// up-convert Prev by filling defaults
+	if prev != nil {
+		network.FillDefaults(prev, prev)
+	}
 
 	// Fill all defaults explicitly
 	network.FillDefaults(&operConfig.Spec, prev)

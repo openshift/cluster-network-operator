@@ -31,6 +31,9 @@ var config = operv1.NetworkSpec{
 
 			// optional duration
 			"conntrack-tcp-timeout-close-wait": {"10m"},
+
+			// This will be overridden
+			"conntrack-max-per-core": {"5"},
 		},
 	},
 }
@@ -41,11 +44,16 @@ func TestKubeProxyConfig(t *testing.T) {
 	errs := validateKubeProxy(&config)
 	g.Expect(errs).To(HaveLen(0))
 
-	cfg, err := kubeProxyConfiguration(&config, map[string]operv1.ProxyArgumentList{
+	cfg, err := kubeProxyConfiguration(map[string]operv1.ProxyArgumentList{
 		// special address+port combo
-		"metrics-bind-address": {"1.2.3.4"},
-		"metrics-port":         {"999"},
-	})
+		"metrics-bind-address":   {"1.2.3.4"},
+		"metrics-port":           {"999"},
+		"conntrack-max-per-core": {"10"},
+	},
+		&config,
+		map[string]operv1.ProxyArgumentList{
+			"conntrack-max-per-core": {"15"},
+		})
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(cfg).To(MatchYAML(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
@@ -59,7 +67,7 @@ clusterCIDR: 10.128.0.0/14
 configSyncPeriod: 0s
 conntrack:
   max: null
-  maxPerCore: null
+  maxPerCore: 15
   min: null
   tcpCloseWaitTimeout: 10m0s
   tcpEstablishedTimeout: null
