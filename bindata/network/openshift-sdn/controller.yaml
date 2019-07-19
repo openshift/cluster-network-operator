@@ -20,8 +20,8 @@ spec:
     spec:
       containers:
       - name: sdn-controller
-        image: {{.HypershiftImage}}
-        command: ["hypershift", "openshift-network-controller"]
+        image: {{.SDNControllerImage}}
+        command: ["network-controller"]
         resources:
           requests:
             cpu: 10m
