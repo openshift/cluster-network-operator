@@ -76,7 +76,7 @@ spec:
               type: array
               items:
                 type: object
-                required: ["type", "name", "rawCNIConfig"]
+                required: ["type", "name"]
                 properties:
                   type:
                     type: string
@@ -86,6 +86,54 @@ spec:
                     type: string
                   rawCNIConfig:
                     type: string
+                  simpleMacvlanConfig:
+                    type: object
+                    properties:
+                      master:
+                        type: string
+                      ipamConfig:
+                        type: object
+                        properties:
+                          type:
+                            type: string
+                          staticIPAMConfig:
+                            type: object
+                            properties:
+                              addresses:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    address:
+                                      type: string
+                                    gateway:
+                                      type: string
+                              routes:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    destination:
+                                      type: string
+                                    gateway:
+                                      type: string
+                              dns:
+                                type: object
+                                properties:
+                                  nameservers:
+                                    type: array
+                                    items:
+                                      type: string
+                                  domain:
+                                    type: string
+                                  search:
+                                    type: array
+                                    items:
+                                      type: string
+                      mode:
+                        type: string
+                      mtu:
+                        type: integer
             disableMultiNetwork:
               type: boolean
             deployKubeProxy:
