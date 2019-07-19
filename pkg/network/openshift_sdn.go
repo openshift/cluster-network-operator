@@ -48,10 +48,21 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 		"metrics-bind-address":    {"0.0.0.0"},
 		"metrics-port":            {"9101"},
 		"healthz-port":            {"10256"},
-		"proxy-mode":              {"iptables"},
+		"proxy-mode":              {"unidling+iptables"},
 		"iptables-masquerade-bit": {"0"},
 	}
-	kpc, err := kubeProxyConfiguration(conf, kpcDefaults)
+	if !*c.EnableUnidling {
+		kpcDefaults["proxy-mode"][0] = "iptables"
+	}
+
+	// Always set the proxy-mode, even if the user specified it
+	// We already validated that proxy-mode was either unset or iptables.
+	kpcOverrides := map[string]operv1.ProxyArgumentList{}
+	if *c.EnableUnidling {
+		kpcOverrides["proxy-mode"] = operv1.ProxyArgumentList{"unidling+iptables"}
+	}
+
+	kpc, err := kubeProxyConfiguration(kpcDefaults, conf, kpcOverrides)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build kube-proxy config")
 	}
@@ -92,6 +103,15 @@ func validateOpenShiftSDN(conf *operv1.NetworkSpec) []error {
 		if sc.MTU != nil && (*sc.MTU < 576 || *sc.MTU > 65536) {
 			out = append(out, errors.Errorf("invalid MTU %d", *sc.MTU))
 		}
+
+		// the proxy mode must be unset or iptables for unidling to work
+		if (sc.EnableUnidling == nil || *sc.EnableUnidling) &&
+			conf.KubeProxyConfig != nil && conf.KubeProxyConfig.ProxyArguments != nil &&
+			len(conf.KubeProxyConfig.ProxyArguments["proxy-mode"]) > 0 &&
+			conf.KubeProxyConfig.ProxyArguments["proxy-mode"][0] != "iptables" {
+
+			out = append(out, errors.Errorf("invalid proxy-mode - when unidling is enabled, proxy-mode must be \"iptables\""))
+		}
 	}
 
 	proxyErrs := validateKubeProxy(conf)
@@ -100,20 +120,39 @@ func validateOpenShiftSDN(conf *operv1.NetworkSpec) []error {
 	return out
 }
 
-// isOpenShiftSDNChangeSafe currently returns an error if any changes are made.
+// isOpenShiftSDNChangeSafe ensures no unsafe changes are applied to the running
+// network
+// It allows changing only useExternalOpenvswitch and enableUnidling.
 // In the future, we may support rolling out MTU or external openvswitch alterations.
+// as with all is*ChangeSafe functions, defaults have already been applied.
 func isOpenShiftSDNChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	pn := prev.DefaultNetwork.OpenShiftSDNConfig
 	nn := next.DefaultNetwork.OpenShiftSDNConfig
+	errs := []error{}
 
 	if reflect.DeepEqual(pn, nn) {
-		return []error{}
+		return errs
 	}
-	return []error{errors.Errorf("cannot change openshift-sdn configuration")}
+
+	if pn.Mode != nn.Mode {
+		errs = append(errs, errors.Errorf("cannot change openshift-sdn mode"))
+	}
+
+	// deepequal is nil-safe
+	if !reflect.DeepEqual(pn.VXLANPort, nn.VXLANPort) {
+		errs = append(errs, errors.Errorf("cannot change openshift-sdn vxlanPort"))
+	}
+
+	if !reflect.DeepEqual(pn.MTU, nn.MTU) {
+		errs = append(errs, errors.Errorf("cannot change openshift-sdn mtu"))
+	}
+
+	// It is allowed to change useExternalOpenvswitch and enableUnidling
+	return errs
 }
 
 func fillOpenShiftSDNDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
-	// NOTE: If you change any defaults, and it's not a safe chang to roll out
+	// NOTE: If you change any defaults, and it's not a safe change to roll out
 	// to existing clusters, you MUST use the value from previous instead.
 	if conf.DeployKubeProxy == nil {
 		prox := false
@@ -127,18 +166,23 @@ func fillOpenShiftSDNDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 		conf.KubeProxyConfig.BindAddress = "0.0.0.0"
 	}
 
-	if conf.DefaultNetwork.OpenShiftSDNConfig == nil {
-		conf.DefaultNetwork.OpenShiftSDNConfig = &operv1.OpenShiftSDNConfig{}
-	}
-
 	if conf.KubeProxyConfig.ProxyArguments == nil {
 		conf.KubeProxyConfig.ProxyArguments = map[string]operv1.ProxyArgumentList{}
 	}
 
+	if conf.DefaultNetwork.OpenShiftSDNConfig == nil {
+		conf.DefaultNetwork.OpenShiftSDNConfig = &operv1.OpenShiftSDNConfig{}
+	}
 	sc := conf.DefaultNetwork.OpenShiftSDNConfig
+
 	if sc.VXLANPort == nil {
 		var port uint32 = 4789
 		sc.VXLANPort = &port
+	}
+
+	if sc.EnableUnidling == nil {
+		truth := true
+		sc.EnableUnidling = &truth
 	}
 
 	// MTU is currently the only field we pull from previous.

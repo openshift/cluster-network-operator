@@ -116,6 +116,7 @@ func TestFillOpenShiftSDNDefaults(t *testing.T) {
 	f := false
 	p := uint32(4789)
 	m := uint32(8950)
+	truth := true
 
 	expected := operv1.NetworkSpec{
 		ServiceNetwork: []string{"172.30.0.0/16"},
@@ -132,9 +133,10 @@ func TestFillOpenShiftSDNDefaults(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOpenShiftSDN,
 			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
-				Mode:      operv1.SDNModeNetworkPolicy,
-				VXLANPort: &p,
-				MTU:       &m,
+				Mode:           operv1.SDNModeNetworkPolicy,
+				VXLANPort:      &p,
+				MTU:            &m,
+				EnableUnidling: &truth,
 			},
 		},
 		DeployKubeProxy: &f,
@@ -182,6 +184,13 @@ func TestValidateOpenShiftSDN(t *testing.T) {
 
 	config.ClusterNetwork = nil
 	errExpect("ClusterNetwork cannot be empty")
+
+	config.KubeProxyConfig = &operv1.ProxyConfig{
+		ProxyArguments: map[string]operv1.ProxyArgumentList{
+			"proxy-mode": {"userspace"},
+		},
+	}
+	errExpect("invalid proxy-mode - when unidling is enabled")
 }
 
 func TestProxyArgs(t *testing.T) {
@@ -250,6 +259,27 @@ func TestProxyArgs(t *testing.T) {
 	arg, _, _ = uns.NestedString(cfg.Object, "configSyncPeriod")
 	g.Expect(arg).To(Equal("2s"))
 
+	// Setting the proxy mode explicitly still gets unidling
+	config.KubeProxyConfig.ProxyArguments = map[string]operv1.ProxyArgumentList{
+		"proxy-mode": {"iptables"},
+	}
+	objs, err = renderOpenShiftSDN(config, manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+	cfg = getProxyConfigFile(objs)
+
+	arg, _, _ = uns.NestedString(cfg.Object, "mode")
+	g.Expect(arg).To(Equal("unidling+iptables"))
+
+	// Disabling unidling doesn't add the fixup
+	f := false
+	config.DefaultNetwork.OpenShiftSDNConfig.EnableUnidling = &f
+	objs, err = renderOpenShiftSDN(config, manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+	cfg = getProxyConfigFile(objs)
+
+	arg, _, _ = uns.NestedString(cfg.Object, "mode")
+	g.Expect(arg).To(Equal("iptables"))
+
 }
 
 func TestOpenShiftSDNIsSafe(t *testing.T) {
@@ -266,10 +296,17 @@ func TestOpenShiftSDNIsSafe(t *testing.T) {
 	// change the vxlan port
 	p := uint32(99)
 	next.DefaultNetwork.OpenShiftSDNConfig.VXLANPort = &p
+	next.DefaultNetwork.OpenShiftSDNConfig.Mode = operv1.SDNModeMultitenant
+	mtu := uint32(4000)
+	next.DefaultNetwork.OpenShiftSDNConfig.MTU = &mtu
+	f := false
+	next.DefaultNetwork.OpenShiftSDNConfig.EnableUnidling = &f
 
 	errs = isOpenShiftSDNChangeSafe(prev, next)
-	g.Expect(errs).To(HaveLen(1))
-	g.Expect(errs[0]).To(MatchError("cannot change openshift-sdn configuration"))
+	g.Expect(errs).To(HaveLen(3))
+	g.Expect(errs[0]).To(MatchError("cannot change openshift-sdn mode"))
+	g.Expect(errs[1]).To(MatchError("cannot change openshift-sdn vxlanPort"))
+	g.Expect(errs[2]).To(MatchError("cannot change openshift-sdn mtu"))
 }
 
 func TestOpenShiftSDNMultitenant(t *testing.T) {
@@ -357,6 +394,50 @@ func TestOpenshiftSDNProxyConfig(t *testing.T) {
 
 	// test default rendering
 	objs, err := renderOpenShiftSDN(config, manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(getProxyConfig(objs)).To(MatchYAML(`
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+bindAddress: 0.0.0.0
+clientConnection:
+  acceptContentTypes: ""
+  burst: 0
+  contentType: ""
+  kubeconfig: ""
+  qps: 0
+clusterCIDR: ""
+configSyncPeriod: 0s
+conntrack:
+  max: null
+  maxPerCore: null
+  min: null
+  tcpCloseWaitTimeout: null
+  tcpEstablishedTimeout: null
+enableProfiling: false
+healthzBindAddress: 0.0.0.0:10256
+hostnameOverride: ""
+iptables:
+  masqueradeAll: false
+  masqueradeBit: 0
+  minSyncPeriod: 0s
+  syncPeriod: 0s
+ipvs:
+  excludeCIDRs: null
+  minSyncPeriod: 0s
+  scheduler: ""
+  syncPeriod: 0s
+kind: KubeProxyConfiguration
+metricsBindAddress: 0.0.0.0:9101
+mode: unidling+iptables
+nodePortAddresses: null
+oomScoreAdj: null
+portRange: ""
+resourceContainer: ""
+udpIdleTimeout: 0s`))
+
+	// Disable unidling
+	f := false
+	config.DefaultNetwork.OpenShiftSDNConfig.EnableUnidling = &f
+	objs, err = renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(getProxyConfig(objs)).To(MatchYAML(`
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
