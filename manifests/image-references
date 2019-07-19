@@ -14,10 +14,10 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-kube-proxy:4.2
-  - name: hypershift
+  - name: sdn-controller
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-hypershift:4.2
+      name: quay.io/openshift/origin-sdn-controller:4.2
   - name: multus-cni
     from:
       kind: DockerImage
