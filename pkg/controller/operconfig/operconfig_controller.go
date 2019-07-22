@@ -271,6 +271,9 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 	}
 
+	// Run a pod status check just to clear any initial inconsitencies at startup of the CNO
+	r.status.SetFromPods()
+
 	// Update Network.config.openshift.io.Status
 	status, err := r.ClusterNetworkStatus(context.TODO(), operConfig)
 	if err != nil {

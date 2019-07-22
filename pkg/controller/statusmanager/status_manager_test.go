@@ -70,6 +70,11 @@ func TestStatusManager_set(t *testing.T) {
 		t.Fatalf("unexpected error (expected Not Found): %v", err)
 	}
 
+	condUpdate := configv1.ClusterOperatorStatusCondition{
+		Type:   configv1.OperatorUpgradeable,
+		Status: configv1.ConditionTrue,
+	}
+
 	condFail := configv1.ClusterOperatorStatusCondition{
 		Type:    configv1.OperatorDegraded,
 		Status:  configv1.ConditionTrue,
@@ -82,7 +87,8 @@ func TestStatusManager_set(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFail}) {
+
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFail, condUpdate}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 
@@ -96,7 +102,7 @@ func TestStatusManager_set(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFail, condProgress}) {
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFail, condUpdate, condProgress}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 
@@ -110,7 +116,7 @@ func TestStatusManager_set(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condNoFail, condProgress}) {
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condNoFail, condUpdate, condProgress}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 
@@ -128,7 +134,7 @@ func TestStatusManager_set(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condNoFail, condNoProgress, condAvailable}) {
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condNoFail, condUpdate, condNoProgress, condAvailable}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 }
@@ -142,6 +148,10 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 		t.Fatalf("unexpected error (expected Not Found): %v", err)
 	}
 
+	condUpdate := configv1.ClusterOperatorStatusCondition{
+		Type:   configv1.OperatorUpgradeable,
+		Status: configv1.ConditionTrue,
+	}
 	condFailCluster := configv1.ClusterOperatorStatusCondition{
 		Type:   configv1.OperatorDegraded,
 		Status: configv1.ConditionTrue,
@@ -164,7 +174,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailOperator}) {
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailOperator, condUpdate}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 
@@ -174,7 +184,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailCluster}) {
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailCluster, condUpdate}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 
@@ -184,7 +194,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailCluster}) {
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailCluster, condUpdate}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 
@@ -194,7 +204,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailCluster}) {
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailCluster, condUpdate}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 
@@ -204,7 +214,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailPods}) {
+	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condFailPods, condUpdate}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 
@@ -214,7 +224,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	if !v1helpers.IsStatusConditionFalse(co.Status.Conditions, configv1.OperatorDegraded) {
+	if !v1helpers.IsStatusConditionFalse(co.Status.Conditions, configv1.OperatorDegraded) && !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condUpdate}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 }
@@ -272,6 +282,10 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Reason: "Deploying",
 		},
 		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
 			Type:   configv1.OperatorAvailable,
 			Status: configv1.ConditionFalse,
 			Reason: "Startup",
@@ -316,6 +330,10 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
 			{
 				Type:   configv1.OperatorProgressing,
+				Status: configv1.ConditionTrue,
+			},
+			{
+				Type:   configv1.OperatorUpgradeable,
 				Status: configv1.ConditionTrue,
 			},
 			{
@@ -374,6 +392,10 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		{
 			Type:   configv1.OperatorProgressing,
 			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
 		},
 		{
 			Type:   configv1.OperatorAvailable,
@@ -468,6 +490,10 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 			Reason: "Deploying",
 		},
 		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
 			Type:   configv1.OperatorAvailable,
 			Status: configv1.ConditionFalse,
 			Reason: "Startup",
@@ -497,6 +523,10 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 		{
 			Type:   configv1.OperatorProgressing,
 			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
 		},
 		{
 			Type:   configv1.OperatorAvailable,
@@ -545,6 +575,10 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 			Status: configv1.ConditionTrue,
 		},
 		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
 			Type:   configv1.OperatorAvailable,
 			Status: configv1.ConditionTrue,
 		},
@@ -572,6 +606,10 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 		{
 			Type:   configv1.OperatorProgressing,
 			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
 		},
 		{
 			Type:   configv1.OperatorAvailable,
