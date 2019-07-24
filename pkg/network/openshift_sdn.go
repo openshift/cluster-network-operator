@@ -48,17 +48,13 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 		"metrics-bind-address":    {"0.0.0.0"},
 		"metrics-port":            {"9101"},
 		"healthz-port":            {"10256"},
-		"proxy-mode":              {"unidling+iptables"},
+		"proxy-mode":              {"iptables"},
 		"iptables-masquerade-bit": {"0"},
 	}
-	if !*c.EnableUnidling {
-		kpcDefaults["proxy-mode"][0] = "iptables"
-	}
 
-	// Always set the proxy-mode, even if the user specified it
-	// We already validated that proxy-mode was either unset or iptables.
 	kpcOverrides := map[string]operv1.ProxyArgumentList{}
 	if *c.EnableUnidling {
+		// We already validated that proxy-mode was either unset or iptables.
 		kpcOverrides["proxy-mode"] = operv1.ProxyArgumentList{"unidling+iptables"}
 	}
 
