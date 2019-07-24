@@ -135,7 +135,7 @@ func TestRenderSimpleMacvlanConfig(t *testing.T) {
 		"name": "net-attach-1"
 	},
 	"spec": {
-		"config": "{ \"cniVersion\": \"0.3.0\", \"type\": \"macvlan\",\n\"master\": \"eth0\",\n\"mode\": \"bridge\",\n\"ipam\":       { \"type\": \"dhcp\" } }"
+		"config": "{ \"cniVersion\": \"0.3.1\", \"type\": \"macvlan\",\n\"master\": \"eth0\",\n\"mode\": \"bridge\",\n\"ipam\":       { \"type\": \"dhcp\" } }"
 	}
 }`
 		g.Expect(objs[0].MarshalJSON()).To(MatchJSON(expected))
