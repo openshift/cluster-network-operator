@@ -193,6 +193,151 @@ spec:
      iptables-min-sync-period: ["30s"]
 ```
 
+## Configuring Additional Networks
+Users can configure additional networks, based on [Kubernetes Network Plumbing Working Group's Kubernetes Network Custom Resource Definition De-facto Standard Version 1](https://github.com/K8sNetworkPlumbingWG/multi-net-spec/blob/master/%5Bv1%5D%20Kubernetes%20Network%20Custom%20Resource%20Definition%20De-facto%20Standard.md).
+
+* `name`: name of network attachment definition, required
+* `namespace`: namespace for the network attachment definition. The default is default namespace
+* `type`: specify network attachment definition type, required
+
+Currently, the understood values for type are:
+* `Raw`
+* `SimpleMacvlan`
+
+```yaml
+spec:
+  additionalNetworks:
+  - name: test-network-1
+    namespace: namespace-test-1
+    type: ...
+```
+
+Then it generates the following network attachment definition:
+
+```yaml
+$ oc -n namespace-test-1 get network-attachment-definitions.k8s.cni.cncf.io
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: test-network-1
+  namespace: namespace-test-1
+  # (snip)
+spec:
+  # (snip)
+```
+
+### Attaching additional network into Pod
+Users can attach the network attachment through Pod annotation, k8s.v1.cni.cncf.io/networks, such as:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod-01
+  namespace: namespace-test-1
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+            { "name": "test-network-1" }
+    ]'
+spec:
+  containers:
+# (snip)
+```
+
+Please take a look into the spec, [Kubernetes Network Plumbing Working Group's Kubernetes Network Custom Resource Definition De-facto Standard Version 1](https://github.com/K8sNetworkPlumbingWG/multi-net-spec/blob/master/%5Bv1%5D%20Kubernetes%20Network%20Custom%20Resource%20Definition%20De-facto%20Standard.md), for its detail.
+
+### Configuring Raw CNI
+Users can configure network attachment definition with CNI json as following options required:
+
+* `rawCNIConfig`: CNI JSON configuration for the network attachment
+
+```yaml
+spec:
+  additionalNetworks:
+  - name: test-network-1
+    namespace: namespace-test-1
+    rawCNIConfig: '{ "cniVersion": "0.3.1", "type": "macvlan", "master": "eth1", "mode": "bridge", "ipam": { "type": "dhcp" } }'
+    type: Raw
+```
+
+This config will generate the following network attachment definition:
+
+```yaml
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  # (snip)
+  name: test-network-1
+  namespace: namespace-test-1
+  ownerReferences:
+  - apiVersion: operator.openshift.io/v1
+    # (snip)
+spec:
+  config: '{ "cniVersion": "0.3.1", "type": "macvlan", "master": "eth1", "mode": "bridge", "ipam": { "type": "dhcp" } }'
+```
+
+### Configuring SimpleMacvlan
+SimpleMacvlan provides user to configure macvlan network attachments. macvlan creates a virtual copy of a master interface and assigns the copy a randomly generated MAC address. The pod can communicate with the network that is attached to the master interface. The distinct MAC address allows the pod to be identified by external network services like DHCP servers, firewalls, routers, etc. macvlan interfaces cannot communicate with the host via the macvlan interface. This is because traffic that is sent by the pod onto the macvlan interface is bypassing the master interface and is sent directly to the interfaces underlying network. Before traffic gets sent to the underlying network it can be evaluated within the macvlan driver, allowing it to communicate with all other pods that created their macvlan interface from the same master interface.
+
+Users can configure macvlan network attachment definition with following parameters, all of which are optional:
+
+* `master`: master is the host interface to create the macvlan interface from. If not specified, it will be default route interface
+* `mode`: mode is the macvlan mode: bridge, private, vepa, passthru. The default is bridge
+* `mtu`: mtu is the mtu to use for the macvlan interface. if unset, host's kernel will select the value
+* `ipamConfig`: IPAM (IP Address Management) configration: dhcp or static. The default is dhcp
+
+```yaml
+spec:
+  additionalNetworks:
+  - name: test-network-2
+    type: SimpleMacvlan
+    simpleMacvlanConfig:
+      master: eth0
+      mode: bridge
+      mtu: 1515
+      ipamConfig:
+        type: dhcp
+```
+
+#### Configuring Static IPAM
+Users can configure static IPAM with following parameters:
+
+* `addresses`:
+  * `address`: Address is the IP address in CIDR format, optional
+  * `gateway`: Gateway is IP inside of subnet to designate as the gateway, optional
+* `routes`: optional
+  * `destination`: Destination points the IP route destination
+  * `gateway`: Gateway is the route's next-hop IP address. If unset, a default gateway is assumed (as determined by the CNI plugin)
+* `dns`: optional
+  * `nameservers`: Nameservers points DNS servers for IP lookup
+  * `domain`: Domain configures the domainname the local domain used for short hostname lookups
+  * `search`: Search configures priority ordered search domains for short hostname lookups
+
+```yaml
+spec:
+  additionalNetworks:
+  - name: test-network-3
+    type: SimpleMacvlan
+    simpleMacvlanConfig:
+      ipamConfig:
+        type: static
+        staticIPAMConfig:
+          addresses:
+          - address: 198.51.100.11/24
+            gateway: 198.51.100.10
+          routes:
+          - destination: 0.0.0.0/0
+            gateway: 198.51.100.1
+          dns:
+            nameservers:
+            - 198.51.100.1
+            - 198.51.100.2
+            domain: testDNS.example
+            search:
+            - testdomain1.example
+            - testdomain2.example
+```
+
 # Using
 The operator is expected to run as a pod (via a Deployment) inside a kubernetes cluster. It will retrieve the configuration above and reconcile the desired configuration. A suitable manifest for running the operator is located in `manifests/`.
 
