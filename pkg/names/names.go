@@ -1,5 +1,7 @@
 package names
 
+import "k8s.io/apimachinery/pkg/types"
+
 // some names
 
 // OperatorConfig is the name of the CRD that defines the complete
@@ -34,3 +36,21 @@ const SERVICE_CA_CONFIGMAP = "openshift-service-ca"
 // MULTUS_VALIDATING_WEBHOOK is the name of the ValidatingWebhookConfiguration for multus-admission-controller
 // that is used in multus admission controller deployment
 const MULTUS_VALIDATING_WEBHOOK = "multus.openshift.io"
+
+// PROXY_TRUSTED_CA_CONFIGMAP is the name of the proxy.spec.trustedCA
+// ConfigMap that contains the trusted CA certificate bundle used for
+// proxying HTTPS connections.
+const PROXY_TRUSTED_CA_CONFIGMAP = "user-ca-bundle"
+
+// PROXY_TRUSTED_CA_CONFIGMAP_NS is the namespace that hosts the
+// PROXY_TRUSTED_CA_CONFIGMAP ConfigMap.
+const PROXY_TRUSTED_CA_CONFIGMAP_NS = "openshift-config-managed"
+
+// ProxyTrustedCAConfigMap returns the namespaced name of the ConfigMap
+// containing the proxy trusted CA certificate bundle.
+func ProxyTrustedCAConfigMap() types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: PROXY_TRUSTED_CA_CONFIGMAP_NS,
+		Name:      PROXY_TRUSTED_CA_CONFIGMAP,
+	}
+}
