@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
@@ -19,6 +20,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func printVersion() {
@@ -108,8 +113,62 @@ func main() {
 
 	log.Print("Starting the Cmd.")
 
-	// Start the Cmd
-	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+	// Create the stop channel and start the operator
+	stop := signals.SetupSignalHandler()
+	if err := start(mgr, stop); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// start creates the default Proxy if it does not exist and then
+// starts the operator synchronously until a message is received
+// on the stop channel.
+func start(mgr manager.Manager, stop <-chan struct{}) error {
+	// Periodically ensure the default proxy exists.
+	go wait.Until(func() {
+		if !mgr.GetCache().WaitForCacheSync(stop) {
+			log.Print("failed to sync cache before ensuring default proxy")
+			return
+		}
+		err := ensureDefaultProxy(mgr)
+		if err != nil {
+			log.Print(err, "failed to ensure default proxy")
+		}
+	}, 1*time.Minute, stop)
+
+	errChan := make(chan error)
+	go func() {
+		errChan <- mgr.Start(stop)
+	}()
+
+	// Wait for the manager to exit or an explicit stop.
+	select {
+	case <-stop:
+		return nil
+	case err := <-errChan:
+		return err
+	}
+}
+
+// ensureDefaultProxy creates the default proxy if it doesn't exist.
+func ensureDefaultProxy(mgr manager.Manager) error {
+	proxy := &configv1.Proxy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cluster",
+		},
+	}
+	client := mgr.GetClient()
+	err := client.Get(context.TODO(), types.NamespacedName{Name: proxy.Name}, proxy)
+	if err == nil {
+		return nil
+	}
+	if !errors.IsNotFound(err) {
+		return err
+	}
+	err = client.Create(context.TODO(), proxy)
+	if err != nil {
+		return err
+	}
+	log.Printf("created default proxy %q", proxy.Name)
+	return nil
 }
