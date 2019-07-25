@@ -15,15 +15,15 @@ import (
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func printVersion() {
@@ -154,7 +154,7 @@ func start(mgr manager.Manager, stop <-chan struct{}) error {
 func ensureDefaultProxy(mgr manager.Manager) error {
 	proxy := &configv1.Proxy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cluster",
+			Name: "cluster",
 		},
 	}
 	client := mgr.GetClient()
