@@ -93,7 +93,7 @@ func (status *StatusManager) Set(reachedAvailableLevel bool, conditions ...confi
 		},
 	)
 
-	if reflect.DeepEqual(oldStatus, co.Status) {
+	if reflect.DeepEqual(*oldStatus, co.Status) {
 		return
 	}
 
