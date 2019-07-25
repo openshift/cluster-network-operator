@@ -60,6 +60,19 @@ subjects:
   name: sdn-controller
   namespace: openshift-sdn
 
+- apiGroups:
+  - "toleration.scheduling.openshift.io"
+  resources:
+  - node-role.kubernetes.io/master
+  - node.kubernetes.io/unreachable
+  - node.kubernetes.io/not-ready
+  resourceNames:
+  - "NoSchedule:"
+  - "NoExecute:"  
+  verbs:
+  - exists
+  - equal
+    
 ---
 # Only grant access to the specific config map for leader election
 apiVersion: rbac.authorization.k8s.io/v1

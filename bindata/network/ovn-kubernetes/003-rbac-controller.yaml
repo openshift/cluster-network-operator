@@ -50,6 +50,18 @@ rules:
   - use
   resourceNames:
   - privileged
+- apiGroups:
+  - "toleration.scheduling.openshift.io"
+  resources:
+  - node-role.kubernetes.io/master
+  - node.kubernetes.io/unreachable
+  - node.kubernetes.io/not-ready
+  resourceNames:
+  - "NoSchedule:"
+  - "NoExecute:"  
+  verbs:
+  - exists
+  - equal 
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
