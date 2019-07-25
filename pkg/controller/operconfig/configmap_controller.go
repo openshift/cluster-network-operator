@@ -46,7 +46,7 @@ func addConfigMapReconciler(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForOwner{OwnerType: &operv1.Network{}})
+	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForOwner{OwnerType: &operv1.Network{}, IsController: true})
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func addConfigMapReconciler(mgr manager.Manager, r reconcile.Reconciler) error {
 }
 
 func (r *ReconcileConfigMaps) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	if request.Namespace == names.APPLIED_NAMESPACE || request.Name == names.SERVICE_CA_CONFIGMAP {
+	if request.Namespace == names.APPLIED_NAMESPACE && request.Name == names.OPERATOR_CONFIG {
 		return r.ReconcileMultusWebhook(request)
 	}
 	return reconcile.Result{}, nil
@@ -63,10 +63,14 @@ func (r *ReconcileConfigMaps) Reconcile(request reconcile.Request) (reconcile.Re
 
 // ReconcileMultusWebhook updates ValidatingWebhookConfiguration CABundle, given from SERVICE_CA_CONFIGMAP
 func (r *ReconcileConfigMaps) ReconcileMultusWebhook(request reconcile.Request) (reconcile.Result, error) {
-	log.Printf("Reconciling update to %s/%s\n", request.Namespace, request.Name)
+	log.Printf("Reconciling update for %s from %s/%s\n", names.SERVICE_CA_CONFIGMAP, request.Namespace, request.Name)
 
 	caBundleConfigMap := &corev1.ConfigMap{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, caBundleConfigMap)
+	configMapName := types.NamespacedName{
+		Namespace: names.APPLIED_NAMESPACE,
+		Name:      names.SERVICE_CA_CONFIGMAP,
+	}
+	err := r.client.Get(context.TODO(), configMapName, caBundleConfigMap)
 	if err != nil {
 		log.Println(err)
 		return reconcile.Result{}, err
