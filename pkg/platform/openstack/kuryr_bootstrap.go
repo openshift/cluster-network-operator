@@ -854,6 +854,11 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to add rule opening traffic from workers and masters")
 	}
+	log.Print("Allowing traffic from pod to pod")
+	err = ensureOpenStackSgRule(client, podSgId, "0.0.0.0/0", -1, -1)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to add rule opening traffic pod to pod")
+	}
 	for _, cidr := range podSubnetCidrs {
 		err = ensureOpenStackSgRule(client, masterSgId, cidr, -1, -1)
 		if err != nil {
