@@ -40,7 +40,7 @@ spec:
         command:
         - /bin/bash
         - -c
-        - exec /usr/bin/hyperkube kube-proxy --config=/config/kube-proxy-config.yaml --hostname-override "${K8S_NODE_NAME}"
+        - exec /usr/bin/kube-proxy --config=/config/kube-proxy-config.yaml --hostname-override "${K8S_NODE_NAME}"
         securityContext:
           privileged: true
         env:
