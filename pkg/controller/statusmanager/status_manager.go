@@ -93,11 +93,11 @@ func (status *StatusManager) Set(reachedAvailableLevel bool, conditions ...confi
 		},
 	)
 
-	if reflect.DeepEqual(oldStatus, co.Status) {
+	if reflect.DeepEqual(*oldStatus, co.Status) {
 		return
 	}
 
-	buf, err := yaml.Marshal(co.Status)
+	buf, err := yaml.Marshal(co.Status.Conditions)
 	if err != nil {
 		buf = []byte(fmt.Sprintf("(failed to convert to YAML: %s)", err))
 	}
@@ -105,14 +105,14 @@ func (status *StatusManager) Set(reachedAvailableLevel bool, conditions ...confi
 		if err := status.client.Create(context.TODO(), co); err != nil {
 			log.Printf("Failed to create ClusterOperator %q: %v", co.Name, err)
 		} else {
-			log.Printf("Created ClusterOperator with status:\n%s", string(buf))
+			log.Printf("Created ClusterOperator with conditions:\n%s", string(buf))
 		}
 	} else {
 		err = status.client.Status().Update(context.TODO(), co)
 		if err != nil {
 			log.Printf("Failed to update ClusterOperator %q: %v", co.Name, err)
 		} else {
-			log.Printf("Updated ClusterOperator with status:\n%s", string(buf))
+			log.Printf("Updated ClusterOperator with conditions:\n%s", string(buf))
 		}
 	}
 }
