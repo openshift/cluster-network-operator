@@ -275,7 +275,7 @@ func (r *ReconcileProxyConfig) validateTrustedCA(proxyConfig *configv1.ProxySpec
 }
 
 // validateTrustedCAConfigMap validates that proxyConfig is a
-// valid ConfigMap reference
+// valid ConfigMap reference.
 func (r *ReconcileProxyConfig) validateTrustedCAConfigMap(proxyConfig *configv1.ProxySpec) (*corev1.ConfigMap, error) {
 	if !isExpectedProxyConfigMap(proxyConfig) {
 		return nil, fmt.Errorf("invalid ConfigMap reference for TrustedCA: %s", proxyConfig.TrustedCA.Name)
@@ -292,6 +292,8 @@ func (r *ReconcileProxyConfig) validateTrustedCAConfigMap(proxyConfig *configv1.
 // CA certificate bundle named clusterConfigMapKey and that
 // clusterConfigMapKey contains a valid PEM encoded certificate.
 func validateTrustedCABundle(configMap *corev1.ConfigMap) ([]*x509.Certificate, error) {
+	// TODO: A separate controller is needed to watch for changes to the proxy
+	// ca bundle configmap.
 	if _, ok := configMap.Data[clusterConfigMapKey]; !ok {
 		return nil, fmt.Errorf("ConfigMap %q is missing %q", names.PROXY_TRUSTED_CA_CONFIGMAP, clusterConfigMapKey)
 	}

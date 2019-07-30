@@ -57,7 +57,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-var _ reconcile.Reconciler = &ReconcileProxyConfig{}
+//var _ reconcile.Reconciler = &ReconcileProxyConfig{}
 
 // ReconcileProxyConfig reconciles a Proxy object
 type ReconcileProxyConfig struct {
@@ -132,12 +132,6 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 	log.Printf("Reconciling Proxy.config.openshift.io %s complete\n", request.Name)
 
 	return reconcile.Result{}, nil
-}
-
-// isSpecHTTPAndHTTPSProxySet checks whether spec.httpProxy and spec.httpsProxy
-// of proxy is set.
-func isSpecHTTPAndHTTPSProxySet(proxyConfig *configv1.ProxySpec) bool {
-	return !isSpecHTTPProxySet(proxyConfig) && !isSpecHTTPSProxySet(proxyConfig)
 }
 
 // isSpecHTTPProxySet checks whether spec.httpProxy of proxy is set.
