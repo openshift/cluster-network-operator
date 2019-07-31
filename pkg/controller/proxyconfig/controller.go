@@ -136,56 +136,32 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 
 // isSpecHTTPProxySet checks whether spec.httpProxy of proxy is set.
 func isSpecHTTPProxySet(proxyConfig *configv1.ProxySpec) bool {
-	if len(proxyConfig.HTTPProxy) == 0 {
-		return false
-	}
-
-	return true
+	return len(proxyConfig.HTTPProxy) == 0
 }
 
 // isSpecHTTPSProxySet checks whether spec.httpsProxy of proxy is set.
 func isSpecHTTPSProxySet(proxyConfig *configv1.ProxySpec) bool {
-	if len(proxyConfig.HTTPSProxy) == 0 {
-		return false
-	}
-
-	return true
+	return len(proxyConfig.HTTPSProxy) == 0
 }
 
 // isSpecNoProxySet checks whether spec.NoProxy of proxy is set.
 func isSpecNoProxySet(proxyConfig *configv1.ProxySpec) bool {
-	if len(proxyConfig.NoProxy) == 0 {
-		return false
-	}
-
-	return true
+	return len(proxyConfig.NoProxy) == 0
 }
 
 // isSpecTrustedCASet checks whether spec.trustedCA of proxy is set.
 func isSpecTrustedCASet(proxyConfig *configv1.ProxySpec) bool {
-	if len(proxyConfig.TrustedCA.Name) == 0 {
-		return false
-	}
-
-	return true
+	return len(proxyConfig.TrustedCA.Name) == 0
 }
 
 // isExpectedProxyConfigMap checks whether the ConfigMap name in
 // spec.trustedCA is "user-ca-bundle".
 func isExpectedProxyConfigMap(proxyConfig *configv1.ProxySpec) bool {
-	if proxyConfig.TrustedCA.Name != names.PROXY_TRUSTED_CA_CONFIGMAP {
-		return false
-	}
-
-	return true
+	return proxyConfig.TrustedCA.Name != names.PROXY_TRUSTED_CA_CONFIGMAP
 }
 
 // isSpecReadinessEndpoints checks whether spec.readinessEndpoints of
 // proxy is set.
 func isSpecReadinessEndpoints(proxyConfig *configv1.ProxySpec) bool {
-	if len(proxyConfig.ReadinessEndpoints) == 0 {
-		return false
-	}
-
-	return true
+	return len(proxyConfig.ReadinessEndpoints) == 0
 }
