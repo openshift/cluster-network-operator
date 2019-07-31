@@ -37,20 +37,33 @@ const SERVICE_CA_CONFIGMAP = "openshift-service-ca"
 // that is used in multus admission controller deployment
 const MULTUS_VALIDATING_WEBHOOK = "multus.openshift.io"
 
-// PROXY_TRUSTED_CA_CONFIGMAP is the name of the proxy.spec.trustedCA
-// ConfigMap that contains the trusted CA certificate bundle used for
-// proxying HTTPS connections.
-const PROXY_TRUSTED_CA_CONFIGMAP = "user-ca-bundle"
+// TRUST_BUNDLE_CONFIGMAP_KEY is the name of the data key containing
+// the PEM encoded trust bundle.
+const TRUST_BUNDLE_CONFIGMAP_KEY = "ca-bundle.crt"
 
-// PROXY_TRUSTED_CA_CONFIGMAP_NS is the namespace that hosts the
-// PROXY_TRUSTED_CA_CONFIGMAP ConfigMap.
-const PROXY_TRUSTED_CA_CONFIGMAP_NS = "openshift-config-managed"
+// MERGED_TRUST_BUNDLE_CONFIGMAP is the name of the ConfigMap
+// containing the combined user/system trust bundle.
+// TODO: The bundle can be used for more than proxy, change name.
+const MERGED_TRUST_BUNDLE_CONFIGMAP = "proxy-ca-bundle"
 
-// ProxyTrustedCAConfigMap returns the namespaced name of the ConfigMap
-// containing the proxy trusted CA certificate bundle.
-func ProxyTrustedCAConfigMap() types.NamespacedName {
+// TRUST_BUNDLE_CONFIGMAP_NS is the namespace that hosts the
+// ADDL_TRUST_BUNDLE_CONFIGMAP and MERGED_TRUST_BUNDLE_CONFIGMAP
+// ConfigMaps.
+const TRUST_BUNDLE_CONFIGMAP_NS = "openshift-config-managed"
+
+// ProxyName returns the namespaced name of the proxy
+// object named "cluster" in namespace "openshift-config-managed".
+func ProxyName() types.NamespacedName {
 	return types.NamespacedName{
-		Namespace: PROXY_TRUSTED_CA_CONFIGMAP_NS,
-		Name:      PROXY_TRUSTED_CA_CONFIGMAP,
+		Name: PROXY_CONFIG,
+	}
+}
+
+// MergedTrustBundleName returns the namespaced name of the ConfigMap
+// containing the merged user/system trust bundle.
+func MergedTrustBundleName() types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: TRUST_BUNDLE_CONFIGMAP_NS,
+		Name:      MERGED_TRUST_BUNDLE_CONFIGMAP,
 	}
 }

@@ -18,15 +18,24 @@ import (
 // syncProxyStatus computes the current status of proxy and
 // updates status if any changes since last sync.
 func (r *ReconcileProxyConfig) syncProxyStatus(proxy *configv1.Proxy, infra *configv1.Infrastructure, network *configv1.Network, cluster *corev1.ConfigMap) error {
+	var err error
+	var noProxy string
 	updated := proxy.DeepCopy()
-	noProxy, err := mergeUserSystemNoProxy(proxy, infra, network, cluster)
-	if err != nil {
-		return fmt.Errorf("failed to merge user/system noProxy settings: %v", err)
+
+	if isSpecNoProxySet(&proxy.Spec) {
+		if proxy.Spec.NoProxy == noProxyWildcard {
+			noProxy = proxy.Spec.NoProxy
+		} else {
+			noProxy, err = mergeUserSystemNoProxy(proxy, infra, network, cluster)
+			if err != nil {
+				return fmt.Errorf("failed to merge user/system noProxy settings: %v", err)
+			}
+		}
 	}
 
-	updated.Status.NoProxy = noProxy
 	updated.Status.HTTPProxy = proxy.Spec.HTTPProxy
 	updated.Status.HTTPSProxy = proxy.Spec.HTTPSProxy
+	updated.Status.NoProxy = noProxy
 
 	if !proxyStatusesEqual(proxy.Status, updated.Status) {
 		if err := r.client.Status().Update(context.TODO(), updated); err != nil {
@@ -37,7 +46,8 @@ func (r *ReconcileProxyConfig) syncProxyStatus(proxy *configv1.Proxy, infra *con
 	return nil
 }
 
-// mergeUserSystemNoProxy merges user-supplied noProxy settings from proxy
+// mergeUserSystemNoProxy returns noProxyWildcard if it supplied as a noProxy setting.
+// Otherwise, mergeUserSystemNoProxy merges user-supplied noProxy settings from proxy
 // with cluster-wide noProxy settings, returning a merged, comma-separated
 // string of noProxy settings.
 func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructure, network *configv1.Network, cluster *corev1.ConfigMap) (string, error) {
