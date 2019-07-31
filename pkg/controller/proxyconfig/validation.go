@@ -161,13 +161,15 @@ func validateHTTPReadinessEndpoint(endpoint string) error {
 // validateHTTPReadinessEndpointWithRetries tries to validate an http
 // endpoint in a finite loop and returns the last result if it never succeeds.
 func validateHTTPReadinessEndpointWithRetries(endpoint string, retries int) error {
+	var err error
 	for i := 0; i < retries; i++ {
-		if err := runHTTPReadinessProbe(endpoint); err != nil {
-			return err
+		err = runHTTPReadinessProbe(endpoint)
+		if err == nil {
+			return nil
 		}
 	}
 
-	return nil
+	return err
 }
 
 // runHTTPReadinessProbe issues an http GET request to endpoint and returns
