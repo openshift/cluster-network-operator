@@ -29,7 +29,7 @@ spec:
       - operator: Exists
       initContainers:
       - name: dhcp-daemon-initialization
-        image: {{.CNIPluginsSupportedImage}}
+        image: {{.CNIPluginsImage}}
         command: ["/bin/sh"]
         args: ["-c", "rm -f /var/run/cni/dhcp.sock"]
         volumeMounts:
@@ -38,7 +38,7 @@ spec:
       containers:
       - name: dhcp-daemon
         # Based on: https://github.com/s1061123/cni-dhcp-daemon/blob/master/Dockerfile
-        image: {{.CNIPluginsSupportedImage}}
+        image: {{.CNIPluginsImage}}
         imagePullPolicy: Always
         command: ["/usr/src/plugins/bin/dhcp"]
         args:
