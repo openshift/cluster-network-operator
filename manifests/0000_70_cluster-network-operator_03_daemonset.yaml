@@ -37,10 +37,8 @@ spec:
           value: "quay.io/openshift/origin-multus-cni:4.2"
         - name: MULTUS_ADMISSION_CONTROLLER_IMAGE
           value: "quay.io/openshift/origin-multus-admission-controller:4.2"
-        - name: CNI_PLUGINS_SUPPORTED_IMAGE
-          value: "quay.io/openshift/origin-container-networking-plugins-supported:4.2"
-        - name: CNI_PLUGINS_UNSUPPORTED_IMAGE
-          value: "quay.io/openshift/origin-container-networking-plugins-unsupported:4.2"
+        - name: CNI_PLUGINS_IMAGE
+          value: "quay.io/openshift/origin-container-networking-plugins:4.2"
         - name: OVN_IMAGE
           value: "quay.io/openshift/origin-ovn-kubernetes:4.2"
         - name: KURYR_DAEMON_IMAGE
