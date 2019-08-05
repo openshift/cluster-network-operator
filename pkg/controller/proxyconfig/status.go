@@ -46,8 +46,7 @@ func (r *ReconcileProxyConfig) syncProxyStatus(proxy *configv1.Proxy, infra *con
 	return nil
 }
 
-// mergeUserSystemNoProxy returns noProxyWildcard if it supplied as a noProxy setting.
-// Otherwise, mergeUserSystemNoProxy merges user-supplied noProxy settings from proxy
+// mergeUserSystemNoProxy merges user-supplied noProxy settings from proxy
 // with cluster-wide noProxy settings, returning a merged, comma-separated
 // string of noProxy settings.
 func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructure, network *configv1.Network, cluster *corev1.ConfigMap) (string, error) {
@@ -68,9 +67,8 @@ func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		apiServerURL.Hostname(),
 		internalAPIServer.Hostname(),
 	)
-	platform := infra.Status.PlatformStatus.Type
 
-	// TODO: Does a better way exist to get machineCIDR and control-plane replicas?
+	// TODO: This will be flexible when master machine management is more dynamic.
 	type installConfig struct {
 		ControlPlane struct {
 			Replicas string `json:"replicas"`
@@ -88,10 +86,11 @@ func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		return "", fmt.Errorf("invalid install-config: %v\njson:\n%s", err, data)
 	}
 
-	if platform != configv1.VSpherePlatformType &&
-		platform != configv1.NonePlatformType &&
-		platform != configv1.BareMetalPlatformType {
+	switch infra.Status.PlatformStatus.Type {
+	case configv1.AWSPlatformType:
 		set.Insert("169.254.169.254", ic.Networking.MachineCIDR)
+	default:
+		return "", fmt.Errorf("unsupported infrastructure provider: %s", infra.Status.PlatformStatus.Type)
 	}
 
 	replicas, err := strconv.Atoi(ic.ControlPlane.Replicas)

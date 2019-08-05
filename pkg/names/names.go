@@ -41,29 +41,28 @@ const MULTUS_VALIDATING_WEBHOOK = "multus.openshift.io"
 // the PEM encoded trust bundle.
 const TRUST_BUNDLE_CONFIGMAP_KEY = "ca-bundle.crt"
 
-// MERGED_TRUST_BUNDLE_CONFIGMAP is the name of the ConfigMap
+// TRUST_BUNDLE_CONFIGMAP is the name of the ConfigMap
 // containing the combined user/system trust bundle.
-// TODO: The bundle can be used for more than proxy, change name.
-const MERGED_TRUST_BUNDLE_CONFIGMAP = "proxy-ca-bundle"
+const TRUST_BUNDLE_CONFIGMAP = "trusted-ca-bundle"
 
 // TRUST_BUNDLE_CONFIGMAP_NS is the namespace that hosts the
-// ADDL_TRUST_BUNDLE_CONFIGMAP and MERGED_TRUST_BUNDLE_CONFIGMAP
+// ADDL_TRUST_BUNDLE_CONFIGMAP and TRUST_BUNDLE_CONFIGMAP
 // ConfigMaps.
 const TRUST_BUNDLE_CONFIGMAP_NS = "openshift-config-managed"
 
-// ProxyName returns the namespaced name of the proxy
+// Proxy returns the namespaced name of the proxy
 // object named "cluster" in namespace "openshift-config-managed".
-func ProxyName() types.NamespacedName {
+func Proxy() types.NamespacedName {
 	return types.NamespacedName{
 		Name: PROXY_CONFIG,
 	}
 }
 
-// MergedTrustBundleName returns the namespaced name of the ConfigMap
+// TrustBundleConfigMap returns the namespaced name of the ConfigMap
 // containing the merged user/system trust bundle.
-func MergedTrustBundleName() types.NamespacedName {
+func TrustBundleConfigMap() types.NamespacedName {
 	return types.NamespacedName{
 		Namespace: TRUST_BUNDLE_CONFIGMAP_NS,
-		Name:      MERGED_TRUST_BUNDLE_CONFIGMAP,
+		Name:      TRUST_BUNDLE_CONFIGMAP,
 	}
 }
