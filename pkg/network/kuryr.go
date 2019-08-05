@@ -50,7 +50,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["ControllerEnableProbes"] = true
 	data.Data["ControllerProbesPort"] = c.ControllerProbesPort
 
-	data.Data["NodeImage"] = os.Getenv("NODE_IMAGE")
+	data.Data["CNIPluginsImage"] = os.Getenv("CNI_PLUGINS_IMAGE")
 	data.Data["DaemonImage"] = os.Getenv("KURYR_DAEMON_IMAGE")
 	data.Data["ControllerImage"] = os.Getenv("KURYR_CONTROLLER_IMAGE")
 	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")

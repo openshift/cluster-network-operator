@@ -24,15 +24,14 @@ spec:
       priorityClassName: system-node-critical
       initContainers:
       - name: install-cni-plugins
-        image: {{ .NodeImage }}
+        image: {{ .CNIPluginsImage }}
         command:
         - /bin/bash
         - -c
         - |
           #!/bin/bash
           set -ex
-          # Take over network functions on the node
-          cp -Rf /opt/cni/bin/* /host-cni-bin/
+          cp -f /usr/src/plugins/bin/loopback /host-cni-bin/
         volumeMounts:
         - name: bin
           mountPath: /host-cni-bin
