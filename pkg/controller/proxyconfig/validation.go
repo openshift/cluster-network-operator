@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -13,7 +12,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	cnovalidation "github.com/openshift/cluster-network-operator/pkg/util/validation"
+	"github.com/openshift/cluster-network-operator/pkg/util/validation"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -32,8 +31,9 @@ const (
 
 // ValidateProxyConfig ensures that proxyConfig is valid.
 func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySpec) error {
+	var err error
 	if isSpecHTTPProxySet(proxyConfig) {
-		scheme, err := cnovalidation.URI(proxyConfig.HTTPProxy)
+		scheme, err := validation.URI(proxyConfig.HTTPProxy)
 		if err != nil {
 			return fmt.Errorf("invalid httpProxy URI: %v", err)
 		}
@@ -42,25 +42,10 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 		}
 	}
 
-	readinessCerts := []*x509.Certificate{}
 	if isSpecHTTPSProxySet(proxyConfig) {
-		scheme, err := cnovalidation.URI(proxyConfig.HTTPSProxy)
+		_, err := validation.URI(proxyConfig.HTTPSProxy)
 		if err != nil {
 			return fmt.Errorf("invalid httpsProxy URI: %v", err)
-		}
-		if scheme == proxyHTTPSScheme {
-			// A trusted CA bundle must be provided when using https
-			// between client and proxy.
-			if !isSpecTrustedCASet(proxyConfig) {
-				return errors.New("trustedCA is required when using an https scheme with httpsProxy")
-			}
-			certBundle, err := r.validateTrustedCA(proxyConfig)
-			if err != nil {
-				return fmt.Errorf("failed validating TrustedCA %q: %v", proxyConfig.TrustedCA.Name, err)
-			}
-			for _, cert := range certBundle {
-				readinessCerts = append(readinessCerts, cert)
-			}
 		}
 	}
 
@@ -68,7 +53,7 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 		if proxyConfig.NoProxy != noProxyWildcard {
 			for _, v := range strings.Split(proxyConfig.NoProxy, ",") {
 				v = strings.TrimSpace(v)
-				errDomain := cnovalidation.DomainName(v, false)
+				errDomain := validation.DomainName(v, false)
 				_, _, errCIDR := net.ParseCIDR(v)
 				if errDomain != nil && errCIDR != nil {
 					return fmt.Errorf("invalid noProxy: %v", v)
@@ -77,9 +62,17 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 		}
 	}
 
+	var certBundle []*x509.Certificate
+	if isSpecTrustedCASet(proxyConfig) {
+		certBundle, err = r.validateTrustedCA(proxyConfig)
+		if err != nil {
+			return fmt.Errorf("failed to validate TrustedCA %q: %v", proxyConfig.TrustedCA.Name, err)
+		}
+	}
+
 	if isSpecReadinessEndpoints(proxyConfig) {
 		for _, endpoint := range proxyConfig.ReadinessEndpoints {
-			scheme, err := cnovalidation.URI(endpoint)
+			scheme, err := validation.URI(endpoint)
 			if err != nil {
 				return fmt.Errorf("invalid URI for endpoint %s: %v", endpoint, err)
 			}
@@ -92,7 +85,7 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 				if !isSpecTrustedCASet(proxyConfig) {
 					return fmt.Errorf("readinessEndpoint with an %q scheme requires trustedCA to be set", proxyHTTPSScheme)
 				}
-				if err := validateHTTPSReadinessEndpoint(readinessCerts, endpoint); err != nil {
+				if err := validateHTTPSReadinessEndpoint(certBundle, endpoint); err != nil {
 					return fmt.Errorf("readinessEndpoint probe failed for endpoint %s", endpoint)
 				}
 			default:
@@ -156,13 +149,14 @@ func validateHTTPSReadinessEndpoint(certBundle []*x509.Certificate, endpoint str
 // by using certBundle as trusted CAs to create a TLS connection using a
 // finite loop based on retries, returning an error if it never succeeds.
 func validateHTTPSReadinessEndpointWithRetries(certBundle []*x509.Certificate, endpoint string, retries int) error {
+	var err error
 	for i := 0; i < retries; i++ {
-		if err := runHTTPSReadinessProbe(certBundle, endpoint); err != nil {
-			return err
+		if err := runHTTPSReadinessProbe(certBundle, endpoint); err == nil {
+			return nil
 		}
 	}
 
-	return nil
+	return err
 }
 
 // runHTTPSReadinessProbe tries connecting to endpoint by using certBundle as
@@ -201,7 +195,7 @@ func (r *ReconcileProxyConfig) validateTrustedCA(proxyConfig *configv1.ProxySpec
 		return nil, err
 	}
 
-	certBundle, _, err := cnovalidation.TrustBundleConfigMap(cfgMap)
+	certBundle, _, err := validation.TrustBundleConfigMap(cfgMap)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +210,7 @@ func (r *ReconcileProxyConfig) validateTrustedCAConfigMap(proxyConfig *configv1.
 		return nil, fmt.Errorf("invalid ConfigMap reference for TrustedCA: %s", proxyConfig.TrustedCA.Name)
 	}
 	cfgMap := &corev1.ConfigMap{}
-	if err := r.client.Get(context.TODO(), names.MergedTrustBundleName(), cfgMap); err != nil {
+	if err := r.client.Get(context.TODO(), names.TrustBundleConfigMap(), cfgMap); err != nil {
 		return nil, err
 	}
 
