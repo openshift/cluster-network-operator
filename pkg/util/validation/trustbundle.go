@@ -20,12 +20,12 @@ const (
 // contains one or more valid PEM encoded certificates, returning
 // a byte slice of "ca-bundle.crt" contents upon success.
 func TrustBundleConfigMap(cfgMap *corev1.ConfigMap) ([]*x509.Certificate, []byte, error) {
-	if _, ok := cfgMap.Data[names.TRUST_BUNDLE_CONFIGMAP_KEY]; !ok {
-		return nil, nil, fmt.Errorf("ConfigMap %q is missing %q", cfgMap.Name, names.TRUST_BUNDLE_CONFIGMAP_KEY)
+	if _, ok := cfgMap.Data[names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY]; !ok {
+		return nil, nil, fmt.Errorf("ConfigMap %q is missing %q", cfgMap.Name, names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY)
 	}
-	trustBundleData := []byte(cfgMap.Data[names.TRUST_BUNDLE_CONFIGMAP_KEY])
+	trustBundleData := []byte(cfgMap.Data[names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY])
 	if len(trustBundleData) == 0 {
-		return nil, nil, fmt.Errorf("data key %q is empty from ConfigMap %q", names.TRUST_BUNDLE_CONFIGMAP_KEY, cfgMap.Name)
+		return nil, nil, fmt.Errorf("data key %q is empty from ConfigMap %q", names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY, cfgMap.Name)
 	}
 	certBundle, _, err := CertificateData(trustBundleData)
 	if err != nil {
