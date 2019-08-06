@@ -16,7 +16,7 @@ import (
 )
 
 // syncProxyStatus computes the current status of proxy and
-// updates status if any changes since last sync.
+// updates status of any changes since last sync.
 func (r *ReconcileProxyConfig) syncProxyStatus(proxy *configv1.Proxy, infra *configv1.Infrastructure, network *configv1.Network, cluster *corev1.ConfigMap) error {
 	var err error
 	var noProxy string
@@ -87,10 +87,8 @@ func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 	}
 
 	switch infra.Status.PlatformStatus.Type {
-	case configv1.AWSPlatformType:
+	case configv1.AWSPlatformType, configv1.GCPPlatformType, configv1.AzurePlatformType, configv1.OpenStackPlatformType:
 		set.Insert("169.254.169.254", ic.Networking.MachineCIDR)
-	default:
-		return "", fmt.Errorf("unsupported infrastructure provider: %s", infra.Status.PlatformStatus.Type)
 	}
 
 	replicas, err := strconv.Atoi(ic.ControlPlane.Replicas)
