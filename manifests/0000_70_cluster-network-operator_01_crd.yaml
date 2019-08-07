@@ -20,7 +20,7 @@ spec:
       properties:
         spec:
           type: object
-          required: ["clusterNetwork", "serviceNetwork", "defaultNetwork"]
+          required: ["defaultNetwork"]
           properties:
             clusterNetwork:
               type: array
