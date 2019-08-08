@@ -25,7 +25,7 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 			return fmt.Errorf("invalid httpProxy URI: %v", err)
 		}
 		if scheme != proxyHTTPScheme {
-			return fmt.Errorf("httpProxy requires an %q URI scheme", proxyHTTPScheme)
+			return fmt.Errorf("httpProxy requires an %s URI scheme", proxyHTTPScheme)
 		}
 	}
 
@@ -35,7 +35,7 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 			return fmt.Errorf("invalid httpsProxy URI: %v", err)
 		}
 		if scheme != proxyHTTPScheme && scheme != proxyHTTPSScheme {
-			return fmt.Errorf("httpsProxy requires a %q or %s URI scheme", proxyHTTPScheme, proxyHTTPSScheme)
+			return fmt.Errorf("httpsProxy requires a %s or %s URI scheme", proxyHTTPScheme, proxyHTTPSScheme)
 		}
 	}
 
