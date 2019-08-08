@@ -5,6 +5,8 @@ metadata:
   namespace: openshift-network-operator
   labels:
     name: network-operator
+  annotations:
+    config.openshift.io/inject-proxy: network-operator
 spec:
   selector:
     matchLabels:
