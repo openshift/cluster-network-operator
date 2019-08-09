@@ -22,7 +22,7 @@ func (r *ReconcileProxyConfig) syncProxyStatus(proxy *configv1.Proxy, infra *con
 	var noProxy string
 	updated := proxy.DeepCopy()
 
-	if isSpecNoProxySet(&proxy.Spec) {
+	if isSpecNoProxySet(&proxy.Spec) || isSpecHTTPProxySet(&proxy.Spec) || isSpecHTTPSProxySet(&proxy.Spec) {
 		if proxy.Spec.NoProxy == noProxyWildcard {
 			noProxy = proxy.Spec.NoProxy
 		} else {
@@ -46,9 +46,11 @@ func (r *ReconcileProxyConfig) syncProxyStatus(proxy *configv1.Proxy, infra *con
 	return nil
 }
 
-// mergeUserSystemNoProxy merges user-supplied noProxy settings from proxy
-// with cluster-wide noProxy settings, returning a merged, comma-separated
-// string of noProxy settings.
+// mergeUserSystemNoProxy merges user supplied noProxy settings from proxy
+// with cluster-wide noProxy settings. It returns a merged, comma-separated
+// string of noProxy settings. If no user supplied noProxy settings are
+// provided, a comma-separated string of cluster-wide noProxy settings
+// are returned.
 func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructure, network *configv1.Network, cluster *corev1.ConfigMap) (string, error) {
 	apiServerURL, err := url.Parse(infra.Status.APIServerURL)
 	if err != nil {
@@ -105,8 +107,10 @@ func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		set.Insert(clusterNetwork.CIDR)
 	}
 
-	for _, userValue := range strings.Split(proxy.Spec.NoProxy, ",") {
-		set.Insert(userValue)
+	if len(proxy.Spec.NoProxy) != 0 {
+		for _, userValue := range strings.Split(proxy.Spec.NoProxy, ",") {
+			set.Insert(userValue)
+		}
 	}
 
 	return strings.Join(set.List(), ","), nil
