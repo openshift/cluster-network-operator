@@ -54,6 +54,9 @@ spec:
         - mountPath: /etc/kubernetes/kubeconfig
           name: host-kubeconfig
           readOnly: true
+        - mountPath: /etc/pki/ca-trust/extracted/pem/
+          name: trusted-ca
+          readOnly: true
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -62,6 +65,12 @@ spec:
         - name: host-kubeconfig
           hostPath:
             path: /etc/kubernetes/kubeconfig
+        - name: trusted-ca
+          configMap:
+            name: trusted-ca
+            optional: true
+            items:
+            - key: ca-bundle.crt
       restartPolicy: Always
       securityContext:
         runAsNonRoot: true

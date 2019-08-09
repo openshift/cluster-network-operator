@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    config.openshift.io/inject-trusted-cabundle: "true"
+    release.openshift.io/create-only: "true"
+  name: trusted-ca
+  namespace: openshift-network-operator
