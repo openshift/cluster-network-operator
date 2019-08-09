@@ -55,6 +55,9 @@ func CertificateData(certData []byte) ([]*x509.Certificate, []byte, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to parse certificate: %v", err)
 		}
+		if !cert.IsCA {
+			return nil, nil, fmt.Errorf("certificate is not a CA certificate: %v", err)
+		}
 		certBundle = append(certBundle, cert)
 	}
 
