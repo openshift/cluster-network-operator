@@ -81,7 +81,7 @@ func TestStatusManager_set(t *testing.T) {
 		Reason:  "Reason",
 		Message: "Message",
 	}
-	status.Set(false, condFail)
+	status.set(false, condFail)
 
 	co, err = getCO(client, "testing")
 	if err != nil {
@@ -96,7 +96,7 @@ func TestStatusManager_set(t *testing.T) {
 		Type:   configv1.OperatorProgressing,
 		Status: configv1.ConditionUnknown,
 	}
-	status.Set(false, condProgress)
+	status.set(false, condProgress)
 
 	co, err = getCO(client, "testing")
 	if err != nil {
@@ -110,7 +110,7 @@ func TestStatusManager_set(t *testing.T) {
 		Type:   configv1.OperatorDegraded,
 		Status: configv1.ConditionFalse,
 	}
-	status.Set(false, condNoFail)
+	status.set(false, condNoFail)
 
 	co, err = getCO(client, "testing")
 	if err != nil {
@@ -128,7 +128,7 @@ func TestStatusManager_set(t *testing.T) {
 		Type:   configv1.OperatorAvailable,
 		Status: configv1.ConditionTrue,
 	}
-	status.Set(false, condNoProgress, condAvailable)
+	status.set(false, condNoProgress, condAvailable)
 
 	co, err = getCO(client, "testing")
 	if err != nil {

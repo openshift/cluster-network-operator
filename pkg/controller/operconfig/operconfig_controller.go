@@ -232,6 +232,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 			Namespace: obj.GetNamespace(),
 		})
 	}
+
 	r.status.SetDaemonSets(daemonSets)
 	r.status.SetDeployments(deployments)
 	r.status.SetRelatedObjects(relatedObjects)
