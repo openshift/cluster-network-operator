@@ -259,7 +259,6 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 			trustBundle.Namespace, trustBundle.Name, err)
 	}
 
-	// Reconciliation completed, so set status manager accordingly.
 	r.status.SetNotDegraded(statusmanager.ProxyConfig)
 
 	return reconcile.Result{}, nil
