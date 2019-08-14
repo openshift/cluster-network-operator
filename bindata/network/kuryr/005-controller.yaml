@@ -27,12 +27,14 @@ spec:
         name: controller
 {{ if (default true .ControllerEnableProbes) eq "true" }}
         readinessProbe:
+          failureThreshold: 10
           httpGet:
             path: /ready
             port: {{ default 8082 .ControllerProbesPort }}
             scheme: HTTP
           timeoutSeconds: 5
         livenessProbe:
+          failureThreshold: 10
           httpGet:
             path: /alive
             port: {{ default 8082 .ControllerProbesPort }}
