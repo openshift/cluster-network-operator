@@ -71,6 +71,7 @@ spec:
           mountPath: /var/run/openvswitch
 {{ if (default true .DaemonEnableProbes) eq "true" }}
         readinessProbe:
+          failureThreshold: 10
           httpGet:
             path: /ready
             port: {{ default 8090 .DaemonProbesPort }}
@@ -78,6 +79,7 @@ spec:
           initialDelaySeconds: 15
           timeoutSeconds: 5
         livenessProbe:
+          failureThreshold: 10
           httpGet:
             path: /alive
             port: {{ default 8090 .DaemonProbesPort }}
