@@ -154,3 +154,9 @@ func isSpecHTTPSProxySet(proxyConfig *configv1.ProxySpec) bool {
 func isSpecNoProxySet(proxyConfig *configv1.ProxySpec) bool {
 	return len(proxyConfig.NoProxy) > 0
 }
+
+// isSpecReadinessEndpointsSet returns true if spec.readinessEndpoints of
+// proxyConfig is set.
+func isSpecReadinessEndpointsSet(proxyConfig *configv1.ProxySpec) bool {
+	return len(proxyConfig.ReadinessEndpoints) > 0
+}
