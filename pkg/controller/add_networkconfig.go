@@ -2,6 +2,7 @@ package controller
 
 import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/clusterconfig"
+	"github.com/openshift/cluster-network-operator/pkg/controller/configmap_ca_injector"
 	"github.com/openshift/cluster-network-operator/pkg/controller/operconfig"
 	"github.com/openshift/cluster-network-operator/pkg/controller/proxyconfig"
 )
@@ -13,5 +14,6 @@ func init() {
 		operconfig.Add,
 		clusterconfig.Add,
 		operconfig.AddConfigMapReconciler,
+		configmapcainjector.Add,
 	)
 }

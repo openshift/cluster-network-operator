@@ -37,10 +37,36 @@ const SERVICE_CA_CONFIGMAP = "openshift-service-ca"
 // that is used in multus admission controller deployment
 const MULTUS_VALIDATING_WEBHOOK = "multus.openshift.io"
 
+// TRUSTED_CA_BUNDLE_CONFIGMAP_KEY is the name of the data key containing
+// the PEM encoded trust bundle.
+const TRUSTED_CA_BUNDLE_CONFIGMAP_KEY = "ca-bundle.crt"
+
+// TRUSTED_CA_BUNDLE_CONFIGMAP is the name of the ConfigMap
+// containing the combined user/system trust bundle.
+const TRUSTED_CA_BUNDLE_CONFIGMAP = "trusted-ca-bundle"
+
+// TRUSTED_CA_BUNDLE_CONFIGMAP_NS is the namespace that hosts the
+// ADDL_TRUST_BUNDLE_CONFIGMAP and TRUST_BUNDLE_CONFIGMAP
+// ConfigMaps.
+const TRUSTED_CA_BUNDLE_CONFIGMAP_NS = "openshift-config-managed"
+
+// TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL is the name of the label that
+// determines whether or not to inject the combined ca certificate
+const TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL = "config.openshift.io/inject-trusted-cabundle"
+
 // Proxy returns the namespaced name "cluster" in the
 // default namespace.
 func Proxy() types.NamespacedName {
 	return types.NamespacedName{
 		Name: PROXY_CONFIG,
+	}
+}
+
+// AddlTrustBundleConfigMapNS returns the namespaced name of the
+// namespace containing the user-provided trust bundle ConfigMap.
+func AddlTrustBundleConfigMap() types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: TRUSTED_CA_BUNDLE_CONFIGMAP_NS,
+		Name:      TRUSTED_CA_BUNDLE_CONFIGMAP,
 	}
 }
