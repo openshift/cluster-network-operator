@@ -70,7 +70,7 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 			case scheme == proxyHTTPScheme:
 				// TODO: Add case for proxyHTTPSScheme when CA support is merged.
 				if err := validateHTTPReadinessEndpoint(proxyConfig.HTTPProxy, endpoint); err != nil {
-					return fmt.Errorf("readinessEndpoint probe failed for endpoint '%s'", endpoint)
+					return fmt.Errorf("readinessEndpoint probe failed for endpoint '%s': %v", endpoint, err)
 				}
 			default:
 				// TODO: Update error to include proxyHTTPSScheme when CA support is merged.
@@ -130,7 +130,7 @@ func runHTTPReadinessProbe(httpProxy, endpoint string) error {
 
 	resp, err := client.Do(request)
 	if err != nil {
-		return err
+		return fmt.Errorf("readiness probe failed for endpoint '%s' using proxy '%s': %v", endpoint, httpProxy, err)
 	}
 	defer resp.Body.Close()
 
@@ -138,5 +138,6 @@ func runHTTPReadinessProbe(httpProxy, endpoint string) error {
 		return nil
 	}
 
-	return fmt.Errorf("http probe failed with statuscode: %d", resp.StatusCode)
+	return fmt.Errorf("readiness probe failed with statuscode '%d' for endpoint '%s' using proxy '%s' ",
+		resp.StatusCode, endpoint, httpProxy)
 }
