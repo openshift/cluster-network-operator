@@ -45,7 +45,6 @@ spec:
                   type: string
                 openshiftSDNConfig:
                   type: object
-                  required: ["mode"]
                   properties:
                     mode:
                       type: string
