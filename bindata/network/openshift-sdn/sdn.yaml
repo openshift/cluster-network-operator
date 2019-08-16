@@ -37,6 +37,21 @@ spec:
       hostNetwork: true
       hostPID: true
       priorityClassName: system-node-critical
+      initContainers:
+      - name: install-cni-plugins
+        image: {{ .CNIPluginsImage }}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -ex
+          cp -f /usr/src/plugins/bin/{loopback,host-local} /host/opt/cni/bin
+        volumeMounts:
+        - mountPath: /host/opt/cni/bin
+          name: host-cni-bin
+        securityContext:
+          privileged: true
       containers:
       - name: sdn
         image: {{.NodeImage}}
@@ -78,7 +93,7 @@ spec:
 
           # Take over network functions on the node
           rm -f /etc/cni/net.d/80-openshift-network.conf
-          cp -f /opt/cni/bin/* /host/opt/cni/bin/
+          cp -f /opt/cni/bin/openshift-sdn /host/opt/cni/bin/
 
           # Launch the network process
           exec /usr/bin/openshift-sdn --proxy-config=/config/kube-proxy-config.yaml --url-only-kubeconfig=/etc/kubernetes/kubeconfig --v=${DEBUG_LOGLEVEL:-2}
