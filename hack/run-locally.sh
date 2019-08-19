@@ -184,8 +184,8 @@ The following environment variables are honored:
 }
 
 PLUGIN_IMAGE="${PLUGIN_IMAGE:-}"
-NETWORK_PLUGIN=
-IMAGE_ENV_KEY=
+NETWORK_PLUGIN="OpenShiftSDN"
+IMAGE_ENV_KEY="NODE_IMAGE"
 CLUSTER_DIR="${CLUSTER_DIR:-}"
 INSTALLER_PATH="${INSTALLER_PATH:-}"
 INSTALL_CONFIG="${INSTALL_CONFIG:-}"
@@ -204,8 +204,6 @@ while getopts "c:f:i:m:n:w" opt; do
                     IMAGE_ENV_KEY="OVN_IMAGE"
                     ;;
                 sdn|OpenShiftSDN)
-                    NETWORK_PLUGIN="OpenShiftSDN"
-                    IMAGE_ENV_KEY="NODE_IMAGE"
                     ;;
                 *)
                     echo "Unknown network plugin ${OPTARG}" >&2
