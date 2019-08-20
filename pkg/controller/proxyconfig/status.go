@@ -12,7 +12,8 @@ import (
 
 // syncProxyStatus computes the current status of proxy and
 // updates status of any changes since last sync.
-func (r *ReconcileProxyConfig) syncProxyStatus(proxy *configv1.Proxy, infra *configv1.Infrastructure, network *configv1.Network, cluster *corev1.ConfigMap) error {
+func (r *ReconcileProxyConfig) syncProxyStatus(proxy *configv1.Proxy, infra *configv1.Infrastructure,
+	network *configv1.Network, dns *configv1.DNS, cluster *corev1.ConfigMap) error {
 	var err error
 	var noProxy string
 	updated := proxy.DeepCopy()
@@ -21,7 +22,7 @@ func (r *ReconcileProxyConfig) syncProxyStatus(proxy *configv1.Proxy, infra *con
 		if proxy.Spec.NoProxy == noProxyWildcard {
 			noProxy = proxy.Spec.NoProxy
 		} else {
-			noProxy, err = proxyconfig.MergeUserSystemNoProxy(proxy, infra, network, cluster)
+			noProxy, err = proxyconfig.MergeUserSystemNoProxy(proxy, infra, network, dns, cluster)
 			if err != nil {
 				return fmt.Errorf("failed to merge user/system noProxy settings: %v", err)
 			}

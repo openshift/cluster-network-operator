@@ -102,6 +102,7 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 		proxyConfig := &configv1.Proxy{}
 		infraConfig := &configv1.Infrastructure{}
 		netConfig := &configv1.Network{}
+		dnsConfig := &configv1.DNS{}
 		clusterConfig := &corev1.ConfigMap{}
 
 		log.Printf("Reconciling proxy '%s'", request.Name)
@@ -183,6 +184,12 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 				fmt.Sprintf("Error getting network config '%s': %v.", names.CLUSTER_CONFIG, err))
 			return reconcile.Result{}, fmt.Errorf("failed to get network config '%s': %v", names.CLUSTER_CONFIG, err)
 		}
+		if err := r.client.Get(context.TODO(), types.NamespacedName{Name: names.CLUSTER_CONFIG}, dnsConfig); err != nil {
+			log.Printf("Failed to get dns config '%s': %v", names.CLUSTER_CONFIG, err)
+			r.status.SetDegraded(statusmanager.ProxyConfig, "DNSConfigError",
+				fmt.Sprintf("Error getting dns config '%s': %v.", names.CLUSTER_CONFIG, err))
+			return reconcile.Result{}, fmt.Errorf("failed to get dns config '%s': %v", names.CLUSTER_CONFIG, err)
+		}
 		if err := r.client.Get(context.TODO(), types.NamespacedName{Name: "cluster-config-v1", Namespace: "kube-system"},
 			clusterConfig); err != nil {
 			log.Printf("Failed to get configmap '%s/%s': %v", clusterConfig.Namespace, clusterConfig.Name, err)
@@ -192,7 +199,7 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 			return reconcile.Result{}, fmt.Errorf("failed to get configmap '%s/%s': %v", clusterConfig.Namespace, clusterConfig.Name, err)
 		}
 		// Update proxy status.
-		if err := r.syncProxyStatus(proxyConfig, infraConfig, netConfig, clusterConfig); err != nil {
+		if err := r.syncProxyStatus(proxyConfig, infraConfig, netConfig, dnsConfig, clusterConfig); err != nil {
 			log.Printf("Could not sync proxy '%s' status: %v", proxyConfig.Name, err)
 			r.status.SetDegraded(statusmanager.ProxyConfig, "StatusError",
 				fmt.Sprintf("Could not update proxy '%s' status: %v", proxyConfig.Name, err))
