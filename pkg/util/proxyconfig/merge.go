@@ -23,6 +23,8 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 	set := sets.NewString(
 		"127.0.0.1",
 		"localhost",
+		".svc",
+		".cluster.local",
 	)
 
 	if len(infra.Status.APIServerURL) > 0 {
