@@ -73,6 +73,8 @@ spec:
                     controllerProbesPort:
                       type: integer
                       minimum: 0
+                    openStackServiceNetwork:
+                      type: string
             additionalNetworks:
               type: array
               items:
