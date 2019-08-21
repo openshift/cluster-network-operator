@@ -16,6 +16,7 @@ data:
     daemon_enabled = true
     docker_mode = true
     netns_proc_dir = /host_proc
+    vif_annotation_timeout = 120
 
     [ingress]
     #l7_router_uuid = <None>
@@ -73,7 +74,7 @@ data:
     ports_pool_update_frequency = 30
 
     [health_server]
-    port = {{ default 8082 .ControllerProbesPort }}
+    port = {{ default 8091 .ControllerProbesPort }}
 
     [cni_health_server]
     port = {{ default 8090 .DaemonProbesPort }}
