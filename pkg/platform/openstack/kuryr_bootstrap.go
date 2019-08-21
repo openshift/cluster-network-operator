@@ -204,17 +204,17 @@ func findOpenStackSubnet(client *gophercloud.ServiceClient, name, tag string) (s
 	}
 }
 
-// Looks for a Neutron subnet by name, tag, network ID, CIDR and optionally
-// gateway IP, if it does not exist creates it. Will fail if two subnets match
-// all the criteria.
-func ensureOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, netId, cidr string, gatewayIp *string) (string, error) {
+// Looks for a Neutron subnet by name, tag, network ID, CIDR and gateway IP,
+// if it does not exist creates it using allocationRanges as allocation pools.
+// Will fail if two subnets match all the criteria.
+func ensureOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, netId, cidr, gatewayIp string, allocationRanges []iputil.IPRange) (string, error) {
 	dhcp := false
 	page, err := subnets.List(client, subnets.ListOpts{
 		Name:       name,
 		Tags:       tag,
 		NetworkID:  netId,
 		CIDR:       cidr,
-		GatewayIP:  *gatewayIp,
+		GatewayIP:  gatewayIp,
 		IPVersion:  4,
 		EnableDHCP: &dhcp,
 	}).AllPages()
@@ -230,13 +230,19 @@ func ensureOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, netId, 
 	} else if len(subnetList) == 1 {
 		return subnetList[0].ID, nil
 	} else {
+		var allocationPools []subnets.AllocationPool
+		for _, r := range allocationRanges {
+			allocationPools = append(allocationPools, subnets.AllocationPool{
+				Start: r.Start.String(), End: r.End.String()})
+		}
 		opts := subnets.CreateOpts{
-			Name:       name,
-			NetworkID:  netId,
-			CIDR:       cidr,
-			GatewayIP:  gatewayIp,
-			IPVersion:  gophercloud.IPv4,
-			EnableDHCP: &dhcp,
+			Name:            name,
+			NetworkID:       netId,
+			CIDR:            cidr,
+			GatewayIP:       &gatewayIp,
+			IPVersion:       gophercloud.IPv4,
+			EnableDHCP:      &dhcp,
+			AllocationPools: allocationPools,
 		}
 		subnetObj, err := subnets.Create(client, opts).Extract()
 		if err != nil {
@@ -712,6 +718,7 @@ func generateName(name, clusterID string) string {
 // returned to populate Kuryr's configuration.
 func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 	log.Print("Kuryr bootstrap started")
+	kc := conf.DefaultNetwork.KuryrConfig
 
 	clusterID, err := GetClusterID(kubeClient)
 	if err != nil {
@@ -778,11 +785,19 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		return nil, errors.Wrapf(err, "Failed to parse ServiceNetwork CIDR %s", conf.ServiceNetwork[0])
 	}
 
-	ip := iputil.LastUsableIP(*svcNet)
-	ipStr := ip.String()
-	log.Printf("Ensuring services subnet with %s CIDR and %s gateway", conf.ServiceNetwork[0], ipStr)
+	openStackSvcCIDR := kc.OpenStackServiceNetwork
+	_, openStackSvcNet, _ := net.ParseCIDR(openStackSvcCIDR)
+	allocationRanges := iputil.UsableNonOverlappingRanges(*openStackSvcNet, *svcNet)
+	// OpenShift will use svcNet range. In allocationRanges we have parts of openStackSvcNet that are not overlapping
+	// with svcNet. We will put gatewayIP on the highest usable IP from those ranges. We need to exclude that IP from
+	// the ranges we pass to Neutron or it will complain.
+	gatewayIP := allocationRanges[len(allocationRanges)-1].End
+	allocationRanges[len(allocationRanges)-1].End = iputil.IterateIP4(gatewayIP, -1)
+
+	log.Printf("Ensuring services subnet with %s CIDR (services from %s) and %s gateway with allocation pools %+v",
+		openStackSvcCIDR, conf.ServiceNetwork[0], gatewayIP.String(), allocationRanges)
 	svcSubnetId, err := ensureOpenStackSubnet(client, generateName("kuryr-service-subnet", clusterID), tag,
-		svcNetId, conf.ServiceNetwork[0], &ipStr)
+		svcNetId, openStackSvcCIDR, gatewayIP.String(), allocationRanges)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create service subnet")
 	}
@@ -820,9 +835,9 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 
 	if !lookupOpenStackPort(ps, svcSubnetId) {
-		log.Printf("Ensuring service subnet router port with %s IP", ipStr)
+		log.Printf("Ensuring service subnet router port with %s IP", gatewayIP.String())
 		portId, err := ensureOpenStackPort(client, generateName("kuryr-service-subnet-router-port", clusterID), tag,
-			svcNetId, svcSubnetId, ipStr)
+			svcNetId, svcSubnetId, gatewayIP.String())
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create service subnet router port")
 		}
@@ -872,7 +887,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	// We need to open traffic from service subnet to masters for API LB to work.
 	// Port range is taken from how openshift/installer opens traffic to the API,
 	// though just 6443 should probably be enough for us.
-	err = ensureOpenStackSgRule(client, masterSgId, conf.ServiceNetwork[0], 6443, 6445)
+	err = ensureOpenStackSgRule(client, masterSgId, openStackSvcCIDR, 6443, 6445)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to add rule opening traffic to masters from service subnet %s", conf.ServiceNetwork[0])
 	}
@@ -885,10 +900,9 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 
 	// We need first usable IP from services CIDR
 	// This will get us the first one (subnet IP)
-	ip = iputil.FirstUsableIP(*svcNet)
-	ipStr = ip.String()
-	log.Printf("Creating OpenShift API loadbalancer with IP %s", ipStr)
-	lbId, err := ensureOpenStackLb(lbClient, generateName("kuryr-api-loadbalancer", clusterID), ipStr, svcSubnetId, tag)
+	apiIP := iputil.FirstUsableIP(*svcNet)
+	log.Printf("Creating OpenShift API loadbalancer with IP %s", apiIP.String())
+	lbId, err := ensureOpenStackLb(lbClient, generateName("kuryr-api-loadbalancer", clusterID), apiIP.String(), svcSubnetId, tag)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create OpenShift API loadbalancer")
 	}

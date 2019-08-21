@@ -99,4 +99,71 @@ func TestValidateKuryr(t *testing.T) {
 		},
 	}
 	errExpect("clusterNetwork must have exactly 1 entry")
+
+	config.ServiceNetwork = []string{"172.30.0.0/16"}
+	config.ClusterNetwork = []operv1.ClusterNetworkEntry{
+		{
+			CIDR:       "172.31.0.0/16",
+			HostPrefix: 16,
+		},
+	}
+	errExpect("will overlap with cluster network")
+
+	config.ServiceNetwork = []string{"172.31.0.0/16"}
+	config.ClusterNetwork = []operv1.ClusterNetworkEntry{
+		{
+			CIDR:       "172.30.0.0/16",
+			HostPrefix: 16,
+		},
+	}
+	errExpect("will overlap with cluster network")
+
+	config.ClusterNetwork = []operv1.ClusterNetworkEntry{
+		{
+			CIDR:       "10.128.0.0/15",
+			HostPrefix: 24,
+		},
+	}
+	config.ServiceNetwork = []string{"172.30.0.0/16"}
+	config.DefaultNetwork.KuryrConfig.OpenStackServiceNetwork = "172.31.0.0/16"
+	errExpect("does not include")
+
+	config.DefaultNetwork.KuryrConfig.OpenStackServiceNetwork = "172.30.0.0/16"
+	errExpect("is too small")
+
+	config.DefaultNetwork.KuryrConfig.OpenStackServiceNetwork = "172.30.0.0/15"
+	err = validateKuryr(config)
+	g.Expect(err).To(BeEmpty())
+}
+
+func TestFillKuryrDefaults(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := KuryrConfig.DeepCopy()
+	conf := &crd.Spec
+
+	c := uint32(8082)
+	d := uint32(8090)
+	expected := operv1.NetworkSpec{
+		ServiceNetwork: []string{"172.30.0.0/16"},
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 24,
+			},
+		},
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeKuryr,
+			KuryrConfig: &operv1.KuryrConfig{
+				ControllerProbesPort:    &c,
+				DaemonProbesPort:        &d,
+				OpenStackServiceNetwork: "172.30.0.0/15",
+			},
+		},
+	}
+
+	fillKuryrDefaults(conf)
+
+	g.Expect(conf).To(Equal(&expected))
+
 }
