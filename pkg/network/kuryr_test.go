@@ -142,7 +142,7 @@ func TestFillKuryrDefaults(t *testing.T) {
 	crd := KuryrConfig.DeepCopy()
 	conf := &crd.Spec
 
-	c := uint32(8082)
+	c := uint32(8091)
 	d := uint32(8090)
 	expected := operv1.NetworkSpec{
 		ServiceNetwork: []string{"172.30.0.0/16"},
