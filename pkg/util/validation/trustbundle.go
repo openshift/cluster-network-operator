@@ -60,3 +60,29 @@ func CertificateData(certData []byte) ([]*x509.Certificate, []byte, error) {
 
 	return certBundle, certData, nil
 }
+
+// MergeCertificateData merges certificates, if any, from adlData and systemData,
+// returning the merged certificates as a slice of *x509.Certificate.
+func MergeCertificateData(addlData, systemData []byte) ([]*x509.Certificate, error) {
+	var mergedCerts []*x509.Certificate
+	if len(addlData) > 0 {
+		addlCerts, _, err := CertificateData(addlData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse certificate data: %v", err)
+		}
+		for _, cert := range addlCerts {
+			mergedCerts = append(mergedCerts, cert)
+		}
+	}
+	if len(systemData) > 0 {
+		systemCerts, _, err := CertificateData(systemData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse certificate data: %v", err)
+		}
+		for _, cert := range systemCerts {
+			mergedCerts = append(mergedCerts, cert)
+		}
+	}
+
+	return mergedCerts, nil
+}

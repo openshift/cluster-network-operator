@@ -2,6 +2,7 @@ package proxyconfig
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
@@ -69,20 +70,52 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 	}
 
 	if isSpecReadinessEndpointsSet(proxyConfig) {
+		var trustBundle []*x509.Certificate
 		for _, endpoint := range proxyConfig.ReadinessEndpoints {
 			scheme, err := validation.URI(endpoint)
 			if err != nil {
-				return fmt.Errorf("invalid URI for endpoint '%s': %v", endpoint, err)
+				return fmt.Errorf("invalid URI for readinessEndpoint '%s': %v", endpoint, err)
 			}
 			switch {
 			case scheme == proxyHTTPScheme:
-				// TODO: Add case for proxyHTTPSScheme when CA support is merged.
-				if err := validateHTTPReadinessEndpoint(proxyConfig.HTTPProxy, endpoint); err != nil {
-					return fmt.Errorf("readinessEndpoint probe failed for endpoint '%s'", endpoint)
+				if !isSpecHTTPProxySet(proxyConfig) {
+					return fmt.Errorf("httpProxy must be set when using a http proxy readinessEndpoint")
+				}
+				if err := validateReadinessEndpoint(trustBundle, proxyConfig.HTTPProxy, endpoint); err != nil {
+					return fmt.Errorf("http readinessEndpoint probe failed for endpoint '%s': %v", endpoint, err)
+				}
+			case scheme == proxyHTTPSScheme:
+				if !isSpecHTTPSProxySet(proxyConfig) {
+					return fmt.Errorf("httpsProxy must be set when using a https proxy readinessEndpoint")
+				}
+				var systemData []byte
+				var proxyData []byte
+				if isSpecTrustedCASet(proxyConfig) {
+					// TrustedCA is set, so create a combined trustedCA/system trust bundle for readinessEndpoints.
+					proxyData, systemData, err = r.validateTrustedCA(proxyConfig.TrustedCA.Name)
+					if err != nil {
+						return fmt.Errorf("failed to get certificate data for trustedCA '%s': %v",
+							proxyConfig.TrustedCA.Name, err)
+					}
+				} else {
+					// No trustedCA is set, so use the system trust bundle for readinessEndpoints.
+					systemData, err = ioutil.ReadFile(names.SYSTEM_TRUST_BUNDLE)
+					if err != nil {
+						return fmt.Errorf("failed to read system trust bundle '%s': %v",
+							names.SYSTEM_TRUST_BUNDLE, err)
+					}
+				}
+				// Merge the proxy trustedCA (if it exists) and system trust bundle data.
+				trustBundle, err = validation.MergeCertificateData(systemData, proxyData)
+				if err != nil {
+					return fmt.Errorf("failed to merge system and trustedCA trust bundles: %v", err)
+				}
+				if err := validateReadinessEndpoint(trustBundle, proxyConfig.HTTPSProxy, endpoint); err != nil {
+					return fmt.Errorf("readinessEndpoint probe failed for endpoint '%s': %v", endpoint, err)
 				}
 			default:
-				// TODO: Update error to include proxyHTTPSScheme when CA support is merged.
-				return fmt.Errorf("readiness endpoints requires a '%s' URI sheme", proxyHTTPScheme)
+				return fmt.Errorf("a proxy readiness endpoint requires a '%s' or '%s' URI sheme",
+					proxyHTTPScheme, proxyHTTPSScheme)
 			}
 		}
 	}
@@ -101,7 +134,6 @@ func (r *ReconcileProxyConfig) validateTrustedCA(trustedCA string) ([]byte, []by
 			trustedCA, err)
 	}
 
-	// TODO: Update return values to include []*x509.Certificates for https readinessEndpoint support.
 	_, bundleData, err := r.validateTrustBundle(cfgMap)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to validate trust bundle for proxy trustedCA '%s': %v",
@@ -159,21 +191,44 @@ func (r *ReconcileProxyConfig) validateSystemTrustBundle(trustBundle string) ([]
 	return bundleData, nil
 }
 
-// validateHTTPReadinessEndpoint validates an http readinessEndpoint endpoint.
-func validateHTTPReadinessEndpoint(httpProxy, endpoint string) error {
-	if err := validateHTTPReadinessEndpointWithRetries(httpProxy, endpoint, proxyProbeMaxRetries); err != nil {
+// validateReadinessEndpoint validates endpoint using proxy. If caBundle
+// is not nil, TLS is used for the probe with caBundle as the cert pool.
+func validateReadinessEndpoint(caBundle []*x509.Certificate, proxy, endpoint string) error {
+	proxyURL, err := url.Parse(proxy)
+	if err != nil {
+		return fmt.Errorf("failed to parse proxy url '%s': %v", proxy, err)
+	}
+
+	endpointURL, err := url.Parse(endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to parse endpoint url '%s': %v", endpoint, err)
+	}
+
+	if endpointURL.Scheme == proxyHTTPScheme && proxyURL.Scheme == proxyHTTPSScheme {
+		return fmt.Errorf("endpoint '%s' requires a `%s` proxy scheme", endpoint, proxyHTTPScheme)
+	}
+
+	if endpointURL.Scheme == proxyHTTPSScheme && proxyURL.Scheme == proxyHTTPScheme {
+		return fmt.Errorf("endpoint '%s' requires a `%s` proxy scheme", endpoint, proxyHTTPSScheme)
+	}
+
+	if proxyURL.Scheme == proxyHTTPSScheme && len(caBundle) == 0 {
+		return fmt.Errorf("https proxy probe requires at least one CA certificate")
+	}
+
+	if err := validateReadinessEndpointWithRetries(caBundle, proxyURL, endpointURL, proxyProbeMaxRetries); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// validateHTTPReadinessEndpointWithRetries tries to validate an http
-// endpoint in a finite loop and returns the last result if it never succeeds.
-func validateHTTPReadinessEndpointWithRetries(httpProxy, endpoint string, retries int) error {
+// validateReadinessEndpointWithRetries tries to validate endpoint in a
+// finite loop using proxy and returns the last result if it never succeeds.
+func validateReadinessEndpointWithRetries(caBundle []*x509.Certificate, proxy, endpoint *url.URL, retries int) error {
 	var err error
 	for i := 0; i < retries; i++ {
-		err = runHTTPReadinessProbe(httpProxy, endpoint)
+		err = runReadinessProbe(caBundle, proxy, endpoint)
 		if err == nil {
 			return nil
 		}
@@ -183,31 +238,37 @@ func validateHTTPReadinessEndpointWithRetries(httpProxy, endpoint string, retrie
 	return err
 }
 
-// runHTTPReadinessProbe issues an http GET request to endpoint and returns
-// an error if a 2XX or 3XX http status code is not returned. The request
-// is proxied if proxy environment variables exist.
-func runHTTPReadinessProbe(httpProxy, endpoint string) error {
-	proxyURL, err := url.Parse(httpProxy)
-	if err != nil {
-		return fmt.Errorf("failed to parse httpProxy url '%s': %v", httpProxy, err)
+// runReadinessProbe issues an GET request to endpoint using proxy and
+// returns an error if a 2XX or 3XX http status code is not returned.
+// If proxy has a https scheme and caBundle contains at least one
+// valid CA certificate, TLS transport will be used by the client.
+func runReadinessProbe(caBundle []*x509.Certificate, proxy, endpoint *url.URL) error {
+	transport := &http.Transport{
+		Proxy: http.ProxyURL(proxy),
 	}
 
-	transport := &http.Transport{
-		Proxy: http.ProxyURL(proxyURL),
+	if proxy.Scheme == proxyHTTPSScheme {
+		caPool := x509.NewCertPool()
+		for _, cert := range caBundle {
+			caPool.AddCert(cert)
+		}
+		transport.TLSClientConfig = &tls.Config{RootCAs: caPool}
 	}
 
 	client := &http.Client{
 		Transport: transport,
 	}
 
-	request, err := http.NewRequest("GET", endpoint, nil)
+	request, err := http.NewRequest("GET", endpoint.String(), nil)
 	if err != nil {
-		return fmt.Errorf("failed to create http request for '%s': %v", endpoint, err)
+		return fmt.Errorf("failed to create request for '%s' using proxy '%s': %v", endpoint.String(),
+			proxy.String(), err)
 	}
 
 	resp, err := client.Do(request)
 	if err != nil {
-		return err
+		return fmt.Errorf("endpoint probe failed for endpoint '%s' using proxy '%s': %v",
+			endpoint.String(), proxy.String(), err)
 	}
 	defer resp.Body.Close()
 
@@ -215,5 +276,6 @@ func runHTTPReadinessProbe(httpProxy, endpoint string) error {
 		return nil
 	}
 
-	return fmt.Errorf("http probe failed with statuscode: %d", resp.StatusCode)
+	return fmt.Errorf("endpoint probe failed with statuscode '%d' for endpoint '%s' using proxy '%s' ",
+		resp.StatusCode, endpoint.String(), proxy.String())
 }
