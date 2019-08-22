@@ -46,6 +46,8 @@ spec:
         - "--multus-conf-file=auto"
         - "--multus-autoconfig-dir=/host/var/run/multus/cni/net.d"
         - "--multus-kubeconfig-file-host=/etc/kubernetes/cni/net.d/multus.d/multus.kubeconfig"
+        - "--cleanup-config-on-exit=true"
+        - "--restart-crio=true"
         - "--namespace-isolation=true"
         - "--multus-log-level=verbose"
         - "--cni-version=0.3.1"
@@ -56,6 +58,8 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
+        - name: run
+          mountPath: /run
         - name: system-cni-dir
           mountPath: /host/etc/cni/net.d
         - name: multus-cni-dir
@@ -68,6 +72,9 @@ spec:
         - name: KUBERNETES_SERVICE_HOST
           value: "{{.KUBERNETES_SERVICE_HOST}}"
       volumes:
+        - name: run
+          hostPath:
+            path: /run
         - name: system-cni-dir
           hostPath:
             path: {{ .SystemCNIConfDir }}
