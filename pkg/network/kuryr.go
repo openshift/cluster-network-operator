@@ -155,7 +155,7 @@ func fillKuryrDefaults(conf *operv1.NetworkSpec) {
 	}
 
 	if kc.ControllerProbesPort == nil {
-		var port uint32 = 8082
+		var port uint32 = 8091
 		kc.ControllerProbesPort = &port
 	}
 
