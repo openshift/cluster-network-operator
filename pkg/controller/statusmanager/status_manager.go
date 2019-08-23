@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/ghodss/yaml"
 
@@ -24,15 +25,17 @@ import (
 type StatusLevel int
 
 const (
-	ClusterConfig  StatusLevel = iota
-	OperatorConfig StatusLevel = iota
-	ProxyConfig    StatusLevel = iota
-	PodDeployment  StatusLevel = iota
-	maxStatusLevel StatusLevel = iota
+	ClusterConfig StatusLevel = iota
+	OperatorConfig
+	ProxyConfig
+	PodDeployment
+	maxStatusLevel
 )
 
 // StatusManager coordinates changes to ClusterOperator.Status
 type StatusManager struct {
+	sync.Mutex
+
 	client  client.Client
 	name    string
 	version string
@@ -49,7 +52,8 @@ func New(client client.Client, name, version string) *StatusManager {
 }
 
 // Set updates the ClusterOperator.Status with the provided conditions
-func (status *StatusManager) Set(reachedAvailableLevel bool, conditions ...configv1.ClusterOperatorStatusCondition) {
+func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...configv1.ClusterOperatorStatusCondition) {
+
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
 	err := status.client.Get(context.TODO(), types.NamespacedName{Name: status.name}, co)
 	isNotFound := errors.IsNotFound(err)
@@ -122,11 +126,11 @@ func (status *StatusManager) Set(reachedAvailableLevel bool, conditions ...confi
 func (status *StatusManager) syncDegraded() {
 	for _, c := range status.failing {
 		if c != nil {
-			status.Set(false, *c)
+			status.set(false, *c)
 			return
 		}
 	}
-	status.Set(
+	status.set(
 		false,
 		configv1.ClusterOperatorStatusCondition{
 			Type:   configv1.OperatorDegraded,
@@ -135,10 +139,8 @@ func (status *StatusManager) syncDegraded() {
 	)
 }
 
-// SetDegraded marks the operator as Degraded with the given reason and message. If it
-// is not already failing for a lower-level reason, the operator's status will be updated.
-func (status *StatusManager) SetDegraded(level StatusLevel, reason, message string) {
-	status.failing[level] = &configv1.ClusterOperatorStatusCondition{
+func (status *StatusManager) setDegraded(statusLevel StatusLevel, reason, message string) {
+	status.failing[statusLevel] = &configv1.ClusterOperatorStatusCondition{
 		Type:    configv1.OperatorDegraded,
 		Status:  configv1.ConditionTrue,
 		Reason:  reason,
@@ -147,31 +149,48 @@ func (status *StatusManager) SetDegraded(level StatusLevel, reason, message stri
 	status.syncDegraded()
 }
 
-// SetNotDegraded marks the operator as not Degraded at the given level. If the operator
-// status previously indicated failure at this level, it will updated to show the next
-// higher-level failure, or else to show that the operator is no longer failing.
-func (status *StatusManager) SetNotDegraded(level StatusLevel) {
-	if status.failing[level] != nil {
-		status.failing[level] = nil
+func (status *StatusManager) setNotDegraded(statusLevel StatusLevel) {
+	if status.failing[statusLevel] != nil {
+		status.failing[statusLevel] = nil
 	}
 	status.syncDegraded()
 }
 
+func (status *StatusManager) SetDegraded(statusLevel StatusLevel, reason, message string) {
+	status.Lock()
+	defer status.Unlock()
+	status.setDegraded(statusLevel, reason, message)
+}
+
+func (status *StatusManager) SetNotDegraded(statusLevel StatusLevel) {
+	status.Lock()
+	defer status.Unlock()
+	status.setNotDegraded(statusLevel)
+}
+
 func (status *StatusManager) SetDaemonSets(daemonSets []types.NamespacedName) {
+	status.Lock()
+	defer status.Unlock()
 	status.daemonSets = daemonSets
 }
 
 func (status *StatusManager) SetDeployments(deployments []types.NamespacedName) {
+	status.Lock()
+	defer status.Unlock()
 	status.deployments = deployments
 }
 
 func (status *StatusManager) SetRelatedObjects(relatedObjects []configv1.ObjectReference) {
+	status.Lock()
+	defer status.Unlock()
 	status.relatedObjects = relatedObjects
 }
 
 // SetFromPods sets the operator Degraded/Progressing/Available status, based on
 // the current status of the manager's DaemonSets and Deployments.
 func (status *StatusManager) SetFromPods() {
+	status.Lock()
+	defer status.Unlock()
 
 	targetLevel := os.Getenv("RELEASE_VERSION")
 	reachedAvailableLevel := (len(status.daemonSets) + len(status.deployments)) > 0
@@ -226,10 +245,10 @@ func (status *StatusManager) SetFromPods() {
 		}
 	}
 
-	status.SetNotDegraded(PodDeployment)
+	status.setNotDegraded(PodDeployment)
 
 	if len(progressing) > 0 {
-		status.Set(
+		status.set(
 			reachedAvailableLevel,
 			configv1.ClusterOperatorStatusCondition{
 				Type:    configv1.OperatorProgressing,
@@ -239,7 +258,7 @@ func (status *StatusManager) SetFromPods() {
 			},
 		)
 	} else {
-		status.Set(
+		status.set(
 			reachedAvailableLevel,
 			configv1.ClusterOperatorStatusCondition{
 				Type:   configv1.OperatorProgressing,
