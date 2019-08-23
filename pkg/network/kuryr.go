@@ -13,6 +13,7 @@ import (
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 )
@@ -57,6 +58,14 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["ControllerImage"] = os.Getenv("KURYR_CONTROLLER_IMAGE")
 	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
+
+	// DNS mutating webhook
+	data.Data["AdmissionControllerSecret"] = names.KURYR_ADMISSION_CONTROLLER_SECRET
+	data.Data["WebhookSecret"] = names.KURYR_WEBHOOK_SECRET
+	data.Data["WebhookCA"] = b.WebhookCA
+	data.Data["WebhookCAKey"] = b.WebhookCAKey
+	data.Data["WebhookCert"] = b.WebhookCert
+	data.Data["WebhookKey"] = b.WebhookKey
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/kuryr"), &data)
 	if err != nil {

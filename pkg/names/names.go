@@ -78,3 +78,9 @@ func TrustedCABundleConfigMap() types.NamespacedName {
 		Name:      TRUSTED_CA_BUNDLE_CONFIGMAP,
 	}
 }
+
+// KURYR_ADMISSION_CONTROLLER_SECRET is the name of the Secret that stores the admission controller CA and Key
+const KURYR_ADMISSION_CONTROLLER_SECRET = "kuryr-dns-admission-controller-secret"
+
+// KURYR_WEB_HOOK_SECRET is the name of the secret used in the kuryr-dns-admission-controller DaemonSet
+const KURYR_WEBHOOK_SECRET = "kuryr-webhook-secret"
