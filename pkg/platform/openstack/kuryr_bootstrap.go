@@ -2,6 +2,7 @@ package openstack
 
 import (
 	"context"
+	b64 "encoding/base64"
 	"fmt"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"k8s.io/api/core/v1"
@@ -27,6 +28,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/utils/openstack/clientconfig"
+	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/platform/openstack/util/cert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -51,6 +54,7 @@ const (
 	MinOctaviaVersionWithTimeouts   = "v2.1"
 	KubernetesEndpointsName         = "kubernetes"
 	KubernetesEndpointsNamespace    = "default"
+	KuryrNamespace                  = "openshift-kuryr"
 )
 
 func GetClusterID(kubeClient client.Client) (string, error) {
@@ -708,6 +712,58 @@ func generateName(name, clusterID string) string {
 	return fmt.Sprintf("%s-%s", clusterID, name)
 }
 
+func ensureCA(kubeClient client.Client) ([]byte, []byte, error) {
+	secret := &v1.Secret{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
+		ObjectMeta: metav1.ObjectMeta{Name: names.KURYR_ADMISSION_CONTROLLER_SECRET},
+	}
+	err := kubeClient.Get(context.TODO(), client.ObjectKey{Namespace: KuryrNamespace, Name: names.KURYR_ADMISSION_CONTROLLER_SECRET}, secret)
+	if err != nil {
+		caBytes, keyBytes, err := cert.GenerateCA("Kuryr")
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "Failed to generate CA.")
+		}
+		return caBytes, keyBytes, nil
+	} else {
+		crtContent, crtok := secret.Data["ca.crt"]
+		keyContent, keyok := secret.Data["ca.key"]
+		if !crtok || !keyok {
+			caBytes, keyBytes, err := cert.GenerateCA("Kuryr")
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "Failed to generate CA.")
+			}
+			return caBytes, keyBytes, nil
+		}
+		return crtContent, keyContent, nil
+	}
+}
+
+func ensureCertificate(kubeClient client.Client, caPEM []byte, privateKey []byte) ([]byte, []byte, error) {
+	secret := &v1.Secret{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
+		ObjectMeta: metav1.ObjectMeta{Name: names.KURYR_WEBHOOK_SECRET},
+	}
+	err := kubeClient.Get(context.TODO(), client.ObjectKey{Namespace: KuryrNamespace, Name: names.KURYR_WEBHOOK_SECRET}, secret)
+	if err != nil {
+		caBytes, keyBytes, err := cert.GenerateCertificate("Kuryr", []string{"kuryr-dns-admission-controller.openshift-kuryr", "kuryr-dns-admission-controller.openshift-kuryr.svc"}, caPEM, privateKey)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "Failed to generate CA.")
+		}
+		return caBytes, keyBytes, nil
+	} else {
+		crtContent, crtok := secret.Data["tls.crt"]
+		keyContent, keyok := secret.Data["tls.key"]
+		if !crtok || !keyok {
+			caBytes, keyBytes, err := cert.GenerateCertificate("Kuryr", []string{"kuryr-dns-admission-controller.openshift-kuryr", "kuryr-dns-admission-controller.openshift-kuryr.svc"}, caPEM, privateKey)
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "Failed to generate CA.")
+			}
+			return caBytes, keyBytes, nil
+		}
+		return crtContent, keyContent, nil
+	}
+}
+
 // Logs into OpenStack and creates all the resources that are required to run
 // Kuryr based on conf NetworkConfigSpec. Basically this includes service
 // network and subnet, pods subnetpool, security group and load balancer for
@@ -951,6 +1007,16 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		return nil, errors.Wrap(err, "failed to delete unused members from OpenShist API loadbalancer pool")
 	}
 
+	log.Print("Ensuring certificates")
+	ca, key, err := ensureCA(kubeClient)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to ensure CA")
+	}
+	webhookCert, webhookKey, err := ensureCertificate(kubeClient, ca, key)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to ensure Certificate")
+	}
+
 	log.Print("Kuryr bootstrap finished")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed get OpenShift cluster ID")
@@ -965,6 +1031,10 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 			PodSecurityGroups: []string{podSgId},
 			ClusterID:         clusterID,
 			OpenStackCloud:    cloud,
+			WebhookCA:         b64.StdEncoding.EncodeToString(ca),
+			WebhookCAKey:      b64.StdEncoding.EncodeToString(key),
+			WebhookKey:        b64.StdEncoding.EncodeToString(webhookKey),
+			WebhookCert:       b64.StdEncoding.EncodeToString(webhookCert),
 		}}
 	return &res, nil
 }

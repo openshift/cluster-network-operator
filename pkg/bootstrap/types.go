@@ -12,6 +12,10 @@ type KuryrBootstrapResult struct {
 	PodSecurityGroups []string
 	ClusterID         string
 	OpenStackCloud    clientconfig.Cloud
+	WebhookCA         string
+	WebhookCAKey      string
+	WebhookCert       string
+	WebhookKey        string
 }
 
 type BootstrapResult struct {
