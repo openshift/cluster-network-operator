@@ -112,6 +112,8 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 
 	if err != nil {
 		log.Println(err)
+		r.status.SetDegraded(statusmanager.InjectorConfig, "InvalidInjectorConfig",
+			fmt.Sprintf("Failed to validate trusted CA certificates in %s", trustedCAbundleConfigMap.Name))
 		return reconcile.Result{}, err
 	}
 	// Build a list of configMaps.
@@ -125,6 +127,8 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 		err = r.client.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, configMapList)
 		if err != nil {
 			log.Println(err)
+			r.status.SetDegraded(statusmanager.InjectorConfig, "ListConfigMapError",
+				fmt.Sprintf("Error getting the list of affected configmaps: %v", err))
 			return reconcile.Result{}, err
 		}
 		configMapsToChange = configMapList.Items
@@ -144,6 +148,8 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 				log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", request.Namespace, request.Name)
 				return reconcile.Result{}, nil
 			}
+			r.status.SetDegraded(statusmanager.InjectorConfig, "ClusterConfigError",
+				fmt.Sprintf("failed to get configmap '%s/%s': %v", request.Namespace, request.Name, err))
 			log.Println(err)
 			return reconcile.Result{}, err
 		}
@@ -183,13 +189,18 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 		if err != nil {
 			errs = append(errs, err)
 			if len(errs) > 5 {
+				r.status.SetDegraded(statusmanager.InjectorConfig, "ConfigMapUpdateFailure",
+					fmt.Sprintf("Too many errors seen when updating trusted CA configmaps"))
 				return reconcile.Result{}, fmt.Errorf("Too many errors attempting to update configmaps with CA cert. data")
 			}
 		}
 	}
 	if len(errs) > 0 {
+		r.status.SetDegraded(statusmanager.InjectorConfig, "ConfigmapUpdateFailure",
+			fmt.Sprintf("some configmaps didn't fully update with CA cert. data"))
 		return reconcile.Result{}, fmt.Errorf("some configmaps didn't fully update with CA cert. data")
 	}
+	r.status.SetNotDegraded(statusmanager.InjectorConfig)
 	return reconcile.Result{}, nil
 }
 
