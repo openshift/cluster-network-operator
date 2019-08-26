@@ -102,6 +102,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 	err := r.client.Get(context.TODO(), trustedCAbundleConfigMapName, trustedCAbundleConfigMap)
 	if err != nil {
 		if errors.IsNotFound(err) {
+			log.Println("proxy not found; reconciliation will be skipped", "request", request)
 			return reconcile.Result{}, nil
 		}
 		log.Println(err)
@@ -110,6 +111,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 	_, trustedCAbundleData, err := validation.TrustBundleConfigMap(trustedCAbundleConfigMap)
 
 	if err != nil {
+		log.Println(err)
 		return reconcile.Result{}, err
 	}
 	// Build a list of configMaps.
@@ -138,10 +140,11 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 		}
 		err = r.client.Get(context.TODO(), requestedCAbundleConfigMapName, requestedCAbundleConfigMap)
 		if err != nil {
-			log.Println(err)
 			if apierrors.IsNotFound(err) {
+				log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", request.Namespace, request.Name)
 				return reconcile.Result{}, nil
 			}
+			log.Println(err)
 			return reconcile.Result{}, err
 		}
 		configMapsToChange = append(configMapsToChange, *requestedCAbundleConfigMap)
