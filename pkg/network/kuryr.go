@@ -33,6 +33,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	objs := []*uns.Unstructured{}
 
 	data := render.MakeRenderData()
+	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 
 	// general kuryr options
 	data.Data["ResourceTags"] = "openshiftClusterID=" + b.ClusterID
