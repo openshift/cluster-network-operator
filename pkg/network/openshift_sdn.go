@@ -89,7 +89,7 @@ func validateOpenShiftSDN(conf *operv1.NetworkSpec) []error {
 
 	sc := conf.DefaultNetwork.OpenShiftSDNConfig
 	if sc != nil {
-		if sdnPluginName(sc.Mode) == "" {
+		if sc.Mode != "" && sdnPluginName(sc.Mode) == "" {
 			out = append(out, errors.Errorf("invalid openshift-sdn mode %q", sc.Mode))
 		}
 
