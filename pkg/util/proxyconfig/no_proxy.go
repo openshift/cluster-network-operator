@@ -76,6 +76,18 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		set.Insert("169.254.169.254", ic.Networking.MachineCIDR)
 	}
 
+	// Construct the node sub domain.
+	// TODO: Add support for additional cloud providers.
+	switch infra.Status.PlatformStatus.Type {
+	case configv1.AWSPlatformType:
+		region := infra.Status.PlatformStatus.AWS.Region
+		if region == "us-east-1" {
+			set.Insert(".ec2.internal")
+		} else {
+			set.Insert(fmt.Sprintf(".%s.compute.internal", region))
+		}
+	}
+
 	if len(ic.ControlPlane.Replicas) > 0 {
 		replicas, err := strconv.Atoi(ic.ControlPlane.Replicas)
 		if err != nil {
@@ -100,10 +112,9 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 
 	if len(proxy.Spec.NoProxy) > 0 {
 		for _, userValue := range strings.Split(proxy.Spec.NoProxy, ",") {
-			if userValue == "" {
-				return "", fmt.Errorf("failed to parse noProxy from proxy spec")
+			if userValue != "" {
+				set.Insert(userValue)
 			}
-			set.Insert(userValue)
 		}
 	}
 
