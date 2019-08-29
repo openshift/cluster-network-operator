@@ -20,11 +20,30 @@ import (
 // provided, a comma-separated string of cluster-wide noProxy settings
 // are returned.
 func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructure, network *configv1.Network, cluster *corev1.ConfigMap) (string, error) {
+	// TODO: This will be flexible when master machine management is more dynamic.
+	type installConfig struct {
+		ControlPlane struct {
+			Replicas string `json:"replicas"`
+		} `json:"controlPlane"`
+		Networking struct {
+			MachineCIDR string `json:"machineCIDR"`
+		} `json:"networking"`
+	}
+	var ic installConfig
+	data, ok := cluster.Data["install-config"]
+	if !ok {
+		return "", fmt.Errorf("missing install-config in configmap")
+	}
+	if err := yaml.Unmarshal([]byte(data), &ic); err != nil {
+		return "", fmt.Errorf("invalid install-config: %v\njson:\n%s", err, data)
+	}
+
 	set := sets.NewString(
 		"127.0.0.1",
 		"localhost",
 		".svc",
 		".cluster.local",
+		ic.Networking.MachineCIDR,
 	)
 
 	if len(infra.Status.APIServerURL) > 0 {
@@ -53,27 +72,9 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		return "", fmt.Errorf("serviceNetwork missing from network '%s' status", network.Name)
 	}
 
-	// TODO: This will be flexible when master machine management is more dynamic.
-	type installConfig struct {
-		ControlPlane struct {
-			Replicas string `json:"replicas"`
-		} `json:"controlPlane"`
-		Networking struct {
-			MachineCIDR string `json:"machineCIDR"`
-		} `json:"networking"`
-	}
-	var ic installConfig
-	data, ok := cluster.Data["install-config"]
-	if !ok {
-		return "", fmt.Errorf("missing install-config in configmap")
-	}
-	if err := yaml.Unmarshal([]byte(data), &ic); err != nil {
-		return "", fmt.Errorf("invalid install-config: %v\njson:\n%s", err, data)
-	}
-
 	switch infra.Status.PlatformStatus.Type {
 	case configv1.AWSPlatformType, configv1.GCPPlatformType, configv1.AzurePlatformType, configv1.OpenStackPlatformType:
-		set.Insert("169.254.169.254", ic.Networking.MachineCIDR)
+		set.Insert("169.254.169.254")
 	}
 
 	// Construct the node sub domain.
