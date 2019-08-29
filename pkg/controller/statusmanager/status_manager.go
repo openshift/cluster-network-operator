@@ -28,6 +28,7 @@ const (
 	ClusterConfig StatusLevel = iota
 	OperatorConfig
 	ProxyConfig
+	InjectorConfig
 	PodDeployment
 	maxStatusLevel
 )
