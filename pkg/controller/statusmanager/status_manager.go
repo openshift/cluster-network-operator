@@ -16,7 +16,10 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
@@ -39,6 +42,7 @@ type StatusManager struct {
 	sync.Mutex
 
 	client  client.Client
+	mapper  meta.RESTMapper
 	name    string
 	version string
 
@@ -49,8 +53,53 @@ type StatusManager struct {
 	relatedObjects []configv1.ObjectReference
 }
 
-func New(client client.Client, name, version string) *StatusManager {
-	return &StatusManager{client: client, name: name, version: version}
+func New(client client.Client, mapper meta.RESTMapper, name, version string) *StatusManager {
+	return &StatusManager{client: client, mapper: mapper, name: name, version: version}
+}
+
+// deleteRelatedObjects checks for related objects attached to ClusterOperator and deletes
+// whatever is not been rendered from manifests. This is a mechanism to cleanup objects
+// that are no longer needed and are probably present from a previous version
+func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.ClusterOperator) {
+	if status.relatedObjects == nil {
+		return
+	}
+
+	for _, currentObj := range co.Status.RelatedObjects {
+		var found bool = false
+		for _, renderedObj := range status.relatedObjects {
+			found = reflect.DeepEqual(currentObj, renderedObj)
+
+			if found {
+				break
+			}
+		}
+		if !found {
+			gvr := schema.GroupVersionResource{
+				Group:    currentObj.Group,
+				Resource: currentObj.Resource,
+			}
+			gvk, err := status.mapper.KindFor(gvr)
+			if err != nil {
+				log.Printf("Error getting GVK of object for deletion: %v", err)
+				status.relatedObjects = append(status.relatedObjects, currentObj)
+				continue
+			}
+			log.Printf("Detected related object with GVK %+v, namespace %v and name %v not rendered by manifests, deleting...", gvk, currentObj.Namespace, currentObj.Name)
+			objToDelete := &uns.Unstructured{}
+			objToDelete.SetName(currentObj.Name)
+			objToDelete.SetNamespace(currentObj.Namespace)
+			objToDelete.SetGroupVersionKind(gvk)
+			err = status.client.Delete(context.TODO(), objToDelete, client.PropagationPolicy("Background"))
+			if err != nil {
+				log.Printf("Error deleting related object: %v", err)
+				if !errors.IsNotFound(err) {
+					status.relatedObjects = append(status.relatedObjects, currentObj)
+				}
+				continue
+			}
+		}
+	}
 }
 
 // Set updates the ClusterOperator.Status with the provided conditions
@@ -64,6 +113,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...confi
 		}
 
 		oldStatus := co.Status.DeepCopy()
+		status.deleteRelatedObjectsNotRendered(co)
 		co.Status.RelatedObjects = status.relatedObjects
 
 		if reachedAvailableLevel {
