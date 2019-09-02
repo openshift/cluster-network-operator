@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -53,72 +54,73 @@ func New(client client.Client, name, version string) *StatusManager {
 
 // Set updates the ClusterOperator.Status with the provided conditions
 func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...configv1.ClusterOperatorStatusCondition) {
-
-	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
-	err := status.client.Get(context.TODO(), types.NamespacedName{Name: status.name}, co)
-	isNotFound := errors.IsNotFound(err)
-	if err != nil && !isNotFound {
-		log.Printf("Failed to get ClusterOperator %q: %v", status.name, err)
-		return
-	}
-
-	oldStatus := co.Status.DeepCopy()
-	co.Status.RelatedObjects = status.relatedObjects
-
-	if reachedAvailableLevel {
-		if releaseVersion := os.Getenv("RELEASE_VERSION"); len(releaseVersion) > 0 {
-			co.Status.Versions = []configv1.OperandVersion{
-				{Name: "operator", Version: releaseVersion},
-			}
-		} else {
-			co.Status.Versions = nil
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
+		err := status.client.Get(context.TODO(), types.NamespacedName{Name: status.name}, co)
+		isNotFound := errors.IsNotFound(err)
+		if err != nil && !isNotFound {
+			return err
 		}
-	}
-	for _, condition := range conditions {
-		v1helpers.SetStatusCondition(&co.Status.Conditions, condition)
-	}
 
-	progressingCondition := v1helpers.FindStatusCondition(co.Status.Conditions, configv1.OperatorProgressing)
-	availableCondition := v1helpers.FindStatusCondition(co.Status.Conditions, configv1.OperatorAvailable)
-	if availableCondition == nil && progressingCondition != nil && progressingCondition.Status == configv1.ConditionTrue {
+		oldStatus := co.Status.DeepCopy()
+		co.Status.RelatedObjects = status.relatedObjects
+
+		if reachedAvailableLevel {
+			if releaseVersion := os.Getenv("RELEASE_VERSION"); len(releaseVersion) > 0 {
+				co.Status.Versions = []configv1.OperandVersion{
+					{Name: "operator", Version: releaseVersion},
+				}
+			} else {
+				co.Status.Versions = nil
+			}
+		}
+		for _, condition := range conditions {
+			v1helpers.SetStatusCondition(&co.Status.Conditions, condition)
+		}
+
+		progressingCondition := v1helpers.FindStatusCondition(co.Status.Conditions, configv1.OperatorProgressing)
+		availableCondition := v1helpers.FindStatusCondition(co.Status.Conditions, configv1.OperatorAvailable)
+		if availableCondition == nil && progressingCondition != nil && progressingCondition.Status == configv1.ConditionTrue {
+			v1helpers.SetStatusCondition(&co.Status.Conditions,
+				configv1.ClusterOperatorStatusCondition{
+					Type:    configv1.OperatorAvailable,
+					Status:  configv1.ConditionFalse,
+					Reason:  "Startup",
+					Message: "The network is starting up",
+				},
+			)
+		}
+
 		v1helpers.SetStatusCondition(&co.Status.Conditions,
 			configv1.ClusterOperatorStatusCondition{
-				Type:    configv1.OperatorAvailable,
-				Status:  configv1.ConditionFalse,
-				Reason:  "Startup",
-				Message: "The network is starting up",
+				Type:   configv1.OperatorUpgradeable,
+				Status: configv1.ConditionTrue,
 			},
 		)
-	}
 
-	v1helpers.SetStatusCondition(&co.Status.Conditions,
-		configv1.ClusterOperatorStatusCondition{
-			Type:   configv1.OperatorUpgradeable,
-			Status: configv1.ConditionTrue,
-		},
-	)
-
-	if reflect.DeepEqual(*oldStatus, co.Status) {
-		return
-	}
-
-	buf, err := yaml.Marshal(co.Status.Conditions)
-	if err != nil {
-		buf = []byte(fmt.Sprintf("(failed to convert to YAML: %s)", err))
-	}
-	if isNotFound {
-		if err := status.client.Create(context.TODO(), co); err != nil {
-			log.Printf("Failed to create ClusterOperator %q: %v", co.Name, err)
-		} else {
-			log.Printf("Created ClusterOperator with conditions:\n%s", string(buf))
+		if reflect.DeepEqual(*oldStatus, co.Status) {
+			return nil
 		}
-	} else {
-		err = status.client.Status().Update(context.TODO(), co)
+
+		buf, err := yaml.Marshal(co.Status.Conditions)
 		if err != nil {
-			log.Printf("Failed to update ClusterOperator %q: %v", co.Name, err)
-		} else {
-			log.Printf("Updated ClusterOperator with conditions:\n%s", string(buf))
+			buf = []byte(fmt.Sprintf("(failed to convert to YAML: %s)", err))
 		}
+		if isNotFound {
+			if err := status.client.Create(context.TODO(), co); err != nil {
+				return err
+			}
+			log.Printf("Created ClusterOperator with conditions:\n%s", string(buf))
+			return nil
+		}
+		if err := status.client.Status().Update(context.TODO(), co); err != nil {
+			return err
+		}
+		log.Printf("Updated ClusterOperator with conditions:\n%s", string(buf))
+		return nil
+	})
+	if err != nil {
+		log.Printf("Failed to set ClusterOperator: %v", err)
 	}
 }
 
