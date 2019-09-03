@@ -48,6 +48,7 @@ data:
     project = {{ default "\"\"" $AuthInfo.ProjectID }}
     pod_security_groups = {{ default "default" .PodSecurityGroups }}
     resource_tags = {{ default "" .ResourceTags }}
+    external_svc_net = {{ .ExternalNetwork }}
     #network_device_mtu = 1500
 
     [neutron]

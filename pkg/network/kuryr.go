@@ -42,6 +42,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["WorkerNodesRouter"] = b.WorkerNodesRouter
 	data.Data["PodSubnetpool"] = b.PodSubnetpool
 	data.Data["ServiceSubnet"] = b.ServiceSubnet
+	data.Data["ExternalNetwork"] = b.ExternalNetwork
 	data.Data["OpenStackCloud"] = b.OpenStackCloud
 	// FIXME(dulek): Move that logic to the template once it's known how to dereference pointers there.
 	data.Data["OpenStackInsecureAPI"] = b.OpenStackCloud.Verify != nil && !*b.OpenStackCloud.Verify

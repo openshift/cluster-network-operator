@@ -10,6 +10,7 @@ type KuryrBootstrapResult struct {
 	WorkerNodesRouter string
 	WorkerNodesSubnet string
 	PodSecurityGroups []string
+	ExternalNetwork   string
 	ClusterID         string
 	OpenStackCloud    clientconfig.Cloud
 	WebhookCA         string
