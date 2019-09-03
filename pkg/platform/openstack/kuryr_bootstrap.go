@@ -264,22 +264,23 @@ func ensureOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, netId, 
 
 // Looks for a Neutron router by name and tag. Fails if router is not found
 // or multiple routers match.
-func findOpenStackRouterId(client *gophercloud.ServiceClient, name, tag string) (string, error) {
+func findOpenStackRouter(client *gophercloud.ServiceClient, name, tag string) (routers.Router, error) {
+	empty := routers.Router{}
 	page, err := routers.List(client, routers.ListOpts{Name: name, Tags: tag}).AllPages()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get router list")
+		return empty, errors.Wrap(err, "failed to get router list")
 	}
 	routerList, err := routers.ExtractRouters(page)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to extract routers list")
+		return empty, errors.Wrap(err, "failed to extract routers list")
 	}
 
 	if len(routerList) == 1 {
-		return routerList[0].ID, nil
+		return routerList[0], nil
 	} else if len(routerList) == 0 {
-		return "", errors.New("router not found")
+		return empty, errors.New("router not found")
 	} else {
-		return "", errors.New("multiple matching routers")
+		return empty, errors.New("multiple matching routers")
 	}
 }
 
@@ -880,10 +881,12 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		return nil, errors.Wrap(err, "failed to find worker nodes subnet")
 	}
 	log.Printf("Found worker nodes subnet %s", workerSubnet.ID)
-	routerId, err := findOpenStackRouterId(client, generateName("external-router", clusterID), tag)
+	router, err := findOpenStackRouter(client, generateName("external-router", clusterID), tag)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes router")
 	}
+	routerId := router.ID
+	externalNetwork := router.GatewayInfo.NetworkID
 	log.Printf("Found worker nodes router %s", routerId)
 	ps, err := getOpenStackRouterPorts(client, routerId)
 	if err != nil {
@@ -1018,9 +1021,6 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 
 	log.Print("Kuryr bootstrap finished")
-	if err != nil {
-		return nil, errors.Wrap(err, "failed get OpenShift cluster ID")
-	}
 
 	res := bootstrap.BootstrapResult{
 		Kuryr: bootstrap.KuryrBootstrapResult{
@@ -1029,6 +1029,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 			WorkerNodesRouter: routerId,
 			WorkerNodesSubnet: workerSubnet.ID,
 			PodSecurityGroups: []string{podSgId},
+			ExternalNetwork:   externalNetwork,
 			ClusterID:         clusterID,
 			OpenStackCloud:    cloud,
 			WebhookCA:         b64.StdEncoding.EncodeToString(ca),
