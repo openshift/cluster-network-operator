@@ -944,9 +944,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		}
 	}
 	// We need to open traffic from service subnet to masters for API LB to work.
-	// Port range is taken from how openshift/installer opens traffic to the API,
-	// though just 6443 should probably be enough for us.
-	err = ensureOpenStackSgRule(client, masterSgId, openStackSvcCIDR, 6443, 6445)
+	err = ensureOpenStackSgRule(client, masterSgId, openStackSvcCIDR, 6443, 6443)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to add rule opening traffic to masters from service subnet %s", conf.ServiceNetwork[0])
 	}
