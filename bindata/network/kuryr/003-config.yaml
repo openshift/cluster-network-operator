@@ -64,6 +64,7 @@ data:
     project_name = {{ default "\"\"" $AuthInfo.ProjectName }}
     user_domain_name = {{ default "\"\"" $AuthInfo.UserDomainName }}
     user_domain_id = {{ default "\"\"" $AuthInfo.UserDomainID }}
+    region_name = {{ default "\"\"" .OpenStackCloud.RegionName }}
 
     [pod_vif_nested]
     worker_nodes_subnet = {{ default "\"\"" .WorkerNodesSubnet }}
