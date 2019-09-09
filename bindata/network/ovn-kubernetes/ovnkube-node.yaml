@@ -223,10 +223,10 @@ spec:
           path: /sys
       - name: host-cni-bin
         hostPath:
-          path: {{.CNIBinDir}}
+          path: /var/lib/cni/bin
       - name: host-cni-netd
         hostPath:
-          path: {{.CNIConfDir}}
+          path: /etc/kubernetes/cni/net.d
       - name: host-config-openvswitch
         hostPath:
           path: /etc/origin/openvswitch
