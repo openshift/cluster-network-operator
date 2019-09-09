@@ -372,6 +372,32 @@ func RenderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 	return out, nil
 }
 
+// RenderMultus generates the manifests of Multus
+func RenderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+	if *conf.DisableMultiNetwork {
+		return nil, nil
+	}
+
+	var err error
+	out := []*uns.Unstructured{}
+	objs := []*uns.Unstructured{}
+
+	// enabling Multus always renders the CRD since Multus uses it
+	objs, err = renderAdditionalNetworksCRD(manifestDir)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, objs...)
+
+	usedhcp := UseDHCP(conf)
+	objs, err = renderMultusConfig(manifestDir, usedhcp)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, objs...)
+	return out, nil
+}
+
 // RenderMultusAdmissionController generates the manifests of Multus Admission Controller
 func RenderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	if *conf.DisableMultiNetwork {
