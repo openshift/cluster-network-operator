@@ -203,7 +203,8 @@ spec:
             --nodeport --gateway-mode local \
             ${hybrid_overlay_flags} \
             --pidfile /var/run/openvswitch/ovnkube-node.pid \
-            --loglevel "${OVN_KUBE_LOG_LEVEL}"  --logfile /dev/stdout
+            --loglevel "${OVN_KUBE_LOG_LEVEL}" --logfile /dev/stdout \
+            --metrics-bind-address "0.0.0.0:9101"
         env:
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
@@ -230,6 +231,9 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        ports:
+        - name: metrics-port
+          containerPort: 9101
         securityContext:
           privileged: true
         volumeMounts:

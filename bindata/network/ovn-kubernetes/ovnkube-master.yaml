@@ -193,7 +193,8 @@ spec:
             --nodeport \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             ${hybrid_overlay_flags} \
-            --logfile /dev/stdout
+            --logfile /dev/stdout \
+            --metrics-bind-address "0.0.0.0:9102"
         volumeMounts:
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
@@ -228,7 +229,9 @@ spec:
           value: "{{ .OVNHybridOverlayEnable }}"
         - name: OVN_HYBRID_OVERLAY_NET_CIDR
           value: "{{ .OVNHybridOverlayNetCIDR }}"
-
+        ports:
+        - name: metrics-port
+          containerPort: 9102
       nodeSelector:
         node-role.kubernetes.io/master: ""
         beta.kubernetes.io/os: "linux"
