@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	proxyHTTPScheme  = "http"
-	proxyHTTPSScheme = "https"
+	schemeHTTP  = "http"
+	schemeHTTPS = "https"
 	// noProxyWildcard is the string used to as a wildcard attached to a
 	// domain suffix in proxy.spec.noProxy to bypass proxying.
 	noProxyWildcard = "*"
@@ -41,8 +41,8 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 		if err != nil {
 			return fmt.Errorf("invalid httpProxy URI: %v", err)
 		}
-		if scheme != proxyHTTPScheme {
-			return fmt.Errorf("httpProxy requires a '%s' URI scheme", proxyHTTPScheme)
+		if scheme != schemeHTTP {
+			return fmt.Errorf("httpProxy requires a '%s' URI scheme", schemeHTTP)
 		}
 	}
 
@@ -51,8 +51,8 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 		if err != nil {
 			return fmt.Errorf("invalid httpsProxy URI: %v", err)
 		}
-		if scheme != proxyHTTPScheme && scheme != proxyHTTPSScheme {
-			return fmt.Errorf("httpsProxy requires a '%s' or '%s' URI scheme", proxyHTTPScheme, proxyHTTPSScheme)
+		if scheme != schemeHTTP && scheme != schemeHTTPS {
+			return fmt.Errorf("httpsProxy requires a '%s' or '%s' URI scheme", schemeHTTP, schemeHTTPS)
 		}
 	}
 
@@ -77,14 +77,14 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 				return fmt.Errorf("invalid URI for readinessEndpoint '%s': %v", endpoint, err)
 			}
 			switch {
-			case scheme == proxyHTTPScheme:
+			case scheme == schemeHTTP:
 				if !isSpecHTTPProxySet(proxyConfig) {
 					return fmt.Errorf("httpProxy must be set when using a http proxy readinessEndpoint")
 				}
 				if err := validateReadinessEndpoint(trustBundle, proxyConfig.HTTPProxy, endpoint); err != nil {
 					return fmt.Errorf("http readinessEndpoint probe failed for endpoint '%s': %v", endpoint, err)
 				}
-			case scheme == proxyHTTPSScheme:
+			case scheme == schemeHTTPS:
 				if !isSpecHTTPSProxySet(proxyConfig) {
 					return fmt.Errorf("httpsProxy must be set when using a https proxy readinessEndpoint")
 				}
@@ -115,7 +115,7 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 				}
 			default:
 				return fmt.Errorf("a proxy readiness endpoint requires a '%s' or '%s' URI sheme",
-					proxyHTTPScheme, proxyHTTPSScheme)
+					schemeHTTP, schemeHTTPS)
 			}
 		}
 	}
@@ -204,15 +204,11 @@ func validateReadinessEndpoint(caBundle []*x509.Certificate, proxy, endpoint str
 		return fmt.Errorf("failed to parse endpoint url '%s': %v", endpoint, err)
 	}
 
-	if endpointURL.Scheme == proxyHTTPScheme && proxyURL.Scheme == proxyHTTPSScheme {
-		return fmt.Errorf("endpoint '%s' requires a `%s` proxy scheme", endpoint, proxyHTTPScheme)
+	if endpointURL.Scheme == schemeHTTP && proxyURL.Scheme == schemeHTTPS {
+		return fmt.Errorf("endpoint '%s' requires a `%s` proxy scheme", endpoint, schemeHTTP)
 	}
 
-	if endpointURL.Scheme == proxyHTTPSScheme && proxyURL.Scheme == proxyHTTPScheme {
-		return fmt.Errorf("endpoint '%s' requires a `%s` proxy scheme", endpoint, proxyHTTPSScheme)
-	}
-
-	if proxyURL.Scheme == proxyHTTPSScheme && len(caBundle) == 0 {
+	if proxyURL.Scheme == schemeHTTPS && len(caBundle) == 0 {
 		return fmt.Errorf("https proxy probe requires at least one CA certificate")
 	}
 
@@ -247,7 +243,7 @@ func runReadinessProbe(caBundle []*x509.Certificate, proxy, endpoint *url.URL) e
 		Proxy: http.ProxyURL(proxy),
 	}
 
-	if proxy.Scheme == proxyHTTPSScheme {
+	if proxy.Scheme == schemeHTTPS {
 		caPool := x509.NewCertPool()
 		for _, cert := range caBundle {
 			caPool.AddCert(cert)
