@@ -22,8 +22,9 @@ var NetworkAttachmentConfigSimpleMacvlan = operv1.Network{
 	Spec: operv1.NetworkSpec{
 		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
 			{
-				Type: operv1.NetworkTypeSimpleMacvlan,
-				Name: "net-attach-1",
+				Type:      operv1.NetworkTypeSimpleMacvlan,
+				Name:      "net-attach-1",
+				Namespace: "foobar",
 				SimpleMacvlanConfig: &operv1.SimpleMacvlanConfig{
 					IPAMConfig: &operv1.IPAMConfig{
 						Type: operv1.IPAMTypeDHCP,
@@ -125,13 +126,13 @@ func TestRenderSimpleMacvlanConfig(t *testing.T) {
 		g.Expect(objs).To(HaveLen(1))
 		g.Expect(objs).To(
 			ContainElement(HaveKubernetesID(
-				"NetworkAttachmentDefinition", "default", cfg.Name)))
+				"NetworkAttachmentDefinition", "foobar", cfg.Name)))
 		expected := `
 {
 	"apiVersion": "k8s.cni.cncf.io/v1",
 	"kind": "NetworkAttachmentDefinition",
 	"metadata": {
-		"namespace": "default",
+		"namespace": "foobar",
 		"name": "net-attach-1"
 	},
 	"spec": {
