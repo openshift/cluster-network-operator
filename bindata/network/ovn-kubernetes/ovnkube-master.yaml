@@ -66,6 +66,10 @@ spec:
           value: "3"
         - name: OVN_LOG_NORTHD
           value: "-vconsole:info"
+        - name: OVN_NB_PORT
+          value: "9641"
+        - name: OVN_SB_PORT
+          value: "9642"
         - name: OVN_NET_CIDR
           valueFrom:
             configMapKeyRef:
@@ -116,6 +120,10 @@ spec:
           value: "3"
         - name: OVN_LOG_NB
           value: "-vconsole:info -vfile:info"
+        - name: OVN_NB_PORT
+          value: "9641"
+        - name: OVN_SB_PORT
+          value: "9642"
         - name: OVN_NET_CIDR
           valueFrom:
             configMapKeyRef:
@@ -168,6 +176,10 @@ spec:
           value: "3"
         - name: OVN_LOG_SB
           value: "-vconsole:info -vfile:info"
+        - name: OVN_NB_PORT
+          value: "9641"
+        - name: OVN_SB_PORT
+          value: "9642"
         - name: OVN_NET_CIDR
           valueFrom:
             configMapKeyRef:
@@ -221,6 +233,10 @@ spec:
           value: "true"
         - name: OVNKUBE_LOGLEVEL
           value: "4"
+        - name: OVN_NB_PORT
+          value: "9641"
+        - name: OVN_SB_PORT
+          value: "9642"
         - name: OVN_NET_CIDR
           valueFrom:
             configMapKeyRef:

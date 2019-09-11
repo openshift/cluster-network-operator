@@ -11,13 +11,13 @@ metadata:
 spec:
   ports:
   - name: north
-    port: 6641
+    port: 9641
     protocol: TCP
-    targetPort: 6641
+    targetPort: 9641
   - name: south
-    port: 6642
+    port: 9642
     protocol: TCP
-    targetPort: 6642
+    targetPort: 9642
   sessionAffinity: None
   clusterIP: None
   type: ClusterIP
