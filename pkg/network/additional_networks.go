@@ -128,6 +128,7 @@ func renderSimpleMacvlanConfig(conf *operv1.AdditionalNetworkDefinition, manifes
 	// render SimpleMacvlanConfig manifests
 	data := render.MakeRenderData()
 	data.Data["AdditionalNetworkName"] = conf.Name
+	data.Data["AdditionalNetworkNamespace"] = conf.Namespace
 
 	if conf.SimpleMacvlanConfig == nil {
 		// no additional config, just fill default IPAM
