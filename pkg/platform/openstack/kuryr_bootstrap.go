@@ -8,6 +8,7 @@ import (
 	"k8s.io/api/core/v1"
 	"log"
 	"net"
+	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/pkg/errors"
@@ -54,8 +55,6 @@ const (
 	MinOctaviaVersionWithHTTPSMonitors = "v2.10"
 	MinOctaviaVersionWithTagSupport    = "v2.5"
 	MinOctaviaVersionWithTimeouts      = "v2.1"
-	KubernetesEndpointsName            = "kubernetes"
-	KubernetesEndpointsNamespace       = "default"
 	KuryrNamespace                     = "openshift-kuryr"
 )
 
@@ -70,20 +69,6 @@ func GetClusterID(kubeClient client.Client) (string, error) {
 		return "", errors.Wrapf(err, "Failed to get Infrastracture CRD %s", InfrastructureCRDName)
 	}
 	return cluster.Status.InfrastructureName, nil
-}
-
-func GetEndpointsSubsets(kubeClient client.Client, endpointsName string, endpointsNamespace string) ([]v1.EndpointSubset, error) {
-	endpoints := &v1.Endpoints{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Endpoints"},
-		ObjectMeta: metav1.ObjectMeta{Name: endpointsName},
-	}
-
-	err := kubeClient.Get(context.TODO(), client.ObjectKey{Namespace: endpointsNamespace, Name: endpointsName}, endpoints)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to get Endpoints %s", endpointsName)
-	}
-
-	return endpoints.Subsets, nil
 }
 
 func GetCloudFromSecret(kubeClient client.Client) (clientconfig.Cloud, error) {
@@ -326,6 +311,27 @@ func ensureOpenStackRouterInterface(client *gophercloud.ServiceClient, routerId 
 		return errors.Wrap(err, "failed to add interface")
 	}
 	return nil
+}
+
+// Looks up OpenStack ports by tag and regexp pattern matched against name.
+// Returns a slice with matched Ports.
+func listOpenStackPortsMatchingPattern(client *gophercloud.ServiceClient, tag string, pattern *regexp.Regexp) ([]ports.Port, error) {
+	page, err := ports.List(client, ports.ListOpts{Tags: tag}).AllPages()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get port list")
+	}
+	portList, err := ports.ExtractPorts(page)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to extract ports list")
+	}
+	result := []ports.Port{}
+	for _, port := range portList {
+		if pattern.MatchString(port.Name) {
+			result = append(result, port)
+		}
+	}
+
+	return result, nil
 }
 
 // Looks for a Neutron Port by name, tag and network ID. If it does not exist
@@ -649,50 +655,6 @@ func ensureOpenStackLbPoolMember(client *gophercloud.ServiceClient, name, lbId, 
 
 		return poolsObj.ID, nil
 	}
-}
-
-// Checks if a load balancer pool member has a corresponding kubernetes endpoint.
-func isMemberUsed(subsetsList []v1.EndpointSubset, memberAddress string, memberPort int) bool {
-	for _, subset := range subsetsList {
-		subsetAddresses := subset.Addresses
-		subsetPorts := subset.Ports
-		for _, address := range subsetAddresses {
-			for _, port := range subsetPorts {
-				if memberAddress == address.IP && memberPort == int(port.Port) {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
-// Checks if all load balancer pool members have a corresponding kubernetes endpoint. If do not,
-// the member is removed from the load balancer pool.
-func deleteUnusedMembers(client *gophercloud.ServiceClient, kubeClient client.Client, poolId string, subsetsList []v1.EndpointSubset) error {
-	page, err := pools.ListMembers(client, poolId, pools.ListMembersOpts{}).AllPages()
-	if err != nil {
-		return errors.Wrap(err, "failed to get LB member list")
-	}
-	allMembers, err := pools.ExtractMembers(page)
-	if err != nil {
-		return errors.Wrap(err, "failed to extract LB members list")
-	}
-
-	for _, poolMember := range allMembers {
-		member, err := pools.GetMember(client, poolId, poolMember.ID).Extract()
-		if err != nil {
-			return errors.Wrap(err, "failed to extract LB member")
-		}
-		if !isMemberUsed(subsetsList, member.Address, member.ProtocolPort) {
-			err := pools.DeleteMember(client, poolId, member.ID).ExtractErr()
-			if err != nil {
-				return errors.Wrap(err, "failed to delete member from LB pool")
-			}
-			log.Printf("Deleted member %s from LB pool %s", member.ID, poolId)
-		}
-	}
-	return nil
 }
 
 // Looks for a Octavia load balancer listeners by name, port, pool ID and LB ID.
@@ -1043,32 +1005,24 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 	log.Printf("OpenShift API loadbalancer listener %s present", listenerId)
 
-	subsetsList, err := GetEndpointsSubsets(kubeClient, KubernetesEndpointsName, KubernetesEndpointsNamespace)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get Kubernetes endpoints")
-	}
-
+	// We need to list all master ports and add them to the LB pool
 	log.Print("Creating OpenShift API loadbalancer pool members")
-	for _, subset := range subsetsList {
-		subsetAddresses := subset.Addresses
-		subsetPorts := subset.Ports
-		for _, address := range subsetAddresses {
-			for _, port := range subsetPorts {
-				memberId, err := ensureOpenStackLbPoolMember(lbClient, fmt.Sprintf("%s:%d", address.IP, port.Port), lbId,
-					poolId, address.IP, svcSubnetId, int(port.Port))
-				if err != nil {
-					log.Printf("Failed to add %s:%d to LB pool %s: %s", address.IP, port.Port, poolId, err)
-					continue
-				}
-				log.Printf("OpenShit API loadbalancer member %s present on pool %s", memberId, poolId)
+	r, _ := regexp.Compile(fmt.Sprintf("^%s-master-port-[0-9]+$", clusterID))
+	portList, err := listOpenStackPortsMatchingPattern(client, tag, r)
+	for _, port := range portList {
+		if len(port.FixedIPs) > 0 {
+			portIp := port.FixedIPs[0].IPAddress
+			log.Printf("Found port %s with IP %s", port.ID, portIp)
+			memberId, err := ensureOpenStackLbPoolMember(lbClient, port.Name, lbId,
+				poolId, portIp, svcSubnetId, 6443)
+			if err != nil {
+				log.Printf("Failed to add port %s to LB pool %s: %s", port.ID, poolId, err)
+				continue
 			}
+			log.Printf("Added member %s to LB pool %s", memberId, poolId)
+		} else {
+			log.Printf("Matching port %s has no IP", port.ID)
 		}
-	}
-
-	log.Print("Deleting unused OpenShift API loadbalancer pool members")
-	err = deleteUnusedMembers(lbClient, kubeClient, poolId, subsetsList)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to delete unused members from OpenShist API loadbalancer pool")
 	}
 
 	log.Print("Ensuring certificates")
