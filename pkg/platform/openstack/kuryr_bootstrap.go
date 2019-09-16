@@ -1005,9 +1005,12 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 	log.Printf("OpenShift API loadbalancer listener %s present", listenerId)
 
-	// We need to list all master ports and add them to the LB pool
+	// We need to list all master ports and add them to the LB pool. We also add the
+	// bootstrap node port as for a portion of installation only it provides access to
+	// the API. With healthchecks enabled for the pool we'll get masters added automatically
+	// when they're up and ready.
 	log.Print("Creating OpenShift API loadbalancer pool members")
-	r, _ := regexp.Compile(fmt.Sprintf("^%s-master-port-[0-9]+$", clusterID))
+	r, _ := regexp.Compile(fmt.Sprintf("^%s-(master-port-[0-9]+|bootstrap-port)$", clusterID))
 	portList, err := listOpenStackPortsMatchingPattern(client, tag, r)
 	for _, port := range portList {
 		if len(port.FixedIPs) > 0 {
@@ -1016,7 +1019,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 			memberId, err := ensureOpenStackLbPoolMember(lbClient, port.Name, lbId,
 				poolId, portIp, svcSubnetId, 6443)
 			if err != nil {
-				log.Printf("Failed to add port %s to LB pool %s: %s", port.ID, poolId, err)
+				log.Printf("Failed to add port %s (%s) to LB pool %s: %s", port.ID, port.Name, poolId, err)
 				continue
 			}
 			log.Printf("Added member %s to LB pool %s", memberId, poolId)
