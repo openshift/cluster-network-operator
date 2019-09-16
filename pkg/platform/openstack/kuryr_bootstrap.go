@@ -943,6 +943,10 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 			return nil, errors.Wrapf(err, "failed to add rule opening traffic to workers on %s", cidr)
 		}
 	}
+	err = ensureOpenStackSgRule(client, masterSgId, openStackSvcCIDR, 2379, 2380)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to add rule opening etcd traffic to masters from service subnet %s", conf.ServiceNetwork[0])
+	}
 	// We need to open traffic from service subnet to masters for API LB to work.
 	err = ensureOpenStackSgRule(client, masterSgId, openStackSvcCIDR, 6443, 6443)
 	if err != nil {
