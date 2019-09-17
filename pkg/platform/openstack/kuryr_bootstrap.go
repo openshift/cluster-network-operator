@@ -441,6 +441,34 @@ func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix
 	return nil
 }
 
+// Delete a LoadBalancer and all associated resources
+func deleteOpenStackLb(client *gophercloud.ServiceClient, lbId string) error {
+	log.Printf("Deleting Openstack LoadBalancer: %s", lbId)
+	deleteOpts := loadbalancers.DeleteOpts{
+		Cascade: true,
+	}
+	err := loadbalancers.Delete(client, lbId, deleteOpts).ExtractErr()
+	if err != nil {
+		return err
+	}
+
+	err = gophercloud.WaitFor(300, func() (bool, error) {
+		lb, err := loadbalancers.Get(client, lbId).Extract()
+		if err != nil {
+			if _, ok := err.(gophercloud.ErrDefault404); ok {
+				return true, nil
+			}
+			return false, err
+		}
+		if lb.ProvisioningStatus == "DELETED" {
+			return true, nil
+		}
+		return false, nil
+	})
+
+	return err
+}
+
 // Waits up to 5 minutes for OpenStack LoadBalancer to move into ACTIVE
 // provisioning_status. Fails if time runs out.
 func waitForOpenStackLb(client *gophercloud.ServiceClient, lbId string) error {
@@ -490,30 +518,36 @@ func ensureOpenStackLb(client *gophercloud.ServiceClient, name, vipAddress, vipS
 	if len(lbs) > 1 {
 		return "", errors.Errorf("found multiple LB matching name %s, tag %s, cannot proceed", name, tag)
 	} else if len(lbs) == 1 {
-		return lbs[0].ID, nil
-	} else {
-		opts := loadbalancers.CreateOpts{
-			Name:        name,
-			VipAddress:  vipAddress,
-			VipSubnetID: vipSubnetId,
+		if lbs[0].ProvisioningStatus == "ACTIVE" {
+			return lbs[0].ID, nil
+		} else if lbs[0].ProvisioningStatus == "ERROR" {
+			err := deleteOpenStackLb(client, lbs[0].ID)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to delete LB")
+			}
 		}
-		if octaviaTagSupport {
-			opts.Tags = []string{tag}
-		} else {
-			opts.Description = tag
-		}
-		lb, err := loadbalancers.Create(client, opts).Extract()
-		if err != nil {
-			return "", errors.Wrap(err, "failed to create LB")
-		}
-
-		err = waitForOpenStackLb(client, lb.ID)
-		if err != nil {
-			return "", errors.Errorf("Timed out waiting for the LB %s to become ready", lb.ID)
-		}
-
-		return lb.ID, nil
 	}
+
+	createOpts := loadbalancers.CreateOpts{
+		Name:        name,
+		VipAddress:  vipAddress,
+		VipSubnetID: vipSubnetId,
+	}
+	if octaviaTagSupport {
+		createOpts.Tags = []string{tag}
+	} else {
+		createOpts.Description = tag
+	}
+	lb, err := loadbalancers.Create(client, createOpts).Extract()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to create LB")
+	}
+	err = waitForOpenStackLb(client, lb.ID)
+	if err != nil {
+		return "", errors.Errorf("Timed out waiting for the LB %s to become ready", lb.ID)
+	}
+
+	return lb.ID, nil
 }
 
 // Looks for a Octavia load balancer pool by name and LB ID. If it does
