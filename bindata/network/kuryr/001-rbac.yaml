@@ -48,6 +48,11 @@ rules:
   resources:
   - routes
   verbs: ["*"]
+- apiGroups: ["security.openshift.io"]
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
 
 ---
 apiVersion: v1
