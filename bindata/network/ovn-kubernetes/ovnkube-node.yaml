@@ -99,6 +99,10 @@ spec:
           value: "3"
         - name: OVNKUBE_LOGLEVEL
           value: "4"
+        - name: OVN_NB_PORT
+          value: "9641"
+        - name: OVN_SB_PORT
+          value: "9642"
         - name: OVN_NET_CIDR
           valueFrom:
             configMapKeyRef:
@@ -160,6 +164,10 @@ spec:
           value: "3"
         - name: OVNKUBE_LOGLEVEL
           value: "4"
+        - name: OVN_NB_PORT
+          value: "9641"
+        - name: OVN_SB_PORT
+          value: "9642"
         - name: OVN_GATEWAY_MODE
           value: local
         - name: OVN_NET_CIDR
