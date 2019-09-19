@@ -48,6 +48,7 @@ spec:
         - "--namespace-isolation=true"
         - "--multus-log-level=verbose"
         - "--cni-version=0.3.1"
+        - "--additional-bin-dir=/opt/multus/bin"
         resources:
           requests:
             cpu: 10m
