@@ -10,6 +10,7 @@ import (
 	"net"
 	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
@@ -619,7 +620,7 @@ func ensureOpenStackLbMonitor(client *gophercloud.ServiceClient, name, poolId st
 // it does not exist creates it. Will fail if multiple LB pool members are
 // matching all criteria.
 func ensureOpenStackLbPoolMember(client *gophercloud.ServiceClient, name, lbId, poolId,
-	address, subnetId string, port int) (string, error) {
+	address, subnetId string, port, weight int) (string, error) {
 	page, err := pools.ListMembers(client, poolId, pools.ListMembersOpts{
 		Name:         name,
 		Address:      address,
@@ -642,6 +643,7 @@ func ensureOpenStackLbPoolMember(client *gophercloud.ServiceClient, name, lbId, 
 			Address:      address,
 			ProtocolPort: port,
 			SubnetID:     subnetId,
+			Weight:       &weight,
 		}
 		poolsObj, err := pools.CreateMember(client, poolId, opts).Extract()
 		if err != nil {
@@ -1016,8 +1018,16 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		if len(port.FixedIPs) > 0 {
 			portIp := port.FixedIPs[0].IPAddress
 			log.Printf("Found port %s with IP %s", port.ID, portIp)
+
+			// We want bootstrap to stop being used as soon as possible, as it will serve
+			// outdated data during the bootstrap transition period.
+			weight := 100
+			if strings.HasSuffix(port.Name, "bootstrap-port") {
+				weight = 1
+			}
+
 			memberId, err := ensureOpenStackLbPoolMember(lbClient, port.Name, lbId,
-				poolId, portIp, svcSubnetId, 6443)
+				poolId, portIp, svcSubnetId, 6443, weight)
 			if err != nil {
 				log.Printf("Failed to add port %s (%s) to LB pool %s: %s", port.ID, port.Name, poolId, err)
 				continue
