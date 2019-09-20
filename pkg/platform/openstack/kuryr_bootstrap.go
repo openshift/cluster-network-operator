@@ -8,7 +8,9 @@ import (
 	"k8s.io/api/core/v1"
 	"log"
 	"net"
+	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
@@ -18,6 +20,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/listeners"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/loadbalancers"
+	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/monitors"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/attributestags"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
@@ -49,12 +52,11 @@ const (
 	CloudName             = "openstack"
 	CloudsSecretKey       = "clouds.yaml"
 	// NOTE(dulek): This one is hardcoded in openshift/installer.
-	InfrastructureCRDName           = "cluster"
-	MinOctaviaVersionWithTagSupport = "v2.5"
-	MinOctaviaVersionWithTimeouts   = "v2.1"
-	KubernetesEndpointsName         = "kubernetes"
-	KubernetesEndpointsNamespace    = "default"
-	KuryrNamespace                  = "openshift-kuryr"
+	InfrastructureCRDName              = "cluster"
+	MinOctaviaVersionWithHTTPSMonitors = "v2.10"
+	MinOctaviaVersionWithTagSupport    = "v2.5"
+	MinOctaviaVersionWithTimeouts      = "v2.1"
+	KuryrNamespace                     = "openshift-kuryr"
 )
 
 func GetClusterID(kubeClient client.Client) (string, error) {
@@ -68,20 +70,6 @@ func GetClusterID(kubeClient client.Client) (string, error) {
 		return "", errors.Wrapf(err, "Failed to get Infrastracture CRD %s", InfrastructureCRDName)
 	}
 	return cluster.Status.InfrastructureName, nil
-}
-
-func GetEndpointsSubsets(kubeClient client.Client, endpointsName string, endpointsNamespace string) ([]v1.EndpointSubset, error) {
-	endpoints := &v1.Endpoints{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Endpoints"},
-		ObjectMeta: metav1.ObjectMeta{Name: endpointsName},
-	}
-
-	err := kubeClient.Get(context.TODO(), client.ObjectKey{Namespace: endpointsNamespace, Name: endpointsName}, endpoints)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to get Endpoints %s", endpointsName)
-	}
-
-	return endpoints.Subsets, nil
 }
 
 func GetCloudFromSecret(kubeClient client.Client) (clientconfig.Cloud, error) {
@@ -324,6 +312,27 @@ func ensureOpenStackRouterInterface(client *gophercloud.ServiceClient, routerId 
 		return errors.Wrap(err, "failed to add interface")
 	}
 	return nil
+}
+
+// Looks up OpenStack ports by tag and regexp pattern matched against name.
+// Returns a slice with matched Ports.
+func listOpenStackPortsMatchingPattern(client *gophercloud.ServiceClient, tag string, pattern *regexp.Regexp) ([]ports.Port, error) {
+	page, err := ports.List(client, ports.ListOpts{Tags: tag}).AllPages()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get port list")
+	}
+	portList, err := ports.ExtractPorts(page)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to extract ports list")
+	}
+	result := []ports.Port{}
+	for _, port := range portList {
+		if pattern.MatchString(port.Name) {
+			result = append(result, port)
+		}
+	}
+
+	return result, nil
 }
 
 // Looks for a Neutron Port by name, tag and network ID. If it does not exist
@@ -591,11 +600,61 @@ func ensureOpenStackLbPool(client *gophercloud.ServiceClient, name, lbId string)
 	}
 }
 
+// Looks for Octavia load balancer health monitor by name and pool ID. If it does
+// not exist creates it. Will fail if multiple LB health monitors are matching all criteria.
+func ensureOpenStackLbMonitor(client *gophercloud.ServiceClient, name, poolId string) (string, error) {
+	octaviaHTTPSMonitors, err := IsOctaviaVersionSupported(client, MinOctaviaVersionWithHTTPSMonitors)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to determine if Octavia supports HTTPS health monitors")
+	}
+
+	page, err := monitors.List(client, monitors.ListOpts{
+		Name:   name,
+		PoolID: poolId,
+	}).AllPages()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get LB monitors list")
+	}
+	monitorsList, err := monitors.ExtractMonitors(page)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to extract LB monitors list")
+	}
+	if len(monitorsList) > 1 {
+		return "", errors.Errorf("found multiple LB monitors matching name %s, pool %s, cannot proceed", name, poolId)
+	} else if len(monitorsList) == 1 {
+		return monitorsList[0].ID, nil
+	} else {
+		opts := monitors.CreateOpts{
+			Name:       name,
+			PoolID:     poolId,
+			Type:       monitors.TypeTCP,
+			MaxRetries: 3,
+			Delay:      10,
+			Timeout:    10,
+		}
+		if octaviaHTTPSMonitors {
+			// TODO(dulek): Octavia is a wild animal. So in OpenStack Stein the meaning of HTTPS type of health monitor
+			//              changed. Before, it was a simple TLS handshake. Now it's really doing an HTTPS connection to
+			//              a certain URL and TLS-HELLO is the new HTTPS. We're going to stick with the simple TCP check
+			//              for Octavia's prior to Stein and in Stein we switch to proper HTTPS healthcheck. The former
+			//              behavior can be removed once we stop supporting OpenStack Queens and Rocky.
+			opts.URLPath = "/healthz"
+			opts.Type = monitors.TypeHTTPS
+		}
+		monitorObj, err := monitors.Create(client, opts).Extract()
+		if err != nil {
+			return "", errors.Wrap(err, "failed to create LB monitor")
+		}
+
+		return monitorObj.ID, nil
+	}
+}
+
 // Looks for a Octavia load balancer pool member by name, address and port. If
 // it does not exist creates it. Will fail if multiple LB pool members are
 // matching all criteria.
 func ensureOpenStackLbPoolMember(client *gophercloud.ServiceClient, name, lbId, poolId,
-	address, subnetId string, port int) (string, error) {
+	address, subnetId string, port, weight int) (string, error) {
 	page, err := pools.ListMembers(client, poolId, pools.ListMembersOpts{
 		Name:         name,
 		Address:      address,
@@ -618,6 +677,7 @@ func ensureOpenStackLbPoolMember(client *gophercloud.ServiceClient, name, lbId, 
 			Address:      address,
 			ProtocolPort: port,
 			SubnetID:     subnetId,
+			Weight:       &weight,
 		}
 		poolsObj, err := pools.CreateMember(client, poolId, opts).Extract()
 		if err != nil {
@@ -631,50 +691,6 @@ func ensureOpenStackLbPoolMember(client *gophercloud.ServiceClient, name, lbId, 
 
 		return poolsObj.ID, nil
 	}
-}
-
-// Checks if a load balancer pool member has a corresponding kubernetes endpoint.
-func isMemberUsed(subsetsList []v1.EndpointSubset, memberAddress string, memberPort int) bool {
-	for _, subset := range subsetsList {
-		subsetAddresses := subset.Addresses
-		subsetPorts := subset.Ports
-		for _, address := range subsetAddresses {
-			for _, port := range subsetPorts {
-				if memberAddress == address.IP && memberPort == int(port.Port) {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
-// Checks if all load balancer pool members have a corresponding kubernetes endpoint. If do not,
-// the member is removed from the load balancer pool.
-func deleteUnusedMembers(client *gophercloud.ServiceClient, kubeClient client.Client, poolId string, subsetsList []v1.EndpointSubset) error {
-	page, err := pools.ListMembers(client, poolId, pools.ListMembersOpts{}).AllPages()
-	if err != nil {
-		return errors.Wrap(err, "failed to get LB member list")
-	}
-	allMembers, err := pools.ExtractMembers(page)
-	if err != nil {
-		return errors.Wrap(err, "failed to extract LB members list")
-	}
-
-	for _, poolMember := range allMembers {
-		member, err := pools.GetMember(client, poolId, poolMember.ID).Extract()
-		if err != nil {
-			return errors.Wrap(err, "failed to extract LB member")
-		}
-		if !isMemberUsed(subsetsList, member.Address, member.ProtocolPort) {
-			err := pools.DeleteMember(client, poolId, member.ID).ExtractErr()
-			if err != nil {
-				return errors.Wrap(err, "failed to delete member from LB pool")
-			}
-			log.Printf("Deleted member %s from LB pool %s", member.ID, poolId)
-		}
-	}
-	return nil
 }
 
 // Looks for a Octavia load balancer listeners by name, port, pool ID and LB ID.
@@ -1010,6 +1026,13 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 	log.Printf("OpenShift API loadbalancer pool %s present", poolId)
 
+	log.Print("Creating OpenShift API loadbalancer health monitor")
+	monitorId, err := ensureOpenStackLbMonitor(lbClient, "kuryr-api-loadbalancer-monitor", poolId)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create OpenShift API loadbalancer health monitor")
+	}
+	log.Printf("OpenShift API loadbalancer health monitor %s present", monitorId)
+
 	log.Print("Creating OpenShift API loadbalancer listener")
 	listenerId, err := ensureOpenStackLbListener(lbClient, generateName("kuryr-api-loadbalancer-listener", clusterID),
 		lbId, poolId, 443)
@@ -1018,32 +1041,35 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 	log.Printf("OpenShift API loadbalancer listener %s present", listenerId)
 
-	subsetsList, err := GetEndpointsSubsets(kubeClient, KubernetesEndpointsName, KubernetesEndpointsNamespace)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get Kubernetes endpoints")
-	}
-
+	// We need to list all master ports and add them to the LB pool. We also add the
+	// bootstrap node port as for a portion of installation only it provides access to
+	// the API. With healthchecks enabled for the pool we'll get masters added automatically
+	// when they're up and ready.
 	log.Print("Creating OpenShift API loadbalancer pool members")
-	for _, subset := range subsetsList {
-		subsetAddresses := subset.Addresses
-		subsetPorts := subset.Ports
-		for _, address := range subsetAddresses {
-			for _, port := range subsetPorts {
-				memberId, err := ensureOpenStackLbPoolMember(lbClient, fmt.Sprintf("%s:%d", address.IP, port.Port), lbId,
-					poolId, address.IP, svcSubnetId, int(port.Port))
-				if err != nil {
-					log.Printf("Failed to add %s:%d to LB pool %s: %s", address.IP, port.Port, poolId, err)
-					continue
-				}
-				log.Printf("OpenShit API loadbalancer member %s present on pool %s", memberId, poolId)
-			}
-		}
-	}
+	r, _ := regexp.Compile(fmt.Sprintf("^%s-(master-port-[0-9]+|bootstrap-port)$", clusterID))
+	portList, err := listOpenStackPortsMatchingPattern(client, tag, r)
+	for _, port := range portList {
+		if len(port.FixedIPs) > 0 {
+			portIp := port.FixedIPs[0].IPAddress
+			log.Printf("Found port %s with IP %s", port.ID, portIp)
 
-	log.Print("Deleting unused OpenShift API loadbalancer pool members")
-	err = deleteUnusedMembers(lbClient, kubeClient, poolId, subsetsList)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to delete unused members from OpenShist API loadbalancer pool")
+			// We want bootstrap to stop being used as soon as possible, as it will serve
+			// outdated data during the bootstrap transition period.
+			weight := 100
+			if strings.HasSuffix(port.Name, "bootstrap-port") {
+				weight = 1
+			}
+
+			memberId, err := ensureOpenStackLbPoolMember(lbClient, port.Name, lbId,
+				poolId, portIp, svcSubnetId, 6443, weight)
+			if err != nil {
+				log.Printf("Failed to add port %s (%s) to LB pool %s: %s", port.ID, port.Name, poolId, err)
+				continue
+			}
+			log.Printf("Added member %s to LB pool %s", memberId, poolId)
+		} else {
+			log.Printf("Matching port %s has no IP", port.ID)
+		}
 	}
 
 	log.Print("Ensuring certificates")
