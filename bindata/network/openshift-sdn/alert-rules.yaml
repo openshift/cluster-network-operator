@@ -67,7 +67,10 @@ spec:
       annotations:
         message: The average time between iptables resyncs is too high. NOTE - There is some scrape delay and other offsets, 90s isn't exact but it is still too high.
       expr: |
-        time() - (sum(kubeproxy_sync_proxy_rules_last_timestamp_seconds) / :kube_pod_info_node_count:) > 90
+        quantile(0.95,
+            timestamp(kubeproxy_sync_proxy_rules_last_timestamp_seconds)
+            - on(pod) kubeproxy_sync_proxy_rules_last_timestamp_seconds
+            * on(pod) group_right kube_pod_info{namespace="openshift-sdn",  pod=~"sdn-[^-]*"}) > 90
       for: 20m
       labels:
         severity: warning
