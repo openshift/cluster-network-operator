@@ -31,10 +31,10 @@ spec:
       - name: dhcp-daemon-initialization
         image: {{.CNIPluginsImage}}
         command: ["/bin/sh"]
-        args: ["-c", "rm -f /var/run/cni/dhcp.sock"]
+        args: ["-c", "rm -f /host/run/cni/dhcp.sock"]
         volumeMounts:
         - name: socketpath
-          mountPath: /var/run/cni
+          mountPath: /host/run/cni
       containers:
       - name: dhcp-daemon
         # Based on: https://github.com/s1061123/cni-dhcp-daemon/blob/master/Dockerfile
@@ -49,13 +49,13 @@ spec:
           privileged: true
         volumeMounts:
         - name: socketpath
-          mountPath: /var/run/cni
+          mountPath: /host/run/cni
         - name: procpath
           mountPath: /host/proc
       volumes:
         - name: socketpath
           hostPath:
-            path: /var/run/cni
+            path: /run/cni
         - name: procpath
           hostPath:
             path: /proc
