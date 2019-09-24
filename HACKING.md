@@ -46,7 +46,7 @@ _output/linux/amd64/cluster-network-renderer --config sample-config.yaml --out o
 ```
 
 ### Building images
-By default, podman is used to build images. 
+By default, podman is used to build images.
 
 ```
 ./hack/build-image.sh

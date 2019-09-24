@@ -278,8 +278,7 @@ spec:
                       format: int32
                       minimum: 0
                 ovnKubernetesConfig:
-                  description: oVNKubernetesConfig configures the ovn-kubernetes plugin.
-                    This is currently not implemented.
+                  description: ovnKubernetesConfig configures the ovn-kubernetes plugin.
                   type: object
                   properties:
                     genevePort:
