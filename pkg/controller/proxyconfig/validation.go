@@ -60,7 +60,7 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 		if proxyConfig.NoProxy != noProxyWildcard {
 			for _, v := range strings.Split(proxyConfig.NoProxy, ",") {
 				v = strings.TrimSpace(v)
-				errDomain := validation.DomainName(v, false)
+				errDomain := validation.DomainName(v, true)
 				_, _, errCIDR := net.ParseCIDR(v)
 				if errDomain != nil && errCIDR != nil {
 					return fmt.Errorf("invalid noProxy: %v", v)
