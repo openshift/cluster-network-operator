@@ -41,7 +41,7 @@ spec:
         - -c
         - |
           #!/bin/bash
-          set -euo pipefail
+          set -e
           if [[ -f "/env/${K8S_NODE}" ]]; then
             set -o allexport
             source "/env/${K8S_NODE}"
@@ -184,6 +184,15 @@ spec:
             echo "waiting for db endpoint"
             sleep 5
           done
+
+          hybrid_overlay_flags=
+          if [[ -n "{{.OVNHybridOverlayEnable}}" ]]; then
+            hybrid_overlay_flags="--enable-hybrid-overlay"
+            if [[ -n "{{.OVNHybridOverlayNetCIDR}}" ]]; then
+              hybrid_overlay_flags="${hybrid_overlay_flags} --hybrid-overlay-cluster-subnets={{.OVNHybridOverlayNetCIDR}}"
+            fi
+          fi
+
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --cluster-subnets "${OVN_NET_CIDR}" \
             --k8s-service-cidr "${OVN_SVC_CIDR}" \
@@ -192,11 +201,16 @@ spec:
             --nb-address "tcp://${db_ip}:{{.OVN_NB_PORT}}" \
             --sb-address "tcp://${db_ip}:{{.OVN_SB_PORT}}" \
             --nodeport --gateway-mode local \
+            ${hybrid_overlay_flags} \
             --pidfile /var/run/openvswitch/ovnkube-node.pid \
-            --loglevel "${OVN_KUBE_LOG_LEVEL}" --logfile /dev/stdout
+            --loglevel "${OVN_KUBE_LOG_LEVEL}"  --logfile /dev/stdout
         env:
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
+        - name: OVN_HYBRID_OVERLAY_ENABLE
+          value: "{{ .OVNHybridOverlayEnable }}"
+        - name: OVN_HYBRID_OVERLAY_NET_CIDR
+          value: "{{ .OVNHybridOverlayNetCIDR }}"
         # for kubectl
         - name: KUBERNETES_SERVICE_PORT
           value: "{{.KUBERNETES_SERVICE_PORT}}"
