@@ -61,6 +61,14 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.U
 	}
 	data.Data["OVN_service_cidr"] = svcpools
 
+	if c.HybridOverlayConfig != nil {
+		data.Data["OVNHybridOverlayNetCIDR"] = c.HybridOverlayConfig.HybridClusterNetwork[0].CIDR
+		data.Data["OVNHybridOverlayEnable"] = "true"
+	} else {
+		data.Data["OVNHybridOverlayNetCIDR"] = ""
+		data.Data["OVNHybridOverlayEnable"] = ""
+	}
+
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/ovn-kubernetes"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render manifests")
@@ -97,11 +105,17 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	pn := prev.DefaultNetwork.OVNKubernetesConfig
 	nn := next.DefaultNetwork.OVNKubernetesConfig
+	errs := []error{}
 
-	if reflect.DeepEqual(pn, nn) {
-		return []error{}
+	if !reflect.DeepEqual(pn.MTU, nn.MTU) {
+		errs = append(errs, errors.Errorf("cannot change ovn-kubernetes MTU"))
 	}
-	return []error{errors.Errorf("cannot change ovn-kubernetes configuration")}
+	if pn.HybridOverlayConfig != nil {
+		if !reflect.DeepEqual(pn.HybridOverlayConfig, nn.HybridOverlayConfig) {
+			errs = append(errs, errors.Errorf("once set cannot change ovn-kubernetes Hybrid Overlay Config"))
+		}
+	}
+	return errs
 }
 
 func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
