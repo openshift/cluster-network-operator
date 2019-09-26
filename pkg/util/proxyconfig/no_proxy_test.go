@@ -103,7 +103,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
-			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
+			want: ".amazonaws.com,.cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,api.test.cluster.com," +
 				"etcd-0.test.cluster.com,etcd-1.test.cluster.com,etcd-2.test.cluster.com,localhost",
 			wantErr: false,
@@ -115,7 +115,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
-			want: ".cluster.local,.ec2.internal,.svc,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
+			want: ".amazonaws.com,.cluster.local,.ec2.internal,.svc,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,api.test.cluster.com," +
 				"etcd-0.test.cluster.com,etcd-1.test.cluster.com,etcd-2.test.cluster.com,localhost",
 			wantErr: false,
@@ -127,7 +127,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
-			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
+			want: ".amazonaws.com,.cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,172.30.0.1,api-int.test.cluster.com,api.test.cluster.com," +
 				"etcd-0.test.cluster.com,etcd-1.test.cluster.com,etcd-2.test.cluster.com,localhost",
 			wantErr: false,
@@ -139,7 +139,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
-			want: ".cluster.local,.foo.test.com,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
+			want: ".amazonaws.com,.cluster.local,.foo.test.com,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,api-int.test.cluster.com," +
 				"api.test.cluster.com,etcd-0.test.cluster.com,etcd-1.test.cluster.com,etcd-2.test.cluster.com,localhost",
 			wantErr: false,

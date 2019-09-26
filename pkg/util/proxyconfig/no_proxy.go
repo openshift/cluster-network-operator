@@ -81,6 +81,10 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 	// TODO: Add support for additional cloud providers.
 	switch infra.Status.PlatformStatus.Type {
 	case configv1.AWSPlatformType:
+		// Bypass proxy to aws service api endpoints: https://docs.aws.amazon.com/general/latest/gr/rande.html
+		// Note: Can't be region scoped due to Route53.
+		set.Insert(".amazonaws.com")
+		// AWS doesn't have a consistent naming scheme for all regions.
 		region := infra.Status.PlatformStatus.AWS.Region
 		if region == "us-east-1" {
 			set.Insert(".ec2.internal")
