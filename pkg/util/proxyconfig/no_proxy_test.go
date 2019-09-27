@@ -35,7 +35,24 @@ func proxyConfigWithNoProxy(noProxy string) *configv1.Proxy {
 	return proxy
 }
 
-func infraConfig(domain, region string) *configv1.Infrastructure {
+func infraConfig(platform configv1.PlatformType, domain, region string) *configv1.Infrastructure {
+	platformStatus := &configv1.PlatformStatus{}
+	switch platform {
+	case configv1.AWSPlatformType:
+		platformStatus = &configv1.PlatformStatus{
+			Type: configv1.AWSPlatformType,
+			AWS: &configv1.AWSPlatformStatus{
+				Region: region,
+			},
+		}
+	case configv1.GCPPlatformType:
+		platformStatus = &configv1.PlatformStatus{
+			Type: configv1.GCPPlatformType,
+			GCP: &configv1.GCPPlatformStatus{
+				Region: region,
+			},
+		}
+	}
 	return &configv1.Infrastructure{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-infra",
@@ -43,13 +60,8 @@ func infraConfig(domain, region string) *configv1.Infrastructure {
 		Status: configv1.InfrastructureStatus{
 			APIServerURL:         "https://api." + domain + ":6443",
 			APIServerInternalURL: "https://api-int." + domain + ":6443",
-			PlatformStatus: &configv1.PlatformStatus{
-				Type: configv1.AWSPlatformType,
-				AWS: &configv1.AWSPlatformStatus{
-					Region: region,
-				},
-			},
-			EtcdDiscoveryDomain: domain,
+			PlatformStatus:       platformStatus,
+			EtcdDiscoveryDomain:  domain,
 		},
 	}
 }
@@ -96,10 +108,10 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{name: "valid proxy config",
+		{name: "valid proxy config with aws provider",
 			args: args{
 				proxy:   proxyConfig(),
-				infra:   infraConfig("test.cluster.com", "us-west-2"),
+				infra:   infraConfig(configv1.AWSPlatformType, "test.cluster.com", "us-west-2"),
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
@@ -108,10 +120,22 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				"etcd-0.test.cluster.com,etcd-1.test.cluster.com,etcd-2.test.cluster.com,localhost",
 			wantErr: false,
 		},
+		{name: "valid proxy config with gcp provider",
+			args: args{
+				proxy:   proxyConfig(),
+				infra:   infraConfig(configv1.GCPPlatformType, "test.cluster.com", "us-west2"),
+				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
+				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
+			},
+			want: ".cluster.local,.svc,10.0.0.0/16,10.128.0.0/14,127.0.0.1,169.254.169.254,172.30.0.0/16," +
+				"api-int.test.cluster.com,api.test.cluster.com,etcd-0.test.cluster.com,etcd-1.test.cluster.com," +
+				"etcd-2.test.cluster.com,localhost,metadata,metadata.google.internal,metadata.google.internal.",
+			wantErr: false,
+		},
 		{name: "valid proxy config using us-east-1 aws region",
 			args: args{
 				proxy:   proxyConfig(),
-				infra:   infraConfig("test.cluster.com", "us-east-1"),
+				infra:   infraConfig(configv1.AWSPlatformType, "test.cluster.com", "us-east-1"),
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
@@ -123,7 +147,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 		{name: "valid proxy config with single user noProxy",
 			args: args{
 				proxy:   proxyConfigWithNoProxy("172.30.0.1"),
-				infra:   infraConfig("test.cluster.com", "us-west-2"),
+				infra:   infraConfig(configv1.AWSPlatformType, "test.cluster.com", "us-west-2"),
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
@@ -135,7 +159,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 		{name: "valid proxy config with multiple user noProxy",
 			args: args{
 				proxy:   proxyConfigWithNoProxy("172.30.0.1,.foo.test.com,199.161.0.0/16"),
-				infra:   infraConfig("test.cluster.com", "us-west-2"),
+				infra:   infraConfig(configv1.AWSPlatformType, "test.cluster.com", "us-west-2"),
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
@@ -147,7 +171,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 		{name: "invalid api server url",
 			args: args{
 				proxy:   proxyConfigWithNoProxy("172.30.0.1."),
-				infra:   infraConfig("^&", "us-west-2"),
+				infra:   infraConfig(configv1.AWSPlatformType, "^&", "us-west-2"),
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
@@ -156,7 +180,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 		{name: "invalid missing service network",
 			args: args{
 				proxy:   proxyConfigWithNoProxy("172.30.0.1."),
-				infra:   infraConfig("^&", "us-west-2"),
+				infra:   infraConfig(configv1.AWSPlatformType, "^&", "us-west-2"),
 				network: netConfig("10.128.0.0/14", ""),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
@@ -165,7 +189,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 		{name: "invalid missing cluster network",
 			args: args{
 				proxy:   proxyConfigWithNoProxy("172.30.0.1."),
-				infra:   infraConfig("^&", "us-west-2"),
+				infra:   infraConfig(configv1.AWSPlatformType, "^&", "us-west-2"),
 				network: netConfig("", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
@@ -174,7 +198,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 		{name: "invalid empty configmap",
 			args: args{
 				proxy:   proxyConfigWithNoProxy("172.30.0.1."),
-				infra:   infraConfig("^&", "us-west-2"),
+				infra:   infraConfig(configv1.AWSPlatformType, "^&", "us-west-2"),
 				network: netConfig("", "172.30.0.0/16"),
 				cluster: cfgMap(),
 			},
@@ -183,7 +207,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 		{name: "invalid configmap key",
 			args: args{
 				proxy:   proxyConfigWithNoProxy("172.30.0.1."),
-				infra:   infraConfig("^&", "us-west-2"),
+				infra:   infraConfig(configv1.AWSPlatformType, "^&", "us-west-2"),
 				network: netConfig("", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig("bad-key", cfgMapData),
 			},
@@ -192,7 +216,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 		{name: "invalid configmap data",
 			args: args{
 				proxy:   proxyConfigWithNoProxy("172.30.0.1."),
-				infra:   infraConfig("^&", "us-west-2"),
+				infra:   infraConfig(configv1.AWSPlatformType, "^&", "us-west-2"),
 				network: netConfig("", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig("bad-key", "bad data"),
 			},
