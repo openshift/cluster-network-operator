@@ -1,13 +1,7 @@
----
-# ovnkube-node
-# daemonset version 3
-# starts node daemons for ovs and ovn, each in a separate container
-# it is run on all nodes
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
   name: ovnkube-node
-  # namespace set up by install
   namespace: openshift-ovn-kubernetes
   annotations:
     kubernetes.io/description: |
@@ -28,204 +22,261 @@ spec:
         openshift.io/component: network
         kubernetes.io/os: "linux"
     spec:
-      # Requires fairly broad permissions - ability to read all services and network functions as well
-      # as all pods.
       serviceAccountName: ovn-kubernetes-node
       hostNetwork: true
       hostPID: true
       priorityClassName: "system-node-critical"
+      # volumes in all containers:
+      # (container) -> (host)
+      # /etc/openvswitch -> /var/lib/openvswitch/etc - ovsdb system id
+      # /var/lib/openvswitch -> /var/lib/openvswitch/data - ovsdb data
+      # /run/openvswitch -> tmpfs - ovsdb sockets
+      # /env -> configmap env-overrides - debug overrides
       containers:
-      # ovsdb-server and ovs-switchd daemons
+      # ovsdb and ovs-vswitchd
       - name: ovs-daemons
         image: {{.OvnImage}}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          if [[ -f "/env/${K8S_NODE}" ]]; then
+            set -o allexport
+            source "/env/${K8S_NODE}"
+            set +o allexport
+          fi
+          chown -R openvswitch:openvswitch /run/openvswitch
+          chown -R openvswitch:openvswitch /etc/openvswitch
+          function quit {
+              /usr/share/openvswitch/scripts/ovs-ctl stop
+              exit 0
+          }
+          trap quit SIGTERM
+          /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --system-id=random
+          ovs-appctl vlog/set "file:${OVS_LOG_LEVEL}"
 
-        command: ["/root/ovnkube.sh", "ovs-server"]
-
+          tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
+          tail -F --pid=$(cat /var/run/openvswitch/ovsdb-server.pid) /var/log/openvswitch/ovsdb-server.log &
+          wait
+        env:
+        - name: OVS_LOG_LEVEL
+          value: info
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         securityContext:
-          # Permission could be reduced by selecting an appropriate SELinux policy
           privileged: true
-
         volumeMounts:
         - mountPath: /lib/modules
           name: host-modules
           readOnly: true
-        - mountPath: /run/openvswitch
-          name: host-run-ovs
-        - mountPath: /var/run/openvswitch
-          name: host-var-run-ovs
         - mountPath: /sys
           name: host-sys
           readOnly: true
+        - mountPath: /run/openvswitch
+          name: run-openvswitch
         - mountPath: /etc/openvswitch
-          name: host-config-openvswitch
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch
+          name: var-lib-openvswitch
+        - mountPath: /env
+          name: env-overrides
         resources:
           requests:
             cpu: 100m
             memory: 300Mi
-        env:
-        - name: OVN_DAEMONSET_VERSION
-          value: "3"
-
-
-      # firewall rules for ovn - assumed to be setup
-      # iptables -A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 6641 -j ACCEPT
-      # iptables -A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 6642 -j ACCEPT
-      # ovs flow for ovn (geneve)
-      # /usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
-      # The network container launches the ovn-k8s-cni-overlay process, the kube-proxy, and the local DNS service.
-      # It relies on an up to date node-config.yaml being present.
-      - name: ovn-controller
-        image: {{.OvnImage}}
-
-        command: ["/root/ovnkube.sh", "ovn-controller"]
-
-        securityContext:
-          # Permission could be reduced by selecting an appropriate SELinux policy
-          privileged: true
-
-        volumeMounts:
-        # Directory which contains the host configuration.
-        - mountPath: /var/lib/openvswitch/
-          name: host-var-lib-ovs
-        - mountPath: /var/run/openvswitch/
-          name: host-var-run-ovs
-
-        resources:
-          requests:
-            cpu: 100m
-            memory: 300Mi
-        env:
-        - name: OVN_DAEMONSET_VERSION
-          value: "3"
-        - name: OVNKUBE_LOGLEVEL
-          value: "4"
-        - name: OVN_NB_PORT
-          value: "9641"
-        - name: OVN_SB_PORT
-          value: "9642"
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
-        - name: K8S_NODE
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        - name: K8S_APISERVER
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: k8s_apiserver
-        - name: OVN_KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-
-      - name: ovn-node
-        image: {{.OvnImage}}
-
-        command: ["/root/ovnkube.sh", "ovn-node"]
-
-        securityContext:
-          # Permission could be reduced by selecting an appropriate SELinux policy
-          privileged: true
-
-        volumeMounts:
-        - mountPath: /host
-          name: host-slash
-          readOnly: true
-        # Directory which contains the host configuration.
-        - mountPath: /var/lib/openvswitch/
-          name: host-var-lib-ovs
-        - mountPath: /var/run/openvswitch/
-          name: host-var-run-ovs
-        - mountPath: /var/run/ovn-kubernetes/
-          name: host-var-run-ovn-kubernetes
-        # CNI related mounts which we take over
-        - mountPath: /host/opt/cni/bin
-          name: host-cni-bin
-        - mountPath: /etc/cni/net.d
-          name: host-cni-netd
-        - mountPath: /var/lib/cni/networks/ovn-k8s-cni-overlay
-          name: host-var-lib-cni-networks-ovn-kubernetes
-
-        resources:
-          requests:
-            cpu: 100m
-            memory: 300Mi
-        env:
-        - name: OVN_DAEMONSET_VERSION
-          value: "3"
-        - name: OVNKUBE_LOGLEVEL
-          value: "4"
-        - name: OVN_NB_PORT
-          value: "9641"
-        - name: OVN_SB_PORT
-          value: "9642"
-        - name: OVN_GATEWAY_MODE
-          value: local
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
-        - name: K8S_NODE
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        - name: K8S_APISERVER
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: k8s_apiserver
-        - name: OVN_KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-
+        terminationMessagePolicy: FallbackToLogsOnError
+        livenessProbe:
+          exec:
+            command:
+            - /usr/share/openvswitch/scripts/ovs-ctl
+            - status
+          initialDelaySeconds: 15
+          periodSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - /usr/share/openvswitch/scripts/ovs-ctl
+            - status
+          initialDelaySeconds: 15
+          periodSeconds: 5
         lifecycle:
           preStop:
             exec:
-              command: ["rm","-f","/etc/cni/net.d/10-ovn-kubernetes.conf", "/host/opt/cni/bin/ovn-k8s-cni-overlay"]
+              command: ["/usr/share/openvswitch/scripts/ovs-ctl", "stop"]
+        terminationGracePeriodSeconds: 10
+
+      # ovn-controller: programs the vswitch with flows from the sbdb
+      - name: ovn-controller
+        image: {{.OvnImage}}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          if [[ -f "/env/${K8S_NODE}" ]]; then
+            set -o allexport
+            source "/env/${K8S_NODE}"
+            set +o allexport
+          fi
+          exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
+            --no-chdir --pidfile=/var/run/openvswitch/ovn-controller.pid \
+            -vconsole:"${OVN_LOG_LEVEL}"
+        securityContext:
+          privileged: true
+        env:
+        - name: OVN_LOG_LEVEL
+          value: info
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - mountPath: /run/openvswitch
+          name: run-openvswitch
+        - mountPath: /etc/openvswitch
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch
+          name: var-lib-openvswitch
+        - mountPath: /env
+          name: env-overrides
+        terminationMessagePolicy: FallbackToLogsOnError
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+
+      # ovnkube-node: does node-level bookkeeping and configuration
+      - name: ovnkube-node
+        image: {{.OvnImage}}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          if [[ -f "/env/${K8S_NODE}" ]]; then
+            set -o allexport
+            source "/env/${K8S_NODE}"
+            set +o allexport
+          fi
+          cp -f /usr/libexec/cni/ovn-k8s-cni-overlay /cni-bin-dir/
+          retries=0
+          while true; do
+            db_ip=$(kubectl get ep ovnkube-db -o jsonpath='{.subsets[0].addresses[0].ip}')
+            if [[ -n "${db_ip}" ]]; then
+              break
+            fi
+            (( retries += 1 ))
+            if [[ "${retries}" -gt 40 ]]; then
+              echo "db endpoint never came up"
+              exit 1
+            fi
+            echo "waiting for db endpoint"
+            sleep 5
+          done
+          exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
+            --cluster-subnets "${OVN_NET_CIDR}" \
+            --k8s-service-cidr "${OVN_SVC_CIDR}" \
+            --k8s-apiserver "{{.K8S_APISERVER}}" \
+            --nb-address "tcp://${db_ip}:{{.OVN_NB_PORT}}" \
+            --sb-address "tcp://${db_ip}:{{.OVN_SB_PORT}}" \
+            --nodeport --gateway-mode local \
+            --pidfile /var/run/openvswitch/ovnkube-node.pid \
+            --loglevel "${OVN_KUBE_LOG_LEVEL}" --logfile /dev/stdout
+        env:
+        - name: OVN_KUBE_LOG_LEVEL
+          value: "4"
+        # for kubectl
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
+        - name: OVN_NET_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: net_cidr
+        - name: OVN_SVC_CIDR
+          valueFrom:
+            configMapKeyRef:
+              name: ovn-config
+              key: svc_cidr
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        securityContext:
+          privileged: true
+        volumeMounts:
+        # for the iptables wrapper
+        - mountPath: /host
+          name: host-slash
+          readOnly: true
+        # for the CNI server socket
+        - mountPath: /run/ovn-kubernetes/
+          name: host-run-ovn-kubernetes
+        # accessing bind-mounted net namespaces
+        - mountPath: /run/netns
+          name: host-run-netns
+          readOnly: true
+        # for installing the CNI plugin binary
+        - mountPath: /cni-bin-dir
+          name: host-cni-bin
+        # for installing the CNI configuration file
+        - mountPath: /etc/cni/net.d
+          name: host-cni-netd
+        # Where we store IP allocations
+        - mountPath: /var/lib/cni/networks/ovn-k8s-cni-overlay
+          name: host-var-lib-cni-networks-ovn-kubernetes
+        - mountPath: /run/openvswitch
+          name: run-openvswitch
+        - mountPath: /etc/openvswitch
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch
+          name: var-lib-openvswitch
+        - mountPath: /env
+          name: env-overrides
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+        lifecycle:
+          preStop:
+            exec:
+              command: ["rm","-f","/etc/cni/net.d/10-ovn-kubernetes.conf"]
         readinessProbe:
           exec:
-            # ovnkube --node writes this file when it is ready to handle pod requests.
             command: ["test", "-f", "/etc/cni/net.d/10-ovn-kubernetes.conf"]
           initialDelaySeconds: 5
           periodSeconds: 5
-
       nodeSelector:
         beta.kubernetes.io/os: "linux"
       volumes:
+      # used for iptables wrapper scripts
       - name: host-slash
         hostPath:
           path: /
       - name: host-modules
         hostPath:
           path: /lib/modules
-      - name: host-var-lib-ovs
+      - name: host-run-netns
         hostPath:
-          path: /var/lib/openvswitch
-      - name: host-run-ovs
+          path: /run/netns
+      - name: var-lib-openvswitch
         hostPath:
-          path: /run/openvswitch
-      - name: host-var-run-ovs
+          path: /var/lib/openvswitch/data
+      - name: etc-openvswitch
         hostPath:
-          path: /var/run/openvswitch
-      - name: host-var-run-ovn-kubernetes
+          path: /var/lib/openvswitch/etc
+      - name: run-openvswitch
+        emptyDir: {}
+      # For CNI server
+      - name: host-run-ovn-kubernetes
         hostPath:
-          path: /var/run/ovn-kubernetes
+          path: /run/ovn-kubernetes
       - name: host-sys
         hostPath:
           path: /sys
@@ -235,11 +286,12 @@ spec:
       - name: host-cni-netd
         hostPath:
           path: {{.CNIConfDir}}
-      - name: host-config-openvswitch
-        hostPath:
-          path: /etc/origin/openvswitch
       - name: host-var-lib-cni-networks-ovn-kubernetes
         hostPath:
           path: /var/lib/cni/networks/ovn-k8s-cni-overlay
+      - name: env-overrides
+        configMap:
+          name: env-overrides
+          optional: true
       tolerations:
       - operator: "Exists"

@@ -9,15 +9,17 @@ metadata:
   name: ovnkube-db
   namespace: openshift-ovn-kubernetes
 spec:
+  selector:
+    name: ovnkube-master
   ports:
   - name: north
-    port: 9641
+    port: {{.OVN_NB_PORT}}
     protocol: TCP
-    targetPort: 9641
+    targetPort: {{.OVN_NB_PORT}}
   - name: south
-    port: 9642
+    port: {{.OVN_SB_PORT}}
     protocol: TCP
-    targetPort: 9642
+    targetPort: {{.OVN_SB_PORT}}
   sessionAffinity: None
   clusterIP: None
   type: ClusterIP
