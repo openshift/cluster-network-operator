@@ -146,6 +146,30 @@ spec:
       mtu: 1400
 ```
 
+Additionally, you can configure per-node verbosity for ovn-kubernetes. This is useful
+if you want to debug an issue, and can reproduce it on a single node. To do this,
+create a special ConfigMap with keys based on the Node's name:
+
+```yaml
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: env-overrides
+  namespace: openshift-ovn-kubernetes
+  annotations:
+data:
+# to set the node processes on a single node to verbose
+# replace this with the node's name (from oc get nodes)
+  ip-10-0-135-96.us-east-2.compute.internal: |
+    OVN_KUBE_LOG_LEVEL=5
+    OVN_LOG_LEVEL=dbg
+    OVS_LOG_LEVEL=dbg
+# To adjust master log levels, use _master
+  _master: |
+    OVN_KUBE_LOG_LEVEL=5
+    OVN_LOG_LEVEL=dbg
+```
+
 ### Configuring Kuryr-Kubernetes
 Kuryr-Kubernetes is a CNI plugin that uses OpenStack Neutron to network OpenShift Pods, and OpenStack Octavia to create load balancers for Services. In general it is useful when OpenShift is running on an OpenStack cluster, as you can use the same SDN (OpenStack Neutron) to provide networking for both the VMs OpenShift is running on, and the Pods created by OpenShift. In such case avoidance of double encapsulation gives you two advantages: improved performace (in terms of both latency and throughput) and lower complexity of the networking architecture.
 

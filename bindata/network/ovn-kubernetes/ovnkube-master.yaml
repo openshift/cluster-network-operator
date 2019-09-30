@@ -1,12 +1,7 @@
-# ovnkube-master
-# daemonset version 3
-# starts master daemons, each in a separate container
-# it is run on the master node(s)
 kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: ovnkube-master
-  # namespace set up by install
   namespace: openshift-ovn-kubernetes
   annotations:
     kubernetes.io/description: |
@@ -19,6 +14,11 @@ spec:
       name: ovnkube-master
   strategy:
     type: RollingUpdate
+    rollingUpdate:
+      # by default, Deployments spin up the new pod before terminating the old one
+      # but we don't want that - because ovsdb holds the lock.
+      maxSurge: 0
+      maxUnavailable: 1
   template:
     metadata:
       labels:
@@ -28,215 +28,178 @@ spec:
         openshift.io/component: network
         kubernetes.io/os: "linux"
     spec:
-      # Requires fairly broad permissions - ability to read all services and network functions as well
-      # as all pods.
       serviceAccountName: ovn-kubernetes-controller
       hostNetwork: true
-      hostPID: true
       priorityClassName: "system-cluster-critical"
+      # volumes in all containers:
+      # (container) -> (host)
+      # /etc/openvswitch -> /var/lib/ovn/etc - ovsdb data
+      # /var/lib/openvswitch -> /var/lib/ovn/data - ovsdb pki state
+      # /run/openvswitch -> tmpfs - sockets & pids
+      # /env -> configmap env-overrides - debug overrides
       containers:
-      # firewall rules for ovn - assumed to be setup
-      # iptables -A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 6641 -j ACCEPT
-      # iptables -A OS_FIREWALL_ALLOW -p tcp -m state --state NEW -m tcp --dport 6642 -j ACCEPT
-      # ovs flow for ovn (geneve)
-      # /usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
-
-      # run-ovn-northd - v3
-      - name: run-ovn-northd
+      # ovn-northd: convert network objects in nbdb to flows in sbdb
+      - name: northd
         image: {{.OvnImage}}
-
-        command: ["/root/ovnkube.sh", "run-ovn-northd"]
-
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          if [[ -f /env/_master ]]; then
+            set -o allexport
+            source /env/_master
+            set +o allexport
+          fi
+          exec ovn-northd --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off --pidfile=/var/run/openvswitch/ovn-northd.pid
+        env:
+        - name: OVN_LOG_LEVEL
+          value: info
         volumeMounts:
-        # ovn db is stored in the pod in /etc/openvswitch (default ovs tool location)
-        # and on the host in /var/lib/openvswitch/
         - mountPath: /etc/openvswitch/
-          name: host-var-lib-ovs
+          name: etc-openvswitch
         - mountPath: /var/lib/openvswitch/
-          name: host-var-lib-ovs
-        - mountPath: /var/run/openvswitch/
-          name: host-var-run-ovs
-
+          name: var-lib-openvswitch
+        - mountPath: /run/openvswitch/
+          name: run-openvswitch
+        - mountPath: /env
+          name: env-overrides
         resources:
           requests:
             cpu: 100m
             memory: 300Mi
-        env:
-        - name: OVN_DAEMONSET_VERSION
-          value: "3"
-        - name: OVN_LOG_NORTHD
-          value: "-vconsole:info"
-        - name: OVN_NB_PORT
-          value: "9641"
-        - name: OVN_SB_PORT
-          value: "9642"
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
-        - name: K8S_NODE
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        - name: K8S_APISERVER
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: k8s_apiserver
-        - name: OVN_KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-      # end of container
 
-      # nb-ovsdb - v3
-      - name: nb-ovsdb
+      # nbdb: the northbound, or logical network object DB
+      - name: nbdb
         image: {{.OvnImage}}
-
-        command: ["/root/ovnkube.sh", "nb-ovsdb"]
-
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          if [[ -f /env/_master ]]; then
+            set -o allexport
+            source /env/_master
+            set +o allexport
+          fi
+          exec /usr/share/openvswitch/scripts/ovn-ctl run_nb_ovsdb \
+            --no-monitor \
+            --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off"
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/bash
+              - -c
+              - |
+                retries=0
+                while ! ovn-nbctl -t 5 set-connection ptcp:{{.OVN_NB_PORT}} -- set connection . inactivity_probe=0; do
+                  (( retries += 1 ))
+                  if [[ "${retries}" -gt 40 ]]; then
+                    echo "too many failed ovn-nbctl attempts, giving up"
+                    exit 1
+                  fi
+                  sleep 2
+                done
+        env:
+        - name: OVN_LOG_LEVEL
+          value: info
         volumeMounts:
-        # ovn db is stored in the pod in /etc/openvswitch (default ovs tool location)
-        # and on the host in /var/lib/openvswitch/
         - mountPath: /etc/openvswitch/
-          name: host-var-lib-ovs
+          name: etc-openvswitch
         - mountPath: /var/lib/openvswitch/
-          name: host-var-lib-ovs
-        - mountPath: /var/run/openvswitch/
-          name: host-var-run-ovs
-
+          name: var-lib-openvswitch
+        - mountPath: /run/openvswitch/
+          name: run-openvswitch
+        - mountPath: /env
+          name: env-overrides
         resources:
           requests:
             cpu: 100m
             memory: 300Mi
-        env:
-        - name: OVN_DAEMONSET_VERSION
-          value: "3"
-        - name: OVN_LOG_NB
-          value: "-vconsole:info -vfile:info"
-        - name: OVN_NB_PORT
-          value: "9641"
-        - name: OVN_SB_PORT
-          value: "9642"
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
-        - name: K8S_NODE
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        - name: K8S_APISERVER
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: k8s_apiserver
-        - name: OVN_KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-      # end of container
 
-      # sb-ovsdb - v3
-      - name: sb-ovsdb
+      # sbdb: the southbound, or flow DB
+      - name: sbdb
         image: {{.OvnImage}}
-
-        command: ["/root/ovnkube.sh", "sb-ovsdb"]
-
-        volumeMounts:
-        # ovn db is stored in the pod in /etc/openvswitch (default ovs tool location)
-        # and on the host in /var/lib/openvswitch/
-        - mountPath: /etc/openvswitch/
-          name: host-var-lib-ovs
-        - mountPath: /var/lib/openvswitch/
-          name: host-var-lib-ovs
-        - mountPath: /var/run/openvswitch/
-          name: host-var-run-ovs
-        - mountPath: /var/run/kubernetes/
-          name: host-var-run-kubernetes
-
-        resources:
-          requests:
-            cpu: 100m
-            memory: 300Mi
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          if [[ -f "/env/_master" ]]; then
+            set -o allexport
+            source "/env/_master"
+            set +o allexport
+          fi
+          exec /usr/share/openvswitch/scripts/ovn-ctl run_sb_ovsdb \
+            --no-monitor \
+            --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off"
         env:
-        - name: OVN_DAEMONSET_VERSION
-          value: "3"
-        - name: OVN_LOG_SB
-          value: "-vconsole:info -vfile:info"
-        - name: OVN_NB_PORT
-          value: "9641"
-        - name: OVN_SB_PORT
-          value: "9642"
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
-        - name: K8S_NODE
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        - name: K8S_APISERVER
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: k8s_apiserver
-        - name: OVN_KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-      # end of container
+        - name: OVN_LOG_LEVEL
+          value: info
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/bash
+              - -c
+              - |
+                retries=0
+                while ! ovn-sbctl -t 5 set-connection ptcp:{{.OVN_SB_PORT}} -- set connection . inactivity_probe=0; do
+                  (( retries += 1 ))
+                  if [[ "${retries}" -gt 40 ]]; then
+                    echo "too many failed ovn-sbctl attempts, giving up"
+                    exit 1
+                  fi
+                  sleep 2
+                done
+        volumeMounts:
+        - mountPath: /etc/openvswitch/
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch/
+          name: var-lib-openvswitch
+        - mountPath: /run/openvswitch/
+          name: run-openvswitch
+        - mountPath: /env
+          name: env-overrides
 
+      # ovnkube master: convert kubernetes objects in to nbdb logical network components
       - name: ovnkube-master
         image: {{.OvnImage}}
-
-        command: ["/root/ovnkube.sh", "ovn-master"]
-
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          if [[ -f "/env/_master" ]]; then
+            set -o allexport
+            source "/env/_master"
+            set +o allexport
+          fi
+          exec /usr/bin/ovnkube \
+            --init-master "${K8S_NODE}" \
+            --cluster-subnets "${OVN_NET_CIDR}" \
+            --k8s-service-cidr "${OVN_SVC_CIDR}" \
+            --k8s-apiserver "{{.K8S_APISERVER}}" \
+            --nodeport \
+            --loglevel "${OVN_KUBE_LOG_LEVEL}" \
+            --logfile /dev/stdout
         volumeMounts:
-        # ovn db is stored in the pod in /etc/openvswitch (default ovs tool location)
-        # and on the host in /var/lib/openvswitch/
         - mountPath: /etc/openvswitch/
-          name: host-var-lib-ovs
+          name: etc-openvswitch
         - mountPath: /var/lib/openvswitch/
-          name: host-var-lib-ovs
-        - mountPath: /var/run/openvswitch/
-          name: host-var-run-ovs
-        - mountPath: /var/run/kubernetes/
-          name: host-var-run-kubernetes
-
+          name: var-lib-openvswitch
+        - mountPath: /run/openvswitch/
+          name: run-openvswitch
+        - mountPath: /env
+          name: env-overrides
         resources:
           requests:
             cpu: 100m
             memory: 300Mi
         env:
-        - name: OVN_DAEMONSET_VERSION
-          value: "3"
-        - name: OVN_MASTER
-          value: "true"
-        - name: OVNKUBE_LOGLEVEL
+        - name: OVN_KUBE_LOG_LEVEL
           value: "4"
-        - name: OVN_NB_PORT
-          value: "9641"
-        - name: OVN_SB_PORT
-          value: "9642"
         - name: OVN_NET_CIDR
           valueFrom:
             configMapKeyRef:
@@ -251,37 +214,26 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: K8S_APISERVER
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: k8s_apiserver
-        - name: OVN_KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-      # end of container
-
       nodeSelector:
         node-role.kubernetes.io/master: ""
         beta.kubernetes.io/os: "linux"
       volumes:
-      - name: host-modules
+      - name: etc-openvswitch
         hostPath:
-          path: /lib/modules
-      - name: host-var-lib-ovs
+          path: /var/lib/ovn/etc
+      - name: var-lib-openvswitch
         hostPath:
-          path: /var/lib/openvswitch
-      - name: host-var-run-ovs
-        hostPath:
-          path: /var/run/openvswitch
-      - name: host-var-run-kubernetes
-        hostPath:
-          path: /var/run/kubernetes
+          path: /var/lib/ovn/data
+      - name: run-openvswitch
+        emptyDir: {}
+      - name: env-overrides
+        configMap:
+          name: env-overrides
+          optional: true
       tolerations:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"
-        effect: "NoSchedule"
       - key: "node.kubernetes.io/not-ready"
         operator: "Exists"
-        effect: "NoSchedule"
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"

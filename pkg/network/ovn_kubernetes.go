@@ -14,6 +14,9 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/render"
 )
 
+const OVN_NB_PORT = "9641"
+const OVN_SB_PORT = "9642"
+
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
 // This creates
 // - the ClusterNetwork object
@@ -31,10 +34,14 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.U
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["OvnImage"] = os.Getenv("OVN_IMAGE")
+	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
+	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
 	data.Data["K8S_APISERVER"] = fmt.Sprintf("https://%s:%s", os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT"))
 	data.Data["MTU"] = c.MTU
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
+	data.Data["OVN_NB_PORT"] = OVN_NB_PORT
+	data.Data["OVN_SB_PORT"] = OVN_SB_PORT
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
