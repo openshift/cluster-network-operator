@@ -181,6 +181,7 @@ spec:
             --cluster-subnets "${OVN_NET_CIDR}" \
             --k8s-service-cidr "${OVN_SVC_CIDR}" \
             --k8s-apiserver "{{.K8S_APISERVER}}" \
+            --ovn-config-namespace openshift-ovn-kubernetes \
             --nodeport \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --logfile /dev/stdout
