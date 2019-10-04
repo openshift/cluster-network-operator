@@ -40,7 +40,7 @@ spec:
       containers:
       # ovn-northd: convert network objects in nbdb to flows in sbdb
       - name: northd
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
         command:
         - /bin/bash
         - -c
@@ -66,6 +66,12 @@ spec:
             nb_addr_list="${nb_addr_list}ssl:${host}:{{.OVN_NB_PORT}}"
             sb_addr_list="${sb_addr_list}ssl:${host}:{{.OVN_SB_PORT}}"
           done
+          echo /ovn-cert/tls.key
+          cat /ovn-cert/tls.key
+          echo /ovn-cert/tls.crt
+          cat /ovn-cert/tls.crt
+          echo /ovn-ca/ca-bundle.crt
+          cat /ovn-ca/ca-bundle.crt
           
           exec ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
@@ -98,7 +104,7 @@ spec:
 
       # nbdb: the northbound, or logical network object DB. In raft mode 
       - name: nbdb
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
         command:
         - /bin/bash
         - -c
@@ -113,6 +119,12 @@ spec:
           OVN_NODES_ARRAY=({{.OVN_NODES}})
           MASTER_NODE=$(getent ahostsv4 "${OVN_NODES_ARRAY[0]}" | grep RAW | awk '{print $1}')
           LOCALHOST=$(getent ahostsv4 "${K8S_NODE}" | grep RAW | awk '{print $1}')
+          echo /ovn-cert/tls.key
+          cat /ovn-cert/tls.key
+          echo /ovn-cert/tls.crt
+          cat /ovn-cert/tls.crt
+          echo /ovn-ca/ca-bundle.crt
+          cat /ovn-ca/ca-bundle.crt
 
           if [[ "$LOCALHOST" == "$MASTER_NODE" ]]; then
             exec /usr/share/openvswitch/scripts/ovn-ctl \
@@ -191,7 +203,7 @@ spec:
       
       # sbdb: The southbound, or flow DB. In raft mode 
       - name: sbdb
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
         command:
         - /bin/bash
         - -c
@@ -206,6 +218,12 @@ spec:
           OVN_NODES_ARRAY=({{.OVN_NODES}})
           MASTER_NODE=$(getent ahostsv4 "${OVN_NODES_ARRAY[0]}" | grep RAW | awk '{print $1}')
           LOCALHOST=$(getent ahostsv4 "${K8S_NODE}" | grep RAW | awk '{print $1}')
+          echo /ovn-cert/tls.key
+          cat /ovn-cert/tls.key
+          echo /ovn-cert/tls.crt
+          cat /ovn-cert/tls.crt
+          echo /ovn-ca/ca-bundle.crt
+          cat /ovn-ca/ca-bundle.crt
 
           if [[ "$LOCALHOST" == "$MASTER_NODE" ]]; then
             exec /usr/share/openvswitch/scripts/ovn-ctl \
@@ -281,7 +299,7 @@ spec:
 
       # ovnkube master: convert kubernetes objects in to nbdb logical network components
       - name: ovnkube-master
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
         command:
         - /bin/bash
         - -c
@@ -313,6 +331,12 @@ spec:
             nb_addr_list="${nb_addr_list}ssl:${host}:{{.OVN_NB_PORT}}"
             sb_addr_list="${sb_addr_list}ssl://${host}:{{.OVN_SB_PORT}}"
           done
+          echo /ovn-cert/tls.key
+          cat /ovn-cert/tls.key
+          echo /ovn-cert/tls.crt
+          cat /ovn-cert/tls.crt
+          echo /ovn-ca/ca-bundle.crt
+          cat /ovn-ca/ca-bundle.crt
           
           # start nbctl daemon for caching
           export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/run/openvswitch/ovnk-nbctl.pid \
@@ -322,15 +346,10 @@ spec:
 
           exec /usr/bin/ovnkube \
             --init-master "${K8S_NODE}" \
-            --cluster-subnets "${OVN_NET_CIDR}" \
-            --k8s-service-cidr "${OVN_SVC_CIDR}" \
-            --k8s-apiserver "{{.K8S_APISERVER}}" \
-            --ovn-config-namespace openshift-ovn-kubernetes \
-            --nodeport \
+            --config-file=/run/ovnkube-config/ovnkube.conf \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             ${hybrid_overlay_flags} \
-            --logfile /dev/stdout \
             --metrics-bind-address "0.0.0.0:9102" \
             --sb-address "${sb_addr_list}" \
             --sb-client-privkey /ovn-cert/tls.key \
@@ -347,6 +366,8 @@ spec:
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
           name: run-openvswitch
+        - mountPath: /run/ovnkube-config/
+          name: ovnkube-config
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert
@@ -359,17 +380,7 @@ spec:
             memory: 300Mi
         env:
         - name: OVN_KUBE_LOG_LEVEL
-          value: "4"
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
+          value: "{{.OvnkubeLogLevel}}"
         - name: K8S_NODE
           valueFrom:
             fieldRef:
@@ -394,6 +405,9 @@ spec:
           path: /var/lib/ovn/data
       - name: run-openvswitch
         emptyDir: {}
+      - name: ovnkube-config
+        configMap:
+          name: ovnkube-config
       - name: env-overrides
         configMap:
           name: env-overrides
