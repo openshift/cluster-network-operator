@@ -1,9 +1,10 @@
 reviewers:
+  - alexanderConstantinescu
   - danwinship
   - dcbw
   - JacobTanenbaum
-  - knobunc
   - pecameron
+  - rcarrillocruz
   - squeed
 approvers:
   - danwinship
