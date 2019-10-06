@@ -163,9 +163,10 @@ spec:
             set +o allexport
           fi
           cp -f /usr/libexec/cni/ovn-k8s-cni-overlay /cni-bin-dir/
+          ovn_config_namespace=openshift-ovn-kubernetes
           retries=0
           while true; do
-            db_ip=$(kubectl get ep ovnkube-db -o jsonpath='{.subsets[0].addresses[0].ip}')
+            db_ip=$(kubectl get ep -n ${ovn_config_namespace} ovnkube-db -o jsonpath='{.subsets[0].addresses[0].ip}')
             if [[ -n "${db_ip}" ]]; then
               break
             fi
@@ -181,6 +182,7 @@ spec:
             --cluster-subnets "${OVN_NET_CIDR}" \
             --k8s-service-cidr "${OVN_SVC_CIDR}" \
             --k8s-apiserver "{{.K8S_APISERVER}}" \
+            --ovn-config-namespace ${ovn_config_namespace} \
             --nb-address "tcp://${db_ip}:{{.OVN_NB_PORT}}" \
             --sb-address "tcp://${db_ip}:{{.OVN_SB_PORT}}" \
             --nodeport --gateway-mode local \
