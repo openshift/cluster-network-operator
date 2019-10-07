@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   name: sdn-controller
   namespace: openshift-sdn
@@ -10,6 +10,7 @@ metadata:
   labels:
     app: sdn-controller
 spec:
+  replicas: 2
   selector:
     matchLabels:
       app: sdn-controller
@@ -18,6 +19,16 @@ spec:
       labels:
         app: sdn-controller
     spec:
+      affinity:
+        podAntiAffinity:
+           requiredDuringSchedulingIgnoredDuringExecution:
+           - labelSelector:
+               matchExpressions:
+               - key: app
+                 operator: In
+                 values:
+                 - sdn-controller
+             topologyKey: kubernetes.io/hostname
       containers:
       - name: sdn-controller
         image: {{.SDNControllerImage}}
@@ -35,8 +46,6 @@ spec:
           value: "{{.KUBERNETES_SERVICE_HOST}}"
         terminationMessagePolicy: FallbackToLogsOnError
       hostNetwork: true
-      nodeSelector:
-        node-role.kubernetes.io/master: ""
       priorityClassName: "system-cluster-critical"
       restartPolicy: Always
       serviceAccountName: sdn-controller

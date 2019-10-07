@@ -70,14 +70,14 @@ func TestRenderOpenShiftSDN(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-sdn", "sdn-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "openshift-sdn")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "sdn")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "sdn-controller")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-sdn", "sdn-controller")))
 
 	// No netnamespaces by default
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("NetNamespace", "", "openshift-ingress")))
 
-	// make sure all deployments are in the master
+	// make sure all deployments, except the sdn-controller, are on the master,
 	for _, obj := range objs {
-		if obj.GetKind() != "Deployment" {
+		if obj.GetKind() != "Deployment" || obj.GetName() == "sdn-controller" {
 			continue
 		}
 
