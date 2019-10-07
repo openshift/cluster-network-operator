@@ -2,6 +2,7 @@ package status
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/klog"
@@ -46,11 +47,10 @@ type StatusSyncer struct {
 	operatorClient        operatorv1helpers.OperatorClient
 	clusterOperatorClient configv1client.ClusterOperatorsGetter
 	clusterOperatorLister configv1listers.ClusterOperatorLister
-	clusterOperatorSynced cache.InformerSynced
-	eventRecorder         events.Recorder
 
-	// queue only ever has one item, but it has nice error handling backoff/retry semantics
-	queue workqueue.RateLimitingInterface
+	cachesToSync  []cache.InformerSynced
+	queue         workqueue.RateLimitingInterface
+	eventRecorder events.Recorder
 }
 
 func NewClusterOperatorStatusController(
@@ -68,15 +68,17 @@ func NewClusterOperatorStatusController(
 		versionGetter:         versionGetter,
 		clusterOperatorClient: clusterOperatorClient,
 		clusterOperatorLister: clusterOperatorInformer.Lister(),
-		clusterOperatorSynced: clusterOperatorInformer.Informer().HasSynced,
 		operatorClient:        operatorClient,
 		eventRecorder:         recorder.WithComponentSuffix("status-controller"),
 
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "StatusSyncer-"+name),
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "StatusSyncer_"+strings.Replace(name, "-", "_", -1)),
 	}
 
 	operatorClient.Informer().AddEventHandler(c.eventHandler())
 	clusterOperatorInformer.Informer().AddEventHandler(c.eventHandler())
+
+	c.cachesToSync = append(c.cachesToSync, operatorClient.Informer().HasSynced)
+	c.cachesToSync = append(c.cachesToSync, clusterOperatorInformer.Informer().HasSynced)
 
 	return c
 }
@@ -86,7 +88,7 @@ func NewClusterOperatorStatusController(
 func (c StatusSyncer) sync() error {
 	detailedSpec, currentDetailedStatus, _, err := c.operatorClient.GetOperatorState()
 	if apierrors.IsNotFound(err) {
-		c.eventRecorder.Warningf("StatusNotFound", "Unable to determine current operator status for %s", c.clusterOperatorName)
+		c.eventRecorder.Warningf("StatusNotFound", "Unable to determine current operator status for clusteroperator/%s", c.clusterOperatorName)
 		if err := c.clusterOperatorClient.ClusterOperators().Delete(c.clusterOperatorName, nil); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -98,7 +100,7 @@ func (c StatusSyncer) sync() error {
 
 	originalClusterOperatorObj, err := c.clusterOperatorLister.Get(c.clusterOperatorName)
 	if err != nil && !apierrors.IsNotFound(err) {
-		c.eventRecorder.Warningf("StatusFailed", "Unable to get current operator status for %s: %v", c.clusterOperatorName, err)
+		c.eventRecorder.Warningf("StatusFailed", "Unable to get current operator status for clusteroperator/%s: %v", c.clusterOperatorName, err)
 		return err
 	}
 
@@ -127,7 +129,7 @@ func (c StatusSyncer) sync() error {
 
 		configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorAvailable, Status: configv1.ConditionUnknown, Reason: "Unmanaged"})
 		configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorProgressing, Status: configv1.ConditionUnknown, Reason: "Unmanaged"})
-		configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorFailing, Status: configv1.ConditionUnknown, Reason: "Unmanaged"})
+		configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorDegraded, Status: configv1.ConditionUnknown, Reason: "Unmanaged"})
 		configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorUpgradeable, Status: configv1.ConditionUnknown, Reason: "Unmanaged"})
 
 		if equality.Semantic.DeepEqual(clusterOperatorObj, originalClusterOperatorObj) {
@@ -141,7 +143,7 @@ func (c StatusSyncer) sync() error {
 	}
 
 	clusterOperatorObj.Status.RelatedObjects = c.relatedObjects
-	configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, unionInertialCondition("Failing", operatorv1.ConditionFalse, currentDetailedStatus.Conditions...))
+	configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, unionInertialCondition("Degraded", operatorv1.ConditionFalse, currentDetailedStatus.Conditions...))
 	configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, unionCondition("Progressing", operatorv1.ConditionFalse, currentDetailedStatus.Conditions...))
 	configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, unionCondition("Available", operatorv1.ConditionTrue, currentDetailedStatus.Conditions...))
 	configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, unionCondition("Upgradeable", operatorv1.ConditionTrue, currentDetailedStatus.Conditions...))
@@ -149,7 +151,11 @@ func (c StatusSyncer) sync() error {
 	// TODO work out removal.  We don't always know the existing value, so removing early seems like a bad idea.  Perhaps a remove flag.
 	versions := c.versionGetter.GetVersions()
 	for operand, version := range versions {
-		operatorv1helpers.SetOperandVersion(&clusterOperatorObj.Status.Versions, configv1.OperandVersion{Name: operand, Version: version})
+		previousVersion := operatorv1helpers.SetOperandVersion(&clusterOperatorObj.Status.Versions, configv1.OperandVersion{Name: operand, Version: version})
+		if previousVersion != version {
+			// having this message will give us a marker in events when the operator updated compared to when the operand is updated
+			c.eventRecorder.Eventf("OperatorVersionChanged", "clusteroperator/%s version %q changed from %q to %q", c.clusterOperatorName, operand, previousVersion, version)
+		}
 	}
 
 	// if we have no diff, just return
@@ -161,7 +167,7 @@ func (c StatusSyncer) sync() error {
 	if _, updateErr := c.clusterOperatorClient.ClusterOperators().UpdateStatus(clusterOperatorObj); err != nil {
 		return updateErr
 	}
-	c.eventRecorder.Eventf("OperatorStatusChanged", "Status for operator %s changed: %s", c.clusterOperatorName, configv1helpers.GetStatusDiff(originalClusterOperatorObj.Status, clusterOperatorObj.Status))
+	c.eventRecorder.Eventf("OperatorStatusChanged", "Status for clusteroperator/%s changed: %s", c.clusterOperatorName, configv1helpers.GetStatusDiff(originalClusterOperatorObj.Status, clusterOperatorObj.Status))
 	return nil
 }
 
@@ -181,7 +187,7 @@ func (c *StatusSyncer) Run(workers int, stopCh <-chan struct{}) {
 
 	klog.Infof("Starting StatusSyncer-" + c.clusterOperatorName)
 	defer klog.Infof("Shutting down StatusSyncer-" + c.clusterOperatorName)
-	if !cache.WaitForCacheSync(stopCh, c.clusterOperatorSynced) {
+	if !cache.WaitForCacheSync(stopCh, c.cachesToSync...) {
 		return
 	}
 

@@ -47,6 +47,7 @@ func ToConfigMapLeaderElection(clientConfig *rest.Config, config configv1.Leader
 		config.Namespace,
 		config.Name,
 		kubeClient.CoreV1(),
+		kubeClient.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      identity,
 			EventRecorder: eventRecorder,
@@ -75,13 +76,13 @@ func LeaderElectionDefaulting(config configv1.LeaderElection, defaultNamespace, 
 	ret := *(&config).DeepCopy()
 
 	if ret.LeaseDuration.Duration == 0 {
-		ret.LeaseDuration.Duration = 120 * time.Second
+		ret.LeaseDuration.Duration = 60 * time.Second
 	}
 	if ret.RenewDeadline.Duration == 0 {
-		ret.RenewDeadline.Duration = 90 * time.Second
+		ret.RenewDeadline.Duration = 35 * time.Second
 	}
 	if ret.RetryPeriod.Duration == 0 {
-		ret.RetryPeriod.Duration = 20 * time.Second
+		ret.RetryPeriod.Duration = 10 * time.Second
 	}
 	if len(ret.Namespace) == 0 {
 		if len(defaultNamespace) > 0 {
