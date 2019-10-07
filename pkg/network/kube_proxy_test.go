@@ -66,7 +66,6 @@ clientConnection:
 clusterCIDR: 10.128.0.0/14
 configSyncPeriod: 0s
 conntrack:
-  max: null
   maxPerCore: 15
   min: null
   tcpCloseWaitTimeout: 10m0s
@@ -83,6 +82,7 @@ ipvs:
   excludeCIDRs: null
   minSyncPeriod: 0s
   scheduler: ""
+  strictARP: false
   syncPeriod: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 1.2.3.4:999
@@ -90,8 +90,11 @@ mode: blah
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-resourceContainer: ""
 udpIdleTimeout: 0s
+winkernel:
+  enableDSR: false
+  networkName: ""
+  sourceVip: ""
 `))
 }
 
@@ -221,7 +224,6 @@ clientConnection:
 clusterCIDR: 192.168.0.0/14
 configSyncPeriod: 0s
 conntrack:
-  max: null
   maxPerCore: null
   min: null
   tcpCloseWaitTimeout: null
@@ -238,6 +240,7 @@ ipvs:
   excludeCIDRs: null
   minSyncPeriod: 0s
   scheduler: ""
+  strictARP: false
   syncPeriod: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 0.0.0.0:9101
@@ -245,8 +248,12 @@ mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-resourceContainer: ""
-udpIdleTimeout: 0s`))
+udpIdleTimeout: 0s
+winkernel:
+  enableDSR: false
+  networkName: ""
+  sourceVip: ""
+`))
 		}
 	}
 	g.Expect(found).To(BeTrue())

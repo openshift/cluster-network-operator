@@ -37,7 +37,6 @@ clientConnection:
 clusterCIDR: ""
 configSyncPeriod: 0s
 conntrack:
-  max: null
   maxPerCore: null
   min: null
   tcpCloseWaitTimeout: null
@@ -54,6 +53,7 @@ ipvs:
   excludeCIDRs: null
   minSyncPeriod: 0s
   scheduler: ""
+  strictARP: false
   syncPeriod: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 0.0.0.0:9101
@@ -61,8 +61,11 @@ mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-resourceContainer: ""
 udpIdleTimeout: 0s
+winkernel:
+  enableDSR: false
+  networkName: ""
+  sourceVip: ""
 `,
 		},
 		{
@@ -86,7 +89,6 @@ clientConnection:
 clusterCIDR: ""
 configSyncPeriod: 0s
 conntrack:
-  max: null
   maxPerCore: null
   min: null
   tcpCloseWaitTimeout: null
@@ -103,6 +105,7 @@ ipvs:
   excludeCIDRs: null
   minSyncPeriod: 0s
   scheduler: ""
+  strictARP: false
   syncPeriod: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 5.6.7.8:9999
@@ -110,8 +113,11 @@ mode: userspace
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-resourceContainer: ""
 udpIdleTimeout: 0s
+winkernel:
+  enableDSR: false
+  networkName: ""
+  sourceVip: ""
 `,
 		},
 		{
@@ -131,7 +137,6 @@ clientConnection:
 clusterCIDR: ""
 configSyncPeriod: 0s
 conntrack:
-  max: null
   maxPerCore: null
   min: null
   tcpCloseWaitTimeout: null
@@ -148,6 +153,7 @@ ipvs:
   excludeCIDRs: null
   minSyncPeriod: 0s
   scheduler: ""
+  strictARP: false
   syncPeriod: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 5.6.7.8:9101
@@ -155,8 +161,11 @@ mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-resourceContainer: ""
 udpIdleTimeout: 0s
+winkernel:
+  enableDSR: false
+  networkName: ""
+  sourceVip: ""
 `,
 		},
 		{
@@ -176,7 +185,6 @@ clientConnection:
 clusterCIDR: ""
 configSyncPeriod: 0s
 conntrack:
-  max: null
   maxPerCore: null
   min: null
   tcpCloseWaitTimeout: null
@@ -193,6 +201,7 @@ ipvs:
   excludeCIDRs: null
   minSyncPeriod: 0s
   scheduler: ""
+  strictARP: false
   syncPeriod: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 0.0.0.0:9999
@@ -200,8 +209,11 @@ mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-resourceContainer: ""
 udpIdleTimeout: 0s
+winkernel:
+  enableDSR: false
+  networkName: ""
+  sourceVip: ""
 `,
 		},
 		{
@@ -224,7 +236,6 @@ clientConnection:
 clusterCIDR: ""
 configSyncPeriod: 0s
 conntrack:
-  max: null
   maxPerCore: null
   min: null
   tcpCloseWaitTimeout: null
@@ -243,6 +254,7 @@ ipvs:
   - 5.6.7.8/16
   minSyncPeriod: 0s
   scheduler: ""
+  strictARP: false
   syncPeriod: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 0.0.0.0:9101
@@ -250,8 +262,11 @@ mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: 1000+10
-resourceContainer: ""
 udpIdleTimeout: 0s
+winkernel:
+  enableDSR: false
+  networkName: ""
+  sourceVip: ""
 `,
 		},
 		{
