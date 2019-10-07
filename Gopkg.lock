@@ -730,6 +730,7 @@
   ]
   pruneopts = "NT"
   revision = "95b840bb6a1f5f0462af804c8589396d294d4914"
+  version = "kubernetes-1.16.0"
 
 [[projects]]
   digest = "1:160844ee5d0ce19aa0f2a51019c25c2971f185a4aa190dbd91887d98994e43a7"
@@ -782,6 +783,7 @@
   ]
   pruneopts = "NT"
   revision = "27d36303b6556f377b4f34e64705fa9024a12b0c"
+  version = "kubernetes-1.16.0"
 
 [[projects]]
   digest = "1:65f86d654fcfcc0ba794c99514724dd1f1b4ea870b0c8e53652ddfa63395dca0"
@@ -865,6 +867,7 @@
   ]
   pruneopts = "NT"
   revision = "1fbdaa4c8d908275eee958429b1cafc2591a2c5d"
+  version = "kubernetes-1.16.0"
 
 [[projects]]
   digest = "1:1b6fd3650ea50bc09ff7174c152175eeb4459d579585163ecae6ff1d82dee3d4"
@@ -897,6 +900,7 @@
   ]
   pruneopts = "T"
   revision = "cd179ad6a2693011d6f2fa5cd64c6680ee99379f"
+  version = "kubernetes-1.16.0"
 
 [[projects]]
   branch = "master"
