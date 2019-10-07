@@ -17,14 +17,14 @@
 package translate
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"cloud.google.com/go/internal/version"
-	raw "cloud.google.com/go/translate/internal/translate/v2"
-	"golang.org/x/net/context"
 	"golang.org/x/text/language"
 	"google.golang.org/api/option"
+	raw "google.golang.org/api/translate/v2"
 	htransport "google.golang.org/api/transport/http"
 )
 
