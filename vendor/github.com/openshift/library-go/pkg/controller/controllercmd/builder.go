@@ -67,15 +67,16 @@ type ControllerBuilder struct {
 	fileObserver            fileobserver.Observer
 	fileObserverReactorFn   func(file string, action fileobserver.ActionType) error
 
-	startFunc        StartFunc
-	componentName    string
-	instanceIdentity string
-	observerInterval time.Duration
+	startFunc          StartFunc
+	componentName      string
+	componentNamespace string
+	instanceIdentity   string
+	observerInterval   time.Duration
 
 	servingInfo          *configv1.HTTPServingInfo
 	authenticationConfig *operatorv1alpha1.DelegatedAuthentication
 	authorizationConfig  *operatorv1alpha1.DelegatedAuthorization
-	healthChecks         []healthz.HealthzChecker
+	healthChecks         []healthz.HealthChecker
 }
 
 // NewController returns a builder struct for constructing the command you want to run
@@ -114,6 +115,11 @@ func (b *ControllerBuilder) WithRestartOnChange(stopCh chan<- struct{}, starting
 	return b
 }
 
+func (b *ControllerBuilder) WithComponentNamespace(ns string) *ControllerBuilder {
+	b.componentNamespace = ns
+	return b
+}
+
 // WithLeaderElection adds leader election options
 func (b *ControllerBuilder) WithLeaderElection(leaderElection configv1.LeaderElection, defaultNamespace, defaultName string) *ControllerBuilder {
 	if leaderElection.Disable {
@@ -135,7 +141,7 @@ func (b *ControllerBuilder) WithServer(servingInfo configv1.HTTPServingInfo, aut
 }
 
 // WithHealthChecks adds a list of healthchecks to the server
-func (b *ControllerBuilder) WithHealthChecks(healthChecks ...healthz.HealthzChecker) *ControllerBuilder {
+func (b *ControllerBuilder) WithHealthChecks(healthChecks ...healthz.HealthChecker) *ControllerBuilder {
 	b.healthChecks = append(b.healthChecks, healthChecks...)
 	return b
 }
@@ -166,9 +172,9 @@ func (b *ControllerBuilder) Run(config *unstructured.Unstructured, ctx context.C
 	}
 
 	kubeClient := kubernetes.NewForConfigOrDie(clientConfig)
-	namespace, err := b.getNamespace()
+	namespace, err := b.getComponentNamespace()
 	if err != nil {
-		panic("unable to read the namespace")
+		klog.Warningf("unable to identify the current namespace for events: %v", err)
 	}
 	controllerRef, err := events.GetControllerReferenceForCurrentPod(kubeClient, namespace, nil)
 	if err != nil {
@@ -193,7 +199,7 @@ func (b *ControllerBuilder) Run(config *unstructured.Unstructured, ctx context.C
 	if b.kubeAPIServerConfigFile != nil {
 		kubeConfig = *b.kubeAPIServerConfigFile
 	}
-	serverConfig, err := serving.ToServerConfig(*b.servingInfo, *b.authenticationConfig, *b.authorizationConfig, kubeConfig)
+	serverConfig, err := serving.ToServerConfig(ctx, *b.servingInfo, *b.authenticationConfig, *b.authorizationConfig, kubeConfig)
 	if err != nil {
 		return err
 	}
@@ -246,12 +252,15 @@ func (b *ControllerBuilder) Run(config *unstructured.Unstructured, ctx context.C
 	return fmt.Errorf("exited")
 }
 
-func (b *ControllerBuilder) getNamespace() (string, error) {
+func (b *ControllerBuilder) getComponentNamespace() (string, error) {
+	if len(b.componentNamespace) > 0 {
+		return b.componentNamespace, nil
+	}
 	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
-		return "", err
+		return "openshift-config-managed", err
 	}
-	return string(nsBytes), err
+	return string(nsBytes), nil
 }
 
 func (b *ControllerBuilder) getClientConfig() (*rest.Config, error) {
