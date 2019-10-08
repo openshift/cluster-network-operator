@@ -724,13 +724,13 @@ func ensureOpenStackLbListener(client *gophercloud.ServiceClient, name, lbId, po
 			LoadbalancerID: lbId,
 		}
 
-		// NOTE(dulek): If Octavia supports setting data timeouts in listeners (Rocky+) we set them to 1 hour as this
+		// NOTE(dulek): If Octavia supports setting data timeouts in listeners (Rocky+) we set them to 10 mins hour as this
 		//              LB will be used for watching the Kubernetes API, that shouldn't time out after the default 50 seconds.
 		timeoutSupport, err := IsOctaviaVersionSupported(client, MinOctaviaVersionWithTimeouts)
 		if err != nil {
 			return "", errors.Wrap(err, "failed to determine if Octavia supports listener timeouts API")
 		}
-		timeout := 3600000
+		timeout := 600000
 		if timeoutSupport {
 			opts.TimeoutClientData = &timeout
 			opts.TimeoutMemberData = &timeout
