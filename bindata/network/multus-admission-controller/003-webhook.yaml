@@ -13,7 +13,7 @@ webhooks:
         namespace: openshift-multus
         path: "/validate"
     rules:
-      - operations: [ "CREATE" ]
+      - operations: [ "CREATE", "UPDATE" ]
         apiGroups: ["k8s.cni.cncf.io"]
         apiVersions: ["v1"]
         resources: ["network-attachment-definitions"]
