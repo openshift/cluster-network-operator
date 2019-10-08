@@ -17,28 +17,23 @@ required = [
 
 [[override]]
   name = "k8s.io/code-generator"
-  # revision for tag "kubernetes-1.16.0"
   version = "kubernetes-1.16.0"
 
 [[override]]
   name = "k8s.io/api"
   version = "kubernetes-1.16.0"
-  # revision for tag "kubernetes-1.16.0"
 
 [[override]]
   name = "k8s.io/apiextensions-apiserver"
   version = "kubernetes-1.16.0"
-  # revision for tag "kubernetes-1.16.0"
 
 [[override]]
   name = "k8s.io/apimachinery"
   version = "kubernetes-1.16.0"
-  # revision for tag "kubernetes-1.16.0"
 
 [[override]]
   name = "k8s.io/client-go"
   version = "kubernetes-1.16.0"
-  # revision for tag "kubernetes-1.16.0"
 
 [[override]]
   name = "github.com/coreos/prometheus-operator"
