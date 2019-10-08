@@ -2,6 +2,7 @@ package management
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/klog"
@@ -14,6 +15,7 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
+	"github.com/openshift/library-go/pkg/operator/condition"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -27,27 +29,28 @@ var workQueueKey = "instance"
 type ManagementStateController struct {
 	operatorName   string
 	operatorClient operatorv1helpers.OperatorClient
-	eventRecorder  events.Recorder
 
-	// queue only ever has one item, but it has nice error handling backoff/retry semantics
-	queue workqueue.RateLimitingInterface
+	cachesToSync  []cache.InformerSynced
+	queue         workqueue.RateLimitingInterface
+	eventRecorder events.Recorder
 }
 
 func NewOperatorManagementStateController(
 	name string,
-	operatorStatusProvider operatorv1helpers.OperatorClient,
+	operatorClient operatorv1helpers.OperatorClient,
 	recorder events.Recorder,
 ) *ManagementStateController {
 	c := &ManagementStateController{
 		operatorName:   name,
-		operatorClient: operatorStatusProvider,
+		operatorClient: operatorClient,
 		eventRecorder:  recorder,
 
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ManagementStateController-"+name),
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ManagementStateController_"+strings.Replace(name, "-", "_", -1)),
 	}
 
-	operatorStatusProvider.Informer().AddEventHandler(c.eventHandler())
-	// TODO watch clusterOperator.status changes when it moves to openshift/api
+	operatorClient.Informer().AddEventHandler(c.eventHandler())
+
+	c.cachesToSync = append(c.cachesToSync, operatorClient.Informer().HasSynced)
 
 	return c
 }
@@ -60,7 +63,7 @@ func (c ManagementStateController) sync() error {
 	}
 
 	cond := operatorv1.OperatorCondition{
-		Type:   "ManagementStateFailing",
+		Type:   condition.ManagementStateDegradedConditionType,
 		Status: operatorv1.ConditionFalse,
 	}
 
@@ -97,6 +100,9 @@ func (c *ManagementStateController) Run(workers int, stopCh <-chan struct{}) {
 
 	klog.Infof("Starting management-state-controller-" + c.operatorName)
 	defer klog.Infof("Shutting down management-state-controller-" + c.operatorName)
+	if !cache.WaitForCacheSync(stopCh, c.cachesToSync...) {
+		return
+	}
 
 	// doesn't matter what workers say, only start one.
 	go wait.Until(c.runWorker, time.Second, stopCh)

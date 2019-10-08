@@ -29,7 +29,7 @@
 // The notion of "exportedness" that matters here is that of the
 // compiler. According to the language spec, a method pkg.T.f is
 // unexported simply because its name starts with lowercase. But the
-// compiler must nonethless export f so that downstream compilations can
+// compiler must nonetheless export f so that downstream compilations can
 // accurately ascertain whether pkg.T implements an interface pkg.I
 // defined as interface{f()}. Exported thus means "described in export
 // data".
@@ -99,6 +99,16 @@ func (s *Set) ExportObjectFact(obj types.Object, fact analysis.Fact) {
 	s.mu.Unlock()
 }
 
+func (s *Set) AllObjectFacts(filter map[reflect.Type]bool) []analysis.ObjectFact {
+	var facts []analysis.ObjectFact
+	for k, v := range s.m {
+		if k.obj != nil && filter[k.t] {
+			facts = append(facts, analysis.ObjectFact{Object: k.obj, Fact: v})
+		}
+	}
+	return facts
+}
+
 // ImportPackageFact implements analysis.Pass.ImportPackageFact.
 func (s *Set) ImportPackageFact(pkg *types.Package, ptr analysis.Fact) bool {
 	if pkg == nil {
@@ -120,6 +130,16 @@ func (s *Set) ExportPackageFact(fact analysis.Fact) {
 	s.mu.Lock()
 	s.m[key] = fact // clobber any existing entry
 	s.mu.Unlock()
+}
+
+func (s *Set) AllPackageFacts(filter map[reflect.Type]bool) []analysis.PackageFact {
+	var facts []analysis.PackageFact
+	for k, v := range s.m {
+		if k.obj == nil && filter[k.t] {
+			facts = append(facts, analysis.PackageFact{Package: k.pkg, Fact: v})
+		}
+	}
+	return facts
 }
 
 // gobFact is the Gob declaration of a serialized fact.
@@ -217,7 +237,7 @@ func (s *Set) Encode() []byte {
 	s.mu.Lock()
 	for k, fact := range s.m {
 		if debug {
-			log.Printf("%#v => %s\n", k, fact)
+			log.Printf("%v => %s\n", k, fact)
 		}
 		var object objectpath.Path
 		if k.obj != nil {
@@ -259,15 +279,6 @@ func (s *Set) Encode() []byte {
 	if len(gobFacts) > 0 {
 		if err := gob.NewEncoder(&buf).Encode(gobFacts); err != nil {
 			// Fact encoding should never fail. Identify the culprit.
-			//
-			// TODO(adonovan): what's the right thing to do here?
-			// The error is clearly a bug, so log.Fatal leads to early
-			// detection, but it could potentially bring down a big
-			// job because of an obscure dynamic bug in a fact.
-			// But perhaps that's fine: other bugs in Analyzers
-			// have the same potential to cause failures.
-			// Alternatively we could discard the bad facts with a
-			// log message, but who reads logs?
 			for _, gf := range gobFacts {
 				if err := gob.NewEncoder(ioutil.Discard).Encode(gf); err != nil {
 					fact := gf.Fact

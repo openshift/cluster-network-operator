@@ -10,6 +10,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 
+	operatorv1 "github.com/openshift/api/operator/v1"
+
 	"github.com/openshift/library-go/pkg/operator/events"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 )
@@ -18,11 +20,10 @@ var workQueueKey = "instance"
 
 type LogLevelController struct {
 	operatorClient operatorv1helpers.OperatorClient
-	cachesToSync   []cache.InformerSynced
-	eventRecorder  events.Recorder
 
-	// queue only ever has one item, but it has nice error handling backoff/retry semantics
-	queue workqueue.RateLimitingInterface
+	cachesToSync  []cache.InformerSynced
+	queue         workqueue.RateLimitingInterface
+	eventRecorder events.Recorder
 }
 
 // sets the klog level based on desired state
@@ -31,7 +32,6 @@ func NewClusterOperatorLoggingController(
 	recorder events.Recorder,
 ) *LogLevelController {
 	c := &LogLevelController{
-		cachesToSync:   []cache.InformerSynced{operatorClient.Informer().HasSynced},
 		operatorClient: operatorClient,
 		eventRecorder:  recorder.WithComponentSuffix("loglevel-controller"),
 
@@ -39,6 +39,8 @@ func NewClusterOperatorLoggingController(
 	}
 
 	operatorClient.Informer().AddEventHandler(c.eventHandler())
+
+	c.cachesToSync = append(c.cachesToSync, operatorClient.Informer().HasSynced)
 
 	return c
 }
@@ -51,15 +53,25 @@ func (c LogLevelController) sync() error {
 		return err
 	}
 
-	logLevel := fmt.Sprintf("%d", LogLevelToKlog(detailedSpec.OperatorLogLevel))
+	currentLogLevel := CurrentLogLevel()
+	desiredLogLevel := detailedSpec.OperatorLogLevel
 
-	var level klog.Level
-	if err := level.Set(logLevel); err != nil {
-		c.eventRecorder.Warningf("LoglevelChangeFailed", "Unable to set loglevel level %v", err)
+	if len(desiredLogLevel) == 0 {
+		desiredLogLevel = operatorv1.Normal
+	}
+
+	// When the current loglevel is the desired one, do nothing
+	if currentLogLevel == desiredLogLevel {
+		return nil
+	}
+
+	// Set the new loglevel if the operator spec changed
+	if err := SetVerbosityValue(desiredLogLevel); err != nil {
+		c.eventRecorder.Warningf("OperatorLoglevelChangeFailed", "Unable to change operator log level from %q to %q: %v", currentLogLevel, desiredLogLevel, err)
 		return err
 	}
 
-	c.eventRecorder.Eventf("LoglevelChange", "Changed loglevel level to %q", logLevel)
+	c.eventRecorder.Eventf("OperatorLoglevelChange", "Operator log level changed from %q to %q", currentLogLevel, desiredLogLevel)
 	return nil
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All Rights Reserved.
+// Copyright 2019 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -437,7 +437,7 @@ func (m *lineMachine) evalCompilationUnit(b *buf, f func(m *lineMachine) (cont b
 		case lineStdSetISA:
 			m.isa = b.uint()
 		case lineStdConstAddPC:
-			// Update the the address and op_index registers.
+			// Update the address and op_index registers.
 			m.specialOpcodeStep2(255)
 		default:
 			panic("not reached")

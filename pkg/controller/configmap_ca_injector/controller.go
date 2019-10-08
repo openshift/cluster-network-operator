@@ -11,7 +11,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 
 	corev1 "k8s.io/api/core/v1"
@@ -123,8 +122,8 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 	if request.Name == names.TRUSTED_CA_BUNDLE_CONFIGMAP && request.Namespace == names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS {
 
 		configMapList := &corev1.ConfigMapList{}
-		selector := labels.Set(map[string]string{names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL: "true"}).AsSelector()
-		err = r.client.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, configMapList)
+		matchingLabels := &client.MatchingLabels{names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL: "true"}
+		err = r.client.List(context.TODO(), configMapList, matchingLabels)
 		if err != nil {
 			log.Println(err)
 			r.status.SetDegraded(statusmanager.InjectorConfig, "ListConfigMapError",

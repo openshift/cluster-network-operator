@@ -407,7 +407,6 @@ clientConnection:
 clusterCIDR: ""
 configSyncPeriod: 0s
 conntrack:
-  max: null
   maxPerCore: null
   min: null
   tcpCloseWaitTimeout: null
@@ -424,6 +423,7 @@ ipvs:
   excludeCIDRs: null
   minSyncPeriod: 0s
   scheduler: ""
+  strictARP: false
   syncPeriod: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 0.0.0.0:9101
@@ -431,8 +431,12 @@ mode: unidling+iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-resourceContainer: ""
-udpIdleTimeout: 0s`))
+udpIdleTimeout: 0s
+winkernel:
+  enableDSR: false
+  networkName: ""
+  sourceVip: ""
+`))
 
 	// Disable unidling
 	f := false
@@ -451,7 +455,6 @@ clientConnection:
 clusterCIDR: ""
 configSyncPeriod: 0s
 conntrack:
-  max: null
   maxPerCore: null
   min: null
   tcpCloseWaitTimeout: null
@@ -468,6 +471,7 @@ ipvs:
   excludeCIDRs: null
   minSyncPeriod: 0s
   scheduler: ""
+  strictARP: false
   syncPeriod: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 0.0.0.0:9101
@@ -475,7 +479,11 @@ mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-resourceContainer: ""
-udpIdleTimeout: 0s`))
+udpIdleTimeout: 0s
+winkernel:
+  enableDSR: false
+  networkName: ""
+  sourceVip: ""
+`))
 
 }

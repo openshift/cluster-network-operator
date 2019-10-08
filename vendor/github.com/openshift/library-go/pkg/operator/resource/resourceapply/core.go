@@ -1,6 +1,7 @@
 package resourceapply
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"strings"
@@ -168,9 +169,19 @@ func ApplyConfigMap(client coreclientv1.ConfigMapsGetter, recorder events.Record
 			modifiedKeys = append(modifiedKeys, "data."+existingCopyKey)
 		}
 	}
+	for existingCopyKey, existingCopyBinValue := range existingCopy.BinaryData {
+		if requiredBinValue, ok := required.BinaryData[existingCopyKey]; !ok || !bytes.Equal(existingCopyBinValue, requiredBinValue) {
+			modifiedKeys = append(modifiedKeys, "binaryData."+existingCopyKey)
+		}
+	}
 	for requiredKey := range required.Data {
 		if _, ok := existingCopy.Data[requiredKey]; !ok {
 			modifiedKeys = append(modifiedKeys, "data."+requiredKey)
+		}
+	}
+	for requiredBinKey := range required.BinaryData {
+		if _, ok := existingCopy.BinaryData[requiredBinKey]; !ok {
+			modifiedKeys = append(modifiedKeys, "binaryData."+requiredBinKey)
 		}
 	}
 
@@ -179,6 +190,7 @@ func ApplyConfigMap(client coreclientv1.ConfigMapsGetter, recorder events.Record
 		return existingCopy, false, nil
 	}
 	existingCopy.Data = required.Data
+	existingCopy.BinaryData = required.BinaryData
 
 	actual, err := client.ConfigMaps(required.Namespace).Update(existingCopy)
 
@@ -196,6 +208,10 @@ func ApplyConfigMap(client coreclientv1.ConfigMapsGetter, recorder events.Record
 
 // ApplySecret merges objectmeta, requires data
 func ApplySecret(client coreclientv1.SecretsGetter, recorder events.Recorder, required *corev1.Secret) (*corev1.Secret, bool, error) {
+	if len(required.StringData) > 0 {
+		return nil, false, fmt.Errorf("Secret.stringData is not supported")
+	}
+
 	existing, err := client.Secrets(required.Namespace).Get(required.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		actual, err := client.Secrets(required.Namespace).Create(required)
@@ -210,6 +226,7 @@ func ApplySecret(client coreclientv1.SecretsGetter, recorder events.Recorder, re
 	existingCopy := existing.DeepCopy()
 
 	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)
+
 	dataSame := equality.Semantic.DeepEqual(existingCopy.Data, required.Data)
 	if dataSame && !*modified {
 		return existingCopy, false, nil
@@ -217,7 +234,23 @@ func ApplySecret(client coreclientv1.SecretsGetter, recorder events.Recorder, re
 	existingCopy.Data = required.Data
 
 	if klog.V(4) {
-		klog.Infof("Secret %q changes: %v", required.Namespace+"/"+required.Name, JSONPatch(existing, required))
+		safeRequired := required.DeepCopy()
+		safeExisting := existing.DeepCopy()
+
+		for s := range safeExisting.Data {
+			safeExisting.Data[s] = []byte("OLD")
+		}
+		for s := range safeRequired.Data {
+			if _, preexisting := existing.Data[s]; !preexisting {
+				safeRequired.Data[s] = []byte("NEW")
+			} else if !equality.Semantic.DeepEqual(existing.Data[s], safeRequired.Data[s]) {
+				safeRequired.Data[s] = []byte("MODIFIED")
+			} else {
+				safeRequired.Data[s] = []byte("OLD")
+			}
+		}
+
+		klog.Infof("Secret %q changes: %v", required.Namespace+"/"+required.Name, JSONPatch(safeExisting, safeRequired))
 	}
 	actual, err := client.Secrets(required.Namespace).Update(existingCopy)
 
@@ -230,6 +263,9 @@ func SyncConfigMap(client coreclientv1.ConfigMapsGetter, recorder events.Recorde
 	switch {
 	case apierrors.IsNotFound(err):
 		deleteErr := client.ConfigMaps(targetNamespace).Delete(targetName, nil)
+		if _, getErr := client.ConfigMaps(targetNamespace).Get(targetName, metav1.GetOptions{}); getErr != nil && apierrors.IsNotFound(getErr) {
+			return nil, true, nil
+		}
 		if apierrors.IsNotFound(deleteErr) {
 			return nil, false, nil
 		}
@@ -253,6 +289,9 @@ func SyncSecret(client coreclientv1.SecretsGetter, recorder events.Recorder, sou
 	source, err := client.Secrets(sourceNamespace).Get(sourceName, metav1.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
+		if _, getErr := client.Secrets(targetNamespace).Get(targetName, metav1.GetOptions{}); getErr != nil && apierrors.IsNotFound(getErr) {
+			return nil, true, nil
+		}
 		deleteErr := client.Secrets(targetNamespace).Delete(targetName, nil)
 		if apierrors.IsNotFound(deleteErr) {
 			return nil, false, nil
