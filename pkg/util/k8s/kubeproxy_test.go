@@ -329,6 +329,13 @@ winkernel:
 			},
 			err: "unused arguments: blah-blah-blah",
 		},
+		{
+			description: "deprecated args",
+			overrides: map[string]operv1.ProxyArgumentList{
+				"conntrack-max": {"100"},
+			},
+			err: "unused arguments: conntrack-max",
+		},
 	}
 
 	for _, test := range tests {
