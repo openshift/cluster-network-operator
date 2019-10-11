@@ -64,6 +64,10 @@ spec:
           name: run-openvswitch
         - mountPath: /env
           name: env-overrides
+        - mountPath: /ovn-cert # not needed, but useful when exec'ing in to pod.
+          name: ovn-cert
+        - mountPath: /ovn-ca
+          name: ovn-ca
         resources:
           requests:
             cpu: 100m
@@ -84,6 +88,9 @@ spec:
           fi
           exec /usr/share/openvswitch/scripts/ovn-ctl run_nb_ovsdb \
             --no-monitor \
+            --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
+            --ovn-nb-db-ssl-cert=/ovn-cert/tls.crt \
+            --ovn-nb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
             --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off"
         lifecycle:
           postStart:
@@ -93,7 +100,7 @@ spec:
               - -c
               - |
                 retries=0
-                while ! ovn-nbctl -t 5 set-connection ptcp:{{.OVN_NB_PORT}} -- set connection . inactivity_probe=0; do
+                while ! ovn-nbctl -t 5 set-connection pssl:{{.OVN_NB_PORT}} -- set connection . inactivity_probe=0; do
                   (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
                     echo "too many failed ovn-nbctl attempts, giving up"
@@ -113,6 +120,10 @@ spec:
           name: run-openvswitch
         - mountPath: /env
           name: env-overrides
+        - mountPath: /ovn-cert
+          name: ovn-cert
+        - mountPath: /ovn-ca
+          name: ovn-ca
         resources:
           requests:
             cpu: 100m
@@ -133,6 +144,9 @@ spec:
           fi
           exec /usr/share/openvswitch/scripts/ovn-ctl run_sb_ovsdb \
             --no-monitor \
+            --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
+            --ovn-sb-db-ssl-cert=/ovn-cert/tls.crt \
+            --ovn-sb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off"
         env:
         - name: OVN_LOG_LEVEL
@@ -145,7 +159,7 @@ spec:
               - -c
               - |
                 retries=0
-                while ! ovn-sbctl -t 5 set-connection ptcp:{{.OVN_SB_PORT}} -- set connection . inactivity_probe=0; do
+                while ! ovn-sbctl -t 5 set-connection pssl:{{.OVN_SB_PORT}} -- set connection . inactivity_probe=0; do
                   (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
                     echo "too many failed ovn-sbctl attempts, giving up"
@@ -162,6 +176,10 @@ spec:
           name: run-openvswitch
         - mountPath: /env
           name: env-overrides
+        - mountPath: /ovn-cert
+          name: ovn-cert
+        - mountPath: /ovn-ca
+          name: ovn-ca
 
       # ovnkube master: convert kubernetes objects in to nbdb logical network components
       - name: ovnkube-master
@@ -245,6 +263,12 @@ spec:
         configMap:
           name: env-overrides
           optional: true
+      - name: ovn-ca
+        configMap:
+          name: ovn-ca
+      - name: ovn-cert
+        secret:
+          secretName: ovn-cert
       tolerations:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"
