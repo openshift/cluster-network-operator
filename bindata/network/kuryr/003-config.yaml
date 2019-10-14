@@ -16,7 +16,7 @@ data:
     daemon_enabled = true
     docker_mode = true
     netns_proc_dir = /host_proc
-    vif_annotation_timeout = 120
+    vif_annotation_timeout = 500
 
     [ingress]
     #l7_router_uuid = <None>
@@ -33,7 +33,7 @@ data:
     vif_pool_driver = nested
     multi_vif_drivers = noop
 
-    enabled_handlers = vif,lb,lbaasspec,policy,pod_label,namespace,kuryrnetpolicy,kuryrnet
+    enabled_handlers = vif,lb,lbaasspec,policy,pod_label,namespace,kuryrnetpolicy
     pod_security_groups_driver = policy
     service_security_groups_driver = policy
     pod_subnets_driver = namespace
