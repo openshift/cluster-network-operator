@@ -373,9 +373,50 @@
   digest = "1:1d9fda8fed8ae0f18bca4fceea007596d852828521c10bb58633e6eb9dda8a2a"
   name = "github.com/openshift/api"
   packages = [
+    ".",
+    "apps",
+    "apps/v1",
+    "authorization",
+    "authorization/v1",
+    "build",
+    "build/v1",
+    "config",
     "config/v1",
+    "image",
+    "image/docker10",
+    "image/dockerpre012",
+    "image/v1",
+    "kubecontrolplane",
+    "kubecontrolplane/v1",
+    "legacyconfig/v1",
+    "network",
     "network/v1",
+    "oauth",
+    "oauth/v1",
+    "openshiftcontrolplane",
+    "openshiftcontrolplane/v1",
+    "operator",
     "operator/v1",
+    "operator/v1alpha1",
+    "osin",
+    "osin/v1",
+    "pkg/serialization",
+    "project",
+    "project/v1",
+    "quota",
+    "quota/v1",
+    "route",
+    "route/v1",
+    "security",
+    "security/v1",
+    "servicecertsigner",
+    "servicecertsigner/v1alpha1",
+    "template",
+    "template/v1",
+    "user",
+    "user/v1",
+    "webconsole",
+    "webconsole/v1",
   ]
   pruneopts = "NT"
   revision = "d92789481b059132f1febccd9bb47cb27220f248"
@@ -384,7 +425,17 @@
   branch = "master"
   digest = "1:84d847a8d27e5a2b02d93242a4659e34b48ec919c38ef9a531021ec266641b69"
   name = "github.com/openshift/library-go"
-  packages = ["pkg/config/clusteroperator/v1helpers"]
+  packages = [
+    "pkg/certs",
+    "pkg/config/clusteroperator/v1helpers",
+    "pkg/crypto",
+    "pkg/operator/certrotation",
+    "pkg/operator/condition",
+    "pkg/operator/events",
+    "pkg/operator/resource/resourceapply",
+    "pkg/operator/resource/resourcemerge",
+    "pkg/operator/v1helpers",
+  ]
   pruneopts = "NT"
   revision = "97c62d8a29013969b080844b90404fd37588b457"
 
@@ -712,6 +763,7 @@
     "discovery/v1alpha1",
     "events/v1beta1",
     "extensions/v1beta1",
+    "imagepolicy/v1alpha1",
     "networking/v1",
     "networking/v1beta1",
     "node/v1alpha1",
@@ -730,6 +782,20 @@
   ]
   pruneopts = "NT"
   revision = "95b840bb6a1f5f0462af804c8589396d294d4914"
+  version = "kubernetes-1.16.0"
+
+[[projects]]
+  digest = "1:142d4ab6e25ace8958cf493f320e81d5108c461f83ecc623be6353d3a7d2dddc"
+  name = "k8s.io/apiextensions-apiserver"
+  packages = [
+    "pkg/apis/apiextensions",
+    "pkg/apis/apiextensions/v1",
+    "pkg/apis/apiextensions/v1beta1",
+    "pkg/client/clientset/clientset/scheme",
+    "pkg/client/clientset/clientset/typed/apiextensions/v1beta1",
+  ]
+  pruneopts = "NT"
+  revision = "8f644eb6e783291c4b8cb8cb25a9983be1a74f5c"
   version = "kubernetes-1.16.0"
 
 [[projects]]
@@ -786,11 +852,73 @@
   version = "kubernetes-1.16.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:f8bb099039820f3f3bab3cf068e46b6297b09b5fbc7632de165c36217422d105"
+  name = "k8s.io/apiserver"
+  packages = ["pkg/authentication/user"]
+  pruneopts = "NT"
+  revision = "c29386a6051d0cc905faa078747da7d109a36faa"
+
+[[projects]]
   digest = "1:65f86d654fcfcc0ba794c99514724dd1f1b4ea870b0c8e53652ddfa63395dca0"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
     "dynamic",
+    "informers",
+    "informers/admissionregistration",
+    "informers/admissionregistration/v1",
+    "informers/admissionregistration/v1beta1",
+    "informers/apps",
+    "informers/apps/v1",
+    "informers/apps/v1beta1",
+    "informers/apps/v1beta2",
+    "informers/auditregistration",
+    "informers/auditregistration/v1alpha1",
+    "informers/autoscaling",
+    "informers/autoscaling/v1",
+    "informers/autoscaling/v2beta1",
+    "informers/autoscaling/v2beta2",
+    "informers/batch",
+    "informers/batch/v1",
+    "informers/batch/v1beta1",
+    "informers/batch/v2alpha1",
+    "informers/certificates",
+    "informers/certificates/v1beta1",
+    "informers/coordination",
+    "informers/coordination/v1",
+    "informers/coordination/v1beta1",
+    "informers/core",
+    "informers/core/v1",
+    "informers/discovery",
+    "informers/discovery/v1alpha1",
+    "informers/events",
+    "informers/events/v1beta1",
+    "informers/extensions",
+    "informers/extensions/v1beta1",
+    "informers/internalinterfaces",
+    "informers/networking",
+    "informers/networking/v1",
+    "informers/networking/v1beta1",
+    "informers/node",
+    "informers/node/v1alpha1",
+    "informers/node/v1beta1",
+    "informers/policy",
+    "informers/policy/v1beta1",
+    "informers/rbac",
+    "informers/rbac/v1",
+    "informers/rbac/v1alpha1",
+    "informers/rbac/v1beta1",
+    "informers/scheduling",
+    "informers/scheduling/v1",
+    "informers/scheduling/v1alpha1",
+    "informers/scheduling/v1beta1",
+    "informers/settings",
+    "informers/settings/v1alpha1",
+    "informers/storage",
+    "informers/storage/v1",
+    "informers/storage/v1alpha1",
+    "informers/storage/v1beta1",
     "kubernetes",
     "kubernetes/scheme",
     "kubernetes/typed/admissionregistration/v1",
@@ -831,6 +959,40 @@
     "kubernetes/typed/storage/v1",
     "kubernetes/typed/storage/v1alpha1",
     "kubernetes/typed/storage/v1beta1",
+    "listers/admissionregistration/v1",
+    "listers/admissionregistration/v1beta1",
+    "listers/apps/v1",
+    "listers/apps/v1beta1",
+    "listers/apps/v1beta2",
+    "listers/auditregistration/v1alpha1",
+    "listers/autoscaling/v1",
+    "listers/autoscaling/v2beta1",
+    "listers/autoscaling/v2beta2",
+    "listers/batch/v1",
+    "listers/batch/v1beta1",
+    "listers/batch/v2alpha1",
+    "listers/certificates/v1beta1",
+    "listers/coordination/v1",
+    "listers/coordination/v1beta1",
+    "listers/core/v1",
+    "listers/discovery/v1alpha1",
+    "listers/events/v1beta1",
+    "listers/extensions/v1beta1",
+    "listers/networking/v1",
+    "listers/networking/v1beta1",
+    "listers/node/v1alpha1",
+    "listers/node/v1beta1",
+    "listers/policy/v1beta1",
+    "listers/rbac/v1",
+    "listers/rbac/v1alpha1",
+    "listers/rbac/v1beta1",
+    "listers/scheduling/v1",
+    "listers/scheduling/v1alpha1",
+    "listers/scheduling/v1beta1",
+    "listers/settings/v1alpha1",
+    "listers/storage/v1",
+    "listers/storage/v1alpha1",
+    "listers/storage/v1beta1",
     "pkg/apis/clientauthentication",
     "pkg/apis/clientauthentication/v1alpha1",
     "pkg/apis/clientauthentication/v1beta1",
@@ -937,6 +1099,20 @@
   pruneopts = "NT"
   revision = "2ca9ad30301bf30a8a6e0fa2110db6b8df699a91"
   version = "v1.0.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:7295d3e34a8456ed7a6e52200a9a5c9d6d4832bfbff0eaf6606b3f62e818a578"
+  name = "k8s.io/kube-aggregator"
+  packages = [
+    "pkg/apis/apiregistration",
+    "pkg/apis/apiregistration/v1",
+    "pkg/apis/apiregistration/v1beta1",
+    "pkg/client/clientset_generated/clientset/scheme",
+    "pkg/client/clientset_generated/clientset/typed/apiregistration/v1",
+  ]
+  pruneopts = "NT"
+  revision = "cd60da6daff6d142f0e06ceb88bde4ce66e7a1a8"
 
 [[projects]]
   branch = "master"
@@ -1055,6 +1231,9 @@
     "github.com/openshift/api/network/v1",
     "github.com/openshift/api/operator/v1",
     "github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers",
+    "github.com/openshift/library-go/pkg/crypto",
+    "github.com/openshift/library-go/pkg/operator/certrotation",
+    "github.com/openshift/library-go/pkg/operator/events",
     "github.com/operator-framework/operator-sdk/pkg/leader",
     "github.com/operator-framework/operator-sdk/version",
     "github.com/pkg/errors",
@@ -1079,6 +1258,8 @@
     "k8s.io/apimachinery/pkg/util/validation",
     "k8s.io/apimachinery/pkg/util/yaml",
     "k8s.io/client-go/discovery",
+    "k8s.io/client-go/informers",
+    "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
