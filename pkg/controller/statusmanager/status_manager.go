@@ -31,6 +31,7 @@ const (
 	ProxyConfig
 	InjectorConfig
 	PodDeployment
+	PKIConfig
 	maxStatusLevel
 )
 
