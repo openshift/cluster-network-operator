@@ -1,0 +1,71 @@
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    name: monitor-multus-admission-controller
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+  name: monitor-multus-admission-controller
+  namespace: openshift-multus
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+  jobLabel: app
+  namespaceSelector:
+    matchNames:
+    - openshift-multus
+  selector:
+    matchLabels:
+      name: multus-admission-controller-monitor-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: multus-admission-controller-monitor-service
+  name:  multus-admission-controller-monitor-service
+  namespace: openshift-multus
+spec:
+  selector:
+    app: multus-admission-controller
+  clusterIP: None
+  ports:
+  - name: metrics
+    port: 9091
+    protocol: TCP
+    targetPort: 9091
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-k8s
+  namespace: openshift-multus
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  - endpoints
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-k8s
+  namespace: openshift-multus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-k8s
+subjects:
+- kind: ServiceAccount
+  name: prometheus-k8s
+  namespace: openshift-monitoring

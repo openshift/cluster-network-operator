@@ -1,11 +1,12 @@
 package network
 
 import (
+	"testing"
+
 	. "github.com/onsi/gomega"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"testing"
 )
 
 var MultusAdmissionControllerConfig = operv1.Network{
@@ -49,7 +50,7 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus-admission-controller")))
 
 	// Check rendered object
-	g.Expect(len(objs)).To(Equal(6))
+	g.Expect(len(objs)).To(Equal(10))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Service", "openshift-multus", "multus-admission-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "multus-admission-controller-webhook")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "multus-admission-controller-webhook")))
