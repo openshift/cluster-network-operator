@@ -70,3 +70,7 @@ required = [
 [[constraint]]
   name = "sigs.k8s.io/controller-runtime"
   revision = "2df793d0207600b5cd3a50be2d3edd7f5cb333d9"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/K8sNetworkPlumbingWG/network-attachment-definition-client"

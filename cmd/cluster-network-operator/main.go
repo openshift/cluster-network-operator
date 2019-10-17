@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 
+	netattachv1 "github.com/K8sNetworkPlumbingWG/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
@@ -101,6 +102,9 @@ func main() {
 		log.Fatal(err)
 	}
 	if err := netopv1.Install(mgr.GetScheme()); err != nil {
+		log.Fatal(err)
+	}
+	if err := netattachv1.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Fatal(err)
 	}
 

@@ -15,6 +15,8 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 
+	netattachv1 "github.com/K8sNetworkPlumbingWG/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -200,6 +202,9 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	// Delete the unused NetworkAttachmentDefinition so far
+	clearNetAttachDef(r.client, prev, &operConfig.Spec)
+
 	// The first object we create should be the record of our applied configuration. The last object we create is config.openshift.io/v1/Network.Status
 	app, err := AppliedConfiguration(operConfig)
 	if err != nil {
@@ -300,4 +305,67 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	// All was successful. Request that this be re-triggered after ResyncPeriod,
 	// so we can reconcile state again.
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
+}
+
+// clearNetAttachDef deletes net-attah-defs that is removed in the operator
+// configuration (Network.operator.openshift.io)
+func clearNetAttachDef(c client.Client, prev *operv1.NetworkSpec, conf *operv1.NetworkSpec) error {
+	// At initial phase, no need to do that, just return with no error
+	if prev == nil || conf == nil {
+		return nil
+	}
+	prevNetAttachDefs := prev.AdditionalNetworks
+	curNetAttachDefs := conf.AdditionalNetworks
+	deleteNetAttachDefs := []operv1.AdditionalNetworkDefinition{}
+
+	for _, prev := range prevNetAttachDefs {
+		isFound := false
+		for _, cur := range curNetAttachDefs {
+			if prev.Name == cur.Name && prev.Namespace == cur.Namespace {
+				isFound = true
+				break
+			}
+		}
+
+		if isFound == false {
+			deleteNetAttachDefs = append(deleteNetAttachDefs, prev)
+		}
+	}
+
+	for _, netAttach := range deleteNetAttachDefs {
+		log.Printf("delete net-attach-def/%s namespace: %s", netAttach.Name, netAttach.Namespace)
+
+		if netAttach.Namespace == "" {
+			netAttach.Namespace = "default"
+		}
+
+		obj := &netattachv1.NetworkAttachmentDefinition{}
+		err := c.Get(context.TODO(), client.ObjectKey{
+			Namespace: netAttach.Namespace,
+			Name:      netAttach.Name,
+		}, obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			log.Printf("failed to get net-attach-def %s in namespace %s: %v", netAttach.Name, netAttach.Namespace, err)
+			return err
+		}
+
+		// check its OwnerReference
+		refs := obj.GetOwnerReferences()
+		isOwner := false
+		for _, ref := range refs {
+			if ref.Name == names.CLUSTER_CONFIG && ref.Kind == "Network" {
+				isOwner = true
+			}
+		}
+
+		if isOwner {
+			err = c.Delete(context.TODO(), obj)
+			if err != nil && !apierrors.IsNotFound(err) {
+				log.Printf("failed to delete net-attach-def %s in namespace %s: %v", netAttach.Name, netAttach.Namespace, err)
+				return err
+			}
+		}
+	}
+
+	return nil
 }

@@ -10,6 +10,17 @@
   version = "v0.46.3"
 
 [[projects]]
+  branch = "master"
+  digest = "1:318c3f06b494bcabd4f7b00f127eb253e65576d441de8dc37b1111415018dc9b"
+  name = "github.com/K8sNetworkPlumbingWG/network-attachment-definition-client"
+  packages = [
+    "pkg/apis/k8s.cni.cncf.io",
+    "pkg/apis/k8s.cni.cncf.io/v1",
+  ]
+  pruneopts = "NT"
+  revision = "edaf8b9548595daf42c2fa2c2d06f1b710fd6e68"
+
+[[projects]]
   digest = "1:25870183293a3fb61cc9afd060a61d63a486f091db72af01a8ea3449f5ca530d"
   name = "github.com/Masterminds/goutils"
   packages = ["."]
@@ -1172,6 +1183,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/K8sNetworkPlumbingWG/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1",
     "github.com/Masterminds/semver",
     "github.com/Masterminds/sprig",
     "github.com/containernetworking/cni/pkg/types",
