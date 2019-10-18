@@ -10,7 +10,10 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
@@ -61,9 +64,46 @@ func conditionsEqual(oldConditions, newConditions []configv1.ClusterOperatorStat
 	return conditionsInclude(oldConditions, newConditions) && conditionsInclude(newConditions, oldConditions)
 }
 
+type fakeRESTMapper struct {
+	kindForInput schema.GroupVersionResource
+}
+
+func (f *fakeRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
+	f.kindForInput = resource
+	return schema.GroupVersionKind{
+		Group:   "test",
+		Version: "test",
+		Kind:    "test"}, nil
+}
+
+func (f *fakeRESTMapper) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error) {
+	return schema.GroupVersionResource{}, nil
+}
+
+func (f *fakeRESTMapper) ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
+	return "", nil
+}
+
 func TestStatusManager_set(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing", "1.2.3")
+	mapper := &fakeRESTMapper{}
+	status := New(client, mapper, "testing", "1.2.3")
 
 	co, err := getCO(client, "testing")
 	if !errors.IsNotFound(err) {
@@ -137,11 +177,50 @@ func TestStatusManager_set(t *testing.T) {
 	if !conditionsEqual(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{condNoFail, condUpdate, condNoProgress, condAvailable}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+
+	obj := &uns.Unstructured{}
+	gvk := schema.GroupVersionKind{
+		Group:   "test",
+		Version: "test",
+		Kind:    "test",
+	}
+	obj.SetGroupVersionKind(gvk)
+	obj.SetName("current")
+	err = status.client.Create(context.TODO(), obj)
+	if err != nil {
+		t.Fatalf("error creating not rendered object: %v", err)
+	}
+
+	co.Status.RelatedObjects = []configv1.ObjectReference{
+		{
+			Group:    "test",
+			Resource: "test",
+			Name:     "current",
+		},
+	}
+	status.relatedObjects = []configv1.ObjectReference{
+		{
+			Group:    "test",
+			Resource: "test",
+			Name:     "related",
+		},
+	}
+	status.deleteRelatedObjectsNotRendered(co)
+	err = status.client.Get(context.TODO(), types.NamespacedName{Name: "current"}, obj)
+	if err == nil {
+		t.Fatalf("unexpected related object in ClusterOperator object was not deleted")
+	}
 }
 
 func TestStatusManagerSetDegraded(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing", "1.2.3")
+	mapper := &fakeRESTMapper{}
+	status := New(client, mapper, "testing", "1.2.3")
 
 	co, err := getCO(client, "testing")
 	if !errors.IsNotFound(err) {
@@ -231,7 +310,8 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 
 func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing", "1.2.3")
+	mapper := &fakeRESTMapper{}
+	status := New(client, mapper, "testing", "1.2.3")
 
 	status.SetDaemonSets([]types.NamespacedName{
 		{Namespace: "one", Name: "alpha"},
@@ -418,7 +498,8 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 
 func TestStatusManagerSetFromPods(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing", "1.2.3")
+	mapper := &fakeRESTMapper{}
+	status := New(client, mapper, "testing", "1.2.3")
 
 	status.SetDeployments([]types.NamespacedName{
 		{Namespace: "one", Name: "alpha"},
