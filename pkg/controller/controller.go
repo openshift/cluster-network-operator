@@ -11,7 +11,7 @@ var AddToManagerFuncs []func(manager.Manager, *statusmanager.StatusManager) erro
 
 // AddToManager adds all Controllers to the Manager
 func AddToManager(m manager.Manager) error {
-	s := statusmanager.New(m.GetClient(), "network", operatorversion.Version)
+	s := statusmanager.New(m.GetClient(), m.GetRESTMapper(), "network", operatorversion.Version)
 
 	for _, f := range AddToManagerFuncs {
 		if err := f(m, s); err != nil {
