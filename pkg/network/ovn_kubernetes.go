@@ -26,9 +26,8 @@ const OVN_SB_RAFT_PORT = "9644"
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
 // This creates
-// - the ClusterNetwork object
-// - the ovn-kubernetes namespace
-// - the ovn-kubeernetes setup
+// - the openshift-ovn-kubernetes namespace
+// - the ovn-config ConfigMap
 // - the ovnkube-node daemonset
 // - the ovnkube-master deployment
 // and some other small things.
