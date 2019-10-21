@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"reflect"
-	"strings"
 	"sync"
 
 	"github.com/ghodss/yaml"
@@ -14,7 +13,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
 
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +33,7 @@ const (
 	InjectorConfig
 	PodDeployment
 	PKIConfig
+	RolloutHung
 	maxStatusLevel
 )
 
@@ -238,90 +237,4 @@ func (status *StatusManager) SetRelatedObjects(relatedObjects []configv1.ObjectR
 	status.Lock()
 	defer status.Unlock()
 	status.relatedObjects = relatedObjects
-}
-
-// SetFromPods sets the operator Degraded/Progressing/Available status, based on
-// the current status of the manager's DaemonSets and Deployments.
-func (status *StatusManager) SetFromPods() {
-	status.Lock()
-	defer status.Unlock()
-
-	targetLevel := os.Getenv("RELEASE_VERSION")
-	reachedAvailableLevel := (len(status.daemonSets) + len(status.deployments)) > 0
-
-	progressing := []string{}
-
-	for _, dsName := range status.daemonSets {
-		ds := &appsv1.DaemonSet{}
-		if err := status.client.Get(context.TODO(), dsName, ds); err != nil {
-			log.Printf("Error getting DaemonSet %q: %v", dsName.String(), err)
-			progressing = append(progressing, fmt.Sprintf("Waiting for DaemonSet %q to be created", dsName.String()))
-			// Assume the OperConfig Controller is in the process of reconciling
-			// things; it will set a Degraded status if it fails.
-			continue
-		}
-
-		if ds.Status.UpdatedNumberScheduled < ds.Status.DesiredNumberScheduled {
-			progressing = append(progressing, fmt.Sprintf("DaemonSet %q update is rolling out (%d out of %d updated)", dsName.String(), ds.Status.UpdatedNumberScheduled, ds.Status.DesiredNumberScheduled))
-		} else if ds.Status.NumberUnavailable > 0 {
-			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not available (awaiting %d nodes)", dsName.String(), ds.Status.NumberUnavailable))
-		} else if ds.Status.NumberAvailable == 0 { // NOTE: update this if we ever expect empty (unscheduled) daemonsets ~cdc
-			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not yet scheduled on any nodes", dsName.String()))
-		} else if ds.Generation > ds.Status.ObservedGeneration {
-			progressing = append(progressing, fmt.Sprintf("DaemonSet %q update is being processed (generation %d, observed generation %d)", dsName.String(), ds.Generation, ds.Status.ObservedGeneration))
-		}
-
-		if !(ds.Generation <= ds.Status.ObservedGeneration && ds.Status.UpdatedNumberScheduled == ds.Status.DesiredNumberScheduled && ds.Status.NumberUnavailable == 0 && ds.Annotations["release.openshift.io/version"] == targetLevel) {
-			reachedAvailableLevel = false
-		}
-	}
-
-	for _, depName := range status.deployments {
-		dep := &appsv1.Deployment{}
-		if err := status.client.Get(context.TODO(), depName, dep); err != nil {
-			log.Printf("Error getting Deployment %q: %v", depName.String(), err)
-			progressing = append(progressing, fmt.Sprintf("Waiting for Deployment %q to be created", depName.String()))
-			// Assume the OperConfig Controller is in the process of reconciling
-			// things; it will set a Degraded status if it fails.
-			continue
-		}
-
-		if dep.Status.UnavailableReplicas > 0 {
-			progressing = append(progressing, fmt.Sprintf("Deployment %q is not available (awaiting %d nodes)", depName.String(), dep.Status.UnavailableReplicas))
-		} else if dep.Status.AvailableReplicas == 0 {
-			progressing = append(progressing, fmt.Sprintf("Deployment %q is not yet scheduled on any nodes", depName.String()))
-		} else if dep.Status.ObservedGeneration < dep.Generation {
-			progressing = append(progressing, fmt.Sprintf("Deployment %q update is being processed (generation %d, observed generation %d)", depName.String(), dep.Generation, dep.Status.ObservedGeneration))
-		}
-
-		if !(dep.Generation <= dep.Status.ObservedGeneration && dep.Status.UpdatedReplicas == dep.Status.Replicas && dep.Status.AvailableReplicas > 0 && dep.Annotations["release.openshift.io/version"] == targetLevel) {
-			reachedAvailableLevel = false
-		}
-	}
-
-	status.setNotDegraded(PodDeployment)
-
-	if len(progressing) > 0 {
-		status.set(
-			reachedAvailableLevel,
-			configv1.ClusterOperatorStatusCondition{
-				Type:    configv1.OperatorProgressing,
-				Status:  configv1.ConditionTrue,
-				Reason:  "Deploying",
-				Message: strings.Join(progressing, "\n"),
-			},
-		)
-	} else {
-		status.set(
-			reachedAvailableLevel,
-			configv1.ClusterOperatorStatusCondition{
-				Type:   configv1.OperatorProgressing,
-				Status: configv1.ConditionFalse,
-			},
-			configv1.ClusterOperatorStatusCondition{
-				Type:   configv1.OperatorAvailable,
-				Status: configv1.ConditionTrue,
-			},
-		)
-	}
 }
