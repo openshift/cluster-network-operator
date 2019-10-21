@@ -1,0 +1,144 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: ovs-node
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    kubernetes.io/description: |
+      This daemonset launches  Open vSwitch per-node networking components.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+    matchLabels:
+      app: ovs-node
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: ovs-node
+        component: network
+        type: infra
+        openshift.io/component: network
+        kubernetes.io/os: "linux"
+    spec:
+      serviceAccountName: ovn-kubernetes-node
+      hostNetwork: true
+      hostPID: true
+      priorityClassName: "system-node-critical"
+      # volumes in all containers:
+      # (container) -> (host)
+      # /etc/openvswitch -> /var/lib/openvswitch/etc - ovsdb system id
+      # /var/lib/openvswitch -> /var/lib/openvswitch/data - ovsdb data
+      # /run/openvswitch -> tmpfs - ovsdb sockets
+      # /env -> configmap env-overrides - debug overrides
+      containers:
+      # ovsdb and ovs-vswitchd
+      - name: ovs-daemons
+        image: {{.OvnImage}}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          if [[ -f "/env/${K8S_NODE}" ]]; then
+            set -o allexport
+            source "/env/${K8S_NODE}"
+            set +o allexport
+          fi
+          chown -R openvswitch:openvswitch /run/openvswitch
+          chown -R openvswitch:openvswitch /etc/openvswitch
+          function quit {
+              /usr/share/openvswitch/scripts/ovs-ctl stop
+              exit 0
+          }
+          trap quit SIGTERM
+          /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --system-id=random
+          ovs-appctl vlog/set "file:${OVS_LOG_LEVEL}"
+          /usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
+
+          tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
+          tail -F --pid=$(cat /var/run/openvswitch/ovsdb-server.pid) /var/log/openvswitch/ovsdb-server.log &
+          wait
+        env:
+        - name: OVS_LOG_LEVEL
+          value: info
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /lib/modules
+          name: host-modules
+          readOnly: true
+        - mountPath: /sys
+          name: host-sys
+          readOnly: true
+        - mountPath: /run/openvswitch
+          name: run-openvswitch
+        - mountPath: /etc/openvswitch
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch
+          name: var-lib-openvswitch
+        - mountPath: /env
+          name: env-overrides
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        livenessProbe:
+          exec:
+            command:
+            - /usr/share/openvswitch/scripts/ovs-ctl
+            - status
+          initialDelaySeconds: 15
+          periodSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - /usr/share/openvswitch/scripts/ovs-ctl
+            - status
+          initialDelaySeconds: 15
+          periodSeconds: 5
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/usr/share/openvswitch/scripts/ovs-ctl", "stop"]
+        terminationGracePeriodSeconds: 10
+
+      nodeSelector:
+        beta.kubernetes.io/os: "linux"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: network.operator.openshift.io/external-openvswitch
+                operator: DoesNotExist        
+      volumes:
+      # used for iptables wrapper scripts
+      - name: host-modules
+        hostPath:
+          path: /lib/modules
+      - name: var-lib-openvswitch
+        hostPath:
+          path: /var/lib/openvswitch/data
+      - name: etc-openvswitch
+        hostPath:
+          path: /var/lib/openvswitch/etc
+      - name: run-openvswitch
+        hostPath:
+          path: /run/openvswitch
+      - name: host-sys
+        hostPath:
+          path: /sys
+      - name: env-overrides
+        configMap:
+          name: env-overrides
+          optional: true
+      tolerations:
+      - operator: "Exists"
