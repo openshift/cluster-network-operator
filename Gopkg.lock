@@ -362,7 +362,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:1d9fda8fed8ae0f18bca4fceea007596d852828521c10bb58633e6eb9dda8a2a"
+  digest = "1:6fa8967ceefa2000f40ef424cf286ff81826d789dce8d06b7ae474c27200135c"
   name = "github.com/openshift/api"
   packages = [
     ".",
@@ -407,11 +407,9 @@
     "template/v1",
     "user",
     "user/v1",
-    "webconsole",
-    "webconsole/v1",
   ]
   pruneopts = "NT"
-  revision = "d92789481b059132f1febccd9bb47cb27220f248"
+  revision = "8c074bd7371659c93bef66afbf01bd4e7f7d41ed"
 
 [[projects]]
   branch = "master"

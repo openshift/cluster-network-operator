@@ -8,8 +8,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // Feature holds cluster-wide information about feature gates.  The canonical name is `cluster`
 type FeatureGate struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
+	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec holds user settable values for configuration
@@ -76,9 +75,9 @@ type FeatureGateStatus struct {
 
 type FeatureGateList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
 	metav1.ListMeta `json:"metadata"`
-	Items           []FeatureGate `json:"items"`
+
+	Items []FeatureGate `json:"items"`
 }
 
 type FeatureGateEnabledDisabled struct {
@@ -104,9 +103,11 @@ var FeatureSets = map[FeatureSet]*FeatureGateEnabledDisabled{
 			"RotateKubeletServerCertificate",    // sig-pod, sjenning
 			"SupportPodPidsLimit",               // sig-pod, sjenning
 			"TLSSecurityProfile",                // sig-network, danehans
+			"NodeDisruptionExclusion",           // sig-scheduling, ccoleman
+			"ServiceNodeExclusion",              // sig-scheduling, ccoleman
 		},
 		Disabled: []string{
-			"LocalStorageCapacityIsolation", // sig-pod, sjenning
+			"LegacyNodeRoleBehavior", // sig-scheduling, ccoleman
 		},
 	},
 	CustomNoUpgrade: {
@@ -119,9 +120,11 @@ var FeatureSets = map[FeatureSet]*FeatureGateEnabledDisabled{
 			"RotateKubeletServerCertificate",    // sig-pod, sjenning
 			"SupportPodPidsLimit",               // sig-pod, sjenning
 			"TLSSecurityProfile",                // sig-network, danehans
+			"NodeDisruptionExclusion",           // sig-scheduling, ccoleman
+			"ServiceNodeExclusion",              // sig-scheduling, ccoleman
 		},
 		Disabled: []string{
-			"LocalStorageCapacityIsolation", // sig-pod, sjenning
+			"LegacyNodeRoleBehavior", // sig-scheduling, ccoleman
 		},
 	},
 	LatencySensitive: {
@@ -130,9 +133,11 @@ var FeatureSets = map[FeatureSet]*FeatureGateEnabledDisabled{
 			"RotateKubeletServerCertificate",    // sig-pod, sjenning
 			"SupportPodPidsLimit",               // sig-pod, sjenning
 			"TopologyManager",                   // sig-pod, sjenning
+			"NodeDisruptionExclusion",           // sig-scheduling, ccoleman
+			"ServiceNodeExclusion",              // sig-scheduling, ccoleman
 		},
 		Disabled: []string{
-			"LocalStorageCapacityIsolation", // sig-pod, sjenning
+			"LegacyNodeRoleBehavior", // sig-scheduling, ccoleman
 		},
 	},
 }
