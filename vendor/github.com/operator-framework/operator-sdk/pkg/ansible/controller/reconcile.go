@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand"
 	"os"
 	"strconv"
@@ -26,6 +27,7 @@ import (
 
 	ansiblestatus "github.com/operator-framework/operator-sdk/pkg/ansible/controller/status"
 	"github.com/operator-framework/operator-sdk/pkg/ansible/events"
+	"github.com/operator-framework/operator-sdk/pkg/ansible/metrics"
 	"github.com/operator-framework/operator-sdk/pkg/ansible/proxy/kubeconfig"
 	"github.com/operator-framework/operator-sdk/pkg/ansible/runner"
 	"github.com/operator-framework/operator-sdk/pkg/ansible/runner/eventapi"
@@ -37,12 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 const (
-	// ReconcilePeriodAnnotation - annotation used by a user to specify the reconcilation interval for the CR.
+	// ReconcilePeriodAnnotation - annotation used by a user to specify the reconciliation interval for the CR.
 	// To use create a CR with an annotation "ansible.operator-sdk/reconcile-period: 30s" or some other valid
 	// Duration. This will override the operators/or controllers reconcile period for that particular CR.
 	ReconcilePeriodAnnotation = "ansible.operator-sdk/reconcile-period"
@@ -53,7 +55,6 @@ type AnsibleOperatorReconciler struct {
 	GVK             schema.GroupVersionKind
 	Runner          runner.Runner
 	Client          client.Client
-	APIReader       client.Reader
 	EventHandlers   []events.EventHandler
 	ReconcilePeriod time.Duration
 	ManageStatus    bool
@@ -82,6 +83,9 @@ func (r *AnsibleOperatorReconciler) Reconcile(request reconcile.Request) (reconc
 	if ds, ok := u.GetAnnotations()[ReconcilePeriodAnnotation]; ok {
 		duration, err := time.ParseDuration(ds)
 		if err != nil {
+			// Should attempt to update to a failed condition
+			r.markError(u, request.NamespacedName, fmt.Sprintf("Unable to parse reconcile period annotation: %v", err))
+			logger.Error(err, "Unable to parse reconcile period annotation")
 			return reconcileResult, err
 		}
 		reconcileResult.RequeueAfter = duration
@@ -96,29 +100,31 @@ func (r *AnsibleOperatorReconciler) Reconcile(request reconcile.Request) (reconc
 		finalizers := append(pendingFinalizers, finalizer)
 		u.SetFinalizers(finalizers)
 		err := r.Client.Update(context.TODO(), u)
-		if exit, err := determineReturn(err); exit {
+		if err != nil {
+			logger.Error(err, "Unable to update cr with finalizer")
 			return reconcileResult, err
 		}
 	}
 	if !contains(pendingFinalizers, finalizer) && deleted {
-		logger.Info("Resource is terminated, skipping reconcilation")
+		logger.Info("Resource is terminated, skipping reconciliation")
 		return reconcile.Result{}, nil
 	}
 
 	spec := u.Object["spec"]
 	_, ok := spec.(map[string]interface{})
+	// Need to handle cases where there is no spec.
+	// We can add the spec to the object, which will allow
+	// everything to work, and will not get updated.
+	// Therefore we can now deal with the case of secrets and configmaps.
 	if !ok {
 		logger.V(1).Info("Spec was not found")
 		u.Object["spec"] = map[string]interface{}{}
-		err = r.Client.Update(context.TODO(), u)
-		if exit, err := determineReturn(err); exit {
-			return reconcileResult, err
-		}
 	}
 
 	if r.ManageStatus {
 		err = r.markRunning(u, request.NamespacedName)
-		if exit, err := determineReturn(err); exit {
+		if err != nil {
+			logger.Error(err, "Unable to update the status to mark cr as running")
 			return reconcileResult, err
 		}
 	}
@@ -132,6 +138,8 @@ func (r *AnsibleOperatorReconciler) Reconcile(request reconcile.Request) (reconc
 
 	kc, err := kubeconfig.Create(ownerRef, "http://localhost:8888", u.GetNamespace())
 	if err != nil {
+		r.markError(u, request.NamespacedName, "Unable to run reconciliation")
+		logger.Error(err, "Unable to generate kubeconfig")
 		return reconcileResult, err
 	}
 	defer func() {
@@ -141,6 +149,8 @@ func (r *AnsibleOperatorReconciler) Reconcile(request reconcile.Request) (reconc
 	}()
 	result, err := r.Runner.Run(ident, u, kc.Name())
 	if err != nil {
+		r.markError(u, request.NamespacedName, "Unable to run reconciliation")
+		logger.Error(err, "Unable to run ansible runner")
 		return reconcileResult, err
 	}
 
@@ -162,7 +172,7 @@ func (r *AnsibleOperatorReconciler) Reconcile(request reconcile.Request) (reconc
 				return reconcile.Result{}, err
 			}
 		}
-		if event.Event == eventapi.EventRunnerOnFailed {
+		if event.Event == eventapi.EventRunnerOnFailed && !event.IgnoreError() {
 			failureMessages = append(failureMessages, event.GetFailedPlaybookMessage())
 		}
 	}
@@ -177,13 +187,21 @@ func (r *AnsibleOperatorReconciler) Reconcile(request reconcile.Request) (reconc
 		return reconcileResult, eventErr
 	}
 
-	err = r.APIReader.Get(context.TODO(), request.NamespacedName, u)
+	// Need to get the unstructured object after ansible
+	// this needs to hit the API
+	err = r.Client.Get(context.TODO(), request.NamespacedName, u)
+	if apierrors.IsNotFound(err) {
+		return reconcile.Result{}, nil
+	}
 	if err != nil {
-		log.Error(err, "Unable to get updated object from api")
 		return reconcile.Result{}, err
 	}
 
-	// We only want to update the CustomResource once, so we'll track changes and do it at the end
+	// try to get the updated finalizers
+	pendingFinalizers = u.GetFinalizers()
+
+	// We only want to update the CustomResource once, so we'll track changes
+	// and do it at the end
 	runSuccessful := len(failureMessages) == 0
 	// The finalizer has run successfully, time to remove it
 	if deleted && finalizerExists && runSuccessful {
@@ -195,22 +213,26 @@ func (r *AnsibleOperatorReconciler) Reconcile(request reconcile.Request) (reconc
 		}
 		u.SetFinalizers(finalizers)
 		err := r.Client.Update(context.TODO(), u)
-		if exit, err := determineReturn(err); exit {
+		if err != nil {
+			logger.Error(err, "Failed to remove finalizer")
 			return reconcileResult, err
 		}
 	}
 	if r.ManageStatus {
 		err = r.markDone(u, request.NamespacedName, statusEvent, failureMessages)
-		if exit, err := determineReturn(err); exit {
-			return reconcileResult, err
+		if err != nil {
+			logger.Error(err, "Failed to mark status done")
 		}
-
 	}
 	return reconcileResult, err
 }
 
 func (r *AnsibleOperatorReconciler) markRunning(u *unstructured.Unstructured, namespacedName types.NamespacedName) error {
 	// Get the latest resource to prevent updating a stale status
+	err := r.Client.Get(context.TODO(), namespacedName, u)
+	if err != nil {
+		return err
+	}
 	statusInterface := u.Object["status"]
 	statusMap, _ := statusInterface.(map[string]interface{})
 	crStatus := ansiblestatus.CreateFromMap(statusMap)
@@ -234,14 +256,66 @@ func (r *AnsibleOperatorReconciler) markRunning(u *unstructured.Unstructured, na
 	)
 	ansiblestatus.SetCondition(&crStatus, *c)
 	u.Object["status"] = crStatus.GetJSONMap()
-	err := r.Client.Status().Update(context.TODO(), u)
+	err = r.Client.Status().Update(context.TODO(), u)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
+// markError - used to alert the user to the issues during the validation of a reconcile run.
+// i.e Annotations that could be incorrect
+func (r *AnsibleOperatorReconciler) markError(u *unstructured.Unstructured, namespacedName types.NamespacedName, failureMessage string) error {
+	logger := logf.Log.WithName("markError")
+	metrics.ReconcileFailed(r.GVK.String())
+	// Get the latest resource to prevent updating a stale status
+	err := r.Client.Get(context.TODO(), namespacedName, u)
+	if apierrors.IsNotFound(err) {
+		logger.Info("Resource not found, assuming it was deleted")
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	statusInterface := u.Object["status"]
+	statusMap, ok := statusInterface.(map[string]interface{})
+	// If the map is not available create one.
+	if !ok {
+		statusMap = map[string]interface{}{}
+	}
+	crStatus := ansiblestatus.CreateFromMap(statusMap)
+
+	sc := ansiblestatus.GetCondition(crStatus, ansiblestatus.RunningConditionType)
+	if sc != nil {
+		sc.Status = v1.ConditionFalse
+		ansiblestatus.SetCondition(&crStatus, *sc)
+	}
+
+	c := ansiblestatus.NewCondition(
+		ansiblestatus.FailureConditionType,
+		v1.ConditionTrue,
+		nil,
+		ansiblestatus.FailedReason,
+		failureMessage,
+	)
+	ansiblestatus.SetCondition(&crStatus, *c)
+	// This needs the status subresource to be enabled by default.
+	u.Object["status"] = crStatus.GetJSONMap()
+
+	return r.Client.Status().Update(context.TODO(), u)
+}
+
 func (r *AnsibleOperatorReconciler) markDone(u *unstructured.Unstructured, namespacedName types.NamespacedName, statusEvent eventapi.StatusJobEvent, failureMessages eventapi.FailureMessages) error {
+	logger := logf.Log.WithName("markDone")
+	// Get the latest resource to prevent updating a stale status
+	err := r.Client.Get(context.TODO(), namespacedName, u)
+	if apierrors.IsNotFound(err) {
+		logger.Info("Resource not found, assuming it was deleted")
+		return nil
+	}
+	if err != nil {
+		return err
+	}
 	statusInterface := u.Object["status"]
 	statusMap, _ := statusInterface.(map[string]interface{})
 	crStatus := ansiblestatus.CreateFromMap(statusMap)
@@ -250,6 +324,7 @@ func (r *AnsibleOperatorReconciler) markDone(u *unstructured.Unstructured, names
 	ansibleStatus := ansiblestatus.NewAnsibleResultFromStatusJobEvent(statusEvent)
 
 	if !runSuccessful {
+		metrics.ReconcileFailed(r.GVK.String())
 		sc := ansiblestatus.GetCondition(crStatus, ansiblestatus.RunningConditionType)
 		sc.Status = v1.ConditionFalse
 		ansiblestatus.SetCondition(&crStatus, *sc)
@@ -262,6 +337,7 @@ func (r *AnsibleOperatorReconciler) markDone(u *unstructured.Unstructured, names
 		)
 		ansiblestatus.SetCondition(&crStatus, *c)
 	} else {
+		metrics.ReconcileSucceeded(r.GVK.String())
 		c := ansiblestatus.NewCondition(
 			ansiblestatus.RunningConditionType,
 			v1.ConditionTrue,
@@ -286,22 +362,4 @@ func contains(l []string, s string) bool {
 		}
 	}
 	return false
-}
-
-// determineReturn - if the object was updated outside of our controller
-// this means that the current reconcilation is over and we should use the
-// latest version. To do this, we just exit without error because the
-// latest version should be queued for update.
-func determineReturn(err error) (bool, error) {
-	exit := false
-	if err == nil {
-		return exit, err
-	}
-	exit = true
-
-	if apierrors.IsConflict(err) {
-		log.V(1).Info("Conflict found during an update; re-running reconcilation")
-		return exit, nil
-	}
-	return exit, err
 }
