@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: network-operator
-        image: quay.io/openshift/origin-cluster-network-operator:4.2
+        image: quay.io/openshift/origin-cluster-network-operator:4.3
         command:
         - "/usr/bin/cluster-network-operator"
         - "--url-only-kubeconfig=/etc/kubernetes/kubeconfig"
@@ -28,23 +28,23 @@ spec:
         - name: RELEASE_VERSION
           value: "0.0.1-snapshot"
         - name: NODE_IMAGE
-          value: "quay.io/openshift/origin-node:4.2"
+          value: "quay.io/openshift/origin-node:4.3"
         - name: SDN_CONTROLLER_IMAGE
-          value: "quay.io/openshift/origin-sdn-controller:4.2"
+          value: "quay.io/openshift/origin-sdn-controller:4.3"
         - name: KUBE_PROXY_IMAGE
-          value: "quay.io/openshift/origin-kube-proxy:4.2"
+          value: "quay.io/openshift/origin-kube-proxy:4.3"
         - name: MULTUS_IMAGE
-          value: "quay.io/openshift/origin-multus-cni:4.2"
+          value: "quay.io/openshift/origin-multus-cni:4.3"
         - name: MULTUS_ADMISSION_CONTROLLER_IMAGE
-          value: "quay.io/openshift/origin-multus-admission-controller:4.2"
+          value: "quay.io/openshift/origin-multus-admission-controller:4.3"
         - name: CNI_PLUGINS_IMAGE
-          value: "quay.io/openshift/origin-container-networking-plugins:4.2"
+          value: "quay.io/openshift/origin-container-networking-plugins:4.3"
         - name: OVN_IMAGE
-          value: "quay.io/openshift/origin-ovn-kubernetes:4.2"
+          value: "quay.io/openshift/origin-ovn-kubernetes:4.3"
         - name: KURYR_DAEMON_IMAGE
-          value: "quay.io/openshift/origin-kuryr-cni:4.2"
+          value: "quay.io/openshift/origin-kuryr-cni:4.3"
         - name: KURYR_CONTROLLER_IMAGE
-          value: "quay.io/openshift/origin-kuryr-controller:4.2"
+          value: "quay.io/openshift/origin-kuryr-controller:4.3"
         - name: POD_NAME
           valueFrom:
             fieldRef:
