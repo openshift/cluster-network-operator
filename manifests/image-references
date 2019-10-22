@@ -5,40 +5,40 @@ spec:
   - name: cluster-network-operator
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-cluster-network-operator:4.2
+      name: quay.io/openshift/origin-cluster-network-operator:4.3
   - name: node
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-node:4.2
+      name: quay.io/openshift/origin-node:4.3
   - name: kube-proxy
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-kube-proxy:4.2
+      name: quay.io/openshift/origin-kube-proxy:4.3
   - name: sdn-controller
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-sdn-controller:4.2
+      name: quay.io/openshift/origin-sdn-controller:4.3
   - name: multus-cni
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-multus-cni:4.2
+      name: quay.io/openshift/origin-multus-cni:4.3
   - name: multus-admission-controller
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-multus-admission-controller:4.2
+      name: quay.io/openshift/origin-multus-admission-controller:4.3
   - name: container-networking-plugins
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-container-networking-plugins:4.2
+      name: quay.io/openshift/origin-container-networking-plugins:4.3
   - name: ovn-kubernetes
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-ovn-kubernetes:4.2
+      name: quay.io/openshift/origin-ovn-kubernetes:4.3
   - name: kuryr-cni
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-kuryr-cni:4.2
+      name: quay.io/openshift/origin-kuryr-cni:4.3
   - name: kuryr-controller
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-kuryr-controller:4.2
+      name: quay.io/openshift/origin-kuryr-controller:4.3
