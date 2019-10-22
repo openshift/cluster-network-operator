@@ -57,19 +57,22 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		clusterName := kubeconfig.Contexts[kubeconfig.CurrentContext].Cluster
-		apiURL := kubeconfig.Clusters[clusterName].Server
+		dcc := clientcmd.NewDefaultClientConfig(*kubeconfig, nil)
+		rc, err := dcc.ClientConfig()
+		if err != nil {
+			log.Fatal(err)
+		}
 
-		url, err := url.Parse(apiURL)
+		apiURL, err := url.Parse(rc.Host)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		// The kubernetes in-cluster functions don't let you override the apiserver
 		// directly; gotta "pass" it via environment vars.
-		log.Printf("overriding kubernetes api to %s", apiURL)
-		os.Setenv("KUBERNETES_SERVICE_HOST", url.Hostname())
-		os.Setenv("KUBERNETES_SERVICE_PORT", url.Port())
+		log.Printf("overriding kubernetes api to %s", rc.Host)
+		os.Setenv("KUBERNETES_SERVICE_HOST", apiURL.Hostname())
+		os.Setenv("KUBERNETES_SERVICE_PORT", apiURL.Port())
 	}
 
 	// Get a config to talk to the apiserver
