@@ -35,23 +35,6 @@ required = [
   name = "k8s.io/client-go"
   version = "kubernetes-1.16.0"
 
-[[override]]
-  name = "github.com/coreos/prometheus-operator"
-  version = "=v0.26.0"
-
-[[override]]
-  name = "sigs.k8s.io/controller-runtime"
-  # switch back to upstream when https://github.com/kubernetes-sigs/controller-runtime/pull/588 lands
-  revision = "d02b94982e5761c7c1455279c460cd383a9c04d4"
-  source = "https://github.com/munnerz/controller-runtime.git"
-
-[[constraint]]
-  name = "github.com/operator-framework/operator-sdk"
-  # The version rule is used for a specific release and the master branch for in between releases.
-  # branch = "v0.4.x" #osdk_branch_annotation
-  version = "=v0.4.1" #osdk_version_annotation
-
-
 [prune]
   go-tests = true
   non-go = true
@@ -83,3 +66,7 @@ required = [
 [[constraint]]
   name = "github.com/containernetworking/cni"
   version = "0.7.1"
+
+[[constraint]]
+  name = "sigs.k8s.io/controller-runtime"
+  revision = "2df793d0207600b5cd3a50be2d3edd7f5cb333d9"
