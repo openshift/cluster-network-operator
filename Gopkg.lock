@@ -109,14 +109,6 @@
   version = "v0.1.0"
 
 [[projects]]
-  digest = "1:340497a512995aa69c0add901d79a2096b3449d35a44a6f1f1115091a9f8c687"
-  name = "github.com/go-logr/zapr"
-  packages = ["."]
-  pruneopts = "NT"
-  revision = "03f06a783fbb7dfaf3f629c7825480e43a7105e6"
-  version = "v0.1.1"
-
-[[projects]]
   digest = "1:3758c86e787dfe5792a23430f34636106a16da914446724399c9c12f121a225d"
   name = "github.com/go-openapi/jsonpointer"
   packages = ["."]
@@ -440,7 +432,7 @@
   revision = "97c62d8a29013969b080844b90404fd37588b457"
 
 [[projects]]
-  digest = "1:c7b6faf294d8ef95f74c0467df72b8ffa103935462df294a9e7bc1d416a9f4d5"
+  digest = "1:663d2d751003fa80eb348ca665b8969fa0d8b92b4625bf060807aad7813a6edd"
   name = "github.com/operator-framework/operator-sdk"
   packages = [
     "pkg/k8sutil",
@@ -448,8 +440,8 @@
     "version",
   ]
   pruneopts = "NT"
-  revision = "8e3c20e730c364f75ddc454acec79e981bb819dd"
-  version = "v0.4.1"
+  revision = "39c65c36159a9c249e5f3c178205cc6e86c16f8d"
+  version = "v0.11.0"
 
 [[projects]]
   digest = "1:14715f705ff5dfe0ffd6571d7d201dd8e921030f8070321a79380d8ca4ec1a24"
@@ -529,37 +521,6 @@
   packages = ["."]
   pruneopts = "NT"
   revision = "7109fa855b0ff1ebef7fbd2f6aa613e8db7cfbc0"
-
-[[projects]]
-  digest = "1:cc9d86ec4e6e3bdf87e3a421273bfeed003cf8e21351c0302fe8b0eb7b10efe6"
-  name = "go.uber.org/atomic"
-  packages = ["."]
-  pruneopts = "NT"
-  revision = "df976f2515e274675050de7b3f42545de80594fd"
-  version = "v1.4.0"
-
-[[projects]]
-  digest = "1:7b954fc1e310e8df787500d512b4f1e47e6bf05989c6f7118a5159978abdbc41"
-  name = "go.uber.org/multierr"
-  packages = ["."]
-  pruneopts = "NT"
-  revision = "71e610a0e48dbda460d9c18adca8b5f2de04a7c1"
-  version = "v1.2.0"
-
-[[projects]]
-  digest = "1:80f7b1f444dbbe5b64a5174c6726af3243a4770fb19daaae9613c4d615a9684a"
-  name = "go.uber.org/zap"
-  packages = [
-    ".",
-    "buffer",
-    "internal/bufferpool",
-    "internal/color",
-    "internal/exit",
-    "zapcore",
-  ]
-  pruneopts = "NT"
-  revision = "27376062155ad36be76b0f12cf1572a221d3a48c"
-  version = "v1.10.0"
 
 [[projects]]
   branch = "master"
@@ -682,6 +643,17 @@
   ]
   pruneopts = "NT"
   revision = "c9f9432ec4b21a28c4d47f172513698febb68e9c"
+
+[[projects]]
+  branch = "master"
+  digest = "1:c0619d0c0c2f585812ce9f844eafb9c5660f5bd723c9ac0cd60b7fac665d2ac6"
+  name = "golang.org/x/xerrors"
+  packages = [
+    ".",
+    "internal",
+  ]
+  pruneopts = "NT"
+  revision = "1b5146add8981d58be77b16229c0ff0f8bebd8c1"
 
 [[projects]]
   digest = "1:8392b5c29adedc5f85c66b48bb53b6c49dd91d8540f3cad5d43ef7277946718f"
@@ -1151,7 +1123,7 @@
   revision = "69764acb6e8e900b7c05296c5d3c9c19545475f9"
 
 [[projects]]
-  digest = "1:14bf7546be2516f5290a438bb9ad1e8c992785c6904330eabb9848cdd136692f"
+  digest = "1:6a2dad4276ed181cb1990dc1dabad3bf0218bb98416ab4171142f2c0b9829bef"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
     "pkg/cache",
@@ -1164,6 +1136,7 @@
     "pkg/controller/controllerutil",
     "pkg/event",
     "pkg/handler",
+    "pkg/healthz",
     "pkg/internal/controller",
     "pkg/internal/controller/metrics",
     "pkg/internal/log",
@@ -1171,7 +1144,6 @@
     "pkg/internal/recorder",
     "pkg/leaderelection",
     "pkg/log",
-    "pkg/log/zap",
     "pkg/manager",
     "pkg/manager/signals",
     "pkg/metrics",
@@ -1179,7 +1151,6 @@
     "pkg/reconcile",
     "pkg/recorder",
     "pkg/runtime/inject",
-    "pkg/runtime/log",
     "pkg/runtime/signals",
     "pkg/source",
     "pkg/source/internal",
@@ -1189,8 +1160,7 @@
     "pkg/webhook/internal/metrics",
   ]
   pruneopts = "NT"
-  revision = "d02b94982e5761c7c1455279c460cd383a9c04d4"
-  source = "https://github.com/munnerz/controller-runtime.git"
+  revision = "2df793d0207600b5cd3a50be2d3edd7f5cb333d9"
 
 [[projects]]
   digest = "1:8730e0150dfb2b7e173890c8b9868e7a273082ef8e39f4940e3506a481cf895c"
