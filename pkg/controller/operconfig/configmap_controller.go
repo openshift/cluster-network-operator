@@ -55,7 +55,7 @@ func addConfigMapReconciler(mgr manager.Manager, r reconcile.Reconciler) error {
 }
 
 func (r *ReconcileConfigMaps) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	if request.Namespace == names.APPLIED_NAMESPACE && request.Name == names.OPERATOR_CONFIG {
+	if request.Namespace == "" && request.Name == names.OPERATOR_CONFIG {
 		return r.ReconcileMultusWebhook(request)
 	}
 	return reconcile.Result{}, nil
