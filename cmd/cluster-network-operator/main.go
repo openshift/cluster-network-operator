@@ -86,8 +86,9 @@ func main() {
 
 	// Create a new Cmd to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, manager.Options{
-		Namespace:      namespace,
-		MapperProvider: k8sutil.NewDynamicRESTMapper,
+		Namespace:          namespace,
+		MapperProvider:     k8sutil.NewDynamicRESTMapper,
+		MetricsBindAddress: "0",
 	})
 	if err != nil {
 		log.Fatal(err)
