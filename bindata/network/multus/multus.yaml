@@ -31,13 +31,42 @@ spec:
       initContainers:
       - name: cni-plugins
         image: {{.CNIPluginsImage}}
-        command: ["/bin/sh"]
-        args: ["-c", "cp -rf /usr/src/plugins/bin/* /host/opt/cni/bin"]
+        command: 
+          - /bin/bash
+          - -c
+          - |
+            #!/bin/bash
+            set -x
+            . /host/etc/os-release
+            rhelmajor=
+            # detect which version we're using in order to copy the proper binaries
+            case "${ID}" in
+              rhcos) rhelmajor=8
+              ;;
+              rhel) rhelmajor=$(echo "${VERSION_ID}" | cut -f 1 -d .) 
+              ;;
+              *) echo "FATAL ERROR: Unsupported OS ID=${ID}"; exit 1
+              ;;
+            esac
+            # Set which directory we'll copy from, detect if it exists
+            # When it doesn't exist, fall back to the original directory.
+            SOURCEDIR=/usr/src/plugins/rhel${rhelmajor}/bin/
+            if [ -d "${SOURCEDIR}" ]; then
+              echo "Detected OS version ${rhelmajor}, ${SOURCEDIR} exists"
+            else
+              echo "Source directory unavailable for OS version: ${rhelmajor}"
+              SOURCEDIR=/usr/src/plugins/bin/
+            fi
+            cp -rf ${SOURCEDIR}* /host/opt/cni/bin
+
         securityContext:
           privileged: true
         volumeMounts:
         - mountPath: /host/opt/cni/bin
           name: cnibin
+        - mountPath: /host/etc/os-release
+          name: os-release
+          readOnly: true
       containers:
       - name: kube-multus
         image: {{.MultusImage}}
@@ -79,3 +108,7 @@ spec:
         - name: cnibin
           hostPath:
             path: /var/lib/cni/bin
+        - name: os-release
+          hostPath:
+            path: /etc/os-release
+            type: File
