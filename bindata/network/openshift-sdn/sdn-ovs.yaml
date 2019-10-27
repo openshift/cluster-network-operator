@@ -28,7 +28,7 @@ spec:
       priorityClassName: system-node-critical
       containers:
       - name: openvswitch
-        image: {{.NodeImage}}
+        image: {{.SDNImage}}
         command:
         - /bin/bash
         - -c
