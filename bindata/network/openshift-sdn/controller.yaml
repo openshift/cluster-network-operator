@@ -20,8 +20,8 @@ spec:
     spec:
       containers:
       - name: sdn-controller
-        image: {{.SDNControllerImage}}
-        command: ["network-controller"]
+        image: {{.SDNImage}}
+        command: ["openshift-sdn-controller"]
         resources:
           requests:
             cpu: 10m

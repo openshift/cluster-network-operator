@@ -84,7 +84,7 @@ hack/build-go.sh
 
 ```
 export CLUSTER_DIR=<your cluster directory>
-hack/run-locally.sh -n OpenShiftSDN -m "docker.io/myawesome/origin-node:latest"
+hack/run-locally.sh -n OpenShiftSDN -m "docker.io/myawesome/origin-sdn:latest"
 ```
 
 It will print status messages as it waits for the installer to make progress.
@@ -138,17 +138,10 @@ export HACK_MINIMIZE=1
 Origin images are difficult to build correctly. If you want to test some binary changes with openshift-sdn, there's an easier way.
 
 #### One-time setup:
-1. Set up your API credentials:
+Set up your API credentials:
     - Log on to https://api.ci.openshift.org/ with your GitHub credentials
     - On the top right, click copy login command. Execute it in a terminal
     - Execute `oc registry login`, which will install credentials for your local podman and docker clients
-2. Create the following dockerfile in your origin repo:
-```
-cat <<EOF > Dockerfile.node-hacking
-FROM docker.io/openshift/origin-node:v4.0.0
-COPY _output/local/bin/linux/amd64/openshift-sdn /usr/bin/openshift-sdn
-EOF
-```
 
 #### Building a development sdn image
 1.  Pick a registry. You can use the Openshift CI one if you are a member of the organization.
@@ -156,18 +149,13 @@ EOF
 export REGISTRY=registry.svc.ci.openshift.org/<YOUR-GITHUB-USERNAME>
 ```
 
-2. Build the sdn process
+2. Build and push the sdn image
 ```
-make WHAT=./cmd/openshift-sdn
-```
-
-3. Build and push the node image
-```
-podman build -t ${REGISTRY}/origin-node:latest -f Dockerfile.node-hacking .
-podman push ${REGISTRY}/origin-node:latest
+podman build -t ${REGISTRY}/origin-sdn:latest -f images/sdn/Dockerfile.fedora .
+podman push ${REGISTRY}/origin-sdn:latest
 ```
 
-4. Follow the steps above, but override the node image reference in step 3.
+3. Follow the steps above, using the `-m` option to override the image:
 ```
-echo "NODE_IMAGE=${REGISTRY}/origin-node:latest" >> ${CLUSTER_DIR}/env.sh
+hack/run-locally.sh -m ${REGISTRY}/origin-sdn:latest
 ```
