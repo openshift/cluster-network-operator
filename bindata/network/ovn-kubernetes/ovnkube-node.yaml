@@ -47,6 +47,9 @@ spec:
             source "/env/${K8S_NODE}"
             set +o allexport
           fi
+          if [[ -f "/old/openvswitch/conf.db" && ! -f "/etc/openvswitch/conf.db" ]]; then
+            mv /old/openvswitch/conf.db /etc/openvswitch/conf.db
+          fi
           chown -R openvswitch:openvswitch /run/openvswitch
           chown -R openvswitch:openvswitch /etc/openvswitch
           function quit {
@@ -81,6 +84,8 @@ spec:
           name: run-openvswitch
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
+        - mountPath: /old/openvswitch
+          name: old-openvswitch-database
         - mountPath: /var/lib/openvswitch
           name: var-lib-openvswitch
         - mountPath: /env
@@ -276,6 +281,9 @@ spec:
           path: /var/lib/openvswitch/etc
       - name: run-openvswitch
         emptyDir: {}
+      # commit 0ac2cd changed the location of the ovs database, mount and check if a database already exists
+      - name: old-openvswitch-database
+        path: /etc/origin/openvswitch
       # For CNI server
       - name: host-run-ovn-kubernetes
         hostPath:
