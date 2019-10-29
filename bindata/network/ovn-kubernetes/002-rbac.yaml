@@ -21,6 +21,7 @@ rules:
   - get
   - list
   - watch
+  - patch
 - apiGroups: ["extensions", "networking.k8s.io"]
   resources:
   - networkpolicies

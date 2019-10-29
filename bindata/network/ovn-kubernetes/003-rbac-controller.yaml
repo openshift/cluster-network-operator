@@ -15,12 +15,20 @@ rules:
   resources:
   - namespaces
   - nodes
+  verbs:
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups: [""]
+  resources:
   - pods
   verbs:
   - get
   - list
   - patch
   - watch
+  - delete
 - apiGroups: [""]
   resources:
   - services

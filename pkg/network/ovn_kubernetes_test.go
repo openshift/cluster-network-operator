@@ -170,5 +170,5 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	errs = isOVNKubernetesChangeSafe(prev, next)
 	g.Expect(errs).To(HaveLen(1))
 
-	g.Expect(errs[0]).To(MatchError("cannot change ovn-kubernetes configuration"))
+	g.Expect(errs[0]).To(MatchError("cannot change ovn-kubernetes MTU"))
 }
