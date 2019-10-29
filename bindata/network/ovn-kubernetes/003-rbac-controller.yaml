@@ -31,6 +31,13 @@ rules:
   - delete
 - apiGroups: [""]
   resources:
+  - configmaps
+  verbs:
+  - get
+  - create
+  - update
+- apiGroups: [""]
+  resources:
   - services
   - endpoints
   verbs:
