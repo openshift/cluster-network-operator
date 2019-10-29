@@ -133,7 +133,7 @@ spec:
           fi
           exec /usr/share/openvswitch/scripts/ovn-ctl run_sb_ovsdb \
             --no-monitor \
-            --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off"
+            --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off"
         env:
         - name: OVN_LOG_LEVEL
           value: info
