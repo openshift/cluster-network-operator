@@ -1,5 +1,5 @@
 #!/bin/bash 
-
+ 
 # run-locally.sh is some scaffolding around running a local instance of the
 # network operator with the installer.
 # See HACKING.md
