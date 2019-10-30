@@ -162,6 +162,11 @@ func FillDefaults(conf, previous *operv1.NetworkSpec) {
 		disable := false
 		conf.DisableMultiNetwork = &disable
 	}
+
+	if len(conf.LogLevel) == 0 {
+		conf.LogLevel = "Normal"
+	}
+
 	FillDefaultNetworkDefaults(conf, previous, hostMTU)
 	FillKubeProxyDefaults(conf, previous)
 }
