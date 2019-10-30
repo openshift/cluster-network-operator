@@ -5,6 +5,7 @@ metadata:
   name: openshift-ovn-kubernetes
   labels:
     openshift.io/run-level: "0"
+    openshift.io/cluster-monitoring: "true"
   annotations:
     openshift.io/node-selector: ""
     openshift.io/description: "OVN Kubernetes components"
