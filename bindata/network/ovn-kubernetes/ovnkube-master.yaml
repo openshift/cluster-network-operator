@@ -69,6 +69,43 @@ spec:
             cpu: 100m
             memory: 300Mi
 
+      # ovn-nbctl daemon 
+      - name: ovn-nbctl
+        image: {{.OvnImage}}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          if [[ -f /env/_master ]]; then
+            set -o allexport
+            source /env/_master
+            set +o allexport
+          fi
+          rm -f /var/run/openvswitch/ovn-nbctl.pid
+          rm -f /var/run/openvswitch/ovn-nbctl.*.ctl
+          exec ovn-nbctl --detach --monitor --pidfile --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off
+        lifecycle:
+          preStop:
+            exec:
+              command: ["rm","-f","/var/run/openvswitch/ovn-nbctl.pid","/var/run/openvswitch/ovn-nbctl.*.ctl"]
+        env:
+        - name: OVN_LOG_LEVEL
+          value: off
+        volumeMounts:
+        - mountPath: /etc/openvswitch/
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch/
+          name: var-lib-openvswitch
+        - mountPath: /run/openvswitch/
+          name: run-openvswitch
+        - mountPath: /env
+          name: env-overrides
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+
       # nbdb: the northbound, or logical network object DB
       - name: nbdb
         image: {{.OvnImage}}
