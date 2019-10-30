@@ -233,6 +233,11 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		})
 	}
 
+	relatedObjects = append(relatedObjects, configv1.ObjectReference{
+		Resource: "namespaces",
+		Name:     names.APPLIED_NAMESPACE,
+	})
+
 	r.status.SetDaemonSets(daemonSets)
 	r.status.SetDeployments(deployments)
 	r.status.SetRelatedObjects(relatedObjects)
