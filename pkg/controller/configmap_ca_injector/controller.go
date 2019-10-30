@@ -91,7 +91,7 @@ type ReconcileConfigMapInjector struct {
 // 2. a configmap in any namespace with the label config.openshift.io/inject-trusted-cabundle = true and will insure that it contains the ca-bundle.crt
 // entry in the configmap named trusted-ca-bundle in namespace openshift-config-managed.
 func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Printf("Reconciling configmap from  %s/%s\n", request.Name, request.Namespace)
+	log.Printf("Reconciling configmap from  %s/%s\n", request.Namespace, request.Name)
 
 	trustedCAbundleConfigMap := &corev1.ConfigMap{}
 	trustedCAbundleConfigMapName := types.NamespacedName{
