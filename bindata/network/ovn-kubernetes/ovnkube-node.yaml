@@ -167,7 +167,7 @@ spec:
         - /bin/bash
         - -c
         - |
-          set -e
+          set -xe
           if [[ -f "/env/${K8S_NODE}" ]]; then
             set -o allexport
             source "/env/${K8S_NODE}"
@@ -197,17 +197,30 @@ spec:
               hybrid_overlay_flags="${hybrid_overlay_flags} --hybrid-overlay-cluster-subnets={{.OVNHybridOverlayNetCIDR}}"
             fi
           fi
+          
+          OVN_NODES_ARRAY=({{.OVN_NODES}})
+          nb_addr_list=""
+          sb_addr_list=""
+          for i in "${!OVN_NODES_ARRAY[@]}"; do
+            if [[ $i != 0 ]]; then
+              nb_addr_list="${nb_addr_list},"
+              sb_addr_list="${sb_addr_list},"
+            fi
+            host=$(getent hosts "${OVN_NODES_ARRAY[$i]}" | awk '{print $1}')
+            nb_addr_list="${nb_addr_list}ssl://${host}:{{.OVN_NB_PORT}}"
+            sb_addr_list="${sb_addr_list}ssl://${host}:{{.OVN_SB_PORT}}"
+          done
 
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --cluster-subnets "${OVN_NET_CIDR}" \
             --k8s-service-cidr "${OVN_SVC_CIDR}" \
             --k8s-apiserver "{{.K8S_APISERVER}}" \
             --ovn-config-namespace ${ovn_config_namespace} \
-            --nb-address "ssl://${db_ip}:{{.OVN_NB_PORT}}" \
+            --nb-address "${nb_addr_list}" \
+            --sb-address "${sb_addr_list}" \
             --nb-client-privkey /ovn-cert/tls.key \
             --nb-client-cert /ovn-cert/tls.crt \
             --nb-client-cacert /ovn-ca/ca-bundle.crt \
-            --sb-address "ssl://${db_ip}:{{.OVN_SB_PORT}}" \
             --sb-client-privkey /ovn-cert/tls.key \
             --sb-client-cert /ovn-cert/tls.crt \
             --sb-client-cacert /ovn-ca/ca-bundle.crt \

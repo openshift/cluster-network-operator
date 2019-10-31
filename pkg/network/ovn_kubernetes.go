@@ -1,21 +1,28 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
+	"strings"
 
 	"github.com/pkg/errors"
-
-	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	corev1 "k8s.io/api/core/v1"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const OVN_NB_PORT = "9641"
 const OVN_SB_PORT = "9642"
+const OVN_NB_RAFT_PORT = "9643"
+const OVN_SB_RAFT_PORT = "9644"
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
 // This creates
@@ -25,7 +32,7 @@ const OVN_SB_PORT = "9642"
 // - the ovnkube-node daemonset
 // - the ovnkube-master deployment
 // and some other small things.
-func renderOVNKubernetes(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	c := conf.DefaultNetwork.OVNKubernetesConfig
 
 	objs := []*uns.Unstructured{}
@@ -42,6 +49,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.U
 	data.Data["CNIBinDir"] = CNIBinDir
 	data.Data["OVN_NB_PORT"] = OVN_NB_PORT
 	data.Data["OVN_SB_PORT"] = OVN_SB_PORT
+	data.Data["OVN_NB_RAFT_PORT"] = OVN_NB_RAFT_PORT
+	data.Data["OVN_SB_RAFT_PORT"] = OVN_SB_RAFT_PORT
+	data.Data["OVN_NODES"] = strings.Join(bootstrapResult.OVN.OVNMasterNodes, " ")
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
@@ -138,4 +148,30 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 
 func networkPluginName() string {
 	return "ovn-kubernetes"
+}
+
+func boostrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
+	masterNodeList := &corev1.NodeList{}
+	matchingLabels := &client.MatchingLabels{"node-role.kubernetes.io/master": ""}
+	if err := kubeClient.List(context.TODO(), masterNodeList, matchingLabels); err != nil {
+		return nil, err
+	}
+
+	if len(masterNodeList.Items) == 0 {
+		return nil, fmt.Errorf("unable to bootstrap OVN, no master nodes found")
+	}
+
+	ovnMasterNodes := []string{}
+	for _, masterNode := range masterNodeList.Items {
+		ovnMasterNodes = append(ovnMasterNodes, masterNode.Name)
+	}
+
+	sort.Strings(ovnMasterNodes)
+
+	res := bootstrap.BootstrapResult{
+		OVN: bootstrap.OVNBootstrapResult{
+			OVNMasterNodes: ovnMasterNodes,
+		},
+	}
+	return &res, nil
 }

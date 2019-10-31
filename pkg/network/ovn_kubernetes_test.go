@@ -6,9 +6,9 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 
-	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	. "github.com/onsi/gomega"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var OVNKubernetesConfig = operv1.Network{
@@ -45,10 +45,10 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	FillDefaults(config, nil)
 
 	// enable openvswitch
-	objs, err := renderOVNKubernetes(config, manifestDirOvn)
+	objs, err := renderOVNKubernetes(config, &bootstrap.BootstrapResult{}, manifestDirOvn)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-ovn-kubernetes", "ovnkube-master")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-master")))
 
 	// It's important that the namespace is first
 	g.Expect(objs[0]).To(HaveKubernetesID("Namespace", "", "openshift-ovn-kubernetes"))
@@ -57,7 +57,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-ovn-kubernetes", "ovn-kubernetes-node")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-ovn-kubernetes", "ovn-kubernetes-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "openshift-ovn-kubernetes-node")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-ovn-kubernetes", "ovnkube-master")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-master")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
 
 	// make sure all deployments are in the master
