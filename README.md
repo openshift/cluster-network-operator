@@ -131,6 +131,11 @@ spec:
       useExternalOpenvswitch: false
 ```
 
+OpenShiftSDN can be used with an existing Open vSwitch installation on the nodes.
+Each node with Open VSwitch pre-installed must be labeled with `network.operator.openshift.io/external-openvswitch`.
+This will prevent the `ovs` daemonset from installing Open vSwitch on this node.
+
+
 ### Configuring OVNKubernetes
 OVNKubernetes supports the following configuration options, all of which are optional:
 * `MTU`: The MTU to use for the geneve overlay. The default is the MTU of the node that the cluster-network-operator is first run on, minus 100 bytes for geneve overhead. If the nodes in your cluster don't all have the same MTU then you may need to set this explicitly.
@@ -169,6 +174,11 @@ data:
     OVN_KUBE_LOG_LEVEL=5
     OVN_LOG_LEVEL=dbg
 ```
+
+OVNKubernetes can be used with an existing Open vSwitch installation on the nodes.
+Each node with Open VSwitch pre-installed must be labeled with `network.operator.openshift.io/external-openvswitch`.
+This will prevent the `ovs-node` daemonset from installing Open vSwitch on this node.
+
 
 ### Configuring Kuryr-Kubernetes
 Kuryr-Kubernetes is a CNI plugin that uses OpenStack Neutron to network OpenShift Pods, and OpenStack Octavia to create load balancers for Services. In general it is useful when OpenShift is running on an OpenStack cluster, as you can use the same SDN (OpenStack Neutron) to provide networking for both the VMs OpenShift is running on, and the Pods created by OpenShift. In such case avoidance of double encapsulation gives you two advantages: improved performace (in terms of both latency and throughput) and lower complexity of the networking architecture.
