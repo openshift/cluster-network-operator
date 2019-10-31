@@ -19,6 +19,11 @@ type KuryrBootstrapResult struct {
 	WebhookKey        string
 }
 
+type OVNBootstrapResult struct {
+	OVNMasterNodes []string
+}
+
 type BootstrapResult struct {
 	Kuryr KuryrBootstrapResult
+	OVN   OVNBootstrapResult
 }
