@@ -130,6 +130,7 @@ spec:
           fi
           exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
             --no-chdir --pidfile=/var/run/openvswitch/ovn-controller.pid \
+            -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
             -vconsole:"${OVN_LOG_LEVEL}"
         securityContext:
           privileged: true
@@ -149,6 +150,10 @@ spec:
           name: var-lib-openvswitch
         - mountPath: /env
           name: env-overrides
+        - mountPath: /ovn-cert
+          name: ovn-cert
+        - mountPath: /ovn-ca
+          name: ovn-ca
         terminationMessagePolicy: FallbackToLogsOnError
         resources:
           requests:
@@ -198,8 +203,14 @@ spec:
             --k8s-service-cidr "${OVN_SVC_CIDR}" \
             --k8s-apiserver "{{.K8S_APISERVER}}" \
             --ovn-config-namespace ${ovn_config_namespace} \
-            --nb-address "tcp://${db_ip}:{{.OVN_NB_PORT}}" \
-            --sb-address "tcp://${db_ip}:{{.OVN_SB_PORT}}" \
+            --nb-address "ssl://${db_ip}:{{.OVN_NB_PORT}}" \
+            --nb-client-privkey /ovn-cert/tls.key \
+            --nb-client-cert /ovn-cert/tls.crt \
+            --nb-client-cacert /ovn-ca/ca-bundle.crt \
+            --sb-address "ssl://${db_ip}:{{.OVN_SB_PORT}}" \
+            --sb-client-privkey /ovn-cert/tls.key \
+            --sb-client-cert /ovn-cert/tls.crt \
+            --sb-client-cacert /ovn-ca/ca-bundle.crt \
             --nodeport --gateway-mode local \
             ${hybrid_overlay_flags} \
             --pidfile /var/run/openvswitch/ovnkube-node.pid \
@@ -265,6 +276,10 @@ spec:
           name: var-lib-openvswitch
         - mountPath: /env
           name: env-overrides
+        - mountPath: /ovn-cert
+          name: ovn-cert
+        - mountPath: /ovn-ca
+          name: ovn-ca
         resources:
           requests:
             cpu: 100m
@@ -322,5 +337,11 @@ spec:
         configMap:
           name: env-overrides
           optional: true
+      - name: ovn-ca
+        configMap:
+          name: ovn-ca
+      - name: ovn-cert
+        secret:
+          secretName: ovn-cert
       tolerations:
       - operator: "Exists"
