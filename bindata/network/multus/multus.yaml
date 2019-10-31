@@ -45,6 +45,14 @@ spec:
               ;;
               rhel) rhelmajor=$(echo "${VERSION_ID}" | cut -f 1 -d .) 
               ;;
+              fedora)
+                if [ "${VARIANT_ID}" == "coreos" ]; then
+                  rhelmajor=8
+                else 
+                  echo "FATAL ERROR: Unsupported Fedora variant=${VARIANT_ID}"
+                  exit 1
+                fi
+              ;;
               *) echo "FATAL ERROR: Unsupported OS ID=${ID}"; exit 1
               ;;
             esac
