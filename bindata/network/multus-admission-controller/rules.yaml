@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: k8s
+  name: prometheus-k8s-rules
+  namespace: openshift-multus
+spec:
+  groups:
+  - name: multus-admission-controller-monitor-service.rules
+    rules:
+    - expr: |
+        max  (network_attachment_definition_enabled_instance_up) by (networks)
+      record: cluster:network_attachment_definition_enabled_instance_up:max
+    - expr: |
+       max  (network_attachment_definition_instances) by (networks)
+      record: cluster:network_attachment_definition_instances:max
+  
