@@ -209,6 +209,7 @@ spec:
             --k8s-apiserver "{{.K8S_APISERVER}}" \
             --ovn-config-namespace openshift-ovn-kubernetes \
             --nodeport \
+            --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             ${hybrid_overlay_flags} \
             --logfile /dev/stdout \
