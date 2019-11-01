@@ -43,14 +43,9 @@ import (
 )
 
 const (
-	// TODO(dulek): Those values come from openshift/installer and
-	//              openshift/cluster-api-provider-openstack and at the moment
-	//              are hardcoded there too. One day we might need to fetch them
-	//              from somewhere.
-	CloudsSecret          = "openstack-credentials"
-	CloudsSecretNamespace = "kube-system"
-	CloudName             = "openstack"
-	CloudsSecretKey       = "clouds.yaml"
+	CloudsSecret    = "installer-cloud-credentials"
+	CloudName       = "openstack"
+	CloudsSecretKey = "clouds.yaml"
 	// NOTE(dulek): This one is hardcoded in openshift/installer.
 	InfrastructureCRDName              = "cluster"
 	MinOctaviaVersionWithHTTPSMonitors = "v2.10"
@@ -80,7 +75,7 @@ func GetCloudFromSecret(kubeClient client.Client) (clientconfig.Cloud, error) {
 		ObjectMeta: metav1.ObjectMeta{Name: CloudsSecret},
 	}
 
-	err := kubeClient.Get(context.TODO(), client.ObjectKey{Namespace: CloudsSecretNamespace, Name: CloudsSecret}, secret)
+	err := kubeClient.Get(context.TODO(), client.ObjectKey{Namespace: names.APPLIED_NAMESPACE, Name: CloudsSecret}, secret)
 	if err != nil {
 		return emptyCloud, errors.Wrapf(err, "Failed to get %s Secret with OpenStack credentials", CloudsSecret)
 	}
