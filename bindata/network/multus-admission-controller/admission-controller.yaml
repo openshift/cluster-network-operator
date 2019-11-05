@@ -37,6 +37,7 @@ spec:
         - -tls-private-key-file=/etc/webhook/tls.key
         - -tls-cert-file=/etc/webhook/tls.crt
         - -alsologtostderr=true
+        - -metrics-listen-address=0.0.0.0:9091
         volumeMounts:
         - name: webhook-certs
           mountPath: /etc/webhook
@@ -45,6 +46,9 @@ spec:
         resources:
           requests:
             cpu: 10m
+        ports:
+        - name: metrics-port
+          containerPort: 9091
       serviceAccountName: multus
       priorityClassName: "system-cluster-critical"
       restartPolicy: Always
