@@ -63,8 +63,8 @@ spec:
               sb_addr_list="${sb_addr_list},"
             fi
             host=$(getent ahostsv4 "${OVN_NODES_ARRAY[$i]}" | grep RAW | awk '{print $1}')
-            nb_addr_list="${nb_addr_list}ssl://${host}:{{.OVN_NB_PORT}}"
-            sb_addr_list="${sb_addr_list}ssl://${host}:{{.OVN_SB_PORT}}"
+            nb_addr_list="${nb_addr_list}ssl:${host}:{{.OVN_NB_PORT}}"
+            sb_addr_list="${sb_addr_list}ssl:${host}:{{.OVN_SB_PORT}}"
           done
           
           exec ovn-northd \
@@ -304,9 +304,15 @@ spec:
               sb_addr_list="${sb_addr_list},"
             fi
             host=$(getent ahostsv4 "${OVN_NODES_ARRAY[$i]}" | grep RAW | awk '{print $1}')
-            nb_addr_list="${nb_addr_list}ssl://${host}:{{.OVN_NB_PORT}}"
+            nb_addr_list="${nb_addr_list}ssl:${host}:{{.OVN_NB_PORT}}"
             sb_addr_list="${sb_addr_list}ssl://${host}:{{.OVN_SB_PORT}}"
           done
+          
+          # start nbctl daemon for caching
+          export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/run/openvswitch/ovnk-nbctl.pid \
+            --detach \
+            -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
+            --db "${nb_addr_list}")
 
           exec /usr/bin/ovnkube \
             --init-master "${K8S_NODE}" \
@@ -319,14 +325,14 @@ spec:
             ${hybrid_overlay_flags} \
             --logfile /dev/stdout \
             --metrics-bind-address "0.0.0.0:9102" \
-            --nb-address "${nb_addr_list}" \
             --sb-address "${sb_addr_list}" \
-            --nb-client-privkey /ovn-cert/tls.key \
-            --nb-client-cert /ovn-cert/tls.crt \
-            --nb-client-cacert /ovn-ca/ca-bundle.crt \
             --sb-client-privkey /ovn-cert/tls.key \
             --sb-client-cert /ovn-cert/tls.crt \
             --sb-client-cacert /ovn-ca/ca-bundle.crt
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/bash", "-c", "kill $(cat /run/openvswitch/ovnk-nbctl.pid)"]
         volumeMounts:
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
