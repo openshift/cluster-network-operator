@@ -280,3 +280,5 @@ spec:
         operator: "Exists"
       - key: "node.kubernetes.io/unreachable"
         operator: "Exists"
+      - key: "node.kubernetes.io/network-unavailable"
+        operator: "Exists"
