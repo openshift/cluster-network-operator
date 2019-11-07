@@ -46,6 +46,16 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		ic.Networking.MachineCIDR,
 	)
 
+	if len(infra.Status.APIServerURL) > 0 {
+		apiServerURL, err := url.Parse(infra.Status.APIServerURL)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse api server url")
+		}
+		set.Insert(apiServerURL.Hostname())
+	} else {
+		return "", fmt.Errorf("api server url missing from infrastructure config '%s'", infra.Name)
+	}
+
 	if len(infra.Status.APIServerInternalURL) > 0 {
 		internalAPIServer, err := url.Parse(infra.Status.APIServerInternalURL)
 		if err != nil {
