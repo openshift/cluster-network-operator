@@ -56,9 +56,11 @@ spec:
     - alert: NodeIPTablesStale
     # there is some scrape delay and some other offset 120 is not really 120s but it is still too long
       annotations:
-        message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} has gone too long without syncing iptables rules. NOTE - There is some scrape delay and other offsets, 120s isn't exact but it is still too high.
+        message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} has gone too long without syncing iptables rules.
       expr: |
-        (time() - kubeproxy_sync_proxy_rules_last_timestamp_seconds) * on(pod) group_right kube_pod_info{namespace="openshift-sdn",  pod=~"sdn-[^-]*"} > 120
+            (timestamp(kubeproxy_sync_proxy_rules_last_timestamp_seconds)
+            - on(pod) kubeproxy_sync_proxy_rules_last_timestamp_seconds)
+            * on(pod) group_right kube_pod_info{namespace="openshift-sdn",  pod=~"sdn-[^-]*"}> 120
       for: 20m
       labels:
         severity: warning
