@@ -209,8 +209,10 @@ func validateSimpleMacvlanConfig(conf *operv1.AdditionalNetworkDefinition) []err
 
 	if conf.SimpleMacvlanConfig != nil {
 		macvlanConfig := conf.SimpleMacvlanConfig
-		outIPAM := validateIPAMConfig(macvlanConfig.IPAMConfig)
-		out = append(out, outIPAM...)
+		if macvlanConfig.IPAMConfig != nil {
+			outIPAM := validateIPAMConfig(macvlanConfig.IPAMConfig)
+			out = append(out, outIPAM...)
+		}
 
 		if conf.SimpleMacvlanConfig.Mode != "" {
 			switch conf.SimpleMacvlanConfig.Mode {
