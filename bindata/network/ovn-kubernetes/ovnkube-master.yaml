@@ -111,10 +111,13 @@ spec:
           fi
           
           OVN_NODES_ARRAY=({{.OVN_NODES}})
-          if [[ "$K8S_NODE" == "${OVN_NODES_ARRAY[0]}" ]]; then
+          MASTER_NODE=$(getent ahostsv4 "${OVN_NODES_ARRAY[0]}" | grep RAW | awk '{print $1}')
+          LOCALHOST=$(getent ahostsv4 "${K8S_NODE}" | grep RAW | awk '{print $1}')
+
+          if [[ "$LOCALHOST" == "$MASTER_NODE" ]]; then
             exec /usr/share/openvswitch/scripts/ovn-ctl \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
-            --db-nb-cluster-local-addr=${K8S_NODE} \
+            --db-nb-cluster-local-addr=${LOCALHOST} \
             --no-monitor \
             --db-nb-cluster-local-proto=ssl \
             --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
@@ -126,8 +129,8 @@ spec:
             exec /usr/share/openvswitch/scripts/ovn-ctl \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
-            --db-nb-cluster-local-addr=${K8S_NODE} \
-            --db-nb-cluster-remote-addr=${OVN_NODES_ARRAY[0]} \
+            --db-nb-cluster-local-addr=${LOCALHOST} \
+            --db-nb-cluster-remote-addr=${MASTER_NODE} \
             --no-monitor \
             --db-nb-cluster-local-proto=ssl \
             --db-nb-cluster-remote-proto=ssl \
@@ -201,10 +204,13 @@ spec:
           fi
 
           OVN_NODES_ARRAY=({{.OVN_NODES}})
-          if [[ "$K8S_NODE" == "${OVN_NODES_ARRAY[0]}" ]]; then
+          MASTER_NODE=$(getent ahostsv4 "${OVN_NODES_ARRAY[0]}" | grep RAW | awk '{print $1}')
+          LOCALHOST=$(getent ahostsv4 "${K8S_NODE}" | grep RAW | awk '{print $1}')
+
+          if [[ "$LOCALHOST" == "$MASTER_NODE" ]]; then
             exec /usr/share/openvswitch/scripts/ovn-ctl \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
-            --db-sb-cluster-local-addr=${K8S_NODE} \
+            --db-sb-cluster-local-addr=${LOCALHOST} \
             --no-monitor \
             --db-sb-cluster-local-proto=ssl \
             --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
@@ -217,8 +223,8 @@ spec:
             exec /usr/share/openvswitch/scripts/ovn-ctl \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
-            --db-sb-cluster-local-addr=${K8S_NODE} \
-            --db-sb-cluster-remote-addr=${OVN_NODES_ARRAY[0]} \
+            --db-sb-cluster-local-addr=${LOCALHOST} \
+            --db-sb-cluster-remote-addr=${MASTER_NODE} \
             --no-monitor \
             --db-sb-cluster-local-proto=ssl \
             --db-sb-cluster-remote-proto=ssl \
