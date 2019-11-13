@@ -101,7 +101,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 	err := r.client.Get(context.TODO(), trustedCAbundleConfigMapName, trustedCAbundleConfigMap)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Println("proxy not found; reconciliation will be skipped", "request", request)
+			log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", trustedCAbundleConfigMapName.Namespace, trustedCAbundleConfigMapName.Name)
 			return reconcile.Result{}, nil
 		}
 		log.Println(err)
