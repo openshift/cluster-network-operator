@@ -54,7 +54,7 @@ spec:
           privileged: true
       containers:
       - name: sdn
-        image: {{.NodeImage}}
+        image: {{.SDNImage}}
         command: 
         - /bin/bash
         - -c
@@ -96,7 +96,7 @@ spec:
           cp -f /opt/cni/bin/openshift-sdn /host/opt/cni/bin/
 
           # Launch the network process
-          exec /usr/bin/openshift-sdn --proxy-config=/config/kube-proxy-config.yaml --url-only-kubeconfig=/etc/kubernetes/kubeconfig --v=${DEBUG_LOGLEVEL:-2}
+          exec /usr/bin/openshift-sdn-node --proxy-config=/config/kube-proxy-config.yaml --url-only-kubeconfig=/etc/kubernetes/kubeconfig --v=${DEBUG_LOGLEVEL:-2}
         securityContext:
           privileged: true
         volumeMounts:

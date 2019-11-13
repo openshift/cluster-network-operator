@@ -6,18 +6,14 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-cluster-network-operator:4.3
-  - name: node
+  - name: sdn
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-node:4.3
+      name: quay.io/openshift/origin-sdn:4.3
   - name: kube-proxy
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-kube-proxy:4.3
-  - name: sdn-controller
-    from:
-      kind: DockerImage
-      name: quay.io/openshift/origin-sdn-controller:4.3
   - name: multus-cni
     from:
       kind: DockerImage
