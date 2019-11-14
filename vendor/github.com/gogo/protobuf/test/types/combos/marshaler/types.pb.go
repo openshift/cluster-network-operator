@@ -1514,37 +1514,37 @@ type isOneofProtoTypes_OneOfProtoTimes interface {
 }
 
 type OneofProtoTypes_Timestamp struct {
-	Timestamp *types.Timestamp `protobuf:"bytes,1,opt,name=timestamp,proto3,oneof"`
+	Timestamp *types.Timestamp `protobuf:"bytes,1,opt,name=timestamp,proto3,oneof" json:"timestamp,omitempty"`
 }
 type OneofProtoTypes_Duration struct {
-	Duration *types.Duration `protobuf:"bytes,2,opt,name=duration,proto3,oneof"`
+	Duration *types.Duration `protobuf:"bytes,2,opt,name=duration,proto3,oneof" json:"duration,omitempty"`
 }
 type OneofProtoTypes_RepDouble struct {
-	RepDouble *types.DoubleValue `protobuf:"bytes,3,opt,name=repDouble,proto3,oneof"`
+	RepDouble *types.DoubleValue `protobuf:"bytes,3,opt,name=repDouble,proto3,oneof" json:"repDouble,omitempty"`
 }
 type OneofProtoTypes_RepFloat struct {
-	RepFloat *types.FloatValue `protobuf:"bytes,4,opt,name=repFloat,proto3,oneof"`
+	RepFloat *types.FloatValue `protobuf:"bytes,4,opt,name=repFloat,proto3,oneof" json:"repFloat,omitempty"`
 }
 type OneofProtoTypes_RepInt64 struct {
-	RepInt64 *types.Int64Value `protobuf:"bytes,5,opt,name=repInt64,proto3,oneof"`
+	RepInt64 *types.Int64Value `protobuf:"bytes,5,opt,name=repInt64,proto3,oneof" json:"repInt64,omitempty"`
 }
 type OneofProtoTypes_RepUInt64 struct {
-	RepUInt64 *types.UInt64Value `protobuf:"bytes,6,opt,name=repUInt64,proto3,oneof"`
+	RepUInt64 *types.UInt64Value `protobuf:"bytes,6,opt,name=repUInt64,proto3,oneof" json:"repUInt64,omitempty"`
 }
 type OneofProtoTypes_RepInt32 struct {
-	RepInt32 *types.Int32Value `protobuf:"bytes,7,opt,name=repInt32,proto3,oneof"`
+	RepInt32 *types.Int32Value `protobuf:"bytes,7,opt,name=repInt32,proto3,oneof" json:"repInt32,omitempty"`
 }
 type OneofProtoTypes_RepUInt32 struct {
-	RepUInt32 *types.UInt32Value `protobuf:"bytes,8,opt,name=repUInt32,proto3,oneof"`
+	RepUInt32 *types.UInt32Value `protobuf:"bytes,8,opt,name=repUInt32,proto3,oneof" json:"repUInt32,omitempty"`
 }
 type OneofProtoTypes_RepBool struct {
-	RepBool *types.BoolValue `protobuf:"bytes,9,opt,name=repBool,proto3,oneof"`
+	RepBool *types.BoolValue `protobuf:"bytes,9,opt,name=repBool,proto3,oneof" json:"repBool,omitempty"`
 }
 type OneofProtoTypes_RepString struct {
-	RepString *types.StringValue `protobuf:"bytes,10,opt,name=repString,proto3,oneof"`
+	RepString *types.StringValue `protobuf:"bytes,10,opt,name=repString,proto3,oneof" json:"repString,omitempty"`
 }
 type OneofProtoTypes_RepBytes struct {
-	RepBytes *types.BytesValue `protobuf:"bytes,11,opt,name=repBytes,proto3,oneof"`
+	RepBytes *types.BytesValue `protobuf:"bytes,11,opt,name=repBytes,proto3,oneof" json:"repBytes,omitempty"`
 }
 
 func (*OneofProtoTypes_Timestamp) isOneofProtoTypes_OneOfProtoTimes() {}
@@ -1721,37 +1721,37 @@ type isOneofStdTypes_OneOfStdTimes interface {
 }
 
 type OneofStdTypes_Timestamp struct {
-	Timestamp *time.Time `protobuf:"bytes,1,opt,name=timestamp,proto3,oneof,stdtime"`
+	Timestamp *time.Time `protobuf:"bytes,1,opt,name=timestamp,proto3,oneof,stdtime" json:"timestamp,omitempty"`
 }
 type OneofStdTypes_Duration struct {
-	Duration *time.Duration `protobuf:"bytes,2,opt,name=duration,proto3,oneof,stdduration"`
+	Duration *time.Duration `protobuf:"bytes,2,opt,name=duration,proto3,oneof,stdduration" json:"duration,omitempty"`
 }
 type OneofStdTypes_RepDouble struct {
-	RepDouble *float64 `protobuf:"bytes,3,opt,name=repDouble,proto3,oneof,wktptr"`
+	RepDouble *float64 `protobuf:"bytes,3,opt,name=repDouble,proto3,oneof,wktptr" json:"repDouble,omitempty"`
 }
 type OneofStdTypes_RepFloat struct {
-	RepFloat *float32 `protobuf:"bytes,4,opt,name=repFloat,proto3,oneof,wktptr"`
+	RepFloat *float32 `protobuf:"bytes,4,opt,name=repFloat,proto3,oneof,wktptr" json:"repFloat,omitempty"`
 }
 type OneofStdTypes_RepInt64 struct {
-	RepInt64 *int64 `protobuf:"bytes,5,opt,name=repInt64,proto3,oneof,wktptr"`
+	RepInt64 *int64 `protobuf:"bytes,5,opt,name=repInt64,proto3,oneof,wktptr" json:"repInt64,omitempty"`
 }
 type OneofStdTypes_RepUInt64 struct {
-	RepUInt64 *uint64 `protobuf:"bytes,6,opt,name=repUInt64,proto3,oneof,wktptr"`
+	RepUInt64 *uint64 `protobuf:"bytes,6,opt,name=repUInt64,proto3,oneof,wktptr" json:"repUInt64,omitempty"`
 }
 type OneofStdTypes_RepInt32 struct {
-	RepInt32 *int32 `protobuf:"bytes,7,opt,name=repInt32,proto3,oneof,wktptr"`
+	RepInt32 *int32 `protobuf:"bytes,7,opt,name=repInt32,proto3,oneof,wktptr" json:"repInt32,omitempty"`
 }
 type OneofStdTypes_RepUInt32 struct {
-	RepUInt32 *uint32 `protobuf:"bytes,8,opt,name=repUInt32,proto3,oneof,wktptr"`
+	RepUInt32 *uint32 `protobuf:"bytes,8,opt,name=repUInt32,proto3,oneof,wktptr" json:"repUInt32,omitempty"`
 }
 type OneofStdTypes_RepBool struct {
-	RepBool *bool `protobuf:"bytes,9,opt,name=repBool,proto3,oneof,wktptr"`
+	RepBool *bool `protobuf:"bytes,9,opt,name=repBool,proto3,oneof,wktptr" json:"repBool,omitempty"`
 }
 type OneofStdTypes_RepString struct {
-	RepString *string `protobuf:"bytes,10,opt,name=repString,proto3,oneof,wktptr"`
+	RepString *string `protobuf:"bytes,10,opt,name=repString,proto3,oneof,wktptr" json:"repString,omitempty"`
 }
 type OneofStdTypes_RepBytes struct {
-	RepBytes *[]byte `protobuf:"bytes,11,opt,name=repBytes,proto3,oneof,wktptr"`
+	RepBytes *[]byte `protobuf:"bytes,11,opt,name=repBytes,proto3,oneof,wktptr" json:"repBytes,omitempty"`
 }
 
 func (*OneofStdTypes_Timestamp) isOneofStdTypes_OneOfStdTimes() {}
@@ -8761,7 +8761,8 @@ func (m *OneofProtoTypes) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 }
 
 func (m *OneofProtoTypes_Timestamp) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofProtoTypes_Timestamp) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -8781,7 +8782,8 @@ func (m *OneofProtoTypes_Timestamp) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	return len(dAtA) - i, nil
 }
 func (m *OneofProtoTypes_Duration) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofProtoTypes_Duration) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -8801,7 +8803,8 @@ func (m *OneofProtoTypes_Duration) MarshalToSizedBuffer(dAtA []byte) (int, error
 	return len(dAtA) - i, nil
 }
 func (m *OneofProtoTypes_RepDouble) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofProtoTypes_RepDouble) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -8821,7 +8824,8 @@ func (m *OneofProtoTypes_RepDouble) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	return len(dAtA) - i, nil
 }
 func (m *OneofProtoTypes_RepFloat) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofProtoTypes_RepFloat) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -8841,7 +8845,8 @@ func (m *OneofProtoTypes_RepFloat) MarshalToSizedBuffer(dAtA []byte) (int, error
 	return len(dAtA) - i, nil
 }
 func (m *OneofProtoTypes_RepInt64) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofProtoTypes_RepInt64) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -8861,7 +8866,8 @@ func (m *OneofProtoTypes_RepInt64) MarshalToSizedBuffer(dAtA []byte) (int, error
 	return len(dAtA) - i, nil
 }
 func (m *OneofProtoTypes_RepUInt64) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofProtoTypes_RepUInt64) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -8881,7 +8887,8 @@ func (m *OneofProtoTypes_RepUInt64) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	return len(dAtA) - i, nil
 }
 func (m *OneofProtoTypes_RepInt32) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofProtoTypes_RepInt32) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -8901,7 +8908,8 @@ func (m *OneofProtoTypes_RepInt32) MarshalToSizedBuffer(dAtA []byte) (int, error
 	return len(dAtA) - i, nil
 }
 func (m *OneofProtoTypes_RepUInt32) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofProtoTypes_RepUInt32) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -8921,7 +8929,8 @@ func (m *OneofProtoTypes_RepUInt32) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	return len(dAtA) - i, nil
 }
 func (m *OneofProtoTypes_RepBool) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofProtoTypes_RepBool) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -8941,7 +8950,8 @@ func (m *OneofProtoTypes_RepBool) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 func (m *OneofProtoTypes_RepString) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofProtoTypes_RepString) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -8961,7 +8971,8 @@ func (m *OneofProtoTypes_RepString) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	return len(dAtA) - i, nil
 }
 func (m *OneofProtoTypes_RepBytes) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofProtoTypes_RepBytes) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -9017,7 +9028,8 @@ func (m *OneofStdTypes) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 }
 
 func (m *OneofStdTypes_Timestamp) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofStdTypes_Timestamp) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -9035,7 +9047,8 @@ func (m *OneofStdTypes_Timestamp) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 func (m *OneofStdTypes_Duration) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofStdTypes_Duration) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -9053,7 +9066,8 @@ func (m *OneofStdTypes_Duration) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 	return len(dAtA) - i, nil
 }
 func (m *OneofStdTypes_RepDouble) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofStdTypes_RepDouble) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -9071,7 +9085,8 @@ func (m *OneofStdTypes_RepDouble) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 func (m *OneofStdTypes_RepFloat) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofStdTypes_RepFloat) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -9089,7 +9104,8 @@ func (m *OneofStdTypes_RepFloat) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 	return len(dAtA) - i, nil
 }
 func (m *OneofStdTypes_RepInt64) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofStdTypes_RepInt64) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -9107,7 +9123,8 @@ func (m *OneofStdTypes_RepInt64) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 	return len(dAtA) - i, nil
 }
 func (m *OneofStdTypes_RepUInt64) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofStdTypes_RepUInt64) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -9125,7 +9142,8 @@ func (m *OneofStdTypes_RepUInt64) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 func (m *OneofStdTypes_RepInt32) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofStdTypes_RepInt32) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -9143,7 +9161,8 @@ func (m *OneofStdTypes_RepInt32) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 	return len(dAtA) - i, nil
 }
 func (m *OneofStdTypes_RepUInt32) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofStdTypes_RepUInt32) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -9161,7 +9180,8 @@ func (m *OneofStdTypes_RepUInt32) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 func (m *OneofStdTypes_RepBool) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofStdTypes_RepBool) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -9179,7 +9199,8 @@ func (m *OneofStdTypes_RepBool) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *OneofStdTypes_RepString) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofStdTypes_RepString) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -9197,7 +9218,8 @@ func (m *OneofStdTypes_RepString) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 func (m *OneofStdTypes_RepBytes) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *OneofStdTypes_RepBytes) MarshalToSizedBuffer(dAtA []byte) (int, error) {
