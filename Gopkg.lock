@@ -365,7 +365,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:729f1597d1affbaa73a5d8d2cfbd23e3a9a5599804817dbc8ff190c9453cb897"
+  digest = "1:ded62c35ffdd78e16931c3da4926107bb3ebde10c5fd64917a57dcfb1e1e125a"
   name = "github.com/openshift/api"
   packages = [
     ".",
@@ -413,8 +413,8 @@
     "user",
     "user/v1",
   ]
-  pruneopts = "NT"
-  revision = "86def77f6f909e31ffacf73fe63bf5ca830ede83"
+  pruneopts = "UT"
+  revision = "4efd1a50a74e455e53d0f4478657e5c226fe9b24"
 
 [[projects]]
   branch = "master"
