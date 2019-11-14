@@ -52,21 +52,21 @@ spec:
             set +o allexport
           fi
 
-          OVN_NODES_ARRAY=({{.OVN_NODES}})
-          
+          OVN_NODE_IPS_ARRAY=({{.OVN_NODE_IPS}})
+
           nb_addr_list=""
           sb_addr_list=""
-          
-          for i in "${!OVN_NODES_ARRAY[@]}"; do
+
+          for i in "${!OVN_NODE_IPS_ARRAY[@]}"; do
             if [[ $i != 0 ]]; then
               nb_addr_list="${nb_addr_list},"
               sb_addr_list="${sb_addr_list},"
             fi
-            host=$(getent ahostsv4 "${OVN_NODES_ARRAY[$i]}" | grep RAW | awk '{print $1}')
+            host="${OVN_NODE_IPS_ARRAY[$i]}"
             nb_addr_list="${nb_addr_list}ssl:${host}:{{.OVN_NB_PORT}}"
             sb_addr_list="${sb_addr_list}ssl:${host}:{{.OVN_SB_PORT}}"
           done
-          
+
           exec ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
             --pidfile=/var/run/openvswitch/ovn-northd.pid \
@@ -109,15 +109,23 @@ spec:
             source /env/_master
             set +o allexport
           fi
-          
-          OVN_NODES_ARRAY=({{.OVN_NODES}})
-          MASTER_NODE=$(getent ahostsv4 "${OVN_NODES_ARRAY[0]}" | grep RAW | awk '{print $1}')
-          LOCALHOST=$(getent ahostsv4 "${K8S_NODE}" | grep RAW | awk '{print $1}')
 
-          if [[ "$LOCALHOST" == "$MASTER_NODE" ]]; then
+          OVN_NODES_ARRAY=({{.OVN_NODES}})
+          OVN_NODE_IPS_ARRAY=({{.OVN_NODE_IPS}})
+          MASTER_NODE_IP="${OVN_NODE_IPS_ARRAY[0]}"
+          NODE_INDEX=0
+          for i in "${!OVN_NODES_ARRAY[@]}"; do
+            if [[ "${OVN_NODES_ARRAY[i]}" == "${K8S_NODE}" ]]; then
+              NODE_INDEX=${i}
+              break
+            fi
+          done
+          THIS_NODE_IP="${OVN_NODE_IPS_ARRAY[${NODE_INDEX}]}"
+
+          if [[ "$THIS_NODE_IP" == "$MASTER_NODE_IP" ]]; then
             exec /usr/share/openvswitch/scripts/ovn-ctl \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
-            --db-nb-cluster-local-addr=${LOCALHOST} \
+            --db-nb-cluster-local-addr=${THIS_NODE_IP} \
             --no-monitor \
             --db-nb-cluster-local-proto=ssl \
             --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
@@ -129,8 +137,8 @@ spec:
             exec /usr/share/openvswitch/scripts/ovn-ctl \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
-            --db-nb-cluster-local-addr=${LOCALHOST} \
-            --db-nb-cluster-remote-addr=${MASTER_NODE} \
+            --db-nb-cluster-local-addr=${THIS_NODE_IP} \
+            --db-nb-cluster-remote-addr=${MASTER_NODE_IP} \
             --no-monitor \
             --db-nb-cluster-local-proto=ssl \
             --db-nb-cluster-remote-proto=ssl \
@@ -204,13 +212,21 @@ spec:
           fi
 
           OVN_NODES_ARRAY=({{.OVN_NODES}})
-          MASTER_NODE=$(getent ahostsv4 "${OVN_NODES_ARRAY[0]}" | grep RAW | awk '{print $1}')
-          LOCALHOST=$(getent ahostsv4 "${K8S_NODE}" | grep RAW | awk '{print $1}')
+          OVN_NODE_IPS_ARRAY=({{.OVN_NODE_IPS}})
+          MASTER_NODE_IP="${OVN_NODE_IPS_ARRAY[0]}"
+          NODE_INDEX=0
+          for i in "${!OVN_NODES_ARRAY[@]}"; do
+            if [[ "${OVN_NODES_ARRAY[i]}" == "${K8S_NODE}" ]]; then
+              NODE_INDEX=${i}
+              break
+            fi
+          done
+          THIS_NODE_IP="${OVN_NODE_IPS_ARRAY[${NODE_INDEX}]}"
 
-          if [[ "$LOCALHOST" == "$MASTER_NODE" ]]; then
+          if [[ "$THIS_NODE_IP" == "$MASTER_NODE_IP" ]]; then
             exec /usr/share/openvswitch/scripts/ovn-ctl \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
-            --db-sb-cluster-local-addr=${LOCALHOST} \
+            --db-sb-cluster-local-addr=${THIS_NODE_IP} \
             --no-monitor \
             --db-sb-cluster-local-proto=ssl \
             --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
@@ -223,8 +239,8 @@ spec:
             exec /usr/share/openvswitch/scripts/ovn-ctl \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
-            --db-sb-cluster-local-addr=${LOCALHOST} \
-            --db-sb-cluster-remote-addr=${MASTER_NODE} \
+            --db-sb-cluster-local-addr=${THIS_NODE_IP} \
+            --db-sb-cluster-remote-addr=${MASTER_NODE_IP} \
             --no-monitor \
             --db-sb-cluster-local-proto=ssl \
             --db-sb-cluster-remote-proto=ssl \
@@ -244,7 +260,7 @@ spec:
                 OVN_NODES_ARRAY=({{.OVN_NODES}})
                 if [[ "$K8S_NODE" == "${OVN_NODES_ARRAY[0]}" ]]; then
                   retries=0
-                  while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}[::] -- set connection . inactivity_probe=0; do
+                  while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}:[::] -- set connection . inactivity_probe=0; do
                     (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
                     echo "too many failed ovn-sbctl attempts, giving up"
@@ -301,15 +317,15 @@ spec:
             fi
           fi
 
-          OVN_NODES_ARRAY=({{.OVN_NODES}})
+          OVN_NODE_IPS_ARRAY=({{.OVN_NODE_IPS}})
           nb_addr_list=""
           sb_addr_list=""
-          for i in "${!OVN_NODES_ARRAY[@]}"; do
+          for i in "${!OVN_NODE_IPS_ARRAY[@]}"; do
             if [[ $i != 0 ]]; then
               nb_addr_list="${nb_addr_list},"
               sb_addr_list="${sb_addr_list},"
             fi
-            host=$(getent ahostsv4 "${OVN_NODES_ARRAY[$i]}" | grep RAW | awk '{print $1}')
+            host="${OVN_NODE_IPS_ARRAY[$i]}"
             nb_addr_list="${nb_addr_list}ssl:${host}:{{.OVN_NB_PORT}}"
             sb_addr_list="${sb_addr_list}ssl://${host}:{{.OVN_SB_PORT}}"
           done

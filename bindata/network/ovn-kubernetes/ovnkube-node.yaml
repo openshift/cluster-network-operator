@@ -198,7 +198,7 @@ spec:
             fi
           fi
           
-          OVN_NODES_ARRAY=({{.OVN_NODES}})
+          OVN_NODES_ARRAY=({{.OVN_NODE_IPS}})
           nb_addr_list=""
           sb_addr_list=""
           for i in "${!OVN_NODES_ARRAY[@]}"; do
@@ -206,7 +206,7 @@ spec:
               nb_addr_list="${nb_addr_list},"
               sb_addr_list="${sb_addr_list},"
             fi
-            host=$(getent ahostsv4 "${OVN_NODES_ARRAY[$i]}" | grep RAW | awk '{print $1}')
+            host="${OVN_NODES_ARRAY[$i]}"
             nb_addr_list="${nb_addr_list}ssl://${host}:{{.OVN_NB_PORT}}"
             sb_addr_list="${sb_addr_list}ssl://${host}:{{.OVN_SB_PORT}}"
           done

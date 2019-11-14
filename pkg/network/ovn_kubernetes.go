@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -51,6 +52,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_NB_RAFT_PORT"] = OVN_NB_RAFT_PORT
 	data.Data["OVN_SB_RAFT_PORT"] = OVN_SB_RAFT_PORT
 	data.Data["OVN_NODES"] = strings.Join(bootstrapResult.OVN.OVNMasterNodes, " ")
+	data.Data["OVN_NODE_IPS"] = strings.Join(bootstrapResult.OVN.OVNMasterNodeIPs, " ")
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
@@ -149,6 +151,18 @@ func networkPluginName() string {
 	return "ovn-kubernetes"
 }
 
+type ovnMaster struct {
+	Name string
+	IP   string
+}
+
+// Implements sort.Interface
+type ovnMasterSlice []*ovnMaster
+
+func (p ovnMasterSlice) Len() int           { return len(p) }
+func (p ovnMasterSlice) Less(i, j int) bool { return p[i].Name < p[j].Name }
+func (p ovnMasterSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
 func boostrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 	masterNodeList := &corev1.NodeList{}
 	matchingLabels := &client.MatchingLabels{"node-role.kubernetes.io/master": ""}
@@ -160,16 +174,42 @@ func boostrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 		return nil, fmt.Errorf("unable to bootstrap OVN, no master nodes found")
 	}
 
-	ovnMasterNodes := []string{}
+	var ovnMasters ovnMasterSlice
+
 	for _, masterNode := range masterNodeList.Items {
-		ovnMasterNodes = append(ovnMasterNodes, masterNode.Name)
+		var ip string
+		for _, address := range masterNode.Status.Addresses {
+			if address.Type == corev1.NodeInternalIP {
+				ip = address.Address
+				break
+			}
+		}
+		if ip == "" {
+			return nil, fmt.Errorf("No InternalIP found on master node '%s'", masterNode.Name)
+		}
+		parsedIP := net.ParseIP(ip)
+		if parsedIP == nil {
+			return nil, fmt.Errorf("Failed to parse InternalIP '%s' found on master node '%s'", ip, masterNode.Name)
+		}
+		if parsedIP.To4() == nil {
+			// IPv6, wrap address in brackets
+			ip = fmt.Sprintf("[%s]", ip)
+		}
+		ovnMasters = append(ovnMasters, &ovnMaster{Name: masterNode.Name, IP: ip})
 	}
 
-	sort.Strings(ovnMasterNodes)
+	sort.Sort(ovnMasters)
+	ovnMasterNodes := []string{}
+	ovnMasterNodeIPs := []string{}
+	for _, m := range ovnMasters {
+		ovnMasterNodes = append(ovnMasterNodes, m.Name)
+		ovnMasterNodeIPs = append(ovnMasterNodeIPs, m.IP)
+	}
 
 	res := bootstrap.BootstrapResult{
 		OVN: bootstrap.OVNBootstrapResult{
-			OVNMasterNodes: ovnMasterNodes,
+			OVNMasterNodes:   ovnMasterNodes,
+			OVNMasterNodeIPs: ovnMasterNodeIPs,
 		},
 	}
 	return &res, nil
