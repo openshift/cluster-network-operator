@@ -170,9 +170,9 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 			}
 			configMapToUpdate := retrievedConfigMap.DeepCopy()
 			if configMapToUpdate.Data == nil {
-				configMapToUpdate.Data = map[string]string{names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY: string(trustedCAbundleData)}
+				configMapToUpdate.Data = map[string]string{names.CA_BUNDLE_CONFIGMAP_KEY: string(trustedCAbundleData)}
 			} else {
-				configMapToUpdate.Data[names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY] = string(trustedCAbundleData)
+				configMapToUpdate.Data[names.CA_BUNDLE_CONFIGMAP_KEY] = string(trustedCAbundleData)
 			}
 			if equality.Semantic.DeepEqual(configMapToUpdate, retrievedConfigMap) {
 				// Nothing to update the new and old configmap object would be the same.

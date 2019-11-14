@@ -41,9 +41,9 @@ const MULTUS_VALIDATING_WEBHOOK = "multus.openshift.io"
 // ConfigMaps that contain user provided trusted CA bundles.
 const ADDL_TRUST_BUNDLE_CONFIGMAP_NS = "openshift-config"
 
-// TRUSTED_CA_BUNDLE_CONFIGMAP_KEY is the name of the data key containing
+// CA_BUNDLE_CONFIGMAP_KEY is the name of the data key containing
 // the PEM encoded trust bundle.
-const TRUSTED_CA_BUNDLE_CONFIGMAP_KEY = "ca-bundle.crt"
+const CA_BUNDLE_CONFIGMAP_KEY = "ca-bundle.crt"
 
 // TRUSTED_CA_BUNDLE_CONFIGMAP is the name of the ConfigMap
 // containing the combined user/system trust bundle.

@@ -386,7 +386,7 @@ func (r *ReconcileProxyConfig) mergeTrustBundlesToConfigMap(additionalData, syst
 			Namespace: names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS,
 		},
 		Data: map[string]string{
-			names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY: string(combinedTrustData),
+			names.CA_BUNDLE_CONFIGMAP_KEY: string(combinedTrustData),
 		},
 	}
 	if _, _, err := r.validateTrustBundle(mergedCfgMap); err != nil {
@@ -414,7 +414,7 @@ func (r *ReconcileProxyConfig) syncTrustedCABundle(trustedCABundle *corev1.Confi
 		}
 	}
 
-	if !configMapsEqual(names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY, currentCfgMap, trustedCABundle) {
+	if !configMapsEqual(names.CA_BUNDLE_CONFIGMAP_KEY, currentCfgMap, trustedCABundle) {
 		if err := r.client.Update(context.TODO(), trustedCABundle); err != nil {
 			return fmt.Errorf("failed to update trusted CA bundle configmap '%s/%s': %v",
 				trustedCABundle.Namespace, trustedCABundle.Name, err)
@@ -447,7 +447,7 @@ func (r *ReconcileProxyConfig) generateSystemTrustBundle() (*corev1.ConfigMap, e
 			Namespace: names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS,
 		},
 		Data: map[string]string{
-			names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY: string(bundleData),
+			names.CA_BUNDLE_CONFIGMAP_KEY: string(bundleData),
 		},
 	}
 
