@@ -43,6 +43,11 @@ required = [
     name = "k8s.io/code-generator"
     non-go = false
 
+  [[prune.project]]
+    name = "github.com/openshift/api"
+    non-go = false
+    unused-packages = true
+
 [[constraint]]
   name = "github.com/Masterminds/sprig"
   version = "^2"
