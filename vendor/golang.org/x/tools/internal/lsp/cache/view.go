@@ -12,16 +12,19 @@ import (
 	"go/token"
 	"os"
 	"os/exec"
+	"reflect"
 	"strings"
 	"sync"
+	"time"
 
-	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/internal/imports"
 	"golang.org/x/tools/internal/lsp/debug"
+	"golang.org/x/tools/internal/lsp/protocol"
 	"golang.org/x/tools/internal/lsp/source"
 	"golang.org/x/tools/internal/span"
 	"golang.org/x/tools/internal/telemetry/log"
+	"golang.org/x/tools/internal/telemetry/tag"
 	"golang.org/x/tools/internal/xcontext"
 	errors "golang.org/x/xerrors"
 )
@@ -59,7 +62,8 @@ type view struct {
 	// TODO(suzmue): the state cached in the process env is specific to each view,
 	// however, there is state that can be shared between views that is not currently
 	// cached, like the module cache.
-	processEnv *imports.ProcessEnv
+	processEnv       *imports.ProcessEnv
+	cacheRefreshTime time.Time
 
 	// modFileVersions stores the last seen versions of the module files that are used
 	// by processEnvs resolver.
@@ -80,8 +84,6 @@ type view struct {
 	// ignoredURIs is the set of URIs of files that we ignore.
 	ignoredURIsMu sync.Mutex
 	ignoredURIs   map[span.URI]struct{}
-
-	analyzers []*analysis.Analyzer
 }
 
 func (v *view) Session() source.Session {
@@ -102,8 +104,26 @@ func (v *view) Options() source.Options {
 	return v.options
 }
 
-func (v *view) SetOptions(options source.Options) {
-	v.options = options
+func minorOptionsChange(a, b source.Options) bool {
+	// Check if any of the settings that modify our understanding of files have been changed
+	if !reflect.DeepEqual(a.Env, b.Env) {
+		return false
+	}
+	if !reflect.DeepEqual(a.BuildFlags, b.BuildFlags) {
+		return false
+	}
+	// the rest of the options are benign
+	return true
+}
+
+func (v *view) SetOptions(ctx context.Context, options source.Options) (source.View, error) {
+	// no need to rebuild the view if the options were not materially changed
+	if minorOptionsChange(v.options, options) {
+		v.options = options
+		return v, nil
+	}
+	newView, err := v.session.updateView(ctx, v, options)
+	return newView, err
 }
 
 // Config returns the configuration used for the view's interaction with the
@@ -112,6 +132,7 @@ func (v *view) Config(ctx context.Context) *packages.Config {
 	// TODO: Should we cache the config and/or overlay somewhere?
 	return &packages.Config{
 		Dir:        v.folder.Filename(),
+		Context:    ctx,
 		Env:        v.options.Env,
 		BuildFlags: v.options.BuildFlags,
 		Mode: packages.NeedName |
@@ -126,7 +147,9 @@ func (v *view) Config(ctx context.Context) *packages.Config {
 			panic("go/packages must not be used to parse files")
 		},
 		Logf: func(format string, args ...interface{}) {
-			log.Print(ctx, fmt.Sprintf(format, args...))
+			if v.options.VerboseOutput {
+				log.Print(ctx, fmt.Sprintf(format, args...))
+			}
 		},
 		Tests: true,
 	}
@@ -144,15 +167,7 @@ func (v *view) RunProcessEnvFunc(ctx context.Context, fn func(*imports.Options) 
 
 	// Before running the user provided function, clear caches in the resolver.
 	if v.modFilesChanged() {
-		if r, ok := v.processEnv.GetResolver().(*imports.ModuleResolver); ok {
-			// Clear the resolver cache and set Initialized to false.
-			r.Initialized = false
-			r.Main = nil
-			r.ModsByModPath = nil
-			r.ModsByDir = nil
-			// Reset the modFileVersions.
-			v.modFileVersions = nil
-		}
+		v.processEnv.GetResolver().(*imports.ModuleResolver).ClearForNewMod()
 	}
 
 	// Run the user function.
@@ -160,10 +175,26 @@ func (v *view) RunProcessEnvFunc(ctx context.Context, fn func(*imports.Options) 
 	if err := fn(opts); err != nil {
 		return err
 	}
+	if v.cacheRefreshTime.IsZero() {
+		v.cacheRefreshTime = time.Now()
+	}
 
 	// If applicable, store the file versions of the 'go.mod' files that are
 	// looked at by the resolver.
 	v.storeModFileVersions()
+
+	if time.Since(v.cacheRefreshTime) > 30*time.Second {
+		go func() {
+			v.mu.Lock()
+			defer v.mu.Unlock()
+
+			log.Print(context.Background(), "background imports cache refresh starting")
+			v.processEnv.GetResolver().ClearForNewScan()
+			_, err := imports.GetAllCandidates("", opts)
+			v.cacheRefreshTime = time.Now()
+			log.Print(context.Background(), "background refresh finished with err: ", tag.Of("err", err))
+		}()
+	}
 
 	return nil
 }
@@ -175,6 +206,8 @@ func (v *view) buildProcessEnv(ctx context.Context) (*imports.ProcessEnv, error)
 		Logf: func(format string, args ...interface{}) {
 			log.Print(ctx, fmt.Sprintf(format, args...))
 		},
+		LocalPrefix: v.options.LocalPrefix,
+		Debug:       v.options.VerboseOutput,
 	}
 	for _, kv := range cfg.Env {
 		split := strings.Split(kv, "=")
@@ -241,7 +274,7 @@ func (v *view) storeModFileVersions() {
 func (v *view) fileVersion(filename string, kind source.FileKind) string {
 	uri := span.FileURI(filename)
 	f := v.session.GetFile(uri, kind)
-	return f.Identity().Version
+	return f.Identity().Identifier
 }
 
 func (v *view) Shutdown(ctx context.Context) {
@@ -266,16 +299,6 @@ func (v *view) Ignore(uri span.URI) bool {
 
 	_, ok := v.ignoredURIs[uri]
 	return ok
-}
-
-func (v *view) findIgnoredFile(ctx context.Context, uri span.URI) (source.ParseGoHandle, source.Package, error) {
-	// Check the builtin package.
-	for _, h := range v.BuiltinPackage().Files() {
-		if h.File().Identity().URI == uri {
-			return h, nil, nil
-		}
-	}
-	return nil, nil, errors.Errorf("no ignored file for %s", uri)
 }
 
 func (v *view) BackgroundContext() context.Context {
@@ -353,9 +376,9 @@ func (v *view) getFile(ctx context.Context, uri span.URI, kind source.FileKind) 
 		fname: uri.Filename(),
 		kind:  source.Go,
 	}
-	v.session.filesWatchMap.Watch(uri, func() {
+	v.session.filesWatchMap.Watch(uri, func(changeType protocol.FileChangeType) bool {
 		ctx := xcontext.Detach(ctx)
-		v.invalidateContent(ctx, uri, kind)
+		return v.invalidateContent(ctx, f, kind, changeType)
 	})
 	v.mapFile(uri, f)
 	return f, nil
@@ -396,10 +419,6 @@ func (v *view) findFile(uri span.URI) (viewFile, error) {
 	return nil, nil
 }
 
-func (v *view) Analyzers() []*analysis.Analyzer {
-	return v.analyzers
-}
-
 func (f *fileBase) addURI(uri span.URI) int {
 	f.uris = append(f.uris, uri)
 	return len(f.uris)
@@ -424,6 +443,70 @@ func (v *view) openFiles(ctx context.Context, uris []span.URI) (results []source
 		}
 	}
 	return results
+}
+
+func (v *view) FindPosInPackage(searchpkg source.Package, pos token.Pos) (*ast.File, *protocol.ColumnMapper, source.Package, error) {
+	tok := v.session.cache.fset.File(pos)
+	if tok == nil {
+		return nil, nil, nil, errors.Errorf("no file for pos in package %s", searchpkg.ID())
+	}
+	uri := span.FileURI(tok.Name())
+
+	// Special case for ignored files.
+	var (
+		ph  source.ParseGoHandle
+		pkg source.Package
+		err error
+	)
+	if v.Ignore(uri) {
+		ph, pkg, err = v.findIgnoredFile(uri)
+	} else {
+		ph, pkg, err = findFileInPackage(searchpkg, uri)
+	}
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	file, m, _, err := ph.Cached()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if !(file.Pos() <= pos && pos <= file.End()) {
+		return nil, nil, nil, err
+	}
+	return file, m, pkg, nil
+}
+
+func (v *view) findIgnoredFile(uri span.URI) (source.ParseGoHandle, source.Package, error) {
+	// Check the builtin package.
+	for _, h := range v.BuiltinPackage().Files() {
+		if h.File().Identity().URI == uri {
+			return h, nil, nil
+		}
+	}
+	return nil, nil, errors.Errorf("no ignored file for %s", uri)
+}
+
+func findFileInPackage(pkg source.Package, uri span.URI) (source.ParseGoHandle, source.Package, error) {
+	queue := []source.Package{pkg}
+	seen := make(map[string]bool)
+
+	for len(queue) > 0 {
+		pkg := queue[0]
+		queue = queue[1:]
+		seen[pkg.ID()] = true
+
+		for _, ph := range pkg.Files() {
+			if ph.File().Identity().URI == uri {
+				return ph, pkg, nil
+			}
+		}
+		for _, dep := range pkg.Imports() {
+			if !seen[dep.ID()] {
+				queue = append(queue, dep)
+			}
+		}
+	}
+	return nil, nil, errors.Errorf("no file for %s in package %s", uri, pkg.ID())
 }
 
 type debugView struct{ *view }

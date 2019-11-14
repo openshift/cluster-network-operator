@@ -81,10 +81,11 @@ func (s *Serve) Run(ctx context.Context, args ...string) error {
 		return s.forward()
 	}
 
-	// For debugging purposes only.
-	run := func(ctx context.Context, srv *lsp.Server) {
-		go srv.Run(ctx)
+	prepare := func(ctx context.Context, srv *lsp.Server) *lsp.Server {
+		srv.Conn.AddHandler(&handler{})
+		return srv
 	}
+	run := func(ctx context.Context, srv *lsp.Server) { go prepare(ctx, srv).Run(ctx) }
 	if s.Address != "" {
 		return lsp.RunServerOnAddress(ctx, s.app.cache, s.Address, run)
 	}
@@ -96,7 +97,7 @@ func (s *Serve) Run(ctx context.Context, args ...string) error {
 		stream = protocol.LoggingStream(stream, out)
 	}
 	ctx, srv := lsp.NewServer(ctx, s.app.cache, stream)
-	return srv.Run(ctx)
+	return prepare(ctx, srv).Run(ctx)
 }
 
 func (s *Serve) forward() error {
@@ -119,9 +120,7 @@ func (s *Serve) forward() error {
 	return <-errc
 }
 
-type handler struct {
-	out io.Writer
-}
+type handler struct{}
 
 type rpcStats struct {
 	method     string
@@ -149,7 +148,7 @@ func (h *handler) Cancel(ctx context.Context, conn *jsonrpc2.Conn, id jsonrpc2.I
 	return false
 }
 
-func (h *handler) Request(ctx context.Context, direction jsonrpc2.Direction, r *jsonrpc2.WireRequest) context.Context {
+func (h *handler) Request(ctx context.Context, conn *jsonrpc2.Conn, direction jsonrpc2.Direction, r *jsonrpc2.WireRequest) context.Context {
 	if r.Method == "" {
 		panic("no method in rpc stats")
 	}
@@ -174,7 +173,7 @@ func (h *handler) Request(ctx context.Context, direction jsonrpc2.Direction, r *
 	return ctx
 }
 
-func (h *handler) Response(ctx context.Context, direction jsonrpc2.Direction, r *jsonrpc2.WireResponse) context.Context {
+func (h *handler) Response(ctx context.Context, conn *jsonrpc2.Conn, direction jsonrpc2.Direction, r *jsonrpc2.WireResponse) context.Context {
 	return ctx
 }
 
