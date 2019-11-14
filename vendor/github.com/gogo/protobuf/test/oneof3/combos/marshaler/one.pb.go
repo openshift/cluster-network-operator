@@ -135,52 +135,52 @@ type isSampleOneOf_TestOneof interface {
 }
 
 type SampleOneOf_Field1 struct {
-	Field1 float64 `protobuf:"fixed64,1,opt,name=Field1,proto3,oneof"`
+	Field1 float64 `protobuf:"fixed64,1,opt,name=Field1,proto3,oneof" json:"Field1,omitempty"`
 }
 type SampleOneOf_Field2 struct {
-	Field2 float32 `protobuf:"fixed32,2,opt,name=Field2,proto3,oneof"`
+	Field2 float32 `protobuf:"fixed32,2,opt,name=Field2,proto3,oneof" json:"Field2,omitempty"`
 }
 type SampleOneOf_Field3 struct {
-	Field3 int32 `protobuf:"varint,3,opt,name=Field3,proto3,oneof"`
+	Field3 int32 `protobuf:"varint,3,opt,name=Field3,proto3,oneof" json:"Field3,omitempty"`
 }
 type SampleOneOf_Field4 struct {
-	Field4 int64 `protobuf:"varint,4,opt,name=Field4,proto3,oneof"`
+	Field4 int64 `protobuf:"varint,4,opt,name=Field4,proto3,oneof" json:"Field4,omitempty"`
 }
 type SampleOneOf_Field5 struct {
-	Field5 uint32 `protobuf:"varint,5,opt,name=Field5,proto3,oneof"`
+	Field5 uint32 `protobuf:"varint,5,opt,name=Field5,proto3,oneof" json:"Field5,omitempty"`
 }
 type SampleOneOf_Field6 struct {
-	Field6 uint64 `protobuf:"varint,6,opt,name=Field6,proto3,oneof"`
+	Field6 uint64 `protobuf:"varint,6,opt,name=Field6,proto3,oneof" json:"Field6,omitempty"`
 }
 type SampleOneOf_Field7 struct {
-	Field7 int32 `protobuf:"zigzag32,7,opt,name=Field7,proto3,oneof"`
+	Field7 int32 `protobuf:"zigzag32,7,opt,name=Field7,proto3,oneof" json:"Field7,omitempty"`
 }
 type SampleOneOf_Field8 struct {
-	Field8 int64 `protobuf:"zigzag64,8,opt,name=Field8,proto3,oneof"`
+	Field8 int64 `protobuf:"zigzag64,8,opt,name=Field8,proto3,oneof" json:"Field8,omitempty"`
 }
 type SampleOneOf_Field9 struct {
-	Field9 uint32 `protobuf:"fixed32,9,opt,name=Field9,proto3,oneof"`
+	Field9 uint32 `protobuf:"fixed32,9,opt,name=Field9,proto3,oneof" json:"Field9,omitempty"`
 }
 type SampleOneOf_Field10 struct {
-	Field10 int32 `protobuf:"fixed32,10,opt,name=Field10,proto3,oneof"`
+	Field10 int32 `protobuf:"fixed32,10,opt,name=Field10,proto3,oneof" json:"Field10,omitempty"`
 }
 type SampleOneOf_Field11 struct {
-	Field11 uint64 `protobuf:"fixed64,11,opt,name=Field11,proto3,oneof"`
+	Field11 uint64 `protobuf:"fixed64,11,opt,name=Field11,proto3,oneof" json:"Field11,omitempty"`
 }
 type SampleOneOf_Field12 struct {
-	Field12 int64 `protobuf:"fixed64,12,opt,name=Field12,proto3,oneof"`
+	Field12 int64 `protobuf:"fixed64,12,opt,name=Field12,proto3,oneof" json:"Field12,omitempty"`
 }
 type SampleOneOf_Field13 struct {
-	Field13 bool `protobuf:"varint,13,opt,name=Field13,proto3,oneof"`
+	Field13 bool `protobuf:"varint,13,opt,name=Field13,proto3,oneof" json:"Field13,omitempty"`
 }
 type SampleOneOf_Field14 struct {
-	Field14 string `protobuf:"bytes,14,opt,name=Field14,proto3,oneof"`
+	Field14 string `protobuf:"bytes,14,opt,name=Field14,proto3,oneof" json:"Field14,omitempty"`
 }
 type SampleOneOf_Field15 struct {
-	Field15 []byte `protobuf:"bytes,15,opt,name=Field15,proto3,oneof"`
+	Field15 []byte `protobuf:"bytes,15,opt,name=Field15,proto3,oneof" json:"Field15,omitempty"`
 }
 type SampleOneOf_SubMessage struct {
-	SubMessage *Subby `protobuf:"bytes,16,opt,name=sub_message,json=subMessage,proto3,oneof"`
+	SubMessage *Subby `protobuf:"bytes,16,opt,name=sub_message,json=subMessage,proto3,oneof" json:"sub_message,omitempty"`
 }
 
 func (*SampleOneOf_Field1) isSampleOneOf_TestOneof()     {}
@@ -2571,7 +2571,8 @@ func (m *SampleOneOf) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 }
 
 func (m *SampleOneOf_Field1) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field1) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2583,7 +2584,8 @@ func (m *SampleOneOf_Field1) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field2) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field2) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2595,7 +2597,8 @@ func (m *SampleOneOf_Field2) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field3) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field3) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2606,7 +2609,8 @@ func (m *SampleOneOf_Field3) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field4) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field4) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2617,7 +2621,8 @@ func (m *SampleOneOf_Field4) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field5) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field5) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2628,7 +2633,8 @@ func (m *SampleOneOf_Field5) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field6) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field6) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2639,7 +2645,8 @@ func (m *SampleOneOf_Field6) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field7) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field7) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2650,7 +2657,8 @@ func (m *SampleOneOf_Field7) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field8) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field8) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2661,7 +2669,8 @@ func (m *SampleOneOf_Field8) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field9) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field9) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2673,7 +2682,8 @@ func (m *SampleOneOf_Field9) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field10) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field10) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2685,7 +2695,8 @@ func (m *SampleOneOf_Field10) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field11) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field11) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2697,7 +2708,8 @@ func (m *SampleOneOf_Field11) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field12) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field12) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2709,7 +2721,8 @@ func (m *SampleOneOf_Field12) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field13) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field13) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2725,7 +2738,8 @@ func (m *SampleOneOf_Field13) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field14) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field14) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2738,7 +2752,8 @@ func (m *SampleOneOf_Field14) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_Field15) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_Field15) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -2753,7 +2768,8 @@ func (m *SampleOneOf_Field15) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *SampleOneOf_SubMessage) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SampleOneOf_SubMessage) MarshalToSizedBuffer(dAtA []byte) (int, error) {
