@@ -156,9 +156,14 @@ spec:
               - -c
               - |
                 OVN_NODES_ARRAY=({{.OVN_NODES}})
+                OVN_NODE_IPS_ARRAY=({{.OVN_NODE_IPS}})
                 if [[ "$K8S_NODE" == "${OVN_NODES_ARRAY[0]}" ]]; then
+                  USEIPV6=
+                  if [[ ${OVN_NODE_IPS_ARRAY[0]} == *":"* ]]; then
+                    USEIPV6=":[::]"
+                  fi
                   retries=0
-                  while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}:[::] -- set connection . inactivity_probe=0; do
+                  while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}${USEIPV6} -- set connection . inactivity_probe=0; do
                     (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
                     echo "too many failed ovn-nbctl attempts, giving up"
@@ -258,9 +263,14 @@ spec:
               - -c
               - |
                 OVN_NODES_ARRAY=({{.OVN_NODES}})
+                OVN_NODE_IPS_ARRAY=({{.OVN_NODE_IPS}})
                 if [[ "$K8S_NODE" == "${OVN_NODES_ARRAY[0]}" ]]; then
+                  USEIPV6=
+                  if [[ ${OVN_NODE_IPS_ARRAY[0]} == *":"* ]]; then
+                    USEIPV6=":[::]"
+                  fi
                   retries=0
-                  while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}:[::] -- set connection . inactivity_probe=0; do
+                  while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}${USEIPV6} -- set connection . inactivity_probe=0; do
                     (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
                     echo "too many failed ovn-sbctl attempts, giving up"
