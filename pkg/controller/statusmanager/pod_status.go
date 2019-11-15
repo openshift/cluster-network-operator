@@ -11,6 +11,7 @@ import (
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -73,6 +74,7 @@ func (status *StatusManager) SetFromPods() {
 		if err := status.client.Get(context.TODO(), dsName, ds); err != nil {
 			log.Printf("Error getting DaemonSet %q: %v", dsName.String(), err)
 			progressing = append(progressing, fmt.Sprintf("Waiting for DaemonSet %q to be created", dsName.String()))
+			reachedAvailableLevel = false
 			// Assume the OperConfig Controller is in the process of reconciling
 			// things; it will set a Degraded status if it fails.
 			continue
@@ -94,11 +96,13 @@ func (status *StatusManager) SetFromPods() {
 			dsProgressing = true
 		}
 
-		if dsProgressing || ds.Annotations["release.openshift.io/version"] != targetLevel {
+		if ds.Annotations["release.openshift.io/version"] != targetLevel {
 			reachedAvailableLevel = false
 		}
 
-		if dsProgressing {
+		if dsProgressing && !isNonCritical(ds) {
+			reachedAvailableLevel = false
+
 			dsState, exists := daemonsetStates[dsName]
 			if !exists || !reflect.DeepEqual(dsState.LastSeenStatus, ds.Status) {
 				dsState.LastChangeTime = time.Now()
@@ -120,6 +124,7 @@ func (status *StatusManager) SetFromPods() {
 		if err := status.client.Get(context.TODO(), depName, dep); err != nil {
 			log.Printf("Error getting Deployment %q: %v", depName.String(), err)
 			progressing = append(progressing, fmt.Sprintf("Waiting for Deployment %q to be created", depName.String()))
+			reachedAvailableLevel = false
 			// Assume the OperConfig Controller is in the process of reconciling
 			// things; it will set a Degraded status if it fails.
 			continue
@@ -138,11 +143,13 @@ func (status *StatusManager) SetFromPods() {
 			depProgressing = true
 		}
 
-		if depProgressing || dep.Annotations["release.openshift.io/version"] != targetLevel {
+		if dep.Annotations["release.openshift.io/version"] != targetLevel {
 			reachedAvailableLevel = false
 		}
 
-		if depProgressing {
+		if depProgressing && !isNonCritical(dep) {
+			reachedAvailableLevel = false
+
 			depState, exists := deploymentStates[depName]
 			if !exists || !reflect.DeepEqual(depState.LastSeenStatus, dep.Status) {
 				depState.LastChangeTime = time.Now()
@@ -164,9 +171,9 @@ func (status *StatusManager) SetFromPods() {
 		log.Printf("Failed to set pod state (continuing): %+v\n", err)
 	}
 
+	conditions := make([]configv1.ClusterOperatorStatusCondition, 0, 2)
 	if len(progressing) > 0 {
-		status.set(
-			reachedAvailableLevel,
+		conditions = append(conditions,
 			configv1.ClusterOperatorStatusCondition{
 				Type:    configv1.OperatorProgressing,
 				Status:  configv1.ConditionTrue,
@@ -174,24 +181,27 @@ func (status *StatusManager) SetFromPods() {
 				Message: strings.Join(progressing, "\n"),
 			},
 		)
-
-		if len(hung) > 0 {
-			status.setDegraded(RolloutHung, "RolloutHung", strings.Join(hung, "\n"))
-		} else {
-			status.setNotDegraded(RolloutHung)
-		}
 	} else {
-		status.set(
-			reachedAvailableLevel,
+		conditions = append(conditions,
 			configv1.ClusterOperatorStatusCondition{
 				Type:   configv1.OperatorProgressing,
 				Status: configv1.ConditionFalse,
 			},
+		)
+	}
+	if reachedAvailableLevel {
+		conditions = append(conditions,
 			configv1.ClusterOperatorStatusCondition{
 				Type:   configv1.OperatorAvailable,
 				Status: configv1.ConditionTrue,
 			},
 		)
+	}
+
+	status.set(reachedAvailableLevel, conditions...)
+	if len(hung) > 0 {
+		status.setDegraded(RolloutHung, "RolloutHung", strings.Join(hung, "\n"))
+	} else {
 		status.setNotDegraded(RolloutHung)
 	}
 }
@@ -275,4 +285,9 @@ func (status *StatusManager) setLastPodState(
 		newStatus.Annotations[lastSeenAnnotation] = string(lsbytes)
 		return status.client.Patch(context.TODO(), newStatus, client.MergeFrom(oldStatus))
 	})
+}
+
+func isNonCritical(obj metav1.Object) bool {
+	_, exists := obj.GetAnnotations()[names.NonCriticalAnnotation]
+	return exists
 }
