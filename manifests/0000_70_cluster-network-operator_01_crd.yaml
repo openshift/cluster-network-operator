@@ -37,6 +37,7 @@ spec:
         spec:
           description: NetworkSpec is the top-level network configuration object.
           type: object
+          required: ["defaultNetwork"]
           properties:
             additionalNetworks:
               description: additionalNetworks is a list of extra networks to make
@@ -48,6 +49,7 @@ spec:
                   request them by name. type must be specified, along with exactly
                   one "Config" that matches the type.
                 type: object
+                required: ["type", "name"]
                 properties:
                   name:
                     description: name is the name of the network. This will be populated
@@ -166,6 +168,7 @@ spec:
                   allocated when nodes join the cluster. Not all network providers
                   support multiple ClusterNetworks
                 type: object
+                required: ["cidr", "hostPrefix"]
                 properties:
                   cidr:
                     type: string
@@ -177,6 +180,7 @@ spec:
               description: defaultNetwork is the "default" network that all pods will
                 receive
               type: object
+              required: ["type"]
               properties:
                 kuryrConfig:
                   description: KuryrConfig configures the kuryr plugin
