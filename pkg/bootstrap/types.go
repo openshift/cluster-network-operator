@@ -20,7 +20,8 @@ type KuryrBootstrapResult struct {
 }
 
 type OVNBootstrapResult struct {
-	OVNMasterNodes []string
+	OVNMasterNodes    []string
+	OVNMaxUnavailable int
 }
 
 type BootstrapResult struct {

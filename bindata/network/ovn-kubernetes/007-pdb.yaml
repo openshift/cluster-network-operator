@@ -1,0 +1,10 @@
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: ovn-raft-quorum-guard
+  namespace: openshift-ovn-kubernetes
+spec:
+  maxUnavailable: {{.OVN_MAX_UNAVAILABLE}} 
+  selector:
+    matchLabels:
+      name: ovnkube-master

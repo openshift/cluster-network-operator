@@ -188,6 +188,21 @@ spec:
           containerPort: {{.OVN_NB_PORT}}
         - name: nb-db-raft-port
           containerPort: {{.OVN_NB_RAFT_PORT}}
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -xe
+              OVN_NODES_ARRAY=({{.OVN_NODES}}) 
+              for node in "${OVN_NODES_ARRAY[@]}"; do
+                node_ip=$(getent ahostsv4 "${node}" | grep RAW | awk '{print $1}')
+                if ! ovs-appctl -t /var/run/openvswitch/ovnnb_db.ctl  cluster/status OVN_Northbound | grep -q $node_ip; then
+                  exit 1
+                fi
+              done
+              sleep 30
       
       # sbdb: The southbound, or flow DB. In raft mode 
       - name: sbdb
@@ -278,6 +293,21 @@ spec:
           containerPort: {{.OVN_SB_PORT}}
         - name: sb-db-raft-port
           containerPort: {{.OVN_SB_RAFT_PORT}}
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -xe
+              OVN_NODES_ARRAY=({{.OVN_NODES}}) 
+              for node in "${OVN_NODES_ARRAY[@]}"; do
+                node_ip=$(getent ahostsv4 "${node}" | grep RAW | awk '{print $1}')
+                if ! ovs-appctl -t /var/run/openvswitch/ovnsb_db.ctl  cluster/status OVN_Southbound | grep -q $node_ip; then 
+                  exit 1
+                fi
+              done
+              sleep 30
 
       # ovnkube master: convert kubernetes objects in to nbdb logical network components
       - name: ovnkube-master

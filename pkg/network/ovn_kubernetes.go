@@ -52,6 +52,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_NB_RAFT_PORT"] = OVN_NB_RAFT_PORT
 	data.Data["OVN_SB_RAFT_PORT"] = OVN_SB_RAFT_PORT
 	data.Data["OVN_NODES"] = strings.Join(bootstrapResult.OVN.OVNMasterNodes, " ")
+	data.Data["OVN_MAX_UNAVAILABLE"] = bootstrapResult.OVN.OVNMaxUnavailable
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
@@ -170,7 +171,8 @@ func boostrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 
 	res := bootstrap.BootstrapResult{
 		OVN: bootstrap.OVNBootstrapResult{
-			OVNMasterNodes: ovnMasterNodes,
+			OVNMasterNodes:    ovnMasterNodes,
+			OVNMaxUnavailable: (len(ovnMasterNodes) - 1) / 2,
 		},
 	}
 	return &res, nil
