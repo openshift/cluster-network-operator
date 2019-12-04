@@ -1,3 +1,19 @@
+# The ovnkube control-plane components
+
+# The pod disruption budget ensures that we keep a raft quorum
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: ovn-raft-quorum-guard
+  namespace: openshift-ovn-kubernetes
+spec:
+  minAvailable: {{.OVN_MIN_AVAILABLE}}
+  selector:
+    matchLabels:
+      name: ovnkube-master
+
+---
+
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
@@ -80,6 +96,7 @@ spec:
           requests:
             cpu: 100m
             memory: 300Mi
+        terminationMessagePolicy: FallbackToLogsOnError
 
       # nbdb: the northbound, or logical network object DB. In raft mode 
       - name: nbdb
@@ -143,6 +160,10 @@ spec:
                   sleep 2
                   done
                 fi
+        readinessProbe:
+          initialDelaySeconds: 30
+          tcpSocket:
+            port: {{.OVN_NB_PORT}}
         env:
         - name: OVN_LOG_LEVEL
           value: info 
@@ -172,6 +193,7 @@ spec:
           containerPort: {{.OVN_NB_PORT}}
         - name: nb-db-raft-port
           containerPort: {{.OVN_NB_RAFT_PORT}}
+        terminationMessagePolicy: FallbackToLogsOnError
       
       # sbdb: The southbound, or flow DB. In raft mode 
       - name: sbdb
@@ -236,6 +258,10 @@ spec:
                   sleep 2
                   done
                 fi
+        readinessProbe:
+          initialDelaySeconds: 30
+          tcpSocket:
+            port: {{.OVN_SB_PORT}}
         env:
         - name: OVN_LOG_LEVEL
           value: info 
@@ -261,6 +287,7 @@ spec:
           containerPort: {{.OVN_SB_PORT}}
         - name: sb-db-raft-port
           containerPort: {{.OVN_SB_RAFT_PORT}}
+        terminationMessagePolicy: FallbackToLogsOnError
 
       # ovnkube master: convert kubernetes objects in to nbdb logical network components
       - name: ovnkube-master
@@ -347,6 +374,7 @@ spec:
         ports:
         - name: metrics-port
           containerPort: 9102
+        terminationMessagePolicy: FallbackToLogsOnError
 
       nodeSelector:
         node-role.kubernetes.io/master: ""
