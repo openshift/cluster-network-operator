@@ -52,6 +52,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_NB_RAFT_PORT"] = OVN_NB_RAFT_PORT
 	data.Data["OVN_SB_RAFT_PORT"] = OVN_SB_RAFT_PORT
 	data.Data["OVN_NODES"] = strings.Join(bootstrapResult.OVN.OVNMasterNodes, " ")
+	data.Data["OVN_MIN_AVAILABLE"] = len(bootstrapResult.OVN.OVNMasterNodes)/2 + 1
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
