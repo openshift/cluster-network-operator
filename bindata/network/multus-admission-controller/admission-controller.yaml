@@ -10,6 +10,7 @@ metadata:
     kubernetes.io/description: |
       This daemon set launches the Multus admisson controller component on each node.
     release.openshift.io/version: "{{.ReleaseVersion}}"
+    networkoperator.openshift.io/non-critical: ""
 spec:
   selector:
     matchLabels:
