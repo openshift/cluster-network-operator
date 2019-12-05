@@ -260,6 +260,7 @@ spec:
           containerPort: 9101
         securityContext:
           privileged: true
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         # for the iptables wrapper
         - mountPath: /host
