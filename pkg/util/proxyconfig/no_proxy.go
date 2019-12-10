@@ -56,31 +56,33 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		return "", fmt.Errorf("internal api server url missing from infrastructure config '%s'", infra.Name)
 	}
 
-	if len(network.Status.ServiceNetwork) > 0 {
-		set.Insert(network.Status.ServiceNetwork[0])
-	} else {
-		return "", fmt.Errorf("serviceNetwork missing from network '%s' status", network.Name)
-	}
-
-	switch infra.Status.PlatformStatus.Type {
-	case configv1.AWSPlatformType, configv1.GCPPlatformType, configv1.AzurePlatformType, configv1.OpenStackPlatformType:
-		set.Insert("169.254.169.254")
-	}
-
-	// Construct the node sub domain.
-	// TODO: Add support for additional cloud providers.
-	switch infra.Status.PlatformStatus.Type {
-	case configv1.AWSPlatformType:
-		region := infra.Status.PlatformStatus.AWS.Region
-		if region == "us-east-1" {
-			set.Insert(".ec2.internal")
+	if infra.Status.PlatformStatus != nil {
+		if len(network.Status.ServiceNetwork) > 0 {
+			set.Insert(network.Status.ServiceNetwork[0])
 		} else {
-			set.Insert(fmt.Sprintf(".%s.compute.internal", region))
+			return "", fmt.Errorf("serviceNetwork missing from network '%s' status", network.Name)
 		}
-	case configv1.GCPPlatformType:
-		// From https://cloud.google.com/vpc/docs/special-configurations add GCP metadata.
-		// "metadata.google.internal." added due to https://bugzilla.redhat.com/show_bug.cgi?id=1754049
-		set.Insert("metadata", "metadata.google.internal", "metadata.google.internal.")
+
+		switch infra.Status.PlatformStatus.Type {
+		case configv1.AWSPlatformType, configv1.GCPPlatformType, configv1.AzurePlatformType, configv1.OpenStackPlatformType:
+			set.Insert("169.254.169.254")
+		}
+
+		// Construct the node sub domain.
+		// TODO: Add support for additional cloud providers.
+		switch infra.Status.PlatformStatus.Type {
+		case configv1.AWSPlatformType:
+			region := infra.Status.PlatformStatus.AWS.Region
+			if region == "us-east-1" {
+				set.Insert(".ec2.internal")
+			} else {
+				set.Insert(fmt.Sprintf(".%s.compute.internal", region))
+			}
+		case configv1.GCPPlatformType:
+			// From https://cloud.google.com/vpc/docs/special-configurations add GCP metadata.
+			// "metadata.google.internal." added due to https://bugzilla.redhat.com/show_bug.cgi?id=1754049
+			set.Insert("metadata", "metadata.google.internal", "metadata.google.internal.")
+		}
 	}
 
 	if len(ic.ControlPlane.Replicas) > 0 {
