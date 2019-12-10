@@ -10,7 +10,7 @@ metadata:
   namespace: openshift-ovn-kubernetes
 spec:
   selector:
-    name: ovnkube-master
+    app: ovnkube-master
   ports:
   - name: north
     port: {{.OVN_NB_PORT}}
