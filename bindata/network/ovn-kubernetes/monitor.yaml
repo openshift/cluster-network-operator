@@ -3,7 +3,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    name: ovnkube-master
+    app: ovnkube-master
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
   name: monitor-ovn-master
@@ -18,18 +18,18 @@ spec:
     - openshift-ovn-kubernetes
   selector:
     matchLabels:
-      name: ovnkube-master
+      app: ovnkube-master
 ---
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    name: ovnkube-master
+    app: ovnkube-master
   name: ovn-kubernetes-master
   namespace: openshift-ovn-kubernetes
 spec:
   selector:
-    name: ovnkube-master
+    app: ovnkube-master
   clusterIP: None
   publishNotReadyAddresses: true
   ports:
