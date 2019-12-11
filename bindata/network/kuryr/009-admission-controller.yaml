@@ -25,6 +25,7 @@ spec:
         type: infra
         openshift.io/component: network
     spec:
+      serviceAccountName: kuryr
       containers:
       - name: kuryr-dns-admission-controller
         image: {{ .ControllerImage }}
@@ -35,6 +36,7 @@ spec:
         - --port=6443
         - --tls-private-key-file=/etc/webhook/tls.key
         - --tls-cert-file=/etc/webhook/tls.crt
+        - --ns=openshift-insights
         volumeMounts:
         - name: webhook-certs
           mountPath: /etc/webhook
