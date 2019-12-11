@@ -11,6 +11,9 @@ spec:
   selector:
     matchLabels:
       app: kuryr-controller
+  # There can be only one kuryr-controller without HA enabled
+  strategy:
+    type: Recreate
   template:
     metadata:
       name: kuryr-controller
@@ -19,6 +22,7 @@ spec:
         component: network
         type: infra
         openshift.io/component: network
+        configuration-hash: {{ .ConfigMapHash }}
     spec:
       serviceAccountName: kuryr
       hostNetwork: true

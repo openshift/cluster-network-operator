@@ -19,6 +19,7 @@ spec:
         component: network
         type: infra
         openshift.io/component: network
+        configuration-hash: {{ .ConfigMapHash }}
     spec:
       hostNetwork: true
       serviceAccountName: kuryr
