@@ -16,6 +16,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
+	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
 )
 
 // renderKuryr returns manifests for Kuryr SDN.
@@ -69,6 +70,14 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
+
+	// We use MD5 hash of the JSONfied config data to make pods restart when
+	// configuration was changed.
+	hash, err := k8sutil.CalculateHash(data.Data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to calculate checksum of Kuryr configuration")
+	}
+	data.Data["ConfigMapHash"] = hash
 
 	// DNS mutating webhook
 	data.Data["AdmissionControllerSecret"] = names.KURYR_ADMISSION_CONTROLLER_SECRET
@@ -159,6 +168,10 @@ func isKuryrChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	if reflect.DeepEqual(pn, nn) {
 		return []error{}
 	}
+
+	// NOTE(dulek): We allow changes to the NetworkSpec.LogLevel, but that's on higher level,
+	//              so simply not doing anything is enough to allow it.
+
 	return []error{errors.Errorf("cannot change kuryr configuration")}
 }
 
