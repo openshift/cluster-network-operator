@@ -48,8 +48,13 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	g.Expect(errs).To(HaveLen(0))
 	FillDefaults(config, nil)
 
-	// enable openvswitch
-	objs, err := renderOVNKubernetes(config, &bootstrap.BootstrapResult{}, manifestDirOvn)
+	bootstrapResult := &bootstrap.BootstrapResult{
+		OVN: bootstrap.OVNBootstrapResult{
+			MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+		},
+	}
+
+	objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-master")))
