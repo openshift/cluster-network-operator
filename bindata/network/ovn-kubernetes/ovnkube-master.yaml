@@ -68,26 +68,11 @@ spec:
             set +o allexport
           fi
 
-          OVN_NODES_ARRAY=({{.OVN_NODES}})
-          
-          nb_addr_list=""
-          sb_addr_list=""
-          
-          for i in "${!OVN_NODES_ARRAY[@]}"; do
-            if [[ $i != 0 ]]; then
-              nb_addr_list="${nb_addr_list},"
-              sb_addr_list="${sb_addr_list},"
-            fi
-            host=$(getent ahostsv4 "${OVN_NODES_ARRAY[$i]}" | grep RAW | awk '{print $1}')
-            nb_addr_list="${nb_addr_list}ssl:${host}:{{.OVN_NB_PORT}}"
-            sb_addr_list="${sb_addr_list}ssl:${host}:{{.OVN_SB_PORT}}"
-          done
-          
           exec ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
             --pidfile=/var/run/openvswitch/ovn-northd.pid \
-            --ovnnb-db "${nb_addr_list}" \
-            --ovnsb-db "${sb_addr_list}" \
+            --ovnnb-db "{{.OVN_NB_DB_LIST}}" \
+            --ovnsb-db "{{.OVN_SB_DB_LIST}}" \
             -p /ovn-cert/tls.key \
             -c /ovn-cert/tls.crt \
             -C /ovn-ca/ca-bundle.crt 
@@ -126,10 +111,6 @@ spec:
             source /env/_master
             set +o allexport
           fi
-          
-          OVN_NODES_ARRAY=({{.OVN_NODES}})
-          MASTER_NODE=$(getent ahostsv4 "${OVN_NODES_ARRAY[0]}" | grep RAW | awk '{print $1}')
-          LOCALHOST=$(getent ahostsv4 "${K8S_NODE}" | grep RAW | awk '{print $1}')
 
           # Determine the ovn rundir.
           if [[ -f /usr/bin/ovn-appctl ]] ; then
@@ -140,10 +121,11 @@ spec:
               OVNCTL_PATH=/usr/share/openvswitch/scripts/ovn-ctl
           fi
 
-          if [[ "$LOCALHOST" == "$MASTER_NODE" ]]; then
+          MASTER_IP="{{.OVN_MASTER_IP}}"
+          if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
             exec ${OVNCTL_PATH} \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
-            --db-nb-cluster-local-addr=${LOCALHOST} \
+            --db-nb-cluster-local-addr=${K8S_NODE_IP} \
             --no-monitor \
             --db-nb-cluster-local-proto=ssl \
             --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
@@ -155,8 +137,8 @@ spec:
             exec ${OVNCTL_PATH} \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
-            --db-nb-cluster-local-addr=${LOCALHOST} \
-            --db-nb-cluster-remote-addr=${MASTER_NODE} \
+            --db-nb-cluster-local-addr=${K8S_NODE_IP} \
+            --db-nb-cluster-remote-addr=${MASTER_IP} \
             --no-monitor \
             --db-nb-cluster-local-proto=ssl \
             --db-nb-cluster-remote-proto=ssl \
@@ -173,8 +155,8 @@ spec:
               - /bin/bash
               - -c
               - |
-                OVN_NODES_ARRAY=({{.OVN_NODES}})
-                if [[ "$K8S_NODE" == "${OVN_NODES_ARRAY[0]}" ]]; then
+                MASTER_IP="{{.OVN_MASTER_IP}}"
+                if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
                   retries=0
                   while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}} -- set connection . inactivity_probe=0; do
                     (( retries += 1 ))
@@ -192,10 +174,10 @@ spec:
         env:
         - name: OVN_LOG_LEVEL
           value: info 
-        - name: K8S_NODE
+        - name: K8S_NODE_IP
           valueFrom:
             fieldRef:
-              fieldPath: spec.nodeName
+              fieldPath: status.hostIP
         volumeMounts:
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
@@ -236,10 +218,6 @@ spec:
             set +o allexport
           fi
 
-          OVN_NODES_ARRAY=({{.OVN_NODES}})
-          MASTER_NODE=$(getent ahostsv4 "${OVN_NODES_ARRAY[0]}" | grep RAW | awk '{print $1}')
-          LOCALHOST=$(getent ahostsv4 "${K8S_NODE}" | grep RAW | awk '{print $1}')
-
           # Determine the ovn rundir.
           if [[ -f /usr/bin/ovn-appctl ]] ; then
               # ovn-appctl is present. Use new ovn run dir path.
@@ -249,10 +227,11 @@ spec:
               OVNCTL_PATH=/usr/share/openvswitch/scripts/ovn-ctl
           fi
 
-          if [[ "$LOCALHOST" == "$MASTER_NODE" ]]; then
+          MASTER_IP="{{.OVN_MASTER_IP}}"
+          if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
             exec ${OVNCTL_PATH} \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
-            --db-sb-cluster-local-addr=${LOCALHOST} \
+            --db-sb-cluster-local-addr=${K8S_NODE_IP} \
             --no-monitor \
             --db-sb-cluster-local-proto=ssl \
             --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
@@ -261,12 +240,12 @@ spec:
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
             run_sb_ovsdb
           else
-            echo "joining cluster at ${OVN_NODES_ARRAY[0]}"
+            echo "joining cluster at ${MASTER_IP}"
             exec ${OVNCTL_PATH} \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
-            --db-sb-cluster-local-addr=${LOCALHOST} \
-            --db-sb-cluster-remote-addr=${MASTER_NODE} \
+            --db-sb-cluster-local-addr=${K8S_NODE_IP} \
+            --db-sb-cluster-remote-addr=${MASTER_IP} \
             --no-monitor \
             --db-sb-cluster-local-proto=ssl \
             --db-sb-cluster-remote-proto=ssl \
@@ -283,8 +262,8 @@ spec:
               - /bin/bash
               - -c
               - |
-                OVN_NODES_ARRAY=({{.OVN_NODES}})
-                if [[ "$K8S_NODE" == "${OVN_NODES_ARRAY[0]}" ]]; then
+                MASTER_IP="{{.OVN_MASTER_IP}}"
+                if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
                   retries=0
                   while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}} -- set connection . inactivity_probe=0; do
                     (( retries += 1 ))
@@ -302,10 +281,10 @@ spec:
         env:
         - name: OVN_LOG_LEVEL
           value: info 
-        - name: K8S_NODE
+        - name: K8S_NODE_IP
           valueFrom:
             fieldRef:
-              fieldPath: spec.nodeName
+              fieldPath: status.hostIP
         volumeMounts:
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
@@ -350,24 +329,11 @@ spec:
             fi
           fi
 
-          OVN_NODES_ARRAY=({{.OVN_NODES}})
-          nb_addr_list=""
-          sb_addr_list=""
-          for i in "${!OVN_NODES_ARRAY[@]}"; do
-            if [[ $i != 0 ]]; then
-              nb_addr_list="${nb_addr_list},"
-              sb_addr_list="${sb_addr_list},"
-            fi
-            host=$(getent ahostsv4 "${OVN_NODES_ARRAY[$i]}" | grep RAW | awk '{print $1}')
-            nb_addr_list="${nb_addr_list}ssl:${host}:{{.OVN_NB_PORT}}"
-            sb_addr_list="${sb_addr_list}ssl://${host}:{{.OVN_SB_PORT}}"
-          done
-          
           # start nbctl daemon for caching
           export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/run/openvswitch/ovnk-nbctl.pid \
             --detach \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
-            --db "${nb_addr_list}")
+            --db "{{.OVN_NB_DB_LIST}}")
 
           exec /usr/bin/ovnkube \
             --init-master "${K8S_NODE}" \
@@ -376,7 +342,7 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             ${hybrid_overlay_flags} \
             --metrics-bind-address "0.0.0.0:9102" \
-            --sb-address "${sb_addr_list}" \
+            --sb-address "{{.OVN_SB_ADDR_LIST}}" \
             --sb-client-privkey /ovn-cert/tls.key \
             --sb-client-cert /ovn-cert/tls.crt \
             --sb-client-cacert /ovn-ca/ca-bundle.crt
@@ -412,10 +378,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: OVN_HYBRID_OVERLAY_ENABLE
-          value: "{{ .OVNHybridOverlayEnable }}"
-        - name: OVN_HYBRID_OVERLAY_NET_CIDR
-          value: "{{ .OVNHybridOverlayNetCIDR }}"
         ports:
         - name: metrics-port
           containerPort: 9102
