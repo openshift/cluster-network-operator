@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -50,7 +51,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_SB_PORT"] = OVN_SB_PORT
 	data.Data["OVN_NB_RAFT_PORT"] = OVN_NB_RAFT_PORT
 	data.Data["OVN_SB_RAFT_PORT"] = OVN_SB_RAFT_PORT
-	data.Data["OVN_NODES"] = strings.Join(bootstrapResult.OVN.OVNMasterNodes, " ")
+	data.Data["OVN_NB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterIPs, OVN_NB_PORT)
+	data.Data["OVN_SB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterIPs, OVN_SB_PORT)
+	data.Data["OVN_NB_ADDR_LIST"] = addrList(bootstrapResult.OVN.MasterIPs, OVN_NB_PORT)
+	data.Data["OVN_SB_ADDR_LIST"] = addrList(bootstrapResult.OVN.MasterIPs, OVN_SB_PORT)
+	data.Data["OVN_MASTER_IP"] = bootstrapResult.OVN.MasterIPs[0]
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
@@ -160,17 +165,43 @@ func boostrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 		return nil, fmt.Errorf("unable to bootstrap OVN, no master nodes found")
 	}
 
-	ovnMasterNodes := []string{}
-	for _, masterNode := range masterNodeList.Items {
-		ovnMasterNodes = append(ovnMasterNodes, masterNode.Name)
+	ovnMasterIPs := make([]string, len(masterNodeList.Items))
+	for i, masterNode := range masterNodeList.Items {
+		var ip string
+		for _, address := range masterNode.Status.Addresses {
+			if address.Type == corev1.NodeInternalIP {
+				ip = address.Address
+				break
+			}
+		}
+		if ip == "" {
+			return nil, fmt.Errorf("No InternalIP found on master node '%s'", masterNode.Name)
+		}
+		ovnMasterIPs[i] = ip
 	}
 
-	sort.Strings(ovnMasterNodes)
+	sort.Strings(ovnMasterIPs)
 
 	res := bootstrap.BootstrapResult{
 		OVN: bootstrap.OVNBootstrapResult{
-			OVNMasterNodes: ovnMasterNodes,
+			MasterIPs: ovnMasterIPs,
 		},
 	}
 	return &res, nil
+}
+
+func dbList(masterIPs []string, port string) string {
+	addrs := make([]string, len(masterIPs))
+	for i, ip := range masterIPs {
+		addrs[i] = "ssl:" + net.JoinHostPort(ip, port)
+	}
+	return strings.Join(addrs, ",")
+}
+
+func addrList(masterIPs []string, port string) string {
+	addrs := make([]string, len(masterIPs))
+	for i, ip := range masterIPs {
+		addrs[i] = "ssl://" + net.JoinHostPort(ip, port)
+	}
+	return strings.Join(addrs, ",")
 }
