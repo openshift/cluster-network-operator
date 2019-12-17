@@ -132,7 +132,7 @@ spec:
                 MASTER_IP="{{.OVN_MASTER_IP}}"
                 if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
                   retries=0
-                  while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}} -- set connection . inactivity_probe=0; do
+                  while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=0; do
                     (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
                     echo "too many failed ovn-nbctl attempts, giving up"
@@ -223,7 +223,7 @@ spec:
                 MASTER_IP="{{.OVN_MASTER_IP}}"
                 if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
                   retries=0
-                  while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}} -- set connection . inactivity_probe=0; do
+                  while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=0; do
                     (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
                     echo "too many failed ovn-sbctl attempts, giving up"

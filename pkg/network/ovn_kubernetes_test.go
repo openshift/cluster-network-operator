@@ -1,6 +1,8 @@
 package network
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	operv1 "github.com/openshift/api/operator/v1"
@@ -93,6 +95,86 @@ func TestRenderOVNKubernetes(t *testing.T) {
 		tweakMetaForCompare(cur)
 		g.Expect(cur).To(Equal(upd))
 	}
+}
+
+// TestRenderOVNKubernetesIPv6 tests IPv6 support
+func TestRenderOVNKubernetesIPv6(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+
+	errs := validateOVNKubernetes(config)
+	g.Expect(errs).To(HaveLen(0))
+	FillDefaults(config, nil)
+
+	bootstrapResult := &bootstrap.BootstrapResult{
+		OVN: bootstrap.OVNBootstrapResult{
+			MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+		},
+	}
+	objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	script, err := findNBDBPostStart(objs)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	g.Expect(script).To(ContainSubstring("pssl:9641"))
+
+	bootstrapResult = &bootstrap.BootstrapResult{
+		OVN: bootstrap.OVNBootstrapResult{
+			MasterIPs: []string{"fd01::1", "fd01::2", "fd01::3"},
+		},
+	}
+	objs, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	script, err = findNBDBPostStart(objs)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	g.Expect(script).To(ContainSubstring("pssl:9641:[::]"))
+}
+
+func findNBDBPostStart(objects []*uns.Unstructured) (string, error) {
+	var master *uns.Unstructured
+	for _, obj := range objects {
+		if obj.GetKind() == "DaemonSet" && obj.GetNamespace() == "openshift-ovn-kubernetes" && obj.GetName() == "ovnkube-master" {
+			master = obj
+			break
+		}
+	}
+	if master == nil {
+		return "", fmt.Errorf("could not find DaemonSet openshift-ovn-kubernetes/ovnkube-master")
+	}
+
+	containers, found, err := uns.NestedSlice(master.Object, "spec", "template", "spec", "containers")
+	if err != nil {
+		return "", err
+	} else if !found {
+		return "", fmt.Errorf("could not find containers in DaemonSet ovnkube-master")
+	}
+
+	var nbdb map[string]interface{}
+	for _, container := range containers {
+		cmap := container.(map[string]interface{})
+		name, found, err := uns.NestedString(cmap, "name")
+		if found && err == nil && name == "nbdb" {
+			nbdb = cmap
+			break
+		}
+	}
+	if nbdb == nil {
+		return "", fmt.Errorf("could not find nbdb container in DaemonSet ovnkube-master")
+	}
+
+	script, found, err := uns.NestedStringSlice(nbdb, "lifecycle", "postStart", "exec", "command")
+	if err != nil {
+		return "", err
+	} else if !found {
+		return "", fmt.Errorf("could not find nbdb postStart script")
+	}
+
+	return strings.Join(script, " "), nil
 }
 
 func TestFillOVNKubernetesDefaults(t *testing.T) {
