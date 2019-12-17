@@ -58,6 +58,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_SB_ADDR_LIST"] = addrList(bootstrapResult.OVN.MasterIPs, OVN_SB_PORT)
 	data.Data["OVN_MASTER_IP"] = bootstrapResult.OVN.MasterIPs[0]
 	data.Data["OVN_MIN_AVAILABLE"] = len(bootstrapResult.OVN.MasterIPs)/2 + 1
+	data.Data["LISTEN_DUAL_STACK"] = listenDualStack(bootstrapResult.OVN.MasterIPs[0])
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
@@ -219,4 +220,14 @@ func addrList(masterIPs []string, port string) string {
 		addrs[i] = "ssl://" + net.JoinHostPort(ip, port)
 	}
 	return strings.Join(addrs, ",")
+}
+
+func listenDualStack(masterIP string) string {
+	if strings.Contains(masterIP, ":") {
+		// IPv6 master, make the databases listen dual-stack
+		return ":[::]"
+	} else {
+		// IPv4 master, be IPv4-only for backward-compatibility
+		return ""
+	}
 }
