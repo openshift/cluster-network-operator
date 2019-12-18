@@ -234,6 +234,10 @@ if [[ -z "$(which oc 2> /dev/null || exit 0)" ]]; then
     exit 1
 fi
 
+# re-build the network operator
+echo "rebuilding the CNO"
+hack/build-go.sh
+
 # Autodetect the state of the cluster to determine which mode to run in
 if [[ -z "$(ls -A ${CLUSTER_DIR} 2> /dev/null | grep -v install-config.yaml | grep -v .openshift_install | grep -v env.sh)" ]]; then
     echo "Creating new cluster..."
