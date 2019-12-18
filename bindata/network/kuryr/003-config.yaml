@@ -38,6 +38,14 @@ data:
     service_security_groups_driver = policy
     pod_subnets_driver = namespace
 
+    endpoints_driver_octavia_provider = {{ default "default" .OctaviaProvider }}
+
+    [octavia_defaults]
+    member_mode = {{ default "L3" .OctaviaMemberMode }}
+    sg_mode = {{ default "update" .OctaviaSGMode }}
+    enforce_sg_rules = {{ .OctaviaSGEnforce }}
+    lb_algorithm = {{ .OctaviaLBAlgorithm }}
+
     [namespace_subnet]
     pod_router = {{ .WorkerNodesRouter }}
     pod_subnet_pool = {{ .PodSubnetpool }}

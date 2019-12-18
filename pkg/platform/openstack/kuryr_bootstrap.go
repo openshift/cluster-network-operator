@@ -22,6 +22,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/loadbalancers"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/monitors"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools"
+	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/providers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/attributestags"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
@@ -49,9 +50,12 @@ const (
 	// NOTE(dulek): This one is hardcoded in openshift/installer.
 	InfrastructureCRDName              = "cluster"
 	MinOctaviaVersionWithHTTPSMonitors = "v2.10"
+	MinOctaviaVersionWithProviders     = "v2.6"
 	MinOctaviaVersionWithTagSupport    = "v2.5"
 	MinOctaviaVersionWithTimeouts      = "v2.1"
 	KuryrNamespace                     = "openshift-kuryr"
+	// NOTE(ltomasbo): Only OVN octavia driver supported on kuryr
+	OVNProvider = "ovn"
 )
 
 func GetClusterID(kubeClient client.Client) (string, error) {
@@ -1077,6 +1081,31 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		return nil, errors.Wrap(err, "failed to ensure Certificate")
 	}
 
+	log.Print("Checking OVN Octavia driver support")
+	octaviaProviderSupport, err := IsOctaviaVersionSupported(client, MinOctaviaVersionWithProviders)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to determine if Octavia supports providers")
+	}
+
+	octaviaProvider := "default"
+	if octaviaProviderSupport {
+		page, err := providers.List(lbClient, providers.ListOpts{}).AllPages()
+		if err != nil {
+			log.Print("failed to get lbs provider list, using default octavia provider")
+		} else {
+			providers, err := providers.ExtractProviders(page)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to extract providers list")
+			}
+			for _, provider := range providers {
+				if provider.Name == OVNProvider {
+					log.Print("OVN Provider is enabled and Kuryr will use it")
+					octaviaProvider = OVNProvider
+				}
+			}
+		}
+	}
+
 	log.Print("Kuryr bootstrap finished")
 
 	res := bootstrap.BootstrapResult{
@@ -1088,6 +1117,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 			PodSecurityGroups: []string{podSgId},
 			ExternalNetwork:   externalNetwork,
 			ClusterID:         clusterID,
+			OctaviaProvider:   octaviaProvider,
 			OpenStackCloud:    cloud,
 			WebhookCA:         b64.StdEncoding.EncodeToString(ca),
 			WebhookCAKey:      b64.StdEncoding.EncodeToString(key),

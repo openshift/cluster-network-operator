@@ -216,7 +216,7 @@
   version = "v0.3.1"
 
 [[projects]]
-  digest = "1:b75616aafac5d462dad2ca1a9bc82d29ed7e28a8aa93f2f433e9660945c4a5fe"
+  digest = "1:3c65ac6fd0b1f3d2736e25df3783167785da5eda70f078af8ffa60bc10a21973"
   name = "github.com/gophercloud/gophercloud"
   packages = [
     ".",
@@ -230,6 +230,7 @@
     "openstack/loadbalancer/v2/loadbalancers",
     "openstack/loadbalancer/v2/monitors",
     "openstack/loadbalancer/v2/pools",
+    "openstack/loadbalancer/v2/providers",
     "openstack/networking/v2/extensions/attributestags",
     "openstack/networking/v2/extensions/layer3/routers",
     "openstack/networking/v2/extensions/security/groups",
@@ -242,7 +243,7 @@
     "pagination",
   ]
   pruneopts = "NT"
-  revision = "17584a22adf89c48eb1f2518e71326b3b01ba573"
+  revision = "2567326a4c71208f8b4717a784a912212b5eff7d"
 
 [[projects]]
   branch = "master"
@@ -1184,6 +1185,7 @@
     "github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/loadbalancers",
     "github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/monitors",
     "github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools",
+    "github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/providers",
     "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/attributestags",
     "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers",
     "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups",
