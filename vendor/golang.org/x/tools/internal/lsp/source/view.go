@@ -20,13 +20,21 @@ import (
 
 // FileIdentity uniquely identifies a file at a version from a FileSystem.
 type FileIdentity struct {
-	URI     span.URI
-	Version string
-	Kind    FileKind
+	URI span.URI
+
+	// Version is the version of the file, as specified by the client.
+	Version float64
+
+	// Identifier represents a unique identifier for the file.
+	// It could be a file's modification time or its SHA1 hash if it is not on disk.
+	Identifier string
+
+	// Kind is the file's kind.
+	Kind FileKind
 }
 
 func (identity FileIdentity) String() string {
-	return fmt.Sprintf("%s%s%s", identity.URI, identity.Version, identity.Kind)
+	return fmt.Sprintf("%s%f%s%s", identity.URI, identity.Version, identity.Identifier, identity.Kind)
 }
 
 // FileHandle represents a handle to a specific version of a single file from
@@ -73,7 +81,7 @@ type ParseGoHandle interface {
 	Parse(ctx context.Context) (*ast.File, *protocol.ColumnMapper, error, error)
 
 	// Cached returns the AST for this handle, if it has already been stored.
-	Cached(ctx context.Context) (*ast.File, *protocol.ColumnMapper, error, error)
+	Cached() (*ast.File, *protocol.ColumnMapper, error, error)
 }
 
 // ParseMode controls the content of the AST produced when parsing a source file.
@@ -109,8 +117,9 @@ type CheckPackageHandle interface {
 	Check(ctx context.Context) (Package, error)
 
 	// Cached returns the Package for the CheckPackageHandle if it has already been stored.
-	Cached(ctx context.Context) (Package, error)
+	Cached() (Package, error)
 
+	// MissingDependencies reports any unresolved imports.
 	MissingDependencies() []string
 }
 
@@ -141,7 +150,7 @@ type Cache interface {
 // A session may have many active views at any given time.
 type Session interface {
 	// NewView creates a new View and returns it.
-	NewView(ctx context.Context, name string, folder span.URI, options Options) View
+	NewView(ctx context.Context, name string, folder span.URI, options Options) (View, error)
 
 	// Cache returns the cache that created this session.
 	Cache() Cache
@@ -163,7 +172,7 @@ type Session interface {
 	FileSystem
 
 	// DidOpen is invoked each time a file is opened in the editor.
-	DidOpen(ctx context.Context, uri span.URI, kind FileKind, text []byte)
+	DidOpen(ctx context.Context, uri span.URI, kind FileKind, text []byte) error
 
 	// DidSave is invoked each time an open file is saved in the editor.
 	DidSave(uri span.URI)
@@ -177,9 +186,9 @@ type Session interface {
 	// Called to set the effective contents of a file from this session.
 	SetOverlay(uri span.URI, kind FileKind, data []byte) (wasFirstChange bool)
 
-	// DidChangeOutOfBand is called when a file under the root folder
-	// changes. The file is not necessarily open in the editor.
-	DidChangeOutOfBand(ctx context.Context, uri span.URI, change protocol.FileChangeType)
+	// DidChangeOutOfBand is called when a file under the root folder changes.
+	// If the file was open in the editor, it returns true.
+	DidChangeOutOfBand(ctx context.Context, uri span.URI, change protocol.FileChangeType) bool
 
 	// Options returns a copy of the SessionOptions for this session.
 	Options() Options
@@ -236,12 +245,10 @@ type View interface {
 	Options() Options
 
 	// SetOptions sets the options of this view to new values.
-	// Warning: Do not use this, unless in a test.
-	// This function does not correctly invalidate the view when needed.
-	SetOptions(Options)
-
-	// Analyzers returns the set of Analyzers active for this view.
-	Analyzers() []*analysis.Analyzer
+	// Calling this may cause the view to be invalidated and a replacement view
+	// added to the session. If so the new view will be returned, otherwise the
+	// original one will be.
+	SetOptions(context.Context, Options) (View, error)
 
 	// CheckPackageHandles returns the CheckPackageHandles for the packages
 	// that this file belongs to.
@@ -251,6 +258,10 @@ type View interface {
 	// dependencies of this file's package.
 	GetActiveReverseDeps(ctx context.Context, f File) []CheckPackageHandle
 
+	// FindFileInPackage returns the AST and type information for a file that may
+	// belong to or be part of a dependency of the given package.
+	FindPosInPackage(pkg Package, pos token.Pos) (*ast.File, *protocol.ColumnMapper, Package, error)
+
 	// Snapshot returns the current snapshot for the view.
 	Snapshot() Snapshot
 }
@@ -259,12 +270,49 @@ type View interface {
 type Snapshot interface {
 	// Handle returns the FileHandle for the given file.
 	Handle(ctx context.Context, f File) FileHandle
+
+	// View returns the View associated with this snapshot.
+	View() View
+
+	// Analyze runs the analyses for the given package at this snapshot.
+	Analyze(ctx context.Context, id string, analyzers []*analysis.Analyzer) ([]*Error, error)
+
+	// FindAnalysisError returns the analysis error represented by the diagnostic.
+	// This is used to get the SuggestedFixes associated with that error.
+	FindAnalysisError(ctx context.Context, id string, diag protocol.Diagnostic) (*Error, error)
+
+	// CheckPackageHandles returns the CheckPackageHandles for the packages
+	// that this file belongs to.
+	CheckPackageHandles(ctx context.Context, f File) ([]CheckPackageHandle, error)
+
+	// KnownImportPaths returns all the imported packages loaded in this snapshot,
+	// indexed by their import path.
+	KnownImportPaths() map[string]Package
+
+	// KnownPackages returns all the packages loaded in this snapshot.
+	KnownPackages(ctx context.Context) []Package
 }
 
 // File represents a source file of any type.
 type File interface {
 	URI() span.URI
 	Kind() FileKind
+}
+
+type FileURI span.URI
+
+func (f FileURI) URI() span.URI {
+	return span.URI(f)
+}
+
+type DirectoryURI span.URI
+
+func (d DirectoryURI) URI() span.URI {
+	return span.URI(d)
+}
+
+type Scope interface {
+	URI() span.URI
 }
 
 // Package represents a Go package that has been type-checked. It maintains
@@ -274,25 +322,38 @@ type Package interface {
 	PkgPath() string
 	Files() []ParseGoHandle
 	File(uri span.URI) (ParseGoHandle, error)
-	GetSyntax(context.Context) []*ast.File
-	GetErrors() []packages.Error
+	GetSyntax() []*ast.File
+	GetErrors() []*Error
 	GetTypes() *types.Package
 	GetTypesInfo() *types.Info
 	GetTypesSizes() types.Sizes
 	IsIllTyped() bool
+	GetImport(pkgPath string) (Package, error)
+	Imports() []Package
+}
 
-	SetDiagnostics(*analysis.Analyzer, []Diagnostic)
-	FindDiagnostic(protocol.Diagnostic) (*Diagnostic, error)
+type Error struct {
+	URI            span.URI
+	Range          protocol.Range
+	Kind           ErrorKind
+	Message        string
+	Category       string // only used by analysis errors so far
+	SuggestedFixes []SuggestedFix
+	Related        []RelatedInformation
+}
 
-	// GetImport returns the CheckPackageHandle for a package imported by this package.
-	GetImport(ctx context.Context, pkgPath string) (Package, error)
+type ErrorKind int
 
-	// GetActionGraph returns the action graph for the given package.
-	GetActionGraph(ctx context.Context, a *analysis.Analyzer) (*Action, error)
+const (
+	UnknownError = ErrorKind(iota)
+	ListError
+	ParseError
+	TypeError
+	Analysis
+)
 
-	// FindFile returns the AST and type information for a file that may
-	// belong to or be part of a dependency of the given package.
-	FindFile(ctx context.Context, uri span.URI) (ParseGoHandle, Package, error)
+func (e *Error) Error() string {
+	return fmt.Sprintf("%s:%s: %s", e.URI, e.Range, e.Message)
 }
 
 type BuiltinPackage interface {

@@ -39,10 +39,16 @@ type deepCompletionState struct {
 	candidateCount int
 }
 
-// push pushes obj onto our search stack.
-func (s *deepCompletionState) push(obj types.Object) {
+// push pushes obj onto our search stack. If invoke is true then
+// invocation parens "()" will be appended to the object name.
+func (s *deepCompletionState) push(obj types.Object, invoke bool) {
 	s.chain = append(s.chain, obj)
-	s.chainNames = append(s.chainNames, obj.Name())
+
+	name := obj.Name()
+	if invoke {
+		name += "()"
+	}
+	s.chainNames = append(s.chainNames, name)
 }
 
 // pop pops the last object off our search stack.
@@ -101,7 +107,7 @@ func (c *completer) shouldPrune() bool {
 	}
 
 	// Check our remaining budget every 100 candidates.
-	if c.deepState.candidateCount%100 == 0 {
+	if c.opts.Budget > 0 && c.deepState.candidateCount%100 == 0 {
 		spent := float64(time.Since(c.startTime)) / float64(c.opts.Budget)
 
 		switch {
@@ -134,7 +140,7 @@ func (c *completer) shouldPrune() bool {
 
 // deepSearch searches through obj's subordinate objects for more
 // completion items.
-func (c *completer) deepSearch(obj types.Object) {
+func (c *completer) deepSearch(obj types.Object, imp *importInfo) {
 	if c.deepState.maxDepth == 0 {
 		return
 	}
@@ -150,22 +156,39 @@ func (c *completer) deepSearch(obj types.Object) {
 		return
 	}
 
+	if obj.Type() == nil {
+		return
+	}
+
 	// Don't search embedded fields because they were already included in their
 	// parent's fields.
 	if v, ok := obj.(*types.Var); ok && v.Embedded() {
 		return
 	}
 
+	if sig, ok := obj.Type().Underlying().(*types.Signature); ok {
+		// If obj is a function that takes no arguments and returns one
+		// value, keep searching across the function call.
+		if sig.Params().Len() == 0 && sig.Results().Len() == 1 {
+			// Pass invoke=true since the function needs to be invoked in
+			// the deep chain.
+			c.deepState.push(obj, true)
+			// The result of a function call is not addressable.
+			c.methodsAndFields(sig.Results().At(0).Type(), false, imp)
+			c.deepState.pop()
+		}
+	}
+
 	// Push this object onto our search stack.
-	c.deepState.push(obj)
+	c.deepState.push(obj, false)
 
 	switch obj := obj.(type) {
 	case *types.PkgName:
-		c.packageMembers(obj)
+		c.packageMembers(obj.Imported(), imp)
 	default:
 		// For now it is okay to assume obj is addressable since we don't search beyond
 		// function calls.
-		c.methodsAndFields(obj.Type(), true)
+		c.methodsAndFields(obj.Type(), true, imp)
 	}
 
 	// Pop the object off our search stack.

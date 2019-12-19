@@ -11,6 +11,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/swauth"
+	osClient "github.com/gophercloud/utils/client"
 	"github.com/gophercloud/utils/openstack/clientconfig"
 )
 
@@ -177,18 +178,18 @@ func (c *Config) LoadAndValidate() error {
 		config.BuildNameToCertificate()
 	}
 
+	var logger osClient.Logger
 	// if OS_DEBUG is set, log the requests and responses
-	var osDebug bool
 	if os.Getenv("OS_DEBUG") != "" {
-		osDebug = true
+		logger = &osClient.DefaultLogger{}
 	}
 
 	transport := &http.Transport{Proxy: http.ProxyFromEnvironment, TLSClientConfig: config}
 	client.HTTPClient = http.Client{
-		Transport: &LogRoundTripper{
+		Transport: &osClient.RoundTripper{
 			Rt:         transport,
-			OsDebug:    osDebug,
 			MaxRetries: c.MaxRetries,
+			Logger:     logger,
 		},
 	}
 
