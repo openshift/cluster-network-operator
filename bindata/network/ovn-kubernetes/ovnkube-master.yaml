@@ -27,7 +27,7 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      name: ovnkube-master
+      app: ovnkube-master
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -38,7 +38,7 @@ spec:
   template:
     metadata:
       labels:
-        name: ovnkube-master
+        app: ovnkube-master
         component: network
         type: infra
         openshift.io/component: network

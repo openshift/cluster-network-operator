@@ -18,7 +18,7 @@ spec:
     - openshift-ovn-kubernetes
   selector:
     matchLabels:
-      name: ovnkube-master
+      app: ovnkube-master
 ---
 apiVersion: v1
 kind: Service
@@ -29,7 +29,7 @@ metadata:
   namespace: openshift-ovn-kubernetes
 spec:
   selector:
-    name: ovnkube-master
+    app: ovnkube-master
   clusterIP: None
   ports:
   - name: metrics
