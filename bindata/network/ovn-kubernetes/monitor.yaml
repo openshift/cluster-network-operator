@@ -31,6 +31,7 @@ spec:
   selector:
     app: ovnkube-master
   clusterIP: None
+  publishNotReadyAddresses: true
   ports:
   - name: metrics
     port: 9102
@@ -72,6 +73,7 @@ spec:
   selector:
     app: ovnkube-node
   clusterIP: None
+  publishNotReadyAddresses: true
   ports:
   - name: metrics
     port: 9101
