@@ -1,3 +1,88 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cni-binary-copy-script
+  namespace: openshift-multus
+  annotations:
+    kubernetes.io/description: |
+      This is a script used to copy CNI binaries based on host OS
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+data:
+  cnibincopy.sh: |-
+    #!/bin/bash
+
+    DESTINATION_DIRECTORY=/host/opt/cni/bin/
+
+    # Perform validation of usage
+    if [ -z "$RHEL7_SOURCE_DIRECTORY" ] ||
+       [ -z "$RHEL8_SOURCE_DIRECTORY" ] ||
+       [ -z "$DEFAULT_SOURCE_DIRECTORY" ]; then
+      echo "FATAL ERROR: You must set env variables: RHEL7_SOURCE_DIRECTORY, RHEL8_SOURCE_DIRECTORY, DEFAULT_SOURCE_DIRECTORY"
+      exit 1
+    fi
+
+    if [ ! -d "$DESTINATION_DIRECTORY" ]; then
+      echo "FATAL ERROR: Destination directory ($DESTINATION_DIRECTORY) does not exist"
+      exit 1
+    fi
+
+    # Collect host OS information
+    . /host/etc/os-release
+    rhelmajor=
+    # detect which version we're using in order to copy the proper binaries
+    case "${ID}" in
+      rhcos) rhelmajor=8
+      ;;
+      rhel) rhelmajor=$(echo "${VERSION_ID}" | cut -f 1 -d .)
+      ;;
+      fedora)
+        if [ "${VARIANT_ID}" == "coreos" ]; then
+          rhelmajor=8
+        else
+          echo "FATAL ERROR: Unsupported Fedora variant=${VARIANT_ID}"
+          exit 1
+        fi
+      ;;
+      *) echo "FATAL ERROR: Unsupported OS ID=${ID}"; exit 1
+      ;;
+    esac
+
+    # Set which directory we'll copy from, detect if it exists
+    sourcedir=
+    founddir=false
+    case "${rhelmajor}" in
+      7)
+        if [ -d "${RHEL7_SOURCE_DIRECTORY}" ]; then
+          sourcedir=${RHEL7_SOURCE_DIRECTORY}
+          founddir=true
+        fi
+      ;;
+      8)
+        if [ -d "${RHEL8_SOURCE_DIRECTORY}" ]; then
+          sourcedir=${RHEL8_SOURCE_DIRECTORY}
+          founddir=true
+        fi
+      ;;
+      *)
+        echo "ERROR: RHEL Major Version Unsupported, rhelmajor=${rhelmajor}"
+      ;;
+    esac
+
+    # When it doesn't exist, fall back to the original directory.
+    if [ "$founddir" == false ]; then
+      echo "Source directory unavailable for OS version: ${rhelmajor}"
+      sourcedir=$DEFAULT_SOURCE_DIRECTORY
+    fi
+
+    cp -rf ${sourcedir}* $DESTINATION_DIRECTORY
+    if [ $? -eq 0 ]; then
+        echo "Successfully copied files in ${sourcedir} to $DESTINATION_DIRECTORY"
+    else
+        echo "Failed to copy files in ${sourcedir} to $DESTINATION_DIRECTORY"
+        exit 1
+    fi
+---
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
@@ -29,101 +114,196 @@ spec:
       - operator: Exists
       serviceAccountName: multus
       initContainers:
-      - name: cni-plugins
-        image: {{.CNIPluginsImage}}
-        command: 
-          - /bin/bash
-          - -c
-          - |
-            #!/bin/bash
-            set -x
-            . /host/etc/os-release
-            rhelmajor=
-            # detect which version we're using in order to copy the proper binaries
-            case "${ID}" in
-              rhcos) rhelmajor=8
-              ;;
-              rhel) rhelmajor=$(echo "${VERSION_ID}" | cut -f 1 -d .) 
-              ;;
-              fedora)
-                if [ "${VARIANT_ID}" == "coreos" ]; then
-                  rhelmajor=8
-                else 
-                  echo "FATAL ERROR: Unsupported Fedora variant=${VARIANT_ID}"
-                  exit 1
-                fi
-              ;;
-              *) echo "FATAL ERROR: Unsupported OS ID=${ID}"; exit 1
-              ;;
-            esac
-            # Set which directory we'll copy from, detect if it exists
-            # When it doesn't exist, fall back to the original directory.
-            SOURCEDIR=/usr/src/plugins/rhel${rhelmajor}/bin/
-            if [ -d "${SOURCEDIR}" ]; then
-              echo "Detected OS version ${rhelmajor}, ${SOURCEDIR} exists"
-            else
-              echo "Source directory unavailable for OS version: ${rhelmajor}"
-              SOURCEDIR=/usr/src/plugins/bin/
-            fi
-            cp -rf ${SOURCEDIR}* /host/opt/cni/bin
-
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - mountPath: /host/opt/cni/bin
-          name: cnibin
-        - mountPath: /host/etc/os-release
-          name: os-release
-          readOnly: true
       - name: multus-binary-copy
         image: {{.MultusImage}}
-        command:
-          - /bin/bash
-          - -c
-          - |
-            #!/bin/bash
-            set -x
-            . /host/etc/os-release
-            rhelmajor=
-            # detect which version we're using in order to copy the proper binaries
-            case "${ID}" in
-              rhcos) rhelmajor=8
-              ;;
-              rhel) rhelmajor=$(echo "${VERSION_ID}" | cut -f 1 -d .)
-              ;;
-              fedora)
-                if [ "${VARIANT_ID}" == "coreos" ]; then
-                  rhelmajor=8
-                else
-                  echo "FATAL ERROR: Unsupported Fedora variant=${VARIANT_ID}"
-                  exit 1
-                fi
-              ;;
-              *) echo "FATAL ERROR: Unsupported OS ID=${ID}"; exit 1
-              ;;
-            esac
-            # Set which directory we'll copy from, detect if it exists
-            # When it doesn't exist, fall back to the original directory.
-            SOURCEDIR=/usr/src/multus-cni/rhel${rhelmajor}/bin
-            if [ -d "${SOURCEDIR}" ]; then
-              echo "Detected OS version ${rhelmajor}, ${SOURCEDIR} exists"
-            else
-              echo "Source directory unavailable for OS version: ${rhelmajor}"
-              SOURCEDIR=/usr/src/multus-cni/bin
-            fi
-            # Copy to a temporary filename and then perform a rename to make
-            # for an atomic operation.
-            cp -f ${SOURCEDIR}/multus /host/opt/cni/bin/_multus
-            mv -f /host/opt/cni/bin/_multus /host/opt/cni/bin/multus
-
-        securityContext:
-          privileged: true
+        command: ["/entrypoint/cnibincopy.sh"]
         volumeMounts:
+        - mountPath: /entrypoint
+          name: cni-binary-copy
         - mountPath: /host/opt/cni/bin
           name: cnibin
         - mountPath: /host/etc/os-release
           name: os-release
           readOnly: true
+        env:
+        - name: RHEL7_SOURCE_DIRECTORY
+          value: "/usr/src/multus-cni/rhel7/bin/"
+        - name: RHEL8_SOURCE_DIRECTORY
+          value: "/usr/src/multus-cni/rhel8/bin/"
+        - name: DEFAULT_SOURCE_DIRECTORY
+          value: "/usr/src/multus-cni/bin/"
+      - name: cni-plugins
+        image: {{.CNIPluginsImage}}
+        command: ["/entrypoint/cnibincopy.sh"]
+        volumeMounts:
+        - mountPath: /entrypoint
+          name: cni-binary-copy
+        - mountPath: /host/opt/cni/bin
+          name: cnibin
+        - mountPath: /host/etc/os-release
+          name: os-release
+          readOnly: true
+        env:
+        - name: RHEL7_SOURCE_DIRECTORY
+          value: "/usr/src/plugins/rhel7/bin/"
+        - name: RHEL8_SOURCE_DIRECTORY
+          value: "/usr/src/plugins/rhel8/bin/"
+        - name: DEFAULT_SOURCE_DIRECTORY
+          value: "/usr/src/plugins/bin/"
+      - name: routeoverride-cni
+        image: {{.RouteOverrideImage}}
+        command: ["/entrypoint/cnibincopy.sh"]
+        volumeMounts:
+        - mountPath: /entrypoint
+          name: cni-binary-copy
+        - mountPath: /host/opt/cni/bin
+          name: cnibin
+        - mountPath: /host/etc/os-release
+          name: os-release
+          readOnly: true
+        env:
+        - name: RHEL7_SOURCE_DIRECTORY
+          value: "/usr/src/route-override/rhel7/bin/"
+        - name: RHEL8_SOURCE_DIRECTORY
+          value: "/usr/src/whereabouts/rhel8/bin/"
+        - name: DEFAULT_SOURCE_DIRECTORY
+          value: "/usr/src/route-override/bin/"
+      - name: whereabouts-cni-bincopy
+        image: {{.WhereaboutsImage}}
+        command: ["/entrypoint/cnibincopy.sh"]
+        volumeMounts:
+        - mountPath: /entrypoint
+          name: cni-binary-copy
+        - mountPath: /host/opt/cni/bin
+          name: cnibin
+        - mountPath: /host/etc/os-release
+          name: os-release
+          readOnly: true
+        env:
+        - name: RHEL7_SOURCE_DIRECTORY
+          value: "/usr/src/whereabouts/rhel7/bin/"
+        - name: RHEL8_SOURCE_DIRECTORY
+          value: "/usr/src/whereabouts/rhel8/bin/"
+        - name: DEFAULT_SOURCE_DIRECTORY
+          value: "/usr/src/whereabouts/bin/"
+      - name: whereabouts-cni
+        image: {{.WhereaboutsImage}}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            #!/bin/sh
+
+            set -u -e
+
+            CNI_BIN_DIR=${CNI_BIN_DIR:-"/host/opt/cni/bin/"}
+            WHEREABOUTS_KUBECONFIG_FILE_HOST=${WHEREABOUTS_KUBECONFIG_FILE_HOST:-"/etc/cni/net.d/whereabouts.d/whereabouts.kubeconfig"}
+            CNI_CONF_DIR=${CNI_CONF_DIR:-"/host/etc/cni/net.d"}
+
+            # Make a whereabouts.d directory (for our kubeconfig)
+
+            mkdir -p $CNI_CONF_DIR/whereabouts.d
+            WHEREABOUTS_KUBECONFIG=$CNI_CONF_DIR/whereabouts.d/whereabouts.kubeconfig
+            WHEREABOUTS_GLOBALCONFIG=$CNI_CONF_DIR/whereabouts.d/whereabouts.conf
+
+            # ------------------------------- Generate a "kube-config"
+            SERVICE_ACCOUNT_PATH=/var/run/secrets/kubernetes.io/serviceaccount
+            KUBE_CA_FILE=${KUBE_CA_FILE:-$SERVICE_ACCOUNT_PATH/ca.crt}
+            SERVICEACCOUNT_TOKEN=$(cat $SERVICE_ACCOUNT_PATH/token)
+            SKIP_TLS_VERIFY=${SKIP_TLS_VERIFY:-false}
+
+
+            # Check if we're running as a k8s pod.
+            if [ -f "$SERVICE_ACCOUNT_PATH/token" ]; then
+              # We're running as a k8d pod - expect some variables.
+              if [ -z ${KUBERNETES_SERVICE_HOST} ]; then
+                error "KUBERNETES_SERVICE_HOST not set"; exit 1;
+              fi
+              if [ -z ${KUBERNETES_SERVICE_PORT} ]; then
+                error "KUBERNETES_SERVICE_PORT not set"; exit 1;
+              fi
+
+              if [ "$SKIP_TLS_VERIFY" == "true" ]; then
+                TLS_CFG="insecure-skip-tls-verify: true"
+              elif [ -f "$KUBE_CA_FILE" ]; then
+                TLS_CFG="certificate-authority-data: $(cat $KUBE_CA_FILE | base64 | tr -d '\n')"
+              fi
+
+              # Write a kubeconfig file for the CNI plugin.  Do this
+              # to skip TLS verification for now.  We should eventually support
+              # writing more complete kubeconfig files. This is only used
+              # if the provided CNI network config references it.
+              touch $WHEREABOUTS_KUBECONFIG
+              chmod ${KUBECONFIG_MODE:-600} $WHEREABOUTS_KUBECONFIG
+              cat > $WHEREABOUTS_KUBECONFIG <<EOF
+            # Kubeconfig file for Multus CNI plugin.
+            apiVersion: v1
+            kind: Config
+            clusters:
+            - name: local
+              cluster:
+                server: ${KUBERNETES_SERVICE_PROTOCOL:-https}://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}
+                $TLS_CFG
+            users:
+            - name: whereabouts
+              user:
+                token: "${SERVICEACCOUNT_TOKEN}"
+            contexts:
+            - name: whereabouts-context
+              context:
+                cluster: local
+                user: whereabouts
+                namespace: ${WHEREABOUTS_NAMESPACE}
+            current-context: whereabouts-context
+            EOF
+
+            # Kubeconfig file for Multus CNI plugin.
+            cat > $WHEREABOUTS_GLOBALCONFIG <<EOF
+            {
+              "datastore": "kubernetes",
+              "kubernetes": {
+                "kubeconfig": "/etc/kubernetes/cni/net.d/whereabouts.d/whereabouts.kubeconfig"
+              },
+              "log_level": "debug"
+            }
+            EOF
+
+            else
+              warn "Doesn't look like we're running in a kubernetes environment (no serviceaccount token)"
+            fi
+
+            # copy whereabouts to the cni bin dir
+            # SKIPPED DUE TO FIPS COPY.
+            # cp -f /whereabouts $CNI_BIN_DIR
+
+            # ---------------------- end Generate a "kube-config".
+
+            # Unless told otherwise, sleep forever.
+            # This prevents Kubernetes from restarting the pod repeatedly.
+            should_sleep=${SLEEP:-"true"}
+            echo "Done configuring CNI.  Sleep=$should_sleep"
+            while [ "$should_sleep" == "true"  ]; do
+                sleep 1000000000000
+            done
+
+        volumeMounts:
+        - mountPath: /host/opt/cni/bin
+          name: cnibin
+        - name: system-cni-dir
+          mountPath: /host/etc/cni/net.d
+        env:
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
+        - name: CNI_BIN_DIR
+          value: "/host/opt/cni/bin/"
+        - name: CNI_CONF_DIR
+          value: "/host/etc/cni/net.d"
+        - name: SLEEP
+          value: "false"
+        - name: WHEREABOUTS_NAMESPACE
+          value: "openshift-multus"
       containers:
       - name: kube-multus
         image: {{.MultusImage}}
@@ -170,3 +350,7 @@ spec:
           hostPath:
             path: /etc/os-release
             type: File
+        - name: cni-binary-copy
+          configMap:
+            name: cni-binary-copy-script
+            defaultMode: 0744
