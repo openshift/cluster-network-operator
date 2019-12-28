@@ -10,7 +10,7 @@ spec:
   minAvailable: {{.OVN_MIN_AVAILABLE}}
   selector:
     matchLabels:
-      name: ovnkube-master
+      app: ovnkube-master
 
 ---
 
