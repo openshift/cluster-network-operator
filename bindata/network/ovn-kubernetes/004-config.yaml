@@ -1,11 +1,24 @@
 ---
-# The network cidr and service cidr are set in the ovn-config configmap
+# The ovnconfig config file. Used by both node and master processes.
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: ovn-config
+  name: ovnkube-config
   namespace: openshift-ovn-kubernetes
 data:
-  net_cidr:   {{.OVN_cidr}}
-  svc_cidr:   {{.OVN_service_cidr}}
-  k8s_apiserver: "{{.K8S_APISERVER}}"
+  ovnkube.conf:   |-
+    [default]
+    mtu="{{.MTU}}"
+    cluster-subnets="{{.OVN_cidr}}"
+
+    [kubernetes]
+    service-cidr="{{.OVN_service_cidr}}"
+    ovn-config-namespace="openshift-ovn-kubernetes"
+    apiserver="{{.K8S_APISERVER}}"
+
+    [logging]
+    logfile="/dev/stdout"
+
+    [gateway]
+    mode=local
+    nodeport=true
