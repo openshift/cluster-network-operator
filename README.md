@@ -132,8 +132,9 @@ spec:
 ```
 
 ### Configuring OVNKubernetes
-OVNKubernetes supports the following configuration options, all of which are optional:
+OVNKubernetes supports the following configuration options, all of which are optional and once set at cluster creation, they can't be changed:
 * `MTU`: The MTU to use for the geneve overlay. The default is the MTU of the node that the cluster-network-operator is first run on, minus 100 bytes for geneve overhead. If the nodes in your cluster don't all have the same MTU then you may need to set this explicitly.
+* `genevePort`: The UDP port to use for the Geneve overlay. The default is 6081.
 
 These configuration flags are only in the Operator configuration object.
 
@@ -144,6 +145,7 @@ spec:
     type: OVNKubernetes
     ovnKubernetesConfig:
       mtu: 1400
+      genevePort: 6081
 ```
 
 Additionally, you can configure per-node verbosity for ovn-kubernetes. This is useful
@@ -366,7 +368,7 @@ spec:
 The operator is expected to run as a pod (via a Deployment) inside a kubernetes cluster. It will retrieve the configuration above and reconcile the desired configuration. A suitable manifest for running the operator is located in `manifests/`.
 
 ## Unsafe changes
-Most network changes are unsafe to roll out to a production cluster. Therefore, the network operator will stop reconciling if it detects that an unsafe change has been requested. 
+Most network changes are unsafe to roll out to a production cluster. Therefore, the network operator will stop reconciling if it detects that an unsafe change has been requested.
 
 ### Safe changes to apply:
 It is safe to edit the following fields in the Operator configuration:

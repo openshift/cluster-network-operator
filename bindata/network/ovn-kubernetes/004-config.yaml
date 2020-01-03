@@ -10,6 +10,7 @@ data:
     [default]
     mtu="{{.MTU}}"
     cluster-subnets="{{.OVN_cidr}}"
+    encap-port="{{.GenevePort}}"
 
     [kubernetes]
     service-cidr="{{.OVN_service_cidr}}"

@@ -11,6 +11,8 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// vars
+var g = uint32(8061)
 var OVNKubernetesConfig = operv1.Network{
 	Spec: operv1.NetworkSpec{
 		ServiceNetwork: []string{"172.30.0.0/16"},
@@ -25,8 +27,10 @@ var OVNKubernetesConfig = operv1.Network{
 			},
 		},
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
-			Type:                operv1.NetworkTypeOVNKubernetes,
-			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{},
+			Type: operv1.NetworkTypeOVNKubernetes,
+			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
+				GenevePort: &g,
+			},
 		},
 	},
 }
@@ -99,6 +103,7 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 
 	// vars
 	m := uint32(8900)
+	p := uint32(6081)
 
 	expected := operv1.NetworkSpec{
 		ServiceNetwork: []string{"172.30.0.0/16"},
@@ -115,7 +120,8 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				MTU: &m,
+				MTU:        &m,
+				GenevePort: &p,
 			},
 		},
 	}
@@ -149,6 +155,11 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	ovnConfig.MTU = &mtu
 	errExpect("invalid MTU 70000")
 
+	// set geneve port to insanity
+	geneve := uint32(70001)
+	ovnConfig.GenevePort = &geneve
+	errExpect("invalid GenevePort 70001")
+
 	config.ClusterNetwork = nil
 	errExpect("ClusterNetworks cannot be empty")
 }
@@ -167,8 +178,12 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	// change the mtu
 	mtu := uint32(70000)
 	next.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
-	errs = isOVNKubernetesChangeSafe(prev, next)
-	g.Expect(errs).To(HaveLen(1))
 
+	// change the geneve port
+	geneve := uint32(34001)
+	next.DefaultNetwork.OVNKubernetesConfig.GenevePort = &geneve
+	errs = isOVNKubernetesChangeSafe(prev, next)
+	g.Expect(errs).To(HaveLen(2))
 	g.Expect(errs[0]).To(MatchError("cannot change ovn-kubernetes MTU"))
+	g.Expect(errs[1]).To(MatchError("cannot change ovn-kubernetes genevePort"))
 }
