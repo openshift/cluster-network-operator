@@ -44,6 +44,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
 	data.Data["K8S_APISERVER"] = fmt.Sprintf("https://%s:%s", os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT"))
 	data.Data["MTU"] = c.MTU
+	data.Data["GenevePort"] = c.GenevePort
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
 	data.Data["OVN_NB_PORT"] = OVN_NB_PORT
@@ -108,6 +109,9 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 		if oc.MTU != nil && (*oc.MTU < 576 || *oc.MTU > 65536) {
 			out = append(out, errors.Errorf("invalid MTU %d", *oc.MTU))
 		}
+		if oc.GenevePort != nil && (*oc.GenevePort < 1 || *oc.GenevePort > 65535) {
+			out = append(out, errors.Errorf("invalid GenevePort %d", *oc.GenevePort))
+		}
 	}
 
 	return out
@@ -123,11 +127,15 @@ func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	if !reflect.DeepEqual(pn.MTU, nn.MTU) {
 		errs = append(errs, errors.Errorf("cannot change ovn-kubernetes MTU"))
 	}
+	if !reflect.DeepEqual(pn.GenevePort, nn.GenevePort) {
+		errs = append(errs, errors.Errorf("cannot change ovn-kubernetes genevePort"))
+	}
 	if pn.HybridOverlayConfig != nil {
 		if !reflect.DeepEqual(pn.HybridOverlayConfig, nn.HybridOverlayConfig) {
 			errs = append(errs, errors.Errorf("once set cannot change ovn-kubernetes Hybrid Overlay Config"))
 		}
 	}
+
 	return errs
 }
 
@@ -137,15 +145,21 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 	}
 
 	sc := conf.DefaultNetwork.OVNKubernetesConfig
-	// MTU is currently the only field we pull from previous.
-	// If it's not supplied, we infer it from  the node on which we're running.
+	// MTU  is currently the only field we pull from previous.
+	// If MTU is not supplied, we infer it from the host on which CNO is running
+	// (which may not be a node in the cluster).
 	// However, this can never change, so we always prefer previous.
 	if sc.MTU == nil {
 		var mtu uint32 = uint32(hostMTU) - 100 // 100 byte geneve header
-		if previous != nil && previous.DefaultNetwork.OVNKubernetesConfig != nil {
+		if previous != nil && previous.DefaultNetwork.OVNKubernetesConfig != nil &&
+			previous.DefaultNetwork.OVNKubernetesConfig.MTU != nil {
 			mtu = *previous.DefaultNetwork.OVNKubernetesConfig.MTU
 		}
 		sc.MTU = &mtu
+	}
+	if sc.GenevePort == nil {
+		var geneve uint32 = uint32(6081)
+		sc.GenevePort = &geneve
 	}
 }
 
