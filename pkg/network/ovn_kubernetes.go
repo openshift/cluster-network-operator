@@ -178,10 +178,6 @@ func boostrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 		return nil, fmt.Errorf("unable to bootstrap OVN, no master nodes found")
 	}
 
-	if len(masterNodeList.Items) < 3 {
-		return nil, fmt.Errorf("PHIL Need at least 3 nodes, have %d", len(masterNodeList.Items))
-	}
-
 	ovnMasterNodes := []string{}
 	for _, masterNode := range masterNodeList.Items {
 		ovnMasterNodes = append(ovnMasterNodes, masterNode.Name)

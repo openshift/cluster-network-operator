@@ -128,12 +128,6 @@ spec:
             source "/env/${K8S_NODE}"
             set +o allexport
           fi
-          echo /ovn-cert/tls.key
-          cat /ovn-cert/tls.key
-          echo /ovn-cert/tls.crt
-          cat /ovn-cert/tls.crt
-          echo /ovn-ca/ca-bundle.crt
-          cat /ovn-ca/ca-bundle.crt
           exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
             --no-chdir --pidfile=/var/run/openvswitch/ovn-controller.pid \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
@@ -216,12 +210,6 @@ spec:
             nb_addr_list="${nb_addr_list}ssl://${host}:{{.OVN_NB_PORT}}"
             sb_addr_list="${sb_addr_list}ssl://${host}:{{.OVN_SB_PORT}}"
           done
-          echo /ovn-cert/tls.key
-          cat /ovn-cert/tls.key
-          echo /ovn-cert/tls.crt
-          cat /ovn-cert/tls.crt
-          echo /ovn-ca/ca-bundle.crt
-          cat /ovn-ca/ca-bundle.crt
 
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --cluster-subnets "${OVN_NET_CIDR}" \
