@@ -72,9 +72,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 	data.Data["OVN_service_cidr"] = svcpools
 
-	// ovnkube config file
-	data.Data["OvnkubeLogLevel"] = 4
-
 	if c.HybridOverlayConfig != nil {
 		data.Data["OVNHybridOverlayNetCIDR"] = c.HybridOverlayConfig.HybridClusterNetwork[0].CIDR
 		data.Data["OVNHybridOverlayEnable"] = "true"

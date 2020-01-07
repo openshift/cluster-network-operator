@@ -383,7 +383,7 @@ spec:
             memory: 300Mi
         env:
         - name: OVN_KUBE_LOG_LEVEL
-          value: "{{.OvnkubeLogLevel}}"
+          value: 4
         - name: K8S_NODE
           valueFrom:
             fieldRef:
