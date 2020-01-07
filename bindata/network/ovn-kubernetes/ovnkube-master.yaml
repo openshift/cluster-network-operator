@@ -51,7 +51,7 @@ spec:
       # (container) -> (host)
       # /etc/openvswitch -> /var/lib/ovn/etc - ovsdb data
       # /var/lib/openvswitch -> /var/lib/ovn/data - ovsdb pki state
-      # /run/openvswitch -> tmpfs - sockets & pids
+      # /run/openvswitch -> tmpfs - sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
       # ovn-northd: convert network objects in nbdb to flows in sbdb
@@ -70,7 +70,6 @@ spec:
 
           exec ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
-            --pidfile=/var/run/openvswitch/ovn-northd.pid \
             --ovnnb-db "{{.OVN_NB_DB_LIST}}" \
             --ovnsb-db "{{.OVN_SB_DB_LIST}}" \
             -p /ovn-cert/tls.key \
@@ -86,6 +85,8 @@ spec:
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert # not needed, but useful when exec'ing in to pod.
@@ -112,11 +113,20 @@ spec:
             set +o allexport
           fi
 
+          # Determine the ovn rundir.
+          if [[ -f /usr/bin/ovn-appctl ]] ; then
+              # ovn-appctl is present. Use new ovn run dir path.
+              OVNCTL_PATH=/usr/share/ovn/scripts/ovn-ctl
+          else
+              # ovn-appctl is not present. Use openvswitch run dir path.
+              OVNCTL_PATH=/usr/share/openvswitch/scripts/ovn-ctl
+          fi
+
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
           MASTER_IP="{{.OVN_MASTER_IP}}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
+            exec ${OVNCTL_PATH} \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
@@ -127,7 +137,7 @@ spec:
             --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
             run_nb_ovsdb
           else
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
+            exec ${OVNCTL_PATH} \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
@@ -174,10 +184,14 @@ spec:
         volumeMounts:
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
+        - mountPath: /etc/ovn/
+          name: etc-openvswitch
         - mountPath: /var/lib/openvswitch/
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert
@@ -209,11 +223,20 @@ spec:
             set +o allexport
           fi
 
+          # Determine the ovn rundir.
+          if [[ -f /usr/bin/ovn-appctl ]] ; then
+              # ovn-appctl is present. Use new ovn run dir path.
+              OVNCTL_PATH=/usr/share/ovn/scripts/ovn-ctl
+          else
+              # ovn-appctl is not present. Use openvswitch run dir path.
+              OVNCTL_PATH=/usr/share/openvswitch/scripts/ovn-ctl
+          fi
+
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
           MASTER_IP="{{.OVN_MASTER_IP}}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
+            exec ${OVNCTL_PATH} \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
@@ -225,7 +248,7 @@ spec:
             run_sb_ovsdb
           else
             echo "joining cluster at ${MASTER_IP}"
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
+            exec ${OVNCTL_PATH} \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
@@ -272,10 +295,14 @@ spec:
         volumeMounts:
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
+        - mountPath: /etc/ovn/
+          name: etc-openvswitch
         - mountPath: /var/lib/openvswitch/
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert
@@ -312,7 +339,7 @@ spec:
           fi
 
           # start nbctl daemon for caching
-          export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/run/openvswitch/ovnk-nbctl.pid \
+          export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/tmp/ovnk-nbctl.pid \
             --detach \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
             --db "{{.OVN_NB_DB_LIST}}")
@@ -331,14 +358,18 @@ spec:
         lifecycle:
           preStop:
             exec:
-              command: ["/bin/bash", "-c", "kill $(cat /run/openvswitch/ovnk-nbctl.pid)"]
+              command: ["/bin/bash", "-c", "kill $(cat /tmp/ovnk-nbctl.pid) && unset OVN_NB_DAEMON"]
         volumeMounts:
         - mountPath: /etc/openvswitch/
+          name: etc-openvswitch
+        - mountPath: /etc/ovn/
           name: etc-openvswitch
         - mountPath: /var/lib/openvswitch/
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
         - mountPath: /env
@@ -375,6 +406,9 @@ spec:
           path: /var/lib/ovn/data
       - name: run-openvswitch
         emptyDir: {}
+      - name: run-ovn
+        hostPath:
+          path: /var/run/ovn
       - name: ovnkube-config
         configMap:
           name: ovnkube-config

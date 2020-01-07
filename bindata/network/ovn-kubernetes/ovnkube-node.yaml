@@ -128,8 +128,16 @@ spec:
             source "/env/${K8S_NODE}"
             set +o allexport
           fi
+          # Determine the ovn rundir.
+          if [[ -f /usr/bin/ovn-appctl ]] ; then
+              # ovn-appctl is present. Use new ovn run dir path.
+              OVNCTL_DIR=ovn
+          else
+              # ovn-appctl is not present. Use openvswitch run dir path.
+              OVNCTL_DIR=openvswitch
+          fi
           exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
-            --no-chdir --pidfile=/var/run/openvswitch/ovn-controller.pid \
+            --no-chdir --pidfile=/var/run/${OVNCTL_DIR}/ovn-controller.pid \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
             -vconsole:"${OVN_LOG_LEVEL}"
         securityContext:
@@ -144,7 +152,11 @@ spec:
         volumeMounts:
         - mountPath: /run/openvswitch
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /etc/openvswitch
+          name: etc-openvswitch
+        - mountPath: /etc/ovn/
           name: etc-openvswitch
         - mountPath: /var/lib/openvswitch
           name: var-lib-openvswitch
@@ -210,7 +222,6 @@ spec:
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             ${hybrid_overlay_flags} \
-            --pidfile /var/run/openvswitch/ovnkube-node.pid \
             --metrics-bind-address "0.0.0.0:9101"
         env:
         - name: OVN_KUBE_LOG_LEVEL
@@ -255,7 +266,11 @@ spec:
           name: host-var-lib-cni-networks-ovn-kubernetes
         - mountPath: /run/openvswitch
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /etc/openvswitch
+          name: etc-openvswitch
+        - mountPath: /etc/ovn/
           name: etc-openvswitch
         - mountPath: /var/lib/openvswitch
           name: var-lib-openvswitch
@@ -300,7 +315,11 @@ spec:
         hostPath:
           path: /var/lib/openvswitch/etc
       - name: run-openvswitch
-        emptyDir: {}
+        hostPath:
+          path: /var/run/openvswitch
+      - name: run-ovn
+        hostPath:
+          path: /var/run/ovn
       # commit 0ac2cd changed the location of the ovs database, mount and check if a database already exists
       - name: old-openvswitch-database
         path: /etc/origin/openvswitch
