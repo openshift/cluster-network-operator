@@ -72,9 +72,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 	data.Data["OVN_service_cidr"] = svcpools
 
-	// ovnkube config file
-	data.Data["OvnkubeLogLevel"] = 4
-
 	if c.HybridOverlayConfig != nil {
 		data.Data["OVNHybridOverlayNetCIDR"] = c.HybridOverlayConfig.HybridClusterNetwork[0].CIDR
 		data.Data["OVNHybridOverlayEnable"] = "true"
@@ -176,10 +173,6 @@ func boostrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 
 	if len(masterNodeList.Items) == 0 {
 		return nil, fmt.Errorf("unable to bootstrap OVN, no master nodes found")
-	}
-
-	if len(masterNodeList.Items) < 3 {
-		return nil, fmt.Errorf("PHIL Need at least 3 nodes, have %d", len(masterNodeList.Items))
 	}
 
 	ovnMasterNodes := []string{}

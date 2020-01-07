@@ -82,12 +82,6 @@ spec:
             nb_addr_list="${nb_addr_list}ssl:${host}:{{.OVN_NB_PORT}}"
             sb_addr_list="${sb_addr_list}ssl:${host}:{{.OVN_SB_PORT}}"
           done
-          echo /ovn-cert/tls.key
-          cat /ovn-cert/tls.key
-          echo /ovn-cert/tls.crt
-          cat /ovn-cert/tls.crt
-          echo /ovn-ca/ca-bundle.crt
-          cat /ovn-ca/ca-bundle.crt
           
           exec ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
@@ -136,12 +130,6 @@ spec:
           OVN_NODES_ARRAY=({{.OVN_NODES}})
           MASTER_NODE=$(getent ahostsv4 "${OVN_NODES_ARRAY[0]}" | grep RAW | awk '{print $1}')
           LOCALHOST=$(getent ahostsv4 "${K8S_NODE}" | grep RAW | awk '{print $1}')
-          echo /ovn-cert/tls.key
-          cat /ovn-cert/tls.key
-          echo /ovn-cert/tls.crt
-          cat /ovn-cert/tls.crt
-          echo /ovn-ca/ca-bundle.crt
-          cat /ovn-ca/ca-bundle.crt
 
           if [[ "$LOCALHOST" == "$MASTER_NODE" ]]; then
             exec /usr/share/openvswitch/scripts/ovn-ctl \
@@ -240,12 +228,6 @@ spec:
           OVN_NODES_ARRAY=({{.OVN_NODES}})
           MASTER_NODE=$(getent ahostsv4 "${OVN_NODES_ARRAY[0]}" | grep RAW | awk '{print $1}')
           LOCALHOST=$(getent ahostsv4 "${K8S_NODE}" | grep RAW | awk '{print $1}')
-          echo /ovn-cert/tls.key
-          cat /ovn-cert/tls.key
-          echo /ovn-cert/tls.crt
-          cat /ovn-cert/tls.crt
-          echo /ovn-ca/ca-bundle.crt
-          cat /ovn-ca/ca-bundle.crt
 
           if [[ "$LOCALHOST" == "$MASTER_NODE" ]]; then
             exec /usr/share/openvswitch/scripts/ovn-ctl \
@@ -358,12 +340,6 @@ spec:
             nb_addr_list="${nb_addr_list}ssl:${host}:{{.OVN_NB_PORT}}"
             sb_addr_list="${sb_addr_list}ssl://${host}:{{.OVN_SB_PORT}}"
           done
-          echo /ovn-cert/tls.key
-          cat /ovn-cert/tls.key
-          echo /ovn-cert/tls.crt
-          cat /ovn-cert/tls.crt
-          echo /ovn-ca/ca-bundle.crt
-          cat /ovn-ca/ca-bundle.crt
           
           # start nbctl daemon for caching
           export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/run/openvswitch/ovnk-nbctl.pid \
@@ -407,7 +383,7 @@ spec:
             memory: 300Mi
         env:
         - name: OVN_KUBE_LOG_LEVEL
-          value: "{{.OvnkubeLogLevel}}"
+          value: 4
         - name: K8S_NODE
           valueFrom:
             fieldRef:
