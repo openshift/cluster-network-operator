@@ -54,7 +54,7 @@ spec:
           privileged: true
       containers:
       - name: sdn
-        image: {{.NodeImage}}
+        image: {{.SDNImage}}
         command: 
         - /bin/bash
         - -c
@@ -96,15 +96,12 @@ spec:
           cp -f /opt/cni/bin/openshift-sdn /host/opt/cni/bin/
 
           # Launch the network process
-          exec /usr/bin/openshift-sdn --proxy-config=/config/kube-proxy-config.yaml --url-only-kubeconfig=/etc/kubernetes/kubeconfig --v=${DEBUG_LOGLEVEL:-2}
+          exec /usr/bin/openshift-sdn-node --proxy-config=/config/kube-proxy-config.yaml --v=${DEBUG_LOGLEVEL:-2}
         securityContext:
           privileged: true
         volumeMounts:
         - mountPath: /config
           name: config
-          readOnly: true
-        - mountPath: /etc/kubernetes/kubeconfig
-          name: host-kubeconfig
           readOnly: true
         # Mount the entire run directory for socket access for Docker or CRI-o
         # TODO: remove
@@ -145,6 +142,11 @@ spec:
             cpu: 100m
             memory: 200Mi
         env:
+        # point openshift-sdn to the internal apiserver load balancer
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
         - name: OPENSHIFT_DNS_DOMAIN
           value: cluster.local
         - name: K8S_NODE_NAME
@@ -159,11 +161,6 @@ spec:
           preStop:
             exec:
               command: ["rm","-f","/etc/cni/net.d/80-openshift-network.conf", "/host/opt/cni/bin/openshift-sdn"]
-        # this comes from the kube-proxy code
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: healthz
         readinessProbe:
           exec:
             # openshift-sdn writes this file when it is ready to handle pod requests.
@@ -176,9 +173,6 @@ spec:
       - name: config
         configMap:
           name: sdn-config
-      - name: host-kubeconfig
-        hostPath:
-          path: /etc/kubernetes/kubeconfig
       - name: etc-sysconfig
         hostPath:
           path: /etc/sysconfig

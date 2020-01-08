@@ -6,6 +6,7 @@
 # - openshift-kube-apiserver
 # - openshift-operator-lifecycle-manager
 # - openshift-image-registry
+# - openshift-user-workload-monitoring
 apiVersion: network.openshift.io/v1
 kind: NetNamespace
 metadata:
@@ -52,6 +53,14 @@ metadata:
   name: openshift-image-registry
 netid: 0
 netname: openshift-image-registry
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-user-workload-monitoring
+netid: 0
+netname: openshift-user-workload-monitoring
 
 ---
 # Namespaces which are part of the "control plane" and need to reach each other:

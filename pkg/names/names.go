@@ -29,6 +29,10 @@ const APPLIED_NAMESPACE = "openshift-network-operator"
 // or update. Useful when we want to make a CR for which the CRD may not exist yet.
 const IgnoreObjectErrorAnnotation = "networkoperator.openshift.io/ignore-errors"
 
+// NonCriticalAnnotation is an annotation on Deployments/DaemonSets to indicate
+// that they are not critical to the functioning of the pod network
+const NonCriticalAnnotation = "networkoperator.openshift.io/non-critical"
+
 // SERVICE_CA_CONFIGMAP is the name of the ConfigMap that contains service CA bundle
 // that is used in multus admission controller deployment
 const SERVICE_CA_CONFIGMAP = "openshift-service-ca"

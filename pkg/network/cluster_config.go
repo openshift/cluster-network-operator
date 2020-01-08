@@ -39,15 +39,15 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec) error {
 		if err != nil {
 			return errors.Errorf("could not parse spec.clusterNetwork %s", cnet.CIDR)
 		}
-		size, _ := cidr.Mask.Size()
+		ones, bits := cidr.Mask.Size()
 		// The comparison is inverted; smaller number is larger block
-		if cnet.HostPrefix < uint32(size) {
+		if cnet.HostPrefix < uint32(ones) {
 			return errors.Errorf("hostPrefix %d is larger than its cidr %s",
 				cnet.HostPrefix, cnet.CIDR)
 		}
-		if cnet.HostPrefix > 30 {
-			return errors.Errorf("hostPrefix %d is too small, must be a /30 or larger",
-				cnet.HostPrefix)
+		if int(cnet.HostPrefix) > bits-2 {
+			return errors.Errorf("hostPrefix %d is too small, must be a /%d or larger",
+				cnet.HostPrefix, bits-2)
 		}
 		if err := pool.Add(*cidr); err != nil {
 			return err

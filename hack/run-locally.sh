@@ -185,7 +185,7 @@ The following environment variables are honored:
 
 PLUGIN_IMAGE="${PLUGIN_IMAGE:-}"
 NETWORK_PLUGIN="OpenShiftSDN"
-IMAGE_ENV_KEY="NODE_IMAGE"
+IMAGE_ENV_KEY="SDN_IMAGE"
 CLUSTER_DIR="${CLUSTER_DIR:-}"
 INSTALLER_PATH="${INSTALLER_PATH:-}"
 INSTALL_CONFIG="${INSTALL_CONFIG:-}"
@@ -233,6 +233,10 @@ if [[ -z "$(which oc 2> /dev/null || exit 0)" ]]; then
     echo "could not find 'oc' in PATH" >&2
     exit 1
 fi
+
+# re-build the network operator
+echo "rebuilding the CNO"
+hack/build-go.sh
 
 # Autodetect the state of the cluster to determine which mode to run in
 if [[ -z "$(ls -A ${CLUSTER_DIR} 2> /dev/null | grep -v install-config.yaml | grep -v .openshift_install | grep -v env.sh)" ]]; then
