@@ -45,6 +45,14 @@ spec:
               ;;
               rhel) rhelmajor=$(echo "${VERSION_ID}" | cut -f 1 -d .) 
               ;;
+              fedora)
+                if [ "${VARIANT_ID}" == "coreos" ]; then
+                  rhelmajor=8
+                else 
+                  echo "FATAL ERROR: Unsupported Fedora variant=${VARIANT_ID}"
+                  exit 1
+                fi
+              ;;
               *) echo "FATAL ERROR: Unsupported OS ID=${ID}"; exit 1
               ;;
             esac
@@ -67,6 +75,55 @@ spec:
         - mountPath: /host/etc/os-release
           name: os-release
           readOnly: true
+      - name: multus-binary-copy
+        image: {{.MultusImage}}
+        command:
+          - /bin/bash
+          - -c
+          - |
+            #!/bin/bash
+            set -x
+            . /host/etc/os-release
+            rhelmajor=
+            # detect which version we're using in order to copy the proper binaries
+            case "${ID}" in
+              rhcos) rhelmajor=8
+              ;;
+              rhel) rhelmajor=$(echo "${VERSION_ID}" | cut -f 1 -d .)
+              ;;
+              fedora)
+                if [ "${VARIANT_ID}" == "coreos" ]; then
+                  rhelmajor=8
+                else
+                  echo "FATAL ERROR: Unsupported Fedora variant=${VARIANT_ID}"
+                  exit 1
+                fi
+              ;;
+              *) echo "FATAL ERROR: Unsupported OS ID=${ID}"; exit 1
+              ;;
+            esac
+            # Set which directory we'll copy from, detect if it exists
+            # When it doesn't exist, fall back to the original directory.
+            SOURCEDIR=/usr/src/multus-cni/rhel${rhelmajor}/bin
+            if [ -d "${SOURCEDIR}" ]; then
+              echo "Detected OS version ${rhelmajor}, ${SOURCEDIR} exists"
+            else
+              echo "Source directory unavailable for OS version: ${rhelmajor}"
+              SOURCEDIR=/usr/src/multus-cni/bin
+            fi
+            # Copy to a temporary filename and then perform a rename to make
+            # for an atomic operation.
+            cp -f ${SOURCEDIR}/multus /host/opt/cni/bin/_multus
+            mv -f /host/opt/cni/bin/_multus /host/opt/cni/bin/multus
+
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /host/opt/cni/bin
+          name: cnibin
+        - mountPath: /host/etc/os-release
+          name: os-release
+          readOnly: true
       containers:
       - name: kube-multus
         image: {{.MultusImage}}
@@ -80,6 +137,7 @@ spec:
         - "--multus-log-level=verbose"
         - "--cni-version=0.3.1"
         - "--additional-bin-dir=/opt/multus/bin"
+        - "--skip-multus-binary-copy=true"
         resources:
           requests:
             cpu: 10m

@@ -18,6 +18,10 @@ import (
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 )
 
+const (
+	OVNProvider = "ovn"
+)
+
 // renderKuryr returns manifests for Kuryr SDN.
 // This includes manifests of
 // - the openshift-kuryr namespace
@@ -46,6 +50,27 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["OpenStackCloud"] = b.OpenStackCloud
 	// FIXME(dulek): Move that logic to the template once it's known how to dereference pointers there.
 	data.Data["OpenStackInsecureAPI"] = b.OpenStackCloud.Verify != nil && !*b.OpenStackCloud.Verify
+	data.Data["DebugEnabled"] = conf.LogLevel != operv1.Normal
+
+	// kuryr port pools options
+	data.Data["EnablePortPoolsPrepopulation"] = c.EnablePortPoolsPrepopulation
+	data.Data["PoolMaxPorts"] = c.PoolMaxPorts
+	data.Data["PoolMinPorts"] = c.PoolMinPorts
+	data.Data["PoolBatchPorts"] = c.PoolBatchPorts
+
+	// Octavia config data
+	data.Data["OctaviaProvider"] = b.OctaviaProvider
+	if b.OctaviaProvider == OVNProvider {
+		data.Data["OctaviaMemberMode"] = "L2"
+		data.Data["OctaviaSGMode"] = "create"
+		data.Data["OctaviaSGEnforce"] = "false"
+		data.Data["OctaviaLBAlgorithm"] = "SOURCE_IP_PORT"
+	} else {
+		data.Data["OctaviaMemberMode"] = "L3"
+		data.Data["OctaviaSGMode"] = "update"
+		data.Data["OctaviaSGEnforce"] = "true"
+		data.Data["OctaviaLBAlgorithm"] = "ROUND_ROBIN"
+	}
 
 	// kuryr-daemon DaemonSet data
 	data.Data["DaemonEnableProbes"] = true
@@ -176,5 +201,14 @@ func fillKuryrDefaults(conf *operv1.NetworkSpec) {
 		_, svcNet, _ := net.ParseCIDR(conf.ServiceNetwork[0])
 		octaviaServiceNet := iputil.ExpandNet(*svcNet)
 		kc.OpenStackServiceNetwork = octaviaServiceNet.String()
+	}
+
+	if kc.PoolMinPorts == 0 {
+		kc.PoolMinPorts = 1
+	}
+
+	if kc.PoolBatchPorts == nil {
+		var batchPorts uint = 3
+		kc.PoolBatchPorts = &batchPorts
 	}
 }

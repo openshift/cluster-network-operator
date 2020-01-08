@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package testutil_test
+package testutil
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
@@ -29,7 +30,6 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/status"
 	spannerpb "google.golang.org/genproto/googleapis/spanner/v1"
 	"google.golang.org/grpc/codes"
-
 	gstatus "google.golang.org/grpc/status"
 )
 
@@ -46,12 +46,17 @@ const (
 	// StatementResultUpdateCount indicates that the sql statement returns an
 	// update count.
 	StatementResultUpdateCount StatementResultType = 2
+	// MaxRowsPerPartialResultSet is the maximum number of rows returned in
+	// each PartialResultSet. This number is deliberately set to a low value to
+	// ensure that most queries return more than one PartialResultSet.
+	MaxRowsPerPartialResultSet = 1
 )
 
 // The method names that can be used to register execution times and errors.
 const (
 	MethodBeginTransaction    string = "BEGIN_TRANSACTION"
 	MethodCommitTransaction   string = "COMMIT_TRANSACTION"
+	MethodBatchCreateSession  string = "BATCH_CREATE_SESSION"
 	MethodCreateSession       string = "CREATE_SESSION"
 	MethodDeleteSession       string = "DELETE_SESSION"
 	MethodGetSession          string = "GET_SESSION"
@@ -59,8 +64,8 @@ const (
 	MethodExecuteStreamingSql string = "EXECUTE_STREAMING_SQL"
 )
 
-// StatementResult represents a mocked result on the test server. Th result can
-// be either a ResultSet, an update count or an error.
+// StatementResult represents a mocked result on the test server. The result is
+// either of: a ResultSet, an update count or an error.
 type StatementResult struct {
 	Type        StatementResultType
 	Err         error
@@ -68,23 +73,57 @@ type StatementResult struct {
 	UpdateCount int64
 }
 
+// PartialResultSetExecutionTime represents execution times and errors that
+// should be used when a PartialResult at the specified resume token is to
+// be returned.
+type PartialResultSetExecutionTime struct {
+	ResumeToken   []byte
+	ExecutionTime time.Duration
+	Err           error
+}
+
 // Converts a ResultSet to a PartialResultSet. This method is used to convert
 // a mocked result to a PartialResultSet when one of the streaming methods are
 // called.
-func (s *StatementResult) toPartialResultSet() *spannerpb.PartialResultSet {
-	values := make([]*structpb.Value,
-		len(s.ResultSet.Rows)*len(s.ResultSet.Metadata.RowType.Fields))
-	var idx int
-	for _, row := range s.ResultSet.Rows {
-		for colIdx := range s.ResultSet.Metadata.RowType.Fields {
-			values[idx] = row.Values[colIdx]
-			idx++
+func (s *StatementResult) toPartialResultSets(resumeToken []byte) (result []*spannerpb.PartialResultSet, err error) {
+	var startIndex uint64
+	if len(resumeToken) > 0 {
+		if startIndex, err = DecodeResumeToken(resumeToken); err != nil {
+			return nil, err
 		}
 	}
-	return &spannerpb.PartialResultSet{
-		Metadata: s.ResultSet.Metadata,
-		Values:   values,
+
+	totalRows := uint64(len(s.ResultSet.Rows))
+	for {
+		rowCount := min(totalRows-startIndex, uint64(MaxRowsPerPartialResultSet))
+		rows := s.ResultSet.Rows[startIndex : startIndex+rowCount]
+		values := make([]*structpb.Value,
+			len(rows)*len(s.ResultSet.Metadata.RowType.Fields))
+		var idx int
+		for _, row := range rows {
+			for colIdx := range s.ResultSet.Metadata.RowType.Fields {
+				values[idx] = row.Values[colIdx]
+				idx++
+			}
+		}
+		result = append(result, &spannerpb.PartialResultSet{
+			Metadata:    s.ResultSet.Metadata,
+			Values:      values,
+			ResumeToken: EncodeResumeToken(startIndex + rowCount),
+		})
+		startIndex += rowCount
+		if startIndex == totalRows {
+			break
+		}
 	}
+	return result, nil
+}
+
+func min(x, y uint64) uint64 {
+	if x > y {
+		return y
+	}
+	return x
 }
 
 func (s *StatementResult) updateCountToPartialResultSet(exact bool) *spannerpb.PartialResultSet {
@@ -148,6 +187,10 @@ type InMemSpannerServer interface {
 	// expect a SQL statement, including (batch) DML methods.
 	PutStatementResult(sql string, result *StatementResult) error
 
+	// Adds a PartialResultSetExecutionTime to the server that should be returned
+	// for the specified SQL string.
+	AddPartialResultSetError(sql string, err PartialResultSetExecutionTime)
+
 	// Removes a mocked result on the server for a specific sql statement.
 	RemoveStatementResult(sql string)
 
@@ -164,6 +207,8 @@ type InMemSpannerServer interface {
 
 	TotalSessionsCreated() uint
 	TotalSessionsDeleted() uint
+	SetMaxSessionsReturnedByServerPerBatchRequest(sessionCount int32)
+	SetMaxSessionsReturnedByServerInTotal(sessionCount int32)
 
 	ReceivedRequests() chan interface{}
 	DumpSessions() map[string]bool
@@ -201,10 +246,16 @@ type inMemSpannerServer struct {
 	// The mocked results for this server.
 	statementResults map[string]*StatementResult
 	// The simulated execution times per method.
-	executionTimes       map[string]*SimulatedExecutionTime
+	executionTimes map[string]*SimulatedExecutionTime
+	// The simulated errors for partial result sets
+	partialResultSetErrors map[string][]*PartialResultSetExecutionTime
+
 	totalSessionsCreated uint
 	totalSessionsDeleted uint
-	receivedRequests     chan interface{}
+	// The maximum number of sessions that will be created per batch request.
+	maxSessionsReturnedByServerPerBatchRequest int32
+	maxSessionsReturnedByServerInTotal         int32
+	receivedRequests                           chan interface{}
 	// Session ping history.
 	pings []string
 
@@ -218,6 +269,7 @@ func NewInMemSpannerServer() InMemSpannerServer {
 	res.initDefaults()
 	res.statementResults = make(map[string]*StatementResult)
 	res.executionTimes = make(map[string]*SimulatedExecutionTime)
+	res.partialResultSetErrors = make(map[string][]*PartialResultSetExecutionTime)
 	res.receivedRequests = make(chan interface{}, 1000000)
 	// Produce a closed channel, so the default action of ready is to not block.
 	res.Freeze()
@@ -275,6 +327,12 @@ func (s *inMemSpannerServer) PutExecutionTime(method string, executionTime Simul
 	s.executionTimes[method] = &executionTime
 }
 
+func (s *inMemSpannerServer) AddPartialResultSetError(sql string, partialResultSetError PartialResultSetExecutionTime) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.partialResultSetErrors[sql] = append(s.partialResultSetErrors[sql], &partialResultSetError)
+}
+
 // Freeze stalls all requests.
 func (s *inMemSpannerServer) Freeze() {
 	s.mu.Lock()
@@ -310,6 +368,18 @@ func (s *inMemSpannerServer) TotalSessionsDeleted() uint {
 	return s.totalSessionsDeleted
 }
 
+func (s *inMemSpannerServer) SetMaxSessionsReturnedByServerPerBatchRequest(sessionCount int32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.maxSessionsReturnedByServerPerBatchRequest = sessionCount
+}
+
+func (s *inMemSpannerServer) SetMaxSessionsReturnedByServerInTotal(sessionCount int32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.maxSessionsReturnedByServerInTotal = sessionCount
+}
+
 func (s *inMemSpannerServer) ReceivedRequests() chan interface{} {
 	return s.receivedRequests
 }
@@ -341,6 +411,7 @@ func (s *inMemSpannerServer) DumpSessions() map[string]bool {
 
 func (s *inMemSpannerServer) initDefaults() {
 	s.sessionCounter = 0
+	s.maxSessionsReturnedByServerPerBatchRequest = 100
 	s.sessions = make(map[string]*spannerpb.Session)
 	s.sessionLastUseTime = make(map[string]time.Time)
 	s.transactions = make(map[string]*spannerpb.Transaction)
@@ -349,9 +420,7 @@ func (s *inMemSpannerServer) initDefaults() {
 	s.transactionCounters = make(map[string]*uint64)
 }
 
-func (s *inMemSpannerServer) generateSessionName(database string) string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *inMemSpannerServer) generateSessionNameLocked(database string) string {
 	s.sessionCounter++
 	return fmt.Sprintf("%s/sessions/%d", database, s.sessionCounter)
 }
@@ -472,13 +541,16 @@ func (s *inMemSpannerServer) simulateExecutionTime(method string, req interface{
 		}
 		totalExecutionTime := time.Duration(int64(executionTime.MinimumExecutionTime) + randTime)
 		<-time.After(totalExecutionTime)
+		s.mu.Lock()
 		if executionTime.Errors != nil && len(executionTime.Errors) > 0 {
 			err := executionTime.Errors[0]
 			if !executionTime.KeepError {
 				executionTime.Errors = executionTime.Errors[1:]
 			}
+			s.mu.Unlock()
 			return err
 		}
+		s.mu.Unlock()
 	}
 	return nil
 }
@@ -490,14 +562,50 @@ func (s *inMemSpannerServer) CreateSession(ctx context.Context, req *spannerpb.C
 	if req.Database == "" {
 		return nil, gstatus.Error(codes.InvalidArgument, "Missing database")
 	}
-	sessionName := s.generateSessionName(req.Database)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.maxSessionsReturnedByServerInTotal > int32(0) && int32(len(s.sessions)) == s.maxSessionsReturnedByServerInTotal {
+		return nil, gstatus.Error(codes.ResourceExhausted, "No more sessions available")
+	}
+	sessionName := s.generateSessionNameLocked(req.Database)
 	ts := getCurrentTimestamp()
 	session := &spannerpb.Session{Name: sessionName, CreateTime: ts, ApproximateLastUseTime: ts}
-	s.mu.Lock()
 	s.totalSessionsCreated++
 	s.sessions[sessionName] = session
-	s.mu.Unlock()
 	return session, nil
+}
+
+func (s *inMemSpannerServer) BatchCreateSessions(ctx context.Context, req *spannerpb.BatchCreateSessionsRequest) (*spannerpb.BatchCreateSessionsResponse, error) {
+	if err := s.simulateExecutionTime(MethodBatchCreateSession, req); err != nil {
+		return nil, err
+	}
+	if req.Database == "" {
+		return nil, gstatus.Error(codes.InvalidArgument, "Missing database")
+	}
+	if req.SessionCount <= 0 {
+		return nil, gstatus.Error(codes.InvalidArgument, "Session count must be >= 0")
+	}
+	sessionsToCreate := req.SessionCount
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.maxSessionsReturnedByServerInTotal > int32(0) && int32(len(s.sessions)) >= s.maxSessionsReturnedByServerInTotal {
+		return nil, gstatus.Error(codes.ResourceExhausted, "No more sessions available")
+	}
+	if sessionsToCreate > s.maxSessionsReturnedByServerPerBatchRequest {
+		sessionsToCreate = s.maxSessionsReturnedByServerPerBatchRequest
+	}
+	if s.maxSessionsReturnedByServerInTotal > int32(0) && (sessionsToCreate+int32(len(s.sessions))) > s.maxSessionsReturnedByServerInTotal {
+		sessionsToCreate = s.maxSessionsReturnedByServerInTotal - int32(len(s.sessions))
+	}
+	sessions := make([]*spannerpb.Session, sessionsToCreate)
+	for i := int32(0); i < sessionsToCreate; i++ {
+		sessionName := s.generateSessionNameLocked(req.Database)
+		ts := getCurrentTimestamp()
+		sessions[i] = &spannerpb.Session{Name: sessionName, CreateTime: ts, ApproximateLastUseTime: ts}
+		s.totalSessionsCreated++
+		s.sessions[sessionName] = sessions[i]
+	}
+	return &spannerpb.BatchCreateSessionsResponse{Session: sessions}, nil
 }
 
 func (s *inMemSpannerServer) GetSession(ctx context.Context, req *spannerpb.GetSessionRequest) (*spannerpb.Session, error) {
@@ -628,9 +736,30 @@ func (s *inMemSpannerServer) ExecuteStreamingSql(req *spannerpb.ExecuteSqlReques
 	case StatementResultError:
 		return statementResult.Err
 	case StatementResultResultSet:
-		part := statementResult.toPartialResultSet()
-		if err := stream.Send(part); err != nil {
+		parts, err := statementResult.toPartialResultSets(req.ResumeToken)
+		if err != nil {
 			return err
+		}
+		var nextPartialResultSetError *PartialResultSetExecutionTime
+		s.mu.Lock()
+		pErrors := s.partialResultSetErrors[req.Sql]
+		if len(pErrors) > 0 {
+			nextPartialResultSetError = pErrors[0]
+			s.partialResultSetErrors[req.Sql] = pErrors[1:]
+		}
+		s.mu.Unlock()
+		for _, part := range parts {
+			if nextPartialResultSetError != nil && bytes.Equal(part.ResumeToken, nextPartialResultSetError.ResumeToken) {
+				if nextPartialResultSetError.ExecutionTime > 0 {
+					<-time.After(nextPartialResultSetError.ExecutionTime)
+				}
+				if nextPartialResultSetError.Err != nil {
+					return nextPartialResultSetError.Err
+				}
+			}
+			if err := stream.Send(part); err != nil {
+				return err
+			}
 		}
 		return nil
 	case StatementResultUpdateCount:

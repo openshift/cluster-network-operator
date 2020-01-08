@@ -6,7 +6,7 @@ metadata:
 data:
   kuryr.conf: |+
     [DEFAULT]
-    debug = false
+    debug = {{ .DebugEnabled }}
 
     [binding]
     default_driver = kuryr.lib.binding.drivers.vlan
@@ -33,10 +33,18 @@ data:
     vif_pool_driver = nested
     multi_vif_drivers = noop
 
-    enabled_handlers = vif,lb,lbaasspec,policy,pod_label,namespace,kuryrnetpolicy
+    enabled_handlers = vif,lb,lbaasspec,policy,pod_label,namespace,kuryrnetpolicy{{ if .EnablePortPoolsPrepopulation }},kuryrnet{{ end }}
     pod_security_groups_driver = policy
     service_security_groups_driver = policy
     pod_subnets_driver = namespace
+
+    endpoints_driver_octavia_provider = {{ default "default" .OctaviaProvider }}
+
+    [octavia_defaults]
+    member_mode = {{ default "L3" .OctaviaMemberMode }}
+    sg_mode = {{ default "update" .OctaviaSGMode }}
+    enforce_sg_rules = {{ .OctaviaSGEnforce }}
+    lb_algorithm = {{ .OctaviaLBAlgorithm }}
 
     [namespace_subnet]
     pod_router = {{ .WorkerNodesRouter }}
@@ -70,9 +78,9 @@ data:
     worker_nodes_subnet = {{ default "\"\"" .WorkerNodesSubnet }}
 
     [vif_pool]
-    ports_pool_max = 0
-    ports_pool_min = 1
-    ports_pool_batch = 3
+    ports_pool_max = {{ .PoolMaxPorts }}
+    ports_pool_min = {{ .PoolMinPorts }}
+    ports_pool_batch = {{ .PoolBatchPorts }}
     ports_pool_update_frequency = 30
 
     [health_server]

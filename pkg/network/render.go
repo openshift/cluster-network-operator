@@ -162,6 +162,11 @@ func FillDefaults(conf, previous *operv1.NetworkSpec) {
 		disable := false
 		conf.DisableMultiNetwork = &disable
 	}
+
+	if len(conf.LogLevel) == 0 {
+		conf.LogLevel = "Normal"
+	}
+
 	FillDefaultNetworkDefaults(conf, previous, hostMTU)
 	FillKubeProxyDefaults(conf, previous)
 }
@@ -273,7 +278,7 @@ func RenderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 	case operv1.NetworkTypeOpenShiftSDN:
 		return renderOpenShiftSDN(conf, manifestDir)
 	case operv1.NetworkTypeOVNKubernetes:
-		return renderOVNKubernetes(conf, manifestDir)
+		return renderOVNKubernetes(conf, bootstrapResult, manifestDir)
 	case operv1.NetworkTypeKuryr:
 		return renderKuryr(conf, bootstrapResult, manifestDir)
 	default:

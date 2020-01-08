@@ -1,0 +1,41 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: k8s
+    role: alert-rules
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+  name: master-rules
+  namespace: openshift-ovn-kubernetes
+spec:
+  groups:
+  - name: general.rules
+    rules:
+    - alert: NoRunningOvnMaster
+      annotations:
+        message: |
+          there is no running ovn-kubernetes master
+      expr: |
+        absent(up{job="ovnkube-master",namespace="openshift-ovn-kubernetes"} ==1)
+      for: 10m
+      labels:
+        severity: warning
+    - alert: NorthboundStale
+      annotations:
+        message: |
+          ovn-kubernetes has not written anything to the northbound database for too long
+      expr: |
+         time() - max(ovn_nb_e2e_timestamp) > 300
+      for: 10m
+      labels:
+        severity: warning
+    - alert: SouthboundStale
+      annotations:
+        message: |
+          ovn-northd has not successfully synced any changes to the southbound DB for too long
+      expr: |
+        max(ovn_nb_e2e_timestamp) - max(ovn_sb_e2e_timestamp) > 120
+      for: 10m
+      labels:
+        severity: warning

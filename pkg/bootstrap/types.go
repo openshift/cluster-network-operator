@@ -12,6 +12,7 @@ type KuryrBootstrapResult struct {
 	PodSecurityGroups []string
 	ExternalNetwork   string
 	ClusterID         string
+	OctaviaProvider   string
 	OpenStackCloud    clientconfig.Cloud
 	WebhookCA         string
 	WebhookCAKey      string
@@ -19,6 +20,11 @@ type KuryrBootstrapResult struct {
 	WebhookKey        string
 }
 
+type OVNBootstrapResult struct {
+	OVNMasterNodes []string
+}
+
 type BootstrapResult struct {
 	Kuryr KuryrBootstrapResult
+	OVN   OVNBootstrapResult
 }

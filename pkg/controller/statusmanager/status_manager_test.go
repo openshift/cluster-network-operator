@@ -2,10 +2,13 @@ package statusmanager
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -334,12 +337,12 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 
 	// Create minimal DaemonSets
-	dsA := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha"}}
+	dsA := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Generation: 1}}
 	err = client.Create(context.TODO(), dsA)
 	if err != nil {
 		t.Fatalf("error creating DaemonSet: %v", err)
 	}
-	dsB := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "beta"}}
+	dsB := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "beta", Generation: 1}}
 	err = client.Create(context.TODO(), dsB)
 	if err != nil {
 		t.Fatalf("error creating DaemonSet: %v", err)
@@ -389,7 +392,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	dsANodes := int32(1)
 	dsBNodes := int32(3)
 	dsA.Status.NumberUnavailable = dsANodes
+	dsA.Status.ObservedGeneration = 1
 	dsB.Status.NumberUnavailable = dsBNodes
+	dsB.Status.ObservedGeneration = 1
 
 	// Now start "deploying"
 	for dsA.Status.NumberUnavailable > 0 || dsB.Status.NumberUnavailable > 0 {
@@ -494,9 +499,390 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		// unreachable
 		t.Fatalf("Progressing condition unexpectedly missing")
 	}
+
+	// Now, bump the generation of one of the daemonsets, and verify
+	// that we enter Progressing state but otherwise stay Available
+	dsA.Generation = 2
+	err = client.Update(context.TODO(), dsA)
+	if err != nil {
+		t.Fatalf("error updating DaemonSet: %v", err)
+	}
+	status.SetFromPods()
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		{
+			Type:   configv1.OperatorDegraded,
+			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// update the daemonset status to mimic a kubernetes rollout
+	// Taken from a live v1.16 apiserver
+	// Transition: observedGeneration -> 2, UpdatedNumberScheduled -> 0
+	dsA.Status = appsv1.DaemonSetStatus{
+		CurrentNumberScheduled: 1,
+		DesiredNumberScheduled: 1,
+		NumberMisscheduled:     0,
+		NumberReady:            1,
+		ObservedGeneration:     2,
+	}
+	err = client.Update(context.TODO(), dsA)
+	if err != nil {
+		t.Fatalf("error updating DaemonSet: %v", err)
+	}
+	status.SetFromPods()
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		{
+			Type:   configv1.OperatorDegraded,
+			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Next update: Ready -> 0 Unavailable -> 1
+	dsA.Status = appsv1.DaemonSetStatus{
+		CurrentNumberScheduled: 1,
+		DesiredNumberScheduled: 1,
+		NumberMisscheduled:     0,
+		NumberReady:            0,
+		NumberUnavailable:      1,
+		ObservedGeneration:     2,
+	}
+	err = client.Update(context.TODO(), dsA)
+	if err != nil {
+		t.Fatalf("error updating DaemonSet: %v", err)
+	}
+	status.SetFromPods()
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		{
+			Type:   configv1.OperatorDegraded,
+			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Next update: updatedNumberScheduled -> 1
+	dsA.Status = appsv1.DaemonSetStatus{
+		CurrentNumberScheduled: 1,
+		DesiredNumberScheduled: 1,
+		NumberMisscheduled:     0,
+		NumberReady:            0,
+		NumberUnavailable:      1,
+		ObservedGeneration:     2,
+		UpdatedNumberScheduled: 1,
+	}
+	err = client.Update(context.TODO(), dsA)
+	if err != nil {
+		t.Fatalf("error updating DaemonSet: %v", err)
+	}
+
+	t0 := time.Now()
+	time.Sleep(time.Second / 10)
+	status.SetFromPods()
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		{
+			Type:   configv1.OperatorDegraded,
+			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// See that the last pod state is reasonable
+	ps := getLastPodState(t, client, "testing")
+	nsn := types.NamespacedName{Namespace: "one", Name: "alpha"}
+	found := false
+	for _, ds := range ps.DaemonsetStates {
+		if ds.NamespacedName == nsn {
+			found = true
+			if !ds.LastChangeTime.After(t0) {
+				t.Fatalf("Expected %s to be after %s", ds.LastChangeTime, t0)
+			}
+			if !reflect.DeepEqual(dsA.Status, ds.LastSeenStatus) {
+				t.Fatal("expected cached status to equal last seen status")
+			}
+
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("Didn't find %s in pod state", nsn)
+	}
+
+	// intermission: set the last-update-time to an hour ago, make sure we
+	// set degraded (because the rollout is hung)
+	ps = getLastPodState(t, client, "testing")
+	for idx, ds := range ps.DaemonsetStates {
+		if ds.NamespacedName == nsn {
+			ps.DaemonsetStates[idx].LastChangeTime = time.Now().Add(-time.Hour)
+			break
+		}
+	}
+	setLastPodState(t, client, "testing", ps)
+	status.SetFromPods()
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		{
+			Type:   configv1.OperatorDegraded,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// done: numberReady -> 1, numberUnavailable -> 0
+	dsA.Status = appsv1.DaemonSetStatus{
+		CurrentNumberScheduled: 1,
+		DesiredNumberScheduled: 1,
+		NumberAvailable:        1,
+		NumberMisscheduled:     0,
+		NumberReady:            1,
+		ObservedGeneration:     2,
+		UpdatedNumberScheduled: 1,
+	}
+	err = client.Update(context.TODO(), dsA)
+	if err != nil {
+		t.Fatalf("error updating DaemonSet: %v", err)
+	}
+	status.SetFromPods()
+
+	// see that the pod state is sensible
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		{
+			Type:   configv1.OperatorDegraded,
+			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Test non-critical DaemonSets
+	status.SetDaemonSets([]types.NamespacedName{
+		{Namespace: "one", Name: "non-critical"},
+	})
+
+	dsNC := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "one",
+			Name:       "non-critical",
+			Generation: 1,
+			Annotations: map[string]string{
+				names.NonCriticalAnnotation: "",
+			},
+		},
+		Status: appsv1.DaemonSetStatus{
+			ObservedGeneration: 1,
+			NumberUnavailable:  1,
+		},
+	}
+	err = client.Create(context.TODO(), dsNC)
+	if err != nil {
+		t.Fatalf("error creating DaemonSet: %v", err)
+	}
+	status.SetFromPods()
+
+	// We should now be Progressing, but not un-Available
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		{
+			Type:   configv1.OperatorDegraded,
+			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Mark the rollout as hung; should not change anything
+	ps = getLastPodState(t, client, "testing")
+	nsn = types.NamespacedName{Namespace: "one", Name: "non-critical"}
+	for idx, ds := range ps.DaemonsetStates {
+		if ds.NamespacedName == nsn {
+			ps.DaemonsetStates[idx].LastChangeTime = time.Now().Add(-time.Hour)
+			break
+		}
+	}
+	setLastPodState(t, client, "testing", ps)
+	status.SetFromPods()
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		{
+			Type:   configv1.OperatorDegraded,
+			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	// Now update
+	dsNC.Status.NumberAvailable = 1
+	dsNC.Status.NumberUnavailable = 0
+	err = client.Update(context.TODO(), dsNC)
+	if err != nil {
+		t.Fatalf("error updating DaemonSet: %v", err)
+	}
+	status.SetFromPods()
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		{
+			Type:   configv1.OperatorDegraded,
+			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
 }
 
-func TestStatusManagerSetFromPods(t *testing.T) {
+func TestStatusManagerSetFromDeployments(t *testing.T) {
 	client := fake.NewFakeClient()
 	mapper := &fakeRESTMapper{}
 	status := New(client, mapper, "testing", "1.2.3")
@@ -637,6 +1023,9 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating DaemonSet: %v", err)
 	}
+
+	t0 := time.Now()
+	time.Sleep(time.Second / 10)
 	status.SetFromPods()
 
 	co, err = getCO(client, "testing")
@@ -667,12 +1056,73 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 
+	ps := getLastPodState(t, client, "testing")
+	// see that the pod state is sensible
+	nsn := types.NamespacedName{Namespace: "one", Name: "beta"}
+	found := false
+	for _, ds := range ps.DeploymentStates {
+		if ds.NamespacedName == nsn {
+			found = true
+			if !ds.LastChangeTime.After(t0) {
+				t.Fatalf("Expected %s to be after %s", ds.LastChangeTime, t0)
+			}
+			if !reflect.DeepEqual(depB.Status, ds.LastSeenStatus) {
+				t.Fatal("expected cached status to equal last seen status")
+			}
+
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("Didn't find %s in pod state", nsn)
+	}
+
+	// intermission: set back last-seen times by an hour, see that we mark
+	// as hung
+	ps = getLastPodState(t, client, "testing")
+	for idx, ds := range ps.DeploymentStates {
+		if ds.NamespacedName == nsn {
+			ps.DeploymentStates[idx].LastChangeTime = time.Now().Add(-time.Hour)
+			break
+		}
+	}
+	setLastPodState(t, client, "testing", ps)
+	status.SetFromPods()
+
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	// We should still be Progressing, since nothing else has changed, but
+	// now we're also Degraded, since rollout has not made any progress
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		{
+			Type:   configv1.OperatorDegraded,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
 	depB.Status.UnavailableReplicas = 0
 	depB.Status.AvailableReplicas = 1
 	err = client.Update(context.TODO(), depB)
 	if err != nil {
 		t.Fatalf("error updating Deployment: %v", err)
 	}
+
 	status.SetFromPods()
 
 	co, err = getCO(client, "testing")
@@ -698,5 +1148,41 @@ func TestStatusManagerSetFromPods(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+}
+
+func getLastPodState(t *testing.T, client client.Client, name string) podState {
+	t.Helper()
+	co, err := getCO(client, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(co.Annotations)
+
+	ps := podState{}
+	if err := json.Unmarshal([]byte(co.Annotations[lastSeenAnnotation]), &ps); err != nil {
+		t.Fatal(err)
+	}
+
+	return ps
+}
+
+// sets *all* last-seen-times back an hour
+func setLastPodState(t *testing.T, client client.Client, name string, ps podState) {
+	t.Helper()
+	co, err := getCO(client, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lsBytes, err := json.Marshal(ps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	co.Annotations[lastSeenAnnotation] = string(lsBytes)
+	err = client.Update(context.Background(), co)
+	if err != nil {
+		t.Fatal(err)
 	}
 }

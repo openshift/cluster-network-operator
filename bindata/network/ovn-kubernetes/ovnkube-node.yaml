@@ -35,7 +35,7 @@ spec:
       containers:
       # ovn-controller: programs the vswitch with flows from the sbdb
       - name: ovn-controller
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
         command:
         - /bin/bash
         - -c
@@ -48,6 +48,7 @@ spec:
           fi
           exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
             --no-chdir --pidfile=/var/run/openvswitch/ovn-controller.pid \
+            -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
             -vconsole:"${OVN_LOG_LEVEL}"
         securityContext:
           privileged: true
@@ -67,6 +68,10 @@ spec:
           name: var-lib-openvswitch
         - mountPath: /env
           name: env-overrides
+        - mountPath: /ovn-cert
+          name: ovn-cert
+        - mountPath: /ovn-ca
+          name: ovn-ca
         terminationMessagePolicy: FallbackToLogsOnError
         resources:
           requests:
@@ -75,12 +80,12 @@ spec:
 
       # ovnkube-node: does node-level bookkeeping and configuration
       - name: ovnkube-node
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
         command:
         - /bin/bash
         - -c
         - |
-          set -e
+          set -xe
           if [[ -f "/env/${K8S_NODE}" ]]; then
             set -o allexport
             source "/env/${K8S_NODE}"
@@ -110,21 +115,39 @@ spec:
               hybrid_overlay_flags="${hybrid_overlay_flags} --hybrid-overlay-cluster-subnets={{.OVNHybridOverlayNetCIDR}}"
             fi
           fi
+          
+          OVN_NODES_ARRAY=({{.OVN_NODES}})
+          nb_addr_list=""
+          sb_addr_list=""
+          for i in "${!OVN_NODES_ARRAY[@]}"; do
+            if [[ $i != 0 ]]; then
+              nb_addr_list="${nb_addr_list},"
+              sb_addr_list="${sb_addr_list},"
+            fi
+            host=$(getent ahostsv4 "${OVN_NODES_ARRAY[$i]}" | grep RAW | awk '{print $1}')
+            nb_addr_list="${nb_addr_list}ssl://${host}:{{.OVN_NB_PORT}}"
+            sb_addr_list="${sb_addr_list}ssl://${host}:{{.OVN_SB_PORT}}"
+          done
 
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --cluster-subnets "${OVN_NET_CIDR}" \
             --k8s-service-cidr "${OVN_SVC_CIDR}" \
             --k8s-apiserver "{{.K8S_APISERVER}}" \
             --ovn-config-namespace ${ovn_config_namespace} \
-            --nb-address "tcp://${db_ip}:{{.OVN_NB_PORT}}" \
-            --sb-address "tcp://${db_ip}:{{.OVN_SB_PORT}}" \
-            --nodeport --gateway-mode local \
+            --nb-address "${nb_addr_list}" \
+            --sb-address "${sb_addr_list}" \
+            --nb-client-privkey /ovn-cert/tls.key \
+            --nb-client-cert /ovn-cert/tls.crt \
+            --nb-client-cacert /ovn-ca/ca-bundle.crt \
+            --sb-client-privkey /ovn-cert/tls.key \
+            --sb-client-cert /ovn-cert/tls.crt \
+            --sb-client-cacert /ovn-ca/ca-bundle.crt \
+            --config-file=/run/ovnkube-config/ovnkube.conf \
+            --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             ${hybrid_overlay_flags} \
             --pidfile /var/run/openvswitch/ovnkube-node.pid \
-            --loglevel "${OVN_KUBE_LOG_LEVEL}"  --logfile /dev/stdout
+            --metrics-bind-address "0.0.0.0:9101"
         env:
-        - name: OVN_KUBE_LOG_LEVEL
-          value: "4"
         - name: OVN_HYBRID_OVERLAY_ENABLE
           value: "{{ .OVNHybridOverlayEnable }}"
         - name: OVN_HYBRID_OVERLAY_NET_CIDR
@@ -134,22 +157,18 @@ spec:
           value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: KUBERNETES_SERVICE_HOST
           value: "{{.KUBERNETES_SERVICE_HOST}}"
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
+        - name: OVN_KUBE_LOG_LEVEL
+          value: "4"
         - name: K8S_NODE
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        ports:
+        - name: metrics-port
+          containerPort: 9101
         securityContext:
           privileged: true
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         # for the iptables wrapper
         - mountPath: /host
@@ -177,8 +196,14 @@ spec:
           name: etc-openvswitch
         - mountPath: /var/lib/openvswitch
           name: var-lib-openvswitch
+        - mountPath: /run/ovnkube-config/
+          name: ovnkube-config
         - mountPath: /env
           name: env-overrides
+        - mountPath: /ovn-cert
+          name: ovn-cert
+        - mountPath: /ovn-ca
+          name: ovn-ca
         resources:
           requests:
             cpu: 100m
@@ -217,16 +242,25 @@ spec:
           path: /run/ovn-kubernetes
       - name: host-cni-bin
         hostPath:
-          path: {{.CNIBinDir}}
+          path: "{{.CNIBinDir}}"
       - name: host-cni-netd
         hostPath:
-          path: {{.CNIConfDir}}
+          path: "{{.CNIConfDir}}"
       - name: host-var-lib-cni-networks-ovn-kubernetes
         hostPath:
           path: /var/lib/cni/networks/ovn-k8s-cni-overlay
+      - name: ovnkube-config
+        configMap:
+          name: ovnkube-config
       - name: env-overrides
         configMap:
           name: env-overrides
           optional: true
+      - name: ovn-ca
+        configMap:
+          name: ovn-ca
+      - name: ovn-cert
+        secret:
+          secretName: ovn-cert
       tolerations:
       - operator: "Exists"

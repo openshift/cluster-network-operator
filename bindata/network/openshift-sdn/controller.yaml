@@ -20,18 +20,17 @@ spec:
     spec:
       containers:
       - name: sdn-controller
-        image: {{.SDNControllerImage}}
-        command: ["network-controller"]
+        image: {{.SDNImage}}
+        command: ["openshift-sdn-controller"]
         resources:
           requests:
             cpu: 10m
             memory: 50Mi
         env:
-        # TODO: bind-mount the kubelet's kubeconfig like the openshift-sdn process
-        # need to get the `oc` binary in to the hypershift image first
-        - name: KUBERNETES_SERVICE_PORT # allows the controller to communicate with apiserver directly on same host.
+        # point sdn-controller to the internal apiserver load balancer
+        - name: KUBERNETES_SERVICE_PORT
           value: "{{.KUBERNETES_SERVICE_PORT}}"
-        - name: KUBERNETES_SERVICE_HOST # allows the controller to communicate with apiserver directly on same host.
+        - name: KUBERNETES_SERVICE_HOST
           value: "{{.KUBERNETES_SERVICE_HOST}}"
         terminationMessagePolicy: FallbackToLogsOnError
       hostNetwork: true
