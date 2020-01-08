@@ -33,88 +33,6 @@ spec:
       # /run/openvswitch -> tmpfs - ovsdb sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
-      # ovsdb and ovs-vswitchd
-      - name: ovs-daemons
-        image: "{{.OvnImage}}"
-        command:
-        - /bin/bash
-        - -c
-        - |
-          #!/bin/bash
-          set -e
-          if [[ -f "/env/${K8S_NODE}" ]]; then
-            set -o allexport
-            source "/env/${K8S_NODE}"
-            set +o allexport
-          fi
-          if [[ -f "/old/openvswitch/conf.db" && ! -f "/etc/openvswitch/conf.db" ]]; then
-            mv /old/openvswitch/conf.db /etc/openvswitch/conf.db
-          fi
-          chown -R openvswitch:openvswitch /run/openvswitch
-          chown -R openvswitch:openvswitch /etc/openvswitch
-          function quit {
-              /usr/share/openvswitch/scripts/ovs-ctl stop
-              exit 0
-          }
-          trap quit SIGTERM
-          /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --system-id=random
-          ovs-appctl vlog/set "file:${OVS_LOG_LEVEL}"
-          /usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
-
-          tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
-          tail -F --pid=$(cat /var/run/openvswitch/ovsdb-server.pid) /var/log/openvswitch/ovsdb-server.log &
-          wait
-        env:
-        - name: OVS_LOG_LEVEL
-          value: info
-        - name: K8S_NODE
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - mountPath: /lib/modules
-          name: host-modules
-          readOnly: true
-        - mountPath: /sys
-          name: host-sys
-          readOnly: true
-        - mountPath: /run/openvswitch
-          name: run-openvswitch
-        - mountPath: /etc/openvswitch
-          name: etc-openvswitch
-        - mountPath: /old/openvswitch
-          name: old-openvswitch-database
-        - mountPath: /var/lib/openvswitch
-          name: var-lib-openvswitch
-        - mountPath: /env
-          name: env-overrides
-        resources:
-          requests:
-            cpu: 100m
-            memory: 300Mi
-        terminationMessagePolicy: FallbackToLogsOnError
-        livenessProbe:
-          exec:
-            command:
-            - /usr/share/openvswitch/scripts/ovs-ctl
-            - status
-          initialDelaySeconds: 15
-          periodSeconds: 5
-        readinessProbe:
-          exec:
-            command:
-            - /usr/share/openvswitch/scripts/ovs-ctl
-            - status
-          initialDelaySeconds: 15
-          periodSeconds: 5
-        lifecycle:
-          preStop:
-            exec:
-              command: ["/usr/share/openvswitch/scripts/ovs-ctl", "stop"]
-        terminationGracePeriodSeconds: 10
-
       # ovn-controller: programs the vswitch with flows from the sbdb
       - name: ovn-controller
         image: "{{.OvnImage}}"
@@ -306,9 +224,6 @@ spec:
       - name: host-slash
         hostPath:
           path: /
-      - name: host-modules
-        hostPath:
-          path: /lib/modules
       - name: host-run-netns
         hostPath:
           path: /run/netns
@@ -319,17 +234,12 @@ spec:
         hostPath:
           path: /var/lib/openvswitch/etc
       - name: run-openvswitch
-        emptyDir: {}
-      # commit 0ac2cd changed the location of the ovs database, mount and check if a database already exists
-      - name: old-openvswitch-database
-        path: /etc/origin/openvswitch
+        hostPath:
+          path: /run/openvswitch
       # For CNI server
       - name: host-run-ovn-kubernetes
         hostPath:
           path: /run/ovn-kubernetes
-      - name: host-sys
-        hostPath:
-          path: /sys
       - name: host-cni-bin
         hostPath:
           path: "{{.CNIBinDir}}"
