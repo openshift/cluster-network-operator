@@ -31,8 +31,6 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      # by default, Deployments spin up the new pod before terminating the old one
-      # but we don't want that - because ovsdb holds the lock.
       maxSurge: 0
       maxUnavailable: 1
   template:
@@ -47,6 +45,12 @@ spec:
       serviceAccountName: ovn-kubernetes-controller
       hostNetwork: true
       priorityClassName: "system-cluster-critical"
+      hostAliases:
+      {{range .OVN_INITIAL_CONTROL_PLANE_IPS}}
+      - ip: "{{ . }}"
+        hostnames:
+        - "{{$.OVN_DB_SVC}}"
+      {{end}}
       # volumes in all containers:
       # (container) -> (host)
       # /etc/openvswitch -> /var/lib/ovn/etc - ovsdb data
@@ -62,11 +66,16 @@ spec:
         - -c
         - |
           set -xe
+
+          source /root/ovnkube-helper.sh
+
           if [[ -f /env/_master ]]; then
             set -o allexport
             source /env/_master
             set +o allexport
           fi
+
+          watch_core_dns_ep &
 
           exec ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
@@ -75,8 +84,12 @@ spec:
             --ovnsb-db "{{.OVN_SB_DB_LIST}}" \
             -p /ovn-cert/tls.key \
             -c /ovn-cert/tls.crt \
-            -C /ovn-ca/ca-bundle.crt 
+            -C /ovn-ca/ca-bundle.crt
         env:
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
         - name: OVN_LOG_LEVEL
           value: info 
         volumeMounts:
@@ -97,8 +110,6 @@ spec:
             cpu: 100m
             memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
-
-      # nbdb: the northbound, or logical network object DB. In raft mode 
       - name: nbdb
         image: "{{.OvnImage}}"
         command:
@@ -315,6 +326,9 @@ spec:
         - -c
         - |
           set -xe
+          
+          source /root/ovnkube-helper.sh
+          
           if [[ -f "/env/_master" ]]; then
             set -o allexport
             source "/env/_master"
@@ -329,10 +343,13 @@ spec:
             fi
           fi
 
+          watch_core_dns_ep &
+
           # start nbctl daemon for caching
           export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/run/openvswitch/ovnk-nbctl.pid \
             --detach \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
+            --no-leader-only \
             --db "{{.OVN_NB_DB_LIST}}")
 
           exec /usr/bin/ovnkube \
@@ -345,7 +362,7 @@ spec:
             --sb-address "{{.OVN_SB_ADDR_LIST}}" \
             --sb-client-privkey /ovn-cert/tls.key \
             --sb-client-cert /ovn-cert/tls.crt \
-            --sb-client-cacert /ovn-ca/ca-bundle.crt
+            --sb-client-cacert /ovn-ca/ca-bundle.crt 
         lifecycle:
           preStop:
             exec:
@@ -378,6 +395,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
         ports:
         - name: metrics-port
           containerPort: 9102

@@ -26,6 +26,12 @@ spec:
       hostNetwork: true
       hostPID: true
       priorityClassName: "system-node-critical"
+      hostAliases:
+      {{range .OVN_INITIAL_CONTROL_PLANE_IPS}}
+      - ip: "{{ . }}"
+        hostnames:
+        - "{{$.OVN_DB_SVC}}"
+      {{end}}
       # volumes in all containers:
       # (container) -> (host)
       # /etc/openvswitch -> /var/lib/openvswitch/etc - ovsdb system id
@@ -88,16 +94,20 @@ spec:
         - -c
         - |
           set -xe
+
+          source /root/ovnkube-helper.sh
+
           if [[ -f "/env/${K8S_NODE}" ]]; then
             set -o allexport
             source "/env/${K8S_NODE}"
             set +o allexport
           fi
+          
           cp -f /usr/libexec/cni/ovn-k8s-cni-overlay /cni-bin-dir/
-          ovn_config_namespace=openshift-ovn-kubernetes
+
           retries=0
           while true; do
-            db_ip=$(kubectl get ep -n ${ovn_config_namespace} ovnkube-db -o jsonpath='{.subsets[0].addresses[0].ip}')
+            db_ip=$(kubectl get ep -n ${OVN_NAMESPACE} ${OVN_DB_SVC_NAME} -o jsonpath='{.subsets[0].addresses[0].ip}')
             if [[ -n "${db_ip}" ]]; then
               break
             fi
@@ -109,6 +119,8 @@ spec:
             echo "waiting for db endpoint"
             sleep 5
           done
+
+          watch_core_dns_ep &
 
           hybrid_overlay_flags=
           if [[ -n "{{.OVNHybridOverlayEnable}}" ]]; then
@@ -122,7 +134,7 @@ spec:
             --cluster-subnets "${OVN_NET_CIDR}" \
             --k8s-service-cidr "${OVN_SVC_CIDR}" \
             --k8s-apiserver "{{.K8S_APISERVER}}" \
-            --ovn-config-namespace ${ovn_config_namespace} \
+            --ovn-config-namespace ${OVN_NAMESPACE} \
             --nb-address "{{.OVN_NB_ADDR_LIST}}" \
             --sb-address "{{.OVN_SB_ADDR_LIST}}" \
             --nb-client-privkey /ovn-cert/tls.key \
@@ -148,6 +160,12 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: OVN_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: OVN_DB_SVC_NAME
+          value: "ovnkube-db"
         ports:
         - name: metrics-port
           containerPort: 9103
