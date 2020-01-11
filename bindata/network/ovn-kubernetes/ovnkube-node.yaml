@@ -64,6 +64,8 @@ spec:
           name: run-openvswitch
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
+        - mountPath: /etc/ovn/
+          name: etc-openvswitch
         - mountPath: /var/lib/openvswitch
           name: var-lib-openvswitch
         - mountPath: /env
@@ -193,6 +195,8 @@ spec:
         - mountPath: /run/openvswitch
           name: run-openvswitch
         - mountPath: /etc/openvswitch
+          name: etc-openvswitch
+        - mountPath: /etc/ovn/
           name: etc-openvswitch
         - mountPath: /var/lib/openvswitch
           name: var-lib-openvswitch

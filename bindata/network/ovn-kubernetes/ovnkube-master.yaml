@@ -131,8 +131,17 @@ spec:
           MASTER_NODE=$(getent ahostsv4 "${OVN_NODES_ARRAY[0]}" | grep RAW | awk '{print $1}')
           LOCALHOST=$(getent ahostsv4 "${K8S_NODE}" | grep RAW | awk '{print $1}')
 
+          # Determine the ovn rundir.
+          if [[ -f /usr/bin/ovn-appctl ]] ; then
+              # ovn-appctl is present. Use new ovn run dir path.
+              OVNCTL_PATH=/usr/share/ovn/scripts/ovn-ctl
+          else
+              # ovn-appctl is not present. Use openvswitch run dir path.
+              OVNCTL_PATH=/usr/share/openvswitch/scripts/ovn-ctl
+          fi
+
           if [[ "$LOCALHOST" == "$MASTER_NODE" ]]; then
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
+            exec ${OVNCTL_PATH} \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-local-addr=${LOCALHOST} \
             --no-monitor \
@@ -143,7 +152,7 @@ spec:
             --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
             run_nb_ovsdb
           else
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
+            exec ${OVNCTL_PATH} \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-local-addr=${LOCALHOST} \
@@ -190,6 +199,8 @@ spec:
         volumeMounts:
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
+        - mountPath: /etc/ovn/
+          name: etc-openvswitch
         - mountPath: /var/lib/openvswitch/
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
@@ -229,8 +240,17 @@ spec:
           MASTER_NODE=$(getent ahostsv4 "${OVN_NODES_ARRAY[0]}" | grep RAW | awk '{print $1}')
           LOCALHOST=$(getent ahostsv4 "${K8S_NODE}" | grep RAW | awk '{print $1}')
 
+          # Determine the ovn rundir.
+          if [[ -f /usr/bin/ovn-appctl ]] ; then
+              # ovn-appctl is present. Use new ovn run dir path.
+              OVNCTL_PATH=/usr/share/ovn/scripts/ovn-ctl
+          else
+              # ovn-appctl is not present. Use openvswitch run dir path.
+              OVNCTL_PATH=/usr/share/openvswitch/scripts/ovn-ctl
+          fi
+
           if [[ "$LOCALHOST" == "$MASTER_NODE" ]]; then
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
+            exec ${OVNCTL_PATH} \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-local-addr=${LOCALHOST} \
             --no-monitor \
@@ -242,7 +262,7 @@ spec:
             run_sb_ovsdb
           else
             echo "joining cluster at ${OVN_NODES_ARRAY[0]}"
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
+            exec ${OVNCTL_PATH} \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-local-addr=${LOCALHOST} \
@@ -288,6 +308,8 @@ spec:
               fieldPath: spec.nodeName
         volumeMounts:
         - mountPath: /etc/openvswitch/
+          name: etc-openvswitch
+        - mountPath: /etc/ovn/
           name: etc-openvswitch
         - mountPath: /var/lib/openvswitch/
           name: var-lib-openvswitch
@@ -364,6 +386,8 @@ spec:
               command: ["/bin/bash", "-c", "kill $(cat /run/openvswitch/ovnk-nbctl.pid)"]
         volumeMounts:
         - mountPath: /etc/openvswitch/
+          name: etc-openvswitch
+        - mountPath: /etc/ovn/
           name: etc-openvswitch
         - mountPath: /var/lib/openvswitch/
           name: var-lib-openvswitch
