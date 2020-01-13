@@ -76,9 +76,9 @@ spec:
   publishNotReadyAddresses: true
   ports:
   - name: metrics
-    port: 9101
+    port: 9103
     protocol: TCP
-    targetPort: 9101
+    targetPort: 9103
   sessionAffinity: None
   type: ClusterIP
 ---
