@@ -58,6 +58,9 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["PoolMinPorts"] = c.PoolMinPorts
 	data.Data["PoolBatchPorts"] = c.PoolBatchPorts
 
+	// deploy or not kuryr-admission-controller depending on double listeners support
+	data.Data["AdmissionController"] = !b.OctaviaMultipleListeners
+
 	// Octavia config data
 	data.Data["OctaviaProvider"] = b.OctaviaProvider
 	if b.OctaviaProvider == OVNProvider {
