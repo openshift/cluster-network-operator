@@ -52,11 +52,12 @@ const (
 	OpenShiftConfigNamespace = "openshift-config"
 	UserCABundleConfigMap    = "cloud-provider-config"
 	// NOTE(dulek): This one is hardcoded in openshift/installer.
-	InfrastructureCRDName              = "cluster"
-	MinOctaviaVersionWithHTTPSMonitors = "v2.10"
-	MinOctaviaVersionWithTagSupport    = "v2.5"
-	MinOctaviaVersionWithTimeouts      = "v2.1"
-	KuryrNamespace                     = "openshift-kuryr"
+	InfrastructureCRDName                  = "cluster"
+	MinOctaviaVersionWithMultipleListeners = "v2.11"
+	MinOctaviaVersionWithHTTPSMonitors     = "v2.10"
+	MinOctaviaVersionWithTagSupport        = "v2.5"
+	MinOctaviaVersionWithTimeouts          = "v2.1"
+	KuryrNamespace                         = "openshift-kuryr"
 )
 
 func GetClusterID(kubeClient client.Client) (string, error) {
@@ -1116,23 +1117,30 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		return nil, errors.Wrap(err, "failed to ensure Certificate")
 	}
 
+	log.Print("Checking Double Listeners Octavia support")
+	octaviaMultipleListenersSupport, err := IsOctaviaVersionSupported(client, MinOctaviaVersionWithMultipleListeners)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to determine if Octavia supports double listeners")
+	}
+
 	log.Print("Kuryr bootstrap finished")
 
 	res := bootstrap.BootstrapResult{
 		Kuryr: bootstrap.KuryrBootstrapResult{
-			ServiceSubnet:     svcSubnetId,
-			PodSubnetpool:     podSubnetpoolId,
-			WorkerNodesRouter: routerId,
-			WorkerNodesSubnet: workerSubnet.ID,
-			PodSecurityGroups: []string{podSgId},
-			ExternalNetwork:   externalNetwork,
-			ClusterID:         clusterID,
-			OpenStackCloud:    cloud,
-			WebhookCA:         b64.StdEncoding.EncodeToString(ca),
-			WebhookCAKey:      b64.StdEncoding.EncodeToString(key),
-			WebhookKey:        b64.StdEncoding.EncodeToString(webhookKey),
-			WebhookCert:       b64.StdEncoding.EncodeToString(webhookCert),
-			UserCACert:        userCACert,
+			ServiceSubnet:            svcSubnetId,
+			PodSubnetpool:            podSubnetpoolId,
+			WorkerNodesRouter:        routerId,
+			WorkerNodesSubnet:        workerSubnet.ID,
+			PodSecurityGroups:        []string{podSgId},
+			ExternalNetwork:          externalNetwork,
+			ClusterID:                clusterID,
+			OctaviaMultipleListeners: octaviaMultipleListenersSupport,
+			OpenStackCloud:           cloud,
+			WebhookCA:                b64.StdEncoding.EncodeToString(ca),
+			WebhookCAKey:             b64.StdEncoding.EncodeToString(key),
+			WebhookKey:               b64.StdEncoding.EncodeToString(webhookKey),
+			WebhookCert:              b64.StdEncoding.EncodeToString(webhookCert),
+			UserCACert:               userCACert,
 		}}
 	return &res, nil
 }
