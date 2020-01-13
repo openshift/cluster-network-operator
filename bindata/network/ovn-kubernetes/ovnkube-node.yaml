@@ -148,7 +148,7 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             ${hybrid_overlay_flags} \
             --pidfile /var/run/openvswitch/ovnkube-node.pid \
-            --metrics-bind-address "0.0.0.0:9101"
+            --metrics-bind-address "0.0.0.0:9103"
         env:
         - name: OVN_HYBRID_OVERLAY_ENABLE
           value: "{{ .OVNHybridOverlayEnable }}"
@@ -167,7 +167,7 @@ spec:
               fieldPath: spec.nodeName
         ports:
         - name: metrics-port
-          containerPort: 9101
+          containerPort: 9103
         securityContext:
           privileged: true
         terminationMessagePolicy: FallbackToLogsOnError
