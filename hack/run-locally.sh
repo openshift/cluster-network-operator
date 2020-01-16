@@ -15,10 +15,9 @@ fi
 
 function run_vs_existing_cluster {
     echo "Attaching to already running cluster..."
-
     wait_for_cluster
-    stop_deployed_operator
     extract_environment_from_running_cluster
+    stop_deployed_operator
 }
 
 # Install our overrides so the cluster doesn't run the network operator.
@@ -44,6 +43,9 @@ function extract_environment_from_running_cluster() {
     if [[ ! -e "${CLUSTER_DIR}/env.sh" ]]; then
         echo "Copying environment variables from manifest to ${CLUSTER_DIR}/env.sh"
         oc get deployment -n openshift-network-operator network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
+    fi
+    if [[ $EXPORT_ENV_ONLY == true ]]; then
+        exit 0
     fi
 }
 
@@ -182,10 +184,11 @@ Either -c or -k (or their corresponding environment variable) is required
 
 The following options are always accepted but only used for new clusters:
 
- -f CONFIG        the path to an openshift-install-created install-config.yaml file; if not given one will be created
- -i INSTALLER     path to the openshift-install binary; if not given PATH will be searched
- -n PLUGIN        the name of the network plugin to deploy; one of [sdn|OpenShiftSDN|ovn|OVNKubernetes]
- -w               pause after creating manifests to allow manual overrides
+ -e EXPORT_ENV_ONLY  exports cluster environment only, used as a helper which allows you to modify the image you want to target later
+ -f CONFIG           the path to an openshift-install-created install-config.yaml file; if not given one will be created
+ -i INSTALLER        path to the openshift-install binary; if not given PATH will be searched
+ -n PLUGIN           the name of the network plugin to deploy; one of [sdn|OpenShiftSDN|ovn|OVNKubernetes]
+ -w                  pause after creating manifests to allow manual overrides
 
 The following environment variables are honored:
  - CLUSTER_DIR: the cluster installation temp directory
@@ -195,6 +198,7 @@ The following environment variables are honored:
 "
 }
 
+EXPORT_ENV_ONLY=false
 PLUGIN_IMAGE="${PLUGIN_IMAGE:-}"
 NETWORK_PLUGIN="OpenShiftSDN"
 IMAGE_ENV_KEY="SDN_IMAGE"
@@ -204,10 +208,11 @@ INSTALL_CONFIG="${INSTALL_CONFIG:-}"
 WAIT_FOR_MANIFEST_UPDATES="${WAIT_FOR_MANIFEST_UPDATES:-}"
 KUBECONFIG="${KUBECONFIG:-}"
 
-while getopts "c:f:i:m:k:n:w" opt; do
+while getopts "e?c:f:i:m:k:n:w" opt; do
     case $opt in
         c) CLUSTER_DIR="${OPTARG}"
            mkdir -p "${CLUSTER_DIR}" >& /dev/null;;
+        e) EXPORT_ENV_ONLY=true;;
         f) INSTALL_CONFIG="${OPTARG}";;
         i) INSTALLER_PATH="${OPTARG}";;
         m) PLUGIN_IMAGE="${OPTARG}";;
@@ -257,7 +262,7 @@ if [[ -n "$(ls -A ${CLUSTER_DIR}/terraform.* 2> /dev/null)" ]]; then
     export KUBECONFIG="${CLUSTER_DIR}/auth/kubeconfig"
     run_vs_existing_cluster
 elif [[ ! -z "${KUBECONFIG}" ]]; then
-    export CLUSTER_DIR=$(mktemp -d)
+    export CLUSTER_DIR=/tmp
     run_vs_existing_cluster
 elif [[ -z "$(ls -A ${CLUSTER_DIR} 2> /dev/null | grep -v install-config.yaml | grep -v .openshift_install | grep -v env.sh)" ]]; then
     echo "Creating new cluster..."
