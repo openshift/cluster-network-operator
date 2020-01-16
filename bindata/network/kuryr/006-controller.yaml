@@ -51,6 +51,11 @@ spec:
         volumeMounts:
         - name: config-volume
           mountPath: "/etc/kuryr"
+{{- if .UserCACertificate }}
+        - name: user-ca-certificate-volume
+          subPath: user-ca-bundle.crt
+          mountPath: /etc/ssl/certs/user-ca-bundle.crt
+{{- end }}
       nodeSelector:
         node-role.kubernetes.io/master: ""
       tolerations:
@@ -64,3 +69,8 @@ spec:
       - name: config-volume
         configMap:
           name: kuryr-config
+{{- if .UserCACertificate }}
+      - name: user-ca-certificate-volume
+        configMap:
+          name: user-ca-certificate
+{{- end }}
