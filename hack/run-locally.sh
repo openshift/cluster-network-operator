@@ -24,10 +24,10 @@ function run_vs_existing_cluster {
 # Install our overrides so the cluster doesn't run the network operator.
 function override_install_manifests() {
     # Patch the CVO to not create the network operator
-    kubectl --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f="${CLUSTER_DIR}/manifests/cvo-overrides.yaml" -p "$(cat hack/overrides-patch.yaml)" -o yaml > "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new"
+    oc --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f="${CLUSTER_DIR}/manifests/cvo-overrides.yaml" -p "$(cat hack/overrides-patch.yaml)" -o yaml > "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new"
     # Optionally, tell the CVO to skip some unnecessary components
     if [[ -n "${HACK_MINIMIZE:-}" ]]; then
-        kubectl --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f="${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new" -p "$(cat hack/overrides-minimize-patch.yaml)" -o yaml > "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new.2"
+        oc --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f="${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new" -p "$(cat hack/overrides-minimize-patch.yaml)" -o yaml > "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new.2"
         mv "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new.2" "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new"
     fi
 
@@ -43,7 +43,7 @@ function override_install_manifests() {
 function extract_environment_from_running_cluster() {
     if [[ ! -e "${CLUSTER_DIR}/env.sh" ]]; then
         echo "Copying environment variables from manifest to ${CLUSTER_DIR}/env.sh"
-        kubectl get deployment -n openshift-network-operator network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
+        oc get deployment -n openshift-network-operator network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
     fi
 }
 
@@ -70,11 +70,11 @@ function setup_operator_env() {
 # Patch the CNO out of the cluster-version-operator and scale it down to zero so
 # we can run our local CNO instead
 function stop_deployed_operator() {
-    kubectl patch --type=json -p "$(cat hack/overrides-patch.yaml)" clusterversion version
+    oc patch --type=json -p "$(cat hack/overrides-patch.yaml)" clusterversion version
 
-    if [[ -n "$(kubectl get deployments -n openshift-network-operator 2> /dev/null | grep network-operator)" ]]; then
+    if [[ -n "$(oc get deployments -n openshift-network-operator 2> /dev/null | grep network-operator)" ]]; then
         echo "Scaling the deployed network operator to 0"
-        kubectl scale deployment -n openshift-network-operator network-operator --replicas 0
+        oc scale deployment -n openshift-network-operator network-operator --replicas 0
     fi
 }
 
