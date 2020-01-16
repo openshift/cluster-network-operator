@@ -48,12 +48,13 @@ const (
 	CloudName       = "openstack"
 	CloudsSecretKey = "clouds.yaml"
 	// NOTE(dulek): This one is hardcoded in openshift/installer.
-	InfrastructureCRDName              = "cluster"
-	MinOctaviaVersionWithHTTPSMonitors = "v2.10"
-	MinOctaviaVersionWithProviders     = "v2.6"
-	MinOctaviaVersionWithTagSupport    = "v2.5"
-	MinOctaviaVersionWithTimeouts      = "v2.1"
-	KuryrNamespace                     = "openshift-kuryr"
+	InfrastructureCRDName                  = "cluster"
+	MinOctaviaVersionWithMultipleListeners = "v2.11"
+	MinOctaviaVersionWithHTTPSMonitors     = "v2.10"
+	MinOctaviaVersionWithProviders         = "v2.6"
+	MinOctaviaVersionWithTagSupport        = "v2.5"
+	MinOctaviaVersionWithTimeouts          = "v2.1"
+	KuryrNamespace                         = "openshift-kuryr"
 	// NOTE(ltomasbo): Only OVN octavia driver supported on kuryr
 	OVNProvider = "ovn"
 )
@@ -1087,6 +1088,12 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		return nil, errors.Wrap(err, "failed to determine if Octavia supports providers")
 	}
 
+	log.Print("Checking Double Listeners Octavia support")
+	octaviaMultipleListenersSupport, err := IsOctaviaVersionSupported(client, MinOctaviaVersionWithMultipleListeners)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to determine if Octavia supports double listeners")
+	}
+
 	octaviaProvider := "default"
 	if octaviaProviderSupport {
 		page, err := providers.List(lbClient, providers.ListOpts{}).AllPages()
@@ -1101,6 +1108,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 				if provider.Name == OVNProvider {
 					log.Print("OVN Provider is enabled and Kuryr will use it")
 					octaviaProvider = OVNProvider
+					octaviaMultipleListenersSupport = false
 				}
 			}
 		}
@@ -1110,19 +1118,20 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 
 	res := bootstrap.BootstrapResult{
 		Kuryr: bootstrap.KuryrBootstrapResult{
-			ServiceSubnet:     svcSubnetId,
-			PodSubnetpool:     podSubnetpoolId,
-			WorkerNodesRouter: routerId,
-			WorkerNodesSubnet: workerSubnet.ID,
-			PodSecurityGroups: []string{podSgId},
-			ExternalNetwork:   externalNetwork,
-			ClusterID:         clusterID,
-			OctaviaProvider:   octaviaProvider,
-			OpenStackCloud:    cloud,
-			WebhookCA:         b64.StdEncoding.EncodeToString(ca),
-			WebhookCAKey:      b64.StdEncoding.EncodeToString(key),
-			WebhookKey:        b64.StdEncoding.EncodeToString(webhookKey),
-			WebhookCert:       b64.StdEncoding.EncodeToString(webhookCert),
+			ServiceSubnet:            svcSubnetId,
+			PodSubnetpool:            podSubnetpoolId,
+			WorkerNodesRouter:        routerId,
+			WorkerNodesSubnet:        workerSubnet.ID,
+			PodSecurityGroups:        []string{podSgId},
+			ExternalNetwork:          externalNetwork,
+			ClusterID:                clusterID,
+			OctaviaProvider:          octaviaProvider,
+			OctaviaMultipleListeners: octaviaMultipleListenersSupport,
+			OpenStackCloud:           cloud,
+			WebhookCA:                b64.StdEncoding.EncodeToString(ca),
+			WebhookCAKey:             b64.StdEncoding.EncodeToString(key),
+			WebhookKey:               b64.StdEncoding.EncodeToString(webhookKey),
+			WebhookCert:              b64.StdEncoding.EncodeToString(webhookCert),
 		}}
 	return &res, nil
 }
