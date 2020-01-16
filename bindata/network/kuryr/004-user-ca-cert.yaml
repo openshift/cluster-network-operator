@@ -1,0 +1,10 @@
+{{- if .UserCACertificate }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-ca-certificate
+  namespace: openshift-kuryr
+data:
+  user-ca-bundle.crt: |
+{{ .UserCACertificate | indent 4 }}
+{{- end }}
