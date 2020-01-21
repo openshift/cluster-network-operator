@@ -19,6 +19,7 @@ type KuryrBootstrapResult struct {
 	WebhookCAKey             string
 	WebhookCert              string
 	WebhookKey               string
+	UserCACert               string
 }
 
 type OVNBootstrapResult struct {

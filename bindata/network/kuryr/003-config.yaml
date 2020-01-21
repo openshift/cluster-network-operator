@@ -73,6 +73,11 @@ data:
     user_domain_name = {{ default "\"\"" $AuthInfo.UserDomainName }}
     user_domain_id = {{ default "\"\"" $AuthInfo.UserDomainID }}
     region_name = {{ default "\"\"" .OpenStackCloud.RegionName }}
+{{- if .UserCACertificate }}
+    # There's no good way to just "append" user-provided certs to system ones,
+    # so just configure openstacksdk to use it.
+    cafile = /etc/ssl/certs/user-ca-bundle.crt
+{{- end }}
 
     [pod_vif_nested]
     worker_nodes_subnet = {{ default "\"\"" .WorkerNodesSubnet }}
