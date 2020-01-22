@@ -3,6 +3,7 @@ reviewers:
   - danwinship
   - dcbw
   - JacobTanenbaum
+  - juanluisvaladas
   - pecameron
   - rcarrillocruz
   - squeed
@@ -10,4 +11,5 @@ approvers:
   - danwinship
   - dcbw
   - knobunc
+  - rcarrillocruz
   - squeed
