@@ -33,6 +33,10 @@ const IgnoreObjectErrorAnnotation = "networkoperator.openshift.io/ignore-errors"
 // that they are not critical to the functioning of the pod network
 const NonCriticalAnnotation = "networkoperator.openshift.io/non-critical"
 
+// NetworkMigrationAnnotation is an annotation on the networks.operator.openshift.io CR to indicate
+// that executing network migration (switching the default network type of the cluster) is allowed.
+const NetworkMigrationAnnotation = "networkoperator.openshift.io/network-migration"
+
 // SERVICE_CA_CONFIGMAP is the name of the ConfigMap that contains service CA bundle
 // that is used in multus admission controller deployment
 const SERVICE_CA_CONFIGMAP = "openshift-service-ca"
