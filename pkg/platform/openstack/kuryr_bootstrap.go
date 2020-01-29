@@ -60,6 +60,7 @@ const (
 	MinOctaviaVersionWithTagSupport        = "v2.5"
 	MinOctaviaVersionWithTimeouts          = "v2.1"
 	KuryrNamespace                         = "openshift-kuryr"
+	KuryrConfigMapName                     = "kuryr-config"
 	// NOTE(ltomasbo): Only OVN octavia driver supported on kuryr
 	OVNProvider = "ovn"
 )
@@ -820,16 +821,32 @@ func ensureCertificate(kubeClient client.Client, caPEM []byte, privateKey []byte
 	}
 }
 
-func getUserCACert(kubeClient client.Client) (string, error) {
+func getConfigMap(kubeClient client.Client, namespace, name string) (*v1.ConfigMap, error) {
 	cm := &v1.ConfigMap{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
-		ObjectMeta: metav1.ObjectMeta{Name: UserCABundleConfigMap},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 	}
-	err := kubeClient.Get(context.TODO(), client.ObjectKey{Namespace: OpenShiftConfigNamespace, Name: UserCABundleConfigMap}, cm)
+	err := kubeClient.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: name}, cm)
+	if err != nil {
+		return nil, err
+	}
+	return cm, nil
+}
+
+func getUserCACert(kubeClient client.Client) (string, error) {
+	cm, err := getConfigMap(kubeClient, OpenShiftConfigNamespace, UserCABundleConfigMap)
 	if err != nil {
 		return "", err
 	}
-	return string(cm.Data["ca-bundle.pem"]), nil
+	return cm.Data["ca-bundle.pem"], nil
+}
+
+func getSavedOctaviaProvider(kubeClient client.Client) (string, error) {
+	cm, err := getConfigMap(kubeClient, KuryrNamespace, KuryrConfigMapName)
+	if err != nil {
+		return "", err
+	}
+	return cm.Annotations[names.KuryrOctaviaProviderAnnotation], nil
 }
 
 // Logs into OpenStack and creates all the resources that are required to run
@@ -1133,21 +1150,36 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		return nil, errors.Wrap(err, "failed to determine if Octavia supports double listeners")
 	}
 
-	octaviaProvider := "default"
-	if octaviaProviderSupport {
-		page, err := providers.List(lbClient, providers.ListOpts{}).AllPages()
-		if err != nil {
-			log.Print("failed to get lbs provider list, using default octavia provider")
-		} else {
-			providers, err := providers.ExtractProviders(page)
+	// Logic here is as follows:
+	// 1. We don't want to suddenly reconfigure Kuryr to use different provider, so we always try to fetch the currently
+	//    used one from annotation added to kuryr-config ConfigMap first.
+	// 2. If fetching annotation fails, then either it's the first run and we're yet to create the ConfigMap or user
+	//    deleted the annotation in order for us to trigger the reconfiguration. In both cases proceed with detection:
+	//    a. Check if Octavia version supports provider discovery.
+	//    b. List providers and look for OVN one.
+	//    c. If it's present configure Kuryr to use it.
+	//    d. In case of any issues just use whatever the default is.
+	octaviaProvider, err := getSavedOctaviaProvider(kubeClient) // Ignore error, just do the normal discovery then.
+	if octaviaProvider != "" {
+		log.Printf("Detected that Kuryr was already configured to use %s LB provider. Making sure to keep it that way.",
+			octaviaProvider)
+	} else {
+		octaviaProvider = "default"
+		if octaviaProviderSupport {
+			page, err := providers.List(lbClient, providers.ListOpts{}).AllPages()
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to extract providers list")
-			}
-			for _, provider := range providers {
-				if provider.Name == OVNProvider {
-					log.Print("OVN Provider is enabled and Kuryr will use it")
-					octaviaProvider = OVNProvider
-					octaviaMultipleListenersSupport = false
+				log.Print("failed to get lbs provider list, using default octavia provider")
+			} else {
+				providers, err := providers.ExtractProviders(page)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to extract providers list")
+				}
+				for _, provider := range providers {
+					if provider.Name == OVNProvider {
+						log.Print("OVN Provider is enabled and Kuryr will use it")
+						octaviaProvider = OVNProvider
+						octaviaMultipleListenersSupport = false
+					}
 				}
 			}
 		}
