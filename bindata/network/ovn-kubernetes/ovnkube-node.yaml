@@ -53,7 +53,9 @@ spec:
           chown -R openvswitch:openvswitch /run/openvswitch
           chown -R openvswitch:openvswitch /etc/openvswitch
           function quit {
-              /usr/share/openvswitch/scripts/ovs-ctl stop
+              # Don't allow ovs-vswitchd to clear datapath flows on exit
+              kill -9 $(cat /var/run/openvswitch/ovs-vswitchd.pid 2>/dev/null) 2>/dev/null || true
+              kill $(cat /var/run/openvswitch/ovsdb-server.pid 2>/dev/null) 2>/dev/null || true
               exit 0
           }
           trap quit SIGTERM
@@ -109,10 +111,6 @@ spec:
             - status
           initialDelaySeconds: 15
           periodSeconds: 5
-        lifecycle:
-          preStop:
-            exec:
-              command: ["/usr/share/openvswitch/scripts/ovs-ctl", "stop"]
         terminationGracePeriodSeconds: 10
 
       # ovn-controller: programs the vswitch with flows from the sbdb
