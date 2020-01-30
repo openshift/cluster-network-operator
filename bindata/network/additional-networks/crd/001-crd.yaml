@@ -5,7 +5,6 @@ metadata:
   name: network-attachment-definitions.k8s.cni.cncf.io
 spec:
   group: k8s.cni.cncf.io
-  version: v1
   scope: Namespaced
   names:
     plural: network-attachment-definitions
@@ -13,3 +12,17 @@ spec:
     kind: NetworkAttachmentDefinition
     shortNames:
     - net-attach-def
+  versions:
+  - name: v1
+    served: true
+    storage: true
+  preserveUnknownFields: true
+  validation:
+    openAPIV3Schema:
+      type: object
+      properties:
+        spec:
+          type: object
+          properties:
+            config:
+              type: string
