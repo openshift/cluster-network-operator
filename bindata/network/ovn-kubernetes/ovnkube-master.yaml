@@ -121,11 +121,13 @@ spec:
               OVNCTL_PATH=/usr/share/openvswitch/scripts/ovn-ctl
           fi
 
+          bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
+
           MASTER_IP="{{.OVN_MASTER_IP}}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
             exec ${OVNCTL_PATH} \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
-            --db-nb-cluster-local-addr=${K8S_NODE_IP} \
+            --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
             --db-nb-cluster-local-proto=ssl \
             --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
@@ -137,8 +139,8 @@ spec:
             exec ${OVNCTL_PATH} \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
-            --db-nb-cluster-local-addr=${K8S_NODE_IP} \
-            --db-nb-cluster-remote-addr=${MASTER_IP} \
+            --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
+            --db-nb-cluster-remote-addr=$(bracketify ${MASTER_IP}) \
             --no-monitor \
             --db-nb-cluster-local-proto=ssl \
             --db-nb-cluster-remote-proto=ssl \
@@ -242,11 +244,13 @@ spec:
               OVNCTL_PATH=/usr/share/openvswitch/scripts/ovn-ctl
           fi
 
+          bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
+
           MASTER_IP="{{.OVN_MASTER_IP}}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
             exec ${OVNCTL_PATH} \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
-            --db-sb-cluster-local-addr=${K8S_NODE_IP} \
+            --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
             --db-sb-cluster-local-proto=ssl \
             --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
@@ -259,8 +263,8 @@ spec:
             exec ${OVNCTL_PATH} \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
-            --db-sb-cluster-local-addr=${K8S_NODE_IP} \
-            --db-sb-cluster-remote-addr=${MASTER_IP} \
+            --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
+            --db-sb-cluster-remote-addr=$(bracketify ${MASTER_IP}) \
             --no-monitor \
             --db-sb-cluster-local-proto=ssl \
             --db-sb-cluster-remote-proto=ssl \
