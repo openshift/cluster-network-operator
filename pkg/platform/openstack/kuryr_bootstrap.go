@@ -38,6 +38,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/platform/openstack/util/cert"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	confv1 "github.com/openshift/api/config/v1"
@@ -835,7 +836,7 @@ func getConfigMap(kubeClient client.Client, namespace, name string) (*v1.ConfigM
 	return cm, nil
 }
 
-func getUserCACert(kubeClient client.Client) (string, error) {
+func getCloudProviderCACert(kubeClient client.Client) (string, error) {
 	cm, err := getConfigMap(kubeClient, OpenShiftConfigNamespace, UserCABundleConfigMap)
 	if err != nil {
 		return "", err
@@ -893,7 +894,11 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 
 	// We need to fetch user-provided OpenStack cloud CA certificate and make gophercloud use it.
 	// Also it'll get injected into a ConfigMap mounted into kuryr-controller later on.
-	userCACert, err := getUserCACert(kubeClient)
+	userCACert, err := getCloudProviderCACert(kubeClient)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, errors.Wrap(err, "failed to get cloud provider CA certificate")
+	}
+
 	if userCACert != "" {
 		certPool, err := x509.SystemCertPool()
 		if err == nil {
@@ -1167,7 +1172,10 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	//    b. List providers and look for OVN one.
 	//    c. If it's present configure Kuryr to use it.
 	//    d. In case of any issues just use whatever the default is.
-	octaviaProvider, err := getSavedOctaviaProvider(kubeClient) // Ignore error, just do the normal discovery then.
+	octaviaProvider, err := getSavedOctaviaProvider(kubeClient)
+	if err != nil && !apierrors.IsNotFound(err) { // Ignore 404, just do the normal discovery then.
+		return nil, errors.Wrap(err, "failed to get kuryr-config ConfigMap")
+	}
 	if octaviaProvider != "" {
 		log.Printf("Detected that Kuryr was already configured to use %s LB provider. Making sure to keep it that way.",
 			octaviaProvider)
