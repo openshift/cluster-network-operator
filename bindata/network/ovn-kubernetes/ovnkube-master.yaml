@@ -172,8 +172,23 @@ spec:
                 fi
         readinessProbe:
           initialDelaySeconds: 30
-          tcpSocket:
-            port: {{.OVN_NB_PORT}}
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -xe
+              # Determine the ovn rundir.
+              if [[ -f /usr/bin/ovn-appctl ]] ; then
+                  # ovn-appctl is present. Use new ovn run dir path.
+                  DB_SOCK_PATH=/var/run/ovn/ovnnb_db.ctl
+                  APPCTL_PATH=/usr/bin/ovn-appctl
+              else
+                  # ovn-appctl is not present. Use openvswitch run dir path.
+                  DB_SOCK_PATH=/var/run/openvswitch/ovnnb_db.ctl
+                  APPCTL_PATH=/usr/bin/ovs-appctl
+              fi
+              exec ${APPCTL_PATH} -t ${DB_SOCK_PATH} cluster/status OVN_Northbound  2>/dev/null | grep ${K8S_NODE_IP} | grep -v Address -q
         env:
         - name: OVN_LOG_LEVEL
           value: info 
@@ -283,8 +298,23 @@ spec:
                 fi
         readinessProbe:
           initialDelaySeconds: 30
-          tcpSocket:
-            port: {{.OVN_SB_PORT}}
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -xe
+              # Determine the ovn rundir.
+              if [[ -f /usr/bin/ovn-appctl ]] ; then
+                  # ovn-appctl is present. Use new ovn run dir path.
+                  DB_SOCK_PATH=/var/run/ovn/ovnsb_db.ctl
+                  APPCTL_PATH=/usr/bin/ovn-appctl
+              else
+                  # ovn-appctl is not present. Use openvswitch run dir path.
+                  DB_SOCK_PATH=/var/run/openvswitch/ovnsb_db.ctl
+                  APPCTL_PATH=/usr/bin/ovs-appctl
+              fi
+              exec ${APPCTL_PATH} -t ${DB_SOCK_PATH} cluster/status OVN_Southbound  2>/dev/null | grep ${K8S_NODE_IP} | grep -v Address -q
         env:
         - name: OVN_LOG_LEVEL
           value: info 
