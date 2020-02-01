@@ -55,12 +55,15 @@ spec:
             fi
           done
 
-          # launch OVS
           function quit {
-              /usr/share/openvswitch/scripts/ovs-ctl stop
+              # Don't allow ovs-vswitchd to clear datapath flows on exit
+              kill -9 $(cat /var/run/openvswitch/ovs-vswitchd.pid 2>/dev/null) 2>/dev/null || true
+              kill $(cat /var/run/openvswitch/ovsdb-server.pid 2>/dev/null) 2>/dev/null || true
               exit 0
           }
           trap quit SIGTERM
+
+          # launch OVS
           /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovs-vswitchd --system-id=random
 
           # Restrict the number of pthreads ovs-vswitchd creates to reduce the
@@ -129,10 +132,6 @@ spec:
               /usr/bin/ovs-vsctl -t 5 show > /dev/null
           initialDelaySeconds: 15
           periodSeconds: 5
-        lifecycle:
-          preStop:
-            exec:
-              command: ["/usr/share/openvswitch/scripts/ovs-ctl", "stop"]
         terminationGracePeriodSeconds: 10
       nodeSelector:
         kubernetes.io/os: linux
