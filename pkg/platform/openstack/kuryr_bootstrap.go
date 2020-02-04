@@ -58,6 +58,8 @@ const (
 	MinOctaviaVersionWithTagSupport        = "v2.5"
 	MinOctaviaVersionWithTimeouts          = "v2.1"
 	KuryrNamespace                         = "openshift-kuryr"
+	EtcdPort                               = 2379
+	DNSPort                                = 53
 )
 
 func GetClusterID(kubeClient client.Client) (string, error) {
@@ -427,7 +429,7 @@ func ensureOpenStackSg(client *gophercloud.ServiceClient, name, tag string) (str
 
 // Tries to create an OpenStack security group rule on sgId SG. Ignores an
 // error if such rule already exists.
-func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix string, portMin, portMax int) error {
+func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix string, portMin, portMax int, protocol rules.RuleProtocol) error {
 	opts := rules.CreateOpts{
 		SecGroupID:     sgId,
 		EtherType:      rules.EtherType4,
@@ -438,7 +440,7 @@ func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix
 	if portMin >= 0 && portMax >= 0 {
 		opts.PortRangeMin = portMin
 		opts.PortRangeMax = portMax
-		opts.Protocol = rules.ProtocolTCP
+		opts.Protocol = protocol
 	}
 	_, err := rules.Create(client, opts).Extract()
 	if err != nil {
@@ -1038,33 +1040,39 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	podSgId, err := ensureOpenStackSg(client, generateName("kuryr-pods-security-group", clusterID), tag)
 	log.Printf("Pods security group %s present", podSgId)
 
-	log.Print("Allowing traffic from masters and nodes to pods")
-	// Seems like openshift/installer puts masters on worker subnet, so only this is needed.
-	err = ensureOpenStackSgRule(client, podSgId, workerSubnet.CIDR, -1, -1)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to add rule opening traffic from workers and masters")
-	}
 	log.Print("Allowing traffic from pod to pod")
-	err = ensureOpenStackSgRule(client, podSgId, "0.0.0.0/0", -1, -1)
+	err = ensureOpenStackSgRule(client, podSgId, "0.0.0.0/0", -1, -1, rules.ProtocolTCP)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to add rule opening traffic pod to pod")
 	}
 	for _, cidr := range podSubnetCidrs {
-		err = ensureOpenStackSgRule(client, masterSgId, cidr, -1, -1)
+		err = ensureOpenStackSgRule(client, masterSgId, cidr, EtcdPort, EtcdPort, rules.ProtocolTCP)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to add rule opening traffic to masters on %s", cidr)
+			return nil, errors.Wrapf(err, "failed to add TCP rule opening traffic to masters from %s on %d", cidr, EtcdPort)
 		}
-		err = ensureOpenStackSgRule(client, workerSgId, cidr, -1, -1)
+		err = ensureOpenStackSgRule(client, masterSgId, cidr, DNSPort, DNSPort, rules.ProtocolTCP)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to add rule opening traffic to workers on %s", cidr)
+			return nil, errors.Wrapf(err, "failed to add TCP rule opening traffic to masters from %s on %d", cidr, DNSPort)
+		}
+		err = ensureOpenStackSgRule(client, masterSgId, cidr, DNSPort, DNSPort, rules.ProtocolUDP)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to add UDP rule opening traffic to masters from %s on %d", cidr, DNSPort)
+		}
+		err = ensureOpenStackSgRule(client, workerSgId, cidr, DNSPort, DNSPort, rules.ProtocolTCP)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to add TCP rule opening traffic to workers from %s on %d", cidr, DNSPort)
+		}
+		err = ensureOpenStackSgRule(client, workerSgId, cidr, DNSPort, DNSPort, rules.ProtocolUDP)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to add UDP rule opening traffic to workers from %s on %d", cidr, DNSPort)
 		}
 	}
-	err = ensureOpenStackSgRule(client, masterSgId, openStackSvcCIDR, 2379, 2380)
+	err = ensureOpenStackSgRule(client, masterSgId, openStackSvcCIDR, EtcdPort, EtcdPort, rules.ProtocolTCP)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to add rule opening etcd traffic to masters from service subnet %s", conf.ServiceNetwork[0])
 	}
 	// We need to open traffic from service subnet to masters for API LB to work.
-	err = ensureOpenStackSgRule(client, masterSgId, openStackSvcCIDR, 6443, 6443)
+	err = ensureOpenStackSgRule(client, masterSgId, openStackSvcCIDR, 6443, 6443, rules.ProtocolTCP)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to add rule opening traffic to masters from service subnet %s", conf.ServiceNetwork[0])
 	}
