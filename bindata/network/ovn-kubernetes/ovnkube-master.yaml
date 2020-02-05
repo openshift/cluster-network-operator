@@ -51,7 +51,7 @@ spec:
       # (container) -> (host)
       # /etc/openvswitch -> /var/lib/ovn/etc - ovsdb data
       # /var/lib/openvswitch -> /var/lib/ovn/data - ovsdb pki state
-      # /run/openvswitch -> tmpfs - sockets & pids
+      # /run/openvswitch -> tmpfs - sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
       # ovn-northd: convert network objects in nbdb to flows in sbdb
@@ -70,7 +70,6 @@ spec:
 
           exec ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
-            --pidfile=/var/run/openvswitch/ovn-northd.pid \
             --ovnnb-db "{{.OVN_NB_DB_LIST}}" \
             --ovnsb-db "{{.OVN_SB_DB_LIST}}" \
             -p /ovn-cert/tls.key \
@@ -86,6 +85,8 @@ spec:
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert # not needed, but useful when exec'ing in to pod.
@@ -204,6 +205,8 @@ spec:
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert
@@ -328,6 +331,8 @@ spec:
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert
@@ -364,7 +369,7 @@ spec:
           fi
 
           # start nbctl daemon for caching
-          export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/run/openvswitch/ovnk-nbctl.pid \
+          export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/tmp/ovnk-nbctl.pid \
             --detach \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
             --db "{{.OVN_NB_DB_LIST}}")
@@ -383,7 +388,7 @@ spec:
         lifecycle:
           preStop:
             exec:
-              command: ["/bin/bash", "-c", "kill $(cat /run/openvswitch/ovnk-nbctl.pid)"]
+              command: ["/bin/bash", "-c", "kill $(cat /tmp/ovnk-nbctl.pid) && unset OVN_NB_DAEMON"]
         volumeMounts:
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
@@ -393,6 +398,8 @@ spec:
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
         - mountPath: /env
@@ -429,6 +436,9 @@ spec:
           path: /var/lib/ovn/data
       - name: run-openvswitch
         emptyDir: {}
+      - name: run-ovn
+        hostPath:
+          path: /var/run/ovn
       - name: ovnkube-config
         configMap:
           name: ovnkube-config
