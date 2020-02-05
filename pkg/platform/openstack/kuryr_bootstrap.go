@@ -2,12 +2,15 @@ package openstack
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	b64 "encoding/base64"
 	"fmt"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"k8s.io/api/core/v1"
 	"log"
 	"net"
+	"net/http"
 	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
@@ -43,9 +46,11 @@ import (
 )
 
 const (
-	CloudsSecret    = "installer-cloud-credentials"
-	CloudName       = "openstack"
-	CloudsSecretKey = "clouds.yaml"
+	CloudsSecret             = "installer-cloud-credentials"
+	CloudName                = "openstack"
+	CloudsSecretKey          = "clouds.yaml"
+	OpenShiftConfigNamespace = "openshift-config"
+	UserCABundleConfigMap    = "cloud-provider-config"
 	// NOTE(dulek): This one is hardcoded in openshift/installer.
 	InfrastructureCRDName              = "cluster"
 	MinOctaviaVersionWithHTTPSMonitors = "v2.10"
@@ -810,6 +815,18 @@ func ensureCertificate(kubeClient client.Client, caPEM []byte, privateKey []byte
 	}
 }
 
+func getUserCACert(kubeClient client.Client) (string, error) {
+	cm := &v1.ConfigMap{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
+		ObjectMeta: metav1.ObjectMeta{Name: UserCABundleConfigMap},
+	}
+	err := kubeClient.Get(context.TODO(), client.ObjectKey{Namespace: OpenShiftConfigNamespace, Name: UserCABundleConfigMap}, cm)
+	if err != nil {
+		return "", err
+	}
+	return string(cm.Data["ca-bundle.pem"]), nil
+}
+
 // Logs into OpenStack and creates all the resources that are required to run
 // Kuryr based on conf NetworkConfigSpec. Basically this includes service
 // network and subnet, pods subnetpool, security group and load balancer for
@@ -845,8 +862,30 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to authenticate to OpenStack")
 	}
+	provider, err := openstack.NewClient(opts.IdentityEndpoint)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to authenticate to OpenStack")
+	}
 
-	provider, err := openstack.AuthenticatedClient(*opts)
+	// We need to fetch user-provided OpenStack cloud CA certificate and make gophercloud use it.
+	// Also it'll get injected into a ConfigMap mounted into kuryr-controller later on.
+	userCACert, err := getUserCACert(kubeClient)
+	if userCACert != "" {
+		certPool, err := x509.SystemCertPool()
+		if err == nil {
+			certPool.AppendCertsFromPEM([]byte(userCACert))
+			client := http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+						RootCAs: certPool,
+					},
+				},
+			}
+			provider.HTTPClient = client
+		}
+	}
+
+	err = openstack.Authenticate(provider, *opts)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to authenticate to OpenStack")
 	}
@@ -1093,6 +1132,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 			WebhookCAKey:      b64.StdEncoding.EncodeToString(key),
 			WebhookKey:        b64.StdEncoding.EncodeToString(webhookKey),
 			WebhookCert:       b64.StdEncoding.EncodeToString(webhookCert),
+			UserCACert:        userCACert,
 		}}
 	return &res, nil
 }
