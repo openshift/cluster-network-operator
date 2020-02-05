@@ -35,7 +35,7 @@ spec:
       containers:
       # ovsdb and ovs-vswitchd
       - name: ovs-daemons
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
         command:
         - /bin/bash
         - -c
