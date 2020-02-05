@@ -21,7 +21,7 @@ type KuryrBootstrapResult struct {
 }
 
 type OVNBootstrapResult struct {
-	OVNMasterNodes []string
+	MasterIPs []string
 }
 
 type BootstrapResult struct {
