@@ -113,20 +113,11 @@ spec:
             set +o allexport
           fi
 
-          # Determine the ovn rundir.
-          if [[ -f /usr/bin/ovn-appctl ]] ; then
-              # ovn-appctl is present. Use new ovn run dir path.
-              OVNCTL_PATH=/usr/share/ovn/scripts/ovn-ctl
-          else
-              # ovn-appctl is not present. Use openvswitch run dir path.
-              OVNCTL_PATH=/usr/share/openvswitch/scripts/ovn-ctl
-          fi
-
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
           MASTER_IP="{{.OVN_MASTER_IP}}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
-            exec ${OVNCTL_PATH} \
+            exec /usr/share/ovn/scripts/ovn-ctl \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
@@ -137,7 +128,7 @@ spec:
             --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
             run_nb_ovsdb
           else
-            exec ${OVNCTL_PATH} \
+            exec /usr/share/ovn/scripts/ovn-ctl \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
@@ -178,17 +169,7 @@ spec:
             - -c
             - |
               set -xe
-              # Determine the ovn rundir.
-              if [[ -f /usr/bin/ovn-appctl ]] ; then
-                  # ovn-appctl is present. Use new ovn run dir path.
-                  DB_SOCK_PATH=/var/run/ovn/ovnnb_db.ctl
-                  APPCTL_PATH=/usr/bin/ovn-appctl
-              else
-                  # ovn-appctl is not present. Use openvswitch run dir path.
-                  DB_SOCK_PATH=/var/run/openvswitch/ovnnb_db.ctl
-                  APPCTL_PATH=/usr/bin/ovs-appctl
-              fi
-              exec ${APPCTL_PATH} -t ${DB_SOCK_PATH} cluster/status OVN_Northbound  2>/dev/null | grep ${K8S_NODE_IP} | grep -v Address -q
+              exec /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/status OVN_Northbound  2>/dev/null | grep ${K8S_NODE_IP} | grep -v Address -q
         env:
         - name: OVN_LOG_LEVEL
           value: info 
@@ -238,20 +219,11 @@ spec:
             set +o allexport
           fi
 
-          # Determine the ovn rundir.
-          if [[ -f /usr/bin/ovn-appctl ]] ; then
-              # ovn-appctl is present. Use new ovn run dir path.
-              OVNCTL_PATH=/usr/share/ovn/scripts/ovn-ctl
-          else
-              # ovn-appctl is not present. Use openvswitch run dir path.
-              OVNCTL_PATH=/usr/share/openvswitch/scripts/ovn-ctl
-          fi
-
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
           MASTER_IP="{{.OVN_MASTER_IP}}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
-            exec ${OVNCTL_PATH} \
+            exec /usr/share/ovn/scripts/ovn-ctl \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
@@ -263,7 +235,7 @@ spec:
             run_sb_ovsdb
           else
             echo "joining cluster at ${MASTER_IP}"
-            exec ${OVNCTL_PATH} \
+            exec /usr/share/ovn/scripts/ovn-ctl \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
@@ -304,17 +276,7 @@ spec:
             - -c
             - |
               set -xe
-              # Determine the ovn rundir.
-              if [[ -f /usr/bin/ovn-appctl ]] ; then
-                  # ovn-appctl is present. Use new ovn run dir path.
-                  DB_SOCK_PATH=/var/run/ovn/ovnsb_db.ctl
-                  APPCTL_PATH=/usr/bin/ovn-appctl
-              else
-                  # ovn-appctl is not present. Use openvswitch run dir path.
-                  DB_SOCK_PATH=/var/run/openvswitch/ovnsb_db.ctl
-                  APPCTL_PATH=/usr/bin/ovs-appctl
-              fi
-              exec ${APPCTL_PATH} -t ${DB_SOCK_PATH} cluster/status OVN_Southbound  2>/dev/null | grep ${K8S_NODE_IP} | grep -v Address -q
+              exec /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/status OVN_Southbound  2>/dev/null | grep ${K8S_NODE_IP} | grep -v Address -q
         env:
         - name: OVN_LOG_LEVEL
           value: info 
