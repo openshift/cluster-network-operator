@@ -57,12 +57,34 @@ spec:
 
           # launch OVS
           function quit {
-              /usr/share/openvswitch/scripts/ovs-ctl stop
+              # Save the flows
+              echo "info: Saving flows ..." 2>&1
+              bridges=$(ovs-vsctl -- --real list-br)
+              /usr/share/openvswitch/scripts/ovs-save save-flows $bridges > /var/run/openvswitch/flows.sh
+              echo "info: Saved flows" 2>&1
+
+              # Don't allow ovs-vswitchd to clear datapath flows on exit
+              kill -9 $(cat /var/run/openvswitch/ovs-vswitchd.pid 2>/dev/null) 2>/dev/null || true
+              kill $(cat /var/run/openvswitch/ovsdb-server.pid 2>/dev/null) 2>/dev/null || true
               exit 0
           }
           trap quit SIGTERM
+
+          # launch OVS
+          # Start the ovsdb so that we can prep it before we start the ovs-vswitchd
           /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovs-vswitchd --system-id=random
 
+          # Load any flows that we saved
+          echo "info: Loading previous flows ..." 2>&1
+          ovs-vsctl --no-wait set Open_vSwitch . other_config:flow-restore-wait=true
+          if [[ -f /var/run/openvswitch/flows.sh ]]; then
+             echo "info: Execute flow script ..." 2>&1
+             sh -x /var/run/openvswitch/flows.sh
+          fi
+          echo "info: Remove other config ..." 2>&1
+          ovs-vsctl --no-wait --if-exists remove Open_vSwitch . other_config flow-restore-wait=true
+          echo "info: Removed other config ..." 2>&1
+          
           # Restrict the number of pthreads ovs-vswitchd creates to reduce the
           # amount of RSS it uses on hosts with many cores
           # https://bugzilla.redhat.com/show_bug.cgi?id=1571379
@@ -71,6 +93,8 @@ spec:
               ovs-vsctl --no-wait set Open_vSwitch . other_config:n-revalidator-threads=4
               ovs-vsctl --no-wait set Open_vSwitch . other_config:n-handler-threads=10
           fi
+
+          # And finally start the ovs-vswitchd now the DB is prepped
           /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovsdb-server --system-id=random
 
           tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
