@@ -129,10 +129,6 @@ spec:
           fi
           
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
-            --cluster-subnets "${OVN_NET_CIDR}" \
-            --k8s-service-cidr "${OVN_SVC_CIDR}" \
-            --k8s-apiserver "{{.K8S_APISERVER}}" \
-            --ovn-config-namespace ${ovn_config_namespace} \
             --nb-address "{{.OVN_NB_ADDR_LIST}}" \
             --sb-address "{{.OVN_SB_ADDR_LIST}}" \
             --nb-client-privkey /ovn-cert/tls.key \
