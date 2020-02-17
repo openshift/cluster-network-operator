@@ -60,7 +60,7 @@ spec:
               # Save the flows
               echo "info: Saving flows ..." 2>&1
               bridges=$(ovs-vsctl -- --real list-br)
-              /usr/share/openvswitch/scripts/ovs-save save-flows $bridges > /var/run/openvswitch/flows.sh
+              TMPDIR=/var/run/openvswitch /usr/share/openvswitch/scripts/ovs-save save-flows $bridges > /var/run/openvswitch/flows.sh
               echo "info: Saved flows" 2>&1
 
               # Don't allow ovs-vswitchd to clear datapath flows on exit
@@ -137,10 +137,6 @@ spec:
             - status
           initialDelaySeconds: 15
           periodSeconds: 5
-        lifecycle:
-          preStop:
-            exec:
-              command: ["/usr/share/openvswitch/scripts/ovs-ctl", "stop"]
         terminationGracePeriodSeconds: 10
       nodeSelector:
         kubernetes.io/os: linux
