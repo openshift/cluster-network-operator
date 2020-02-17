@@ -57,18 +57,14 @@ func Port(port int) error {
 	return nil
 }
 
-// URI validates uri as being a valid url and returns the url scheme.
+// URI validates uri as being a http(s) valid url and returns the url scheme.
 func URI(uri string) (string, error) {
-	parsed, err := url.Parse(uri)
+	parsed, err := url.ParseRequestURI(uri)
 	if err != nil {
 		return "", err
 	}
 	if !parsed.IsAbs() {
 		return "", fmt.Errorf("failed validating URI, no scheme for URI %q", uri)
-	}
-	host := parsed.Hostname()
-	if err := Host(host); err != nil {
-		return "", fmt.Errorf("failed validating URI %q: %v", uri, err)
 	}
 	if port := parsed.Port(); len(port) != 0 {
 		intPort, err := strconv.Atoi(port)
