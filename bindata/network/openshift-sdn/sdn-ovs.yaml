@@ -74,16 +74,8 @@ spec:
           # Start the ovsdb so that we can prep it before we start the ovs-vswitchd
           /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovs-vswitchd --system-id=random
 
-          # Load any flows that we saved
-          echo "info: Loading previous flows ..." 2>&1
+          # Set the flow-restore-wait to true so ovs-vswitchd will wait till flows are restored
           ovs-vsctl --no-wait set Open_vSwitch . other_config:flow-restore-wait=true
-          if [[ -f /var/run/openvswitch/flows.sh ]]; then
-             echo "info: Execute flow script ..." 2>&1
-             sh -x /var/run/openvswitch/flows.sh
-          fi
-          echo "info: Remove other config ..." 2>&1
-          ovs-vsctl --no-wait --if-exists remove Open_vSwitch . other_config flow-restore-wait=true
-          echo "info: Removed other config ..." 2>&1
           
           # Restrict the number of pthreads ovs-vswitchd creates to reduce the
           # amount of RSS it uses on hosts with many cores
@@ -96,6 +88,17 @@ spec:
 
           # And finally start the ovs-vswitchd now the DB is prepped
           /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovsdb-server --system-id=random
+
+          # Load any flows that we saved
+          echo "info: Loading previous flows ..." 2>&1
+          if [[ -f /var/run/openvswitch/flows.sh ]]; then
+             echo "info: Execute flow script ..." 2>&1
+             sh -x /var/run/openvswitch/flows.sh
+          fi
+          
+          echo "info: Remove other config ..." 2>&1
+          ovs-vsctl --no-wait --if-exists remove Open_vSwitch . other_config flow-restore-wait=true
+          echo "info: Removed other config ..." 2>&1
 
           tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
           tail -F --pid=$(cat /var/run/openvswitch/ovsdb-server.pid) /var/log/openvswitch/ovsdb-server.log &
