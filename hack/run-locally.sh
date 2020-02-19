@@ -13,13 +13,20 @@ if [[ -n "${HACK_MINIMIZE:-}" ]]; then
     echo ""
 fi
 
+function run_vs_existing_cluster {
+    echo "Attaching to already running cluster..."
+    wait_for_cluster
+    extract_environment_from_running_cluster
+    stop_deployed_operator
+}
+
 # Install our overrides so the cluster doesn't run the network operator.
 function override_install_manifests() {
     # Patch the CVO to not create the network operator
-    kubectl --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f="${CLUSTER_DIR}/manifests/cvo-overrides.yaml" -p "$(cat hack/overrides-patch.yaml)" -o yaml > "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new"
+    oc --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f="${CLUSTER_DIR}/manifests/cvo-overrides.yaml" -p "$(cat hack/overrides-patch.yaml)" -o yaml > "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new"
     # Optionally, tell the CVO to skip some unnecessary components
     if [[ -n "${HACK_MINIMIZE:-}" ]]; then
-        kubectl --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f="${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new" -p "$(cat hack/overrides-minimize-patch.yaml)" -o yaml > "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new.2"
+        oc --kubeconfig=hack/null-kubeconfig patch --type=json --local=true -f="${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new" -p "$(cat hack/overrides-minimize-patch.yaml)" -o yaml > "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new.2"
         mv "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new.2" "${CLUSTER_DIR}/manifests/.cvo-overrides.yaml.new"
     fi
 
@@ -35,7 +42,10 @@ function override_install_manifests() {
 function extract_environment_from_running_cluster() {
     if [[ ! -e "${CLUSTER_DIR}/env.sh" ]]; then
         echo "Copying environment variables from manifest to ${CLUSTER_DIR}/env.sh"
-        kubectl get deployment -n openshift-network-operator network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
+        oc get deployment -n openshift-network-operator network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
+    fi
+    if [[ $EXPORT_ENV_ONLY == true ]]; then
+        exit 0
     fi
 }
 
@@ -62,18 +72,16 @@ function setup_operator_env() {
 # Patch the CNO out of the cluster-version-operator and scale it down to zero so
 # we can run our local CNO instead
 function stop_deployed_operator() {
-    kubectl patch --type=json -p "$(cat hack/overrides-patch.yaml)" clusterversion version
+    oc patch --type=json -p "$(cat hack/overrides-patch.yaml)" clusterversion version
 
-    if [[ -n "$(kubectl get deployments -n openshift-network-operator 2> /dev/null | grep network-operator)" ]]; then
+    if [[ -n "$(oc get deployments -n openshift-network-operator 2> /dev/null | grep network-operator)" ]]; then
         echo "Scaling the deployed network operator to 0"
-        kubectl scale deployment -n openshift-network-operator network-operator --replicas 0
+        oc scale deployment -n openshift-network-operator network-operator --replicas 0
     fi
 }
 
 # wait_for_cluster waits for the cluster to come up and sets some variables
 function wait_for_cluster() {
-    export KUBECONFIG="${CLUSTER_DIR}/auth/kubeconfig"
-
     if [[ ! -e "${KUBECONFIG}" ]]; then
         echo "Waiting for installer to create a kubeconfig..."
         while [[ ! -e "${KUBECONFIG}" ]]; do
@@ -158,7 +166,8 @@ function create_cluster() {
 function print_usage() {
     >&2 echo "Usage: $0 [-c <cluster-dir>] [options]
 
-$0 detects whether the cluster given by the '-c' option does not yet exist or
+$0 runs against an existing cluster using the specific '-k' option or 
+detects whether the cluster given by the '-c' option does not yet exist or
 is already running. If it does not yet exist the cluster will be created using
 the options supplied below. If it is already running, any running
 cluster-network-operator will be stopped, plugin image overrides applied, and
@@ -166,23 +175,30 @@ a local cluster-network-operator started.
 
 The following options are accepted for both new and existing clusters:
 
- -c DIR           the cluster installation temporary directory (can also be given via CLUSTER_DIR); required
+ -c DIR           the cluster installation temporary directory (can also be given via CLUSTER_DIR); 
+ -k KUBECONFIG    the kubeconfig pointing to the existing cluster (can also be given via KUBECONFIG); 
+
+Either -c or -k (or their corresponding environment variable) is required
+
  -m IMAGE         custom network plugin container image name
 
 The following options are always accepted but only used for new clusters:
 
- -f CONFIG        the path to an openshift-install-created install-config.yaml file; if not given one will be created
- -i INSTALLER     path to the openshift-install binary; if not given PATH will be searched
- -n PLUGIN        the name of the network plugin to deploy; one of [sdn|OpenShiftSDN|ovn|OVNKubernetes]
- -w               pause after creating manifests to allow manual overrides
+ -e EXPORT_ENV_ONLY  exports cluster environment only, used as a helper which allows you to modify the image you want to target later
+ -f CONFIG           the path to an openshift-install-created install-config.yaml file; if not given one will be created
+ -i INSTALLER        path to the openshift-install binary; if not given PATH will be searched
+ -n PLUGIN           the name of the network plugin to deploy; one of [sdn|OpenShiftSDN|ovn|OVNKubernetes]
+ -w                  pause after creating manifests to allow manual overrides
 
 The following environment variables are honored:
  - CLUSTER_DIR: the cluster installation temp directory
+ - KUBECONFIG: the kubeconfig pointing to the existing cluster 
  - INSTALLER_PATH: the path to the openshift-install binary for 'new' mode
  - INSTALL_CONFIG: the path to the install-config.yaml file for 'new' mode
 "
 }
 
+EXPORT_ENV_ONLY=false
 PLUGIN_IMAGE="${PLUGIN_IMAGE:-}"
 NETWORK_PLUGIN="OpenShiftSDN"
 IMAGE_ENV_KEY="SDN_IMAGE"
@@ -190,13 +206,17 @@ CLUSTER_DIR="${CLUSTER_DIR:-}"
 INSTALLER_PATH="${INSTALLER_PATH:-}"
 INSTALL_CONFIG="${INSTALL_CONFIG:-}"
 WAIT_FOR_MANIFEST_UPDATES="${WAIT_FOR_MANIFEST_UPDATES:-}"
+KUBECONFIG="${KUBECONFIG:-}"
 
-while getopts "c:f:i:m:n:w" opt; do
+while getopts "e?c:f:i:m:k:n:w" opt; do
     case $opt in
-        c) CLUSTER_DIR="${OPTARG}";;
+        c) CLUSTER_DIR="${OPTARG}"
+           mkdir -p "${CLUSTER_DIR}" >& /dev/null;;
+        e) EXPORT_ENV_ONLY=true;;
         f) INSTALL_CONFIG="${OPTARG}";;
         i) INSTALLER_PATH="${OPTARG}";;
         m) PLUGIN_IMAGE="${OPTARG}";;
+        k) KUBECONFIG="${OPTARG}";;
         n)
             case ${OPTARG} in
                 ovn|OVNKubernetes)
@@ -221,16 +241,15 @@ while getopts "c:f:i:m:n:w" opt; do
     esac
 done
 
-if [[ -z "${CLUSTER_DIR:-}" ]]; then
-    echo "error: CLUSTER_DIR must be set or '-c <cluster-dir>' must be given"
+if [[ -z "${KUBECONFIG:-}" && -z "${CLUSTER_DIR:-}" ]]; then
+    echo "error: KUBECONFIG / CLUSTER_DIR must be set or '-c <cluster-dir>'/'-k <kubeconfig>' must be given"
     echo
     print_usage
     exit 1
 fi
-mkdir -p "${CLUSTER_DIR}" >& /dev/null
 
 if [[ -z "$(which oc 2> /dev/null || exit 0)" ]]; then
-    echo "could not find 'oc' in PATH" >&2
+    echo "error: could not find 'oc' in PATH" >&2
     exit 1
 fi
 
@@ -239,7 +258,13 @@ echo "rebuilding the CNO"
 hack/build-go.sh
 
 # Autodetect the state of the cluster to determine which mode to run in
-if [[ -z "$(ls -A ${CLUSTER_DIR} 2> /dev/null | grep -v install-config.yaml | grep -v .openshift_install | grep -v env.sh)" ]]; then
+if [[ -n "$(ls -A ${CLUSTER_DIR}/terraform.* 2> /dev/null)" ]]; then
+    export KUBECONFIG="${CLUSTER_DIR}/auth/kubeconfig"
+    run_vs_existing_cluster
+elif [[ ! -z "${KUBECONFIG}" ]]; then
+    export CLUSTER_DIR=/tmp
+    run_vs_existing_cluster
+elif [[ -z "$(ls -A ${CLUSTER_DIR} 2> /dev/null | grep -v install-config.yaml | grep -v .openshift_install | grep -v env.sh)" ]]; then
     echo "Creating new cluster..."
 
     # Find openshift-install if not explicitly given
@@ -264,12 +289,6 @@ if [[ -z "$(ls -A ${CLUSTER_DIR} 2> /dev/null | grep -v install-config.yaml | gr
     extract_environment_from_manifests
     create_cluster
     wait_for_cluster
-elif [[ -n "$(ls -A ${CLUSTER_DIR}/terraform.* 2> /dev/null)" ]]; then
-    echo "Attaching to already running cluster..."
-
-    wait_for_cluster
-    stop_deployed_operator
-    extract_environment_from_running_cluster
 else
     echo "could not detect cluster state" >&2
     exit 1
