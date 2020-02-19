@@ -101,8 +101,6 @@ func (status *StatusManager) SetFromPods() {
 		}
 
 		if dsProgressing && !isNonCritical(ds) {
-			reachedAvailableLevel = false
-
 			dsState, exists := daemonsetStates[dsName]
 			if !exists || !reflect.DeepEqual(dsState.LastSeenStatus, ds.Status) {
 				dsState.LastChangeTime = time.Now()
@@ -110,9 +108,18 @@ func (status *StatusManager) SetFromPods() {
 				daemonsetStates[dsName] = dsState
 			}
 
-			// Catch hung rollouts
-			if exists && (time.Since(dsState.LastChangeTime)) > ProgressTimeout {
-				hung = append(hung, fmt.Sprintf("DaemonSet %q rollout is not making progress - last change %s", dsName.String(), dsState.LastChangeTime.Format(time.RFC3339)))
+			// if the daemonset is updated only on pod deletion, consider us available and check for hung status
+			// on a much longer time period
+			if ds.Spec.UpdateStrategy.Type == appsv1.OnDeleteDaemonSetStrategyType {
+				if exists && (time.Since(dsState.LastChangeTime)) > 2*time.Hour {
+					hung = append(hung, fmt.Sprintf("DaemonSet %q rollout is not making progress - last change %s", dsName.String(), dsState.LastChangeTime.Format(time.RFC3339)))
+				}
+			} else {
+				reachedAvailableLevel = false
+
+				if exists && (time.Since(dsState.LastChangeTime)) > ProgressTimeout {
+					hung = append(hung, fmt.Sprintf("DaemonSet %q rollout is not making progress - last change %s", dsName.String(), dsState.LastChangeTime.Format(time.RFC3339)))
+				}
 			}
 		} else {
 			delete(daemonsetStates, dsName)

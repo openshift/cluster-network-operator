@@ -13,9 +13,12 @@ spec:
     matchLabels:
       app: ovs
   updateStrategy:
-    type: RollingUpdate
+    type: OnDelete
   template:
     metadata:
+      annotations:
+        # Indicates this daemonset must be purged during shutdown
+        upgrade.openshift.io/delete-on-node-shutdown: "true"
       labels:
         app: ovs
         component: network
