@@ -1171,6 +1171,10 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	if octaviaProvider != "" {
 		log.Printf("Detected that Kuryr was already configured to use %s LB provider. Making sure to keep it that way.",
 			octaviaProvider)
+		if octaviaProvider == OVNProvider {
+			// OVN provider does not support multiple listeners, so in that case we always set false to that.
+			octaviaMultipleListenersSupport = false
+		}
 	} else {
 		octaviaProvider = "default"
 		if octaviaProviderSupport {
@@ -1186,6 +1190,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 					if provider.Name == OVNProvider {
 						log.Print("OVN Provider is enabled and Kuryr will use it")
 						octaviaProvider = OVNProvider
+						// OVN provider does not support multiple listeners, so in that case we always set false to that.
 						octaviaMultipleListenersSupport = false
 					}
 				}
