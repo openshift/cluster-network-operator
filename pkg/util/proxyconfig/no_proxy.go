@@ -2,6 +2,7 @@ package proxyconfig
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -21,14 +22,20 @@ import (
 // are returned.
 func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructure, network *configv1.Network, cluster *corev1.ConfigMap) (string, error) {
 	// TODO: This will be flexible when master machine management is more dynamic.
+	type machineNetworkEntry struct {
+		// CIDR is the IP block address pool for machines within the cluster.
+		CIDR string `json:"cidr"`
+	}
 	type installConfig struct {
 		ControlPlane struct {
 			Replicas string `json:"replicas"`
 		} `json:"controlPlane"`
 		Networking struct {
-			MachineCIDR string `json:"machineCIDR"`
+			MachineCIDR    string                `json:"machineCIDR"`
+			MachineNetwork []machineNetworkEntry `json:"machineNetwork,omitempty"`
 		} `json:"networking"`
 	}
+
 	var ic installConfig
 	data, ok := cluster.Data["install-config"]
 	if !ok {
@@ -45,6 +52,13 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		".cluster.local",
 		ic.Networking.MachineCIDR,
 	)
+
+	for _, mc := range ic.Networking.MachineNetwork {
+		if _, _, err := net.ParseCIDR(mc.CIDR); err != nil {
+			return "", fmt.Errorf("MachineNetwork has an invalid CIDR: %s", mc.CIDR)
+		}
+		set.Insert(mc.CIDR)
+	}
 
 	if len(infra.Status.APIServerInternalURL) > 0 {
 		internalAPIServer, err := url.Parse(infra.Status.APIServerInternalURL)
