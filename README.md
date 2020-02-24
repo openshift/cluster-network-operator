@@ -220,7 +220,7 @@ spec:
 ```
 
 ## Configuring Additional Networks
-Users can configure additional networks, based on [Kubernetes Network Plumbing Working Group's Kubernetes Network Custom Resource Definition De-facto Standard Version 1](https://github.com/K8sNetworkPlumbingWG/multi-net-spec/blob/master/%5Bv1%5D%20Kubernetes%20Network%20Custom%20Resource%20Definition%20De-facto%20Standard.md).
+Users can configure additional networks, based on [Kubernetes Network Plumbing Working Group's Kubernetes Network Custom Resource Definition De-facto Standard Version 1](https://github.com/k8snetworkplumbingwg/multi-net-spec/blob/master/v1.0/%5Bv1%5D%20Kubernetes%20Network%20Custom%20Resource%20Definition%20De-facto%20Standard.md).
 
 * `name`: name of network attachment definition, required
 * `namespace`: namespace for the network attachment definition. The default is default namespace
@@ -270,7 +270,7 @@ spec:
 # (snip)
 ```
 
-Please take a look into the spec, [Kubernetes Network Plumbing Working Group's Kubernetes Network Custom Resource Definition De-facto Standard Version 1](https://github.com/K8sNetworkPlumbingWG/multi-net-spec/blob/master/%5Bv1%5D%20Kubernetes%20Network%20Custom%20Resource%20Definition%20De-facto%20Standard.md), for its detail.
+Please take a look into the spec, [Kubernetes Network Plumbing Working Group's Kubernetes Network Custom Resource Definition De-facto Standard Version 1](https://github.com/k8snetworkplumbingwg/multi-net-spec/blob/master/v1.0/%5Bv1%5D%20Kubernetes%20Network%20Custom%20Resource%20Definition%20De-facto%20Standard.md), for its detail.
 
 ### Configuring Raw CNI
 Users can configure network attachment definition with CNI json as following options required:
