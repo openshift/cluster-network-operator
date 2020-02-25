@@ -10,6 +10,7 @@ spec:
     kind: ClusterNetwork
     singular: clusternetwork
     plural: clusternetworks
+  preserveUnknownFields: false
   validation:
     # As compared to ValidateClusterNetwork, this does not validate that:
     #   - the hostSubnetLengths are valid for their CIDRs
@@ -77,6 +78,7 @@ spec:
     kind: HostSubnet
     singular: hostsubnet
     plural: hostsubnets
+  preserveUnknownFields: false
   validation:
     # As compared to ValidateHostSubnet, this does not validate that:
     #   - .host == .name
@@ -138,6 +140,7 @@ spec:
     kind: NetNamespace
     singular: netnamespace
     plural: netnamespaces
+  preserveUnknownFields: false
   validation:
     # As compared to ValidateNetNamespace, this does not validate that:
     #   - .netname == .name
@@ -178,6 +181,7 @@ spec:
     kind: EgressNetworkPolicy
     singular: egressnetworkpolicy
     plural: egressnetworkpolicies
+  preserveUnknownFields: false
   validation:
     # This should be mostly equivalent to ValidateEgressNetworkPolicy
     openAPIV3Schema:
