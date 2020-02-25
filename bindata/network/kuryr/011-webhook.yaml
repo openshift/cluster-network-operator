@@ -1,4 +1,4 @@
----
+{{if .AdmissionController}}
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: MutatingWebhookConfiguration
 metadata:
@@ -18,3 +18,4 @@ webhooks:
         apiGroups: [""]
         apiVersions: ["*"]
         resources: ["pods"]
+{{- end}}

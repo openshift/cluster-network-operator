@@ -1,4 +1,4 @@
----
+{{if .AdmissionController}}
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
@@ -60,3 +60,4 @@ spec:
       - key: "node.kubernetes.io/not-ready"
         operator: Exists
         effect: NoSchedule
+{{- end}}
