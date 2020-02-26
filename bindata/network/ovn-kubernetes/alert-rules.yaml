@@ -30,3 +30,12 @@ spec:
       for: 1h
       labels:
         severity: warning
+    - alert: HighNodeIPPoolUtilization
+      annotations:
+        message:  IP Pool utilization on node {{"{{"}} $labels.node {{"}}"}} exceeds the set threshold
+      expr: |
+         node_ip_pool_utilization{namespace="ovnkube"} > 0.8
+      for: 1m
+      labels:
+        severity: warning
+
