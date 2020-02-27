@@ -1,3 +1,19 @@
+# The ovnkube control-plane components
+
+# The pod disruption budget ensures that we keep a raft quorum
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: ovn-raft-quorum-guard
+  namespace: openshift-ovn-kubernetes
+spec:
+  minAvailable: {{.OVN_MIN_AVAILABLE}}
+  selector:
+    matchLabels:
+      app: ovnkube-master
+
+---
+
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
@@ -11,7 +27,7 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      name: ovnkube-master
+      app: ovnkube-master
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -22,7 +38,7 @@ spec:
   template:
     metadata:
       labels:
-        name: ovnkube-master
+        app: ovnkube-master
         component: network
         type: infra
         openshift.io/component: network
@@ -35,12 +51,12 @@ spec:
       # (container) -> (host)
       # /etc/openvswitch -> /var/lib/ovn/etc - ovsdb data
       # /var/lib/openvswitch -> /var/lib/ovn/data - ovsdb pki state
-      # /run/openvswitch -> tmpfs - sockets & pids
+      # /run/openvswitch -> tmpfs - sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
       # ovn-northd: convert network objects in nbdb to flows in sbdb
       - name: northd
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
         command:
         - /bin/bash
         - -c
@@ -54,7 +70,6 @@ spec:
 
           exec ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
-            --pidfile=/var/run/openvswitch/ovn-northd.pid \
             --ovnnb-db "{{.OVN_NB_DB_LIST}}" \
             --ovnsb-db "{{.OVN_SB_DB_LIST}}" \
             -p /ovn-cert/tls.key \
@@ -70,6 +85,8 @@ spec:
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert # not needed, but useful when exec'ing in to pod.
@@ -80,10 +97,11 @@ spec:
           requests:
             cpu: 100m
             memory: 300Mi
+        terminationMessagePolicy: FallbackToLogsOnError
 
       # nbdb: the northbound, or logical network object DB. In raft mode 
       - name: nbdb
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
         command:
         - /bin/bash
         - -c
@@ -95,11 +113,20 @@ spec:
             set +o allexport
           fi
 
+          # Determine the ovn rundir.
+          if [[ -f /usr/bin/ovn-appctl ]] ; then
+              # ovn-appctl is present. Use new ovn run dir path.
+              OVNCTL_PATH=/usr/share/ovn/scripts/ovn-ctl
+          else
+              # ovn-appctl is not present. Use openvswitch run dir path.
+              OVNCTL_PATH=/usr/share/openvswitch/scripts/ovn-ctl
+          fi
+
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
           MASTER_IP="{{.OVN_MASTER_IP}}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
+            exec ${OVNCTL_PATH} \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
@@ -110,7 +137,7 @@ spec:
             --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
             run_nb_ovsdb
           else
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
+            exec ${OVNCTL_PATH} \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
@@ -143,6 +170,25 @@ spec:
                   sleep 2
                   done
                 fi
+        readinessProbe:
+          initialDelaySeconds: 30
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -xe
+              # Determine the ovn rundir.
+              if [[ -f /usr/bin/ovn-appctl ]] ; then
+                  # ovn-appctl is present. Use new ovn run dir path.
+                  DB_SOCK_PATH=/var/run/ovn/ovnnb_db.ctl
+                  APPCTL_PATH=/usr/bin/ovn-appctl
+              else
+                  # ovn-appctl is not present. Use openvswitch run dir path.
+                  DB_SOCK_PATH=/var/run/openvswitch/ovnnb_db.ctl
+                  APPCTL_PATH=/usr/bin/ovs-appctl
+              fi
+              exec ${APPCTL_PATH} -t ${DB_SOCK_PATH} cluster/status OVN_Northbound  2>/dev/null | grep ${K8S_NODE_IP} | grep -v Address -q
         env:
         - name: OVN_LOG_LEVEL
           value: info 
@@ -153,10 +199,14 @@ spec:
         volumeMounts:
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
+        - mountPath: /etc/ovn/
+          name: etc-openvswitch
         - mountPath: /var/lib/openvswitch/
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert
@@ -172,10 +222,11 @@ spec:
           containerPort: {{.OVN_NB_PORT}}
         - name: nb-db-raft-port
           containerPort: {{.OVN_NB_RAFT_PORT}}
+        terminationMessagePolicy: FallbackToLogsOnError
       
       # sbdb: The southbound, or flow DB. In raft mode 
       - name: sbdb
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
         command:
         - /bin/bash
         - -c
@@ -187,11 +238,20 @@ spec:
             set +o allexport
           fi
 
+          # Determine the ovn rundir.
+          if [[ -f /usr/bin/ovn-appctl ]] ; then
+              # ovn-appctl is present. Use new ovn run dir path.
+              OVNCTL_PATH=/usr/share/ovn/scripts/ovn-ctl
+          else
+              # ovn-appctl is not present. Use openvswitch run dir path.
+              OVNCTL_PATH=/usr/share/openvswitch/scripts/ovn-ctl
+          fi
+
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
           MASTER_IP="{{.OVN_MASTER_IP}}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
+            exec ${OVNCTL_PATH} \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
@@ -203,7 +263,7 @@ spec:
             run_sb_ovsdb
           else
             echo "joining cluster at ${MASTER_IP}"
-            exec /usr/share/openvswitch/scripts/ovn-ctl \
+            exec ${OVNCTL_PATH} \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
@@ -236,6 +296,25 @@ spec:
                   sleep 2
                   done
                 fi
+        readinessProbe:
+          initialDelaySeconds: 30
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -xe
+              # Determine the ovn rundir.
+              if [[ -f /usr/bin/ovn-appctl ]] ; then
+                  # ovn-appctl is present. Use new ovn run dir path.
+                  DB_SOCK_PATH=/var/run/ovn/ovnsb_db.ctl
+                  APPCTL_PATH=/usr/bin/ovn-appctl
+              else
+                  # ovn-appctl is not present. Use openvswitch run dir path.
+                  DB_SOCK_PATH=/var/run/openvswitch/ovnsb_db.ctl
+                  APPCTL_PATH=/usr/bin/ovs-appctl
+              fi
+              exec ${APPCTL_PATH} -t ${DB_SOCK_PATH} cluster/status OVN_Southbound  2>/dev/null | grep ${K8S_NODE_IP} | grep -v Address -q
         env:
         - name: OVN_LOG_LEVEL
           value: info 
@@ -246,10 +325,14 @@ spec:
         volumeMounts:
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
+        - mountPath: /etc/ovn/
+          name: etc-openvswitch
         - mountPath: /var/lib/openvswitch/
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert
@@ -261,10 +344,11 @@ spec:
           containerPort: {{.OVN_SB_PORT}}
         - name: sb-db-raft-port
           containerPort: {{.OVN_SB_RAFT_PORT}}
+        terminationMessagePolicy: FallbackToLogsOnError
 
       # ovnkube master: convert kubernetes objects in to nbdb logical network components
       - name: ovnkube-master
-        image: {{.OvnImage}}
+        image: "{{.OvnImage}}"
         command:
         - /bin/bash
         - -c
@@ -285,22 +369,17 @@ spec:
           fi
 
           # start nbctl daemon for caching
-          export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/run/openvswitch/ovnk-nbctl.pid \
+          export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/tmp/ovnk-nbctl.pid \
             --detach \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
             --db "{{.OVN_NB_DB_LIST}}")
 
           exec /usr/bin/ovnkube \
             --init-master "${K8S_NODE}" \
-            --cluster-subnets "${OVN_NET_CIDR}" \
-            --k8s-service-cidr "${OVN_SVC_CIDR}" \
-            --k8s-apiserver "{{.K8S_APISERVER}}" \
-            --ovn-config-namespace openshift-ovn-kubernetes \
-            --nodeport \
+            --config-file=/run/ovnkube-config/ovnkube.conf \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             ${hybrid_overlay_flags} \
-            --logfile /dev/stdout \
             --metrics-bind-address "0.0.0.0:9102" \
             --sb-address "{{.OVN_SB_ADDR_LIST}}" \
             --sb-client-privkey /ovn-cert/tls.key \
@@ -309,14 +388,20 @@ spec:
         lifecycle:
           preStop:
             exec:
-              command: ["/bin/bash", "-c", "kill $(cat /run/openvswitch/ovnk-nbctl.pid)"]
+              command: ["/bin/bash", "-c", "kill $(cat /tmp/ovnk-nbctl.pid) && unset OVN_NB_DAEMON"]
         volumeMounts:
         - mountPath: /etc/openvswitch/
+          name: etc-openvswitch
+        - mountPath: /etc/ovn/
           name: etc-openvswitch
         - mountPath: /var/lib/openvswitch/
           name: var-lib-openvswitch
         - mountPath: /run/openvswitch/
           name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
+        - mountPath: /run/ovnkube-config/
+          name: ovnkube-config
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert
@@ -330,16 +415,6 @@ spec:
         env:
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
-        - name: OVN_NET_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: net_cidr
-        - name: OVN_SVC_CIDR
-          valueFrom:
-            configMapKeyRef:
-              name: ovn-config
-              key: svc_cidr
         - name: K8S_NODE
           valueFrom:
             fieldRef:
@@ -347,6 +422,7 @@ spec:
         ports:
         - name: metrics-port
           containerPort: 9102
+        terminationMessagePolicy: FallbackToLogsOnError
 
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -360,6 +436,12 @@ spec:
           path: /var/lib/ovn/data
       - name: run-openvswitch
         emptyDir: {}
+      - name: run-ovn
+        hostPath:
+          path: /var/run/ovn
+      - name: ovnkube-config
+        configMap:
+          name: ovnkube-config
       - name: env-overrides
         configMap:
           name: env-overrides
