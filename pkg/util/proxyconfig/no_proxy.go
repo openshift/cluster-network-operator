@@ -50,8 +50,13 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		"localhost",
 		".svc",
 		".cluster.local",
-		ic.Networking.MachineCIDR,
 	)
+	if ic.Networking.MachineCIDR != "" {
+		if _, _, err := net.ParseCIDR(ic.Networking.MachineCIDR); err != nil {
+			return "", fmt.Errorf("MachineCIDR has an invalid CIDR: %s", ic.Networking.MachineCIDR)
+		}
+		set.Insert(ic.Networking.MachineCIDR)
+	}
 
 	for _, mc := range ic.Networking.MachineNetwork {
 		if _, _, err := net.ParseCIDR(mc.CIDR); err != nil {
