@@ -132,7 +132,11 @@ spec:
         - "--multus-conf-file=auto"
         - "--multus-autoconfig-dir=/host/var/run/multus/cni/net.d"
         - "--multus-kubeconfig-file-host=/etc/kubernetes/cni/net.d/multus.d/multus.kubeconfig"
+{{- if eq .DefaultNetworkType "OpenShiftSDN"}}
         - "--readiness-indicator-file=/var/run/multus/cni/net.d/80-openshift-network.conf"
+{{- else if eq .DefaultNetworkType "OVNKubernetes"}}
+        - "--readiness-indicator-file=/var/run/multus/cni/net.d/10-ovn-kubernetes.conf"
+{{- end}}
         - "--cleanup-config-on-exit=true"
         - "--namespace-isolation=true"
         - "--multus-log-level=verbose"
