@@ -34,7 +34,7 @@ func RenderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 	out = append(out, objs...)
 
 	usedhcp := UseDHCP(conf)
-	objs, err = renderMultusConfig(manifestDir, usedhcp)
+	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), usedhcp)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func RenderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 }
 
 // renderMultusConfig returns the manifests of Multus
-func renderMultusConfig(manifestDir string, useDHCP bool) ([]*uns.Unstructured, error) {
+func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 
 	// render the manifests on disk
@@ -56,6 +56,7 @@ func renderMultusConfig(manifestDir string, useDHCP bool) ([]*uns.Unstructured, 
 	data.Data["RenderDHCP"] = useDHCP
 	data.Data["MultusCNIConfDir"] = MultusCNIConfDir
 	data.Data["SystemCNIConfDir"] = SystemCNIConfDir
+	data.Data["DefaultNetworkType"] = defaultNetworkType
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus"), &data)
 	if err != nil {
