@@ -84,8 +84,10 @@ func MergeClusterConfig(operConf *operv1.NetworkSpec, clusterConf configv1.Netwo
 
 // StatusFromOperatorConfig generates the cluster NetworkStatus from the
 // currently applied operator configuration.
-func StatusFromOperatorConfig(operConf *operv1.NetworkSpec) *configv1.NetworkStatus {
-	// Don't set status if we don't understand the network type
+func StatusFromOperatorConfig(operConf *operv1.NetworkSpec, oldStatus *configv1.NetworkStatus) *configv1.NetworkStatus {
+	knownNetworkType := true
+	status := configv1.NetworkStatus{}
+
 	switch operConf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		// continue
@@ -94,22 +96,29 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec) *configv1.NetworkSta
 	case operv1.NetworkTypeKuryr:
 		// continue
 	default:
-		return nil
+		knownNetworkType = false
+		// Preserve any status fields set by the unknown network plugin
+		status = *oldStatus
+	}
+
+	if oldStatus.NetworkType == "" || knownNetworkType {
+		status.NetworkType = string(operConf.DefaultNetwork.Type)
 	}
 
 	// TODO: when we support expanding the service cidr or cluster cidr,
 	// don't actually update the status until the changes are rolled out.
-	status := configv1.NetworkStatus{
-		ServiceNetwork: operConf.ServiceNetwork,
-		NetworkType:    string(operConf.DefaultNetwork.Type),
-	}
 
-	for _, cnet := range operConf.ClusterNetwork {
-		status.ClusterNetwork = append(status.ClusterNetwork,
-			configv1.ClusterNetworkEntry{
-				CIDR:       cnet.CIDR,
-				HostPrefix: cnet.HostPrefix,
-			})
+	if len(oldStatus.ServiceNetwork) == 0 || knownNetworkType {
+		status.ServiceNetwork = operConf.ServiceNetwork
+	}
+	if len(oldStatus.ClusterNetwork) == 0 || knownNetworkType {
+		for _, cnet := range operConf.ClusterNetwork {
+			status.ClusterNetwork = append(status.ClusterNetwork,
+				configv1.ClusterNetworkEntry{
+					CIDR:       cnet.CIDR,
+					HostPrefix: cnet.HostPrefix,
+				})
+		}
 	}
 
 	// Determine the MTU from the provider

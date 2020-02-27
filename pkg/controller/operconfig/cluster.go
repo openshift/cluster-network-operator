@@ -81,7 +81,7 @@ func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConf
 	}
 
 	// Update the cluster config status
-	status := network.StatusFromOperatorConfig(&operConfig.Spec)
+	status := network.StatusFromOperatorConfig(&operConfig.Spec, &clusterConfig.Status)
 	if status == nil || reflect.DeepEqual(*status, clusterConfig.Status) {
 		return nil, nil
 	}
