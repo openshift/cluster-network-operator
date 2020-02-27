@@ -65,13 +65,6 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		set.Insert(mc.CIDR)
 	}
 
-	for _, mc := range ic.Networking.MachineNetwork {
-		if _, _, err := net.ParseCIDR(mc.CIDR); err != nil {
-			return "", fmt.Errorf("MachineNetwork has an invalid CIDR: %s", mc.CIDR)
-		}
-		set.Insert(mc.CIDR)
-	}
-
 	if len(infra.Status.APIServerInternalURL) > 0 {
 		internalAPIServer, err := url.Parse(infra.Status.APIServerInternalURL)
 		if err != nil {
