@@ -850,6 +850,8 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	// Now update
 	dsNC.Status.NumberAvailable = 1
 	dsNC.Status.NumberUnavailable = 0
+	dsNC.Status.DesiredNumberScheduled = 1
+	dsNC.Status.UpdatedNumberScheduled = 1
 	err = client.Update(context.TODO(), dsNC)
 	if err != nil {
 		t.Fatalf("error updating DaemonSet: %v", err)
