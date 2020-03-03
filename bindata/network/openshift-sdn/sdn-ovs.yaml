@@ -155,7 +155,7 @@ spec:
               /usr/bin/ovs-vsctl -t 5 show > /dev/null
           initialDelaySeconds: 15
           periodSeconds: 5
-        terminationGracePeriodSeconds: 10
+        terminationGracePeriodSeconds: 45
       nodeSelector:
         kubernetes.io/os: linux
       affinity:
