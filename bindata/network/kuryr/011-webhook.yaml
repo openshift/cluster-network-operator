@@ -1,5 +1,5 @@
 {{if .AdmissionController}}
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: kuryr-dns-admission-controller
@@ -7,6 +7,8 @@ metadata:
     app: kuryr-dns-admission-controller
 webhooks:
   - name: kuryr-dns-admission-controller.openshift.io
+    sideEffects: None
+    admissionReviewVersions: ['v1', 'v1beta1']
     clientConfig:
       service:
         name: kuryr-dns-admission-controller
