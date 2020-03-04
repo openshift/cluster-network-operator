@@ -6,6 +6,11 @@ It follows the [Controller pattern](https://godoc.org/github.com/kubernetes-sigs
 
 Most users will be able to use the top-level OpenShift Config API, which has a [Network type](https://github.com/openshift/api/blob/master/config/v1/types_network.go#L26). The operator will automatically translate the `Network.config.openshift.io` object in to a `Network.operator.openshift.io`.
 
+To see the network operator:
+```
+$ oc get -o yaml network.operator cluster
+```
+
 When the controller has reconciled and all its dependent resources have converged, the cluster should have an installed network plugin and a working service network. In OpenShift, the Cluster Network Operator runs very early in the install process -- while the boostrap API server is still running.
 
 # Configuring
@@ -13,23 +18,57 @@ The network operator gets its configuration from two objects: the Cluster and th
 
 Any changes to the Cluster configuration are propagated down in to the Operator configuration. In the event of conflicts, the Operator configuration will be updated to match the Cluster configuration.
 
-For example, if you want to use the default VXLAN port for OpenShiftSDN, then you don't need to do anything. However, if you need to customize that port, you will need to create both objects and set the port in the Operator config.
+For example, if you want to use OVN networking instead of the default SDN networking, do the following:
+ 
+Create the cluster using openshift-install and generate the install-config. Use a convenient directory for the cluster.
+```
+$ openshift-install --dir=MY_CLUSTER create install-config
+```
+Edit the MY_CLUSTER/install-config.yaml and change the `networkType:` to, for example, OVNKubernetes
 
+After that go on with the install.
+
+When you want to change the default networing parameters,
+for example, you want to use a different VXLAN port for OpenShiftSDN, then you will need to create the manifest files.
+
+```
+$ openshift-install --dir=MY_CLUSTER create manifests
+```
+The `MY_CLUSTER/manifests/cluster-network-02-config.yml` contains the cluster network operator configuration. It is the basis of the operator configuration and can't be changed.
+In particular the "networkType" can't be changed. See above for how to set the "networkType".
+
+The `cluster-network-02-config.yml` file is copied to a new file and that file is edited for new configuration.
+```
+$ cp MY_CLUSTER/manifests/cluster-network-02-config.yml MY_CLUSTER/manifests/cluster-network-03-config.yml
+```
+Edit the new file:
+- change first line `apiVersion: config.openshift.io/v1` to `apiVersion: operator.openshift.io/v1`
+
+When all configuration changes are coplete, go on and create the cluster:
+```
+$ openshift-install --dir=MY_CLUSTER create cluster
+```
+The following sections detail how to configure the `cluster-network-03-config.yml` file for different needs.
 
 #### Configuration objects
 *Cluster config*
 - *Type Name*: `Network.config.openshift.io`
 - *Instance Name*: `cluster`
 - *View Command*: `oc get Network.config.openshift.io cluster -oyaml`
+- *File*: `install-config.yaml`
 
 *Operator config*
-- *Type Name*: `Network.operator.openshift.io`
+- *Type Name*: `operator.openshift.io/v1`
 - *Instance Name*: `cluster`
-- *View Command*: `oc get Network.operator.openshift.io cluster -oyaml`
+- *View Command*: `oc get network.operator cluster -oyaml`
+- *File*: `manifests/cluster-network-03-config.yml` as described above
 
 #### Example configurations
 
-*Cluster Config*
+*Cluster Config* `manifests/cluster-network-02-config.yml`
+
+The fields in this file can't be changed. The installer created it from the install.config.yaml file (above).
+
 ```yaml
 apiVersion: config.openshift.io/v1
 kind: Network
@@ -44,10 +83,12 @@ spec:
   - 172.30.0.0/16
 ```
 
-Alternatively, ovn-kubernetes can be configured by setting `networkType: OVNKubernetes`.
+Alternatively, ovn-kubernetes is configured when `networkType: OVNKubernetes`.
 
-*Corresponding Operator Config*
-This configuration is the auto-generated translation of the above Cluster configuration.
+*Corresponding Operator Config* `manifests/cluster-network-03-config.yml`
+
+This config file starts as a copy of `manifests/cluster-network-02-config.yml`. You can add to the file but you can't change lines in the file.
+
 ```yaml
 apiVersion: operator.openshift.io/v1
 kind: Network
@@ -64,10 +105,10 @@ spec:
   - 172.30.0.0/16
 ```
 
-(For ovn-kubernetes, `type: OVNKubernetes`.)
-
 ## Configuring IP address pools
-Users must supply at least two address pools - one for pods, and one for services. These are the ClusterNetwork and ServiceNetwork parameter. Some network plugins, such as OpenShiftSDN and OVNKubernetes, support multiple ClusterNetworks. All address blocks must be non-overlapping. You should select address pools large enough to fit your anticipated workload. Each pool must be able to hold 1 or more hostPrefix allocations.
+The ClusterNetworks and ServiceNetwork are configured in the `MY_CLUSTER/install-config` from above. They cannot be changed in the manifests.
+
+Users must supply at least two address pools - ClusterNetwork for pods, and ServiceNetwork for services. Some network plugins, such as OpenShiftSDN and OVNKubernetes, support multiple ClusterNetworks. All address blocks must be non-overlapping and a multiple of `hostPrefix`. 
 
 For future expansion, multiple `serviceNetwork` entries are allowed by the configuration but not actually supported by any network plugins. Supplying multiple addresses is invalid.
 
@@ -76,7 +117,7 @@ Each `clusterNetwork` entry has an additional required parameter, `hostPrefix`, 
 cidr: 10.128.0.0/14
 hostPrefix: 23
 ```
-means nodes would get blocks of size `/23`, or 512 addresses.
+means 512 nodes would get blocks of size `/23`, or 512 addresses.
 
 IP address pools are always read from the Cluster configuration and propagated "downwards" into the Operator configuration. Any changes to the Operator configuration are ignored.
 
@@ -96,7 +137,8 @@ spec:
 ```
 
 ## Configuring the default network provider
-Users must select a default network provider. This cannot be changed. Different network providers have additional provider-specific settings.
+The default network provider is configured in the `MY_CLUSTER/install-config` from above. It cannot be changed in the manifests.
+Different network providers have additional provider-specific settings.
 
 The network type is always read from the Cluster configuration.
 
@@ -118,7 +160,7 @@ OpenShiftSDN supports the following configuration options, all of which are opti
 
 These configuration flags are only in the Operator configuration object.
 
-Example:
+Example from the `manifests/cluster-network-03-config.yml` file:
 ```yaml
 spec:
   defaultNetwork:
@@ -135,10 +177,11 @@ spec:
 OVNKubernetes supports the following configuration options, all of which are optional and once set at cluster creation, they can't be changed:
 * `MTU`: The MTU to use for the geneve overlay. The default is the MTU of the node that the cluster-network-operator is first run on, minus 100 bytes for geneve overhead. If the nodes in your cluster don't all have the same MTU then you may need to set this explicitly.
 * `genevePort`: The UDP port to use for the Geneve overlay. The default is 6081.
+* `hybridOverlayConfig`: hybrid linux/windows cluster (see below).
 
 These configuration flags are only in the Operator configuration object.
 
-Example:
+Example from the `manifests/cluster-network-03-config.yml` file:
 ```yaml
 spec:
   defaultNetwork:
@@ -172,6 +215,27 @@ data:
     OVN_LOG_LEVEL=dbg
 ```
 
+### Configuring OVNKubernetes On a Hybrid Cluster
+OVNKubernetes supports a hybrid cluster of both Linux and Windows nodes on x86_64 hosts. The ovn configuration is done as described above. In addition the `hybridOverlayConfig` can be included as follows:
+
+Add the following to the `spec:` section
+
+Example from the `manifests/cluster-network-03-config.yml` file:
+```yaml
+spec:
+  defaultNetwork:
+    type: OVNKubernetes
+    ovnKubernetesConfig:
+      hybridOverlayConfig:
+        hybridClusterNetwork:
+        - cidr: 10.132.0.0/14
+          hostPrefix: 23
+```
+The hybridClusterNetwork `cidr` and hostPrefix are used when adding windows nodes. This CIDR must not overlap the ClusterNetwork CIDR or serviceNetwork CIDR.
+
+There can be at most one hybridClusterNetwork "CIDR". A future version may supports multiple `cidr`.
+
+
 ### Configuring Kuryr-Kubernetes
 Kuryr-Kubernetes is a CNI plugin that uses OpenStack Neutron to network OpenShift Pods, and OpenStack Octavia to create load balancers for Services. In general it is useful when OpenShift is running on an OpenStack cluster, as you can use the same SDN (OpenStack Neutron) to provide networking for both the VMs OpenShift is running on, and the Pods created by OpenShift. In such case avoidance of double encapsulation gives you two advantages: improved performace (in terms of both latency and throughput) and lower complexity of the networking architecture.
 
@@ -181,7 +245,7 @@ Available options, all of which are optional:
 * `controllerProbesPort`: port to be used for liveness and readiness probes of kuryr-controller Pods. Note that kuryr-controller runs with host networking, so the option is useful when there is a port conflict with some other service running on OpenShift nodes.
 * `daemonProbesPort`: same as above, just for kuryr-daemon (kuryr-daemon runs as DaemonSet on every OpenShift node).
 
-Example:
+Example from the `manifests/cluster-network-03-config.yml` file:
 ```yaml
 spec:
   defaultNetwork:
@@ -207,8 +271,7 @@ For plugins that use kube-proxy (whether built-in or standalone), you can config
 
 The top-level flag `deployKubeProxy` tells the network operator to explicitly deploy a kube-proxy process. Generally, you will not need to provide this; the operator will decide appropriately. For example, OpenShiftSDN includes an embedded service proxy, so this flag is automatically false in that case.
 
-Example:
-
+Example from the `manifests/cluster-network-03-config.yml` file:
 ```yaml
 spec:
   deployKubeProxy: false
@@ -230,6 +293,7 @@ Currently, the understood values for type are:
 * `Raw`
 * `SimpleMacvlan`
 
+Example from the `manifests/cluster-network-03-config.yml` file:
 ```yaml
 spec:
   additionalNetworks:
@@ -277,6 +341,7 @@ Users can configure network attachment definition with CNI json as following opt
 
 * `rawCNIConfig`: CNI JSON configuration for the network attachment
 
+Example from the `manifests/cluster-network-03-config.yml` file:
 ```yaml
 spec:
   additionalNetworks:
