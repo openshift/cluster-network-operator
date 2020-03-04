@@ -532,6 +532,37 @@ func ensureOpenStackLb(client *gophercloud.ServiceClient, name, vipAddress, vipS
 	if err != nil {
 		return "", errors.Wrap(err, "failed to extract LB list")
 	}
+
+	if len(lbs) == 0 && octaviaTagSupport {
+		// Attempt to retrieve API load balancer with description tagging
+		// to avoid another load balancer creation upon Octavia upgrade.
+		opts := loadbalancers.ListOpts{
+			Name:        name,
+			VipAddress:  vipAddress,
+			VipSubnetID: vipSubnetId,
+			Description: tag,
+		}
+		page, err = loadbalancers.List(client, opts).AllPages()
+		if err != nil {
+			return "", errors.Wrap(err, "failed to get LB list")
+		}
+		lbs, err = loadbalancers.ExtractLoadBalancers(page)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to extract LB list")
+		}
+		if len(lbs) == 1 {
+			log.Printf("Tagging existing loadbalancer API %s", lbs[0].ID)
+			tags := []string{tag}
+			updateOpts := loadbalancers.UpdateOpts{
+				Tags: &tags,
+			}
+			_, err := loadbalancers.Update(client, lbs[0].ID, updateOpts).Extract()
+			if err != nil {
+				return "", errors.Wrap(err, "failed to update LB")
+			}
+		}
+	}
+
 	if len(lbs) > 1 {
 		return "", errors.Errorf("found multiple LB matching name %s, tag %s, cannot proceed", name, tag)
 	} else if len(lbs) == 1 {
