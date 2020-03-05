@@ -63,3 +63,36 @@ subjects:
 - kind: ServiceAccount
   name: multus
   namespace: openshift-multus
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: multus-whereabouts
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: whereabouts-cni
+subjects:
+- kind: ServiceAccount
+  name: multus
+  namespace: openshift-multus
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: whereabouts-cni
+rules:
+- apiGroups:
+  - whereabouts.cni.k8s.io
+  resources:
+  - ippools
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
