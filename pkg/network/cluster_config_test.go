@@ -103,7 +103,7 @@ func TestStatusFromConfig(t *testing.T) {
 	var mtu uint32 = 1300
 	crd.Spec.DefaultNetwork.OpenShiftSDNConfig.MTU = &mtu
 
-	status := StatusFromOperatorConfig(&crd.Spec)
+	status := StatusFromOperatorConfig(&crd.Spec, &configv1.NetworkStatus{})
 	g.Expect(status).To(Equal(&configv1.NetworkStatus{
 		ClusterNetwork: []configv1.ClusterNetworkEntry{
 			{
@@ -121,7 +121,92 @@ func TestStatusFromConfig(t *testing.T) {
 		NetworkType: "OpenShiftSDN",
 	}))
 
-	crd.Spec.DefaultNetwork.Type = "nasa"
-	status = StatusFromOperatorConfig(&crd.Spec)
-	g.Expect(status).To(BeNil())
+	*crd.Spec.DefaultNetwork.OpenShiftSDNConfig.MTU = 1500
+	status = StatusFromOperatorConfig(&crd.Spec, status)
+	g.Expect(status).To(Equal(&configv1.NetworkStatus{
+		ClusterNetwork: []configv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+			{
+				CIDR:       "10.0.0.0/14",
+				HostPrefix: 24,
+			},
+		},
+		ServiceNetwork:    []string{"172.30.0.0/16"},
+		ClusterNetworkMTU: 1500,
+
+		NetworkType: "OpenShiftSDN",
+	}))
+
+	// If someone manually edits the status we will overwrite them
+	status.ClusterNetwork = status.ClusterNetwork[:1]
+	status.ServiceNetwork = []string{"172.30.0.0/17"}
+	status.ClusterNetworkMTU = 1450
+
+	status = StatusFromOperatorConfig(&crd.Spec, status)
+	g.Expect(status).To(Equal(&configv1.NetworkStatus{
+		ClusterNetwork: []configv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+			{
+				CIDR:       "10.0.0.0/14",
+				HostPrefix: 24,
+			},
+		},
+		ServiceNetwork:    []string{"172.30.0.0/16"},
+		ClusterNetworkMTU: 1500,
+
+		NetworkType: "OpenShiftSDN",
+	}))
+}
+
+func TestStatusFromConfigUnknown(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OpenShiftSDNConfig.DeepCopy()
+	FillDefaults(&crd.Spec, nil)
+
+	crd.Spec.DefaultNetwork.Type = "None"
+
+	status := StatusFromOperatorConfig(&crd.Spec, &configv1.NetworkStatus{})
+	g.Expect(status).To(Equal(&configv1.NetworkStatus{
+		ClusterNetwork: []configv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+			{
+				CIDR:       "10.0.0.0/14",
+				HostPrefix: 24,
+			},
+		},
+		ServiceNetwork:    []string{"172.30.0.0/16"},
+		ClusterNetworkMTU: 0,
+
+		NetworkType: "None",
+	}))
+
+	// The external network plugin updates the status itself...
+	status.ClusterNetwork = status.ClusterNetwork[:1]
+	status.ServiceNetwork = []string{"172.30.0.0/17"}
+	status.ClusterNetworkMTU = 1450
+
+	// The external changes should be preserved
+	status = StatusFromOperatorConfig(&crd.Spec, status)
+	g.Expect(status).To(Equal(&configv1.NetworkStatus{
+		ClusterNetwork: []configv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+		},
+		ServiceNetwork:    []string{"172.30.0.0/17"},
+		ClusterNetworkMTU: 1450,
+
+		NetworkType: "None",
+	}))
 }
