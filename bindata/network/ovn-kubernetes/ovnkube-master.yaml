@@ -362,7 +362,7 @@ spec:
 
           hybrid_overlay_flags=
           if [[ -n "{{.OVNHybridOverlayEnable }}" ]]; then
-            hybrid_overlay_flags="--enable-hybrid-overlay"
+            hybrid_overlay_flags="--enable-hybrid-overlay --no-hostsubnet-nodes=kubernetes.io/os=windows"
             if [[ -n "{{.OVNHybridOverlayNetCIDR}}" ]]; then
               hybrid_overlay_flags="${hybrid_overlay_flags} --hybrid-overlay-cluster-subnets={{.OVNHybridOverlayNetCIDR}}"
             fi
