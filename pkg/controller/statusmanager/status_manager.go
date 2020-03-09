@@ -114,7 +114,9 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...confi
 
 		oldStatus := co.Status.DeepCopy()
 		status.deleteRelatedObjectsNotRendered(co)
-		co.Status.RelatedObjects = status.relatedObjects
+		if status.relatedObjects != nil {
+			co.Status.RelatedObjects = status.relatedObjects
+		}
 
 		if reachedAvailableLevel {
 			if releaseVersion := os.Getenv("RELEASE_VERSION"); len(releaseVersion) > 0 {
