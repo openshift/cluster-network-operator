@@ -91,18 +91,27 @@ spec:
             rmdir /etc/sysconfig/openshift-sdn || true
           fi
 
+          # configmap-based overrides
+          if [[ -f /env/${K8S_NODE_NAME} ]]; then
+            set -o allexport
+            source /env/${K8S_NODE_NAME}
+            set +o allexport
+          fi
+
           # Take over network functions on the node
           rm -f /etc/cni/net.d/80-openshift-network.conf
           cp -f /opt/cni/bin/openshift-sdn /host/opt/cni/bin/
 
           # Launch the network process
-          exec /usr/bin/openshift-sdn-node --proxy-config=/config/kube-proxy-config.yaml --v=${DEBUG_LOGLEVEL:-2}
+          exec /usr/bin/openshift-sdn-node --proxy-config=/config/kube-proxy-config.yaml --v=${OPENSHIFT_SDN_LOG_LEVEL:-2}
         securityContext:
           privileged: true
         volumeMounts:
         - mountPath: /config
           name: config
           readOnly: true
+        - mountPath: /env
+          name: env-overrides
         # Mount the entire run directory for socket access for Docker or CRI-o
         # TODO: remove
         - mountPath: /var/run
@@ -173,6 +182,10 @@ spec:
       - name: config
         configMap:
           name: sdn-config
+      - name: env-overrides
+        configMap:
+          name: env-overrides
+          optional: true
       - name: etc-sysconfig
         hostPath:
           path: /etc/sysconfig

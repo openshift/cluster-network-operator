@@ -191,7 +191,7 @@ spec:
       genevePort: 6081
 ```
 
-Additionally, you can configure per-node verbosity for ovn-kubernetes. This is useful
+Additionally, you can configure per-node verbosity for openshift-sdn and ovn-kubernetes. This is useful
 if you want to debug an issue, and can reproduce it on a single node. To do this,
 create a special ConfigMap with keys based on the Node's name:
 
@@ -214,6 +214,8 @@ data:
     OVN_KUBE_LOG_LEVEL=5
     OVN_LOG_LEVEL=dbg
 ```
+
+(For openshift-sdn, use `namespace: openshift-sdn` and, eg, `OPENSHIFT_SDN_LOG_LEVEL=5`.)
 
 ### Configuring OVNKubernetes On a Hybrid Cluster
 OVNKubernetes supports a hybrid cluster of both Linux and Windows nodes on x86_64 hosts. The ovn configuration is done as described above. In addition the `hybridOverlayConfig` can be included as follows:
