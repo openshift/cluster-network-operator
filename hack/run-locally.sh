@@ -241,13 +241,6 @@ while getopts "e?c:f:i:m:k:n:w" opt; do
     esac
 done
 
-if [[ -z "${KUBECONFIG:-}" && -z "${CLUSTER_DIR:-}" ]]; then
-    echo "error: KUBECONFIG / CLUSTER_DIR must be set or '-c <cluster-dir>'/'-k <kubeconfig>' must be given"
-    echo
-    print_usage
-    exit 1
-fi
-
 if [[ -z "$(which oc 2> /dev/null || exit 0)" ]]; then
     echo "error: could not find 'oc' in PATH" >&2
     exit 1
@@ -258,39 +251,46 @@ echo "rebuilding the CNO"
 hack/build-go.sh
 
 # Autodetect the state of the cluster to determine which mode to run in
-if [[ -n "$(ls -A ${CLUSTER_DIR}/terraform.* 2> /dev/null)" ]]; then
-    export KUBECONFIG="${CLUSTER_DIR}/auth/kubeconfig"
-    run_vs_existing_cluster
-elif [[ ! -z "${KUBECONFIG}" ]]; then
+if [[ -n "${CLUSTER_DIR}" ]]; then
+    if [[ -z "$(ls -A ${CLUSTER_DIR} 2> /dev/null | grep -v install-config.yaml | grep -v .openshift_install | grep -v env.sh)" ]]; then
+        echo "Creating new cluster..."
+
+        # Find openshift-install if not explicitly given
+        if [[ -z "${INSTALLER_PATH}" ]]; then
+            INSTALLER_PATH="$(which openshift-install 2> /dev/null || exit 0)"
+            if [[ -z "${INSTALLER_PATH}" ]]; then
+                echo "could not find openshift-install in PATH for building a new cluster" >&2
+                exit 1
+            fi
+        fi
+
+        rm -f "${CLUSTER_DIR}/env.sh"
+        ensure_install_config
+        create_manifests_with_network_plugin
+        override_install_manifests
+
+        # Wait for user to update manifests if requested
+        if [[ -n "${WAIT_FOR_MANIFEST_UPDATES}" ]]; then
+            read -n 1 -p "Pausing for manual manifest updates; press any key to continue..."
+        fi
+
+        extract_environment_from_manifests
+        create_cluster
+        wait_for_cluster
+    elif [[ -n "$(ls -A ${CLUSTER_DIR}/terraform.* 2> /dev/null)" ]]; then
+        export KUBECONFIG="${CLUSTER_DIR}/auth/kubeconfig"
+        run_vs_existing_cluster
+    else
+        echo "could not detect cluster state" >&2
+        exit 1
+    fi
+elif [[ -n "${KUBECONFIG}" ]]; then
     export CLUSTER_DIR=/tmp
     run_vs_existing_cluster
-elif [[ -z "$(ls -A ${CLUSTER_DIR} 2> /dev/null | grep -v install-config.yaml | grep -v .openshift_install | grep -v env.sh)" ]]; then
-    echo "Creating new cluster..."
-
-    # Find openshift-install if not explicitly given
-    if [[ -z "${INSTALLER_PATH}" ]]; then
-        INSTALLER_PATH="$(which openshift-install 2> /dev/null || exit 0)"
-        if [[ -z "${INSTALLER_PATH}" ]]; then
-            echo "could not find openshift-install in PATH for building a new cluster" >&2
-            exit 1
-        fi
-    fi
-
-    rm -f "${CLUSTER_DIR}/env.sh"
-    ensure_install_config
-    create_manifests_with_network_plugin
-    override_install_manifests
-
-    # Wait for user to update manifests if requested
-    if [[ -n "${WAIT_FOR_MANIFEST_UPDATES}" ]]; then
-        read -n 1 -p "Pausing for manual manifest updates; press any key to continue..."
-    fi
-
-    extract_environment_from_manifests
-    create_cluster
-    wait_for_cluster
 else
-    echo "could not detect cluster state" >&2
+    echo "error: KUBECONFIG / CLUSTER_DIR must be set or '-c <cluster-dir>'/'-k <kubeconfig>' must be given"
+    echo
+    print_usage
     exit 1
 fi
 
