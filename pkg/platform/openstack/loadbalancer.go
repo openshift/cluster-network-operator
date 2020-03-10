@@ -15,8 +15,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools"
 )
 
-var maxOctaviaVersion *semver.Version = nil
-
 func getMaxOctaviaAPIVersion(client *gophercloud.ServiceClient) (*semver.Version, error) {
 	allPages, err := apiversions.List(client).AllPages()
 	if err != nil {
@@ -55,12 +53,9 @@ func getMaxOctaviaAPIVersion(client *gophercloud.ServiceClient) (*semver.Version
 }
 
 func IsOctaviaVersionSupported(client *gophercloud.ServiceClient, constraint string) (bool, error) {
-	if maxOctaviaVersion == nil {
-		var err error
-		maxOctaviaVersion, err = getMaxOctaviaAPIVersion(client)
-		if err != nil {
-			return false, errors.Wrap(err, "cannot get Octavia API versions")
-		}
+	maxOctaviaVersion, err := getMaxOctaviaAPIVersion(client)
+	if err != nil {
+		return false, errors.Wrap(err, "cannot get Octavia API versions")
 	}
 
 	constraintVer := semver.MustParse(constraint)
