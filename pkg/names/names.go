@@ -53,6 +53,13 @@ const MULTUS_VALIDATING_WEBHOOK = "multus.openshift.io"
 // ConfigMaps that contain user provided trusted CA bundles.
 const ADDL_TRUST_BUNDLE_CONFIGMAP_NS = "openshift-config"
 
+// ADDL_TRUST_BUNDLE_CONFIGMAP_NS is the configmap that contain user provided trusted CA bundles.
+const ADDL_TRUST_BUNDLE_CONFIGMAP = "user-ca-bundle"
+
+// ADDL_TRUST_CA_BUNDLE_CONFIGMAP_LABEL is the name of the label that
+// determines whether or not to inject the combined ca certificate
+const ADDL_TRUST_CA_BUNDLE_CONFIGMAP_LABEL = "config.openshift.io/inject-trusted-cabundle"
+
 // TRUSTED_CA_BUNDLE_CONFIGMAP_KEY is the name of the data key containing
 // the PEM encoded trust bundle.
 const TRUSTED_CA_BUNDLE_CONFIGMAP_KEY = "ca-bundle.crt"
@@ -65,10 +72,6 @@ const TRUSTED_CA_BUNDLE_CONFIGMAP = "trusted-ca-bundle"
 // ADDL_TRUST_BUNDLE_CONFIGMAP and TRUST_BUNDLE_CONFIGMAP
 // ConfigMaps.
 const TRUSTED_CA_BUNDLE_CONFIGMAP_NS = "openshift-config-managed"
-
-// TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL is the name of the label that
-// determines whether or not to inject the combined ca certificate
-const TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL = "config.openshift.io/inject-trusted-cabundle"
 
 // SYSTEM_TRUST_BUNDLE is the full path to the file containing
 // the system trust bundle.

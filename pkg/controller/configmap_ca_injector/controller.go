@@ -95,8 +95,8 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 
 	trustedCAbundleConfigMap := &corev1.ConfigMap{}
 	trustedCAbundleConfigMapName := types.NamespacedName{
-		Namespace: names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS,
-		Name:      names.TRUSTED_CA_BUNDLE_CONFIGMAP,
+		Namespace: names.ADDL_TRUST_BUNDLE_CONFIGMAP_NS,
+		Name:      names.ADDL_TRUST_BUNDLE_CONFIGMAP,
 	}
 	err := r.client.Get(context.TODO(), trustedCAbundleConfigMapName, trustedCAbundleConfigMap)
 	if err != nil {
@@ -119,10 +119,10 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 	configMapsToChange := []corev1.ConfigMap{}
 
 	// The trusted-ca-bundle changed.
-	if request.Name == names.TRUSTED_CA_BUNDLE_CONFIGMAP && request.Namespace == names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS {
+	if request.Name == names.ADDL_TRUST_BUNDLE_CONFIGMAP && request.Namespace == names.ADDL_TRUST_BUNDLE_CONFIGMAP_NS {
 
 		configMapList := &corev1.ConfigMapList{}
-		matchingLabels := &client.MatchingLabels{names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL: "true"}
+		matchingLabels := &client.MatchingLabels{names.ADDL_TRUST_CA_BUNDLE_CONFIGMAP_LABEL: "true"}
 		err = r.client.List(context.TODO(), configMapList, matchingLabels)
 		if err != nil {
 			log.Println(err)
@@ -131,7 +131,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 			return reconcile.Result{}, err
 		}
 		configMapsToChange = configMapList.Items
-		log.Printf("%s changed, updating %d configMaps", names.TRUSTED_CA_BUNDLE_CONFIGMAP, len(configMapsToChange))
+		log.Printf("%s changed, updating %d configMaps", names.ADDL_TRUST_BUNDLE_CONFIGMAP, len(configMapsToChange))
 	} else {
 		// Changing a single labeled configmap.
 
@@ -204,6 +204,6 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 }
 
 func shouldUpdateConfigMaps(meta metav1.Object) bool {
-	return meta.GetLabels()[names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL] == "true" ||
-		(meta.GetName() == names.TRUSTED_CA_BUNDLE_CONFIGMAP && meta.GetNamespace() == names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS)
+	return meta.GetLabels()[names.ADDL_TRUST_CA_BUNDLE_CONFIGMAP_LABEL] == "true" ||
+		(meta.GetName() == names.ADDL_TRUST_BUNDLE_CONFIGMAP && meta.GetNamespace() == names.ADDL_TRUST_BUNDLE_CONFIGMAP_NS)
 }
