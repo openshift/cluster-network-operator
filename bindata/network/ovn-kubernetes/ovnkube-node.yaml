@@ -59,6 +59,33 @@ spec:
               exit 0
           }
           trap quit SIGTERM
+
+          # Start the ovsdb so that we can prep it before ovn-controller
+          # connects to it. To achieve that we use a temporary private socket,
+          # db-private.sock.
+          # https://bugzilla.redhat.com/show_bug.cgi?id=1808125
+          # When called with '--db-sock', ovs-ctl doesn't point
+          # 'ovs-vsctl -- init' to the correct socket path so we have to
+          # ignore the error returned by ovs-ctl.
+          priv_db_sock=/var/run/openvswitch/db-private.sock
+          /usr/share/openvswitch/scripts/ovs-ctl start \
+            --ovs-user=openvswitch:openvswitch --db-sock=${priv_db_sock} \
+            --no-ovs-vswitchd || true
+
+          # The OVS DB should also be properly initialized before
+          # ovn-controller connects to it.
+          ovs-vsctl --db=unix:${priv_db_sock} -- init
+
+          # Ensure that ovn-controller will never read a value of
+          # ovn-monitor-all=false followed by an update with
+          # ovn-monitor-all=true.
+          # https://bugzilla.redhat.com/show_bug.cgi?id=1808125
+          ovs-vsctl --no-wait --db=unix:${priv_db_sock} \
+            set Open_vSwitch . external_ids:ovn-monitor-all=true
+          /usr/share/openvswitch/scripts/ovs-ctl stop
+
+          # Start ovsdb-server and ovs-vswitchd such that ovn-controller can
+          # connect to the database and br-int.
           /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --system-id=random
           ovs-appctl vlog/set "file:${OVS_LOG_LEVEL}"
           /usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
