@@ -6,13 +6,14 @@ import (
 	"crypto/x509"
 	b64 "encoding/base64"
 	"fmt"
-	"k8s.io/api/core/v1"
 	"log"
 	"net"
 	"net/http"
 	"regexp"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
+
+	v1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
@@ -360,6 +361,9 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 
 	log.Print("Ensuring pods security group")
 	podSgId, err := ensureOpenStackSg(client, generateName("kuryr-pods-security-group", clusterID), tag)
+	if err != nil {
+		return nil, errors.Wrap(err, "pods security group is not present")
+	}
 	log.Printf("Pods security group %s present", podSgId)
 
 	log.Print("Allowing traffic from pod to pod")
@@ -444,6 +448,9 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	log.Print("Creating OpenShift API loadbalancer pool members")
 	r, _ := regexp.Compile(fmt.Sprintf("^%s-(master-port-[0-9]+|bootstrap-port)$", clusterID))
 	portList, err := listOpenStackPortsMatchingPattern(client, tag, r)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list ports with matching pattern")
+	}
 	for _, port := range portList {
 		if len(port.FixedIPs) > 0 {
 			portIp := port.FixedIPs[0].IPAddress
