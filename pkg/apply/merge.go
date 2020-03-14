@@ -41,9 +41,8 @@ func MergeObjectForUpdate(current, updated *uns.Unstructured) error {
 	// For all object types, merge metadata.
 	// Run this last, in case any of the more specific merge logic has
 	// changed "updated"
-	MergeMetadataForUpdate(current, updated)
+	return MergeMetadataForUpdate(current, updated)
 
-	return nil
 }
 
 const (
