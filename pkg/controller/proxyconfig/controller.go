@@ -232,7 +232,8 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 		}
 
 		// Create a configmap containing the merged proxy.trustedCA/system bundles.
-		trustBundle, err = r.mergeTrustBundlesToConfigMap(proxyData, systemData)
+		_, err = r.mergeTrustBundlesToConfigMap(proxyData, systemData)
+
 		if err != nil {
 			log.Printf("Failed to merge trustedCA and system bundles for proxy '%s': %v", names.PROXY_CONFIG, err)
 			r.status.SetDegraded(statusmanager.ProxyConfig, "EnsureProxyConfigFailure",
