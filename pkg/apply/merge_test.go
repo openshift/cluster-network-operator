@@ -258,6 +258,7 @@ metadata:
 	s, ok, err := uns.NestedSlice(upd.Object, "secrets")
 	g.Expect(ok).To(BeTrue())
 	g.Expect(s).To(ConsistOf("foo"))
+	g.Expect(err).NotTo(HaveOccurred())
 }
 
 // UnstructuredFromYaml creates an unstructured object from a raw yaml string
