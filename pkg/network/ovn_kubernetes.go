@@ -173,10 +173,6 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 	}
 }
 
-func networkPluginName() string {
-	return "ovn-kubernetes"
-}
-
 type replicaCountDecoder struct {
 	ControlPlane struct {
 		Replicas string `json:"replicas"`
