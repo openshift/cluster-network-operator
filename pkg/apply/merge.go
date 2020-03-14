@@ -113,7 +113,9 @@ func MergeServiceAccountForUpdate(current, updated *uns.Unstructured) error {
 			return err
 		}
 		if ok {
-			uns.SetNestedField(updated.Object, curImagePullSecrets, "imagePullSecrets")
+			if err := uns.SetNestedField(updated.Object, curImagePullSecrets, "imagePullSecrets"); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
