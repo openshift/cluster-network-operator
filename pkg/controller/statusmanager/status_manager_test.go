@@ -25,8 +25,8 @@ import (
 )
 
 func init() {
-	configv1.AddToScheme(scheme.Scheme)
-	appsv1.AddToScheme(scheme.Scheme)
+	_ = configv1.AddToScheme(scheme.Scheme)
+	_ = appsv1.AddToScheme(scheme.Scheme)
 }
 
 func getCO(client client.Client, name string) (*configv1.ClusterOperator, error) {
