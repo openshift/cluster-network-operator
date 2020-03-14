@@ -167,7 +167,6 @@ func (r *PKIReconciler) setStatus() {
 type pki struct {
 	spec       netopv1.OperatorPKISpec
 	controller *certrotation.CertRotationController
-	lastErr    error
 }
 
 // newPKI creates a CertRotationController for the supplied configuration
