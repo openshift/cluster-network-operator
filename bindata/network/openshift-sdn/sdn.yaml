@@ -103,7 +103,10 @@ spec:
           cp -f /opt/cni/bin/openshift-sdn /host/opt/cni/bin/
 
           # Launch the network process
-          exec /usr/bin/openshift-sdn-node --proxy-config=/config/kube-proxy-config.yaml --v=${OPENSHIFT_SDN_LOG_LEVEL:-2}
+          exec /usr/bin/openshift-sdn-node \
+            --node-name ${K8S_NODE_NAME} --node-ip ${K8S_NODE_IP} \
+            --proxy-config /config/kube-proxy-config.yaml
+            --v ${OPENSHIFT_SDN_LOG_LEVEL:-2}
         securityContext:
           privileged: true
         volumeMounts:
@@ -162,6 +165,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: K8S_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         ports:
         - name: healthz
           containerPort: 10256
