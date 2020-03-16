@@ -70,18 +70,14 @@ func MergeCertificateData(addlData, systemData []byte) ([]*x509.Certificate, err
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse certificate data: %v", err)
 		}
-		for _, cert := range addlCerts {
-			mergedCerts = append(mergedCerts, cert)
-		}
+		mergedCerts = append(mergedCerts, addlCerts...)
 	}
 	if len(systemData) > 0 {
 		systemCerts, _, err := CertificateData(systemData)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse certificate data: %v", err)
 		}
-		for _, cert := range systemCerts {
-			mergedCerts = append(mergedCerts, cert)
-		}
+		mergedCerts = append(mergedCerts, systemCerts...)
 	}
 
 	return mergedCerts, nil
