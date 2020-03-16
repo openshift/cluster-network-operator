@@ -80,7 +80,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		if len(svcpools) != 0 {
 			svcpools += ","
 		}
-		svcpools += fmt.Sprintf("%s", net)
+		svcpools += net
 	}
 	data.Data["OVN_service_cidr"] = svcpools
 

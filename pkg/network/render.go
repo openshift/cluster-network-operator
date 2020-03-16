@@ -16,17 +16,15 @@ import (
 
 func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	log.Printf("Starting render phase")
-	objs := []*uns.Unstructured{}
 
 	// render Multus
-	o, err := RenderMultus(conf, manifestDir)
+	objs, err := RenderMultus(conf, manifestDir)
 	if err != nil {
 		return nil, err
 	}
-	objs = append(objs, o...)
 
 	// render MultusAdmissionController
-	o, err = RenderMultusAdmissionController(conf, manifestDir)
+	o, err := RenderMultusAdmissionController(conf, manifestDir)
 	if err != nil {
 		return nil, err
 	}
@@ -340,10 +338,8 @@ func ValidateAdditionalNetworks(conf *operv1.NetworkSpec) []error {
 
 // RenderAdditionalNetworks generates the manifests of the requested additional networks
 func RenderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
-	var err error
 	ans := conf.AdditionalNetworks
 	out := []*uns.Unstructured{}
-	objs := []*uns.Unstructured{}
 
 	// validate additional network configuration
 	if errs := ValidateAdditionalNetworks(conf); len(errs) > 0 {
@@ -358,13 +354,13 @@ func RenderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 	for _, an := range ans {
 		switch an.Type {
 		case operv1.NetworkTypeRaw:
-			objs, err = renderRawCNIConfig(&an, manifestDir)
+			objs, err := renderRawCNIConfig(&an, manifestDir)
 			if err != nil {
 				return nil, err
 			}
 			out = append(out, objs...)
 		case operv1.NetworkTypeSimpleMacvlan:
-			objs, err = renderSimpleMacvlanConfig(&an, manifestDir)
+			objs, err := renderSimpleMacvlanConfig(&an, manifestDir)
 			if err != nil {
 				return nil, err
 			}
@@ -383,14 +379,5 @@ func RenderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir strin
 		return nil, nil
 	}
 
-	var err error
-	out := []*uns.Unstructured{}
-	objs := []*uns.Unstructured{}
-
-	objs, err = renderMultusAdmissonControllerConfig(manifestDir)
-	if err != nil {
-		return nil, err
-	}
-	out = append(out, objs...)
-	return out, nil
+	return renderMultusAdmissonControllerConfig(manifestDir)
 }

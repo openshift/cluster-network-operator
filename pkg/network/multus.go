@@ -22,12 +22,10 @@ func RenderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 		return nil, nil
 	}
 
-	var err error
 	out := []*uns.Unstructured{}
-	objs := []*uns.Unstructured{}
 
 	// enabling Multus always renders the CRD since Multus uses it
-	objs, err = renderAdditionalNetworksCRD(manifestDir)
+	objs, err := renderAdditionalNetworksCRD(manifestDir)
 	if err != nil {
 		return nil, err
 	}
@@ -44,8 +42,6 @@ func RenderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 
 // renderMultusConfig returns the manifests of Multus
 func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool) ([]*uns.Unstructured, error) {
-	objs := []*uns.Unstructured{}
-
 	// render the manifests on disk
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
@@ -64,8 +60,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool) ([
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render multus manifests")
 	}
-	objs = append(objs, manifests...)
-	return objs, nil
+	return manifests, nil
 }
 
 // pluginCNIDir is the directory where plugins should install their CNI
