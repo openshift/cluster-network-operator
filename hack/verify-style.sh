@@ -11,17 +11,16 @@ if [[ ! $(which go) ]]; then
   echo "https://golang.org/dl/"
   exit 1
 fi
-if [[ ! $(which golint) ]]; then
-  echo "golint not found on PATH. To install:"
-  echo "go get -u github.com/golang/lint/golint"
-  exit 1
-fi
 if [[ ! $(which dep) ]]; then
   echo "dep not found on PATH. To install:"
   echo "curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh"
   exit 1
 fi
-
+if [[ ! $(which golangci-lint) ]]; then
+  echo "golangci-lint not found on PATH. To install:"
+  echo "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $(cat .golangciversion)"
+  exit 1
+fi
 rc=0
 trap 'rc=$?' ERR
 
@@ -39,8 +38,8 @@ if [[ -n ${fmt_files} ]]; then
     rc=1
 fi
 
-echo "Running go vet..."
-go vet $GOPKGS
+echo "Running golangci-lint..."
+golangci-lint run
 
 echo "Running dep check..."
 dep check
