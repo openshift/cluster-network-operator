@@ -374,12 +374,9 @@ func (r *ReconcileProxyConfig) mergeTrustBundlesToConfigMap(additionalData, syst
 	}
 
 	combinedTrustData := []byte{}
-	for _, d := range additionalData {
-		combinedTrustData = append(combinedTrustData, d)
-	}
-	for _, d := range systemData {
-		combinedTrustData = append(combinedTrustData, d)
-	}
+
+	combinedTrustData = append(combinedTrustData, additionalData...)
+	combinedTrustData = append(combinedTrustData, systemData...)
 
 	mergedCfgMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
