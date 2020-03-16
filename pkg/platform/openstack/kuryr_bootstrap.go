@@ -1118,7 +1118,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 
 	log.Print("Checking Double Listeners Octavia support")
-	octaviaMultipleListenersSupport, err := IsOctaviaVersionSupported(client, MinOctaviaVersionWithMultipleListeners)
+	octaviaMultipleListenersSupport, err := IsOctaviaVersionSupported(lbClient, MinOctaviaVersionWithMultipleListeners)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to determine if Octavia supports double listeners")
 	}
