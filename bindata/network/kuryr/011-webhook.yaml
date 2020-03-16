@@ -7,6 +7,7 @@ metadata:
     app: kuryr-dns-admission-controller
 webhooks:
   - name: kuryr-dns-admission-controller.openshift.io
+    failurePolicy: Ignore
     sideEffects: None
     admissionReviewVersions: ['v1', 'v1beta1']
     clientConfig:
