@@ -21,7 +21,17 @@ spec:
       containers:
       - name: sdn-controller
         image: {{.SDNImage}}
-        command: ["openshift-sdn-controller"]
+        command:
+        - /bin/bash
+        - -c
+        - |
+          if [[ -f /env/_master ]]; then
+            set -o allexport
+            source /env/_master
+            set +o allexport
+          fi
+
+          exec openshift-sdn-controller --v=${OPENSHIFT_SDN_LOG_LEVEL:-2}
         resources:
           requests:
             cpu: 10m
@@ -33,6 +43,9 @@ spec:
         - name: KUBERNETES_SERVICE_HOST
           value: "{{.KUBERNETES_SERVICE_HOST}}"
         terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /env
+          name: env-overrides
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -49,3 +62,8 @@ spec:
       - key: "node.kubernetes.io/not-ready"
         operator: "Exists"
         effect: "NoSchedule"
+      volumes:
+      - name: env-overrides
+        configMap:
+          name: env-overrides
+          optional: true
