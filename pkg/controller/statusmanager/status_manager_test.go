@@ -108,7 +108,7 @@ func TestStatusManager_set(t *testing.T) {
 	mapper := &fakeRESTMapper{}
 	status := New(client, mapper, "testing", "1.2.3")
 
-	co, err := getCO(client, "testing")
+	_, err := getCO(client, "testing")
 	if !errors.IsNotFound(err) {
 		t.Fatalf("unexpected error (expected Not Found): %v", err)
 	}
@@ -126,7 +126,7 @@ func TestStatusManager_set(t *testing.T) {
 	}
 	status.set(false, condFail)
 
-	co, err = getCO(client, "testing")
+	co, err := getCO(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	mapper := &fakeRESTMapper{}
 	status := New(client, mapper, "testing", "1.2.3")
 
-	co, err := getCO(client, "testing")
+	_, err := getCO(client, "testing")
 	if !errors.IsNotFound(err) {
 		t.Fatalf("unexpected error (expected Not Found): %v", err)
 	}
@@ -252,7 +252,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 
 	// Initial failure status
 	status.SetDegraded(OperatorConfig, "Operator", "")
-	co, err = getCO(client, "testing")
+	co, err := getCO(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
