@@ -61,10 +61,13 @@ spec:
           # connects to it. To achieve that we use a temporary private socket,
           # db-private.sock.
           # https://bugzilla.redhat.com/show_bug.cgi?id=1808125
+          # When called with '--db-sock', ovs-ctl doesn't point
+          # 'ovs-vsctl -- init' to the correct socket path so we have to
+          # ignore the error returned by ovs-ctl.
           priv_db_sock=/var/run/openvswitch/db-private.sock
           /usr/share/openvswitch/scripts/ovs-ctl start \
             --ovs-user=openvswitch:openvswitch --db-sock=${priv_db_sock} \
-            --no-ovs-vswitchd
+            --no-ovs-vswitchd || true
 
           # The OVS DB should also be properly initialized before
           # ovn-controller connects to it.
