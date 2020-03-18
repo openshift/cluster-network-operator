@@ -91,6 +91,7 @@ spec:
                   properties:
                     remote_ip_prefixes:
                       type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     namespace:
                       type: string
                     security_group_rule:
@@ -125,6 +126,7 @@ spec:
                   properties:
                     remote_ip_prefixes:
                       type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     namespace:
                       type: string
                     security_group_rule:
