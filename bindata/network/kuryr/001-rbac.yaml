@@ -43,6 +43,7 @@ rules:
 - apiGroups: ["openstack.org"]
   resources:
   - kuryrnets
+  - kuryrnetworks
   - kuryrnetpolicies
   verbs: ["*"]
 - apiGroups: ["route.openshift.io"]

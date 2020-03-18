@@ -35,7 +35,7 @@ data:
     vif_pool_driver = nested
     multi_vif_drivers = noop
 
-    enabled_handlers = vif,lb,lbaasspec,policy,pod_label,namespace,kuryrnetpolicy{{ if .EnablePortPoolsPrepopulation }},kuryrnet{{ end }}
+    enabled_handlers = vif,lb,lbaasspec,policy,pod_label,namespace,kuryrnetpolicy,kuryrnetwork{{ if .EnablePortPoolsPrepopulation }},kuryrnetwork_population{{ end }}
     pod_security_groups_driver = policy
     service_security_groups_driver = policy
     pod_subnets_driver = namespace
