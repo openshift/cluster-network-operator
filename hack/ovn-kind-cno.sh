@@ -12,6 +12,7 @@ CLUSTER_CIDR=${CLUSTER_CIDR:-"172.16.0.0/16"}
 SERVICE_NETWORK=${SERVICE_NETWORK:-"172.30.0.0/16"}
 # Skip the comment lines and retrieve the number of Master nodes from kind.yaml file.
 NUM_MASTER_NODES=`grep "^[^#]" kind.yaml | grep -c "role\: control-plane"`
+OVN_KIND_VERBOSITY=${OVN_KIND_VERBOSITY:-0}
 
 # Check for docker
 if ! command -v docker; then
@@ -40,7 +41,7 @@ if ! sudo iptables -C DOCKER-USER -j ACCEPT > /dev/null 2>&1; then
 fi
 
 # Create KIND cluster
-kind create cluster --name ovn --kubeconfig ${HOME}/admin.conf --image kindest/node:${K8S_VERSION} --config=./kind.yaml
+kind create cluster --name ovn --kubeconfig ${HOME}/admin.conf --image kindest/node:${K8S_VERSION} --config=./kind.yaml -v ${OVN_KIND_VERBOSITY}
 export KUBECONFIG=${HOME}/admin.conf
 mkdir -p /tmp/kind
 sudo chmod 777 /tmp/kind
@@ -73,7 +74,7 @@ if [ "$BUILD_CNO" = true ]; then
     exit 1
   fi
   echo "Loading CNO image into KIND"
-  kind load docker-image $CNO_IMAGE --name ovn
+  kind load docker-image $CNO_IMAGE --name ovn -v ${OVN_KIND_VERBOSITY}
   popd
 fi
 
@@ -94,7 +95,7 @@ COPY ovnkube.sh /root/
 EOF
   popd
   echo "Loading OVN-K8S docker image into KIND"
-  kind load docker-image origin-ovn-kubernetes:dev --name ovn
+  kind load docker-image origin-ovn-kubernetes:dev --name ovn -v ${OVN_KIND_VERBOSITY}
   popd
 fi
 
