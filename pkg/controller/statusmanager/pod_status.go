@@ -82,15 +82,14 @@ func (status *StatusManager) SetFromPods() {
 
 		dsProgressing := false
 
-		if ds.Status.UpdatedNumberScheduled < ds.Status.DesiredNumberScheduled {
+		if isNonCritical(ds) && ds.Status.DesiredNumberScheduled == 0 {
+			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is waiting for other operators to become ready", dsName.String()))
+			dsProgressing = true
+		} else if ds.Status.UpdatedNumberScheduled < ds.Status.DesiredNumberScheduled {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q update is rolling out (%d out of %d updated)", dsName.String(), ds.Status.UpdatedNumberScheduled, ds.Status.DesiredNumberScheduled))
 			dsProgressing = true
 		} else if ds.Status.NumberUnavailable > 0 {
-			if isNonCritical(ds) {
-				progressing = append(progressing, fmt.Sprintf("DaemonSet %q is waiting for other operators to become ready", dsName.String()))
-			} else {
-				progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not available (awaiting %d nodes)", dsName.String(), ds.Status.NumberUnavailable))
-			}
+			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not available (awaiting %d nodes)", dsName.String(), ds.Status.NumberUnavailable))
 			dsProgressing = true
 		} else if ds.Status.NumberAvailable == 0 { // NOTE: update this if we ever expect empty (unscheduled) daemonsets ~cdc
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not yet scheduled on any nodes", dsName.String()))
