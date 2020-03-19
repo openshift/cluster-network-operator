@@ -10,6 +10,8 @@ CNO_PATH=${CNO_PATH:-$GOPATH/src/github.com/openshift/cluster-network-operator}
 OVN_K8S_PATH=${OVN_K8S_PATH:-$GOPATH/src/github.com/ovn-org/ovn-kubernetes}
 CLUSTER_CIDR=${CLUSTER_CIDR:-"172.16.0.0/16"}
 SERVICE_NETWORK=${SERVICE_NETWORK:-"172.30.0.0/16"}
+# Skip the comment lines and retrieve the number of Master nodes from kind.yaml file.
+NUM_MASTER_NODES=`grep "^[^#]" kind.yaml | grep -c "role\: control-plane"`
 
 # Check for docker
 if ! command -v docker; then
@@ -165,6 +167,20 @@ if [ "$BUILD_CNO" != true ]; then
   kubectl -n openshift-network-operator  exec $CNO_POD sed -i '/host-run-netns/{n;s/readOnly.*/mountPropagation: Bidirectional/}' /bindata/network/ovn-kubernetes/ovnkube-node.yaml > /tmp/ovnkube-node.yaml
   kubectl cp /tmp/ovnkube-node.yaml openshift-network-operator/${CNO_POD}:/bindata/network/ovn-kubernetes/
 fi
+
+echo "Creating \"cluster-config-v1\" configMap with $NUM_MASTER_NODES master nodes"
+cat <<EOF | kubectl create -f - 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-config-v1
+  namespace: kube-system
+data:
+  install-config: |
+    apiVersion: v1
+    controlPlane:
+      replicas: ${NUM_MASTER_NODES}
+EOF
 
 echo "Creating OVN CNO config"
 cat << EOF | kubectl create -f -
