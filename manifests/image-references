@@ -50,3 +50,8 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-kuryr-controller:4.3
+  - name: network-metrics-daemon
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-network-metrics-daemon:4.5
+

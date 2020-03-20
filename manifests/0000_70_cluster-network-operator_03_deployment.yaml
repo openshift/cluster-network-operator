@@ -49,6 +49,8 @@ spec:
           value: "quay.io/openshift/origin-kuryr-cni:4.3"
         - name: KURYR_CONTROLLER_IMAGE
           value: "quay.io/openshift/origin-kuryr-controller:4.3"
+        - name: NETWORK_METRICS_DAEMON_IMAGE
+          value: "quay.io/openshift/origin-network-metrics-daemon:4.5"
         - name: POD_NAME
           valueFrom:
             fieldRef:

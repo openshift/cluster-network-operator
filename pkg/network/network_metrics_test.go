@@ -3,13 +3,12 @@ package network
 import (
 	"testing"
 
+	. "github.com/onsi/gomega"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
-
-	. "github.com/onsi/gomega"
 )
 
-var MultusConfig = operv1.Network{
+var NetworkMetricsDaemonConfig = operv1.Network{
 	Spec: operv1.NetworkSpec{
 		ServiceNetwork: []string{"172.30.0.0/16"},
 		ClusterNetwork: []operv1.ClusterNetworkEntry{
@@ -27,36 +26,38 @@ var MultusConfig = operv1.Network{
 	},
 }
 
-// TestRenderMultus has some simple rendering tests
-func TestRenderMultus(t *testing.T) {
+// TestRenderNetworkMetricsDaemon has some simple rendering tests
+func TestRenderNetworkMetricsDaemon(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	crd := MultusConfig.DeepCopy()
+	crd := NetworkMetricsDaemonConfig.DeepCopy()
 	config := &crd.Spec
 	disabled := true
 	config.DisableMultiNetwork = &disabled
 	FillDefaults(config, nil)
 
-	// disable Multus
+	// disable MultusAdmissionController
 	objs, err := RenderMultus(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus")))
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "network-metrics-daemon")))
 
-	// enable Multus
+	// enable MultusAdmissionController
 	enabled := false
 	config.DisableMultiNetwork = &enabled
 	objs, err = RenderMultus(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "network-metrics-daemon")))
 
-	// It's important that the namespace is first
+	// Check rendered object
+
 	g.Expect(len(objs)).To(Equal(18))
-	g.Expect(objs[0]).To(HaveKubernetesID("CustomResourceDefinition", "", "network-attachment-definitions.k8s.cni.cncf.io"))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("Namespace", "", "openshift-multus")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "multus")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-multus", "multus")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "multus")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "network-metrics-daemon")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("Service", "openshift-multus", "network-metrics-service")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "metrics-daemon-role")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "metrics-daemon-sa-rolebinding")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceMonitor", "openshift-multus", "monitor-network")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("Role", "openshift-multus", "prometheus-k8s")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("RoleBinding", "openshift-multus", "prometheus-k8s")))
 
 	// Make sure every obj is reasonable:
 	// - it is supported
