@@ -1,0 +1,38 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: metrics-daemon-sa
+  namespace: openshift-multus
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: metrics-daemon-role
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["k8s.cni.cncf.io"]
+    resources: ["network-attachment-definitions"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+  - apiGroups: ["authorization.k8s.io"]
+    resources: ["subjectaccessreviews"]
+    verbs: ["create"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: metrics-daemon-sa-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: metrics-daemon-sa
+    apiGroup: ""
+    namespace: openshift-multus
+roleRef:
+  kind: ClusterRole
+  name: metrics-daemon-role
+  apiGroup: rbac.authorization.k8s.io
