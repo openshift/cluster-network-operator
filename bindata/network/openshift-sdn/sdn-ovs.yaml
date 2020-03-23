@@ -71,7 +71,10 @@ spec:
               exit 0
           }
           trap quit SIGTERM
-          /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovs-vswitchd --system-id=random
+
+          # launch OVS
+          # Start the ovsdb so that we can prep it before we start the ovs-vswitchd
+          /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovs-vswitchd --system-id=random --no-monitor
 
           # Set the flow-restore-wait to true so ovs-vswitchd will wait till flows are restored
           ovs-vsctl --no-wait set Open_vSwitch . other_config:flow-restore-wait=true
@@ -84,7 +87,9 @@ spec:
               ovs-vsctl --no-wait set Open_vSwitch . other_config:n-revalidator-threads=4
               ovs-vsctl --no-wait set Open_vSwitch . other_config:n-handler-threads=10
           fi
-          /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovsdb-server --system-id=random
+
+          # And finally start the ovs-vswitchd now the DB is prepped
+          /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovsdb-server --system-id=random --no-monitor
 
           /usr/share/openvswitch/scripts/ovs-ctl status > /dev/null &&
           /usr/bin/ovs-appctl -T 5 ofproto/list > /dev/null &&
