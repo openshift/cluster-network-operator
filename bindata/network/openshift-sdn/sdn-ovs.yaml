@@ -24,7 +24,6 @@ spec:
     spec:
       serviceAccountName: sdn #needed to run privileged pods; not used for api access
       hostNetwork: true
-      hostPID: true
       priorityClassName: system-node-critical
       containers:
       - name: openvswitch
@@ -35,7 +34,6 @@ spec:
         - |
           #!/bin/bash
           set -euo pipefail
-          TIMESTAMP=`date -u "+%Y-%m-%d %H:%M:%S"`
           chown -R openvswitch:openvswitch /var/run/openvswitch
           chown -R openvswitch:openvswitch /etc/openvswitch
 
@@ -58,16 +56,14 @@ spec:
           # launch OVS
           function quit {
               # Save the flows
-              echo "$TIMESTAMP info: Saving flows ..." 2>&1
+              echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Saving flows ..." 2>&1
               bridges=$(ovs-vsctl -- --real list-br)
               TMPDIR=/var/run/openvswitch /usr/share/openvswitch/scripts/ovs-save save-flows $bridges > /var/run/openvswitch/flows.sh
-              END_TS=`date -u "+%Y-%m-%d %H:%M:%S"`
-              echo "$END_TS info: Saved flows" 2>&1
+              echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Saved flows" 2>&1
 
               # Don't allow ovs-vswitchd to clear datapath flows on exit
               kill -9 $(cat /var/run/openvswitch/ovs-vswitchd.pid 2>/dev/null) 2>/dev/null || true
               kill $(cat /var/run/openvswitch/ovsdb-server.pid 2>/dev/null) 2>/dev/null || true
-              #kill $(jobs -p)
               exit 0
           }
           trap quit SIGTERM
@@ -78,7 +74,7 @@ spec:
 
           # Set the flow-restore-wait to true so ovs-vswitchd will wait till flows are restored
           ovs-vsctl --no-wait set Open_vSwitch . other_config:flow-restore-wait=true
-           
+          
           # Restrict the number of pthreads ovs-vswitchd creates to reduce the
           # amount of RSS it uses on hosts with many cores
           # https://bugzilla.redhat.com/show_bug.cgi?id=1571379
@@ -91,21 +87,19 @@ spec:
           # And finally start the ovs-vswitchd now the DB is prepped
           /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovsdb-server --system-id=random --no-monitor
 
-          /usr/share/openvswitch/scripts/ovs-ctl status > /dev/null &&
-          /usr/bin/ovs-appctl -T 5 ofproto/list > /dev/null &&
-          /usr/bin/ovs-vsctl -t 5 --retry show > /dev/null &&
-          /usr/bin/ovs-vsctl -t 5 --retry br-exists br0
-          
           # Load any flows that we saved
-          echo "$TIMESTAMP info: Loading previous flows ..." 2>&1
+          echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Loading previous flows ..." 2>&1
           if [[ -f /var/run/openvswitch/flows.sh ]]; then
-             echo "$TIMESTAMP info: Execute flow script ..." 2>&1
+             echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Adding br0 if it doesn't exist ..." 2>&1
+             /usr/bin/ovs-vsctl --may-exist add-br br0 -- set Bridge br0 fail_mode=secure protocols=OpenFlow13
+             echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Created br0, now adding flows ..." 2>&1
              sh -x /var/run/openvswitch/flows.sh
+             echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Done restoring the existing flows ..." 2>&1
           fi
           
-          echo "$TIMESTAMP info: Remove other config ..." 2>&1
+          echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Remove other config ..." 2>&1
           ovs-vsctl --no-wait --if-exists remove Open_vSwitch . other_config flow-restore-wait=true
-          echo "$TIMESTAMP info: Removed other config ..." 2>&1
+          echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Removed other config ..." 2>&1
 
           tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
           tail -F --pid=$(cat /var/run/openvswitch/ovsdb-server.pid) /var/log/openvswitch/ovsdb-server.log &
