@@ -42,6 +42,7 @@ spec:
         - |
           #!/bin/bash
           set -euo pipefail
+          set -x
           if [[ -f "/env/${K8S_NODE}" ]]; then
             set -o allexport
             source "/env/${K8S_NODE}"
@@ -49,6 +50,9 @@ spec:
           fi
           chown -R openvswitch:openvswitch /run/openvswitch
           chown -R openvswitch:openvswitch /etc/openvswitch
+          mkdir -p /var/run/openvswitch
+          touch /var/run/openvswitch/ovs-vswitchd.pid
+          chown -R openvswitch:openvswitch /var/run/openvswitch
           function quit {
               # Don't allow ovs-vswitchd to clear datapath flows on exit
               kill -9 $(cat /var/run/openvswitch/ovs-vswitchd.pid 2>/dev/null) 2>/dev/null || true
@@ -56,12 +60,18 @@ spec:
               exit 0
           }
           trap quit SIGTERM
-          /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --system-id=random
-          ovs-appctl vlog/set "file:${OVS_LOG_LEVEL}"
-          /usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
 
-          tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
-          tail -F --pid=$(cat /var/run/openvswitch/ovsdb-server.pid) /var/log/openvswitch/ovsdb-server.log &
+          # Start ovsdb-server and ovs-vswitchd such that ovn-controller can
+          # connect to the database and br-int.
+          #/usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --system-id=random
+          setenforce Permissive
+          #SYSTEMD_IGNORE_CHROOT=yes systemctl start openvswitch
+          gdbus call --system --dest org.freedesktop.systemd1 --object-path /org/freedesktop/systemd1 --method org.freedesktop.systemd1.Manager.StartUnit openvswitch.service replace
+          #ovs-appctl vlog/set "file:${OVS_LOG_LEVEL}"
+          #/usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
+
+          #tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
+          #tail -F --pid=$(cat /var/run/openvswitch/ovsdb-server.pid) /var/log/openvswitch/ovsdb-server.log &
           wait
         env:
         - name: OVS_LOG_LEVEL
@@ -78,15 +88,36 @@ spec:
           readOnly: true
         - mountPath: /sys
           name: host-sys
-          readOnly: true
+          readOnly: false
         - mountPath: /run/openvswitch
           name: run-openvswitch
+        - mountPath: /run/dbus
+          name: run-dbus
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
         - mountPath: /var/lib/openvswitch
           name: var-lib-openvswitch
         - mountPath: /env
           name: env-overrides
+        - mountPath: /run/systemd
+          name: run-systemd
+        - mountPath: /sysroot
+          name: host-sysroot
+        - mountPath: /var/log/openvswitch
+          name: var-log-openvswitch
+        - mountPath: /usr/share/openvswitch/scripts
+          name: share-openvswitch
+        - mountPath: /etc/sysconfig
+          name: etc-sysconfig
+          readOnly: false
+        - mountPath: /host/dev
+          name: host-dev
+        - mountPath: /host/proc
+          name: host-proc
+          readOnly: true
+        - mountPath: /host/boot
+          name: host-boot
+          readOnly: true
         resources:
           requests:
             cpu: 100m
@@ -131,6 +162,9 @@ spec:
       - name: run-openvswitch
         hostPath:
           path: /run/openvswitch
+      - name: run-dbus
+        hostPath:
+          path: /run/dbus
       - name: host-sys
         hostPath:
           path: /sys
@@ -138,5 +172,29 @@ spec:
         configMap:
           name: env-overrides
           optional: true
+      - name: run-systemd
+        hostPath:
+          path: /run/systemd
+      - name: host-sysroot
+        hostPath:
+          path: /sysroot
+      - name: var-log-openvswitch
+        hostPath:
+          path: /var/log/openvswitch
+      - name: share-openvswitch
+        hostPath:
+          path: /usr/share/openvswitch/scripts
+      - name: etc-sysconfig
+        hostPath:
+          path: /etc/sysconfig
+      - name: host-dev
+        hostPath:
+          path: /dev
+      - name: host-proc
+        hostPath:
+          path: /proc
+      - name: host-boot
+        hostPath:
+          path: /boot
       tolerations:
       - operator: "Exists"
