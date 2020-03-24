@@ -46,3 +46,8 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-kuryr-controller:4.3
+  - name: kube-rbac-proxy
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-kube-rbac-proxy:4.4
+

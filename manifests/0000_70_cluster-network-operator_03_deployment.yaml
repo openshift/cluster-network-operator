@@ -31,6 +31,8 @@ spec:
           value: "quay.io/openshift/origin-sdn:4.3"
         - name: KUBE_PROXY_IMAGE
           value: "quay.io/openshift/origin-kube-proxy:4.3"
+        - name: KUBE_RBAC_PROXY_IMAGE
+          value: "quay.io/openshift/origin-kube-rbac-proxy:4.4"
         - name: MULTUS_IMAGE
           value: "quay.io/openshift/origin-multus-cni:4.3"
         - name: MULTUS_ADMISSION_CONTROLLER_IMAGE
