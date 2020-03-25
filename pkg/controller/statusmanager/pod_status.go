@@ -82,7 +82,10 @@ func (status *StatusManager) SetFromPods() {
 
 		dsProgressing := false
 
-		if ds.Status.UpdatedNumberScheduled < ds.Status.DesiredNumberScheduled {
+		if isNonCritical(ds) && ds.Status.DesiredNumberScheduled == 0 {
+			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is waiting for other operators to become ready", dsName.String()))
+			dsProgressing = true
+		} else if ds.Status.UpdatedNumberScheduled < ds.Status.DesiredNumberScheduled {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q update is rolling out (%d out of %d updated)", dsName.String(), ds.Status.UpdatedNumberScheduled, ds.Status.DesiredNumberScheduled))
 			dsProgressing = true
 		} else if ds.Status.NumberUnavailable > 0 {
