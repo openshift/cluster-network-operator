@@ -42,6 +42,7 @@ spec:
         - |
           #!/bin/bash
           set -euo pipefail
+          set -x
           if [[ -f "/env/${K8S_NODE}" ]]; then
             set -o allexport
             source "/env/${K8S_NODE}"
