@@ -13,6 +13,8 @@ SERVICE_NETWORK=${SERVICE_NETWORK:-"172.30.0.0/16"}
 # Skip the comment lines and retrieve the number of Master nodes from kind.yaml file.
 NUM_MASTER_NODES=`grep "^[^#]" kind.yaml | grep -c "role\: control-plane"`
 OVN_KIND_VERBOSITY=${OVN_KIND_VERBOSITY:-0}
+# Increase the retries if on slower bandwidth to allow for image downloads to complete
+OVN_KIND_RETRIES=${OVN_KIND_RETRIES:-20}
 
 # Check for docker
 if ! command -v docker; then
@@ -147,7 +149,7 @@ fi
 
 count=1
 until kubectl get pod -n openshift-network-operator -o jsonpath='{.items[0].metadata.name}' --field-selector status.phase=Running &> /dev/null ;do
-  if [ $count -gt 15 ]; then
+  if [ $count -gt $OVN_KIND_RETRIES ]; then
     echo "Network operator not running"
     exit 1
   fi
@@ -200,7 +202,7 @@ EOF
 
 count=1
 until kubectl get pod -n openshift-ovn-kubernetes -o jsonpath="{.items[0].status.phase}" 2> /dev/null | grep Running &> /dev/null;do
-  if [ $count -gt 15 ]; then
+  if [ $count -gt $OVN_KIND_RETRIES ]; then
     echo "OVN-k8s pods are not running"
     exit 1
   fi
