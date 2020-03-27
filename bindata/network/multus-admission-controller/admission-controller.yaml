@@ -50,27 +50,6 @@ spec:
         ports:
         - name: metrics-port
           containerPort: 9091
-      - name: kube-rbac-proxy
-        image: {{.KubeRBACProxyImage}}
-        args:
-        - --logtostderr
-        - --secure-listen-address=:8443
-        - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
-        - --upstream=http://127.0.0.1:9091/
-        - --tls-private-key-file=/etc/webhook/tls.key
-        - --tls-cert-file=/etc/webhook/tls.crt
-        ports:
-        - containerPort: 8443
-          name: https
-        resources:
-          requests:
-            cpu: 10m
-            memory: 20Mi
-        terminationMessagePolicy: FallbackToLogsOnError
-        volumeMounts:
-        - name: webhook-certs
-          mountPath: /etc/webhook
-          readOnly: True
       serviceAccountName: multus
       priorityClassName: "system-cluster-critical"
       restartPolicy: Always
