@@ -56,6 +56,9 @@ spec:
           mountPath: /host_proc
         - name: openvswitch
           mountPath: /var/run/openvswitch
+        - name: netns
+          mountPath: /run/netns
+          mountPropagation: HostToContainer
 {{ if (default true .DaemonEnableProbes) eq "true" }}
         readinessProbe:
           failureThreshold: 10
@@ -85,6 +88,9 @@ spec:
       - name: proc
         hostPath:
           path: /proc
+      - name: netns
+        hostPath:
+          path: /run/netns
       - name: openvswitch
         hostPath:
           path: /var/run/openvswitch
