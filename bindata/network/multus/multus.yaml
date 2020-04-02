@@ -315,7 +315,7 @@ spec:
 {{- if eq .DefaultNetworkType "OpenShiftSDN"}}
         - "--readiness-indicator-file=/var/run/multus/cni/net.d/80-openshift-network.conf"
 {{- else if eq .DefaultNetworkType "OVNKubernetes"}}
-        - "--readiness-indicator-file=/var/run/multus/cni/net.d/10-ovn-kubernetes.conf"
+        - "--readiness-indicator-file=/var/run/multus/cni/net.d/10-ovn-kubernetes.conflist"
 {{- end}}
         - "--cleanup-config-on-exit=true"
         - "--namespace-isolation=true"
