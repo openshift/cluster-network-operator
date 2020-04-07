@@ -107,6 +107,7 @@ spec:
         # TODO: remove
         - mountPath: /var/run
           name: host-var-run
+          mountPropagation: Bidirectional
         # Run directories where we need to be able to access sockets
         - mountPath: /var/run/dbus/
           name: host-var-run-dbus

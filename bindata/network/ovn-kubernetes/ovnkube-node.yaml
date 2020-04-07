@@ -170,7 +170,7 @@ spec:
         # accessing bind-mounted net namespaces
         - mountPath: /run/netns
           name: host-run-netns
-          readOnly: true
+          mountPropagation: Bidirectional
         # for installing the CNI plugin binary
         - mountPath: /cni-bin-dir
           name: host-cni-bin
