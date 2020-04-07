@@ -1,4 +1,4 @@
-
+---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -12,32 +12,18 @@ spec:
   endpoints:
   - interval: 30s
     port: metrics
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    scheme: 'https'
+    tlsConfig:
+      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+      serverName: multus-admission-controller.openshift-multus.svc
   jobLabel: app
   namespaceSelector:
     matchNames:
     - openshift-multus
   selector:
     matchLabels:
-      name: multus-admission-controller-monitor-service
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    name: multus-admission-controller-monitor-service
-  name:  multus-admission-controller-monitor-service
-  namespace: openshift-multus
-spec:
-  selector:
-    app: multus-admission-controller
-  clusterIP: None
-  ports:
-  - name: metrics
-    port: 9091
-    protocol: TCP
-    targetPort: 9091
-  sessionAffinity: None
-  type: ClusterIP
+       app: multus-admission-controller
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

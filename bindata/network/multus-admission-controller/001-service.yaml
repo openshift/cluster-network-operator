@@ -10,7 +10,11 @@ metadata:
     service.alpha.openshift.io/serving-cert-secret-name: multus-admission-controller-secret
 spec:
   ports:
-  - port: 443
+  - name: webhook
+    port: 443
     targetPort: 6443
+  - name: metrics
+    port: 8443
+    targetPort: https
   selector:
     app: multus-admission-controller
