@@ -211,7 +211,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			Validity:  OneYear / 2,
 			Refresh:   OneYear / 4,
 			CertCreator: &certrotation.ServingRotation{
-				Hostnames: func() []string { return []string{spec.TargetCert.CommonName} },
+				Hostnames: func() []string { return strings.Split(spec.TargetCert.CommonName, " ") },
 
 				// Force the certificate to also be client
 				CertificateExtensionFn: []crypto.CertificateExtensionFunc{

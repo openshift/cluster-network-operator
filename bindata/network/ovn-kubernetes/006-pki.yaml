@@ -7,4 +7,4 @@ metadata:
   namespace: openshift-ovn-kubernetes
 spec:
   targetCert:
-    commonName: ovn
+    commonName: {{.OVN_MASTER_ADDR_LIST}}
