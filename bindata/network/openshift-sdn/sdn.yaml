@@ -229,3 +229,62 @@ spec:
           path: /var/lib/cni/networks/openshift-sdn
       tolerations:
       - operator: Exists
+---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: sdn-metrics
+  namespace: openshift-sdn
+  annotations:
+    kubernetes.io/description: |
+      This daemon set launches the OpenShift networking components (kube-proxy and openshift-sdn).
+      It expects that OVS is running on the node.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+    matchLabels:
+      app: sdn-metrics
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: sdn-metrics
+        component: network
+        type: infra
+        openshift.io/component: network
+      annotations:
+        networkoperator.openshift.io/non-critical: ""
+    spec:
+      # Requires fairly broad permissions - ability to read all services and network functions as well
+      # as all pods.
+      serviceAccountName: sdn-metrics
+      hostNetwork: true
+      containers:
+      - name: kube-rbac-proxy
+        image: {{.KubeRBACProxyImage}}
+        args:
+        - --logtostderr
+        - --secure-listen-address=:9101
+        - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+        - --upstream=http://127.0.0.1:29101/
+        - --tls-private-key-file=/etc/pki/tls/metrics-certs/tls.key
+        - --tls-cert-file=/etc/pki/tls/metrics-certs/tls.crt
+        ports:
+        - containerPort: 9101
+          name: https
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: sdn-metrics-certs
+          mountPath: /etc/pki/tls/metrics-certs
+          readOnly: True
+      nodeSelector:
+        kubernetes.io/os: linux
+      volumes:
+      - name: sdn-metrics-certs
+        secret:
+          secretName: sdn-metrics-certs
