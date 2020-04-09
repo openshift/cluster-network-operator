@@ -342,7 +342,7 @@ spec:
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             ${hybrid_overlay_flags} \
-            --metrics-bind-address "0.0.0.0:9102" \
+            --metrics-bind-address "0.0.0.0:29102" \
             --sb-address "{{.OVN_SB_ADDR_LIST}}" \
             --sb-client-privkey /ovn-cert/tls.key \
             --sb-client-cert /ovn-cert/tls.crt \
@@ -383,7 +383,7 @@ spec:
               fieldPath: spec.nodeName
         ports:
         - name: metrics-port
-          containerPort: 9102
+          containerPort: 29102
         terminationMessagePolicy: FallbackToLogsOnError
 
       nodeSelector:
@@ -423,3 +423,63 @@ spec:
         operator: "Exists"
       - key: "node.kubernetes.io/network-unavailable"
         operator: "Exists"
+---
+
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: ovnkube-master-metrics
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    kubernetes.io/description: |
+      RBAC Proxy to expose metrics over HTTPS
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ovnkube-master-metrics
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: ovnkube-master-metrics
+        component: network
+        type: infra
+        openshift.io/component: network
+        kubernetes.io/os: "linux"
+    spec:
+      serviceAccountName: ovn-kubernetes-controller
+      hostNetwork: true
+      containers:
+      - name: kube-rbac-proxy
+        image: {{.KubeRBACProxyImage}}
+        args:
+        - --logtostderr
+        - --secure-listen-address=:9102
+        - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+        - --upstream=http://127.0.0.1:29102/
+        - --tls-private-key-file=/etc/pki/tls/metrics-cert/tls.key
+        - --tls-cert-file=/etc/pki/tls/metrics-cert/tls.crt
+        ports:
+        - containerPort: 9102
+          name: https
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: ovn-master-metrics-cert
+          mountPath: /etc/pki/tls/metrics-cert
+          readOnly: True
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+        beta.kubernetes.io/os: "linux"
+      volumes:
+      - name: ovn-master-metrics-cert
+        secret:
+          secretName: ovn-master-metrics-cert
+      tolerations:
+      - operator: "Exists"
