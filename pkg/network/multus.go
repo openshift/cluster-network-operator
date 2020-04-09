@@ -59,6 +59,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool) ([
 	data.Data["MultusCNIConfDir"] = MultusCNIConfDir
 	data.Data["SystemCNIConfDir"] = SystemCNIConfDir
 	data.Data["DefaultNetworkType"] = defaultNetworkType
+	data.Data["CNIBinDir"] = CNIBinDir
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus"), &data)
 	if err != nil {
