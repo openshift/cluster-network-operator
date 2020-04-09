@@ -42,6 +42,18 @@ spec:
         - |
           #!/bin/bash
           set -euo pipefail
+          set -x
+          if [[ -f /usr/bin/id ]]; then
+            /usr/bin/id openvswitch
+          else
+            echo "id command not found"
+          fi
+          if [[ -d /run/openvswitch ]]; then
+            ls -al /run/openvswitch
+          fi
+          if [[ -d /var/run/openvswitch ]]; then
+            ls -al /var/run/openvswitch
+          fi
           if [[ -f "/env/${K8S_NODE}" ]]; then
             set -o allexport
             source "/env/${K8S_NODE}"
@@ -50,6 +62,18 @@ spec:
           echo "$(date -Iseconds) - starting ovs-daemons"
           chown -R openvswitch:openvswitch /run/openvswitch
           chown -R openvswitch:openvswitch /etc/openvswitch
+          if [[ -d /run/openvswitch ]]; then
+            ls -al /run/openvswitch
+          fi
+          if [[ -d /var/run/openvswitch ]]; then
+            ls -al /var/run/openvswitch
+          fi
+          if [[ -f /var/run/openvswitch/ovs-vswitchd.pid ]] ; then
+            cat /var/run/openvswitch/ovs-vswitchd.pid
+          fi
+          if [[ -f /var/run/openvswitch/ovsdb-server.pid ]] ; then
+            cat /var/run/openvswitch/ovsdb-server.pid
+          fi
           function quit {
               # Don't allow ovs-vswitchd to clear datapath flows on exit
               kill -9 $(cat /var/run/openvswitch/ovs-vswitchd.pid 2>/dev/null) 2>/dev/null || true
@@ -57,9 +81,37 @@ spec:
               exit 0
           }
           trap quit SIGTERM
+          if [[ -S /var/run/openvswitch/db.sock ]]; then
+            echo "Found /var/run/openvswitch/db.sock"
+          else
+            echo "File /var/run/openvswitch/db.sock was not found"
+          fi
+          if [[ -S /run/openvswitch/db.sock ]]; then
+            echo "Found /run/openvswitch/db.sock"
+          else
+            echo "File /run/openvswitch/db.sock was not found"
+          fi
+          export SYSTEMD_IGNORE_CHROOT=yes
+          journalctl -xeu ovsdb-server --no-pager
+          #systemctl is-active --quiet ovsdb-server
+          journalctl -xeu openvswitch --no-pager
+          if (modprobe openvswitch) ; then
+            echo "modprobe openvswitch success?"
+          else
+            echo "modprobe openvswitch fail?"
+          fi
+          lsmod | grep openvswitch
+          if (systemctl is-active --quiet openvswitch) ; then
+            echo "OVS started by RHCOS"
+            systemctl is-active openvswitch
+            journalctl -xeu openvswitch --no-pager
+          else
+            echo "OVS started by ovs-node container, NOT RHCOS"
+          # Need container up v0.0 just to see if host starts ovs and friends
           /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --system-id=random
           ovs-appctl vlog/set "file:${OVS_LOG_LEVEL}"
           /usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
+          fi
           echo "$(date -Iseconds) - ovs-daemons running"
 
           tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
@@ -82,9 +134,15 @@ spec:
           name: host-sys
           readOnly: true
         - mountPath: /run/openvswitch
-          name: run-openvswitch
+          name: host-run-openvswitch
+        - mountPath: /run/systemd
+          name: host-run-systemd
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
+        - mountPath: /var/log/openvswitch
+          name: host-var-log-openvswitch
+        - mountPath: /sys/fs/cgroup
+          name: sys-fs-cgroup
         - mountPath: /var/lib/openvswitch
           name: var-lib-openvswitch
         - mountPath: /env
@@ -120,22 +178,33 @@ spec:
               - key: network.operator.openshift.io/external-openvswitch
                 operator: DoesNotExist        
       volumes:
-      # used for iptables wrapper scripts
       - name: host-modules
         hostPath:
           path: /lib/modules
       - name: var-lib-openvswitch
         hostPath:
           path: /var/lib/openvswitch/data
+      - name: host-run-openvswitch
+        hostPath:
+          path: /run/openvswitch
+          type: Directory
+      - name: host-run-systemd
+        hostPath:
+          path: /run/systemd
+          type: Directory
       - name: etc-openvswitch
         hostPath:
           path: /var/lib/openvswitch/etc
-      - name: run-openvswitch
+      - name: host-var-log-openvswitch
         hostPath:
-          path: /run/openvswitch
+          path: /var/log/openvswitch
+          type: Directory
       - name: host-sys
         hostPath:
           path: /sys
+      - name: sys-fs-cgroup
+        hostPath:
+          path: /sys/fs/cgroup
       - name: env-overrides
         configMap:
           name: env-overrides
