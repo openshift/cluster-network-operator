@@ -346,11 +346,11 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             ${hybrid_overlay_flags} \
             --metrics-bind-address "0.0.0.0:9102" \
-            --sb-address "{{.OVN_SB_ADDR_LIST}}" \
+            --sb-address "{{.OVN_SB_DB_LIST}}" \
             --sb-client-privkey /ovn-cert/tls.key \
             --sb-client-cert /ovn-cert/tls.crt \
             --sb-client-cacert /ovn-ca/ca-bundle.crt \
-            --nb-address "{{.OVN_NB_ADDR_LIST}}" \
+            --nb-address "{{.OVN_NB_DB_LIST}}" \
             --nb-client-privkey /ovn-cert/tls.key \
             --nb-client-cert /ovn-cert/tls.crt \
             --nb-client-cacert /ovn-ca/ca-bundle.crt \

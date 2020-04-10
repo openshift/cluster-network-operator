@@ -121,8 +121,8 @@ spec:
           fi
           
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
-            --nb-address "{{.OVN_NB_ADDR_LIST}}" \
-            --sb-address "{{.OVN_SB_ADDR_LIST}}" \
+            --nb-address "{{.OVN_NB_DB_LIST}}" \
+            --sb-address "{{.OVN_SB_DB_LIST}}" \
             --nb-client-privkey /ovn-cert/tls.key \
             --nb-client-cert /ovn-cert/tls.crt \
             --nb-client-cacert /ovn-ca/ca-bundle.crt \

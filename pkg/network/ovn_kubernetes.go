@@ -60,8 +60,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_SB_RAFT_PORT"] = OVN_SB_RAFT_PORT
 	data.Data["OVN_NB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterIPs, OVN_NB_PORT)
 	data.Data["OVN_SB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterIPs, OVN_SB_PORT)
-	data.Data["OVN_NB_ADDR_LIST"] = addrList(bootstrapResult.OVN.MasterIPs, OVN_NB_PORT)
-	data.Data["OVN_SB_ADDR_LIST"] = addrList(bootstrapResult.OVN.MasterIPs, OVN_SB_PORT)
 	data.Data["OVN_MASTER_IP"] = bootstrapResult.OVN.MasterIPs[0]
 	data.Data["OVN_MIN_AVAILABLE"] = len(bootstrapResult.OVN.MasterIPs)/2 + 1
 	data.Data["LISTEN_DUAL_STACK"] = listenDualStack(bootstrapResult.OVN.MasterIPs[0])
@@ -243,14 +241,6 @@ func dbList(masterIPs []string, port string) string {
 	addrs := make([]string, len(masterIPs))
 	for i, ip := range masterIPs {
 		addrs[i] = "ssl:" + net.JoinHostPort(ip, port)
-	}
-	return strings.Join(addrs, ",")
-}
-
-func addrList(masterIPs []string, port string) string {
-	addrs := make([]string, len(masterIPs))
-	for i, ip := range masterIPs {
-		addrs[i] = "ssl://" + net.JoinHostPort(ip, port)
 	}
 	return strings.Join(addrs, ",")
 }
