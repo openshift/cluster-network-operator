@@ -16,6 +16,7 @@ data:
     service-cidr="{{.OVN_service_cidr}}"
     ovn-config-namespace="openshift-ovn-kubernetes"
     apiserver="{{.K8S_APISERVER}}"
+    metrics-enable-pprof=true
 
     [gateway]
     mode=local
