@@ -48,11 +48,11 @@ spec:
             --object-path /org/freedesktop/systemd1 \
             --method org.freedesktop.systemd1.Manager.StartUnit openvswitch.service replace
           WAIT=10
-          while [[ ! -f /run/openvswitch/ovs-vswitchd.pid ]] || [[ ! -f /run/openvswitch/ovs-vswitchd.pid ]] || [[ ${WAIT} -gt 0 ]]; do
+          while ( [[ ! -f /run/openvswitch/ovsdb-server.pid ]] || [[ ! -f /run/openvswitch/ovs-vswitchd.pid ]] ) && [[ ${WAIT} -gt 0 ]]; do
               sleep 1
               (( WAIT-- ))
-              ls -alZ /run/openvswitch
-              ls -alZ /var/log/openvswitch
+              ls -alZ /run/openvswitch || 0
+              ls -alZ /var/log/openvswitch || 0
           done
           [[ ${WAIT} -gt 0 ]] || exit 1
           tail -F --pid=$(cat /run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
@@ -61,12 +61,10 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
-        - mountPath: /run/openvswitch
-          name: run-openvswitch
-        - mountPath: /run/dbus
-          name: run-dbus
-        - mountPath: /var/log/openvswitch
-          name: var-log-openvswitch
+        - mountPath: /run
+          name: host-run
+        - mountPath: /var/log
+          name: host-var-log
         resources:
           requests:
             cpu: 100m
@@ -110,14 +108,11 @@ spec:
               - key: network.operator.openshift.io/external-openvswitch
                 operator: DoesNotExist        
       volumes:
-      - name: run-openvswitch
+      - name: host-run
         hostPath:
-          path: /run/openvswitch
-      - name: run-dbus
+          path: /run
+      - name: host-var-log
         hostPath:
-          path: /run/dbus
-      - name: var-log-openvswitch
-        hostPath:
-          path: /var/log/openvswitch
+          path: /var/log
       tolerations:
       - operator: "Exists"
