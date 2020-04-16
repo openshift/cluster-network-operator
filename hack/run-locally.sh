@@ -277,7 +277,7 @@ if [[ -n "${CLUSTER_DIR}" ]]; then
         extract_environment_from_manifests
         create_cluster
         wait_for_cluster
-    elif [[ -n "$(ls -A ${CLUSTER_DIR}/terraform.* 2> /dev/null)" ]]; then
+    elif [[ -n "$(ls -A ${CLUSTER_DIR}/.openshift_install_state.json 2> /dev/null)" ]]; then
         export KUBECONFIG="${CLUSTER_DIR}/auth/kubeconfig"
         run_vs_existing_cluster
     else
