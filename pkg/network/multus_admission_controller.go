@@ -20,6 +20,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string) ([]*uns.Unstructur
 	data.Data["MultusAdmissionControllerImage"] = os.Getenv("MULTUS_ADMISSION_CONTROLLER_IMAGE")
 	data.Data["MultusValidatingWebhookName"] = names.MULTUS_VALIDATING_WEBHOOK
 	data.Data["ServiceCAConfigMap"] = names.SERVICE_CA_CONFIGMAP
+	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus-admission-controller"), &data)
 	if err != nil {
