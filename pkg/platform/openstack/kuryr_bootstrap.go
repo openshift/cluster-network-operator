@@ -492,12 +492,17 @@ func deleteOpenStackLb(client *gophercloud.ServiceClient, lbId string) error {
 }
 
 // Waits up to 5 minutes for OpenStack LoadBalancer to move into ACTIVE
-// provisioning_status. Fails if time runs out.
+// provisioning_status. Fails if time runs out, or LoadBalancer goes in ERROR
+// state.
 func waitForOpenStackLb(client *gophercloud.ServiceClient, lbId string) error {
 	err := gophercloud.WaitFor(300, func() (bool, error) {
 		lb, err := loadbalancers.Get(client, lbId).Extract()
 		if err != nil {
 			return false, err
+		}
+
+		if lb.ProvisioningStatus == "ERROR" {
+			return true, errors.Errorf("LoadBalancer gone in error state")
 		}
 
 		return lb.ProvisioningStatus == "ACTIVE", nil
@@ -597,7 +602,7 @@ func ensureOpenStackLb(client *gophercloud.ServiceClient, name, vipAddress, vipS
 	}
 	err = waitForOpenStackLb(client, lb.ID)
 	if err != nil {
-		return "", errors.Errorf("Timed out waiting for the LB %s to become ready", lb.ID)
+		return "", errors.Wrapf(err, "Error waiting for LB %s", lb.ID)
 	}
 
 	return lb.ID, nil
@@ -637,7 +642,7 @@ func ensureOpenStackLbPool(client *gophercloud.ServiceClient, name, lbId string)
 
 		err = waitForOpenStackLb(client, lbId)
 		if err != nil {
-			return "", errors.Errorf("Timed out waiting for the LB %s to become ready", lbId)
+			return "", errors.Wrapf(err, "Error waiting for LB %s", lbId)
 		}
 
 		return poolsObj.ID, nil
@@ -730,7 +735,7 @@ func ensureOpenStackLbPoolMember(client *gophercloud.ServiceClient, name, lbId, 
 
 		err = waitForOpenStackLb(client, lbId)
 		if err != nil {
-			return "", errors.Errorf("Timed out waiting for the LB %s to become ready", lbId)
+			return "", errors.Wrapf(err, "Error waiting for LB %s", lbId)
 		}
 
 		return poolsObj.ID, nil
@@ -787,7 +792,7 @@ func ensureOpenStackLbListener(client *gophercloud.ServiceClient, name, lbId, po
 
 		err = waitForOpenStackLb(client, lbId)
 		if err != nil {
-			return "", errors.Errorf("Timed out waiting for the LB %s to become ready", lbId)
+			return "", errors.Wrapf(err, "Error waiting for LB %s", lbId)
 		}
 
 		return listenerObj.ID, nil
