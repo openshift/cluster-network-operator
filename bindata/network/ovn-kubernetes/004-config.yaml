@@ -17,9 +17,6 @@ data:
     ovn-config-namespace="openshift-ovn-kubernetes"
     apiserver="{{.K8S_APISERVER}}"
 
-    [logging]
-    logfile="/dev/stdout"
-
     [gateway]
     mode=local
     nodeport=true
