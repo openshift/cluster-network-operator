@@ -76,11 +76,12 @@ data:
     fi
 
     cp -rf ${sourcedir}* $DESTINATION_DIRECTORY
+
     if [ $? -eq 0 ]; then
-        echo "Successfully copied files in ${sourcedir} to $DESTINATION_DIRECTORY"
+      echo "Successfully copied files in ${sourcedir} to $DESTINATION_DIRECTORY"
     else
-        echo "Failed to copy files in ${sourcedir} to $DESTINATION_DIRECTORY"
-        exit 1
+      echo "Failed to copy files in ${sourcedir} to $DESTINATION_DIRECTORY"
+      exit 1
     fi
 ---
 kind: DaemonSet
@@ -350,7 +351,7 @@ spec:
             path: {{ .MultusCNIConfDir }}
         - name: cnibin
           hostPath:
-            path: /var/lib/cni/bin
+            path: {{ .CNIBinDir }}
         - name: os-release
           hostPath:
             path: /etc/os-release
