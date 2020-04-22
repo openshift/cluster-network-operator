@@ -414,7 +414,9 @@ spec:
         hostPath:
           path: /var/lib/ovn/data
       - name: run-openvswitch
-        emptyDir: {}
+        hostPath:
+          path: /run/openvswitch
+          type: Directory
       - name: run-ovn
         hostPath:
           path: /var/run/ovn
