@@ -5,6 +5,7 @@ metadata:
   namespace: openshift-kuryr
   annotations:
     networkoperator.openshift.io/kuryr-octavia-provider: {{ .OctaviaProvider }}
+    networkoperator.openshift.io/kuryr-octavia-version: {{ .OctaviaVersion }}
 data:
   kuryr.conf: |+
     [DEFAULT]
