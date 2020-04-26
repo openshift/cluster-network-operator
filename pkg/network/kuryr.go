@@ -78,6 +78,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 		data.Data["OctaviaSGEnforce"] = "true"
 		data.Data["OctaviaLBAlgorithm"] = "ROUND_ROBIN"
 	}
+	data.Data["OctaviaVersion"] = b.OctaviaVersion
 
 	// kuryr-daemon DaemonSet data
 	data.Data["DaemonEnableProbes"] = true
