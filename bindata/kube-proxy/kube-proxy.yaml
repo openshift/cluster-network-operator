@@ -77,6 +77,10 @@ spec:
             port: healthz
           initialDelaySeconds: 5
           periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
       restartPolicy: Always
       tolerations:
       - operator: Exists
