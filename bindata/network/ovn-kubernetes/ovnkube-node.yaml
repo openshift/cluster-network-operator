@@ -134,6 +134,7 @@ spec:
             --sb-client-cacert /ovn-ca/ca-bundle.crt \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
+            --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}"
             ${hybrid_overlay_flags} \
             --metrics-bind-address "0.0.0.0:9103"
         env:
@@ -142,6 +143,8 @@ spec:
           value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: KUBERNETES_SERVICE_HOST
           value: "{{.KUBERNETES_SERVICE_HOST}}"
+        - name: OVN_CONTROLLER_INACTIVITY_PROBE
+          value: "{{.OVN_CONTROLLER_INACTIVITY_PROBE}}"
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
         - name: K8S_NODE
