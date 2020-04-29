@@ -149,8 +149,11 @@ spec:
               - /bin/bash
               - -c
               - |
+                set -x
                 MASTER_IP="{{.OVN_MASTER_IP}}"
                 if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
+
+                  # set the connection and disable inactivity probe
                   retries=0
                   while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=60000; do
                     (( retries += 1 ))
@@ -161,6 +164,61 @@ spec:
                   sleep 2
                   done
                 fi
+
+                election_timer="${OVN_NB_RAFT_ELECTION_TIMER}"
+                echo "Setting nb-db raft election timer to ${election_timer} ms"
+                retries=0
+                while current_election_timer=$(ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/status OVN_Northbound 2>/dev/null \
+                  | grep "Election" | sed "s/.*:[[:space:]]//"); do
+                  if [[ -z "${current_election_timer}" ]]; then
+                    (( retries += 1 ))
+                    if [[ "${retries}" -gt 10 ]]; then
+                      echo "Failed to get current nb-db raft election timer value after multiple attempts. Exiting..."
+                      exit 1
+                    fi
+                    sleep 2
+                  else
+                    break
+                  fi
+                done
+
+                retries=0
+                while is_candidate=$(ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/status OVN_Northbound 2>/dev/null \
+                  | grep "Role: candidate" ); do
+                  if [[ ! -z "${is_candidate}" ]]; then
+                    (( retries += 1 ))
+                    if [[ "${retries}" -gt 10 ]]; then
+                      echo "Cluster node (nb-db raft) is in candidate role for prolonged time. Continuing..."
+                    fi
+                    sleep 2
+                  else
+                    break
+                  fi
+                done
+
+                is_leader=$(ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/status OVN_Northbound 2>/dev/null \
+                  | grep "Role: leader")
+                if [[ ! -z "${is_leader}" ]]; then
+                  while [[ ${current_election_timer} != ${election_timer} ]]; do
+                    max_electinon_timer=$((${current_election_timer} * 2))
+                    if [[ ${election_timer} -le ${max_electinon_timer} ]]; then
+                      ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/change-election-timer OVN_Northbound ${election_timer}
+                      if [[ $? != 0 ]]; then
+                        echo "Failed to set nb-db raft election timer ${election_timer}. Exiting..."
+                        exit 2
+                      fi
+                      current_election_timer=${electinon_timer}
+                    else
+                      ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/change-election-timer OVN_Northbound ${max_electinon_timer}
+                      if [[ $? != 0 ]]; then
+                        echo "Failed to set nb-db raft election timer ${max_election_timer}. Exiting..."
+                        exit 2
+                      fi
+                    current_election_timer=${max_electinon_timer}
+                    fi
+                  done
+                fi
+
         readinessProbe:
           initialDelaySeconds: 30
           exec:
@@ -173,6 +231,8 @@ spec:
         env:
         - name: OVN_LOG_LEVEL
           value: info 
+        - name: OVN_NB_RAFT_ELECTION_TIMER
+          value: "{{.OVN_NB_RAFT_ELECTION_TIMER}}"
         - name: K8S_NODE_IP
           valueFrom:
             fieldRef:
@@ -212,7 +272,7 @@ spec:
         - /bin/bash
         - -c
         - |
-          set -xe
+          set -x
           if [[ -f /env/_master ]]; then
             set -o allexport
             source /env/_master
@@ -256,8 +316,11 @@ spec:
               - /bin/bash
               - -c
               - |
+                set -x
                 MASTER_IP="{{.OVN_MASTER_IP}}"
                 if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
+
+                  # set the connection and disable inactivity probe
                   retries=0
                   while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=60000; do
                     (( retries += 1 ))
@@ -268,6 +331,61 @@ spec:
                   sleep 2
                   done
                 fi
+
+                election_timer="${OVN_SB_RAFT_ELECTION_TIMER}"
+                echo "Setting sb-db raft election timer to ${election_timer} ms"
+                retries=0
+                while current_election_timer=$(ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/status OVN_Southbound 2>/dev/null \
+                  | grep "Election" | sed "s/.*:[[:space:]]//"); do
+                  if [[ -z "${current_election_timer}" ]]; then
+                    (( retries += 1 ))
+                    if [[ "${retries}" -gt 10 ]]; then
+                      echo "Failed to get current sb-db raft election timer value after multiple attempts. Exiting..."
+                      exit 1
+                    fi
+                    sleep 2
+                  else
+                    break
+                  fi
+                done
+
+                retries=0
+                while is_candidate=$(ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/status OVN_Southbound 2>/dev/null \
+                  | grep "Role: candidate" ); do
+                  if [[ ! -z "${is_candidate}" ]]; then
+                    (( retries += 1 ))
+                    if [[ "${retries}" -gt 10 ]]; then
+                      echo "Cluster node (sb-db raft) is in candidate role for prolonged time. Continuing..."
+                    fi
+                    sleep 2
+                  else
+                    break
+                  fi
+                done
+
+                is_leader=$(ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/status OVN_Southbound 2>/dev/null \
+                  | grep "Role: leader")
+                if [[ ! -z "${is_leader}" ]]; then
+                  while [[ ${current_election_timer} != ${election_timer} ]]; do
+                    max_electinon_timer=$((${current_election_timer} * 2))
+                    if [[ ${election_timer} -le ${max_electinon_timer} ]]; then
+                      ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/change-election-timer OVN_Southbound ${election_timer}
+                      if [[ $? != 0 ]]; then
+                        echo "Failed to set sb-db raft election timer ${election_timer}. Exiting..."
+                        exit 2
+                      fi
+                      current_election_timer=${electinon_timer}
+                    else
+                      ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/change-election-timer OVN_Southbound ${max_electinon_timer}
+                      if [[ $? != 0 ]]; then
+                        echo "Failed to set sb-db raft election timer ${max_election_timer}. Exiting..."
+                        exit 2
+                      fi
+                    current_election_timer=${max_electinon_timer}
+                    fi
+                  done
+                fi
+
         readinessProbe:
           initialDelaySeconds: 30
           exec:
@@ -280,6 +398,8 @@ spec:
         env:
         - name: OVN_LOG_LEVEL
           value: info 
+        - name: OVN_SB_RAFT_ELECTION_TIMER
+          value: "{{.OVN_SB_RAFT_ELECTION_TIMER}}"
         - name: K8S_NODE_IP
           valueFrom:
             fieldRef:
