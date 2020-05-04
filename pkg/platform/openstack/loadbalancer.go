@@ -57,3 +57,35 @@ func IsOctaviaVersionSupported(client *gophercloud.ServiceClient, constraint str
 
 	return !constraintVer.GreaterThan(maxOctaviaVersion), nil
 }
+
+// Iterate on pool members and check their address against provided list
+// addresses of current master/bootstrap nodes. Remove all surplus members,
+// which address doesn't exists on that list.
+func purgeOpenStackLbPoolMember(client *gophercloud.ServiceClient, poolId string, addresses []string) error {
+	page, err := pools.ListMembers(client, poolId, nil).AllPages()
+	if err != nil {
+		return errors.Wrap(err, "failed to get LB member list")
+	}
+
+	members, err := pools.ExtractMembers(page)
+	if err != nil {
+		return errors.Wrap(err, "failed to extract LB members list")
+	}
+
+	for _, member := range members {
+		found := false
+		for _, address := range addresses {
+			if address == member.Address {
+				found = true
+				break
+			}
+		}
+		if !found {
+			err = pools.DeleteMember(client, poolId, member.ID).ExtractErr()
+			if err != nil {
+				return errors.Wrap(err, "failed to delete LB member")
+			}
+		}
+	}
+	return nil
+}
