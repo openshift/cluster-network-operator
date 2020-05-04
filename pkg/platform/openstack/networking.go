@@ -350,8 +350,8 @@ func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix
 		Direction:      rules.DirIngress,
 		RemoteIPPrefix: remotePrefix,
 	}
-	// Let's just assume that we're getting passed -1 when we aren't supposed to set those
-	if portMin >= 0 && portMax >= 0 {
+	// Let's just assume that we're getting passed 0 when we aren't supposed to set those
+	if portMin > 0 && portMax > 0 {
 		opts.PortRangeMin = portMin
 		opts.PortRangeMax = portMax
 		opts.Protocol = protocol
@@ -365,4 +365,27 @@ func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix
 		return errors.Wrap(err, "failed to create SG rule")
 	}
 	return nil
+}
+
+// Returns list of OpenStack ingress security group rules on SGs tagged with tag.
+func listOpenStackSgRules(client *gophercloud.ServiceClient, tag string) ([]rules.SecGroupRule, error) {
+	page, err := groups.List(client, groups.ListOpts{Tags: tag}).AllPages()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get security group list")
+	}
+	groupsList, err := groups.ExtractGroups(page)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to extract security group list")
+	}
+
+	var rulesList []rules.SecGroupRule
+	for _, group := range groupsList {
+		for _, rule := range group.Rules {
+			if rule.Direction == string(rules.DirIngress) {
+				rulesList = append(rulesList, rule)
+			}
+		}
+	}
+
+	return rulesList, nil
 }
