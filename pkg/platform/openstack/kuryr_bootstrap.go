@@ -1195,9 +1195,11 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	log.Print("Creating OpenShift API loadbalancer pool members")
 	r, _ := regexp.Compile(fmt.Sprintf("^%s-(master-port-[0-9]+|bootstrap-port)$", clusterID))
 	portList, err := listOpenStackPortsMatchingPattern(client, tag, r)
+	addresses := make([]string, 0)
 	for _, port := range portList {
 		if len(port.FixedIPs) > 0 {
 			portIp := port.FixedIPs[0].IPAddress
+			addresses = append(addresses, portIp)
 			log.Printf("Found port %s with IP %s", port.ID, portIp)
 
 			// We want bootstrap to stop being used as soon as possible, as it will serve
@@ -1217,6 +1219,11 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		} else {
 			log.Printf("Matching port %s has no IP", port.ID)
 		}
+	}
+
+	err = purgeOpenStackLbPoolMember(client, poolId, addresses)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed on purging invalid LB members from LB pool")
 	}
 
 	log.Print("Ensuring certificates")
