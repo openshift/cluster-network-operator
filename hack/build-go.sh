@@ -6,7 +6,7 @@ source "$(dirname "${BASH_SOURCE}")/init.sh"
 setup_env
 
 CMDS=${CMDS:-cluster-network-operator cluster-network-renderer}
-GOFLAGS=${GOFLAGS:-}
+GOFLAGS=${GOFLAGS:--mod=vendor}
 GLDFLAGS=${GLDFLAGS:-}
 
 # Go to the root of the repo
