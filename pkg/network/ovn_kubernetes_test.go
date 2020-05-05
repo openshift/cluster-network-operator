@@ -262,6 +262,34 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	errs := isOVNKubernetesChangeSafe(prev, next)
 	g.Expect(errs).To(BeEmpty())
 
+	// try to add a new hybrid overlay config
+	hybridOverlayConfigNext :=
+		operv1.HybridOverlayConfig{
+			HybridClusterNetwork: []operv1.ClusterNetworkEntry{
+				{CIDR: "10.132.0.0/14", HostPrefix: 23},
+			},
+		}
+	next.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = &hybridOverlayConfigNext
+
+	errs = isOVNKubernetesChangeSafe(prev, next)
+	g.Expect(errs).To(HaveLen(1))
+	g.Expect(errs[0]).To(MatchError("cannot start a hybrid overlay network after install time"))
+
+	//try to change a previous hybrid overlay
+	hybridOverlayConfigPrev :=
+		operv1.HybridOverlayConfig{
+			HybridClusterNetwork: []operv1.ClusterNetworkEntry{
+				{CIDR: "10.135.0.0/14", HostPrefix: 23},
+			},
+		}
+	prev.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = &hybridOverlayConfigPrev
+	errs = isOVNKubernetesChangeSafe(prev, next)
+	g.Expect(errs).To(HaveLen(1))
+	g.Expect(errs[0]).To(MatchError("cannot edit a running hybrid overlay network"))
+
+	prev.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = nil
+	next.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = nil
+
 	// change the mtu
 	mtu := uint32(70000)
 	next.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
