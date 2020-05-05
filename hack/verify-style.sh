@@ -13,7 +13,7 @@ if [[ ! $(which go) ]]; then
 fi
 if [[ ! $(which golint) ]]; then
   echo "golint not found on PATH. To install:"
-  echo "go get -u github.com/golang/lint/golint"
+  echo "GO111MODULE=on go get -u github.com/golang/lint/golint"
   exit 1
 fi
 
