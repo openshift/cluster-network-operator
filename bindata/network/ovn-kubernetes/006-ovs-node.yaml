@@ -84,23 +84,33 @@ spec:
               exit 0
           }
           trap quit SIGTERM
-          chroot /host /bin/bash <<EOF
-          set -x
+          #chroot /host /bin/bash <<EOF
+          #set -x
           export SYSTEMD_IGNORE_CHROOT=yes
           echo "systemd ignore chroot now set to " \$SYSTEMD_IGNORE_CHROOT
           if [[ -d /run/openvswitch ]]; then
-            echo "Found dir /run/openvswitch inside chroot"
+            echo "Found dir /run/openvswitch inside chroot before chown"
             ls -al /run/openvswitch
           fi
           if [[ -d /var/run/openvswitch ]]; then
-            echo "Found dir /var/run/openvswitch inside chroot"
+            echo "Found dir /var/run/openvswitch inside chroot before chown"
+            ls -al /var/run/openvswitch
+          fi
+          chown -R openvswitch:openvswitch /run/openvswitch
+          chown -R openvswitch:openvswitch /etc/openvswitch
+          if [[ -d /run/openvswitch ]]; then
+            echo "Found dir /run/openvswitch inside chroot after chown"
+            ls -al /run/openvswitch
+          fi
+          if [[ -d /var/run/openvswitch ]]; then
+            echo "Found dir /var/run/openvswitch inside chroot after chown"
             ls -al /var/run/openvswitch
           fi
           systemctl start ovsdb-server.service
           journalctl -xeu ovsdb-server.service --no-pager
           systemctl start openvswitch.service
           journalctl -xeu openvswitch --no-pager
-          EOF
+          #EOF
           # Need container up v0.0 just to see if host starts ovs and friends
           /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --system-id=random
           ovs-appctl vlog/set "file:${OVS_LOG_LEVEL}"
@@ -122,10 +132,37 @@ spec:
         - mountPath: /host
           name: host-slash
           readOnly: false
+        - mountPath: /lib/modules
+          name: host-modules
+          readOnly: true
+        - mountPath: /var/lib/openvswitch
+          name: var-lib-openvswitch
         - mountPath: /var/run/openvswitch
           name: host-run-openvswitch
         - mountPath: /var/log/openvswitch
           name: var-log-openvswitch
+        - mountPath: /sys
+          name: host-sys
+          readOnly: false
+        - mountPath: /run/systemd
+          name: host-run-systemd
+        - mountPath: /sys/fs/cgroup
+          name: sys-fs-cgroup
+        - mountPath: /run/dbus
+          name: run-dbus
+        - mountPath: /sysroot
+          name: host-sysroot
+        - mountPath: /etc/sysconfig
+          name: etc-sysconfig
+          readOnly: false
+        - mountPath: /host/dev
+          name: host-dev
+        - mountPath: /host/proc
+          name: host-proc
+          readOnly: true
+        - mountPath: /host/boot
+          name: host-boot
+          readOnly: true
         resources:
           requests:
             cpu: 100m
@@ -158,6 +195,12 @@ spec:
                 operator: DoesNotExist        
       volumes:
       # used for iptables wrapper scripts
+      - name: host-modules
+        hostPath:
+          path: /lib/modules
+      - name: var-lib-openvswitch
+        hostPath:
+          path: /var/lib/openvswitch/data
       - name: host-run-openvswitch
         hostPath:
           path: /run/openvswitch
@@ -167,5 +210,41 @@ spec:
       - name: host-slash
         hostPath:
           path: /
+      - name: host-run-systemd
+        hostPath:
+          path: /run/systemd
+          type: Directory
+      - name: host-sys
+        hostPath:
+          path: /sys
+          type: Directory
+      - name: sys-fs-cgroup
+        hostPath:
+          path: /sys/fs/cgroup 
+          type: Directory
+      - name: run-dbus
+        hostPath:
+          path: /run/dbus
+          type: Directory
+      - name: host-sysroot
+        hostPath:
+          path: /sysroot
+          type: Directory
+      - name: etc-sysconfig
+        hostPath:
+          path: /etc/sysconfig
+          type: Directory
+      - name: host-dev
+        hostPath:
+          path: /dev
+          type: Directory
+      - name: host-proc
+        hostPath:
+          path: /proc
+          type: Directory
+      - name: host-boot
+        hostPath:
+          path: /boot
+          type: Directory
       tolerations:
       - operator: "Exists"
