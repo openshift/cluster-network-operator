@@ -42,6 +42,20 @@ spec:
         - |
           #!/bin/bash
           set -euo pipefail
+          set -x
+          if [[ -f /usr/bin/id ]]; then
+            /usr/bin/id openvswitch
+          else
+            echo "id command not found"
+          fi
+          if [[ -d /run/openvswitch ]]; then
+            echo "Found dir /run/openvswitch before chown"
+            ls -al /run/openvswitch
+          fi
+          if [[ -d /var/run/openvswitch ]]; then
+            echo "Found dir /var/run/openvswitch before chown"
+            ls -al /var/run/openvswitch
+          fi
           if [[ -f "/env/${K8S_NODE}" ]]; then
             set -o allexport
             source "/env/${K8S_NODE}"
@@ -49,6 +63,20 @@ spec:
           fi
           chown -R openvswitch:openvswitch /run/openvswitch
           chown -R openvswitch:openvswitch /etc/openvswitch
+          if [[ -d /run/openvswitch ]]; then
+            echo "Found dir /run/openvswitch after chown"
+            ls -al /run/openvswitch
+          fi
+          if [[ -d /var/run/openvswitch ]]; then
+            echo "Found dir /var/run/openvswitch after chown"
+            ls -al /var/run/openvswitch
+          fi
+          if [[ -f /var/run/openvswitch/ovs-vswitchd.pid ]] ; then
+            cat /var/run/openvswitch/ovs-vswitchd.pid
+          fi
+          if [[ -f /var/run/openvswitch/ovsdb-server.pid ]] ; then
+            cat /var/run/openvswitch/ovsdb-server.pid
+          fi
           function quit {
               # Don't allow ovs-vswitchd to clear datapath flows on exit
               kill -9 $(cat /var/run/openvswitch/ovs-vswitchd.pid 2>/dev/null) 2>/dev/null || true
@@ -56,6 +84,24 @@ spec:
               exit 0
           }
           trap quit SIGTERM
+          chroot /host /bin/bash <<EOF
+          set -x
+          export SYSTEMD_IGNORE_CHROOT=yes
+          echo "systemd ignore chroot now set to " \$SYSTEMD_IGNORE_CHROOT
+          if [[ -d /run/openvswitch ]]; then
+            echo "Found dir /run/openvswitch inside chroot"
+            ls -al /run/openvswitch
+          fi
+          if [[ -d /var/run/openvswitch ]]; then
+            echo "Found dir /var/run/openvswitch inside chroot"
+            ls -al /var/run/openvswitch
+          fi
+          systemctl start ovsdb-server.service
+          journalctl -xeu ovsdb-server.service --no-pager
+          systemctl start openvswitch.service
+          journalctl -xeu openvswitch --no-pager
+          EOF
+          # Need container up v0.0 just to see if host starts ovs and friends
           /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --system-id=random
           ovs-appctl vlog/set "file:${OVS_LOG_LEVEL}"
           /usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
@@ -73,20 +119,13 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
-        - mountPath: /lib/modules
-          name: host-modules
-          readOnly: true
-        - mountPath: /sys
-          name: host-sys
-          readOnly: true
-        - mountPath: /run/openvswitch
-          name: run-openvswitch
-        - mountPath: /etc/openvswitch
-          name: etc-openvswitch
-        - mountPath: /var/lib/openvswitch
-          name: var-lib-openvswitch
-        - mountPath: /env
-          name: env-overrides
+        - mountPath: /host
+          name: host-slash
+          readOnly: false
+        - mountPath: /var/run/openvswitch
+          name: host-run-openvswitch
+        - mountPath: /var/log/openvswitch
+          name: var-log-openvswitch
         resources:
           requests:
             cpu: 100m
@@ -119,24 +158,14 @@ spec:
                 operator: DoesNotExist        
       volumes:
       # used for iptables wrapper scripts
-      - name: host-modules
-        hostPath:
-          path: /lib/modules
-      - name: var-lib-openvswitch
-        hostPath:
-          path: /var/lib/openvswitch/data
-      - name: etc-openvswitch
-        hostPath:
-          path: /var/lib/openvswitch/etc
-      - name: run-openvswitch
+      - name: host-run-openvswitch
         hostPath:
           path: /run/openvswitch
-      - name: host-sys
+      - name: var-log-openvswitch
         hostPath:
-          path: /sys
-      - name: env-overrides
-        configMap:
-          name: env-overrides
-          optional: true
+          path: /var/log/openvswitch
+      - name: host-slash
+        hostPath:
+          path: /
       tolerations:
       - operator: "Exists"
