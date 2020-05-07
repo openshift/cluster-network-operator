@@ -142,7 +142,10 @@ func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 		errs = append(errs, errors.Errorf("cannot change ovn-kubernetes genevePort"))
 	}
 	if pn.HybridOverlayConfig == nil && nn.HybridOverlayConfig != nil {
-		errs = append(errs, errors.Errorf("cannot start a hybrid overlay network after install time"))
+		// only restrict from enabeling a hybrid overlay with a cluster network after install
+		if nn.HybridOverlayConfig.HybridClusterNetwork != nil {
+			errs = append(errs, errors.Errorf("cannot start a hybrid overlay network after install time"))
+		}
 	}
 	if pn.HybridOverlayConfig != nil {
 		if !reflect.DeepEqual(pn.HybridOverlayConfig, nn.HybridOverlayConfig) {

@@ -262,8 +262,15 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	errs := isOVNKubernetesChangeSafe(prev, next)
 	g.Expect(errs).To(BeEmpty())
 
+	// try to enable hybrid overlay with an empty HybridClusterNetwork
+	hybridOverlayConfigNext := operv1.HybridOverlayConfig{}
+	next.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = &hybridOverlayConfigNext
+
+	errs = isOVNKubernetesChangeSafe(prev, next)
+	g.Expect(errs).To(BeEmpty())
+
 	// try to add a new hybrid overlay config
-	hybridOverlayConfigNext :=
+	hybridOverlayConfigNext =
 		operv1.HybridOverlayConfig{
 			HybridClusterNetwork: []operv1.ClusterNetworkEntry{
 				{CIDR: "10.132.0.0/14", HostPrefix: 23},
