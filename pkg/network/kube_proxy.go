@@ -121,7 +121,18 @@ func FillKubeProxyDefaults(conf, previous *operv1.NetworkSpec) {
 	}
 
 	if conf.KubeProxyConfig.BindAddress == "" {
-		conf.KubeProxyConfig.BindAddress = "0.0.0.0"
+		// TODO: this will probably need to change for dual stack
+		ip, _, err := net.ParseCIDR(conf.ClusterNetwork[0].CIDR)
+		if err != nil {
+			// this should not happen
+			return
+		}
+		if ip.To4() != nil {
+			conf.KubeProxyConfig.BindAddress = "0.0.0.0"
+		} else {
+			conf.KubeProxyConfig.BindAddress = "::"
+		}
+
 	}
 }
 
