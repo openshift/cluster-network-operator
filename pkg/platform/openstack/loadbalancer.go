@@ -8,6 +8,7 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/apiversions"
+	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools"
 )
 
 func getMaxOctaviaAPIVersion(client *gophercloud.ServiceClient) (*semver.Version, error) {
