@@ -44,7 +44,7 @@ spec:
         - name: ROUTE_OVERRRIDE_CNI_IMAGE
           value: "quay.io/openshift/origin-multus-route-override-cni:4.4"
         - name: OVN_IMAGE
-          value: "docker.io/avishnoi/ovn-kube-f-dev:latest-v2"
+          value: "quay.io/openshift/origin-ovn-kubernetes:4.3"
         - name: OVN_NB_RAFT_ELECTION_TIMER
           value: "5000"
         - name: OVN_SB_RAFT_ELECTION_TIMER
