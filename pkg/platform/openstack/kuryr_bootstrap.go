@@ -483,7 +483,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		}
 	}
 
-	err = purgeOpenStackLbPoolMember(client, poolId, addresses)
+	err = purgeOpenStackLbPoolMember(lbClient, poolId, addresses)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed on purging invalid LB members from LB pool")
 	}
