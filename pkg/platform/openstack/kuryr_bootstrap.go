@@ -376,9 +376,14 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 
 	var sgRules = []sgRule{
-		{podSgId, "0.0.0.0/0", -1, -1, rules.ProtocolTCP},
+		{podSgId, "0.0.0.0/0", 0, 0, rules.ProtocolTCP},
 		{masterSgId, openStackSvcCIDR, etcdPort, etcdPort, rules.ProtocolTCP},
 		{masterSgId, openStackSvcCIDR, apiPort, apiPort, rules.ProtocolTCP},
+	}
+
+	var decommissionedRules = []sgRule{
+		{podSgId, workerSubnet.CIDR, 0, 0, ""},
+		{masterSgId, openStackSvcCIDR, 2379, 2380, rules.ProtocolTCP},
 	}
 
 	for _, cidr := range podSubnetCidrs {
@@ -401,6 +406,11 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 			sgRule{workerSgId, cidr, 9000, 9999, rules.ProtocolTCP},
 			sgRule{workerSgId, cidr, 9000, 9999, rules.ProtocolUDP},
 		)
+
+		decommissionedRules = append(decommissionedRules,
+			sgRule{masterSgId, cidr, 0, 0, ""},
+			sgRule{workerSgId, cidr, 0, 0, ""},
+		)
 	}
 
 	log.Print("Allowing required traffic")
@@ -412,6 +422,33 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		}
 	}
 	log.Print("All requried traffic allowed")
+
+	// It may happen that we tightened some SG rules in an upgrade, we need to make sure to remove the ones that are
+	// not expected anymore.
+	log.Print("Removing old SG rules")
+	existingRules, err := listOpenStackSgRules(client, tag)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list SG rules")
+	}
+
+	for _, existingRule := range existingRules {
+		// Need to convert to "our" format for easy comparisons.
+		rule := sgRule{existingRule.SecGroupID, existingRule.RemoteIPPrefix, existingRule.PortRangeMin,
+			existingRule.PortRangeMax, rules.RuleProtocol(existingRule.Protocol)}
+		for _, decommissionedRule := range decommissionedRules {
+			if decommissionedRule == rule {
+				log.Printf("Removing decommisioned rule %s (%s, %d, %d, %s) from SG %s", existingRule.ID,
+					existingRule.RemoteIPPrefix, existingRule.PortRangeMin, existingRule.PortRangeMax,
+					existingRule.Protocol, existingRule.SecGroupID)
+				err = rules.Delete(client, existingRule.ID).ExtractErr()
+				if err != nil {
+					return nil, errors.Wrapf(err, "Could not delete SG rule %s", existingRule.ID)
+				}
+				break
+			}
+		}
+	}
+	log.Print("All old SG rules removed")
 
 	lbClient, err := openstack.NewLoadBalancerV2(provider, gophercloud.EndpointOpts{})
 	if err != nil {
