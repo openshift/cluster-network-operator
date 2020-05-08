@@ -16,11 +16,6 @@ if [[ ! $(which golint) ]]; then
   echo "go get -u github.com/golang/lint/golint"
   exit 1
 fi
-if [[ ! $(which dep) ]]; then
-  echo "dep not found on PATH. To install:"
-  echo "curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh"
-  exit 1
-fi
 
 rc=0
 trap 'rc=$?' ERR
@@ -41,9 +36,6 @@ fi
 
 echo "Running go vet..."
 go vet $GOPKGS
-
-echo "Running dep check..."
-dep check
 
 echo "Done!"
 exit ${rc}
