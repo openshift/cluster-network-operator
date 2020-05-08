@@ -446,8 +446,8 @@ func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix
 		Direction:      rules.DirIngress,
 		RemoteIPPrefix: remotePrefix,
 	}
-	// Let's just assume that we're getting passed -1 when we aren't supposed to set those
-	if portMin >= 0 && portMax >= 0 {
+	// Let's just assume that we're getting passed 0 when we aren't supposed to set those
+	if portMin > 0 && portMax > 0 {
 		opts.PortRangeMin = portMin
 		opts.PortRangeMax = portMax
 		opts.Protocol = protocol
@@ -461,6 +461,29 @@ func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix
 		return errors.Wrap(err, "failed to create SG rule")
 	}
 	return nil
+}
+
+// Returns list of OpenStack ingress security group rules on SGs tagged with tag.
+func listOpenStackSgRules(client *gophercloud.ServiceClient, tag string) ([]rules.SecGroupRule, error) {
+	page, err := groups.List(client, groups.ListOpts{Tags: tag}).AllPages()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get security group list")
+	}
+	groupsList, err := groups.ExtractGroups(page)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to extract security group list")
+	}
+
+	var rulesList []rules.SecGroupRule
+	for _, group := range groupsList {
+		for _, rule := range group.Rules {
+			if rule.Direction == string(rules.DirIngress) {
+				rulesList = append(rulesList, rule)
+			}
+		}
+	}
+
+	return rulesList, nil
 }
 
 // Delete a LoadBalancer and all associated resources
@@ -1080,9 +1103,14 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 
 	var sgRules = []sgRule{
-		{podSgId, "0.0.0.0/0", -1, -1, rules.ProtocolTCP},
+		{podSgId, "0.0.0.0/0", 0, 0, rules.ProtocolTCP},
 		{masterSgId, openStackSvcCIDR, etcdPort, etcdPort, rules.ProtocolTCP},
 		{masterSgId, openStackSvcCIDR, apiPort, apiPort, rules.ProtocolTCP},
+	}
+
+	var decommissionedRules = []sgRule{
+		{podSgId, workerSubnet.CIDR, 0, 0, ""},
+		{masterSgId, openStackSvcCIDR, 2379, 2380, rules.ProtocolTCP},
 	}
 
 	for _, cidr := range podSubnetCidrs {
@@ -1105,6 +1133,11 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 			sgRule{workerSgId, cidr, 9000, 9999, rules.ProtocolTCP},
 			sgRule{workerSgId, cidr, 9000, 9999, rules.ProtocolUDP},
 		)
+
+		decommissionedRules = append(decommissionedRules,
+			sgRule{masterSgId, cidr, 0, 0, ""},
+			sgRule{workerSgId, cidr, 0, 0, ""},
+		)
 	}
 
 	log.Print("Allowing required traffic")
@@ -1116,6 +1149,33 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		}
 	}
 	log.Print("All requried traffic allowed")
+
+	// It may happen that we tightened some SG rules in an upgrade, we need to make sure to remove the ones that are
+	// not expected anymore.
+	log.Print("Removing old SG rules")
+	existingRules, err := listOpenStackSgRules(client, tag)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list SG rules")
+	}
+
+	for _, existingRule := range existingRules {
+		// Need to convert to "our" format for easy comparisons.
+		rule := sgRule{existingRule.SecGroupID, existingRule.RemoteIPPrefix, existingRule.PortRangeMin,
+			existingRule.PortRangeMax, rules.RuleProtocol(existingRule.Protocol)}
+		for _, decommissionedRule := range decommissionedRules {
+			if decommissionedRule == rule {
+				log.Printf("Removing decommisioned rule %s (%s, %d, %d, %s) from SG %s", existingRule.ID,
+					existingRule.RemoteIPPrefix, existingRule.PortRangeMin, existingRule.PortRangeMax,
+					existingRule.Protocol, existingRule.SecGroupID)
+				err = rules.Delete(client, existingRule.ID).ExtractErr()
+				if err != nil {
+					return nil, errors.Wrapf(err, "Could not delete SG rule %s", existingRule.ID)
+				}
+				break
+			}
+		}
+	}
+	log.Print("All old SG rules removed")
 
 	lbClient, err := openstack.NewLoadBalancerV2(provider, gophercloud.EndpointOpts{})
 	if err != nil {
