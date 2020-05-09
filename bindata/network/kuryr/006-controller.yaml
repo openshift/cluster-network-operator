@@ -60,6 +60,9 @@ spec:
           subPath: user-ca-bundle.crt
           mountPath: /etc/ssl/certs/user-ca-bundle.crt
 {{- end }}
+        ports:
+        - name: metrics-port
+          containerPort: 9654
       nodeSelector:
         node-role.kubernetes.io/master: ""
       tolerations:

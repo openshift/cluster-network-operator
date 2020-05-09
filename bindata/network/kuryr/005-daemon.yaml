@@ -75,6 +75,9 @@ spec:
             port: {{ default 8090 .DaemonProbesPort }}
           initialDelaySeconds: 15
 {{ end }}
+        ports:
+        - name: metrics-port
+          containerPort: 9655
       volumes:
       - name: bin
         hostPath:
