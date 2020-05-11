@@ -12,13 +12,16 @@ spec:
   groups:
   - name: general.rules
     rules:
+    # note: all joins on kube_pod_* need a a "topk by (key) (1, <metric> )"
+    # otherwise you will generate query errors when kube_state_metrics is being
+    # upgraded and there are duplicate rows on the "right" side of the join.
     - alert: NodeWithoutOVSPod
       annotations:
         message: |
           All nodes should be running an ovs pod, {{"{{"}} $labels.node {{"}}"}} is not.
       expr: |
-        (kube_node_info unless on(node) kube_pod_info{namespace="openshift-sdn",  pod=~"ovs.*"}) > 0
-      for: 20m
+        (kube_node_info unless on(node) topk by (node) (1, kube_pod_info{namespace="openshift-sdn",  pod=~"ovs.*"})) > 0
+      for: 10m
       labels:
         severity: warning
     - alert: NodeWithoutSDNPod
@@ -26,53 +29,43 @@ spec:
         message: |
           All nodes should be running an sdn pod, {{"{{"}} $labels.node {{"}}"}} is not.
       expr: |
-        (kube_node_info unless on(node) kube_pod_info{namespace="openshift-sdn",  pod=~"sdn.*"}) > 0
-      for: 20m
+        (kube_node_info unless on(node) topk by (node) (1, kube_pod_info{namespace="openshift-sdn",  pod=~"sdn.*"})) > 0
+      for: 10m
       labels:
         severity: warning
-    - alert: NetworkPodsCrashLooping
+    - alert: NodeProxyApplySlow
       annotations:
-        message: Pod {{"{{"}} $labels.namespace{{"}}"}}/{{"{{"}} $labels.pod{{"}}"}} ({{"{{"}} $labels.container
-          {{"}}"}}) is restarting {{"{{"}} printf "%.2f" $value {{"}}"}} times / 5 minutes.
+        message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} is taking too long, on average, to apply kubernetes service rules to iptables.
       expr: |
-        rate(kube_pod_container_status_restarts_total{namespace="openshift-sdn"}[15m]) * 60 * 5 > 0
-      for: 1h
+        histogram_quantile(.95, kubeproxy_sync_proxy_rules_duration_seconds_bucket) 
+        * on(namespace, pod) group_right topk by (namespace, pod) (1, kube_pod_info{namespace="openshift-sdn",  pod=~"sdn-[^-]*"}) > 15
       labels:
         severity: warning
-    - alert: IPTableSyncSDNPod
+    - alert: ClusterProxyApplySlow
       annotations:
-        message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} takes too long to sync iptables rules.
-      expr: |
-        histogram_quantile(.95, kubeproxy_sync_proxy_rules_duration_seconds_bucket) * on(pod) group_right kube_pod_info{namespace="openshift-sdn",  pod=~"sdn-[^-]*"} > 15
-      labels:
-        severity: warning
-    - alert: IPTableSyncCluster
-      annotations:
-        message: The average time for SDN pods to sync iptables is too high.
+        message: The cluster is taking too long, on average, to apply kubernetes service rules to iptables.
       expr: |
         histogram_quantile(0.95, sum(rate(kubeproxy_sync_proxy_rules_duration_seconds_bucket[5m])) by (le)) > 10
       labels:
         severity: warning
-    - alert: NodeIPTablesStale
-    # there is some scrape delay and some other offset 120 is not really 120s but it is still too long
+    - alert: NodeProxyApplyStale
       annotations:
-        message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} has gone too long without syncing iptables rules.
+        message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} has stale kubernetes service rules in iptables.
+      # Query: find pods where
+      #  - the queued-timestamp is at least 30 seconds after the applied-timestamp
+      #  - the pod (still) exists
       expr: |
-            (timestamp(kubeproxy_sync_proxy_rules_last_timestamp_seconds)
-            - on(pod) kubeproxy_sync_proxy_rules_last_timestamp_seconds)
-            * on(pod) group_right kube_pod_info{namespace="openshift-sdn",  pod=~"sdn-[^-]*"}> 120
-      for: 20m
+        (kubeproxy_sync_proxy_rules_last_queued_timestamp_seconds - kubeproxy_sync_proxy_rules_last_timestamp_seconds)
+        * on(namespace, pod) group_right() topk by (namespace, pod) (1, kube_pod_info{namespace="openshift-sdn",pod=~"sdn-[^-]*"})
+        > 30
+      for: 5m # quiet any churn on sdn restarts.
       labels:
         severity: warning
-    - alert: ClusterIPTablesStale
-    # there is some scrape delay and some other offset 90 i not really 90s but it is still too long
+    - alert: SDNPodNotReady
       annotations:
-        message: The average time between iptables resyncs is too high. NOTE - There is some scrape delay and other offsets, 90s isn't exact but it is still too high.
+        message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} is not ready.
       expr: |
-        quantile(0.95,
-            timestamp(kubeproxy_sync_proxy_rules_last_timestamp_seconds)
-            - on(pod) kubeproxy_sync_proxy_rules_last_timestamp_seconds
-            * on(pod) group_right kube_pod_info{namespace="openshift-sdn",  pod=~"sdn-[^-]*"}) > 90
-      for: 20m
+        kube_pod_status_ready{namespace='openshift-sdn', condition='true'} == 0
+      for: 10m
       labels:
         severity: warning
