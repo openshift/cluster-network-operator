@@ -7,12 +7,14 @@ reviewers:
   - pecameron
   - rcarrillocruz
   - squeed
+  - abhat
 approvers:
   - danwinship
   - dcbw
   - knobunc
   - rcarrillocruz
   - squeed
+  - abhat
 
 # Bugzilla info; "openshift-sdn" is wrong but there is no "generic networking" subcomponent
 component: Networking
