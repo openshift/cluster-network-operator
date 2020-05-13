@@ -58,6 +58,13 @@ const (
 	MinOctaviaVersionWithTagSupport        = "v2.5"
 	MinOctaviaVersionWithTimeouts          = "v2.1"
 	KuryrNamespace                         = "openshift-kuryr"
+	etcdPort                               = 2379
+	dnsPort                                = 53
+	apiPort                                = 6443
+	routerMetricsPort                      = 1936
+	kubeCMMetricsPort                      = 10257
+	kubeSchedulerMetricsPort               = 10259
+	kubeletMetricsPort                     = 10250
 )
 
 func GetClusterID(kubeClient client.Client) (string, error) {
@@ -427,7 +434,7 @@ func ensureOpenStackSg(client *gophercloud.ServiceClient, name, tag string) (str
 
 // Tries to create an OpenStack security group rule on sgId SG. Ignores an
 // error if such rule already exists.
-func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix string, portMin, portMax int) error {
+func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix string, portMin, portMax int, protocol rules.RuleProtocol) error {
 	opts := rules.CreateOpts{
 		SecGroupID:     sgId,
 		EtherType:      rules.EtherType4,
@@ -438,7 +445,7 @@ func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix
 	if portMin >= 0 && portMax >= 0 {
 		opts.PortRangeMin = portMin
 		opts.PortRangeMax = portMax
-		opts.Protocol = rules.ProtocolTCP
+		opts.Protocol = protocol
 	}
 	_, err := rules.Create(client, opts).Extract()
 	if err != nil {
@@ -1038,35 +1045,49 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	podSgId, err := ensureOpenStackSg(client, generateName("kuryr-pods-security-group", clusterID), tag)
 	log.Printf("Pods security group %s present", podSgId)
 
-	log.Print("Allowing traffic from masters and nodes to pods")
-	// Seems like openshift/installer puts masters on worker subnet, so only this is needed.
-	err = ensureOpenStackSgRule(client, podSgId, workerSubnet.CIDR, -1, -1)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to add rule opening traffic from workers and masters")
+	type sgRule struct {
+		sgId     string
+		cidr     string
+		minPort  int
+		maxPort  int
+		protocol rules.RuleProtocol
 	}
-	log.Print("Allowing traffic from pod to pod")
-	err = ensureOpenStackSgRule(client, podSgId, "0.0.0.0/0", -1, -1)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to add rule opening traffic pod to pod")
+
+	var sgRules = []sgRule{
+		{podSgId, "0.0.0.0/0", -1, -1, rules.ProtocolTCP},
+		{masterSgId, openStackSvcCIDR, etcdPort, etcdPort, rules.ProtocolTCP},
+		{masterSgId, openStackSvcCIDR, apiPort, apiPort, rules.ProtocolTCP},
 	}
+
 	for _, cidr := range podSubnetCidrs {
-		err = ensureOpenStackSgRule(client, masterSgId, cidr, -1, -1)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to add rule opening traffic to masters on %s", cidr)
-		}
-		err = ensureOpenStackSgRule(client, workerSgId, cidr, -1, -1)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to add rule opening traffic to workers on %s", cidr)
-		}
+		sgRules = append(sgRules,
+			sgRule{masterSgId, cidr, etcdPort, etcdPort, rules.ProtocolTCP},
+			sgRule{masterSgId, cidr, dnsPort, dnsPort, rules.ProtocolTCP},
+			sgRule{masterSgId, cidr, dnsPort, dnsPort, rules.ProtocolUDP},
+			sgRule{workerSgId, cidr, dnsPort, dnsPort, rules.ProtocolTCP},
+			sgRule{workerSgId, cidr, dnsPort, dnsPort, rules.ProtocolUDP},
+			sgRule{workerSgId, cidr, routerMetricsPort, routerMetricsPort, rules.ProtocolTCP},
+			sgRule{masterSgId, cidr, kubeCMMetricsPort, kubeCMMetricsPort, rules.ProtocolTCP},
+			sgRule{masterSgId, cidr, kubeSchedulerMetricsPort, kubeSchedulerMetricsPort, rules.ProtocolTCP},
+			sgRule{masterSgId, cidr, kubeletMetricsPort, kubeletMetricsPort, rules.ProtocolTCP},
+			sgRule{workerSgId, cidr, kubeletMetricsPort, kubeletMetricsPort, rules.ProtocolTCP},
+			// NOTE(dulek): I honestly don't know why this is so broad range, but I took it from SGs installer sets
+			//              for workers and masters. In general point was to open 9192 so that metrics of
+			//              cluster-autoscaler-operator were rechable.
+			sgRule{masterSgId, cidr, 9000, 9999, rules.ProtocolTCP},
+			sgRule{masterSgId, cidr, 9000, 9999, rules.ProtocolUDP},
+			sgRule{workerSgId, cidr, 9000, 9999, rules.ProtocolTCP},
+			sgRule{workerSgId, cidr, 9000, 9999, rules.ProtocolUDP},
+		)
 	}
-	err = ensureOpenStackSgRule(client, masterSgId, openStackSvcCIDR, 2379, 2380)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to add rule opening etcd traffic to masters from service subnet %s", conf.ServiceNetwork[0])
-	}
-	// We need to open traffic from service subnet to masters for API LB to work.
-	err = ensureOpenStackSgRule(client, masterSgId, openStackSvcCIDR, 6443, 6443)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to add rule opening traffic to masters from service subnet %s", conf.ServiceNetwork[0])
+
+	log.Print("Allowing required traffic")
+	for _, rule := range sgRules {
+		err = ensureOpenStackSgRule(client, rule.sgId, rule.cidr, rule.minPort, rule.maxPort, rule.protocol)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to add %s rule opening traffic from %s in security group %s on ports %d:%d",
+				rule.protocol, rule.cidr, rule.sgId, rule.minPort, rule.maxPort)
+		}
 	}
 	log.Print("All requried traffic allowed")
 
