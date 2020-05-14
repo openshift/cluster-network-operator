@@ -132,9 +132,11 @@ spec:
             --nb-client-privkey /ovn-cert/tls.key \
             --nb-client-cert /ovn-cert/tls.crt \
             --nb-client-cacert /ovn-ca/ca-bundle.crt \
+            --nb-cert-common-name "{{.OVN_CERT_CN}}" \
             --sb-client-privkey /ovn-cert/tls.key \
             --sb-client-cert /ovn-cert/tls.crt \
             --sb-client-cacert /ovn-ca/ca-bundle.crt \
+            --sb-cert-common-name "{{.OVN_CERT_CN}}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
