@@ -480,11 +480,13 @@ spec:
             --sb-client-privkey /ovn-cert/tls.key \
             --sb-client-cert /ovn-cert/tls.crt \
             --sb-client-cacert /ovn-ca/ca-bundle.crt \
+            --sb-cert-common-name "{{.OVN_CERT_CN}}" \
             --nb-address "{{.OVN_NB_DB_LIST}}" \
             --nb-client-privkey /ovn-cert/tls.key \
             --nb-client-cert /ovn-cert/tls.crt \
             --nb-client-cacert /ovn-ca/ca-bundle.crt \
             --nbctl-daemon-mode \
+            --nb-cert-common-name "{{.OVN_CERT_CN}}" \
             --enable-multicast
         lifecycle:
           preStop:
