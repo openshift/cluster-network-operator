@@ -88,7 +88,7 @@ if [ "$BUILD_OVN" = true ]; then
   pushd dist/images
   sudo cp -f ../../go-controller/_output/go/bin/* .
   cat << EOF | docker build -t origin-ovn-kubernetes:dev -f - .
-FROM quay.io/openshift/origin-ovn-kubernetes:4.3
+FROM quay.io/openshift/origin-ovn-kubernetes:4.5
 COPY ovnkube ovn-kube-util /usr/bin/
 COPY ovn-k8s-cni-overlay /usr/libexec/cni/ovn-k8s-cni-overlay
 COPY ovnkube.sh /root/
