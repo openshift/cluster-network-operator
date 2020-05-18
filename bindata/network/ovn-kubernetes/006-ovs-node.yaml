@@ -81,6 +81,8 @@ spec:
           readOnly: true
         - mountPath: /run/openvswitch
           name: run-openvswitch
+        - mountPath: /run/systemd
+          name: host-run-systemd
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
         - mountPath: /var/lib/openvswitch
@@ -131,9 +133,15 @@ spec:
       - name: run-openvswitch
         hostPath:
           path: /run/openvswitch
+          type: Directory
+      - name: host-run-systemd
+        hostPath:
+          path: /run/systemd
+          type: Directory
       - name: host-sys
         hostPath:
           path: /sys
+          type: Directory
       - name: env-overrides
         configMap:
           name: env-overrides
