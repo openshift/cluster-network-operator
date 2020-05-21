@@ -52,6 +52,9 @@ spec:
           mountPath: /host/run/cni
         - name: procpath
           mountPath: /host/proc
+        - name: netnspath
+          mountPath: /host/var/run/netns
+          mountPropagation: HostToContainer
       volumes:
         - name: socketpath
           hostPath:
@@ -59,4 +62,8 @@ spec:
         - name: procpath
           hostPath:
             path: /proc
+        - name: netnspath
+          hostPath:
+            path: /run/netns
+
 {{- end}}
