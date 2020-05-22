@@ -210,7 +210,8 @@ kind: Service
 metadata:
   name: d1
 spec:
-  clusterIP: cur`)
+  clusterIP: cur
+  ipFamily: IPv4`)
 
 	upd := UnstructuredFromYaml(t, `
 apiVersion: v1
@@ -226,6 +227,10 @@ spec:
 	ip, _, err := uns.NestedString(upd.Object, "spec", "clusterIP")
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(ip).To(Equal("cur"))
+
+	ipFamily, _, err := uns.NestedString(upd.Object, "spec", "ipFamily")
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(ipFamily).To(Equal("IPv4"))
 }
 
 func TestMergeServiceAccount(t *testing.T) {
