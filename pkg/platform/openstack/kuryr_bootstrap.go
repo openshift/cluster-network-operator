@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 
+	"github.com/Masterminds/semver"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 
@@ -49,6 +50,8 @@ const (
 	MinOctaviaVersionWithTimeouts          = "v2.1"
 	KuryrNamespace                         = "openshift-kuryr"
 	KuryrConfigMapName                     = "kuryr-config"
+	DNSNamespace                           = "openshift-dns"
+	DNSServiceName                         = "dns-default"
 	// NOTE(ltomasbo): Only OVN octavia driver supported on kuryr
 	OVNProvider              = "ovn"
 	etcdPort                 = 2379
@@ -176,12 +179,12 @@ func getCloudProviderCACert(kubeClient client.Client) (string, error) {
 	return cm.Data["ca-bundle.pem"], nil
 }
 
-func getSavedOctaviaProvider(kubeClient client.Client) (string, error) {
+func getSavedAnnotation(kubeClient client.Client, annotation string) (string, error) {
 	cm, err := getConfigMap(kubeClient, KuryrNamespace, KuryrConfigMapName)
 	if err != nil {
 		return "", err
 	}
-	return cm.Annotations[names.KuryrOctaviaProviderAnnotation], nil
+	return cm.Annotations[annotation], nil
 }
 
 // Logs into OpenStack and creates all the resources that are required to run
@@ -556,7 +559,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	//    b. List providers and look for OVN one.
 	//    c. If it's present configure Kuryr to use it.
 	//    d. In case of any issues just use whatever the default is.
-	octaviaProvider, err := getSavedOctaviaProvider(kubeClient)
+	octaviaProvider, err := getSavedAnnotation(kubeClient, names.KuryrOctaviaProviderAnnotation)
 	if err != nil && !apierrors.IsNotFound(err) { // Ignore 404, just do the normal discovery then.
 		return nil, errors.Wrap(err, "failed to get kuryr-config ConfigMap")
 	}
@@ -586,6 +589,39 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		}
 	}
 
+	octaviaVersion, err := getSavedAnnotation(kubeClient, names.KuryrOctaviaVersionAnnotation)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, errors.Wrap(err, "failed to get kuryr-config ConfigMap")
+	}
+
+	maxOctaviaVersion, err := getMaxOctaviaAPIVersion(lbClient)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get max octavia api version")
+	}
+
+	// In case the Kuryr config-map is annotated with an Octavia version different
+	// than the current Octavia version, and older than the version that multiple
+	// listeners becomes available and the Octavia provider is amphora, an Octavia
+	// upgrade happened and UDP listeners are now allowed to be created.
+	// By recreating the OpenShift DNS service a new load balancer amphora is in
+	// place with all required listeners.
+	log.Print("Checking Octavia upgrade happened")
+	if octaviaVersion != "" && octaviaProvider == "default" {
+		savedOctaviaVersion := semver.MustParse(octaviaVersion)
+		multipleListenersVersion := semver.MustParse(MinOctaviaVersionWithMultipleListeners)
+		if !savedOctaviaVersion.Equal(maxOctaviaVersion) && savedOctaviaVersion.LessThan(multipleListenersVersion) && octaviaMultipleListenersSupport {
+			dnsService := &v1.Service{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
+				ObjectMeta: metav1.ObjectMeta{Name: DNSServiceName, Namespace: DNSNamespace},
+			}
+			err := kubeClient.Delete(context.TODO(), dnsService)
+			if err != nil {
+				return nil, errors.Wrapf(err, "Failed to delete %s Service", DNSServiceName)
+			}
+		}
+	}
+	octaviaVersion = maxOctaviaVersion.Original()
+
 	log.Print("Kuryr bootstrap finished")
 
 	res := bootstrap.BootstrapResult{
@@ -599,6 +635,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 			ClusterID:                clusterID,
 			OctaviaProvider:          octaviaProvider,
 			OctaviaMultipleListeners: octaviaMultipleListenersSupport,
+			OctaviaVersion:           octaviaVersion,
 			OpenStackCloud:           cloud,
 			WebhookCA:                b64.StdEncoding.EncodeToString(ca),
 			WebhookCAKey:             b64.StdEncoding.EncodeToString(key),
