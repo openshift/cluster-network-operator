@@ -71,6 +71,8 @@ netname: openshift-user-workload-monitoring
 # - openshift-service-catalog-controller-manager
 # - openshift-template-service-broker
 # - openshift-ansible-service-broker
+# - openshift-authentication
+# - openshift-authentication-operator
 apiVersion: network.openshift.io/v1
 kind: NetNamespace
 metadata:
@@ -126,4 +128,19 @@ metadata:
 netid: 1
 netname: openshift-service-catalog-controller-manager
 
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-authentication
+netid: 1
+netname: openshift-authentication
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-authentication-operator
+netid: 1
+netname: openshift-authentication-operator
 {{- end}}
