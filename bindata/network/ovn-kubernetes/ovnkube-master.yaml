@@ -392,15 +392,20 @@ spec:
                 - /var/run/ovn/ovnnb_db.ctl
                 - exit
         readinessProbe:
-          initialDelaySeconds: 60
+          initialDelaySeconds: 90
           timeoutSeconds: 5
           exec:
             command:
             - /bin/bash
             - -c
             - |
-              set -xe
-              /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=3 cluster/status OVN_Northbound  2>/dev/null | grep ${K8S_NODE_IP} | grep -v Address -q
+              set -xeo pipefail
+              leader_status=$(/usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=3 cluster/status OVN_Northbound  2>/dev/null | { grep "Leader: unknown" || true; })
+              if [[ ! -z "${leader_status}" ]]; then
+                echo "NB DB Raft leader is unknown to the cluster node."
+                exit 1
+              fi
+
         env:
         - name: OVN_LOG_LEVEL
           value: info 
@@ -744,15 +749,19 @@ spec:
                 - /var/run/ovn/ovnsb_db.ctl
                 - exit
         readinessProbe:
-          initialDelaySeconds: 60
+          initialDelaySeconds: 90
           timeoutSeconds: 5
           exec:
             command:
             - /bin/bash
             - -c
             - |
-              set -xe
-              /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=3 cluster/status OVN_Southbound  2>/dev/null | grep ${K8S_NODE_IP} | grep -v Address -q
+              set -xeo pipefail
+              leader_status=$(/usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=3 cluster/status OVN_Southbound  2>/dev/null | { grep "Leader: unknown" || true; })
+              if [[ ! -z "${leader_status}" ]]; then
+                echo "SB DB Raft leader is unknown to the cluster node."
+                exit 1
+              fi
         env:
         - name: OVN_LOG_LEVEL
           value: info 
