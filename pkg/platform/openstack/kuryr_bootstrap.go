@@ -55,8 +55,9 @@ const (
 	OpenShiftConfigNamespace = "openshift-config"
 	UserCABundleConfigMap    = "cloud-provider-config"
 	// NOTE(dulek): This one is hardcoded in openshift/installer.
-	InfrastructureCRDName                  = "cluster"
-	MinOctaviaVersionWithMultipleListeners = "v2.11"
+	InfrastructureCRDName = "cluster"
+	// NOTE(ltomasbo): Amphora driver supports came on 2.11, but ovn-octavia only supports it after 2.13
+	MinOctaviaVersionWithMultipleListeners = "v2.13"
 	MinOctaviaVersionWithHTTPSMonitors     = "v2.10"
 	MinOctaviaVersionWithProviders         = "v2.6"
 	MinOctaviaVersionWithTagSupport        = "v2.5"
@@ -1291,10 +1292,6 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	if octaviaProvider != "" {
 		log.Printf("Detected that Kuryr was already configured to use %s LB provider. Making sure to keep it that way.",
 			octaviaProvider)
-		if octaviaProvider == OVNProvider {
-			// OVN provider does not support multiple listeners, so in that case we always set false to that.
-			octaviaMultipleListenersSupport = false
-		}
 	} else {
 		octaviaProvider = "default"
 		if octaviaProviderSupport {
@@ -1310,8 +1307,6 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 					if provider.Name == OVNProvider {
 						log.Print("OVN Provider is enabled and Kuryr will use it")
 						octaviaProvider = OVNProvider
-						// OVN provider does not support multiple listeners, so in that case we always set false to that.
-						octaviaMultipleListenersSupport = false
 					}
 				}
 			}
