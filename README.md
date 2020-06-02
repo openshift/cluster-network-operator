@@ -44,7 +44,7 @@ $ cp MY_CLUSTER/manifests/cluster-network-02-config.yml MY_CLUSTER/manifests/clu
 Edit the new file:
 - change first line `apiVersion: config.openshift.io/v1` to `apiVersion: operator.openshift.io/v1`
 
-When all configuration changes are coplete, go on and create the cluster:
+When all configuration changes are complete, go on and create the cluster:
 ```
 $ openshift-install --dir=MY_CLUSTER create cluster
 ```
