@@ -165,6 +165,7 @@ func (ka *kpcArgs) getAddress(key string) string {
 	}
 	if net.ParseIP(value) == nil {
 		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (not an IP address)", key, value))
+		return ""
 	}
 	return value
 }
