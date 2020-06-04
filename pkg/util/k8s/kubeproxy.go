@@ -133,7 +133,7 @@ func (ka *kpcArgs) getAddressAndPort(addressKey, portKey, defaultPort string) st
 	}
 	port := ka.get(portKey)
 	if port != "" {
-		if _, err := strconv.ParseInt(port, 10, 16); err != nil {
+		if _, err := strconv.ParseUint(port, 10, 16); err != nil {
 			ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%v)", portKey, port, err))
 			return ""
 		}
