@@ -125,31 +125,32 @@ func (ka *kpcArgs) get(argName string) string {
 // getAddressAndPort returns a combined IP address and port
 func (ka *kpcArgs) getAddressAndPort(addressKey, portKey, defaultPort string) string {
 	address := ka.get(addressKey)
+	port := ka.get(portKey)
+
+	if address == "" && port == "" {
+		return ""
+	}
+
 	if address != "" {
 		if net.ParseIP(address) == nil {
 			ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (not an IP address)", addressKey, address))
 			return ""
 		}
+	} else {
+		// default to 0.0.0.0
+		address = "0.0.0.0"
 	}
-	port := ka.get(portKey)
+
 	if port != "" {
-		if _, err := strconv.ParseInt(port, 10, 16); err != nil {
+		if _, err := strconv.ParseUint(port, 10, 16); err != nil {
 			ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%v)", portKey, port, err))
 			return ""
 		}
+	} else {
+		port = defaultPort
 	}
 
-	if address != "" {
-		if port == "" {
-			return address + ":" + defaultPort
-		} else {
-			return address + ":" + port
-		}
-	} else if port != "" {
-		return "0.0.0.0:" + port
-	} else {
-		return ""
-	}
+	return net.JoinHostPort(address, port)
 }
 
 // getString returns an uninterpreted string
@@ -165,6 +166,7 @@ func (ka *kpcArgs) getAddress(key string) string {
 	}
 	if net.ParseIP(value) == nil {
 		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (not an IP address)", key, value))
+		return ""
 	}
 	return value
 }

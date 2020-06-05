@@ -38,6 +38,35 @@ var config = operv1.NetworkSpec{
 	},
 }
 
+var configIPv6 = operv1.NetworkSpec{
+	ClusterNetwork: []operv1.ClusterNetworkEntry{
+		{
+			CIDR:       "fd00:1234::/48",
+			HostPrefix: 64,
+		},
+	},
+	KubeProxyConfig: &operv1.ProxyConfig{
+		BindAddress:        "::",
+		IptablesSyncPeriod: "1m",
+		ProxyArguments: map[string]operv1.ProxyArgumentList{
+			// string
+			"proxy-mode": {"blah"},
+
+			// duration
+			"iptables-min-sync-period": {"2m"},
+
+			// optional int
+			"iptables-masquerade-bit": {"14"},
+
+			// optional duration
+			"conntrack-tcp-timeout-close-wait": {"10m"},
+
+			// This will be overridden
+			"conntrack-max-per-core": {"5"},
+		},
+	},
+}
+
 func TestKubeProxyConfig(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -56,7 +85,7 @@ func TestKubeProxyConfig(t *testing.T) {
 		})
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(cfg).To(MatchYAML(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
-bindAddress: 0.0.0.0
+bindAddress: "0.0.0.0"
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -86,6 +115,67 @@ ipvs:
   syncPeriod: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 1.2.3.4:999
+mode: blah
+nodePortAddresses: null
+oomScoreAdj: null
+portRange: ""
+udpIdleTimeout: 0s
+winkernel:
+  enableDSR: false
+  networkName: ""
+  sourceVip: ""
+`))
+}
+
+func TestKubeProxyIPv6Config(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	errs := validateKubeProxy(&configIPv6)
+	g.Expect(errs).To(HaveLen(0))
+
+	cfg, err := kubeProxyConfiguration(
+		map[string]operv1.ProxyArgumentList{
+			// special address+port combo
+			"metrics-bind-address":   {"fd00:1234::4"},
+			"metrics-port":           {"51999"},
+			"conntrack-max-per-core": {"10"},
+		},
+		&configIPv6,
+		map[string]operv1.ProxyArgumentList{
+			"conntrack-max-per-core": {"15"},
+		})
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(cfg).To(MatchYAML(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
+bindAddress: "::"
+clientConnection:
+  acceptContentTypes: ""
+  burst: 0
+  contentType: ""
+  kubeconfig: ""
+  qps: 0
+clusterCIDR: fd00:1234::/48
+configSyncPeriod: 0s
+conntrack:
+  maxPerCore: 15
+  min: null
+  tcpCloseWaitTimeout: 10m0s
+  tcpEstablishedTimeout: null
+enableProfiling: false
+healthzBindAddress: ""
+hostnameOverride: ""
+iptables:
+  masqueradeAll: false
+  masqueradeBit: 14
+  minSyncPeriod: 2m0s
+  syncPeriod: 1m0s
+ipvs:
+  excludeCIDRs: null
+  minSyncPeriod: 0s
+  scheduler: ""
+  strictARP: false
+  syncPeriod: 0s
+kind: KubeProxyConfiguration
+metricsBindAddress: '[fd00:1234::4]:51999'
 mode: blah
 nodePortAddresses: null
 oomScoreAdj: null
@@ -152,29 +242,87 @@ func TestValidateKubeProxy(t *testing.T) {
 func TestFillKubeProxyDefaults(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	c := &operv1.NetworkSpec{
-		ClusterNetwork: []operv1.ClusterNetworkEntry{
-			{
-				CIDR:       "192.168.0.0/14",
-				HostPrefix: 23,
+	trueVar := true
+	falseVar := false
+
+	testcases := []struct {
+		in  *operv1.NetworkSpec
+		out *operv1.NetworkSpec
+	}{
+		// no bind address and cluster CIDR is IPv4
+		{
+			in: &operv1.NetworkSpec{
+				ClusterNetwork: []operv1.ClusterNetworkEntry{
+					{
+						CIDR:       "192.168.0.0/14",
+						HostPrefix: 23,
+					},
+				},
+				DeployKubeProxy: &trueVar,
+			},
+			out: &operv1.NetworkSpec{
+				ClusterNetwork: []operv1.ClusterNetworkEntry{
+					{
+						CIDR:       "192.168.0.0/14",
+						HostPrefix: 23,
+					},
+				},
+				DeployKubeProxy: &trueVar,
+				KubeProxyConfig: &operv1.ProxyConfig{
+					BindAddress: "0.0.0.0",
+				},
+			},
+		},
+		// no bind address and cluster CIDR is IPv6
+		{
+			in: &operv1.NetworkSpec{
+				ClusterNetwork: []operv1.ClusterNetworkEntry{
+					{
+						CIDR:       "fd00:1234::/64",
+						HostPrefix: 23,
+					},
+				},
+				DeployKubeProxy: &trueVar,
+			},
+			out: &operv1.NetworkSpec{
+				ClusterNetwork: []operv1.ClusterNetworkEntry{
+					{
+						CIDR:       "fd00:1234::/64",
+						HostPrefix: 23,
+					},
+				},
+				DeployKubeProxy: &trueVar,
+				KubeProxyConfig: &operv1.ProxyConfig{
+					BindAddress: "::",
+				},
+			},
+		},
+		// no bind address and no deploy kube-proxy
+		{
+			in: &operv1.NetworkSpec{
+				ClusterNetwork: []operv1.ClusterNetworkEntry{
+					{
+						CIDR:       "fd00:1234::/64",
+						HostPrefix: 23,
+					},
+				},
+				DeployKubeProxy: &falseVar,
+			},
+			out: &operv1.NetworkSpec{
+				ClusterNetwork: []operv1.ClusterNetworkEntry{
+					{
+						CIDR:       "fd00:1234::/64",
+						HostPrefix: 23,
+					},
+				},
+				DeployKubeProxy: &falseVar,
 			},
 		},
 	}
-
-	FillKubeProxyDefaults(c, nil)
-	tt := true
-	g.Expect(c).To(Equal(&operv1.NetworkSpec{
-		ClusterNetwork: []operv1.ClusterNetworkEntry{
-			{
-				CIDR:       "192.168.0.0/14",
-				HostPrefix: 23,
-			},
-		},
-		DeployKubeProxy: &tt,
-		KubeProxyConfig: &operv1.ProxyConfig{
-			BindAddress: "0.0.0.0",
-		},
-	}))
+	for _, tc := range testcases {
+		FillKubeProxyDefaults(tc.in, nil)
+		g.Expect(tc.in).To(Equal(tc.out))
+	}
 }
 
 func TestRenderKubeProxy(t *testing.T) {
