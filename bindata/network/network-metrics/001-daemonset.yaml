@@ -1,0 +1,71 @@
+---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: network-metrics-daemon
+  namespace: openshift-multus
+  annotations:
+    kubernetes.io/description: |
+      This daemonset launches the network metrics daemon on each node
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+    networkoperator.openshift.io/non-critical: ""
+spec:
+  selector:
+    matchLabels:
+      app: network-metrics-daemon
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: network-metrics-daemon
+        component: network
+        type: infra
+        openshift.io/component: network
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: network-metrics-daemon
+          image: {{.NetworkMetricsImage}}
+          command:
+            - /usr/bin/network-metrics
+          args: ["--node-name", "$(NODE_NAME)"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 100Mi
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+        - name: kube-rbac-proxy
+          image: {{.KubeRBACProxyImage}}
+          args:
+            - --logtostderr
+            - --secure-listen-address=:8443
+            - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+            - --upstream=http://127.0.0.1:9091/
+            - --tls-private-key-file=/etc/metrics/tls.key
+            - --tls-cert-file=/etc/metrics/tls.crt
+          ports:
+            - containerPort: 8443
+              name: https
+          resources:
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - name: metrics-certs
+              mountPath: /etc/metrics
+              readOnly: True
+      volumes:
+        - name: metrics-certs
+          secret:
+            secretName: metrics-daemon-secret
+      serviceAccountName: metrics-daemon-sa

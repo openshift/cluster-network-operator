@@ -22,12 +22,10 @@ func RenderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 		return nil, nil
 	}
 
-	var err error
 	out := []*uns.Unstructured{}
-	objs := []*uns.Unstructured{}
 
 	// enabling Multus always renders the CRD since Multus uses it
-	objs, err = renderAdditionalNetworksCRD(manifestDir)
+	objs, err := renderAdditionalNetworksCRD(manifestDir)
 	if err != nil {
 		return nil, err
 	}
@@ -39,6 +37,13 @@ func RenderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 		return nil, err
 	}
 	out = append(out, objs...)
+
+	objs, err = renderNetworkMetricsDaemon(manifestDir)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, objs...)
+
 	return out, nil
 }
 
@@ -64,6 +69,25 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool) ([
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render multus manifests")
+	}
+	objs = append(objs, manifests...)
+	return objs, nil
+}
+
+// renderNetworkMetricsDaemon returns the manifests of the Network Metrics Daemon
+func renderNetworkMetricsDaemon(manifestDir string) ([]*uns.Unstructured, error) {
+
+	objs := []*uns.Unstructured{}
+
+	// render the manifests on disk
+	data := render.MakeRenderData()
+	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
+	data.Data["NetworkMetricsImage"] = os.Getenv("NETWORK_METRICS_DAEMON_IMAGE")
+	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
+
+	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/network-metrics"), &data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to render multus admission controller manifests")
 	}
 	objs = append(objs, manifests...)
 	return objs, nil
