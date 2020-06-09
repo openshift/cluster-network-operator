@@ -96,3 +96,7 @@ data:
 
     [cni_health_server]
     port = {{ default 8090 .DaemonProbesPort }}
+
+    [prometheus_exporter]
+    controller_exporter_port = 9654
+    cni_exporter_port = 9655

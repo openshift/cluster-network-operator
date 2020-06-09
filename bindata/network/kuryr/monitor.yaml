@@ -1,0 +1,115 @@
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: kuryr-controller
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+  name: monitor-kuryr-controller
+  namespace: openshift-kuryr
+spec:
+  endpoints:
+  - interval: 60s
+    port: metrics
+    scrapeTimeout: 30s
+  jobLabel: app
+  namespaceSelector:
+    matchNames:
+    - openshift-kuryr
+  selector:
+    matchLabels:
+      app: kuryr-controller
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kuryr-controller
+  name: kuryr-controller
+  namespace: openshift-kuryr
+spec:
+  selector:
+    app: kuryr-controller
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+  - name: metrics
+    port: 9654
+    protocol: TCP
+    targetPort: 9654
+  sessionAffinity: None
+  type: ClusterIP
+---
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: kuryr-cni
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+  name: monitor-kuryr-cni
+  namespace: openshift-kuryr
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+  jobLabel: app
+  namespaceSelector:
+    matchNames:
+    - openshift-kuryr
+  selector:
+    matchLabels:
+      app: kuryr-cni
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kuryr-cni
+  name: kuryr-cni
+  namespace: openshift-kuryr
+spec:
+  selector:
+    app: kuryr-cni
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+  - name: metrics
+    port: 9655
+    protocol: TCP
+    targetPort: 9655
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-k8s
+  namespace: openshift-kuryr
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  - endpoints
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-k8s
+  namespace: openshift-kuryr
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-k8s
+subjects:
+- kind: ServiceAccount
+  name: prometheus-k8s
+  namespace: openshift-monitoring
