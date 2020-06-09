@@ -67,6 +67,12 @@ spec:
           }
           trap quit SIGTERM
 
+          function deletePid {
+              rm /var/run/openvswitch/ovs-vswitchd.pid
+              rm /var/run/openvswitch/ovsdb-server.pid
+          }
+          trap deletePid EXIT
+
           # launch OVS
           # Start the ovsdb so that we can prep it before we start the ovs-vswitchd
           /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovs-vswitchd --system-id=random --no-monitor
