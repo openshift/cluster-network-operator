@@ -359,6 +359,10 @@ spec:
           type: string
         metadata:
           type: object
+          properties:
+            name:
+              type: string
+              pattern: ^default$
         spec:
           description: spec is the specification of the current egress network policy
           properties:
