@@ -60,6 +60,9 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	// deploy or not kuryr-admission-controller depending on double listeners support
 	data.Data["AdmissionController"] = !b.OctaviaMultipleListeners
 
+	// Octavia config data
+	data.Data["OctaviaVersion"] = b.OctaviaVersion
+
 	// kuryr-daemon DaemonSet data
 	data.Data["DaemonEnableProbes"] = true
 	data.Data["DaemonProbesPort"] = c.DaemonProbesPort
