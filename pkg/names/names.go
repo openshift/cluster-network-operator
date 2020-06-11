@@ -41,6 +41,9 @@ const NetworkMigrationAnnotation = "networkoperator.openshift.io/network-migrati
 // prevent from reconfiguring it automatically when underlying Octavia changes.
 const KuryrOctaviaProviderAnnotation = "networkoperator.openshift.io/kuryr-octavia-provider"
 
+// KuryrOctaviaVersionAnnotation is used to save latest Octavia version detected
+const KuryrOctaviaVersionAnnotation = "networkoperator.openshift.io/kuryr-octavia-version"
+
 // SERVICE_CA_CONFIGMAP is the name of the ConfigMap that contains service CA bundle
 // that is used in multus admission controller deployment
 const SERVICE_CA_CONFIGMAP = "openshift-service-ca"
