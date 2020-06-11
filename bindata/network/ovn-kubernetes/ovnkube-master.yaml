@@ -185,39 +185,41 @@ spec:
                   fi
                 done
 
-                retries=0
-                while is_candidate=$(ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/status OVN_Northbound 2>/dev/null \
-                  | grep "Role: candidate" ); do
-                  if [[ ! -z "${is_candidate}" ]]; then
-                    (( retries += 1 ))
-                    if [[ "${retries}" -gt 10 ]]; then
-                      echo "Cluster node (nb-db raft) is in candidate role for prolonged time. Continuing..."
-                    fi
-                    sleep 2
-                  else
-                    break
-                  fi
-                done
-
-                is_leader=$(ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/status OVN_Northbound 2>/dev/null \
-                  | grep "Role: leader")
-                if [[ ! -z "${is_leader}" ]]; then
-                  while [[ ${current_election_timer} != ${election_timer} ]]; do
-                    max_electinon_timer=$((${current_election_timer} * 2))
-                    if [[ ${election_timer} -le ${max_electinon_timer} ]]; then
-                      if ! ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/change-election-timer OVN_Northbound ${election_timer}; then
-                        echo "Failed to set nb-db raft election timer ${election_timer}. Exiting..."
-                        exit 2
+                if [[ ${election_timer} -ne ${current_election_timer} ]]; then
+                  retries=0
+                  while is_candidate=$(ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/status OVN_Northbound 2>/dev/null \
+                    | grep "Role: candidate" ); do
+                    if [[ ! -z "${is_candidate}" ]]; then
+                      (( retries += 1 ))
+                      if [[ "${retries}" -gt 10 ]]; then
+                        echo "Cluster node (nb-db raft) is in candidate role for prolonged time. Continuing..."
                       fi
-                      current_election_timer=${electinon_timer}
+                      sleep 2
                     else
-                      if ! ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/change-election-timer OVN_Northbound ${max_electinon_timer}; then
-                        echo "Failed to set nb-db raft election timer ${max_election_timer}. Exiting..."
-                        exit 2
-                      fi
-                    current_election_timer=${max_electinon_timer}
+                      break
                     fi
                   done
+
+                  is_leader=$(ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/status OVN_Northbound 2>/dev/null \
+                    | grep "Role: leader")
+                  if [[ ! -z "${is_leader}" ]]; then
+                    while [[ ${current_election_timer} != ${election_timer} ]]; do
+                      max_election_timer=$((${current_election_timer} * 2))
+                      if [[ ${election_timer} -le ${max_election_timer} ]]; then
+                        if ! ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/change-election-timer OVN_Northbound ${election_timer}; then
+                          echo "Failed to set nb-db raft election timer ${election_timer}. Exiting..."
+                          exit 2
+                        fi
+                        current_election_timer=${election_timer}
+                      else
+                        if ! ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/change-election-timer OVN_Northbound ${max_election_timer}; then
+                          echo "Failed to set nb-db raft election timer ${max_election_timer}. Exiting..."
+                          exit 2
+                        fi
+                      current_election_timer=${max_election_timer}
+                      fi
+                    done
+                  fi
                 fi
 
         readinessProbe:
@@ -353,39 +355,41 @@ spec:
                   fi
                 done
 
-                retries=0
-                while is_candidate=$(ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/status OVN_Southbound 2>/dev/null \
-                  | grep "Role: candidate" ); do
-                  if [[ ! -z "${is_candidate}" ]]; then
-                    (( retries += 1 ))
-                    if [[ "${retries}" -gt 10 ]]; then
-                      echo "Cluster node (sb-db raft) is in candidate role for prolonged time. Continuing..."
-                    fi
-                    sleep 2
-                  else
-                    break
-                  fi
-                done
-
-                is_leader=$(ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/status OVN_Southbound 2>/dev/null \
-                  | grep "Role: leader")
-                if [[ ! -z "${is_leader}" ]]; then
-                  while [[ ${current_election_timer} != ${election_timer} ]]; do
-                    max_electinon_timer=$((${current_election_timer} * 2))
-                    if [[ ${election_timer} -le ${max_electinon_timer} ]]; then
-                      if ! ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/change-election-timer OVN_Southbound ${election_timer}; then
-                        echo "Failed to set sb-db raft election timer ${election_timer}. Exiting..."
-                        exit 2
+                if [[ ${election_timer} -ne ${current_election_timer} ]]; then
+                  retries=0
+                  while is_candidate=$(ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/status OVN_Southbound 2>/dev/null \
+                    | grep "Role: candidate" ); do
+                    if [[ ! -z "${is_candidate}" ]]; then
+                      (( retries += 1 ))
+                      if [[ "${retries}" -gt 10 ]]; then
+                        echo "Cluster node (sb-db raft) is in candidate role for prolonged time. Continuing..."
                       fi
-                      current_election_timer=${electinon_timer}
+                      sleep 2
                     else
-                      if ! ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/change-election-timer OVN_Southbound ${max_electinon_timer}; then
-                        echo "Failed to set sb-db raft election timer ${max_election_timer}. Exiting..."
-                        exit 2
-                      fi
-                    current_election_timer=${max_electinon_timer}
+                      break
                     fi
                   done
+
+                  is_leader=$(ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/status OVN_Southbound 2>/dev/null \
+                    | grep "Role: leader")
+                  if [[ ! -z "${is_leader}" ]]; then
+                    while [[ ${current_election_timer} != ${election_timer} ]]; do
+                      max_election_timer=$((${current_election_timer} * 2))
+                      if [[ ${election_timer} -le ${max_election_timer} ]]; then
+                        if ! ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/change-election-timer OVN_Southbound ${election_timer}; then
+                          echo "Failed to set sb-db raft election timer ${election_timer}. Exiting..."
+                          exit 2
+                        fi
+                        current_election_timer=${election_timer}
+                      else
+                        if ! ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/change-election-timer OVN_Southbound ${max_election_timer}; then
+                          echo "Failed to set sb-db raft election timer ${max_election_timer}. Exiting..."
+                          exit 2
+                        fi
+                      current_election_timer=${max_election_timer}
+                      fi
+                    done
+                  fi
                 fi
 
         readinessProbe:
