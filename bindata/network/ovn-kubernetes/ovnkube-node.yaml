@@ -46,6 +46,7 @@ spec:
             source "/env/${K8S_NODE}"
             set +o allexport
           fi
+          echo "$(date -Iseconds) - starting ovn-controller"
           exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
             --no-chdir --pidfile=/var/run/ovn/ovn-controller.pid \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
@@ -95,6 +96,7 @@ spec:
             source "/env/${K8S_NODE}"
             set +o allexport
           fi
+          echo "I$(date "+%m%d %H:%M:%S.%N") - waiting for db_ip addresses"
           cp -f /usr/libexec/cni/ovn-k8s-cni-overlay /cni-bin-dir/
           ovn_config_namespace=openshift-ovn-kubernetes
           retries=0
@@ -105,13 +107,14 @@ spec:
             fi
             (( retries += 1 ))
             if [[ "${retries}" -gt 40 ]]; then
-              echo "db endpoint never came up"
+              echo "E$(date "+%m%d %H:%M:%S.%N") - db endpoint never came up"
               exit 1
             fi
-            echo "waiting for db endpoint"
+            echo "I$(date "+%m%d %H:%M:%S.%N") - waiting for db endpoint"
             sleep 5
           done
 
+          echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node db_ip ${db_ip}"
           hybrid_overlay_flags=
           if [[ -n "{{.OVNHybridOverlayEnable}}" ]]; then
             hybrid_overlay_flags="--enable-hybrid-overlay --no-hostsubnet-nodes=kubernetes.io/os=windows"
