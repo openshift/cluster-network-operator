@@ -68,6 +68,7 @@ spec:
             set +o allexport
           fi
 
+          echo "$(date -Iseconds) - starting ovn-northd"
           exec ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
             --ovnnb-db "{{.OVN_NB_DB_LIST}}" \
@@ -116,6 +117,7 @@ spec:
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
           MASTER_IP="{{.OVN_MASTER_IP}}"
+          echo "$(date -Iseconds) - starting nbdb  MASTER_IP=${MASTER_IP}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
             exec /usr/share/ovn/scripts/ovn-ctl \
             --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
@@ -151,11 +153,12 @@ spec:
               - |
                 MASTER_IP="{{.OVN_MASTER_IP}}"
                 if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
+                  echo "$(date -Iseconds) - nbdb - postStart - waiting for master to be selected"
                   retries=0
                   while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=60000; do
                     (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
-                    echo "too many failed ovn-nbctl attempts, giving up"
+                    echo "$(date -Iseconds) - ERROR RESTARTING - nbdb - too many failed ovn-nbctl attempts, giving up"
                       exit 1
                   fi
                   sleep 2
@@ -223,6 +226,7 @@ spec:
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
           MASTER_IP="{{.OVN_MASTER_IP}}"
+          echo "$(date -Iseconds) - starting sbdb  MASTER_IP=${MASTER_IP}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
             exec /usr/share/ovn/scripts/ovn-ctl \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
@@ -235,7 +239,7 @@ spec:
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
             run_sb_ovsdb
           else
-            echo "joining cluster at ${MASTER_IP}"
+            echo "$(date -Iseconds) - joining cluster at ${MASTER_IP}"
             exec /usr/share/ovn/scripts/ovn-ctl \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
@@ -259,11 +263,12 @@ spec:
               - |
                 MASTER_IP="{{.OVN_MASTER_IP}}"
                 if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
+                  echo "$(date -Iseconds) - sdb - postStart - waiting for master to be selected"
                   retries=0
                   while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=60000; do
                     (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
-                    echo "too many failed ovn-sbctl attempts, giving up"
+                    echo "$(date -Iseconds) - ERROR RESTARTING - sbdb - too many failed ovn-sbctl attempts, giving up"
                       exit 1
                   fi
                   sleep 2
@@ -333,6 +338,7 @@ spec:
           fi
 
           # start nbctl daemon for caching
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start nbctl daemon for caching"
           export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/var/run/ovn/ovn-nbctl.pid \
             --detach \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
@@ -341,6 +347,7 @@ spec:
            # REMOVEME once OVN path for control socket is fixed (right now uses /var/run/openvswitch)
           ln -sf $OVN_NB_DAEMON /var/run/ovn/ || true
 
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --init-master "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
