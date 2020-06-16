@@ -13,7 +13,7 @@ data:
     encap-port="{{.GenevePort}}"
 
     [kubernetes]
-    service-cidr="{{.OVN_service_cidr}}"
+    service-cidrs="{{.OVN_service_cidr}}"
     ovn-config-namespace="openshift-ovn-kubernetes"
     apiserver="{{.K8S_APISERVER}}"
 
