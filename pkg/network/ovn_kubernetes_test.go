@@ -248,7 +248,49 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	errExpect("invalid GenevePort 70001")
 
 	config.ClusterNetwork = nil
-	errExpect("ClusterNetworks cannot be empty")
+	errExpect("ClusterNetwork cannot be empty")
+}
+
+func TestValidateOVNKubernetesDualStack(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+
+	err := validateOVNKubernetes(config)
+	g.Expect(err).To(BeEmpty())
+	FillDefaults(config, nil)
+
+	errExpect := func(substr string) {
+		t.Helper()
+		g.Expect(validateOVNKubernetes(config)).To(
+			ContainElement(MatchError(
+				ContainSubstring(substr))))
+	}
+
+	config.ClusterNetwork = []operv1.ClusterNetworkEntry{
+		{CIDR: "10.128.0.0/14", HostPrefix: 23},
+		{CIDR: "10.0.0.0/14", HostPrefix: 23},
+	}
+	err = validateOVNKubernetes(config)
+	g.Expect(err).To(BeEmpty())
+
+	config.ServiceNetwork = []string{
+		"fd02::/112",
+	}
+	errExpect("ClusterNetwork and ServiceNetwork must have matching IP families")
+
+	config.ClusterNetwork = append(config.ClusterNetwork, operv1.ClusterNetworkEntry{
+		CIDR: "fd01::/48", HostPrefix: 64,
+	})
+	errExpect("ClusterNetwork and ServiceNetwork must have matching IP families")
+
+	config.ServiceNetwork = append(config.ServiceNetwork, "172.30.0.0/16")
+	err = validateOVNKubernetes(config)
+	g.Expect(err).To(BeEmpty())
+
+	config.ServiceNetwork = append(config.ServiceNetwork, "172.31.0.0/16")
+	errExpect("ServiceNetwork must have either a single CIDR or a dual-stack pair of CIDRs")
 }
 
 func TestOVNKubernetesIsSafe(t *testing.T) {
