@@ -67,7 +67,8 @@ const (
 	DNSServiceName                         = "dns-default"
 	// NOTE(ltomasbo): Only OVN octavia driver supported on kuryr
 	OVNProvider              = "ovn"
-	etcdPort                 = 2379
+	etcdClientPort           = 2379
+	etcdServerToServerPort   = 2380
 	dnsPort                  = 53
 	apiPort                  = 6443
 	routerMetricsPort        = 1936
@@ -1108,18 +1109,25 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 
 	var sgRules = []sgRule{
 		{podSgId, "0.0.0.0/0", 0, 0, rules.ProtocolTCP},
-		{masterSgId, openStackSvcCIDR, etcdPort, etcdPort, rules.ProtocolTCP},
+		{masterSgId, openStackSvcCIDR, etcdClientPort, etcdClientPort, rules.ProtocolTCP},
 		{masterSgId, openStackSvcCIDR, apiPort, apiPort, rules.ProtocolTCP},
+		// NOTE (maysamacedo): Splitting etcd sg port ranges in different
+		// rules to avoid the issue of constant leader election changes
+		{masterSgId, workerSubnet.CIDR, etcdClientPort, etcdClientPort, rules.ProtocolTCP},
+		{masterSgId, workerSubnet.CIDR, etcdServerToServerPort, etcdServerToServerPort, rules.ProtocolTCP},
 	}
 
 	var decommissionedRules = []sgRule{
 		{podSgId, workerSubnet.CIDR, 0, 0, ""},
-		{masterSgId, openStackSvcCIDR, 2379, 2380, rules.ProtocolTCP},
+		{masterSgId, openStackSvcCIDR, etcdClientPort, etcdServerToServerPort, rules.ProtocolTCP},
+		// NOTE(maysamacedo): This sg rule is created by the installer. We need to remove it and
+		// create two more, each with a unique port from the range.
+		{masterSgId, workerSubnet.CIDR, etcdClientPort, etcdServerToServerPort, rules.ProtocolTCP},
 	}
 
 	for _, cidr := range podSubnetCidrs {
 		sgRules = append(sgRules,
-			sgRule{masterSgId, cidr, etcdPort, etcdPort, rules.ProtocolTCP},
+			sgRule{masterSgId, cidr, etcdClientPort, etcdClientPort, rules.ProtocolTCP},
 			sgRule{masterSgId, cidr, dnsPort, dnsPort, rules.ProtocolTCP},
 			sgRule{masterSgId, cidr, dnsPort, dnsPort, rules.ProtocolUDP},
 			sgRule{workerSgId, cidr, dnsPort, dnsPort, rules.ProtocolTCP},
