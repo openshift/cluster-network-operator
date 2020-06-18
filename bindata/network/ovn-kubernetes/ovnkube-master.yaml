@@ -95,7 +95,7 @@ spec:
           name: ovn-ca
         resources:
           requests:
-            cpu: 100m
+            cpu: 10m
             memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
@@ -215,7 +215,7 @@ spec:
           name: ovn-ca
         resources:
           requests:
-            cpu: 100m
+            cpu: 10m
             memory: 300Mi
         ports:
         - name: nb-db-port
@@ -418,7 +418,7 @@ spec:
           name: ovn-ca
         resources:
           requests:
-            cpu: 100m
+            cpu: 10m
             memory: 300Mi
         env:
         - name: OVN_KUBE_LOG_LEVEL

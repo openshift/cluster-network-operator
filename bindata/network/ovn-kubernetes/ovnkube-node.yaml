@@ -87,7 +87,7 @@ spec:
         terminationMessagePolicy: FallbackToLogsOnError
         resources:
           requests:
-            cpu: 100m
+            cpu: 10m
             memory: 300Mi
 
       # ovnkube-node: does node-level bookkeeping and configuration
@@ -200,7 +200,7 @@ spec:
           name: ovn-ca
         resources:
           requests:
-            cpu: 100m
+            cpu: 10m
             memory: 300Mi
         lifecycle:
           preStop:
