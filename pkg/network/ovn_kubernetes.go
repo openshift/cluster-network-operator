@@ -21,6 +21,7 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilnet "k8s.io/utils/net"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -108,11 +109,35 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 	out := []error{}
 
-	if len(conf.ClusterNetwork) == 0 {
-		out = append(out, errors.Errorf("ClusterNetworks cannot be empty"))
+	var cnHasIPv4, cnHasIPv6 bool
+	for _, cn := range conf.ClusterNetwork {
+		if utilnet.IsIPv6CIDRString(cn.CIDR) {
+			cnHasIPv6 = true
+		} else {
+			cnHasIPv4 = true
+		}
 	}
-	if len(conf.ServiceNetwork) != 1 {
-		out = append(out, errors.Errorf("ServiceNetwork must have exactly 1 entry"))
+	if !cnHasIPv6 && !cnHasIPv4 {
+		out = append(out, errors.Errorf("ClusterNetwork cannot be empty"))
+	}
+
+	var snHasIPv4, snHasIPv6 bool
+	for _, sn := range conf.ServiceNetwork {
+		if utilnet.IsIPv6CIDRString(sn) {
+			snHasIPv6 = true
+		} else {
+			snHasIPv4 = true
+		}
+	}
+	if !snHasIPv6 && !snHasIPv4 {
+		out = append(out, errors.Errorf("ServiceNetwork cannot be empty"))
+	}
+
+	if cnHasIPv4 != snHasIPv4 || cnHasIPv6 != snHasIPv6 {
+		out = append(out, errors.Errorf("ClusterNetwork and ServiceNetwork must have matching IP families"))
+	}
+	if len(conf.ServiceNetwork) > 2 || (len(conf.ServiceNetwork) == 2 && (!snHasIPv4 || !snHasIPv6)) {
+		out = append(out, errors.Errorf("ServiceNetwork must have either a single CIDR or a dual-stack pair of CIDRs"))
 	}
 
 	oc := conf.DefaultNetwork.OVNKubernetesConfig
