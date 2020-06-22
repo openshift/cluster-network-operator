@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
@@ -218,6 +219,7 @@ func clusterNetwork(conf *operv1.NetworkSpec) (string, error) {
 	c := conf.DefaultNetwork.OpenShiftSDNConfig
 
 	networks := []netv1.ClusterNetworkEntry{}
+	cidrs := []string{}
 	for _, entry := range conf.ClusterNetwork {
 		_, cidr, err := net.ParseCIDR(entry.CIDR) // already validated
 		if err != nil {
@@ -227,6 +229,7 @@ func clusterNetwork(conf *operv1.NetworkSpec) (string, error) {
 		hostSubnetLength := uint32(size) - entry.HostPrefix
 
 		networks = append(networks, netv1.ClusterNetworkEntry{CIDR: entry.CIDR, HostSubnetLength: hostSubnetLength})
+		cidrs = append(cidrs, entry.CIDR)
 	}
 
 	cn := netv1.ClusterNetwork{
@@ -239,7 +242,7 @@ func clusterNetwork(conf *operv1.NetworkSpec) (string, error) {
 		},
 
 		PluginName:       sdnPluginName(c.Mode),
-		Network:          networks[0].CIDR,
+		Network:          strings.Join(cidrs[:], ", "),
 		HostSubnetLength: networks[0].HostSubnetLength,
 		ClusterNetworks:  networks,
 		ServiceNetwork:   conf.ServiceNetwork[0],
