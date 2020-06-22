@@ -14,6 +14,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -91,6 +92,10 @@ func (status *StatusManager) SetFromPods() {
 		} else if ds.Status.NumberUnavailable > 0 {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not available (awaiting %d nodes)", dsName.String(), ds.Status.NumberUnavailable))
 			dsProgressing = true
+			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
+			if !isNonCritical(ds) {
+				hung = append(hung, status.CheckCrashLoopBackOffPods(dsName, ds.Spec.Selector.MatchLabels, "DaemonSet")...)
+			}
 		} else if ds.Status.NumberAvailable == 0 { // NOTE: update this if we ever expect empty (unscheduled) daemonsets ~cdc
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not yet scheduled on any nodes", dsName.String()))
 			dsProgressing = true
@@ -138,6 +143,10 @@ func (status *StatusManager) SetFromPods() {
 		if dep.Status.UnavailableReplicas > 0 {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q is not available (awaiting %d nodes)", depName.String(), dep.Status.UnavailableReplicas))
 			depProgressing = true
+			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
+			if !isNonCritical(dep) {
+				hung = append(hung, status.CheckCrashLoopBackOffPods(depName, dep.Spec.Selector.MatchLabels, "Deployment")...)
+			}
 		} else if dep.Status.AvailableReplicas == 0 {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q is not yet scheduled on any nodes", depName.String()))
 			depProgressing = true
@@ -288,6 +297,31 @@ func (status *StatusManager) setLastPodState(
 		newStatus.Annotations[lastSeenAnnotation] = string(lsbytes)
 		return status.client.Patch(context.TODO(), newStatus, client.MergeFrom(oldStatus))
 	})
+}
+
+// CheckCrashLoopBackOffPods checks for pods (matching the label selector) with
+// any containers in the CrashLoopBackoff state. It returns a human-readable string
+// for any pod in such a state.
+// dName should be the name of a DaemonSet or Deployment.
+func (status *StatusManager) CheckCrashLoopBackOffPods(dName types.NamespacedName, selector map[string]string, kind string) []string {
+	hung := []string{}
+	pods := &v1.PodList{}
+	err := status.client.List(context.TODO(), pods, client.InNamespace(dName.Namespace), client.MatchingLabels(selector))
+	if err != nil {
+		log.Printf("Error getting pods from %s %q: %v", kind, dName.String(), err)
+	}
+	for _, pod := range pods.Items {
+		for _, container := range pod.Status.ContainerStatuses {
+			if container.State.Waiting != nil {
+				if container.State.Waiting.Reason == "CrashLoopBackOff" {
+					hung = append(hung, fmt.Sprintf("%s %q rollout is not making progress - pod %s is in CrashLoopBackOff State", kind, dName.String(), pod.Name))
+					// we can break once we find at least one container crashing in this pod
+					break
+				}
+			}
+		}
+	}
+	return hung
 }
 
 func isNonCritical(obj metav1.Object) bool {

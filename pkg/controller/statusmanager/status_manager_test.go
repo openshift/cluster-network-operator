@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
 
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -337,12 +338,26 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 
 	// Create minimal DaemonSets
-	dsA := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Generation: 1}}
+	dsA := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Generation: 1},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "alpha"},
+			},
+		},
+	}
 	err = client.Create(context.TODO(), dsA)
 	if err != nil {
 		t.Fatalf("error creating DaemonSet: %v", err)
 	}
-	dsB := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "beta", Generation: 1}}
+	dsB := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "beta", Generation: 1},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "beta"},
+			},
+		},
+	}
 	err = client.Create(context.TODO(), dsB)
 	if err != nil {
 		t.Fatalf("error creating DaemonSet: %v", err)
@@ -915,6 +930,11 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		Status: appsv1.DeploymentStatus{
 			UnavailableReplicas: 1,
 		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "gamma"},
+			},
+		},
 	}
 	err = client.Create(context.TODO(), depB)
 	if err != nil {
@@ -1186,5 +1206,248 @@ func setLastPodState(t *testing.T, client client.Client, name string, ps podStat
 	err = client.Update(context.Background(), co)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
+	client := fake.NewFakeClient()
+	mapper := &fakeRESTMapper{}
+	status := New(client, mapper, "testing", "1.2.3")
+	status.SetDaemonSets([]types.NamespacedName{
+		{Namespace: "one", Name: "alpha"},
+		{Namespace: "two", Name: "beta"},
+	})
+
+	dsA := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "one",
+			Name:      "alpha",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "alpha"},
+			},
+		},
+	}
+	err := client.Create(context.TODO(), dsA)
+	if err != nil {
+		t.Fatalf("error creating DaemonSet: %v", err)
+	}
+
+	dsB := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "two",
+			Name:      "beta",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "beta"},
+			},
+		},
+	}
+	err = client.Create(context.TODO(), dsB)
+	if err != nil {
+		t.Fatalf("error creating DaemonSet: %v", err)
+	}
+
+	podA := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "one",
+			Name:      "alpha-x0x0",
+			Labels:    map[string]string{"app": "alpha"},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name: "ubuntu",
+				State: v1.ContainerState{
+					Waiting: &v1.ContainerStateWaiting{
+						Reason: "CrashLoopBackOff",
+					},
+				},
+			}},
+		},
+	}
+	err = client.Create(context.TODO(), podA)
+	if err != nil {
+		t.Fatalf("error creating Pod: %v", err)
+	}
+
+	podB := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "two",
+			Name:      "beta-x0x0",
+			Labels:    map[string]string{"app": "beta"},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name: "fedora",
+				State: v1.ContainerState{
+					Running: &v1.ContainerStateRunning{StartedAt: metav1.Time{}},
+				},
+			}},
+		},
+	}
+	err = client.Create(context.TODO(), podB)
+	if err != nil {
+		t.Fatalf("error creating Pod: %v", err)
+	}
+
+	expected := []string{"DaemonSet \"one/alpha\" rollout is not making progress - pod alpha-x0x0 is in CrashLoopBackOff State"}
+	hung := status.CheckCrashLoopBackOffPods(types.NamespacedName{Namespace: "one", Name: "alpha"}, map[string]string{"app": "alpha"}, "DaemonSet")
+	if !reflect.DeepEqual(hung, expected) {
+		t.Fatalf("unexpected value in hung %v", hung)
+	}
+
+	expected = []string{}
+	hung = status.CheckCrashLoopBackOffPods(types.NamespacedName{Namespace: "two", Name: "beta"}, map[string]string{"app": "beta"}, "DaemonSet")
+	if !reflect.DeepEqual(hung, expected) {
+		t.Fatalf("unexpected value in hung %v", hung)
+	}
+
+	// Test non-critical DaemonSets - the operator should not be marked as degraded.
+	status.SetDaemonSets([]types.NamespacedName{
+		{Namespace: "four", Name: "non-critical"},
+	})
+
+	dsNC := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "four",
+			Name:      "non-critical",
+			Annotations: map[string]string{
+				names.NonCriticalAnnotation: "",
+			},
+		},
+		Status: appsv1.DaemonSetStatus{
+			NumberUnavailable: 1,
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "non-critical"},
+			},
+		},
+	}
+	err = client.Create(context.TODO(), dsNC)
+	if err != nil {
+		t.Fatalf("error creating DaemonSet: %v", err)
+	}
+
+	podnC := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "four",
+			Name:      "nC-x0x0",
+			Labels:    map[string]string{"app": "non-critical"},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name: "ubuntu",
+				State: v1.ContainerState{
+					Waiting: &v1.ContainerStateWaiting{
+						Reason: "CrashLoopBackOff",
+					},
+				},
+			},
+			}},
+	}
+	err = client.Create(context.TODO(), podnC)
+	if err != nil {
+		t.Fatalf("error creating Pod: %v", err)
+	}
+
+	status.SetFromPods()
+
+	co, err := getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		{
+			Type:   configv1.OperatorDegraded,
+			Status: configv1.ConditionFalse,
+		},
+		{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorUpgradeable,
+			Status: configv1.ConditionTrue,
+		},
+		{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
+	}
+
+	status.SetDeployments([]types.NamespacedName{
+		{Namespace: "three", Name: "gamma"},
+	})
+
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "three",
+			Name:      "gamma",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "gamma"},
+			},
+		},
+		Status: appsv1.DeploymentStatus{
+			UnavailableReplicas: 1,
+		},
+	}
+	err = client.Create(context.TODO(), dep)
+	if err != nil {
+		t.Fatalf("error creating Deployment: %v", err)
+	}
+
+	podC := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "three",
+			Name:      "gamma-x0x0",
+			Labels:    map[string]string{"app": "gamma"},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name: "fedora",
+				State: v1.ContainerState{
+					Waiting: &v1.ContainerStateWaiting{
+						Reason: "CrashLoopBackOff",
+					},
+				},
+			},
+			}},
+	}
+	err = client.Create(context.TODO(), podC)
+	if err != nil {
+		t.Fatalf("error creating Pod: %v", err)
+	}
+
+	status.SetFromPods()
+	co, err = getCO(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+
+	if !conditionsInclude(co.Status.Conditions, []configv1.ClusterOperatorStatusCondition{
+		{
+			Type:    configv1.OperatorDegraded,
+			Status:  configv1.ConditionTrue,
+			Reason:  "RolloutHung",
+			Message: "Deployment \"three/gamma\" rollout is not making progress - pod gamma-x0x0 is in CrashLoopBackOff State",
+		},
+		{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+			Reason: "Deploying",
+		},
+		{
+			Type:   configv1.OperatorAvailable,
+			Status: configv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", co.Status.Conditions)
 	}
 }
