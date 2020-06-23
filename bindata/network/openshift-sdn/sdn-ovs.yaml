@@ -34,131 +34,128 @@ spec:
         - |
           #!/bin/bash
           set -euo pipefail
-          chown -R openvswitch:openvswitch /var/run/openvswitch
-          chown -R openvswitch:openvswitch /etc/openvswitch
-
-          # if another process is listening on the cni-server socket, wait until it exits
-          retries=0
-          while true; do
-            if /usr/share/openvswitch/scripts/ovs-ctl status &>/dev/null; then
-              echo "warning: Another process is currently managing OVS, waiting 15s ..." 2>&1
-              sleep 15 & wait
-              (( retries += 1 ))
-            else
-              break
+          export SYSTEMD_IGNORE_CHROOT=yes
+          # Check to see if ovs is provided by the node:
+          if systemctl status ovsdb-server; then
+            echo "openvswitch is running in systemd"
+            # In some very strange corner cases, the owner for /run/openvswitch
+            # can be wrong, so we need to clean up and restart.
+            ovs_uid=$(chroot /host id -u openvswitch)
+            ovs_gid=$(chroot /host id -g openvswitch)
+            chown -R "${ovs_uid}:${ovs_gid}" /run/openvswitch
+            if [[ ! -S /run/openvswitch/db.sock ]]; then
+              systemctl restart ovsdb-server
             fi
-            if [[ "${retries}" -gt 40 ]]; then
-              echo "error: Another process is currently managing OVS, exiting" 2>&1
-              exit 1
+
+            # Don't need to worry about restoring flows; this can only change if we've rebooted
+            exec tail -F /host/var/log/openvswitch/ovs-vswitchd.log /host/var/log/openvswitch/ovsdb-server.log
+          else
+
+            echo "openvswitch is running in container"
+            # if another process is listening on the cni-server socket, wait until it exits
+            retries=0
+            while true; do
+              if /usr/share/openvswitch/scripts/ovs-ctl status &>/dev/null; then
+                echo "warning: Another process is currently managing OVS, waiting 15s ..." 2>&1
+                sleep 15 & wait
+                (( retries += 1 ))
+              else
+                break
+              fi
+              if [[ "${retries}" -gt 40 ]]; then
+                echo "error: Another process is currently managing OVS, exiting" 2>&1
+                exit 1
+              fi
+            done
+
+            function quit {
+                # Save the flows
+                echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Saving flows ..." 2>&1
+                bridges=$(ovs-vsctl -- --real list-br)
+                TMPDIR=/var/run/openvswitch /usr/share/openvswitch/scripts/ovs-save save-flows $bridges > /var/run/openvswitch/flows.sh
+                echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Saved flows" 2>&1
+
+                # Don't allow ovs-vswitchd to clear datapath flows on exit
+                kill -9 $(cat /var/run/openvswitch/ovs-vswitchd.pid 2>/dev/null) 2>/dev/null || true
+                kill $(cat /var/run/openvswitch/ovsdb-server.pid 2>/dev/null) 2>/dev/null || true
+                exit 0
+            }
+            trap quit SIGTERM
+
+            function deletePid {
+                rm /var/run/openvswitch/ovs-vswitchd.pid
+                rm /var/run/openvswitch/ovsdb-server.pid
+            }
+            trap deletePid EXIT
+
+            chown -R openvswitch:openvswitch /var/run/openvswitch
+            chown -R openvswitch:openvswitch /etc/openvswitch
+
+            # launch OVS
+            # Start the ovsdb so that we can prep it before we start the ovs-vswitchd
+            /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovs-vswitchd --system-id=random --no-monitor
+
+            # Set the flow-restore-wait to true so ovs-vswitchd will wait till flows are restored
+            ovs-vsctl --no-wait set Open_vSwitch . other_config:flow-restore-wait=true
+
+            # Restrict the number of pthreads ovs-vswitchd creates to reduce the
+            # amount of RSS it uses on hosts with many cores
+            # https://bugzilla.redhat.com/show_bug.cgi?id=1571379
+            # https://bugzilla.redhat.com/show_bug.cgi?id=1572797
+            if [[ `nproc` -gt 12 ]]; then
+                ovs-vsctl --no-wait set Open_vSwitch . other_config:n-revalidator-threads=4
+                ovs-vsctl --no-wait set Open_vSwitch . other_config:n-handler-threads=10
             fi
-          done
 
-          function quit {
-              # Save the flows
-              echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Saving flows ..." 2>&1
-              bridges=$(ovs-vsctl -- --real list-br)
-              TMPDIR=/var/run/openvswitch /usr/share/openvswitch/scripts/ovs-save save-flows $bridges > /var/run/openvswitch/flows.sh
-              echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Saved flows" 2>&1
+            # And finally start the ovs-vswitchd now the DB is prepped
+            /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovsdb-server --system-id=random --no-monitor
 
-              # Don't allow ovs-vswitchd to clear datapath flows on exit
-              kill -9 $(cat /var/run/openvswitch/ovs-vswitchd.pid 2>/dev/null) 2>/dev/null || true
-              kill $(cat /var/run/openvswitch/ovsdb-server.pid 2>/dev/null) 2>/dev/null || true
-              exit 0
-          }
-          trap quit SIGTERM
+            # Load any flows that we saved
+            echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Loading previous flows ..." 2>&1
+            if [[ -f /var/run/openvswitch/flows.sh ]]; then
+              echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Adding br0 if it doesn't exist ..." 2>&1
+              /usr/bin/ovs-vsctl --may-exist add-br br0 -- set Bridge br0 fail_mode=secure protocols=OpenFlow13
+              echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Created br0, now adding flows ..." 2>&1
+              sh -x /var/run/openvswitch/flows.sh
+              echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Done restoring the existing flows ..." 2>&1
+            fi
 
-          function deletePid {
-              rm /var/run/openvswitch/ovs-vswitchd.pid
-              rm /var/run/openvswitch/ovsdb-server.pid
-          }
-          trap deletePid EXIT
+            echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Remove other config ..." 2>&1
+            ovs-vsctl --no-wait --if-exists remove Open_vSwitch . other_config flow-restore-wait=true
+            echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Removed other config ..." 2>&1
 
-          # launch OVS
-          # Start the ovsdb so that we can prep it before we start the ovs-vswitchd
-          /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovs-vswitchd --system-id=random --no-monitor
-
-          # Set the flow-restore-wait to true so ovs-vswitchd will wait till flows are restored
-          ovs-vsctl --no-wait set Open_vSwitch . other_config:flow-restore-wait=true
-          
-          # Restrict the number of pthreads ovs-vswitchd creates to reduce the
-          # amount of RSS it uses on hosts with many cores
-          # https://bugzilla.redhat.com/show_bug.cgi?id=1571379
-          # https://bugzilla.redhat.com/show_bug.cgi?id=1572797
-          if [[ `nproc` -gt 12 ]]; then
-              ovs-vsctl --no-wait set Open_vSwitch . other_config:n-revalidator-threads=4
-              ovs-vsctl --no-wait set Open_vSwitch . other_config:n-handler-threads=10
+            tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
+            tail -F --pid=$(cat /var/run/openvswitch/ovsdb-server.pid) /var/log/openvswitch/ovsdb-server.log &
+            wait
           fi
-
-          # And finally start the ovs-vswitchd now the DB is prepped
-          /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --no-ovsdb-server --system-id=random --no-monitor
-
-          # Load any flows that we saved
-          echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Loading previous flows ..." 2>&1
-          if [[ -f /var/run/openvswitch/flows.sh ]]; then
-             echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Adding br0 if it doesn't exist ..." 2>&1
-             /usr/bin/ovs-vsctl --may-exist add-br br0 -- set Bridge br0 fail_mode=secure protocols=OpenFlow13
-             echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Created br0, now adding flows ..." 2>&1
-             sh -x /var/run/openvswitch/flows.sh
-             echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Done restoring the existing flows ..." 2>&1
-          fi
-          
-          echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Remove other config ..." 2>&1
-          ovs-vsctl --no-wait --if-exists remove Open_vSwitch . other_config flow-restore-wait=true
-          echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Removed other config ..." 2>&1
-
-          tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
-          tail -F --pid=$(cat /var/run/openvswitch/ovsdb-server.pid) /var/log/openvswitch/ovsdb-server.log &
-          wait
         securityContext:
           privileged: true
         volumeMounts:
         - mountPath: /lib/modules
           name: host-modules
           readOnly: true
-        - mountPath: /run/openvswitch
-          name: host-run-ovs
-        - mountPath: /var/run/openvswitch
-          name: host-run-ovs
+        - mountPath: /run
+          name: host-run
         - mountPath: /sys
           name: host-sys
           readOnly: true
         - mountPath: /etc/openvswitch
           name: host-config-openvswitch
+        - mountPath: /host
+          name: host-slash
+          readOnly: true
         resources:
           requests:
             cpu: 100m
             memory: 400Mi
         terminationMessagePolicy: FallbackToLogsOnError
-        livenessProbe:
-          exec:
-            command:
-            # Validate that ovs-vswitchd and ovsdb are running. These three commands check
-            # 1. that the pids in the pid file are up
-            # 2. that ovs-vswitchd is responding to queries
-            # 3. that ovsdb is responding to queries
-            # 4. if br0 is configured, that its management process is responding
-            - /bin/bash
-            - -c
-            - |
-              #!/bin/bash
-              /usr/share/openvswitch/scripts/ovs-ctl status > /dev/null &&
-              /usr/bin/ovs-appctl -T 5 ofproto/list > /dev/null &&
-              /usr/bin/ovs-vsctl -t 5 show > /dev/null &&
-              if /usr/bin/ovs-vsctl -t 5 br-exists br0; then /usr/bin/ovs-ofctl -t 5 -O OpenFlow13 probe br0; else true; fi
-          initialDelaySeconds: 15
-          periodSeconds: 5
         readinessProbe:
           exec:
             command:
-            # The same validation as above, but without checking for br0
-            # This is because it's created by openshift-sdn, so looking for it
-            # won't be very meaningful.
             - /bin/bash
             - -c
             - |
               #!/bin/bash
-              /usr/share/openvswitch/scripts/ovs-ctl status > /dev/null &&
-              /usr/bin/ovs-appctl -T 5 ofproto/list > /dev/null &&
               /usr/bin/ovs-vsctl -t 5 show > /dev/null
           initialDelaySeconds: 15
           periodSeconds: 5
@@ -176,15 +173,19 @@ spec:
       - name: host-modules
         hostPath:
           path: /lib/modules
-      - name: host-run-ovs
+      - name: host-run
         hostPath:
-          path: /run/openvswitch
+          path: /run
       - name: host-sys
         hostPath:
           path: /sys
       - name: host-config-openvswitch
         hostPath:
           path: /var/lib/openvswitch
+          type: DirectoryOrCreate
+      - name: host-slash
+        hostPath:
+          path: /
       tolerations:
       - operator: "Exists"
 {{- end}}
