@@ -88,3 +88,6 @@ const KURYR_ADMISSION_CONTROLLER_SECRET = "kuryr-dns-admission-controller-secret
 
 // KURYR_WEB_HOOK_SECRET is the name of the secret used in the kuryr-dns-admission-controller DaemonSet
 const KURYR_WEBHOOK_SECRET = "kuryr-webhook-secret"
+
+// KuryrOctaviaVersionAnnotation is used to save latest Octavia version detected
+const KuryrOctaviaVersionAnnotation = "networkoperator.openshift.io/kuryr-octavia-version"

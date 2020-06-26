@@ -14,6 +14,7 @@ type KuryrBootstrapResult struct {
 	ClusterID                string
 	OctaviaMultipleListeners bool
 	OpenStackCloud           clientconfig.Cloud
+	OctaviaVersion           string
 	WebhookCA                string
 	WebhookCAKey             string
 	WebhookCert              string

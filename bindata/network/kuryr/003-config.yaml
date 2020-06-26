@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: kuryr-config
   namespace: openshift-kuryr
+  annotations:
+    networkoperator.openshift.io/kuryr-octavia-version: {{ .OctaviaVersion }}
 data:
   kuryr.conf: |+
     [DEFAULT]
