@@ -45,6 +45,12 @@ spec:
           value: "quay.io/openshift/origin-multus-route-override-cni:4.4"
         - name: OVN_IMAGE
           value: "quay.io/openshift/origin-ovn-kubernetes:4.3"
+        - name: OVN_NB_RAFT_ELECTION_TIMER
+          value: "5000"
+        - name: OVN_SB_RAFT_ELECTION_TIMER
+          value: "5000"
+        - name: OVN_CONTROLLER_INACTIVITY_PROBE
+          value: "30000"
         - name: KURYR_DAEMON_IMAGE
           value: "quay.io/openshift/origin-kuryr-cni:4.3"
         - name: KURYR_CONTROLLER_IMAGE
