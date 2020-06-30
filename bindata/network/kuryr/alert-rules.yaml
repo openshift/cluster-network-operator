@@ -1,0 +1,91 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: k8s
+    role: alert-rules
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+  name: kuryr-rules
+  namespace: openshift-kuryr
+spec:
+  groups:
+  - name: general.rules
+    rules:
+    - alert: NoRunningKuryrKubernetes
+      annotations:
+        message: |
+          There is no running kuryr controller
+      expr: |
+        absent(up{job="kuryr-controller",namespace="openshift-kuryr"} ==1)
+      for: 10m
+      labels:
+        severity: warning
+    - alert: NodeWithoutKuryrCNIPodRunning
+      annotations:
+        message: |
+          All nodes should be running a kuryr-cni pod, {{"{{"}} $labels.node {{"}}"}} is not.
+      expr: |
+        (kube_node_info unless on(node) kube_pod_info{namespace="openshift-kuryr",  pod=~"kuryr-cni.*"}) > 0
+      for: 20m
+      labels:
+        severity: warning
+    - alert: KuryrPodsCrashLooping
+      annotations:
+        message: Pod {{"{{"}} $labels.namespace{{"}}"}}/{{"{{"}} $labels.pod{{"}}"}} ({{"{{"}} $labels.container
+          {{"}}"}}) is restarting {{"{{"}} printf "%.2f" $value {{"}}"}} times / 5 minutes.
+      expr: |
+        rate(kube_pod_container_status_restarts_total{namespace="openshift-kuryr"}[15m]) * 60 * 5 > 0
+      for: 1h
+      labels:
+        severity: warning
+    - alert: KuryrSDNPodNotReady
+      annotations:
+        message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} is not ready.
+      expr: |
+        kube_pod_status_ready{namespace='openshift-kuryr', condition='true'} == 0
+      for: 10m
+      labels:
+        severity: warning
+    - alert: LimitedPortsOnNetwork
+      annotations:
+        message: Subnet {{"{{"}} $labels.subnet_name {{"}}"}} is getting out of ports.
+      expr: |
+        kuryr_port_quota_per_subnet < 10
+      labels:
+        severity: warning
+    - alert: InsuficientPortsOnNetwork
+      annotations:
+        message: Subnet {{"{{"}} $labels.subnet_name {{"}}"}} does not have available ports.
+      expr: |
+        kuryr_port_quota_per_subnet == 0
+      labels:
+        severity: critical
+    - alert: LimitedResourceQuota
+      annotations:
+        message: Running out of quota for {{"{{"}} $labels.resource {{"}}"}}.
+      expr: |
+        kuryr_quota_free_count < 10
+      labels:
+        severity: warning
+    - alert: InsuficientResourceQuota
+      annotations:
+        message: There is no quota for {{"{{"}} $labels.resource {{"}}"}}.
+      expr: |
+        kuryr_quota_free_count == 0
+      labels:
+        severity: critical
+    - alert: PodCreationSlow
+      annotations:
+        message: The cluster is taking too long, on average, to make pods to running status.
+      expr: |
+        histogram_quantile(0.95, sum(rate(kuryr_pod_creation_latency_bucket[10m])) by (le)) > 120
+      labels:
+        severity: warning
+    - alert: KuryrCNISlow
+      annotations:
+        message: Kuryr CNI pod {{"{{"}} $labels.pod {{"}}"}} is taking too long, on average, to perform CNI {{"{{"}} $labels.command {{"}}"}} requests.
+      expr: |
+        histogram_quantile(0.95, rate(kuryr_cni_request_duration_seconds_bucket[10m])) > 30
+      labels:
+        severity: warning
