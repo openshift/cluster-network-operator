@@ -18,6 +18,7 @@ import (
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 
+	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/crypto"
 	"github.com/openshift/library-go/pkg/operator/certrotation"
 	"github.com/pkg/errors"
@@ -166,7 +167,7 @@ func (r *PKIReconciler) setStatus() {
 // business of reconciling the certificate objects
 type pki struct {
 	spec       netopv1.OperatorPKISpec
-	controller *certrotation.CertRotationController
+	controller factory.Controller
 	lastErr    error
 }
 
@@ -185,7 +186,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 		24*time.Hour,
 		informers.WithNamespace(config.Namespace))
 
-	cont, err := certrotation.NewCertRotationController(
+	cont := certrotation.NewCertRotationController(
 		fmt.Sprintf("%s/%s", config.Namespace, config.Name), // name, not really used
 		certrotation.SigningRotation{
 			Namespace:     config.Namespace,
@@ -224,10 +225,8 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			EventRecorder: &loggingRecorder{},
 		},
 		nil, // no operatorclient needed
+		&loggingRecorder{},
 	)
-	if err != nil {
-		return nil, err
-	}
 
 	out := &pki{
 		controller: cont,
@@ -243,7 +242,8 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 
 // sync causes the underlying cert controller to try and reconcile
 func (p *pki) sync() error {
-	return p.controller.RunOnce()
+	runOnceCtx := context.WithValue(context.Background(), certrotation.RunOnceContextKey, true)
+	return p.controller.Sync(runOnceCtx, nil)
 }
 
 // toClientCert is a certificate "decorator" that adds ClientAuth to the
