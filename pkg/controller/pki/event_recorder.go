@@ -37,3 +37,7 @@ func (r *loggingRecorder) WithComponentSuffix(componentNameSuffix string) events
 func (r *loggingRecorder) ComponentName() string {
 	return "not implemented"
 }
+
+func (r *loggingRecorder) Shutdown() {
+	//not implemented
+}
