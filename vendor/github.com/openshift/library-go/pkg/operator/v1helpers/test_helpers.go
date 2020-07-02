@@ -1,6 +1,7 @@
 package v1helpers
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -43,7 +44,7 @@ func (fakeSharedIndexInformer) Run(stopCh <-chan struct{}) {
 }
 
 func (fakeSharedIndexInformer) HasSynced() bool {
-	panic("implement me")
+	return true
 }
 
 func (fakeSharedIndexInformer) LastSyncResourceVersion() string {
@@ -82,6 +83,10 @@ type fakeStaticPodOperatorClient struct {
 
 func (c *fakeStaticPodOperatorClient) Informer() cache.SharedIndexInformer {
 	return &fakeSharedIndexInformer{}
+
+}
+func (c *fakeStaticPodOperatorClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
+	panic("not supported")
 }
 
 func (c *fakeStaticPodOperatorClient) GetStaticPodOperatorState() (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
@@ -164,7 +169,7 @@ type fakeNodeLister struct {
 }
 
 func (n *fakeNodeLister) List(selector labels.Selector) ([]*corev1.Node, error) {
-	nodes, err := n.client.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: selector.String()})
+	nodes, err := n.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
 	}
@@ -176,10 +181,6 @@ func (n *fakeNodeLister) List(selector labels.Selector) ([]*corev1.Node, error) 
 }
 
 func (n *fakeNodeLister) Get(name string) (*corev1.Node, error) {
-	panic("implement me")
-}
-
-func (n *fakeNodeLister) ListWithPredicate(predicate corev1listers.NodeConditionPredicate) ([]*corev1.Node, error) {
 	panic("implement me")
 }
 
@@ -202,6 +203,10 @@ type fakeOperatorClient struct {
 
 func (c *fakeOperatorClient) Informer() cache.SharedIndexInformer {
 	return &fakeSharedIndexInformer{}
+}
+
+func (c *fakeOperatorClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
+	panic("not supported")
 }
 
 func (c *fakeOperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
