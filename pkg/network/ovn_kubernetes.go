@@ -232,7 +232,7 @@ func boostrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 
 	controlPlaneReplicaCount, _ := strconv.Atoi(rcD.ControlPlane.Replicas)
 
-	err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
+	err := wait.PollImmediate(5*time.Second, 280*time.Second, func() (bool, error) {
 		matchingLabels := &client.MatchingLabels{"node-role.kubernetes.io/master": ""}
 		if err := kubeClient.List(context.TODO(), masterNodeList, matchingLabels); err != nil {
 			return false, err
