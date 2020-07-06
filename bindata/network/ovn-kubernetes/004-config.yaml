@@ -17,6 +17,17 @@ data:
     ovn-config-namespace="openshift-ovn-kubernetes"
     apiserver="{{.K8S_APISERVER}}"
 
+    {{if .OVNHybridOverlayEnable}}
+    [hybridoverlay]
+    enabled=true
+      {{if .OVNHybridOverlayNetCIDR}}
+    cluster-subnets={{.OVNHybridOverlayNetCIDR}}
+      {{end}}
+      {{if  .OVNHybridOverlayVXLANPort}}
+    hybrid-overlay-vxlan-port={{.OVNHybridOverlayVXLANPort}}
+      {{end}}
+    {{end}}
+
     [gateway]
     mode=local
     nodeport=true

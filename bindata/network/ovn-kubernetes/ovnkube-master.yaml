@@ -449,17 +449,6 @@ spec:
             set +o allexport
           fi
 
-          hybrid_overlay_flags=
-          if [[ -n "{{.OVNHybridOverlayEnable }}" ]]; then
-            hybrid_overlay_flags="--enable-hybrid-overlay --no-hostsubnet-nodes=kubernetes.io/os=windows"
-            if [[ -n "{{.OVNHybridOverlayNetCIDR}}" ]]; then
-              hybrid_overlay_flags="${hybrid_overlay_flags} --hybrid-overlay-cluster-subnets={{.OVNHybridOverlayNetCIDR}}"
-            fi
-            if [[ -n "{{.OVNHybridOverlayVXLANPort}}" ]]; then
-              hybrid_overlay_flags="${hybrid_overlay_flags} --hybrid-overlay-vxlan-port={{.OVNHybridOverlayVXLANPort}}"
-            fi
-          fi
-
           # start nbctl daemon for caching
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start nbctl daemon for caching"
           export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/var/run/ovn/ovn-nbctl.pid \
@@ -476,7 +465,6 @@ spec:
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            ${hybrid_overlay_flags} \
             --metrics-bind-address "127.0.0.1:29102" \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
             --sb-client-privkey /ovn-cert/tls.key \
