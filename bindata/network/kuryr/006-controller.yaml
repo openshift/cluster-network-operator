@@ -30,7 +30,7 @@ spec:
       containers:
       - image: {{ .ControllerImage }}
         name: controller
-{{ if (default true .ControllerEnableProbes) eq "true" }}
+{{ if eq (getOr . "ControllerEnableProbes" true) true }}
         readinessProbe:
           failureThreshold: 10
           httpGet:

@@ -88,7 +88,7 @@ spec:
         - name: netns
           mountPath: /run/netns
           mountPropagation: HostToContainer
-{{ if (default true .DaemonEnableProbes) eq "true" }}
+{{ if eq (getOr . "DaemonEnableProbes" true) true }}
         readinessProbe:
           failureThreshold: 10
           httpGet:
