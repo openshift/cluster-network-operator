@@ -4,6 +4,7 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
+	utilnet "k8s.io/utils/net"
 )
 
 type IPPool struct {
@@ -61,36 +62,18 @@ func lastIP(subnet net.IPNet) net.IP {
 
 // lastUsableIP returns second to last IP of a subnet
 func LastUsableIP(subnet net.IPNet) net.IP {
-	// FIXME(dulek): This should have proper IPv6 support, but for now whatever, Kuryr doesn't support it yet.
-	// This gives us last IP of the subnet…
 	ip := lastIP(subnet)
-	// …and this will be second to last (last usable)
+	if utilnet.IsIPv6(ip) {
+		return ip
+	}
 	ip[len(ip)-1] -= 1
 	return ip
 }
 
 // FirstUsableIP returns second IP of a subnet
 func FirstUsableIP(subnet net.IPNet) net.IP {
-	// FIXME(dulek): This should have proper IPv6 support, but for now whatever, Kuryr doesn't support it yet.
-	// This is first IP of the subnet…
-	ip := subnet.IP
-	// …and this will be second one (first usable)
-	ip[len(ip)-1] += 1
+	ip, _ := utilnet.GetIndexedIP(&subnet, 1)
 	return ip
-}
-
-// IterateIP returns n-th next IP4; n can be negative
-func IterateIP4(ip net.IP, n int) net.IP {
-	i := ip.To4()
-	v := uint(i[0])<<24 + uint(i[1])<<16 + uint(i[2])<<8 + uint(i[3])
-
-	if n >= 0 {
-		v += uint(n)
-	} else {
-		v -= uint(-n)
-	}
-
-	return net.IPv4(byte((v>>24)&0xFF), byte((v>>16)&0xFF), byte((v>>8)&0xFF), byte(v&0xFF)).To4()
 }
 
 // ExpandNet returns subnet E of size twice the given subnet A (it just does `prefix -= 1`).
@@ -100,7 +83,12 @@ func ExpandNet(subnet net.IPNet) net.IPNet {
 	posBit := uint(ones % 8)  // bit in which prefix ends
 
 	// This will effectively do `prefix -= 1` by zeroing last set bit for expanded net
-	expanded := net.IPNet{IP: make(net.IP, 4), Mask: make(net.IPMask, 4)}
+	var expanded net.IPNet
+	if utilnet.IsIPv6(subnet.IP) {
+		expanded = net.IPNet{IP: make(net.IP, 16), Mask: make(net.IPMask, 16)}
+	} else {
+		expanded = net.IPNet{IP: make(net.IP, 4), Mask: make(net.IPMask, 4)}
+	}
 	copy(expanded.IP, subnet.IP)
 	copy(expanded.Mask, subnet.Mask)
 	if posBit == 0 {
@@ -117,11 +105,15 @@ func ExpandNet(subnet net.IPNet) net.IPNet {
 // whole net b. Only usable IP's of a are used.
 func UsableNonOverlappingRanges(a, b net.IPNet) (ranges []IPRange) {
 	if !a.IP.Equal(b.IP) {
-		ranges = append(ranges, IPRange{FirstUsableIP(a), IterateIP4(b.IP, -1)})
+		last_ip := utilnet.AddIPOffset(utilnet.BigForIP(b.IP), -1)
+		//last_ip, err := utilnet.GetIndexedIP(&b, -1)
+		ranges = append(ranges, IPRange{FirstUsableIP(a), last_ip})
 	}
 
 	if !lastIP(a).Equal(lastIP(b)) {
-		ranges = append(ranges, IPRange{IterateIP4(lastIP(b), 1), LastUsableIP(a)})
+		first_ip := utilnet.AddIPOffset(utilnet.BigForIP(lastIP(b)), +1)
+		//first_ip, _ := utilnet.GetIndexedIP(&net.IPNet{IP: lastIP(b), Mask: b.Mask}, 1)
+		ranges = append(ranges, IPRange{first_ip, LastUsableIP(a)})
 	}
 
 	return ranges

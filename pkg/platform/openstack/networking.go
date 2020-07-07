@@ -14,6 +14,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/pkg/errors"
+
+	utilnet "k8s.io/utils/net"
 )
 
 // Use Neutron tags feature to tag Neutron resources. resource argument must
@@ -118,13 +120,17 @@ func findOpenStackSubnet(client *gophercloud.ServiceClient, name, tag string) (s
 // Will fail if two subnets match all the criteria.
 func ensureOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, netId, cidr, gatewayIp string, allocationRanges []iputil.IPRange) (string, error) {
 	dhcp := false
+	ipVersion := gophercloud.IPv4
+	if utilnet.IsIPv6CIDRString(cidr) {
+		ipVersion = gophercloud.IPv6
+	}
 	page, err := subnets.List(client, subnets.ListOpts{
 		Name:       name,
 		Tags:       tag,
 		NetworkID:  netId,
 		CIDR:       cidr,
 		GatewayIP:  gatewayIp,
-		IPVersion:  4,
+		IPVersion:  int(ipVersion),
 		EnableDHCP: &dhcp,
 	}).AllPages()
 	if err != nil {
@@ -149,7 +155,7 @@ func ensureOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, netId, 
 			NetworkID:       netId,
 			CIDR:            cidr,
 			GatewayIP:       &gatewayIp,
-			IPVersion:       gophercloud.IPv4,
+			IPVersion:       ipVersion,
 			EnableDHCP:      &dhcp,
 			AllocationPools: allocationPools,
 		}
@@ -344,9 +350,13 @@ func ensureOpenStackSg(client *gophercloud.ServiceClient, name, tag string) (str
 // Tries to create an OpenStack security group rule on sgId SG. Ignores an
 // error if such rule already exists.
 func ensureOpenStackSgRule(client *gophercloud.ServiceClient, sgId, remotePrefix string, portMin, portMax int, protocol rules.RuleProtocol) error {
+	etherType := rules.EtherType4
+	if utilnet.IsIPv6CIDRString(remotePrefix) {
+		etherType = rules.EtherType6
+	}
 	opts := rules.CreateOpts{
 		SecGroupID:     sgId,
-		EtherType:      rules.EtherType4,
+		EtherType:      etherType,
 		Direction:      rules.DirIngress,
 		RemoteIPPrefix: remotePrefix,
 	}

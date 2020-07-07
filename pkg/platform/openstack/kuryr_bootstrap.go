@@ -28,6 +28,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilnet "k8s.io/utils/net"
 
 	confv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
@@ -299,7 +300,10 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	// with svcNet. We will put gatewayIP on the highest usable IP from those ranges. We need to exclude that IP from
 	// the ranges we pass to Neutron or it will complain.
 	gatewayIP := allocationRanges[len(allocationRanges)-1].End
-	allocationRanges[len(allocationRanges)-1].End = iputil.IterateIP4(gatewayIP, -1)
+	allocationRanges[len(allocationRanges)-1].End, err = utilnet.GetIndexedIP(&net.IPNet{IP: gatewayIP, Mask: openStackSvcNet.Mask}, -1)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to parse ServiceNetwork allocation ranges: %s", conf.ServiceNetwork[0])
+	}
 
 	log.Printf("Ensuring services subnet with %s CIDR (services from %s) and %s gateway with allocation pools %+v",
 		openStackSvcCIDR, conf.ServiceNetwork[0], gatewayIP.String(), allocationRanges)
@@ -382,6 +386,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 
 	var sgRules = []sgRule{
 		{podSgId, "0.0.0.0/0", 0, 0, rules.ProtocolTCP},
+		{podSgId, "::/0", 0, 0, rules.ProtocolTCP},
 		{masterSgId, openStackSvcCIDR, etcdClientPort, etcdClientPort, rules.ProtocolTCP},
 		{masterSgId, openStackSvcCIDR, apiPort, apiPort, rules.ProtocolTCP},
 		// NOTE (maysamacedo): Splitting etcd sg port ranges in different

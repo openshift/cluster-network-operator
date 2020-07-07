@@ -193,6 +193,10 @@ func TestLastUsableIP(t *testing.T) {
 			"10.0.0.128/30",
 			"10.0.0.130",
 		},
+		{
+			"fe80:1:2:3::/64",
+			"fe80:1:2:3:ffff:ffff:ffff:ffff",
+		},
 	}
 
 	for _, tc := range testcases {
@@ -216,6 +220,10 @@ func TestFirstUsableIP(t *testing.T) {
 		{
 			"10.0.0.128/30",
 			"10.0.0.129",
+		},
+		{
+			"fe80:1:2:3::/64",
+			"fe80:1:2:3::1",
 		},
 	}
 
@@ -253,6 +261,10 @@ func TestExpandNet(t *testing.T) {
 			"10.0.1.0/24",
 			"10.0.0.0/23",
 		},
+		{
+			"fe80:1:2:3::/64",
+			"fe80:1:2:2::/63",
+		},
 	}
 
 	for _, tc := range testcases {
@@ -260,27 +272,6 @@ func TestExpandNet(t *testing.T) {
 		g.Expect(err).NotTo(HaveOccurred())
 		e := ExpandNet(*cidr)
 		g.Expect(e.String()).To(Equal(tc.expectedDouble))
-	}
-}
-
-func TestIterateIP4(t *testing.T) {
-	g := NewGomegaWithT(t)
-
-	testcases := []struct {
-		ip       string
-		n        int
-		expected string
-	}{
-		{"10.0.0.0", 1, "10.0.0.1"},
-		{"10.0.0.129", 1, "10.0.0.130"},
-		{"10.0.0.1", -1, "10.0.0.0"},
-		{"172.30.255.254", -1, "172.30.255.253"},
-		{"10.0.0.0", -1, "9.255.255.255"},
-	}
-
-	for _, tc := range testcases {
-		ip := net.ParseIP(tc.ip)
-		g.Expect(IterateIP4(ip, tc.n).String()).To(Equal(tc.expected))
 	}
 }
 
