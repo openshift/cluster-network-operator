@@ -92,7 +92,14 @@ spec:
              echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Adding br0 if it doesn't exist ..." 2>&1
              /usr/bin/ovs-vsctl --may-exist add-br br0 -- set Bridge br0 fail_mode=secure protocols=OpenFlow13
              echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Created br0, now adding flows ..." 2>&1
+             retries=0
              sh -x /var/run/openvswitch/flows.sh
+             while [ $? -ne 0 ] && [ "$retries" -lt 5 ]; do
+                echo "$(date -u "+%Y-%m-%d %H:%M:%S") error: Failed restoring flows, retrying $((5-$retries)) times more..." 2>&1
+                sleep 1
+                retries=$((retries+1))
+                sh -x /var/run/openvswitch/flows.sh
+             done
              echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Done restoring the existing flows ..." 2>&1
           fi
           
@@ -140,6 +147,7 @@ spec:
               /usr/bin/ovs-vsctl -t 5 show > /dev/null &&
               if /usr/bin/ovs-vsctl -t 5 br-exists br0; then /usr/bin/ovs-ofctl -t 5 -O OpenFlow13 probe br0; else true; fi
           initialDelaySeconds: 15
+          timeoutSeconds: 21
           periodSeconds: 5
         readinessProbe:
           exec:
@@ -155,6 +163,7 @@ spec:
               /usr/bin/ovs-appctl -T 5 ofproto/list > /dev/null &&
               /usr/bin/ovs-vsctl -t 5 show > /dev/null
           initialDelaySeconds: 15
+          timeoutSeconds: 11
           periodSeconds: 5
         terminationGracePeriodSeconds: 45
       nodeSelector:
