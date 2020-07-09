@@ -1,0 +1,17 @@
+{{if eq .Mode "NetworkPolicy"}}
+# Set netid: 0 for namespaces that only hostNetwork pods.
+# This is necessary for networkPolicy namespaceSelectors to work.
+# There are more namespaces than the currently added, we add them on demand.
+#
+# List:
+# - openshift-kube-apiserver
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-kube-apiserver
+netid: 0
+netname: openshift-kube-apiserver
+
+{{- end}}
