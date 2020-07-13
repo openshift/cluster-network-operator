@@ -59,8 +59,19 @@ func TestValidateClusterConfig(t *testing.T) {
 	haveError(cc, "CIDRs 192.168.0.0/20 and 192.168.2.0/23 overlap")
 
 	cc = *ClusterConfig.DeepCopy()
+	cc.ClusterNetwork[1].HostPrefix = 0
+	res := ValidateClusterConfig(cc)
+	// Since the NetworkType is None, and the hostprefix is unset we don't validate it
+	g.Expect(res).Should(BeNil())
+
+	cc = *ClusterConfig.DeepCopy()
 	cc.ClusterNetwork[1].HostPrefix = 21
 	haveError(cc, "hostPrefix 21 is larger than its cidr 10.2.0.0/22")
+
+	cc = *ClusterConfig.DeepCopy()
+	cc.NetworkType = "OpenShiftSDN"
+	cc.ClusterNetwork[1].HostPrefix = 0
+	haveError(cc, "hostPrefix 0 is larger than its cidr 10.2.0.0/22")
 
 	// network type
 	cc = *ClusterConfig.DeepCopy()
