@@ -73,6 +73,7 @@ spec:
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
             --ovnnb-db "{{.OVN_NB_DB_LIST}}" \
             --ovnsb-db "{{.OVN_SB_DB_LIST}}" \
+            --pidfile /var/run/ovn/ovn-northd.pid \
             -p /ovn-cert/tls.key \
             -c /ovn-cert/tls.crt \
             -C /ovn-ca/ca-bundle.crt 
