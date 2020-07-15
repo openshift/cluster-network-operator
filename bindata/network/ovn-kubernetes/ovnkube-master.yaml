@@ -115,6 +115,25 @@ spec:
 
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
+          check_db_health() {
+            db="${1}"
+            if [[ ! -f "${db}" ]]; then
+                  echo "${db} does not exist, skipping health check"
+                  return
+            fi
+            echo "Checking ${db} health"
+            serverid=$(ovsdb-tool show-log "${db}" | sed -ne '/server_id:/s/server_id: *\([[:xdigit:]]\+\)/\1/p')
+            match=$(ovsdb-tool show-log "${db}" | grep "prev_servers: *${serverid}(" || true)
+            if [[ -z ${match} ]]; then
+                echo "Current server_id $serverid not found in ${db}, cleaning up"
+                rm -- "${db}"
+            else
+                  echo "${db} is healthy"
+            fi
+          }
+
+          check_db_health "/etc/ovn/ovnnb_db.db"
+
           MASTER_IP="{{.OVN_MASTER_IP}}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
             exec /usr/share/ovn/scripts/ovn-ctl \
@@ -280,6 +299,25 @@ spec:
           fi
 
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
+
+          check_db_health() {
+            db="${1}"
+            if [[ ! -f "${db}" ]]; then
+                  echo "${db} does not exist, skipping health check"
+                  return
+            fi
+            echo "Checking ${db} health"
+            serverid=$(ovsdb-tool show-log "${db}" | sed -ne '/server_id:/s/server_id: *\([[:xdigit:]]\+\)/\1/p')
+            match=$(ovsdb-tool show-log "${db}" | grep "prev_servers: *${serverid}(" || true)
+            if [[ -z ${match} ]]; then
+                echo "Current server_id $serverid not found in ${db}, cleaning up"
+                rm -- "${db}"
+            else
+                  echo "${db} is healthy"
+            fi
+          }
+
+          check_db_health "/etc/ovn/ovnsb_db.db"
 
           MASTER_IP="{{.OVN_MASTER_IP}}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
