@@ -120,6 +120,7 @@ spec:
         - mountPath: /host
           name: host-slash
           readOnly: true
+          mountPropagation: HostToContainer
         # CNI related mounts which we take over
         - mountPath: /host/opt/cni/bin
           name: host-cni-bin
