@@ -99,6 +99,9 @@ spec:
           echo "I$(date "+%m%d %H:%M:%S.%N") - waiting for db_ip addresses"
           cp -f /usr/libexec/cni/ovn-k8s-cni-overlay /cni-bin-dir/
           ovn_config_namespace=openshift-ovn-kubernetes
+          echo "I$(date "+%m%d %H:%M:%S.%N") - disable conntrack on geneve port"
+          iptables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
+          iptables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
           retries=0
           while true; do
             db_ip=$(kubectl get ep -n ${ovn_config_namespace} ovnkube-db -o jsonpath='{.subsets[0].addresses[0].ip}')
