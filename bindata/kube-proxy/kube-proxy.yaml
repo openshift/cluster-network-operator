@@ -58,6 +58,7 @@ spec:
         - mountPath: /host
           name: host-slash
           readOnly: true
+          mountPropagation: HostToContainer
         - mountPath: /config
           name: config
           readOnly: true
