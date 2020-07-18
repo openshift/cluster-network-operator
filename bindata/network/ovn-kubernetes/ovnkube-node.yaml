@@ -165,6 +165,7 @@ spec:
         - mountPath: /host
           name: host-slash
           readOnly: true
+          mountPropagation: HostToContainer
         # for the CNI server socket
         - mountPath: /run/ovn-kubernetes/
           name: host-run-ovn-kubernetes
