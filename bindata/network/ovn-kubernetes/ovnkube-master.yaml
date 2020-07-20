@@ -124,8 +124,10 @@ spec:
                   return
             fi
             echo "Checking ${db} health"
-            serverid=$(ovsdb-tool show-log "${db}" | sed -ne '/server_id:/s/server_id: *\([[:xdigit:]]\+\)/\1/p')
-            match=$(ovsdb-tool show-log "${db}" | grep "prev_servers: *${serverid}(" || true)
+            serverid=$(ovsdb-tool show-log "${db}" | grep -m 1 -oP '(?<=server_id: )[[:xdigit:]]+')
+            # prev_servers is a list.  We are searching for " $server_id(" in the list
+            # prev_servers: 33b4("ssl:10.19.138.37:9643"), 720d("ssl:10.19.138.33:9643"), 7e4f("ssl:10.19.138.32:9643")
+            match=$(ovsdb-tool show-log "${db}" | grep "prev_servers:.* ${serverid}(" || true)
             if [[ -z ${match} ]]; then
                 echo "Current server_id $serverid not found in ${db}, cleaning up"
                 rm -- "${db}"
@@ -312,8 +314,10 @@ spec:
                   return
             fi
             echo "Checking ${db} health"
-            serverid=$(ovsdb-tool show-log "${db}" | sed -ne '/server_id:/s/server_id: *\([[:xdigit:]]\+\)/\1/p')
-            match=$(ovsdb-tool show-log "${db}" | grep "prev_servers: *${serverid}(" || true)
+            serverid=$(ovsdb-tool show-log "${db}" | grep -m 1 -oP '(?<=server_id: )[[:xdigit:]]+')
+            # prev_servers is a list.  We are searching for " $server_id(" in the list
+            # prev_servers: 33b4("ssl:10.19.138.37:9643"), 720d("ssl:10.19.138.33:9643"), 7e4f("ssl:10.19.138.32:9643")
+            match=$(ovsdb-tool show-log "${db}" | grep "prev_servers:.* ${serverid}(" || true)
             if [[ -z ${match} ]]; then
                 echo "Current server_id $serverid not found in ${db}, cleaning up"
                 rm -- "${db}"
