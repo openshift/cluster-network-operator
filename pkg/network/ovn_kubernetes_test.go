@@ -189,7 +189,7 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 	conf.DefaultNetwork.OVNKubernetesConfig = nil
 
 	// vars
-	m := uint32(8900)
+	m := uint32(8942)
 	p := uint32(6081)
 
 	expected := operv1.NetworkSpec{
@@ -214,6 +214,40 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 	}
 
 	fillOVNKubernetesDefaults(conf, nil, 9000)
+
+	g.Expect(conf).To(Equal(&expected))
+
+	conf.ServiceNetwork = []string{
+		"172.30.0.0/16",
+		"fd02::/112",
+	}
+	conf.ClusterNetwork = append(config.ClusterNetwork, operv1.ClusterNetworkEntry{
+		CIDR: "fd01::/48", HostPrefix: 64,
+	})
+	conf.DefaultNetwork.OVNKubernetesConfig = nil
+	m = uint32(1422)
+	expected = operv1.NetworkSpec{
+		ServiceNetwork: []string{"172.30.0.0/16", "fd02::/112"},
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/14",
+				HostPrefix: 23,
+			},
+			{
+				CIDR:       "fd01::/48",
+				HostPrefix: 64,
+			},
+		},
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOVNKubernetes,
+			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
+				MTU:        &m,
+				GenevePort: &p,
+			},
+		},
+	}
+
+	fillOVNKubernetesDefaults(conf, nil, 1500)
 
 	g.Expect(conf).To(Equal(&expected))
 

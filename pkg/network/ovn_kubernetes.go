@@ -193,7 +193,14 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 	// (which may not be a node in the cluster).
 	// However, this can never change, so we always prefer previous.
 	if sc.MTU == nil {
-		var mtu uint32 = uint32(hostMTU) - 100 // 100 byte geneve header
+		var mtu uint32 = uint32(hostMTU) - 58 // 58 bytes geneve header
+		// if it's an ipv6 cluster or dual stack, ip header would be an extra 20 bytes.
+		for _, cn := range conf.ClusterNetwork {
+			if utilnet.IsIPv6CIDRString(cn.CIDR) {
+				mtu = mtu - 20
+				break
+			}
+		}
 		if previous != nil && previous.DefaultNetwork.OVNKubernetesConfig != nil &&
 			previous.DefaultNetwork.OVNKubernetesConfig.MTU != nil {
 			mtu = *previous.DefaultNetwork.OVNKubernetesConfig.MTU
