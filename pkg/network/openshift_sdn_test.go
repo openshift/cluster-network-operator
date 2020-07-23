@@ -426,7 +426,7 @@ ipvs:
   strictARP: false
   syncPeriod: 0s
 kind: KubeProxyConfiguration
-metricsBindAddress: 0.0.0.0:9101
+metricsBindAddress: 0.0.0.0:29101
 mode: unidling+iptables
 nodePortAddresses: null
 oomScoreAdj: null
@@ -474,7 +474,7 @@ ipvs:
   strictARP: false
   syncPeriod: 0s
 kind: KubeProxyConfiguration
-metricsBindAddress: 0.0.0.0:9101
+metricsBindAddress: 0.0.0.0:29101
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null

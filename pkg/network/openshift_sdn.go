@@ -34,6 +34,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 	data.Data["InstallOVS"] = (c.UseExternalOpenvswitch == nil || *c.UseExternalOpenvswitch == false)
 	data.Data["SDNImage"] = os.Getenv("SDN_IMAGE")
 	data.Data["CNIPluginsImage"] = os.Getenv("CNI_PLUGINS_IMAGE")
+	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
 	data.Data["Mode"] = c.Mode
@@ -48,7 +49,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 
 	kpcDefaults := map[string]operv1.ProxyArgumentList{
 		"metrics-bind-address":    {"0.0.0.0"},
-		"metrics-port":            {"9101"},
+		"metrics-port":            {"29101"},
 		"healthz-port":            {"10256"},
 		"proxy-mode":              {"iptables"},
 		"iptables-masquerade-bit": {"0"},
