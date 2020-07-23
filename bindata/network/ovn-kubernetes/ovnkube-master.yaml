@@ -475,6 +475,8 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             ${hybrid_overlay_flags} \
             --metrics-bind-address "127.0.0.1:29102" \
+            --gateway-mode shared \
+            --gateway-interface br-ex \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
             --sb-client-privkey /ovn-cert/tls.key \
             --sb-client-cert /ovn-cert/tls.crt \
@@ -537,7 +539,8 @@ spec:
         hostPath:
           path: /var/lib/ovn/data
       - name: run-openvswitch
-        emptyDir: {}
+        hostPath:
+          path: /var/run/openvswitch
       - name: run-ovn
         hostPath:
           path: /var/run/ovn
