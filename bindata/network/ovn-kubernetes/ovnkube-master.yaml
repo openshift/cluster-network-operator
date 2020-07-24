@@ -117,27 +117,6 @@ spec:
 
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
-          check_db_health() {
-            db="${1}"
-            if [[ ! -f "${db}" ]]; then
-                  echo "${db} does not exist, skipping health check"
-                  return
-            fi
-            echo "Checking ${db} health"
-            serverid=$(ovsdb-tool show-log "${db}" | grep -m 1 -oP '(?<=server_id: )[[:xdigit:]]+')
-            # prev_servers is a list.  We are searching for " $server_id(" in the list
-            # prev_servers: 33b4("ssl:10.19.138.37:9643"), 720d("ssl:10.19.138.33:9643"), 7e4f("ssl:10.19.138.32:9643")
-            match=$(ovsdb-tool show-log "${db}" | grep "prev_servers:.* ${serverid}(" || true)
-            if [[ -z ${match} ]]; then
-                echo "Current server_id $serverid not found in ${db}, cleaning up"
-                rm -- "${db}"
-            else
-                  echo "${db} is healthy"
-            fi
-          }
-
-          check_db_health "/etc/ovn/ovnnb_db.db"
-
           MASTER_IP="{{.OVN_MASTER_IP}}"
           echo "$(date -Iseconds) - starting nbdb  MASTER_IP=${MASTER_IP}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
@@ -306,27 +285,6 @@ spec:
           fi
 
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
-
-          check_db_health() {
-            db="${1}"
-            if [[ ! -f "${db}" ]]; then
-                  echo "${db} does not exist, skipping health check"
-                  return
-            fi
-            echo "Checking ${db} health"
-            serverid=$(ovsdb-tool show-log "${db}" | grep -m 1 -oP '(?<=server_id: )[[:xdigit:]]+')
-            # prev_servers is a list.  We are searching for " $server_id(" in the list
-            # prev_servers: 33b4("ssl:10.19.138.37:9643"), 720d("ssl:10.19.138.33:9643"), 7e4f("ssl:10.19.138.32:9643")
-            match=$(ovsdb-tool show-log "${db}" | grep "prev_servers:.* ${serverid}(" || true)
-            if [[ -z ${match} ]]; then
-                echo "Current server_id $serverid not found in ${db}, cleaning up"
-                rm -- "${db}"
-            else
-                  echo "${db} is healthy"
-            fi
-          }
-
-          check_db_health "/etc/ovn/ovnsb_db.db"
 
           MASTER_IP="{{.OVN_MASTER_IP}}"
           echo "$(date -Iseconds) - starting sbdb  MASTER_IP=${MASTER_IP}"
