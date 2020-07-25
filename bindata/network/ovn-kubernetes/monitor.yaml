@@ -1,35 +1,42 @@
-
+---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: ovnkube-master
+    app: ovnkube-master-metrics
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
-  name: monitor-ovn-master
+  name: monitor-ovn-master-metrics
   namespace: openshift-ovn-kubernetes
 spec:
   endpoints:
   - interval: 30s
     port: metrics
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    scheme: https
+    tlsConfig:
+      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+      serverName: ovn-kubernetes-master-metrics.openshift-ovn-kubernetes.svc
   jobLabel: app
   namespaceSelector:
     matchNames:
     - openshift-ovn-kubernetes
   selector:
     matchLabels:
-      app: ovnkube-master
+      app: ovnkube-master-metrics
 ---
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: ovnkube-master
-  name: ovn-kubernetes-master
+    app: ovnkube-master-metrics
+  name: ovn-kubernetes-master-metrics
   namespace: openshift-ovn-kubernetes
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: ovn-master-metrics-cert
 spec:
   selector:
-    app: ovnkube-master
+    app: ovnkube-master-metrics
   clusterIP: None
   publishNotReadyAddresses: true
   ports:
@@ -45,33 +52,40 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: ovnkube-node
+    app: ovnkube-node-metrics
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
-  name: monitor-ovn-node
+  name: monitor-ovn-node-metrics
   namespace: openshift-ovn-kubernetes
 spec:
   endpoints:
   - interval: 30s
     port: metrics
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    scheme: https
+    tlsConfig:
+      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+      serverName: ovn-kubernetes-node-metrics.openshift-ovn-kubernetes.svc
   jobLabel: app
   namespaceSelector:
     matchNames:
     - openshift-ovn-kubernetes
   selector:
     matchLabels:
-      app: ovnkube-node
+      app: ovnkube-node-metrics
 ---
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: ovnkube-node
-  name: ovn-kubernetes-node
+    app: ovnkube-node-metrics
+  name: ovn-kubernetes-node-metrics
   namespace: openshift-ovn-kubernetes
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: ovn-node-metrics-cert
 spec:
   selector:
-    app: ovnkube-node
+    app: ovnkube-node-metrics
   clusterIP: None
   publishNotReadyAddresses: true
   ports:
