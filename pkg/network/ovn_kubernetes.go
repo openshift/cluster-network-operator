@@ -31,6 +31,7 @@ const OVN_NB_RAFT_PORT = "9643"
 const OVN_SB_RAFT_PORT = "9644"
 const CLUSTER_CONFIG_NAME = "cluster-config-v1"
 const CLUSTER_CONFIG_NAMESPACE = "kube-system"
+const OVN_CERT_CN = "ovn"
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
 // This creates
@@ -68,6 +69,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_MASTER_IP"] = bootstrapResult.OVN.MasterIPs[0]
 	data.Data["OVN_MIN_AVAILABLE"] = len(bootstrapResult.OVN.MasterIPs)/2 + 1
 	data.Data["LISTEN_DUAL_STACK"] = listenDualStack(bootstrapResult.OVN.MasterIPs[0])
+	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
