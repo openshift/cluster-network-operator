@@ -45,6 +45,9 @@ rules:
   - kuryrnets
   - kuryrnetworks
   - kuryrnetpolicies
+  - kuryrnetworkpolicies
+  - kuryrports
+  - kuryrloadbalancers
   verbs: ["*"]
 - apiGroups: ["route.openshift.io"]
   resources:
