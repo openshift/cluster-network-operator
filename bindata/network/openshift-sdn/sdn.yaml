@@ -114,6 +114,11 @@ spec:
         - mountPath: /var/run/kubernetes/
           name: host-var-run-kubernetes
           readOnly: true
+        # accessing bind-mounted net namespaces
+        - mountPath: /run/netns
+          name: host-run-netns
+          readOnly: true
+          mountPropagation: HostToContainer
         # We mount our socket here
         - mountPath: /var/run/openshift-sdn
           name: host-var-run-openshift-sdn
@@ -188,6 +193,9 @@ spec:
       - name: host-var-run
         hostPath:
           path: /var/run
+      - name: host-run-netns
+        hostPath:
+          path: /run/netns
       - name: host-var-run-dbus
         hostPath:
           path: /var/run/dbus
