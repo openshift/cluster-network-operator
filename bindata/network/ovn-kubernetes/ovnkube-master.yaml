@@ -167,7 +167,40 @@ spec:
                   sleep 2
                   done
                 fi
+                #configure northd_probe_interval
+                OVN_NB_CTL="ovn-nbctl -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
+                --db "{{.OVN_NB_DB_LIST}}""
+                northd_probe_interval=${OVN_NORTHD_PROBE_INTERVAL:-5000}
+                echo "Setting northd probe interval to ${northd_probe_interval} ms"
+                retries=0
+                current_probe_interval=0
+                while [[ "${retries}" -lt 10 ]]; do
+                  current_probe_interval=$(${OVN_NB_CTL} --if-exists get NB_GLOBAL . options:northd_probe_interval)
+                  if [[ $? == 0 ]]; then
+                    current_probe_interval=$(echo ${current_probe_interval} | tr -d '\"')
+                    break
+                  else
+                    sleep 2
+                    (( retries += 1 ))
+                  fi
+                done
 
+                if [[ "${current_probe_interval}" != "${northd_probe_interval}" ]]; then
+                  retries=0
+                  while [[ "${retries}" -lt 10 ]]; do
+                    ${OVN_NB_CTL} set NB_GLOBAL . options:northd_probe_interval=${northd_probe_interval}
+                    if [[ $? != 0 ]]; then
+                      echo "Failed to set northd probe interval to ${northd_probe_interval}. retrying....."
+                      sleep 2
+                      (( retries += 1 ))
+                    else
+                      echo "Successfully set northd probe interval to ${northd_probe_interval} ms"
+                      break
+                    fi
+                  done
+                fi
+
+                #configure NB RAFT election timers
                 election_timer="${OVN_NB_RAFT_ELECTION_TIMER}"
                 echo "Setting nb-db raft election timer to ${election_timer} ms"
                 retries=0
@@ -237,6 +270,8 @@ spec:
           value: info 
         - name: OVN_NB_RAFT_ELECTION_TIMER
           value: "{{.OVN_NB_RAFT_ELECTION_TIMER}}"
+        - name: OVN_NORTHD_PROBE_INTERVAL
+          value: "{{.OVN_NORTHD_PROBE_INTERVAL}}"
         - name: K8S_NODE_IP
           valueFrom:
             fieldRef:
