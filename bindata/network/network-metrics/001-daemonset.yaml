@@ -24,7 +24,6 @@ spec:
         openshift.io/component: network
     spec:
       nodeSelector:
-        node-role.kubernetes.io/worker: ""
         kubernetes.io/os: linux
       tolerations:
         - operator: Exists
