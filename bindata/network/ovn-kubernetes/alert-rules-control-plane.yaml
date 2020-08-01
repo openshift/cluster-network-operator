@@ -17,7 +17,7 @@ spec:
         message: |
           there is no running ovn-kubernetes master
       expr: |
-        absent(up{job="ovnkube-master",namespace="openshift-ovn-kubernetes"} ==1)
+        absent(up{job="ovnkube-master",namespace="openshift-ovn-kubernetes"} >=5)
       for: 10m
       labels:
         severity: warning
