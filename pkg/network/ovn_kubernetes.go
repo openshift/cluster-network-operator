@@ -96,10 +96,16 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		} else {
 			data.Data["OVNHybridOverlayNetCIDR"] = ""
 		}
+		if c.HybridOverlayConfig.HybridOverlayVXLANPort != nil {
+			data.Data["OVNHybridOverlayVXLANPort"] = c.HybridOverlayConfig.HybridOverlayVXLANPort
+		} else {
+			data.Data["OVNHybridOverlayVXLANPort"] = ""
+		}
 		data.Data["OVNHybridOverlayEnable"] = "true"
 	} else {
 		data.Data["OVNHybridOverlayNetCIDR"] = ""
 		data.Data["OVNHybridOverlayEnable"] = ""
+		data.Data["OVNHybridOverlayVXLANPort"] = ""
 	}
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/ovn-kubernetes"), &data)

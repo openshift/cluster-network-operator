@@ -490,6 +490,9 @@ spec:
             if [[ -n "{{.OVNHybridOverlayNetCIDR}}" ]]; then
               hybrid_overlay_flags="${hybrid_overlay_flags} --hybrid-overlay-cluster-subnets={{.OVNHybridOverlayNetCIDR}}"
             fi
+            if [[ -n "{{.OVNHybridOverlayVXLANPort}}" ]]; then
+              hybrid_overlay_flags="${hybrid_overlay_flags} --hybrid-overlay-vxlan-port={{.OVNHybridOverlayVXLANPort}}"
+            fi
           fi
 
           # start nbctl daemon for caching
