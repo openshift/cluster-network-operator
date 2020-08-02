@@ -145,6 +145,8 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
             ${hybrid_overlay_flags} \
+            --gateway-mode shared \
+            --gateway-interface br-ex \
             --metrics-bind-address "127.0.0.1:29103"
         env:
         # for kubectl
