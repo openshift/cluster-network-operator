@@ -6,9 +6,13 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/pkg/errors"
 )
+
+// list of known plugins that require hostPrefix to be set
+var pluginsUsingHostPrefix = sets.NewString(string(operv1.NetworkTypeOpenShiftSDN), string(operv1.NetworkTypeOVNKubernetes))
 
 // ValidateClusterConfig ensures the cluster config is valid.
 func ValidateClusterConfig(clusterConfig configv1.NetworkSpec) error {
@@ -39,15 +43,18 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec) error {
 		if err != nil {
 			return errors.Errorf("could not parse spec.clusterNetwork %s", cnet.CIDR)
 		}
-		ones, bits := cidr.Mask.Size()
-		// The comparison is inverted; smaller number is larger block
-		if cnet.HostPrefix < uint32(ones) {
-			return errors.Errorf("hostPrefix %d is larger than its cidr %s",
-				cnet.HostPrefix, cnet.CIDR)
-		}
-		if int(cnet.HostPrefix) > bits-2 {
-			return errors.Errorf("hostPrefix %d is too small, must be a /%d or larger",
-				cnet.HostPrefix, bits-2)
+		// ignore hostPrefix if the plugin does not use it and has it unset
+		if pluginsUsingHostPrefix.Has(clusterConfig.NetworkType) || (cnet.HostPrefix != 0) {
+			ones, bits := cidr.Mask.Size()
+			// The comparison is inverted; smaller number is larger block
+			if cnet.HostPrefix < uint32(ones) {
+				return errors.Errorf("hostPrefix %d is larger than its cidr %s",
+					cnet.HostPrefix, cnet.CIDR)
+			}
+			if int(cnet.HostPrefix) > bits-2 {
+				return errors.Errorf("hostPrefix %d is too small, must be a /%d or larger",
+					cnet.HostPrefix, bits-2)
+			}
 		}
 		if err := pool.Add(*cidr); err != nil {
 			return err

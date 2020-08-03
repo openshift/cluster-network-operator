@@ -112,12 +112,12 @@ Users must supply at least two address pools - ClusterNetwork for pods, and Serv
 
 For future expansion, multiple `serviceNetwork` entries are allowed by the configuration but not actually supported by any network plugins. Supplying multiple addresses is invalid.
 
-Each `clusterNetwork` entry has an additional required parameter, `hostPrefix`, that specifies the address size to assign to each individual node.  For example,
+Each `clusterNetwork` entry has an additional parameter, `hostPrefix`, that specifies the address size to assign to each individual node.  For example,
 ```yaml
 cidr: 10.128.0.0/14
 hostPrefix: 23
 ```
-means 512 nodes would get blocks of size `/23`, or 512 addresses.
+means 512 nodes would get blocks of size `/23`, or 512 addresses. If the hostPrefix field is not used by the plugin, it can be left unset.
 
 IP address pools are always read from the Cluster configuration and propagated "downwards" into the Operator configuration. Any changes to the Operator configuration are ignored.
 
