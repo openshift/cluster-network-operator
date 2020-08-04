@@ -116,6 +116,35 @@ spec:
 
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
+          check_db_health() {
+            db="${1}"
+            serverid_file="${2}"
+
+            if [[ ! -f "${db}" ]]; then
+                  echo "${db} does not exist, skipping health check"
+                  return
+            fi
+            echo "Checking ${db} health"
+            serverid=$(ovsdb-tool show-log "${db}" | grep -m 1 -oP '(?<=server_id: )[[:xdigit:]]+')
+            # prev_servers is a list.  We are searching for " $server_id(" in the list
+            # prev_servers: 33b4("ssl:10.19.138.37:9643"), 720d("ssl:10.19.138.33:9643"), 7e4f("ssl:10.19.138.32:9643")
+            match=$(ovsdb-tool show-log "${db}" | grep "prev_servers:.* ${serverid}(" || true)
+            if [[ -z ${match} ]]; then
+                  echo "Current server_id $serverid not found in ${db} prev_servers list, checking servers"
+                  match=$(ovsdb-tool show-log "${db}" | grep "^ servers:.* ${serverid}(" || true)
+            fi
+            if [[ -z ${match} ]]; then
+                  echo "Current server_id $serverid not found in ${db}, cleaning up"
+                  echo "writing server ${serverid} to ${serverid_file}"
+                  echo "${serverid}" > "${serverid_file}"
+                  rm -- "${db}"
+            else
+                  echo "${db} is healthy"
+            fi
+          }
+          
+          check_db_health "/etc/ovn/ovnnb_db.db" "/etc/ovn/nbdb_id"
+
           MASTER_IP="{{.OVN_MASTER_IP}}"
           echo "$(date -Iseconds) - starting nbdb  MASTER_IP=${MASTER_IP}"
           if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
@@ -254,6 +283,30 @@ spec:
                     done
                   fi
                 fi
+                
+                kick_old_id() {
+                  db="${1}"
+                  serverid_file="${2}"
+                  target="${3}"
+                  echo "Serverid ${serverid_file}"
+                  retries=0
+                  while [[ ! -f ${serverid_file} ]]
+                  do
+                    (( retries += 1 ))
+                    if [[ "${retries}" -gt 5 ]]; then
+                        echo "No file to kick"
+                        return
+                    fi
+                    sleep 2
+                  done
+                  
+                  prev_id=$(cat "${serverid_file}")
+                  echo "Found ${serverid_file}, kicking ${prev_id}"
+                  ovs-appctl -t "${target}" cluster/kick  "${db}" "${prev_id}" || true
+                  rm -- "${serverid_file}"
+                }
+                
+                kick_old_id "OVN_Northbound" "/etc/ovn/nbdb_id" "/var/run/ovn/ovnnb_db.ctl"
 
         readinessProbe:
           initialDelaySeconds: 30
@@ -319,6 +372,34 @@ spec:
           fi
 
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
+
+          check_db_health() {
+            db="${1}"
+            serverid_file="${2}"
+
+            if [[ ! -f "${db}" ]]; then
+                  echo "${db} does not exist, skipping health check"
+                  return
+            fi
+            echo "Checking ${db} health"
+            serverid=$(ovsdb-tool show-log "${db}" | grep -m 1 -oP '(?<=server_id: )[[:xdigit:]]+')
+            # prev_servers is a list.  We are searching for " $server_id(" in the list
+            # prev_servers: 33b4("ssl:10.19.138.37:9643"), 720d("ssl:10.19.138.33:9643"), 7e4f("ssl:10.19.138.32:9643")
+            match=$(ovsdb-tool show-log "${db}" | grep "prev_servers:.* ${serverid}(" || true)
+            if [[ -z ${match} ]]; then
+                  echo "Current server_id $serverid not found in ${db} prev_servers list, checking servers"
+                  match=$(ovsdb-tool show-log "${db}" | grep "^ servers:.* ${serverid}(" || true)
+            fi
+            if [[ -z ${match} ]]; then
+                  echo "Current server_id $serverid not found in ${db}, cleaning up"
+                  echo "${serverid}" > "${serverid_file}"
+                  rm -- "${db}"
+            else
+                  echo "${db} is healthy"
+            fi
+          }
+          
+          check_db_health "/etc/ovn/ovnsb_db.db" "/etc/ovn/sbdb_id"
 
           MASTER_IP="{{.OVN_MASTER_IP}}"
           echo "$(date -Iseconds) - starting sbdb  MASTER_IP=${MASTER_IP}"
@@ -426,6 +507,30 @@ spec:
                     done
                   fi
                 fi
+
+                kick_old_id() {
+                  db="${1}"
+                  serverid_file="${2}"
+                  target="${3}"
+                  echo "Serverid ${serverid_file}"
+                  retries=0
+                  while [[ ! -f ${serverid_file} ]]
+                  do
+                    (( retries += 1 ))
+                    if [[ "${retries}" -gt 5 ]]; then
+                        echo "No file to kick"
+                        return
+                    fi
+                    sleep 2
+                  done
+                  
+                  prev_id=$(cat "${serverid_file}")
+                  echo "Found ${serverid_file}, kicking ${prev_id}"
+                  ovs-appctl -t "${target}" cluster/kick  "${db}" "${prev_id}" || true
+                  rm -- "${serverid_file}"
+                }
+                
+                kick_old_id "OVN_Southbound" "/etc/ovn/sbdb_id" "/var/run/ovn/ovnsb_db.ctl"
 
         readinessProbe:
           initialDelaySeconds: 30
