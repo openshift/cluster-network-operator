@@ -21,6 +21,15 @@ spec:
       for: 10m
       labels:
         severity: warning
+    - alert: NoOvnMasterLeader
+      annotations:
+        message: |
+          There is no ovn-kubernetes master leader
+      expr: |
+        max(ovnkube_master_leader) == 0
+      for: 10m
+      labels:
+        severity: warning
     - alert: NorthboundStale
       annotations:
         message: |
