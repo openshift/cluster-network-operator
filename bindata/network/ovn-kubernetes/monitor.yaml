@@ -23,13 +23,13 @@ spec:
     - openshift-ovn-kubernetes
   selector:
     matchLabels:
-      app: ovnkube-master-metrics
+      app: ovnkube-master
 ---
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: ovnkube-master-metrics
+    app: ovnkube-master
   name: ovn-kubernetes-master-metrics
   namespace: openshift-ovn-kubernetes
   annotations:

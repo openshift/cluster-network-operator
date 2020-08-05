@@ -8,6 +8,8 @@ kind: Service
 metadata:
   name: ovnkube-db
   namespace: openshift-ovn-kubernetes
+  labels:
+    app: ovnkube-master
 spec:
   selector:
     app: ovnkube-master
