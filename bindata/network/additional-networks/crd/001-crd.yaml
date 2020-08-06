@@ -103,7 +103,7 @@ spec:
   - name: v1alpha1
     served: true
     storage: true
-  preserveUnknownFields: true
+  preserveUnknownFields: false
 status:
   acceptedNames:
     kind: ""
