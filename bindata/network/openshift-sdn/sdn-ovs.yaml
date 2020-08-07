@@ -142,6 +142,7 @@ spec:
               if /usr/bin/ovs-vsctl -t 5 br-exists br0; then /usr/bin/ovs-ofctl -t 5 -O OpenFlow13 probe br0; else true; fi
           initialDelaySeconds: 15
           periodSeconds: 5
+          timeoutSeconds: 21
         readinessProbe:
           exec:
             command:
@@ -157,6 +158,7 @@ spec:
               /usr/bin/ovs-vsctl -t 5 show > /dev/null
           initialDelaySeconds: 15
           periodSeconds: 5
+          timeoutSeconds: 11
         lifecycle:
           preStop:
             exec:
