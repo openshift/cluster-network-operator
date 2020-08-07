@@ -174,6 +174,65 @@ spec:
             command: ["test", "-f", "/etc/cni/net.d/80-openshift-network.conf"]
           initialDelaySeconds: 5
           periodSeconds: 5
+      - name: kube-rbac-proxy
+        image: {{.KubeRBACProxyImage}}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          TLS_PK=/etc/pki/tls/metrics-certs/tls.key
+          TLS_CERT=/etc/pki/tls/metrics-certs/tls.crt
+
+          # As the secret mount is optional we must wait for the files to be present.
+          # The service is created in monitor.yaml and this is created in sdn.yaml.
+          # If it isn't created there is probably an issue so we want to crashloop.
+          TS=$(curl \
+            --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+            -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+            "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/openshift-sdn/services/sdn" |
+              python -c 'import json,sys; print(json.load(sys.stdin)["metadata"]["creationTimestamp"])'
+          )
+
+          TS=$(date -d "${TS}" +%s)
+          WARN_TS=$(( ${TS} + $(( 20 * 60)) ))
+          HAS_LOGGED_INFO=0
+          
+          log_missing_certs(){
+              CUR_TS=$(date +%s)
+              if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
+                echo $(date -Iseconds) WARN: sdn-metrics-certs not mounted after 20 minutes.
+              elif [[ "${HAS_LOGGED_INFO}" -eq 0 ]] ; then
+                echo $(date -Iseconds) INFO: sdn-metrics-certs not mounted. Waiting one hour.
+                HAS_LOGGED_INFO=1
+              fi
+          }
+
+          while [[ ! -f "${TLS_PK}" ||  ! -f "${TLS_CERT}" ]] ; do
+            log_missing_certs
+            sleep 5
+          done
+          
+          exec /usr/bin/kube-rbac-proxy \
+            --logtostderr \
+            --secure-listen-address=:9101 \
+            --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
+            --upstream=http://127.0.0.1:29101/ \
+            --tls-private-key-file=${TLS_PK} \
+            --tls-cert-file=${TLS_CERT}
+        ports:
+        - containerPort: 9101
+          name: https
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: sdn-metrics-certs
+          mountPath: /etc/pki/tls/metrics-certs
+          readOnly: True
       nodeSelector:
         kubernetes.io/os: linux
       volumes:
@@ -221,64 +280,11 @@ spec:
       - name: host-var-lib-cni-networks-openshift-sdn
         hostPath:
           path: /var/lib/cni/networks/openshift-sdn
-      tolerations:
-      - operator: Exists
----
-kind: DaemonSet
-apiVersion: apps/v1
-metadata:
-  name: sdn-metrics
-  namespace: openshift-sdn
-  annotations:
-    kubernetes.io/description: |
-      This daemon set launches the OpenShift networking components (kube-proxy and openshift-sdn).
-      It expects that OVS is running on the node.
-    release.openshift.io/version: "{{.ReleaseVersion}}"
-spec:
-  selector:
-    matchLabels:
-      app: sdn-metrics
-  updateStrategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        app: sdn-metrics
-        component: network
-        type: infra
-        openshift.io/component: network
-      annotations:
-        networkoperator.openshift.io/non-critical: ""
-    spec:
-      # Requires fairly broad permissions - ability to read all services and network functions as well
-      # as all pods.
-      serviceAccountName: sdn-metrics
-      hostNetwork: true
-      containers:
-      - name: kube-rbac-proxy
-        image: {{.KubeRBACProxyImage}}
-        args:
-        - --logtostderr
-        - --secure-listen-address=:9101
-        - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
-        - --upstream=http://127.0.0.1:29101/
-        - --tls-private-key-file=/etc/pki/tls/metrics-certs/tls.key
-        - --tls-cert-file=/etc/pki/tls/metrics-certs/tls.crt
-        ports:
-        - containerPort: 9101
-          name: https
-        resources:
-          requests:
-            cpu: 10m
-            memory: 20Mi
-        terminationMessagePolicy: FallbackToLogsOnError
-        volumeMounts:
-        - name: sdn-metrics-certs
-          mountPath: /etc/pki/tls/metrics-certs
-          readOnly: True
-      nodeSelector:
-        kubernetes.io/os: linux
-      volumes:
+      # Must be optional because the sdn-metrics-certs is a service serving
+      # certificate and those cannot be generated without the SDN running
       - name: sdn-metrics-certs
         secret:
           secretName: sdn-metrics-certs
+          optional: true
+      tolerations:
+      - operator: Exists
