@@ -15,9 +15,9 @@ spec:
     - alert: NoRunningOvnMaster
       annotations:
         message: |
-          there is no running ovn-kubernetes master
+          There is no running ovn-kubernetes master
       expr: |
-        absent(up{job="ovnkube-master",namespace="openshift-ovn-kubernetes"} ==1)
+        absent(up{job="ovnkube-master-metrics", namespace="openshift-ovn-kubernetes"} == 1)
       for: 10m
       labels:
         severity: warning
