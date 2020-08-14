@@ -129,7 +129,16 @@ spec:
               hybrid_overlay_flags="${hybrid_overlay_flags} --hybrid-overlay-vxlan-port={{.OVNHybridOverlayVXLANPort}}"
             fi
           fi
-          
+
+          gateway_mode_flags=
+          # Check to see if ovs is provided by the node. This is only for upgrade from 4.5->4.6 or
+          # openshift-sdn to ovn-kube conversion
+          if [ -f /etc/systemd/system/network-online.target.wants/ovs-configuration.service ]; then
+            gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
+          else
+            gateway_mode_flags="--gateway-mode local"
+          fi
+
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --nb-address "{{.OVN_NB_DB_LIST}}" \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
@@ -145,8 +154,7 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
             ${hybrid_overlay_flags} \
-            --gateway-mode shared \
-            --gateway-interface br-ex \
+            ${gateway_mode_flags} \
             --metrics-bind-address "127.0.0.1:29103"
         env:
         # for kubectl
@@ -169,6 +177,10 @@ spec:
           privileged: true
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
+        # for checking ovs-configuration service
+        - mountPath: /etc/systemd/system
+          name: systemd-units
+          readOnly: true
         # for the iptables wrapper
         - mountPath: /host
           name: host-slash
@@ -225,6 +237,10 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: "linux"
       volumes:
+      # for checking ovs-configuration service
+      - name: systemd-units
+        hostPath:
+          path: /etc/systemd/system
       # used for iptables wrapper scripts
       - name: host-slash
         hostPath:
