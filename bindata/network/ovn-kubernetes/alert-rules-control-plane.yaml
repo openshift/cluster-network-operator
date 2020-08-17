@@ -10,7 +10,7 @@ metadata:
   namespace: openshift-ovn-kubernetes
 spec:
   groups:
-  - name: general.rules
+  - name: cluster-network-operator-master.rules
     rules:
     - alert: NoRunningOvnMaster
       annotations:
