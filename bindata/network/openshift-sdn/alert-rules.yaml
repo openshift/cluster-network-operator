@@ -10,7 +10,7 @@ metadata:
   namespace: openshift-sdn
 spec:
   groups:
-  - name: general.rules
+  - name: cluster-network-operator-sdn.rules
     rules:
     # note: all joins on kube_pod_* need a a "topk by (key) (1, <metric> )"
     # otherwise you will generate query errors when kube_state_metrics is being
