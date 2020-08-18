@@ -100,6 +100,13 @@ spec:
           echo "I$(date "+%m%d %H:%M:%S.%N") - disable conntrack on geneve port"
           iptables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
           iptables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
+          iptables -I INPUT -p icmp --icmp-type fragmentation-needed -s ${K8S_NODE_IP}  ! -d ${K8S_NODE_IP} -j LOG
+          iptables -I INPUT -p icmp --icmp-type fragmentation-needed -s ${K8S_NODE_IP}  -d ${K8S_NODE_IP} -j LOG
+          iptables -I OUTPUT -p icmp --icmp-type fragmentation-needed -s ${K8S_NODE_IP} -j LOG
+          #IP4=$(ip -o -4 addr list eth0 | awk '{print $4}' | cut -d/ -f1)
+          #iptables -I INPUT -p icmp --icmp-type fragmentation-needed -s ${IP4}  ! -d ${IP4} -j LOG
+          #iptables -I INPUT -p icmp --icmp-type fragmentation-needed -s ${IP4}  -d ${IP4} -j LOG
+          #iptables -I OUTPUT -p icmp --icmp-type fragmentation-needed -s ${IP4} -j LOG
           retries=0
           while true; do
             db_ip=$(kubectl get ep -n ${ovn_config_namespace} ovnkube-db -o jsonpath='{.subsets[0].addresses[0].ip}')
@@ -151,6 +158,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: K8S_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         ports:
         - name: metrics-port
           containerPort: 9103
