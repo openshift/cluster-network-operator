@@ -15,7 +15,6 @@ func init() {
 		proxyconfig.Add,
 		operconfig.Add,
 		clusterconfig.Add,
-		operconfig.AddConfigMapReconciler,
 		configmapcainjector.Add,
 	)
 }

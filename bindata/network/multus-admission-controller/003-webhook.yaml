@@ -5,6 +5,8 @@ metadata:
   name: {{.MultusValidatingWebhookName}}
   labels:
     app: multus-admission-controller
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
 webhooks:
   - name: multus-validating-config.k8s.io
     clientConfig:
