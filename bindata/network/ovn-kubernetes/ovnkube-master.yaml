@@ -495,6 +495,15 @@ spec:
             fi
           fi
 
+          gateway_mode_flags=
+          # Check to see if ovs is provided by the node. This is only for upgrade from 4.5->4.6 or
+          # openshift-sdn to ovn-kube conversion
+          if [ -f /etc/systemd/system/network-online.target.wants/ovs-configuration.service ]; then
+            gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
+          else
+            gateway_mode_flags="--gateway-mode local"
+          fi
+
           # start nbctl daemon for caching
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start nbctl daemon for caching"
           export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/var/run/ovn/ovn-nbctl.pid \
@@ -513,8 +522,7 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             ${hybrid_overlay_flags} \
             --metrics-bind-address "127.0.0.1:29102" \
-            --gateway-mode shared \
-            --gateway-interface br-ex \
+            ${gateway_mode_flags} \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
             --sb-client-privkey /ovn-cert/tls.key \
             --sb-client-cert /ovn-cert/tls.crt \
@@ -532,6 +540,10 @@ spec:
             exec:
               command: ["/bin/bash", "-c", "kill $(cat /var/run/ovn/ovn-nbctl.pid) && unset OVN_NB_DAEMON"]
         volumeMounts:
+        # for checking ovs-configuration service
+        - mountPath: /etc/systemd/system
+          name: systemd-units
+          readOnly: true
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
         - mountPath: /etc/ovn/
@@ -570,6 +582,10 @@ spec:
         node-role.kubernetes.io/master: ""
         beta.kubernetes.io/os: "linux"
       volumes:
+      # for checking ovs-configuration service
+      - name: systemd-units
+        hostPath:
+          path: /etc/systemd/system
       - name: etc-openvswitch
         hostPath:
           path: /var/lib/ovn/etc
