@@ -254,7 +254,13 @@ spec:
                     done
                   fi
                 fi
-
+          preStop:
+            exec:
+              command:
+                - /usr/bin/ovn-appctl
+                - -t
+                - /var/run/ovn/ovnnb_db.ctl
+                - exit
         readinessProbe:
           initialDelaySeconds: 30
           timeoutSeconds: 5
@@ -426,7 +432,13 @@ spec:
                     done
                   fi
                 fi
-
+          preStop:
+            exec:
+              command:
+                - /usr/bin/ovn-appctl
+                - -t
+                - /var/run/ovn/ovnsb_db.ctl
+                - exit
         readinessProbe:
           initialDelaySeconds: 30
           timeoutSeconds: 5
