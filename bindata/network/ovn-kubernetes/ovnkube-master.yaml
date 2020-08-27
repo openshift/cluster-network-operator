@@ -528,17 +528,6 @@ spec:
             set +o allexport
           fi
 
-          hybrid_overlay_flags=
-          if [[ -n "{{.OVNHybridOverlayEnable }}" ]]; then
-            hybrid_overlay_flags="--enable-hybrid-overlay --no-hostsubnet-nodes=kubernetes.io/os=windows"
-            if [[ -n "{{.OVNHybridOverlayNetCIDR}}" ]]; then
-              hybrid_overlay_flags="${hybrid_overlay_flags} --hybrid-overlay-cluster-subnets={{.OVNHybridOverlayNetCIDR}}"
-            fi
-            if [[ -n "{{.OVNHybridOverlayVXLANPort}}" ]]; then
-              hybrid_overlay_flags="${hybrid_overlay_flags} --hybrid-overlay-vxlan-port={{.OVNHybridOverlayVXLANPort}}"
-            fi
-          fi
-
           gateway_mode_flags=
           # Check to see if ovs is provided by the node. This is only for upgrade from 4.5->4.6 or
           # openshift-sdn to ovn-kube conversion
@@ -564,7 +553,6 @@ spec:
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            ${hybrid_overlay_flags} \
             --metrics-bind-address "127.0.0.1:29102" \
             ${gateway_mode_flags} \
             --sb-address "{{.OVN_SB_DB_LIST}}" \

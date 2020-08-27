@@ -16,6 +16,9 @@ data:
     service-cidrs="{{.OVN_service_cidr}}"
     ovn-config-namespace="openshift-ovn-kubernetes"
     apiserver="{{.K8S_APISERVER}}"
+{{- if .OVNHybridOverlayEnable }}
+    no-hostsubnet-nodes="kubernetes.io/os=windows"
+{{- end  }}
  
     [ovnkubernetesfeature]
     enable-egress-ip=true
@@ -23,3 +26,13 @@ data:
     [gateway]
     mode=local
     nodeport=true
+{{ if .OVNHybridOverlayEnable }}
+    [hybridoverlay]
+    enabled=true
+    {{- if .OVNHybridOverlayNetCIDR }}
+    cluster-subnets="{{.OVNHybridOverlayNetCIDR}}"
+    {{- end }}
+    {{- if .OVNHybridOverlayVXLANPort}}
+    hybrid-overlay-vxlan-port="{{.OVNHybridOverlayVXLANPort}}"
+    {{- end }}
+{{- end  }}
