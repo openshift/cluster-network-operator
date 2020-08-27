@@ -119,16 +119,6 @@ spec:
           done
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node db_ip ${db_ip}"
-          hybrid_overlay_flags=
-          if [[ -n "{{.OVNHybridOverlayEnable}}" ]]; then
-            hybrid_overlay_flags="--enable-hybrid-overlay --no-hostsubnet-nodes=kubernetes.io/os=windows"
-            if [[ -n "{{.OVNHybridOverlayNetCIDR}}" ]]; then
-              hybrid_overlay_flags="${hybrid_overlay_flags} --hybrid-overlay-cluster-subnets={{.OVNHybridOverlayNetCIDR}}"
-            fi
-            if [[ -n "{{.OVNHybridOverlayVXLANPort}}" ]]; then
-              hybrid_overlay_flags="${hybrid_overlay_flags} --hybrid-overlay-vxlan-port={{.OVNHybridOverlayVXLANPort}}"
-            fi
-          fi
 
           gateway_mode_flags=
           # Check to see if ovs is provided by the node. This is only for upgrade from 4.5->4.6 or
@@ -153,7 +143,6 @@ spec:
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
-            ${hybrid_overlay_flags} \
             ${gateway_mode_flags} \
             --metrics-bind-address "127.0.0.1:29103"
         env:

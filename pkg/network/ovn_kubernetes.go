@@ -101,10 +101,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		} else {
 			data.Data["OVNHybridOverlayVXLANPort"] = ""
 		}
-		data.Data["OVNHybridOverlayEnable"] = "true"
+		data.Data["OVNHybridOverlayEnable"] = true
 	} else {
 		data.Data["OVNHybridOverlayNetCIDR"] = ""
-		data.Data["OVNHybridOverlayEnable"] = ""
+		data.Data["OVNHybridOverlayEnable"] = false
 		data.Data["OVNHybridOverlayVXLANPort"] = ""
 	}
 
