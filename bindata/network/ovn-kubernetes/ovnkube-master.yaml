@@ -218,7 +218,7 @@ spec:
                   fi
                 done
 
-                if [[ ${election_timer} -lt ${current_election_timer} ]]; then
+                if [[ ${election_timer} -ne ${current_election_timer} ]]; then
                   retries=0
                   while is_candidate=$(ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/status OVN_Northbound 2>/dev/null \
                     | grep "Role: candidate" ); do
@@ -390,7 +390,7 @@ spec:
                   fi
                 done
 
-                if [[ ${election_timer} -lt ${current_election_timer} ]]; then
+                if [[ ${election_timer} -ne ${current_election_timer} ]]; then
                   retries=0
                   while is_candidate=$(ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/status OVN_Southbound 2>/dev/null \
                     | grep "Role: candidate" ); do
