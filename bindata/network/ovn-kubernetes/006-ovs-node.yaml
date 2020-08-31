@@ -59,6 +59,7 @@ spec:
             if [[ ! -S /run/openvswitch/db.sock ]]; then
               systemctl restart ovsdb-server
             fi
+            ovs-appctl -t ovsdb-server vlog/set "file:jsonrpc:dbg"
             # Don't need to worry about restoring flows; this can only change if we've rebooted
             exec tail -F /host/var/log/openvswitch/ovs-vswitchd.log /host/var/log/openvswitch/ovsdb-server.log
           else
@@ -73,7 +74,6 @@ spec:
             }
             trap quit SIGTERM
             /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --system-id=random
-            ovs-appctl vlog/set "file:${OVS_LOG_LEVEL}"
             /usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
             echo "$(date -Iseconds) - ovs-daemons running"
 

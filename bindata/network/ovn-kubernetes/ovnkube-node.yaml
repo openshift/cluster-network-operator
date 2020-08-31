@@ -51,7 +51,7 @@ spec:
           exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
             --no-chdir --pidfile=/var/run/ovn/ovn-controller.pid \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
-            -vconsole:"${OVN_LOG_LEVEL}"
+            -vconsole:dbg
         securityContext:
           privileged: true
         env:
