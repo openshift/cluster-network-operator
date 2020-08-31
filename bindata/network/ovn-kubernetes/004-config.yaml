@@ -16,6 +16,9 @@ data:
     service-cidrs="{{.OVN_service_cidr}}"
     ovn-config-namespace="openshift-ovn-kubernetes"
     apiserver="{{.K8S_APISERVER}}"
+ 
+    [ovnkubernetesfeature]
+    enable-egress-ip=true
 
     [gateway]
     mode=local
