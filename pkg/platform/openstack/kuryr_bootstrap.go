@@ -326,12 +326,13 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 	log.Printf("Pod subnetpool %s present", podSubnetpoolId)
 
-	workerSubnet, err := findOpenStackSubnet(client, generateName("nodes", clusterID), tag)
+	workerSubnet, err := findOpenStackSubnet(client, generateName("nodes", clusterID), tag, clusterID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes subnet")
 	}
+
 	log.Printf("Found worker nodes subnet %s", workerSubnet.ID)
-	router, err := findOpenStackRouter(client, generateName("external-router", clusterID), tag)
+	router, err := ensureOpenStackRouter(client, generateName("external-router", clusterID), tag, workerSubnet.NetworkID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes router")
 	}
@@ -341,6 +342,14 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	ps, err := getOpenStackRouterPorts(client, routerId)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed list ports of worker nodes router")
+	}
+
+	if !lookupOpenStackPort(ps, workerSubnet.ID) {
+		log.Printf("Adding worker nodes %s subnet to the router", workerSubnet.ID)
+		err = ensureOpenStackRouterInterface(client, routerId, &workerSubnet.ID, nil)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create worker nodes subnet router interface")
+		}
 	}
 
 	if !lookupOpenStackPort(ps, svcSubnetId) {
