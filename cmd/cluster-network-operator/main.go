@@ -40,6 +40,7 @@ func init() {
 }
 
 func main() {
+	initControllerRuntimeLogging()
 	printVersion()
 	flag.Parse()
 
