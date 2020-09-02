@@ -24,6 +24,7 @@ spec:
     spec:
       serviceAccountName: sdn #needed to run privileged pods; not used for api access
       hostNetwork: true
+      hostPID: true
       priorityClassName: system-node-critical
       containers:
       - name: openvswitch
