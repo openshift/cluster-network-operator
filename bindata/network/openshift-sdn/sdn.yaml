@@ -234,6 +234,7 @@ metadata:
       This daemon set launches the OpenShift networking components (kube-proxy and openshift-sdn).
       It expects that OVS is running on the node.
     release.openshift.io/version: "{{.ReleaseVersion}}"
+    networkoperator.openshift.io/non-critical: ""
 spec:
   selector:
     matchLabels:
