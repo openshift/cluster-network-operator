@@ -3,7 +3,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: sdn-metrics
+    app: sdn
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
   name: monitor-sdn
@@ -16,14 +16,14 @@ spec:
     scheme: https
     tlsConfig:
       caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
-      serverName: sdn-metrics.openshift-sdn.svc
+      serverName: sdn.openshift-sdn.svc
   jobLabel: app
   namespaceSelector:
     matchNames:
     - openshift-sdn
   selector:
     matchLabels:
-      app: sdn-metrics
+      app: sdn
 ---
 apiVersion: v1
 kind: Service
@@ -31,12 +31,12 @@ metadata:
   annotations:
     service.beta.openshift.io/serving-cert-secret-name: sdn-metrics-certs
   labels:
-    app: sdn-metrics
-  name: sdn-metrics
+    app: sdn
+  name: sdn
   namespace: openshift-sdn
 spec:
   selector:
-    app: sdn-metrics
+    app: sdn
   clusterIP: None
   publishNotReadyAddresses: true
   ports:
