@@ -84,6 +84,79 @@ spec:
             cpu: 10m
             memory: 300Mi
 
+      - name: kube-rbac-proxy
+        image: {{.KubeRBACProxyImage}}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          TLS_PK=/etc/pki/tls/metrics-cert/tls.key
+          TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
+          # As the secret mount is optional we must wait for the files to be present.
+          # The service is created in monitor.yaml and this is created in sdn.yaml.
+          # If it isn't created there is probably an issue so we want to crashloop.
+          retries=0
+          while [[ "${retries}" -lt 100 ]]; do
+            TS=$(
+              curl \
+                -s \
+                --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+                "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/ovn-kubernetes/services/ovnkube-node" |
+                  python -c 'import json,sys; print(json.load(sys.stdin)["metadata"]["creationTimestamp"])'
+            ) || :
+            if [ ! -z "TS" ]; then
+              break
+            fi
+            (( retries += 1 ))
+            echo $(date -Iseconds) INFO: Failed to get ovnkube-node service from API. Retry "${retries}"/100 1>&2
+            sleep 20
+          done
+          if [ "${retries}" -ge 20 ]; then
+            echo $(date -Iseconds) FATAL: Unable to get ovnkube-node service from API.
+            exit 1
+          fi
+
+          TS=$(date -d "${TS}" +%s)
+          WARN_TS=$(( ${TS} + $(( 20 * 60)) ))
+          HAS_LOGGED_INFO=0
+          
+          log_missing_certs(){
+              CUR_TS=$(date +%s)
+              if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
+                echo $(date -Iseconds) WARN: ovn-node-metrics-cert not mounted after 20 minutes.
+              elif [[ "${HAS_LOGGED_INFO}" -eq 0 ]] ; then
+                echo $(date -Iseconds) INFO: ovn-node-metrics-cert not mounted. Waiting one hour.
+                HAS_LOGGED_INFO=1
+              fi
+          }
+          while [[ ! -f "${TLS_PK}" ||  ! -f "${TLS_CERT}" ]] ; do
+            log_missing_certs
+            sleep 5
+          done
+          
+          exec /usr/bin/kube-rbac-proxy \
+            --logtostderr \
+            --secure-listen-address=:9103 \
+            --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
+            --upstream=http://127.0.0.1:29103/ \
+            --tls-private-key-file=${TLS_PK} \
+            --tls-cert-file=${TLS_CERT}
+        ports:
+        - containerPort: 9103
+          name: https
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: ovn-node-metrics-cert
+          mountPath: /etc/pki/tls/metrics-cert
+          readOnly: True
+
       # ovnkube-node: does node-level bookkeeping and configuration
       - name: ovnkube-node
         image: "{{.OvnImage}}"
@@ -286,65 +359,10 @@ spec:
       - name: ovn-cert
         secret:
           secretName: ovn-cert
-      tolerations:
-      - operator: "Exists"
-
----
-kind: DaemonSet
-apiVersion: apps/v1
-metadata:
-  name: ovnkube-node-metrics
-  namespace: openshift-ovn-kubernetes
-  annotations:
-    kubernetes.io/description: |
-      RBAC proxy to expose metrics over HTTPS
-    release.openshift.io/version: "{{.ReleaseVersion}}"
-    networkoperator.openshift.io/non-critical: ""
-spec:
-  selector:
-    matchLabels:
-      app: ovnkube-node-metrics
-  updateStrategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        app: ovnkube-node-metrics
-        component: network
-        type: infra
-        openshift.io/component: network
-        kubernetes.io/os: "linux"
-    spec:
-      serviceAccountName: openshift-ovn-kubernetes-metrics
-      hostNetwork: true
-      containers:
-      - name: kube-rbac-proxy
-        image: {{.KubeRBACProxyImage}}
-        args:
-        - --logtostderr
-        - --secure-listen-address=:9103
-        - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
-        - --upstream=http://127.0.0.1:29103/
-        - --tls-private-key-file=/etc/pki/tls/metrics-cert/tls.key
-        - --tls-cert-file=/etc/pki/tls/metrics-cert/tls.crt
-        ports:
-        - containerPort: 9103
-          name: https
-        resources:
-          requests:
-            cpu: 10m
-            memory: 20Mi
-        terminationMessagePolicy: FallbackToLogsOnError
-        volumeMounts:
-        - name: ovn-node-metrics-cert
-          mountPath: /etc/pki/tls/metrics-cert
-          readOnly: True
-
-      nodeSelector:
-        beta.kubernetes.io/os: "linux"
-      volumes:
+          optional: true
       - name: ovn-node-metrics-cert
         secret:
           secretName: ovn-node-metrics-cert
+          optional: true
       tolerations:
       - operator: "Exists"
