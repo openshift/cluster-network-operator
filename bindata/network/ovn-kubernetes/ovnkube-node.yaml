@@ -228,7 +228,12 @@ spec:
         lifecycle:
           preStop:
             exec:
-              command: ["rm","-f","/etc/cni/net.d/10-ovn-kubernetes.conf"]
+              command:
+              - /bin/bash
+              - -c
+              - |
+                rm -f /etc/cni/net.d/10-ovn-kubernetes.conf
+                ovs-vsctl --timeout=30 --if-exists del-br br-int -- --if-exists del-br br-local
         readinessProbe:
           exec:
             command: ["test", "-f", "/etc/cni/net.d/10-ovn-kubernetes.conf"]

@@ -167,7 +167,12 @@ spec:
         lifecycle:
           preStop:
             exec:
-              command: ["rm","-f","/etc/cni/net.d/80-openshift-network.conf", "/host/opt/cni/bin/openshift-sdn"]
+              command:
+              - /bin/bash
+              - -c
+              - |
+                rm -f /etc/cni/net.d/80-openshift-network.conf /host/opt/cni/bin/openshift-sdn
+                ovs-vsctl --timeout=30 --if-exists del-br br0
         readinessProbe:
           exec:
             # openshift-sdn writes this file when it is ready to handle pod requests.
