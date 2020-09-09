@@ -561,6 +561,8 @@ spec:
                 type: string
               type:
                 type: string
+              provider:
+                type: string
           status:
             type: object
             properties:
