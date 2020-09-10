@@ -188,12 +188,27 @@ spec:
           # As the secret mount is optional we must wait for the files to be present.
           # The service is created in monitor.yaml and this is created in sdn.yaml.
           # If it isn't created there is probably an issue so we want to crashloop.
-          TS=$(curl \
-            --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-            -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
-            "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/openshift-sdn/services/sdn" |
-              python -c 'import json,sys; print(json.load(sys.stdin)["metadata"]["creationTimestamp"])'
-          )
+          retries=0
+          while [[ "${retries}" -lt 100 ]]; do
+            TS=$(
+              curl \
+                -s \
+                --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+                "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/openshift-sdn/services/sdn" |
+                  python -c 'import json,sys; print(json.load(sys.stdin)["metadata"]["creationTimestamp"])'
+            )
+            if [ ! -z "TS" ]; then
+              break
+            fi
+            (( retries += 1 ))
+            echo $(date -Iseconds) INFO: Failed to get sdn service from API. Retry "${retries}"/100 1>&2
+            sleep 20
+          done
+          if [ "${retries}" -ge 20 ]; then
+            echo $(date -Iseconds) FATAL: Unable to get sdn service from API.
+            exit 1
+          fi
 
           TS=$(date -d "${TS}" +%s)
           WARN_TS=$(( ${TS} + $(( 20 * 60)) ))
@@ -204,7 +219,7 @@ spec:
               if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
                 echo $(date -Iseconds) WARN: sdn-metrics-certs not mounted after 20 minutes.
               elif [[ "${HAS_LOGGED_INFO}" -eq 0 ]] ; then
-                echo $(date -Iseconds) INFO: sdn-metrics-certs not mounted. Waiting one hour.
+                echo $(date -Iseconds) INFO: sdn-metrics-certs not mounted. Waiting 20 minutes.
                 HAS_LOGGED_INFO=1
               fi
           }
