@@ -108,6 +108,7 @@ spec:
         openshift.io/component: network
     spec:
       hostNetwork: true
+      hostPID: true
       nodeSelector:
         kubernetes.io/os: linux
       priorityClassName: "system-node-critical"
