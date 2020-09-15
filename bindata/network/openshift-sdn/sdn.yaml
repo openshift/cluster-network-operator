@@ -119,6 +119,10 @@ spec:
           name: host-run-netns
           readOnly: true
           mountPropagation: HostToContainer
+        - name: host-var-run-netns
+          mountPath: /host/var/run/netns
+          mountPropagation: HostToContainer
+          readOnly: true
         # We mount our socket here
         - mountPath: /var/run/openshift-sdn
           name: host-var-run-openshift-sdn
@@ -256,6 +260,9 @@ spec:
       - name: host-run-netns
         hostPath:
           path: /run/netns
+      - name: host-var-run-netns
+        hostPath:
+          path: /var/run/netns
       - name: host-var-run-dbus
         hostPath:
           path: /var/run/dbus
