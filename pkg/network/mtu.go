@@ -11,7 +11,7 @@ import (
 func GetDefaultMTU() (int, error) {
 	// Get the interface with the default route
 	// TODO(cdc) handle v6-only nodes
-	routes, err := netlink.RouteList(nil, netlink.FAMILY_V4)
+	routes, err := netlink.RouteList(nil, netlink.FAMILY_ALL)
 	if err != nil {
 		return 0, errors.Wrapf(err, "could not list routes")
 	}

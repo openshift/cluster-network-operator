@@ -152,7 +152,7 @@ func FillDefaults(conf, previous *operv1.NetworkSpec) {
 	}
 	if previous == nil { // host mtu isn't used in subsequent runs, elide these logs
 		if err != nil {
-			log.Printf("Failed MTU probe, failling back to 1500: %v", err)
+			log.Printf("Failed MTU probe, falling back to 1500: %v", err)
 		} else {
 			log.Printf("Detected uplink MTU %d", hostMTU)
 		}
