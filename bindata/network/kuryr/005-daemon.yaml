@@ -26,15 +26,14 @@ spec:
       priorityClassName: system-node-critical
       initContainers:
         - name: block-mcs
-          image: {{ .CNIPluginsImage }}
           securityContext:
             privileged: true
+          image: {{ .DaemonImage }}
           command:
           - /bin/sh
           - -c
           - |
             #!/bin/sh
-
             set -x -e
 
             # Block MCS
@@ -48,6 +47,12 @@ spec:
             ip6tables -A OUTPUT -p tcp -m tcp --dport 22624 -j REJECT || true
             ip6tables -A FORWARD -p tcp -m tcp --dport 22623 -j REJECT || true
             ip6tables -A FORWARD -p tcp -m tcp --dport 22624 -j REJECT || true
+          volumeMounts:
+          # for the iptables wrapper
+          - mountPath: /host
+            name: host-slash
+            readOnly: true
+            mountPropagation: HostToContainer
       containers:
       - name: kuryr-cni
         image: {{ .DaemonImage }}
@@ -103,6 +108,9 @@ spec:
         - name: metrics-port
           containerPort: 9655
       volumes:
+      - name: host-slash
+        hostPath:
+          path: /
       - name: bin
         hostPath:
           path: {{.CNIBinDir}}
