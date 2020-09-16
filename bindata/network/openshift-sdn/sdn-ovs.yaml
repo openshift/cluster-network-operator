@@ -36,7 +36,7 @@ spec:
           set -euo pipefail
           export SYSTEMD_IGNORE_CHROOT=yes
           # Check to see if ovs is provided by the node:
-          if systemctl status ovsdb-server; then
+          if [[ $(strace gdbus call   --system --dest org.freedesktop.systemd1 --object-path /org/freedesktop/systemd1/unit/firewalld_2eservice --method org.freedesktop.DBus.Properties.Get "org.freedesktop.systemd1.Service" "ExecMainPID") == '(<uint32 0>,)' ]]; then
             echo "openvswitch is running in systemd"
             # In some very strange corner cases, the owner for /run/openvswitch
             # can be wrong, so we need to clean up and restart.
