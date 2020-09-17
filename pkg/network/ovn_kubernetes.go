@@ -86,7 +86,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_service_cidr"] = svcpools
 
 	if c.HybridOverlayConfig != nil {
-		if c.HybridOverlayConfig.HybridClusterNetwork != nil {
+		if len(c.HybridOverlayConfig.HybridClusterNetwork) > 0 {
 			data.Data["OVNHybridOverlayNetCIDR"] = c.HybridOverlayConfig.HybridClusterNetwork[0].CIDR
 		} else {
 			data.Data["OVNHybridOverlayNetCIDR"] = ""
