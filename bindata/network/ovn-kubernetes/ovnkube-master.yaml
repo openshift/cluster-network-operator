@@ -612,7 +612,7 @@ spec:
             memory: 300Mi
         env:
         - name: OVN_KUBE_LOG_LEVEL
-          value: "4"
+          value: "5"
         - name: K8S_NODE
           valueFrom:
             fieldRef:
