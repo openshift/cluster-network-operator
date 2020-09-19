@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -13,8 +14,6 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// vars
-var g = uint32(8061)
 var OVNKubernetesConfig = operv1.Network{
 	Spec: operv1.NetworkSpec{
 		ServiceNetwork: []string{"172.30.0.0/16"},
@@ -31,7 +30,7 @@ var OVNKubernetesConfig = operv1.Network{
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				GenevePort: &g,
+				GenevePort: ptrToUint32(8061),
 			},
 		},
 	},
@@ -70,6 +69,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "openshift-ovn-kubernetes-node")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-master")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ConfigMap", "openshift-ovn-kubernetes", "ovnkube-config")))
 
 	// make sure all deployments are in the master
 	for _, obj := range objs {
@@ -139,6 +139,159 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	g.Expect(script).To(ContainSubstring("pssl:9641:[::]"))
 }
 
+func TestRenderedOVNKubernetesConfig(t *testing.T) {
+	type testcase struct {
+		desc                string
+		expected            string
+		hybridOverlayConfig *operv1.HybridOverlayConfig
+	}
+	testcases := []testcase{
+		{
+			desc: "default",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://1.1.1.1:1111"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+
+[gateway]
+mode=local
+nodeport=true`,
+		},
+
+		{
+			desc: "HybridOverlay",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://1.1.1.1:1111"
+no-hostsubnet-nodes="kubernetes.io/os=windows"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+
+[gateway]
+mode=local
+nodeport=true
+
+[hybridoverlay]
+enabled=true
+cluster-subnets="10.132.0.0/14"`,
+			hybridOverlayConfig: &operv1.HybridOverlayConfig{
+				HybridClusterNetwork: []operv1.ClusterNetworkEntry{
+					{CIDR: "10.132.0.0/14", HostPrefix: 23},
+				},
+			},
+		},
+		{
+			desc: "HybridOverlay with custom VXLAN port",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://1.1.1.1:1111"
+no-hostsubnet-nodes="kubernetes.io/os=windows"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+
+[gateway]
+mode=local
+nodeport=true
+
+[hybridoverlay]
+enabled=true
+cluster-subnets="10.132.0.0/14"
+hybrid-overlay-vxlan-port="9000"`,
+
+			hybridOverlayConfig: &operv1.HybridOverlayConfig{
+				HybridClusterNetwork: []operv1.ClusterNetworkEntry{
+					{CIDR: "10.132.0.0/14", HostPrefix: 23},
+				},
+				HybridOverlayVXLANPort: ptrToUint32(9000),
+			},
+		},
+		{
+			desc: "HybridOverlay enabled with no ClusterNetworkEntry",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://1.1.1.1:1111"
+no-hostsubnet-nodes="kubernetes.io/os=windows"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+
+[gateway]
+mode=local
+nodeport=true
+
+[hybridoverlay]
+enabled=true`,
+
+			hybridOverlayConfig: &operv1.HybridOverlayConfig{},
+		},
+	}
+	g := NewGomegaWithT(t)
+
+	os.Setenv("KUBERNETES_SERVICE_HOST", "1.1.1.1")
+	os.Setenv("KUBERNETES_SERVICE_PORT", "1111")
+
+	for i, tc := range testcases {
+		t.Run(fmt.Sprintf("%d:%s", i, tc.desc), func(t *testing.T) {
+			OVNKubeConfig := OVNKubernetesConfig.DeepCopy()
+			if tc.hybridOverlayConfig != nil {
+				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = tc.hybridOverlayConfig
+			}
+			//set a few inputs so that the tests are not machine dependant
+			OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.MTU = ptrToUint32(1500)
+
+			crd := OVNKubeConfig.DeepCopy()
+			config := &crd.Spec
+
+			errs := validateOVNKubernetes(config)
+			g.Expect(errs).To(HaveLen(0))
+			FillDefaults(config, nil)
+
+			bootstrapResult := &bootstrap.BootstrapResult{
+				OVN: bootstrap.OVNBootstrapResult{
+					MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+				},
+			}
+			objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+			g.Expect(err).NotTo(HaveOccurred())
+			confFile := extractOVNKubeConfig(g, objs)
+			g.Expect(confFile).To(Equal(strings.TrimSpace(tc.expected)))
+		})
+	}
+
+}
+
 func findNBDBPostStart(objects []*uns.Unstructured) (string, error) {
 	var master *uns.Unstructured
 	for _, obj := range objects {
@@ -188,10 +341,6 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 	conf := &crd.Spec
 	conf.DefaultNetwork.OVNKubernetesConfig = nil
 
-	// vars
-	m := uint32(8900)
-	p := uint32(6081)
-
 	expected := operv1.NetworkSpec{
 		ServiceNetwork: []string{"172.30.0.0/16"},
 		ClusterNetwork: []operv1.ClusterNetworkEntry{
@@ -207,8 +356,8 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				MTU:        &m,
-				GenevePort: &p,
+				MTU:        ptrToUint32(8900),
+				GenevePort: ptrToUint32(6081),
 			},
 		},
 	}
@@ -238,13 +387,11 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	}
 
 	// set mtu to insanity
-	mtu := uint32(70000)
-	ovnConfig.MTU = &mtu
+	ovnConfig.MTU = ptrToUint32(70000)
 	errExpect("invalid MTU 70000")
 
 	// set geneve port to insanity
-	geneve := uint32(70001)
-	ovnConfig.GenevePort = &geneve
+	ovnConfig.GenevePort = ptrToUint32(70001)
 	errExpect("invalid GenevePort 70001")
 
 	config.ClusterNetwork = nil
@@ -333,14 +480,28 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	next.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = nil
 
 	// change the mtu
-	mtu := uint32(70000)
-	next.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
+	next.DefaultNetwork.OVNKubernetesConfig.MTU = ptrToUint32(70000)
 
 	// change the geneve port
-	geneve := uint32(34001)
-	next.DefaultNetwork.OVNKubernetesConfig.GenevePort = &geneve
+	next.DefaultNetwork.OVNKubernetesConfig.GenevePort = ptrToUint32(34001)
 	errs = isOVNKubernetesChangeSafe(prev, next)
 	g.Expect(errs).To(HaveLen(2))
 	g.Expect(errs[0]).To(MatchError("cannot change ovn-kubernetes MTU"))
 	g.Expect(errs[1]).To(MatchError("cannot change ovn-kubernetes genevePort"))
+}
+
+func extractOVNKubeConfig(g *WithT, objs []*uns.Unstructured) string {
+	for _, obj := range objs {
+		if obj.GetKind() == "ConfigMap" && obj.GetName() == "ovnkube-config" {
+			val, ok, err := uns.NestedString(obj.Object, "data", "ovnkube.conf")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(ok).To(BeTrue())
+			return string(val)
+		}
+	}
+	return ""
+}
+
+func ptrToUint32(x uint32) *uint32 {
+	return &x
 }
