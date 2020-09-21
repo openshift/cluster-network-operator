@@ -13,6 +13,7 @@ spec:
     plural: operatorpkis
     singular: operatorpki
   scope: Namespaced
+  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
       description: "OperatorPKI is a simple certificate authority. It is not intended
