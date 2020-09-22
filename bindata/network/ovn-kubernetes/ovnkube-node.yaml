@@ -124,9 +124,9 @@ spec:
           # Check to see if ovs is provided by the node. This is only for upgrade from 4.5->4.6 or
           # openshift-sdn to ovn-kube conversion
           if [ -f /etc/systemd/system/network-online.target.wants/ovs-configuration.service ]; then
-            gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
+            gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
           else
-            gateway_mode_flags="--gateway-mode local"
+            gateway_mode_flags="--gateway-mode local --gateway-interface none"
           fi
 
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
