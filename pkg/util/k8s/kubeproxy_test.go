@@ -41,6 +41,7 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
@@ -55,12 +56,16 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 0.0.0.0:9101
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
+showHiddenMetricsForVersion: ""
 udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
@@ -93,6 +98,7 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
@@ -107,12 +113,16 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 5.6.7.8:9999
 mode: userspace
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
+showHiddenMetricsForVersion: ""
 udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
@@ -141,6 +151,7 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
@@ -155,12 +166,16 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 5.6.7.8:9101
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
+showHiddenMetricsForVersion: ""
 udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
@@ -189,6 +204,7 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
@@ -203,12 +219,16 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 0.0.0.0:9999
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
+showHiddenMetricsForVersion: ""
 udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
@@ -240,6 +260,7 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
@@ -256,12 +277,16 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 0.0.0.0:9101
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: 1000+10
+showHiddenMetricsForVersion: ""
 udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
