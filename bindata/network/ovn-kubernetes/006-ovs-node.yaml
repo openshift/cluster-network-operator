@@ -48,8 +48,59 @@ spec:
             set +o allexport
           fi
           export SYSTEMD_IGNORE_CHROOT=yes
+          # systemctl may not be used in a separate PID namespace to reach
+          # the systemd running in PID 1. Therefore we need to use the dbus API
+          systemctl_restart(){
+            gdbus call \
+              --system \
+              --dest org.freedesktop.systemd1 \
+              --object-path /org/freedesktop/systemd1/unit/"$(svc_encode_name ${1})"_2eservice \
+              --method org.freedesktop.systemd1.Unit.Restart "replace"
+          }
+          svc_encode_name(){
+            # systemd encodes some characters, so far we only need to encode
+            # the character "-" but there may be more in the future.
+            echo "${1//-/_2d}"
+          }
+
           # Check to see if ovs is provided by the node:
-          if systemctl status ovsdb-server; then
+          wait_for_event() {
+            retries=0
+            sleeper=1
+            attempts=30
+            if [[ $1 =~ ^attempts= ]]; then
+              eval $1
+              shift
+            fi
+            while true; do
+              $@
+              if [[ $? != 0 ]]; then
+                ((retries += 1))
+                if [[ "${retries}" -gt ${attempts} ]]; then
+                  echo "error: $@ did not come up, exiting"
+                  exit 1
+                fi
+                echo "info: Waiting for $@ to come up, waiting ${sleeper}s ..."
+                sleep ${sleeper}
+                sleeper=5
+              else
+                if [[ "${retries}" != 0 ]]; then
+                  echo "$@ came up in ${retries} ${sleeper} sec tries"
+                fi
+                break
+              fi
+            done
+          }
+          service_file_found() {
+            if [[ -f '/host/usr/local/bin/configure-ovs.sh' ]]; then
+              return 0
+            fi
+            return 1
+          }
+          wait_for_event service_file_found || true
+
+          # Check to see if ovs is provided by the node:
+          if [[ -f '/host/usr/local/bin/configure-ovs.sh' ]]; then
             echo "openvswitch is running in systemd"
             # In some very strange corner cases, the owner for /run/openvswitch
             # can be wrong, so we need to clean up and restart.
@@ -57,7 +108,7 @@ spec:
             ovs_gid=$(chroot /host id -g openvswitch)
             chown -R "${ovs_uid}:${ovs_gid}" /run/openvswitch
             if [[ ! -S /run/openvswitch/db.sock ]]; then
-              systemctl restart ovsdb-server
+              systemctl_restart ovsdb-server
             fi
             # Don't need to worry about restoring flows; this can only change if we've rebooted
             exec tail -F /host/var/log/openvswitch/ovs-vswitchd.log /host/var/log/openvswitch/ovsdb-server.log
