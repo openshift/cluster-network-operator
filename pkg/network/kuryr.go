@@ -157,6 +157,19 @@ func validateKuryr(conf *operv1.NetworkSpec) []error {
 		octaviaServiceNet = &octaviaServiceNetObj
 	}
 
+	if kc != nil && kc.PoolBatchPorts != nil {
+		if *kc.PoolBatchPorts > 0 {
+			if kc.PoolMinPorts > 0 && *kc.PoolBatchPorts < kc.PoolMinPorts {
+				out = append(out, errors.Errorf("poolBatchPorts cannot be set below poolMinPorts"))
+			}
+			if kc.PoolMaxPorts > 0 && *kc.PoolBatchPorts > kc.PoolMaxPorts {
+				out = append(out, errors.Errorf("poolBatchPorts cannot be set above poolMaxPorts"))
+			}
+		} else {
+			out = append(out, errors.Errorf("poolBatchPorts has to have at least value of 1"))
+		}
+	}
+
 	if octaviaServiceNet != nil {
 		if clusterNet != nil && iputil.NetsOverlap(*octaviaServiceNet, *clusterNet) {
 			out = append(out, errors.Errorf("octaviaServiceNetwork %s will overlap with cluster network %s "+
