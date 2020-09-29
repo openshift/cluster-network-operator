@@ -102,14 +102,6 @@ spec:
           # Check to see if ovs is provided by the node:
           if [[ -f '/host/usr/local/bin/configure-ovs.sh' ]]; then
             echo "openvswitch is running in systemd"
-            # In some very strange corner cases, the owner for /run/openvswitch
-            # can be wrong, so we need to clean up and restart.
-            ovs_uid=$(chroot /host id -u openvswitch)
-            ovs_gid=$(chroot /host id -g openvswitch)
-            chown -R "${ovs_uid}:${ovs_gid}" /run/openvswitch
-            if [[ ! -S /run/openvswitch/db.sock ]]; then
-              systemctl_restart ovsdb-server
-            fi
             # Don't need to worry about restoring flows; this can only change if we've rebooted
             exec tail -F /host/var/log/openvswitch/ovs-vswitchd.log /host/var/log/openvswitch/ovsdb-server.log
           else
