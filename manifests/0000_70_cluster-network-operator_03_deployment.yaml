@@ -46,9 +46,9 @@ spec:
         - name: OVN_IMAGE
           value: "quay.io/openshift/origin-ovn-kubernetes:4.3"
         - name: OVN_NB_RAFT_ELECTION_TIMER
-          value: "5000"
+          value: "10000"
         - name: OVN_SB_RAFT_ELECTION_TIMER
-          value: "5000"
+          value: "16000"
         - name: OVN_NORTHD_PROBE_INTERVAL
           value: "5000"
         - name: OVN_CONTROLLER_INACTIVITY_PROBE
