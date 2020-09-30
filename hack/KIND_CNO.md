@@ -38,7 +38,7 @@ CNO_PATH=${CNO_PATH:-$GOPATH/src/github.com/openshift/cluster-network-operator}
 OVN_K8S_PATH=${OVN_K8S_PATH:-$GOPATH/src/github.com/ovn-org/ovn-kubernetes}
 KIND_CONFIG=${KIND_CONFIG:-$HOME/kind-ovn-config.yaml}
 export KUBECONFIG=${HOME}/kube-ovn.conf
-NUM_MASTER_NODES=1
+NUM_MASTER_NODES={$NUM_MASTER_NODES:-1}
 OVN_KIND_VERBOSITY=${OVN_KIND_VERBOSITY:-5}
 ```
 
@@ -79,6 +79,15 @@ $ IP_FAMILY=ipv6 ovn-kind-cno.sh
 This will build an OVN K8S docker image to use with the deployment from a local git workspace. By default the script will use
 a path relative to your GOPATH. To override this, specify `CNO_PATH` or `OVN_K8S_PATH` when executing the above.
 
+Note, when building OVN K8S using BUILD_OVN=true, you *must* build from openshift/ovn-kubernetes. This is due to downstream only
+patches which currently will specify gateway-interface as "none" in CNO that does not currently exist upstream.
+
+In order to deploy an HA deployment, set NUM_MASTER_NODES to 3:
+
+```
+$ NUM_MASTER_NODES=3 ovn-kind-cno.sh
+```
+
 ### Post deployment
 
 Post deployment you can simply use kubectl to interact with your cluster. Additionally you may wish to exec into the
@@ -101,6 +110,12 @@ e6fca3ad23f05       303ce5db0e90d       3 hours ago         Running             
 43d6cfc99f9f0       06f726e5bab40       3 hours ago         Running             kube-apiserver            0                   42834ae09e8ce
 898e5e0a7aa64       4b2a99ce99208       3 hours ago         Running             kube-controller-manager   0                   a5bf81537cd99
 3d761203df63c       5e7eb76f91581       3 hours ago         Running             kube-scheduler            0                   34ef9a3da0f2d
+```
+
+If using HA mode, may also want to remove the master taint so you can deploy pods or run e2e workloads on master nodes:
+
+```
+kubectl taint nodes --all node-role.kubernetes.io/master-
 ```
 
 Kubelet logs can also be found via journalctl.

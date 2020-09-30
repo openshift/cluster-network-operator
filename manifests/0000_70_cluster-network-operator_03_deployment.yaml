@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: network-operator
-        image: quay.io/openshift/origin-cluster-network-operator:4.3
+        image: quay.io/openshift/origin-cluster-network-operator:4.6
         command:
         - "/usr/bin/cluster-network-operator"
         - "--url-only-kubeconfig=/etc/kubernetes/kubeconfig"
@@ -34,17 +34,17 @@ spec:
         - name: KUBE_RBAC_PROXY_IMAGE
           value: "quay.io/openshift/origin-kube-rbac-proxy:4.3"
         - name: MULTUS_IMAGE
-          value: "quay.io/openshift/origin-multus-cni:4.3"
+          value: "quay.io/openshift/origin-multus-cni:4.6"
         - name: MULTUS_ADMISSION_CONTROLLER_IMAGE
-          value: "quay.io/openshift/origin-multus-admission-controller:4.3"
+          value: "quay.io/openshift/origin-multus-admission-controller:4.6"
         - name: CNI_PLUGINS_IMAGE
-          value: "quay.io/openshift/origin-container-networking-plugins:4.3"
+          value: "quay.io/openshift/origin-container-networking-plugins:4.6"
         - name: WHEREABOUTS_CNI_IMAGE
-          value: "quay.io/openshift/origin-multus-whereabouts-ipam-cni:4.4"
+          value: "quay.io/openshift/origin-multus-whereabouts-ipam-cni:4.6"
         - name: ROUTE_OVERRRIDE_CNI_IMAGE
-          value: "quay.io/openshift/origin-multus-route-override-cni:4.4"
+          value: "quay.io/openshift/origin-multus-route-override-cni:4.6"
         - name: OVN_IMAGE
-          value: "quay.io/openshift/origin-ovn-kubernetes:4.3"
+          value: "quay.io/openshift/origin-ovn-kubernetes:4.6"
         - name: OVN_NB_RAFT_ELECTION_TIMER
           value: "10000"
         - name: OVN_SB_RAFT_ELECTION_TIMER
