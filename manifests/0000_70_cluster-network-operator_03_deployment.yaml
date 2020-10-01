@@ -55,6 +55,8 @@ spec:
           value: "5000"
         - name: OVN_CONTROLLER_INACTIVITY_PROBE
           value: "30000"
+        - name: EGRESS_ROUTER_CNI_IMAGE
+          value: "quay.io/openshift/origin-egress-router-cni:latest"
         - name: KURYR_DAEMON_IMAGE
           value: "quay.io/openshift/origin-kuryr-cni:latest"
         - name: KURYR_CONTROLLER_IMAGE
