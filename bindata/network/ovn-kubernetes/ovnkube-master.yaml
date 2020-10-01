@@ -201,7 +201,7 @@ spec:
               --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
               --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
               --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
-              --db-nb-cluster-remote-addr=$(bracketify ${init_ip}) \
+              --db-nb-cluster-remote-addr=${init_ip} \
               --no-monitor \
               --db-nb-cluster-local-proto=ssl \
               --db-nb-cluster-remote-proto=ssl \
@@ -229,7 +229,7 @@ spec:
                 --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
                 --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
                 --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
-                --db-nb-cluster-remote-addr=$(bracketify ${init_ip}) \
+                --db-nb-cluster-remote-addr=${init_ip} \
                 --no-monitor \
                 --db-nb-cluster-local-proto=ssl \
                 --db-nb-cluster-remote-proto=ssl \
@@ -537,7 +537,7 @@ spec:
               --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
               --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
               --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
-              --db-sb-cluster-remote-addr=$(bracketify ${init_ip}) \
+              --db-sb-cluster-remote-addr=${init_ip} \
               --no-monitor \
               --db-sb-cluster-local-proto=ssl \
               --db-sb-cluster-remote-proto=ssl \
@@ -564,7 +564,7 @@ spec:
                 --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
                 --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
                 --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
-                --db-sb-cluster-remote-addr=$(bracketify ${init_ip}) \
+                --db-sb-cluster-remote-addr=${init_ip} \
                 --no-monitor \
                 --db-sb-cluster-local-proto=ssl \
                 --db-sb-cluster-remote-proto=ssl \
