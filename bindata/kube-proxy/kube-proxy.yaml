@@ -68,10 +68,6 @@ spec:
         ports:
         - name: healthz
           containerPort: {{.HealthzPort}}
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: healthz
         readinessProbe:
           httpGet:
             path: /healthz
