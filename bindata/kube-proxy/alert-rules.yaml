@@ -1,0 +1,62 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: k8s
+    role: alert-rules
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+  name: networking-rules
+  namespace: openshift-kube-proxy
+spec:
+  groups:
+  - name: cluster-network-operator-kube-proxy.rules
+    rules:
+    # note: all joins on kube_pod_* need a a "topk by (key) (1, <metric> )"
+    # otherwise you will generate query errors when kube_state_metrics is being
+    # upgraded and there are duplicate rows on the "right" side of the join.
+    - alert: NodeWithoutKubeProxyPod
+      annotations:
+        message: |
+          All nodes should be running a kube-proxy pod, {{"{{"}} $labels.node {{"}}"}} is not.
+      expr: |
+        (kube_node_info unless on(node) topk by (node) (1, kube_pod_info{namespace="openshift-kube-proxy",  pod=~"kube-proxy.*"})) > 0
+      for: 10m
+      labels:
+        severity: warning
+    - alert: NodeProxyApplySlow
+      annotations:
+        message: Kube-proxy pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} is taking too long, on average, to apply kubernetes service rules to iptables.
+      expr: |
+        histogram_quantile(.95, kubeproxy_sync_proxy_rules_duration_seconds_bucket) 
+        * on(namespace, pod) group_right topk by (namespace, pod) (1, kube_pod_info{namespace="openshift-kube-proxy",  pod=~"kube-proxy-[^-]*"}) > 15
+      labels:
+        severity: warning
+    - alert: ClusterProxyApplySlow
+      annotations:
+        message: The cluster is taking too long, on average, to apply kubernetes service rules to iptables.
+      expr: |
+        histogram_quantile(0.95, sum(rate(kubeproxy_sync_proxy_rules_duration_seconds_bucket[5m])) by (le)) > 10
+      labels:
+        severity: warning
+    - alert: NodeProxyApplyStale
+      annotations:
+        message: Kube-proxy pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} has stale kubernetes service rules in iptables.
+      # Query: find pods where
+      #  - the queued-timestamp is at least 30 seconds after the applied-timestamp
+      #  - the pod (still) exists
+      expr: |
+        (kubeproxy_sync_proxy_rules_last_queued_timestamp_seconds - kubeproxy_sync_proxy_rules_last_timestamp_seconds)
+        * on(namespace, pod) group_right() topk by (namespace, pod) (1, kube_pod_info{namespace="openshift-kube-proxy",pod=~"kube-proxy-[^-]*"})
+        > 30
+      for: 5m # quiet any churn on restarts.
+      labels:
+        severity: warning
+    - alert: KubeProxyPodNotReady
+      annotations:
+        message: Kube-proxy pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} is not ready.
+      expr: |
+        kube_pod_status_ready{namespace='openshift-kube-proxy', condition='true'} == 0
+      for: 10m
+      labels:
+        severity: warning
