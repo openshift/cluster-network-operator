@@ -3,7 +3,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: ovnkube-master-metrics
+    app: ovnkube-master
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
   name: monitor-ovn-master-metrics
@@ -23,20 +23,20 @@ spec:
     - openshift-ovn-kubernetes
   selector:
     matchLabels:
-      app: ovnkube-master-metrics
+      app: ovnkube-master
 ---
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: ovnkube-master-metrics
-  name: ovn-kubernetes-master-metrics
+    app: ovnkube-master
+  name: ovn-kubernetes-master
   namespace: openshift-ovn-kubernetes
   annotations:
     service.beta.openshift.io/serving-cert-secret-name: ovn-master-metrics-cert
 spec:
   selector:
-    app: ovnkube-master-metrics
+    app: ovnkube-master
   clusterIP: None
   publishNotReadyAddresses: true
   ports:
@@ -52,10 +52,10 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: ovnkube-node-metrics
+    app: ovnkube-node
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
-  name: monitor-ovn-node-metrics
+  name: monitor-ovn-node
   namespace: openshift-ovn-kubernetes
 spec:
   endpoints:
@@ -72,20 +72,20 @@ spec:
     - openshift-ovn-kubernetes
   selector:
     matchLabels:
-      app: ovnkube-node-metrics
+      app: ovnkube-node
 ---
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: ovnkube-node-metrics
-  name: ovn-kubernetes-node-metrics
+    app: ovnkube-node
+  name: ovn-kubernetes-node
   namespace: openshift-ovn-kubernetes
   annotations:
     service.beta.openshift.io/serving-cert-secret-name: ovn-node-metrics-cert
 spec:
   selector:
-    app: ovnkube-node-metrics
+    app: ovnkube-node
   clusterIP: None
   publishNotReadyAddresses: true
   ports:
