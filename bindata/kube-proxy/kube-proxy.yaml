@@ -67,10 +67,6 @@ spec:
           containerPort: 10256
         - name: metrics
           containerPort: 9101
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: healthz
         readinessProbe:
           httpGet:
             path: /healthz
