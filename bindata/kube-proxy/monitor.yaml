@@ -32,9 +32,9 @@ spec:
   clusterIP: None
   ports:
   - name: metrics
-    port: 9101
+    port: {{.MetricsPort}}
     protocol: TCP
-    targetPort: 9101
+    targetPort: {{.MetricsPort}}
   sessionAffinity: None
   type: ClusterIP
 ---

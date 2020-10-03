@@ -65,9 +65,9 @@ spec:
         terminationMessagePolicy: FallbackToLogsOnError
         ports:
         - name: healthz
-          containerPort: 10256
+          containerPort: {{.HealthzPort}}
         - name: metrics
-          containerPort: 9101
+          containerPort: {{.MetricsPort}}
         livenessProbe:
           httpGet:
             path: /healthz
