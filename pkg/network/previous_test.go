@@ -47,7 +47,6 @@ func TestPreviousVersionsSafe(t *testing.T) {
 			FillDefaults(applied, applied)
 
 			// This is the exact config transformation flow in the operator
-			Canonicalize(input)
 			g.Expect(Validate(input)).NotTo(HaveOccurred())
 			FillDefaults(input, applied)
 			g.Expect(IsChangeSafe(applied, input)).NotTo(HaveOccurred())
