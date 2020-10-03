@@ -113,9 +113,6 @@ func validateOpenShiftSDN(conf *operv1.NetworkSpec) []error {
 		}
 	}
 
-	proxyErrs := validateKubeProxy(conf)
-	out = append(out, proxyErrs...)
-
 	return out
 }
 
@@ -164,7 +161,6 @@ func fillOpenShiftSDNDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 	if conf.KubeProxyConfig.BindAddress == "" {
 		conf.KubeProxyConfig.BindAddress = "0.0.0.0"
 	}
-
 	if conf.KubeProxyConfig.ProxyArguments == nil {
 		conf.KubeProxyConfig.ProxyArguments = map[string]operv1.ProxyArgumentList{}
 	}

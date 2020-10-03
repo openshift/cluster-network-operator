@@ -207,16 +207,20 @@ func TestShouldDeployKubeProxy(t *testing.T) {
 		},
 	}
 
-	g.Expect(shouldDeployKubeProxy(c)).To(BeFalse())
+	g.Expect(acceptsKubeProxyConfig(c)).To(BeTrue())
+	g.Expect(defaultDeployKubeProxy(c)).To(BeFalse())
 
 	c.DefaultNetwork.Type = operv1.NetworkTypeOVNKubernetes
-	g.Expect(shouldDeployKubeProxy(c)).To(BeFalse())
+	g.Expect(acceptsKubeProxyConfig(c)).To(BeFalse())
+	g.Expect(defaultDeployKubeProxy(c)).To(BeFalse())
 
 	c.DefaultNetwork.Type = operv1.NetworkTypeKuryr
-	g.Expect(shouldDeployKubeProxy(c)).To(BeFalse())
+	g.Expect(acceptsKubeProxyConfig(c)).To(BeFalse())
+	g.Expect(defaultDeployKubeProxy(c)).To(BeFalse())
 
 	c.DefaultNetwork.Type = "Flannel"
-	g.Expect(shouldDeployKubeProxy(c)).To(BeTrue())
+	g.Expect(acceptsKubeProxyConfig(c)).To(BeTrue())
+	g.Expect(defaultDeployKubeProxy(c)).To(BeTrue())
 }
 
 func TestValidateKubeProxy(t *testing.T) {
