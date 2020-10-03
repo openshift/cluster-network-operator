@@ -19,35 +19,35 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	objs := []*uns.Unstructured{}
 
 	// render Multus
-	o, err := RenderMultus(conf, manifestDir)
+	o, err := renderMultus(conf, manifestDir)
 	if err != nil {
 		return nil, err
 	}
 	objs = append(objs, o...)
 
 	// render MultusAdmissionController
-	o, err = RenderMultusAdmissionController(conf, manifestDir)
+	o, err = renderMultusAdmissionController(conf, manifestDir)
 	if err != nil {
 		return nil, err
 	}
 	objs = append(objs, o...)
 
 	// render default network
-	o, err = RenderDefaultNetwork(conf, bootstrapResult, manifestDir)
+	o, err = renderDefaultNetwork(conf, bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, err
 	}
 	objs = append(objs, o...)
 
 	// render kube-proxy
-	o, err = RenderStandaloneKubeProxy(conf, manifestDir)
+	o, err = renderStandaloneKubeProxy(conf, manifestDir)
 	if err != nil {
 		return nil, err
 	}
 	objs = append(objs, o...)
 
 	// render additional networks
-	o, err = RenderAdditionalNetworks(conf, manifestDir)
+	o, err = renderAdditionalNetworks(conf, manifestDir)
 	if err != nil {
 		return nil, err
 	}
@@ -145,10 +145,10 @@ func DeprecatedCanonicalize(conf *operv1.NetworkSpec) {
 func Validate(conf *operv1.NetworkSpec) error {
 	errs := []error{}
 
-	errs = append(errs, ValidateIPPools(conf)...)
-	errs = append(errs, ValidateDefaultNetwork(conf)...)
-	errs = append(errs, ValidateMultus(conf)...)
-	errs = append(errs, ValidateStandaloneKubeProxy(conf)...)
+	errs = append(errs, validateIPPools(conf)...)
+	errs = append(errs, validateDefaultNetwork(conf)...)
+	errs = append(errs, validateMultus(conf)...)
+	errs = append(errs, validateStandaloneKubeProxy(conf)...)
 
 	if len(errs) > 0 {
 		return errors.Errorf("invalid configuration: %v", errs)
@@ -162,7 +162,7 @@ func Validate(conf *operv1.NetworkSpec) error {
 // Defaults are carried forward from previous if it is provided. This is so we
 // can change defaults as we move forward, but won't disrupt existing clusters.
 func FillDefaults(conf, previous *operv1.NetworkSpec) {
-	hostMTU, err := GetDefaultMTU()
+	hostMTU, err := getDefaultMTU()
 	if hostMTU == 0 {
 		hostMTU = 1500
 	}
@@ -183,8 +183,8 @@ func FillDefaults(conf, previous *operv1.NetworkSpec) {
 		conf.LogLevel = "Normal"
 	}
 
-	FillDefaultNetworkDefaults(conf, previous, hostMTU)
-	FillKubeProxyDefaults(conf, previous)
+	fillDefaultNetworkDefaults(conf, previous, hostMTU)
+	fillKubeProxyDefaults(conf, previous)
 }
 
 // IsChangeSafe checks to see if the change between prev and next are allowed
@@ -214,7 +214,7 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 	}
 
 	// Check the default network
-	errs = append(errs, IsDefaultNetworkChangeSafe(prev, next)...)
+	errs = append(errs, isDefaultNetworkChangeSafe(prev, next)...)
 
 	// Changing AdditionalNetworks is supported
 
@@ -223,7 +223,7 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 	}
 
 	// Check kube-proxy
-	errs = append(errs, IsKubeProxyChangeSafe(prev, next)...)
+	errs = append(errs, isKubeProxyChangeSafe(prev, next)...)
 
 	if len(errs) > 0 {
 		return errors.Errorf("invalid configuration: %v", errs)
@@ -231,9 +231,9 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 	return nil
 }
 
-// ValidateIPPools checks that all IP addresses are valid
+// validateIPPools checks that all IP addresses are valid
 // TODO: check for overlap
-func ValidateIPPools(conf *operv1.NetworkSpec) []error {
+func validateIPPools(conf *operv1.NetworkSpec) []error {
 	errs := []error{}
 	for idx, pool := range conf.ClusterNetwork {
 		_, _, err := net.ParseCIDR(pool.CIDR)
@@ -251,8 +251,8 @@ func ValidateIPPools(conf *operv1.NetworkSpec) []error {
 	return errs
 }
 
-// ValidateMultus validates the combination of DisableMultiNetwork and AddtionalNetworks
-func ValidateMultus(conf *operv1.NetworkSpec) []error {
+// validateMultus validates the combination of DisableMultiNetwork and AddtionalNetworks
+func validateMultus(conf *operv1.NetworkSpec) []error {
 	// DisableMultiNetwork defaults to false
 	deployMultus := true
 	if conf.DisableMultiNetwork != nil && *conf.DisableMultiNetwork {
@@ -267,9 +267,9 @@ func ValidateMultus(conf *operv1.NetworkSpec) []error {
 	return []error{}
 }
 
-// ValidateDefaultNetwork validates whichever network is specified
+// validateDefaultNetwork validates whichever network is specified
 // as the default network.
-func ValidateDefaultNetwork(conf *operv1.NetworkSpec) []error {
+func validateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 	switch conf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		return validateOpenShiftSDN(conf)
@@ -282,11 +282,11 @@ func ValidateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 	}
 }
 
-// RenderDefaultNetwork generates the manifests corresponding to the requested
+// renderDefaultNetwork generates the manifests corresponding to the requested
 // default network
-func RenderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	dn := conf.DefaultNetwork
-	if errs := ValidateDefaultNetwork(conf); len(errs) > 0 {
+	if errs := validateDefaultNetwork(conf); len(errs) > 0 {
 		return nil, errors.Errorf("invalid Default Network configuration: %v", errs)
 	}
 
@@ -303,8 +303,7 @@ func RenderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 	}
 }
 
-// FillDefaultNetworkDefaults
-func FillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
+func fillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 	switch conf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		fillOpenShiftSDNDefaults(conf, previous, hostMTU)
@@ -316,7 +315,7 @@ func FillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int)
 	}
 }
 
-func IsDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
+func isDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	if prev.DefaultNetwork.Type != next.DefaultNetwork.Type {
 		return []error{errors.Errorf("cannot change default network type")}
 	}
@@ -334,7 +333,7 @@ func IsDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 }
 
 // ValidateAdditionalNetworks validates additional networks configs
-func ValidateAdditionalNetworks(conf *operv1.NetworkSpec) []error {
+func validateAdditionalNetworks(conf *operv1.NetworkSpec) []error {
 	out := []error{}
 	ans := conf.AdditionalNetworks
 	for _, an := range ans {
@@ -354,15 +353,15 @@ func ValidateAdditionalNetworks(conf *operv1.NetworkSpec) []error {
 	return out
 }
 
-// RenderAdditionalNetworks generates the manifests of the requested additional networks
-func RenderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+// renderAdditionalNetworks generates the manifests of the requested additional networks
+func renderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	var err error
 	ans := conf.AdditionalNetworks
 	out := []*uns.Unstructured{}
 	objs := []*uns.Unstructured{}
 
 	// validate additional network configuration
-	if errs := ValidateAdditionalNetworks(conf); len(errs) > 0 {
+	if errs := validateAdditionalNetworks(conf); len(errs) > 0 {
 		return nil, errors.Errorf("invalid Additional Network Configuration: %v", errs)
 	}
 
@@ -393,8 +392,8 @@ func RenderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 	return out, nil
 }
 
-// RenderMultusAdmissionController generates the manifests of Multus Admission Controller
-func RenderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+// renderMultusAdmissionController generates the manifests of Multus Admission Controller
+func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	if *conf.DisableMultiNetwork {
 		return nil, nil
 	}

@@ -207,16 +207,16 @@ func TestShouldDeployKubeProxy(t *testing.T) {
 		},
 	}
 
-	g.Expect(ShouldDeployKubeProxy(c)).To(BeFalse())
+	g.Expect(shouldDeployKubeProxy(c)).To(BeFalse())
 
 	c.DefaultNetwork.Type = operv1.NetworkTypeOVNKubernetes
-	g.Expect(ShouldDeployKubeProxy(c)).To(BeFalse())
+	g.Expect(shouldDeployKubeProxy(c)).To(BeFalse())
 
 	c.DefaultNetwork.Type = operv1.NetworkTypeKuryr
-	g.Expect(ShouldDeployKubeProxy(c)).To(BeFalse())
+	g.Expect(shouldDeployKubeProxy(c)).To(BeFalse())
 
 	c.DefaultNetwork.Type = "Flannel"
-	g.Expect(ShouldDeployKubeProxy(c)).To(BeTrue())
+	g.Expect(shouldDeployKubeProxy(c)).To(BeTrue())
 }
 
 func TestValidateKubeProxy(t *testing.T) {
@@ -330,7 +330,7 @@ func TestFillKubeProxyDefaults(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		FillKubeProxyDefaults(tc.in, nil)
+		fillKubeProxyDefaults(tc.in, nil)
 		g.Expect(tc.in).To(Equal(tc.out))
 	}
 }
@@ -351,9 +351,9 @@ func TestRenderKubeProxy(t *testing.T) {
 		},
 	}
 
-	FillKubeProxyDefaults(c, nil)
+	fillKubeProxyDefaults(c, nil)
 
-	objs, err := RenderStandaloneKubeProxy(c, manifestDir)
+	objs, err := renderStandaloneKubeProxy(c, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	g.Expect(objs).To(HaveLen(10))

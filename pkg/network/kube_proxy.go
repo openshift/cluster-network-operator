@@ -14,12 +14,12 @@ import (
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
 )
 
-// ShouldDeployKubeProxy determines if the desired network type should
+// shouldDeployKubeProxy determines if the desired network type should
 // install kube-proxy.
 // openshift-sdn deploys its own kube-proxy. ovn-kubernetes and
 // Kuryr-Kubernetes handle services on their own. All other
 // network providers are assumed to require kube-proxy
-func ShouldDeployKubeProxy(conf *operv1.NetworkSpec) bool {
+func shouldDeployKubeProxy(conf *operv1.NetworkSpec) bool {
 	switch conf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		return false
@@ -54,10 +54,10 @@ func kubeProxyConfiguration(pluginDefaults map[string]operv1.ProxyArgumentList, 
 	return k8sutil.GenerateKubeProxyConfiguration(args)
 }
 
-// ValidateStandaloneKubeProxy validates the kube-proxy configuration if
+// validateStandaloneKubeProxy validates the kube-proxy configuration if
 // installation is requested.
-func ValidateStandaloneKubeProxy(conf *operv1.NetworkSpec) []error {
-	if ShouldDeployKubeProxy(conf) {
+func validateStandaloneKubeProxy(conf *operv1.NetworkSpec) []error {
+	if shouldDeployKubeProxy(conf) {
 		return validateKubeProxy(conf)
 	}
 	return nil
@@ -104,11 +104,11 @@ func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 	return out
 }
 
-// FillKubeProxyDefaults inserts kube-proxy defaults, but only if
+// fillKubeProxyDefaults inserts kube-proxy defaults, but only if
 // kube-proxy will be deployed explicitly.
-func FillKubeProxyDefaults(conf, previous *operv1.NetworkSpec) {
+func fillKubeProxyDefaults(conf, previous *operv1.NetworkSpec) {
 	if conf.DeployKubeProxy == nil {
-		v := ShouldDeployKubeProxy(conf)
+		v := shouldDeployKubeProxy(conf)
 		conf.DeployKubeProxy = &v
 	}
 
@@ -136,16 +136,16 @@ func FillKubeProxyDefaults(conf, previous *operv1.NetworkSpec) {
 	}
 }
 
-// IsKubeProxyChangeSafe is noop, but it would check if the proposed kube-proxy
+// isKubeProxyChangeSafe is noop, but it would check if the proposed kube-proxy
 // change is safe.
-func IsKubeProxyChangeSafe(prev, next *operv1.NetworkSpec) []error {
+func isKubeProxyChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	// At present, all kube-proxy changes are safe to deploy
 	return nil
 }
 
-// RenderStandaloneKubeProxy renders the standalone kube-proxy if installation was
+// renderStandaloneKubeProxy renders the standalone kube-proxy if installation was
 // requested.
-func RenderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	if !*conf.DeployKubeProxy {
 		return nil, nil
 	}
