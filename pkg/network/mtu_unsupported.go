@@ -2,4 +2,4 @@
 
 package network
 
-func GetDefaultMTU() (int, error) { return 1500, nil }
+func getDefaultMTU() (int, error) { return 1500, nil }

@@ -16,8 +16,8 @@ const (
 	CNIBinDir        = "/var/lib/cni/bin"
 )
 
-// RenderMultus generates the manifests of Multus
-func RenderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+// renderMultus generates the manifests of Multus
+func renderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	if *conf.DisableMultiNetwork {
 		return nil, nil
 	}
@@ -31,7 +31,7 @@ func RenderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 	}
 	out = append(out, objs...)
 
-	usedhcp := UseDHCP(conf)
+	usedhcp := useDHCP(conf)
 	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), usedhcp)
 	if err != nil {
 		return nil, err

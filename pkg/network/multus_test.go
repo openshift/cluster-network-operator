@@ -38,14 +38,14 @@ func TestRenderMultus(t *testing.T) {
 	FillDefaults(config, nil)
 
 	// disable Multus
-	objs, err := RenderMultus(config, manifestDir)
+	objs, err := renderMultus(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus")))
 
 	// enable Multus
 	enabled := false
 	config.DisableMultiNetwork = &enabled
-	objs, err = RenderMultus(config, manifestDir)
+	objs, err = renderMultus(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus")))
 
