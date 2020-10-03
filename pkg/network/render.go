@@ -57,9 +57,9 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	return objs, nil
 }
 
-// CanonicalizeIPAMConfig converts configuration to a canonical form.
-// Currently we only care about case.
-func CanonicalizeIPAMConfig(conf *operv1.IPAMConfig) {
+// deprecatedCanonicalizeIPAMConfig converts configuration to a canonical form
+// for backward compatibility.
+func deprecatedCanonicalizeIPAMConfig(conf *operv1.IPAMConfig) {
 	switch strings.ToLower(string(conf.Type)) {
 	case strings.ToLower(string(operv1.IPAMTypeDHCP)):
 		conf.Type = operv1.IPAMTypeDHCP
@@ -68,9 +68,9 @@ func CanonicalizeIPAMConfig(conf *operv1.IPAMConfig) {
 	}
 }
 
-// CanonicalizeSimpleMacvlanConfig converts configuration to a canonical form.
-// Currently we only care about case.
-func CanonicalizeSimpleMacvlanConfig(conf *operv1.SimpleMacvlanConfig) {
+// deprecatedCanonicalizeSimpleMacvlanConfig converts configuration to a canonical form
+// for backward compatibility.
+func deprecatedCanonicalizeSimpleMacvlanConfig(conf *operv1.SimpleMacvlanConfig) {
 	switch strings.ToLower(string(conf.Mode)) {
 	case strings.ToLower(string(operv1.MacvlanModeBridge)):
 		conf.Mode = operv1.MacvlanModeBridge
@@ -83,13 +83,24 @@ func CanonicalizeSimpleMacvlanConfig(conf *operv1.SimpleMacvlanConfig) {
 	}
 
 	if conf.IPAMConfig != nil {
-		CanonicalizeIPAMConfig(conf.IPAMConfig)
+		deprecatedCanonicalizeIPAMConfig(conf.IPAMConfig)
 	}
 }
 
-// Canonicalize converts configuration to a canonical form.
-// Currently we only care about case.
-func Canonicalize(conf *operv1.NetworkSpec) {
+// DeprecatedCanonicalize converts configuration to a canonical form for backward
+// compatibility.
+//
+//      *** DO NOT ADD ANY NEW CANONICALIZATION TO THIS FUNCTION! ***
+//
+// Altering the user-provided configuration from CNO causes problems when other components
+// need to look at the configuration before CNO starts. Users should just write the
+// configuration in the correct form to begin with.
+//
+// However, we cannot remove any of the existing canonicalizations because this might
+// break existing clusters.
+func DeprecatedCanonicalize(conf *operv1.NetworkSpec) {
+	orig := conf.DeepCopy()
+
 	switch strings.ToLower(string(conf.DefaultNetwork.Type)) {
 	case strings.ToLower(string(operv1.NetworkTypeOpenShiftSDN)):
 		conf.DefaultNetwork.Type = operv1.NetworkTypeOpenShiftSDN
@@ -119,8 +130,13 @@ func Canonicalize(conf *operv1.NetworkSpec) {
 		}
 
 		if an.Type == operv1.NetworkTypeSimpleMacvlan && an.SimpleMacvlanConfig != nil {
-			CanonicalizeSimpleMacvlanConfig(conf.AdditionalNetworks[idx].SimpleMacvlanConfig)
+			deprecatedCanonicalizeSimpleMacvlanConfig(conf.AdditionalNetworks[idx].SimpleMacvlanConfig)
 		}
+	}
+
+	if !reflect.DeepEqual(orig, conf) {
+		log.Printf("WARNING: One or more fields of Network.operator.openshift.io was incorrectly capitalized. Although this has been fixed now, it is possible that other components previously saw the incorrect value and interpreted it incorrectly.")
+		log.Printf("Original spec: %#v\nModified spec: %#v\n", orig, conf)
 	}
 }
 
