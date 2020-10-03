@@ -14,24 +14,6 @@ import (
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
 )
 
-// shouldDeployKubeProxy determines if the desired network type should
-// install kube-proxy.
-// openshift-sdn deploys its own kube-proxy. ovn-kubernetes and
-// Kuryr-Kubernetes handle services on their own. All other
-// network providers are assumed to require kube-proxy
-func shouldDeployKubeProxy(conf *operv1.NetworkSpec) bool {
-	switch conf.DefaultNetwork.Type {
-	case operv1.NetworkTypeOpenShiftSDN:
-		return false
-	case operv1.NetworkTypeOVNKubernetes:
-		return false
-	case operv1.NetworkTypeKuryr:
-		return false
-	default:
-		return true
-	}
-}
-
 // kubeProxyConfiguration builds the (yaml text of) the kube-proxy config object
 // It merges multiple sources of arguments. The precedence order is:
 // - pluginDefaults
@@ -54,22 +36,50 @@ func kubeProxyConfiguration(pluginDefaults map[string]operv1.ProxyArgumentList, 
 	return k8sutil.GenerateKubeProxyConfiguration(args)
 }
 
-// validateStandaloneKubeProxy validates the kube-proxy configuration if
-// installation is requested.
-func validateStandaloneKubeProxy(conf *operv1.NetworkSpec) []error {
-	if shouldDeployKubeProxy(conf) {
-		return validateKubeProxy(conf)
+// acceptsKubeProxyConfig determines if the desired network type allows
+// conf.KubeProxyConfig to be set. OpenShiftSDN deploys its own kube-proxy.
+// OVNKubernetes and Kuryr do not allow Kubernetes to be used. All other
+// types are assumed to use an external kube-proxy.
+func acceptsKubeProxyConfig(conf *operv1.NetworkSpec) bool {
+	switch conf.DefaultNetwork.Type {
+	case operv1.NetworkTypeOpenShiftSDN:
+		return true
+	case operv1.NetworkTypeOVNKubernetes:
+		return false
+	case operv1.NetworkTypeKuryr:
+		return false
+	default:
+		return true
 	}
-	return nil
 }
 
-// validateKubeProxy checks that the kube-proxy specific configuration
-// is basically sane.
-// This is called either if DeployKubeProxy is true *or* by openshift-sdn
+func noKubeProxyConfig(conf *operv1.NetworkSpec) bool {
+	p := conf.KubeProxyConfig
+	if p == nil {
+		return true
+	}
+	if p.IptablesSyncPeriod != "" || len(p.ProxyArguments) > 0 {
+		return false
+	}
+	// Accept either no value or the value from fillKubeProxyDefaults()
+	if p.BindAddress != "" && p.BindAddress != "0.0.0.0" && p.BindAddress != "::" {
+		return false
+	}
+	return true
+}
+
+// validateKubeProxy checks that the kube-proxy specific configuration is basically sane.
 func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 	out := []error{}
 	p := conf.KubeProxyConfig
 	if p == nil {
+		return out
+	}
+	if !acceptsKubeProxyConfig(conf) {
+		if noKubeProxyConfig(conf) {
+			return out
+		}
+		out = append(out, errors.Errorf("network type %q does not allow specifying kube-proxy options", conf.DefaultNetwork.Type))
 		return out
 	}
 
@@ -104,11 +114,28 @@ func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 	return out
 }
 
-// fillKubeProxyDefaults inserts kube-proxy defaults, but only if
-// kube-proxy will be deployed explicitly.
+// defaultDeployKubeProxy determines if kube-proxy is deployed by default for the given
+// network type. OpenShiftSDN deploys its own kube-proxy. OVNKubernetes and Kuryr handle
+// services on their own. All other network providers are assumed to require a
+// standalone kube-proxy
+func defaultDeployKubeProxy(conf *operv1.NetworkSpec) bool {
+	switch conf.DefaultNetwork.Type {
+	case operv1.NetworkTypeOpenShiftSDN:
+		return false
+	case operv1.NetworkTypeOVNKubernetes:
+		return false
+	case operv1.NetworkTypeKuryr:
+		return false
+	default:
+		return true
+	}
+}
+
+// fillKubeProxyDefaults inserts kube-proxy defaults, if kube-proxy will be deployed
+// explicitly.
 func fillKubeProxyDefaults(conf, previous *operv1.NetworkSpec) {
 	if conf.DeployKubeProxy == nil {
-		v := shouldDeployKubeProxy(conf)
+		v := defaultDeployKubeProxy(conf)
 		conf.DeployKubeProxy = &v
 	}
 

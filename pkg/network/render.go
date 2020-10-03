@@ -148,7 +148,7 @@ func Validate(conf *operv1.NetworkSpec) error {
 	errs = append(errs, validateIPPools(conf)...)
 	errs = append(errs, validateDefaultNetwork(conf)...)
 	errs = append(errs, validateMultus(conf)...)
-	errs = append(errs, validateStandaloneKubeProxy(conf)...)
+	errs = append(errs, validateKubeProxy(conf)...)
 
 	if len(errs) > 0 {
 		return errors.Errorf("invalid configuration: %v", errs)
