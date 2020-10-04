@@ -45,6 +45,18 @@ spec:
               --object-path /org/freedesktop/systemd1/unit/"$(svc_encode_name ${1})"_2eservice \
               --method org.freedesktop.systemd1.Unit.Restart "replace"
           }
+          # returns true if OVS is running in systemd
+          is_systemd_ovs(){
+            local state=$(gdbus call --system --dest org.freedesktop.systemd1 \
+              --object-path /org/freedesktop/systemd1/unit/openvswitch_2eservice \
+              --method org.freedesktop.DBus.Properties.Get \
+              org.freedesktop.systemd1.Unit ActiveState)
+            if [[ "$state" == *\'active\'* || "$state" == *\'activating\'* ]]; then
+              return 0
+            else
+              return 1
+            fi
+          }
           svc_encode_name(){
             # systemd encodes some characters, so far we only need to encode
             # the character "-" but there may be more in the future.
@@ -52,7 +64,7 @@ spec:
           }
 
           # Check to see if ovs is provided by the node:
-          if [[ -L '/host/etc/systemd/system/network-online.target.wants/ovs-configuration.service' ]]; then
+          if is_systemd_ovs; then
             echo "openvswitch is running in systemd"
             # In some very strange corner cases, the owner for /run/openvswitch
             # can be wrong, so we need to clean up and restart.
