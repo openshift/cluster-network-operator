@@ -16,7 +16,7 @@ spec:
     scheme: https
     tlsConfig:
       caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
-      serverName: ovn-kubernetes-master-metrics.openshift-ovn-kubernetes.svc
+      serverName: ovn-kubernetes-master.openshift-ovn-kubernetes.svc
   jobLabel: app
   namespaceSelector:
     matchNames:
@@ -65,7 +65,7 @@ spec:
     scheme: https
     tlsConfig:
       caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
-      serverName: ovn-kubernetes-node-metrics.openshift-ovn-kubernetes.svc
+      serverName: ovn-kubernetes-node.openshift-ovn-kubernetes.svc
   jobLabel: app
   namespaceSelector:
     matchNames:
