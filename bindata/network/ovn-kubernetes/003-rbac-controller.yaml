@@ -88,6 +88,12 @@ rules:
     - get
     - list
     - watch
+- apiGroups: ['authentication.k8s.io']
+  resources: ['tokenreviews']
+  verbs: ['create']
+- apiGroups: ['authorization.k8s.io']
+  resources: ['subjectaccessreviews']
+  verbs: ['create']
 
 
 ---
@@ -132,55 +138,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: ovn-kubernetes-controller
-  namespace: openshift-ovn-kubernetes
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: openshift-ovn-kubernetes-metrics
-rules:
-- apiGroups: [""]
-  resources:
-  - namespaces
-  - endpoints
-  - services
-  - pods
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups: [""]
-  resources:
-  - events
-  verbs:
-  - create
-  - patch
-  - update
-- apiGroups: ['authentication.k8s.io']
-  resources: ['tokenreviews']
-  verbs: ['create']
-- apiGroups: ['authorization.k8s.io']
-  resources: ['subjectaccessreviews']
-  verbs: ['create']
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: openshift-ovn-kubernetes-metrics
-  namespace: openshift-ovn-kubernetes
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: openshift-ovn-kubernetes-metrics
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: openshift-ovn-kubernetes-metrics
-subjects:
-- kind: ServiceAccount
-  name: openshift-ovn-kubernetes-metrics
   namespace: openshift-ovn-kubernetes
