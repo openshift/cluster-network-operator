@@ -297,6 +297,37 @@ spec:
             command: ["test", "-f", "/etc/cni/net.d/10-ovn-kubernetes.conf"]
           initialDelaySeconds: 5
           periodSeconds: 5
+      - name: ovnkube-node-check-endpoints
+        image: quay.io/openshift/origin-cluster-kube-apiserver-operator:latest
+        imagePullPolicy: IfNotPresent
+        terminationMessagePolicy: FallbackToLogsOnError
+        command:
+          - cluster-kube-apiserver-operator
+          - check-endpoints
+        args:
+          - --listen
+          - 0.0.0.0:17698
+          - --namespace
+          - $(POD_NAMESPACE)
+          - --v
+          - '2'
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        ports:
+          - name: check-endpoints
+            containerPort: 17698
+            protocol: TCP
+        resources:
+          requests:
+            memory: 50Mi
+            cpu: 10m
       nodeSelector:
         beta.kubernetes.io/os: "linux"
       volumes:
