@@ -27,6 +27,7 @@ spec:
   selector:
     matchLabels:
       app: ovnkube-master
+      ovn-db-pod: "true"
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -38,6 +39,7 @@ spec:
     metadata:
       labels:
         app: ovnkube-master
+        ovn-db-pod: "true"
         component: network
         type: infra
         openshift.io/component: network
