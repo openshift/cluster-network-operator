@@ -6,6 +6,7 @@ import (
 
 	"github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller"
+	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/operator/leader"
 
@@ -94,6 +95,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	go o.manager.Start(ctx.Done())
 	go logLevelController.Run(ctx, 1)
 	go managementStateController.Run(ctx, 1)
+	connectivitycheck.Start(ctx, o.ccfg.KubeConfig)
 
 	<-ctx.Done()
 

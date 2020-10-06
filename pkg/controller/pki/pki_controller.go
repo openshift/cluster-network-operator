@@ -16,6 +16,7 @@ import (
 	"time"
 
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
+	"github.com/openshift/cluster-network-operator/pkg/controller/eventrecorder"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -196,7 +197,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			Informer:      inf.Core().V1().Secrets(),
 			Lister:        inf.Core().V1().Secrets().Lister(),
 			Client:        clientset.CoreV1(),
-			EventRecorder: &loggingRecorder{},
+			EventRecorder: &eventrecorder.LoggingRecorder{},
 		},
 		certrotation.CABundleRotation{
 			Namespace:     config.Namespace,
@@ -204,7 +205,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			Lister:        inf.Core().V1().ConfigMaps().Lister(),
 			Informer:      inf.Core().V1().ConfigMaps(),
 			Client:        clientset.CoreV1(),
-			EventRecorder: &loggingRecorder{},
+			EventRecorder: &eventrecorder.LoggingRecorder{},
 		},
 		certrotation.TargetRotation{
 			Namespace: config.Namespace,
@@ -222,10 +223,10 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			Lister:        inf.Core().V1().Secrets().Lister(),
 			Informer:      inf.Core().V1().Secrets(),
 			Client:        clientset.CoreV1(),
-			EventRecorder: &loggingRecorder{},
+			EventRecorder: &eventrecorder.LoggingRecorder{},
 		},
 		nil, // no operatorclient needed
-		&loggingRecorder{},
+		&eventrecorder.LoggingRecorder{},
 	)
 
 	out := &pki{

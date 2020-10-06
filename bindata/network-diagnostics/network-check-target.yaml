@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: network-check-target
+  namespace: openshift-network-diagnostics
+  annotations:
+    kubernetes.io/description: |
+      This daemonset deploys the network-check-target pods that run
+      a dummy hello-openshift app to be checked by network-check-source pod
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+      matchLabels:
+        app: network-check-target
+  template:
+    metadata:
+      labels:
+        app: network-check-target
+    spec:
+      containers:
+      - image: "{{.NetworkCheckTargetImage}}"
+        imagePullPolicy: IfNotPresent
+        name: network-check-target-container
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 10m
+            memory: 150Mi
+        readinessProbe:
+          httpGet:
+            port: 8080
+            path: /
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+      serviceAccount: default
+      terminationGracePeriodSeconds: 10
+      tolerations:
+      - operator: "Exists"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: network-check-target
+  namespace: openshift-network-diagnostics
+spec:
+  selector:
+    app: network-check-target
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
