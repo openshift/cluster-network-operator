@@ -13,8 +13,6 @@ import (
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
 	"github.com/openshift/cluster-network-operator/pkg/controller"
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
-	"github.com/operator-framework/operator-sdk/pkg/leader"
-	sdkVersion "github.com/operator-framework/operator-sdk/version"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -25,7 +23,6 @@ import (
 func printVersion() {
 	log.Printf("Go Version: %s", runtime.Version())
 	log.Printf("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH)
-	log.Printf("operator-sdk Version: %v", sdkVersion.Version)
 }
 
 const LOCK_NAME = "cluster-network-operator"
@@ -40,7 +37,6 @@ func init() {
 }
 
 func main() {
-	initControllerRuntimeLogging()
 	printVersion()
 	flag.Parse()
 
@@ -80,7 +76,7 @@ func main() {
 	}
 
 	// become leader
-	err = leader.Become(context.TODO(), LOCK_NAME)
+	err = BecomeLeader(context.TODO(), LOCK_NAME)
 	if err != nil {
 		log.Fatal(err)
 	}
