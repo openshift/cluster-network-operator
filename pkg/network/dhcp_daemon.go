@@ -6,8 +6,8 @@ import (
 	"log"
 )
 
-// UseDHCPRaw determines if the the DHCP CNI plugin running as a daemon should be rendered.
-func UseDHCPRaw(addnet *operv1.AdditionalNetworkDefinition) bool {
+// useDHCPRaw determines if the the DHCP CNI plugin running as a daemon should be rendered.
+func useDHCPRaw(addnet *operv1.AdditionalNetworkDefinition) bool {
 	// Parse the RawCNIConfig
 	var rawConfig map[string]interface{}
 	var err error
@@ -44,8 +44,8 @@ func UseDHCPRaw(addnet *operv1.AdditionalNetworkDefinition) bool {
 	return false
 }
 
-// UseDHCPSimpleMacvlan determines if the the DHCP CNI plugin running as a daemon should be rendered in case of SimpleMacvlan.
-func UseDHCPSimpleMacvlan(conf *operv1.SimpleMacvlanConfig) bool {
+// useDHCPSimpleMacvlan determines if the the DHCP CNI plugin running as a daemon should be rendered in case of SimpleMacvlan.
+func useDHCPSimpleMacvlan(conf *operv1.SimpleMacvlanConfig) bool {
 	// if IPAMConfig is not configured, DHCP is used (as default IPAM is DHCP)
 	if conf == nil || conf.IPAMConfig == nil {
 		return true
@@ -58,8 +58,8 @@ func UseDHCPSimpleMacvlan(conf *operv1.SimpleMacvlanConfig) bool {
 	return false
 }
 
-// UseDHCP determines if the the DHCP CNI plugin running as a daemon should be rendered in case of Raw.
-func UseDHCP(conf *operv1.NetworkSpec) bool {
+// useDHCP determines if the the DHCP CNI plugin running as a daemon should be rendered in case of Raw.
+func useDHCP(conf *operv1.NetworkSpec) bool {
 	renderdhcp := false
 
 	// This isn't useful without Multinetwork.
@@ -72,9 +72,9 @@ func UseDHCP(conf *operv1.NetworkSpec) bool {
 		for _, addnet := range conf.AdditionalNetworks {
 			switch addnet.Type {
 			case operv1.NetworkTypeRaw:
-				renderdhcp = renderdhcp || UseDHCPRaw(&addnet)
+				renderdhcp = renderdhcp || useDHCPRaw(&addnet)
 			case operv1.NetworkTypeSimpleMacvlan:
-				renderdhcp = renderdhcp || UseDHCPSimpleMacvlan(addnet.SimpleMacvlanConfig)
+				renderdhcp = renderdhcp || useDHCPSimpleMacvlan(addnet.SimpleMacvlanConfig)
 			}
 
 			if renderdhcp == true {

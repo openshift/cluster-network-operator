@@ -48,7 +48,7 @@ func render() error {
 		return err
 	}
 
-	network.Canonicalize(&conf.Spec)
+	network.DeprecatedCanonicalize(&conf.Spec)
 
 	err = network.Validate(&conf.Spec)
 	if err != nil {
