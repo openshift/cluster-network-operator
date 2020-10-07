@@ -59,9 +59,11 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 	if *c.EnableUnidling {
 		// We already validated that proxy-mode was either unset or iptables.
 		kpcOverrides["proxy-mode"] = operv1.ProxyArgumentList{"unidling+iptables"}
+	} else if *conf.DeployKubeProxy {
+		kpcOverrides["proxy-mode"] = operv1.ProxyArgumentList{"disabled"}
 	}
 
-	kpc, err := kubeProxyConfiguration(kpcDefaults, conf, kpcOverrides)
+	kpc, _, _, err := kubeProxyConfiguration(kpcDefaults, conf, kpcOverrides)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build kube-proxy config")
 	}
@@ -113,8 +115,14 @@ func validateOpenShiftSDN(conf *operv1.NetworkSpec) []error {
 		}
 	}
 
-	proxyErrs := validateKubeProxy(conf)
-	out = append(out, proxyErrs...)
+	if conf.DeployKubeProxy != nil && *conf.DeployKubeProxy {
+		// We allow deploying an external kube-proxy with openshift-sdn in very
+		// limited circumstances, for testing purposes. The error here
+		// intentionally lies about this.
+		if sc == nil || sc.EnableUnidling == nil || *sc.EnableUnidling || !noKubeProxyConfig(conf) {
+			out = append(out, errors.Errorf("openshift-sdn does not support 'deployKubeProxy: true'"))
+		}
+	}
 
 	return out
 }
@@ -164,7 +172,6 @@ func fillOpenShiftSDNDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 	if conf.KubeProxyConfig.BindAddress == "" {
 		conf.KubeProxyConfig.BindAddress = "0.0.0.0"
 	}
-
 	if conf.KubeProxyConfig.ProxyArguments == nil {
 		conf.KubeProxyConfig.ProxyArguments = map[string]operv1.ProxyArgumentList{}
 	}

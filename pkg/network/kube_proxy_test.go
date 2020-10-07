@@ -73,7 +73,7 @@ func TestKubeProxyConfig(t *testing.T) {
 	errs := validateKubeProxy(&config)
 	g.Expect(errs).To(HaveLen(0))
 
-	cfg, err := kubeProxyConfiguration(map[string]operv1.ProxyArgumentList{
+	cfg, metricsPort, _, err := kubeProxyConfiguration(map[string]operv1.ProxyArgumentList{
 		// special address+port combo
 		"metrics-bind-address":   {"1.2.3.4"},
 		"metrics-port":           {"999"},
@@ -84,6 +84,7 @@ func TestKubeProxyConfig(t *testing.T) {
 			"conntrack-max-per-core": {"15"},
 		})
 	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(metricsPort).To(Equal("999"))
 	g.Expect(cfg).To(MatchYAML(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: "0.0.0.0"
 clientConnection:
@@ -138,7 +139,7 @@ func TestKubeProxyIPv6Config(t *testing.T) {
 	errs := validateKubeProxy(&configIPv6)
 	g.Expect(errs).To(HaveLen(0))
 
-	cfg, err := kubeProxyConfiguration(
+	cfg, metricsPort, _, err := kubeProxyConfiguration(
 		map[string]operv1.ProxyArgumentList{
 			// special address+port combo
 			"metrics-bind-address":   {"fd00:1234::4"},
@@ -150,6 +151,7 @@ func TestKubeProxyIPv6Config(t *testing.T) {
 			"conntrack-max-per-core": {"15"},
 		})
 	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(metricsPort).To(Equal("51999"))
 	g.Expect(cfg).To(MatchYAML(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: "::"
 clientConnection:
@@ -207,16 +209,20 @@ func TestShouldDeployKubeProxy(t *testing.T) {
 		},
 	}
 
-	g.Expect(ShouldDeployKubeProxy(c)).To(BeFalse())
+	g.Expect(acceptsKubeProxyConfig(c)).To(BeTrue())
+	g.Expect(defaultDeployKubeProxy(c)).To(BeFalse())
 
 	c.DefaultNetwork.Type = operv1.NetworkTypeOVNKubernetes
-	g.Expect(ShouldDeployKubeProxy(c)).To(BeFalse())
+	g.Expect(acceptsKubeProxyConfig(c)).To(BeFalse())
+	g.Expect(defaultDeployKubeProxy(c)).To(BeFalse())
 
 	c.DefaultNetwork.Type = operv1.NetworkTypeKuryr
-	g.Expect(ShouldDeployKubeProxy(c)).To(BeFalse())
+	g.Expect(acceptsKubeProxyConfig(c)).To(BeFalse())
+	g.Expect(defaultDeployKubeProxy(c)).To(BeFalse())
 
 	c.DefaultNetwork.Type = "Flannel"
-	g.Expect(ShouldDeployKubeProxy(c)).To(BeTrue())
+	g.Expect(acceptsKubeProxyConfig(c)).To(BeTrue())
+	g.Expect(defaultDeployKubeProxy(c)).To(BeTrue())
 }
 
 func TestValidateKubeProxy(t *testing.T) {
@@ -244,8 +250,8 @@ func TestValidateKubeProxy(t *testing.T) {
 	// Break something
 	c.KubeProxyConfig.BindAddress = "invalid"
 	c.KubeProxyConfig.IptablesSyncPeriod = "asdf"
-	c.KubeProxyConfig.ProxyArguments["healthz-port"] = []string{"9101"}
-	c.KubeProxyConfig.ProxyArguments["metrics-port"] = []string{"10256"}
+	c.KubeProxyConfig.ProxyArguments["healthz-port"] = []string{"9102"}
+	c.KubeProxyConfig.ProxyArguments["metrics-port"] = []string{"10255"}
 	g.Expect(validateKubeProxy(c)).To(HaveLen(4))
 }
 
@@ -330,7 +336,7 @@ func TestFillKubeProxyDefaults(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		FillKubeProxyDefaults(tc.in, nil)
+		fillKubeProxyDefaults(tc.in, nil)
 		g.Expect(tc.in).To(Equal(tc.out))
 	}
 }
@@ -351,9 +357,9 @@ func TestRenderKubeProxy(t *testing.T) {
 		},
 	}
 
-	FillKubeProxyDefaults(c, nil)
+	fillKubeProxyDefaults(c, nil)
 
-	objs, err := RenderStandaloneKubeProxy(c, manifestDir)
+	objs, err := renderStandaloneKubeProxy(c, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	g.Expect(objs).To(HaveLen(10))
@@ -388,7 +394,7 @@ conntrack:
   tcpEstablishedTimeout: null
 detectLocalMode: ""
 enableProfiling: false
-healthzBindAddress: 0.0.0.0:10256
+healthzBindAddress: 0.0.0.0:10255
 hostnameOverride: ""
 iptables:
   masqueradeAll: false
@@ -405,7 +411,7 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
-metricsBindAddress: 0.0.0.0:9101
+metricsBindAddress: 0.0.0.0:9102
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null

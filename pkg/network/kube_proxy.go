@@ -14,30 +14,12 @@ import (
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
 )
 
-// ShouldDeployKubeProxy determines if the desired network type should
-// install kube-proxy.
-// openshift-sdn deploys its own kube-proxy. ovn-kubernetes and
-// Kuryr-Kubernetes handle services on their own. All other
-// network providers are assumed to require kube-proxy
-func ShouldDeployKubeProxy(conf *operv1.NetworkSpec) bool {
-	switch conf.DefaultNetwork.Type {
-	case operv1.NetworkTypeOpenShiftSDN:
-		return false
-	case operv1.NetworkTypeOVNKubernetes:
-		return false
-	case operv1.NetworkTypeKuryr:
-		return false
-	default:
-		return true
-	}
-}
-
 // kubeProxyConfiguration builds the (yaml text of) the kube-proxy config object
 // It merges multiple sources of arguments. The precedence order is:
 // - pluginDefaults
 // - conf.KubeProxyConfig.ProxyArguments
 // - pluginOverrides
-func kubeProxyConfiguration(pluginDefaults map[string]operv1.ProxyArgumentList, conf *operv1.NetworkSpec, pluginOverrides map[string]operv1.ProxyArgumentList) (string, error) {
+func kubeProxyConfiguration(pluginDefaults map[string]operv1.ProxyArgumentList, conf *operv1.NetworkSpec, pluginOverrides map[string]operv1.ProxyArgumentList) (jsonConf, metricsPort, healthzPort string, err error) {
 	p := conf.KubeProxyConfig
 
 	args := map[string]operv1.ProxyArgumentList{}
@@ -51,25 +33,60 @@ func kubeProxyConfiguration(pluginDefaults map[string]operv1.ProxyArgumentList, 
 	args = k8sutil.MergeKubeProxyArguments(args, p.ProxyArguments)
 	args = k8sutil.MergeKubeProxyArguments(args, pluginOverrides)
 
-	return k8sutil.GenerateKubeProxyConfiguration(args)
-}
-
-// ValidateStandaloneKubeProxy validates the kube-proxy configuration if
-// installation is requested.
-func ValidateStandaloneKubeProxy(conf *operv1.NetworkSpec) []error {
-	if ShouldDeployKubeProxy(conf) {
-		return validateKubeProxy(conf)
+	if len(args["metrics-port"]) == 1 {
+		metricsPort = args["metrics-port"][0]
 	}
-	return nil
+	if len(args["healthz-port"]) == 1 {
+		healthzPort = args["healthz-port"][0]
+	}
+	jsonConf, err = k8sutil.GenerateKubeProxyConfiguration(args)
+	return
 }
 
-// validateKubeProxy checks that the kube-proxy specific configuration
-// is basically sane.
-// This is called either if DeployKubeProxy is true *or* by openshift-sdn
+// acceptsKubeProxyConfig determines if the desired network type allows
+// conf.KubeProxyConfig to be set. OpenShiftSDN deploys its own kube-proxy.
+// OVNKubernetes and Kuryr do not allow Kubernetes to be used. All other
+// types are assumed to use an external kube-proxy.
+func acceptsKubeProxyConfig(conf *operv1.NetworkSpec) bool {
+	switch conf.DefaultNetwork.Type {
+	case operv1.NetworkTypeOpenShiftSDN:
+		return true
+	case operv1.NetworkTypeOVNKubernetes:
+		return false
+	case operv1.NetworkTypeKuryr:
+		return false
+	default:
+		return true
+	}
+}
+
+func noKubeProxyConfig(conf *operv1.NetworkSpec) bool {
+	p := conf.KubeProxyConfig
+	if p == nil {
+		return true
+	}
+	if p.IptablesSyncPeriod != "" || len(p.ProxyArguments) > 0 {
+		return false
+	}
+	// Accept either no value or the value from fillKubeProxyDefaults()
+	if p.BindAddress != "" && p.BindAddress != "0.0.0.0" && p.BindAddress != "::" {
+		return false
+	}
+	return true
+}
+
+// validateKubeProxy checks that the kube-proxy specific configuration is basically sane.
 func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 	out := []error{}
 	p := conf.KubeProxyConfig
 	if p == nil {
+		return out
+	}
+	if !acceptsKubeProxyConfig(conf) {
+		if noKubeProxyConfig(conf) {
+			return out
+		}
+		out = append(out, errors.Errorf("network type %q does not allow specifying kube-proxy options", conf.DefaultNetwork.Type))
 		return out
 	}
 
@@ -86,17 +103,20 @@ func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 		}
 	}
 
-	// Don't allow ports to be overridden
+	// Don't allow ports to be overridden. Before 4.7, standalone kube-proxy used the
+	// same ports as openshift-sdn (metrics 9101, healthz 10256). In 4.7 and later,
+	// the defaults are 9102 and 10255 to allow openshift-sdn and kube-proxy to be run
+	// together, but we still allow the old values to avoid breaking old clusters.
 	if p.ProxyArguments != nil {
 		if val, ok := p.ProxyArguments["metrics-port"]; ok {
-			if !(len(val) == 1 && val[0] == "9101") {
-				out = append(out, errors.Errorf("kube-proxy --metrics-port must be 9101"))
+			if len(val) != 1 || (val[0] != "9102" && val[0] != "9101") {
+				out = append(out, errors.Errorf("kube-proxy --metrics-port must be 9102 or 9101"))
 			}
 		}
 
 		if val, ok := p.ProxyArguments["healthz-port"]; ok {
-			if !(len(val) == 1 && val[0] == "10256") {
-				out = append(out, errors.Errorf("kube-proxy --healthz-port must be 10256"))
+			if len(val) != 1 || (val[0] != "10255" && val[0] != "10256") {
+				out = append(out, errors.Errorf("kube-proxy --healthz-port must be 10255 or 10256"))
 			}
 		}
 	}
@@ -104,11 +124,28 @@ func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 	return out
 }
 
-// FillKubeProxyDefaults inserts kube-proxy defaults, but only if
-// kube-proxy will be deployed explicitly.
-func FillKubeProxyDefaults(conf, previous *operv1.NetworkSpec) {
+// defaultDeployKubeProxy determines if kube-proxy is deployed by default for the given
+// network type. OpenShiftSDN deploys its own kube-proxy. OVNKubernetes and Kuryr handle
+// services on their own. All other network providers are assumed to require a
+// standalone kube-proxy
+func defaultDeployKubeProxy(conf *operv1.NetworkSpec) bool {
+	switch conf.DefaultNetwork.Type {
+	case operv1.NetworkTypeOpenShiftSDN:
+		return false
+	case operv1.NetworkTypeOVNKubernetes:
+		return false
+	case operv1.NetworkTypeKuryr:
+		return false
+	default:
+		return true
+	}
+}
+
+// fillKubeProxyDefaults inserts kube-proxy defaults, if kube-proxy will be deployed
+// explicitly.
+func fillKubeProxyDefaults(conf, previous *operv1.NetworkSpec) {
 	if conf.DeployKubeProxy == nil {
-		v := ShouldDeployKubeProxy(conf)
+		v := defaultDeployKubeProxy(conf)
 		conf.DeployKubeProxy = &v
 	}
 
@@ -136,28 +173,28 @@ func FillKubeProxyDefaults(conf, previous *operv1.NetworkSpec) {
 	}
 }
 
-// IsKubeProxyChangeSafe is noop, but it would check if the proposed kube-proxy
+// isKubeProxyChangeSafe is noop, but it would check if the proposed kube-proxy
 // change is safe.
-func IsKubeProxyChangeSafe(prev, next *operv1.NetworkSpec) []error {
+func isKubeProxyChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	// At present, all kube-proxy changes are safe to deploy
 	return nil
 }
 
-// RenderStandaloneKubeProxy renders the standalone kube-proxy if installation was
+// renderStandaloneKubeProxy renders the standalone kube-proxy if installation was
 // requested.
-func RenderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	if !*conf.DeployKubeProxy {
 		return nil, nil
 	}
 
 	kpcDefaults := map[string]operv1.ProxyArgumentList{
 		"metrics-bind-address": {"0.0.0.0"},
-		"metrics-port":         {"9101"},
-		"healthz-port":         {"10256"},
+		"metrics-port":         {"9102"},
+		"healthz-port":         {"10255"},
 		"proxy-mode":           {"iptables"},
 	}
 
-	kpc, err := kubeProxyConfiguration(kpcDefaults, conf, nil)
+	kpc, metricsPort, healthzPort, err := kubeProxyConfiguration(kpcDefaults, conf, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to generate kube-proxy configuration file")
 	}
@@ -168,6 +205,8 @@ func RenderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]
 	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
 	data.Data["KubeProxyConfig"] = kpc
+	data.Data["MetricsPort"] = metricsPort
+	data.Data["HealthzPort"] = healthzPort
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "kube-proxy"), &data)
 	if err != nil {

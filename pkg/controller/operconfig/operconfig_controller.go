@@ -142,8 +142,8 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	// Convert to a canonicalized form
-	network.Canonicalize(&operConfig.Spec)
+	// Convert certain fields to canonicalized form for backward compatibility
+	network.DeprecatedCanonicalize(&operConfig.Spec)
 
 	// Validate the configuration
 	if err := network.Validate(&operConfig.Spec); err != nil {

@@ -11,7 +11,7 @@ func TestGenerateKubeProxyConfiguration(t *testing.T) {
 	defaults := map[string]operv1.ProxyArgumentList{
 		"bind-address":            {"0.0.0.0"},
 		"metrics-bind-address":    {"0.0.0.0"},
-		"metrics-port":            {"9101"},
+		"metrics-port":            {"9102"},
 		"proxy-mode":              {"iptables"},
 		"iptables-masquerade-bit": {"0"},
 	}
@@ -60,7 +60,7 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
-metricsBindAddress: 0.0.0.0:9101
+metricsBindAddress: 0.0.0.0:9102
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
@@ -170,7 +170,7 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
-metricsBindAddress: 5.6.7.8:9101
+metricsBindAddress: 5.6.7.8:9102
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
@@ -281,7 +281,7 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
-metricsBindAddress: 0.0.0.0:9101
+metricsBindAddress: 0.0.0.0:9102
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
