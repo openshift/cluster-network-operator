@@ -67,6 +67,11 @@ spec:
             set +o allexport
           fi
 
+          while [[ ! -f "/ovn-cert/tls.key" ||  ! -f "/ovn-cert/tls.crt" ]] ; do
+            echo waiting for ovn TLS keypair to be present
+            sleep 30
+          done
+
           echo "$(date -Iseconds) - starting ovn-northd"
           exec ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
@@ -126,6 +131,12 @@ spec:
           db="nb"
           db_port="{{.OVN_NB_PORT}}"
           ovn_db_file="/etc/ovn/ovn${db}_db.db"
+          
+          while [[ ! -f "/ovn-cert/tls.key" ||  ! -f "/ovn-cert/tls.crt" ]] ; do
+            echo waiting for ovn TLS keypair to be present
+            sleep 30
+          done
+
           # checks if a db pod is part of a current cluster
           db_part_of_cluster() {
             local pod=${1}
@@ -292,6 +303,12 @@ spec:
                       ovsdb-client -t 30 convert "$DB_SERVER" "$DB_SCHEMA"
                   fi
                 fi
+
+                while [[ ! -f "/ovn-cert/tls.key" ||  ! -f "/ovn-cert/tls.crt" ]] ; do
+                  echo waiting for ovn TLS keypair to be present
+                  sleep 30
+                done
+
                 #configure northd_probe_interval
                 OVN_NB_CTL="ovn-nbctl -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
                 --db "{{.OVN_NB_DB_LIST}}""
@@ -535,6 +552,10 @@ spec:
           db="sb"
           db_port="{{.OVN_SB_PORT}}"
           ovn_db_file="/etc/ovn/ovn${db}_db.db"
+          while [[ ! -f "/ovn-cert/tls.key" ||  ! -f "/ovn-cert/tls.crt" ]] ; do
+            echo waiting for ovn TLS keypair to be present
+            sleep 30
+          done
           # checks if a db pod is part of a current cluster
           db_part_of_cluster() {
             local pod=${1}
