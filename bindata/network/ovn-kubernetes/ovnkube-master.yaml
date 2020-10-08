@@ -67,6 +67,9 @@ spec:
             set +o allexport
           fi
 
+
+          #temporary extra logging do not merge
+          ls /ovn-cert
           echo "$(date -Iseconds) - starting ovn-northd"
           exec ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
@@ -193,6 +196,8 @@ spec:
               counter=$((counter+1))
             done
 
+            #temporary extra logging do not merge
+            ls /ovn-cert
             if ${cluster_found}; then
               echo "Cluster already exists for DB: ${db}"
               initial_raft_create=false
@@ -292,6 +297,8 @@ spec:
                       ovsdb-client -t 30 convert "$DB_SERVER" "$DB_SCHEMA"
                   fi
                 fi
+                #temporary extra logging do not merge
+                ls /ovn-cert
                 #configure northd_probe_interval
                 OVN_NB_CTL="ovn-nbctl -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
                 --db "{{.OVN_NB_DB_LIST}}""
@@ -826,6 +833,8 @@ spec:
             gateway_mode_flags="--gateway-mode local --gateway-interface none"
           fi
 
+          #temporary extra logging do not merge
+          ls /ovn-cert
           # start nbctl daemon for caching
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start nbctl daemon for caching"
           export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/var/run/ovn/ovn-nbctl.pid \
