@@ -52,7 +52,7 @@ spec:
           }
 
           # Check to see if ovs is provided by the node:
-          if [[ -L '/host/etc/systemd/system/network-online.target.wants/ovs-configuration.service' ]]; then
+          if [ -f /host/var/run/ovs-config-executed ]; then
             echo "openvswitch is running in systemd"
             # In some very strange corner cases, the owner for /run/openvswitch
             # can be wrong, so we need to clean up and restart.
@@ -65,7 +65,6 @@ spec:
             # Don't need to worry about restoring flows; this can only change if we've rebooted
             exec tail -F /host/var/log/openvswitch/ovs-vswitchd.log /host/var/log/openvswitch/ovsdb-server.log
           else
-
             echo "openvswitch is running in container"
             # if another process is listening on the cni-server socket, wait until it exits
             retries=0
