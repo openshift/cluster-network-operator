@@ -349,7 +349,6 @@ spec:
       - name: ovn-cert
         secret:
           secretName: ovn-cert
-          optional: true
       - name: ovn-node-metrics-cert
         secret:
           secretName: ovn-node-metrics-cert
