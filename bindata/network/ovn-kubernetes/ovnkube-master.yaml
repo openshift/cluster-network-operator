@@ -820,7 +820,7 @@ spec:
           gateway_mode_flags=
           # Check to see if ovs is provided by the node. This is only for upgrade from 4.5->4.6 or
           # openshift-sdn to ovn-kube conversion
-          if grep -q OVNKubernetes /etc/systemd/system/ovs-configuration.service ; then
+          if grep -q OVNKubernetes /etc/systemd/system/ovs-configuration.service && [ -f /host/var/run/ovs-config-executed ]; then
             gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
           else
             gateway_mode_flags="--gateway-mode local --gateway-interface none"
@@ -862,6 +862,10 @@ spec:
               command: ["/bin/bash", "-c", "kill $(cat /var/run/ovn/ovn-nbctl.pid) && unset OVN_NB_DAEMON"]
         volumeMounts:
         # for checking ovs-configuration service
+        - mountPath: /host
+          name: host-slash
+          readOnly: true
+          mountPropagation: HostToContainer
         - mountPath: /etc/systemd/system
           name: systemd-units
           readOnly: true
@@ -958,6 +962,9 @@ spec:
         beta.kubernetes.io/os: "linux"
       volumes:
       # for checking ovs-configuration service
+      - name: host-slash
+        hostPath:
+          path: /
       - name: systemd-units
         hostPath:
           path: /etc/systemd/system
