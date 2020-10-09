@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
@@ -401,6 +402,30 @@ func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncConte
 		return err
 	}
 
+	newFinalizers := []apiv1.FinalizerName{}
+	for _, curr := range ns.Spec.Finalizers {
+		if curr == apiv1.FinalizerKubernetes {
+			continue
+		}
+		newFinalizers = append(newFinalizers, curr)
+	}
+	if reflect.DeepEqual(newFinalizers, ns.Spec.Finalizers) {
+		return nil
+	}
+	ns.Spec.Finalizers = newFinalizers
+	log.Printf("!bang Namespace WITH NEW FINALIZERS?: %+v", ns)
+
+	err = c.client.Update(context.TODO(), ns)
+	if err != nil {
+		err = errors.Wrapf(err, "could not update namespace finalizers for %s", c.namespaceName)
+		log.Println(err)
+		return err
+	}
+
+	// syncCtx.Recorder().Event("NamespaceFinalization", fmt.Sprintf("clearing namespace finalizer on %q", c.namespaceName))
+	// _, err = c.namespaceGetter.Namespaces().Finalize(ctx, ns, metav1.UpdateOptions{})
+	// return err
+
 	// Next, check if it's been deleted.
 	// We don't care anymore if it's not deleted.
 	if ns.DeletionTimestamp == nil {
@@ -422,13 +447,31 @@ func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncConte
 	log.Printf("!bang PODSIZE!!!!!!!!!!!!?: %v")
 
 	if err != nil {
-		err = errors.Wrapf(err, "could not query for pods %s", "openshift-multus")
+		err = errors.Wrapf(err, "could not query for pods %s", c.namespaceName)
 		log.Println(err)
 		return err
 	}
 
 	// Keep this running until the pods are gone...
 	if len(pods.Items) > 0 {
+		return nil
+	}
+
+	// !bang DAEMONSET LIST HERE
+	// Check out how many daemonsets there are...
+	dslist := &appsv1.DaemonSetList{}
+	err = c.client.List(context.TODO(), dslist, client.InNamespace(c.namespaceName))
+
+	log.Printf("!bang DSSIZE!!!!!!!!!!!!?: %v", len(dslist.Items))
+
+	if err != nil {
+		err = errors.Wrapf(err, "could not query for daemonsets %s", c.namespaceName)
+		log.Println(err)
+		return err
+	}
+
+	// Keep this running until the pods are gone...
+	if len(dslist.Items) > 0 {
 		return nil
 	}
 
