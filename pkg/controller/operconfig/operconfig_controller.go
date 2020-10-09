@@ -14,7 +14,8 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
-
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/events"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -98,20 +99,20 @@ var _ reconcile.Reconciler = &ReconcileOperConfig{}
 type ReconcileOperConfig struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client          client.Client
-	scheme          *runtime.Scheme
-	status          *statusmanager.StatusManager
-	mapper          meta.RESTMapper
-	podReconciler   *ReconcilePods
-	namespaceGetter v1.NamespacesGetter
+	client              client.Client
+	scheme              *runtime.Scheme
+	status              *statusmanager.StatusManager
+	mapper              meta.RESTMapper
+	podReconciler       *ReconcilePods
+	namespaceController factory.Controller
+	eventRecorder       events.Recorder
+	// namespaceGetter     v1.NamespacesGetter
 }
 
 // Reconcile updates the state of the cluster to match that which is desired
 // in the operator configuration (Network.operator.openshift.io)
 func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.Printf("Reconciling Network.operator.openshift.io %s\n", request.Name)
-
-	log.Printf("!bang TRACE A: GETTING NAMESPACE")
 
 	// We won't create more than one network
 	if request.Name != names.OPERATOR_CONFIG {
@@ -147,8 +148,6 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	log.Printf("!bang TRACE B")
-
 	// Convert to a canonicalized form
 	network.Canonicalize(&operConfig.Spec)
 
@@ -171,8 +170,6 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	if prev != nil {
 		network.FillDefaults(prev, prev)
 	}
-
-	log.Printf("!bang TRACE C")
 
 	// Fill all defaults explicitly
 	network.FillDefaults(&operConfig.Spec, prev)
@@ -202,8 +199,6 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 			fmt.Sprintf("Internal error while reconciling platform networking resources: %v", err))
 		return reconcile.Result{}, err
 	}
-
-	log.Printf("!bang TRACE D")
 
 	// Generate the objects
 	objs, err := network.Render(&operConfig.Spec, bootstrapResult, ManifestPath)
@@ -247,28 +242,34 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		})
 	}
 
-	log.Printf("!bang TRACE E")
-	// !bang
-	// Alright, let's try to figure out if we need to remove finalizers
-	log.Printf("!bang GETTING NAMESPACE")
-	log.Printf("!bang wtf is the client: %v", r.client)
+	// usingnamespace := "openshift-multus"
+	usingnamespace := "foo-bar"
 
-	// Using a typed object.
-	ns := &apiv1.Namespace{}
-	// c is a created client.
-	err = r.client.Get(context.Background(), client.ObjectKey{
-		Name: "openshift-multus",
-	}, ns)
-
-	if err != nil {
-		log.Printf("that blew up: %v", err)
+	c := &finalizerController{
+		namespaceName: usingnamespace,
+		client:        r.client,
 	}
+
+	var eventif v1.EventInterface
+	var objectref apiv1.ObjectReference
+
+	r.eventRecorder = events.NewRecorder(eventif, usingnamespace, &objectref)
+	r.namespaceController = factory.New().ResyncEvery(time.Second).WithSync(c.sync).WithInformers().ToController("myname", r.eventRecorder)
+	r.namespaceController.Run(context.TODO(), 1)
+
+	log.Printf("!bang CREATED NAMESPACE FINALIZER CONTROLLER")
+
+	// .ToController("the-nsfinalizer", eventRecorder.WithComponentSuffix("finalizer-controller"))
+
+	// .WithInformers(
+	// 	kubeInformersForTargetNamespace.Core().V1().Pods().Informer(),
+	// 	kubeInformersForTargetNamespace.Apps().V1().DaemonSets().Informer(),
+	// ).ToController(fullname, eventRecorder.WithComponentSuffix("finalizer-controller"))
 
 	// ns := (*v1.Namespaces)(nil)
 	// ns, checkerr := r.client.Namespaces().Get(context.TODO(), "openshift-multus", metav1.GetOptions{})
 	// log.Printf("!bang Got NAMESPACE?")
 	// log.Printf("!bang checkerr: %v", checkerr)
-	log.Printf("!bang Namespace?: %+v", ns)
 
 	relatedObjects = append(relatedObjects, configv1.ObjectReference{
 		Resource: "namespaces",
@@ -344,4 +345,164 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	// All was successful. Request that this be re-triggered after ResyncPeriod,
 	// so we can reconcile state again.
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
+}
+
+type finalizerController struct {
+	namespaceName string
+	client        client.Client
+}
+
+// func NewFinalizerController(
+// 	namespaceName string,
+// 	kubeInformersForTargetNamespace kubeinformers.SharedInformerFactory,
+// 	namespaceGetter v1.NamespacesGetter,
+// 	eventRecorder events.Recorder,
+// ) factory.Controller {
+// 	fullname := "NamespaceFinalizerController_" + namespaceName
+// 	c := &finalizerController{
+// 		name:            fullname,
+// 		namespaceName:   namespaceName,
+// 		namespaceGetter: namespaceGetter,
+// 		podLister:       kubeInformersForTargetNamespace.Core().V1().Pods().Lister(),
+// 		dsLister:        kubeInformersForTargetNamespace.Apps().V1().DaemonSets().Lister(),
+// 	}
+
+// 	return factory.New().ResyncEvery(time.Second).WithSync(c.sync).WithInformers(
+// 		kubeInformersForTargetNamespace.Core().V1().Pods().Informer(),
+// 		kubeInformersForTargetNamespace.Apps().V1().DaemonSets().Informer(),
+// 	).ToController(fullname, eventRecorder.WithComponentSuffix("finalizer-controller"))
+// }
+
+func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+
+	log.Printf("!bang KICK OFF SYNC!!!!!!!!!!!!!")
+
+	// !bang
+	// Alright, let's try to figure out if we need to remove finalizers
+	log.Printf("!bang GETTING NAMESPACE")
+
+	// Query for the namespace.
+	ns := &apiv1.Namespace{}
+	err := c.client.Get(context.Background(), client.ObjectKey{
+		Name: c.namespaceName,
+	}, ns)
+
+	log.Printf("!bang Namespace?: %+v", ns)
+
+	if err != nil {
+		// We don't care if it's not found, that's probably good.
+		if apierrors.IsNotFound(err) {
+			log.Printf("!bang IS NOT FOUND")
+			return nil
+		}
+
+		err = errors.Wrapf(err, "could not query for namespace %s", c.namespaceName)
+		log.Println(err)
+		return err
+	}
+
+	// Next, check if it's been deleted.
+	// We don't care anymore if it's not deleted.
+	if ns.DeletionTimestamp == nil {
+		log.Printf("!bang ITS NOT DELETED")
+		return nil
+	}
+
+	// allow one minute of grace for most things to terminate.
+	deletedMoreThanAMinute := ns.DeletionTimestamp.Time.Add(1 * time.Minute).Before(time.Now())
+	if !deletedMoreThanAMinute {
+		syncCtx.Queue().AddAfter(c.namespaceName, 1*time.Minute)
+		return nil
+	}
+
+	// Check out how many pods there are...
+	pods := &apiv1.PodList{}
+	err = c.client.List(context.TODO(), pods, client.InNamespace(c.namespaceName))
+
+	log.Printf("!bang PODSIZE!!!!!!!!!!!!?: %v")
+
+	if err != nil {
+		err = errors.Wrapf(err, "could not query for pods %s", "openshift-multus")
+		log.Println(err)
+		return err
+	}
+
+	// Keep this running until the pods are gone...
+	if len(pods.Items) > 0 {
+		return nil
+	}
+
+	return nil
+
+	// ns, err := c.namespaceGetter.Namespaces().Get(ctx, c.namespaceName, metav1.GetOptions{})
+	// if apierrors.IsNotFound(err) {
+	// 	return nil
+	// }
+	// if err != nil {
+	// 	return err
+	// }
+	// if ns.DeletionTimestamp == nil {
+	// 	return nil
+	// }
+
+	// // allow one minute of grace for most things to terminate.
+	// // TODO now that we have conditions, we may be able to check specific conditions
+	// deletedMoreThanAMinute := ns.DeletionTimestamp.Time.Add(1 * time.Minute).Before(time.Now())
+	// if !deletedMoreThanAMinute {
+	// 	syncCtx.Queue().AddAfter(c.namespaceName, 1*time.Minute)
+	// 	return nil
+	// }
+
+	// pods, err := c.podLister.Pods(c.namespaceName).List(labels.Everything())
+	// if err != nil {
+	// 	return err
+	// }
+	// if len(pods) > 0 {
+	// 	return nil
+	// }
+	// dses, err := c.dsLister.DaemonSets(c.namespaceName).List(labels.Everything())
+	// if err != nil {
+	// 	return err
+	// }
+	// if len(dses) > 0 {
+	// 	return nil
+	// }
+
+	// newFinalizers := []corev1.FinalizerName{}
+	// for _, curr := range ns.Spec.Finalizers {
+	// 	if curr == corev1.FinalizerKubernetes {
+	// 		continue
+	// 	}
+	// 	newFinalizers = append(newFinalizers, curr)
+	// }
+	// if reflect.DeepEqual(newFinalizers, ns.Spec.Finalizers) {
+	// 	return nil
+	// }
+	// ns.Spec.Finalizers = newFinalizers
+
+	// syncCtx.Recorder().Event("NamespaceFinalization", fmt.Sprintf("clearing namespace finalizer on %q", c.namespaceName))
+	// _, err = c.namespaceGetter.Namespaces().Finalize(ctx, ns, metav1.UpdateOptions{})
+	// return err
+
+	// ---------------------- from: https://github.com/openshift/cluster-etcd-operator/blob/master/vendor/github.com/openshift/library-go/pkg/operator/management/management_state_controller.go
+	// ManagementStateController watches changes of `managementState` field and react in case that field is set to an unsupported value.
+	// As each operator can opt-out from supporting `unmanaged` or `removed` states, this controller will add failing condition when the
+	// value for this field is set to this values for those operators.
+	// type ManagementStateController struct {
+	// 	operatorName   string
+	// 	operatorClient operatorv1helpers.OperatorClient
+	// }
+
+	// func NewOperatorManagementStateController(
+	// 	name string,
+	// 	operatorClient operatorv1helpers.OperatorClient,
+	// 	recorder events.Recorder,
+	// ) factory.Controller {
+	// 	c := &ManagementStateController{
+	// 		operatorName:   name,
+	// 		operatorClient: operatorClient,
+	// 	}
+	// 	return factory.New().WithInformers(operatorClient.Informer()).WithSync(c.sync).ResyncEvery(time.Second).ToController("ManagementStateController", recorder.WithComponentSuffix("management-state-recorder"))
+	// }
+
 }
