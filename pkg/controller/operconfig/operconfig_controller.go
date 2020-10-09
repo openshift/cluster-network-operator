@@ -16,12 +16,14 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/network"
 
 	appsv1 "k8s.io/api/apps/v1"
+	apiv1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -96,17 +98,20 @@ var _ reconcile.Reconciler = &ReconcileOperConfig{}
 type ReconcileOperConfig struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client        client.Client
-	scheme        *runtime.Scheme
-	status        *statusmanager.StatusManager
-	mapper        meta.RESTMapper
-	podReconciler *ReconcilePods
+	client          client.Client
+	scheme          *runtime.Scheme
+	status          *statusmanager.StatusManager
+	mapper          meta.RESTMapper
+	podReconciler   *ReconcilePods
+	namespaceGetter v1.NamespacesGetter
 }
 
 // Reconcile updates the state of the cluster to match that which is desired
 // in the operator configuration (Network.operator.openshift.io)
 func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.Printf("Reconciling Network.operator.openshift.io %s\n", request.Name)
+
+	log.Printf("!bang TRACE A: GETTING NAMESPACE")
 
 	// We won't create more than one network
 	if request.Name != names.OPERATOR_CONFIG {
@@ -142,6 +147,8 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	log.Printf("!bang TRACE B")
+
 	// Convert to a canonicalized form
 	network.Canonicalize(&operConfig.Spec)
 
@@ -164,6 +171,8 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	if prev != nil {
 		network.FillDefaults(prev, prev)
 	}
+
+	log.Printf("!bang TRACE C")
 
 	// Fill all defaults explicitly
 	network.FillDefaults(&operConfig.Spec, prev)
@@ -193,6 +202,8 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 			fmt.Sprintf("Internal error while reconciling platform networking resources: %v", err))
 		return reconcile.Result{}, err
 	}
+
+	log.Printf("!bang TRACE D")
 
 	// Generate the objects
 	objs, err := network.Render(&operConfig.Spec, bootstrapResult, ManifestPath)
@@ -235,6 +246,29 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 			Namespace: obj.GetNamespace(),
 		})
 	}
+
+	log.Printf("!bang TRACE E")
+	// !bang
+	// Alright, let's try to figure out if we need to remove finalizers
+	log.Printf("!bang GETTING NAMESPACE")
+	log.Printf("!bang wtf is the client: %v", r.client)
+
+	// Using a typed object.
+	ns := &apiv1.Namespace{}
+	// c is a created client.
+	err = r.client.Get(context.Background(), client.ObjectKey{
+		Name: "openshift-multus",
+	}, ns)
+
+	if err != nil {
+		log.Printf("that blew up: %v", err)
+	}
+
+	// ns := (*v1.Namespaces)(nil)
+	// ns, checkerr := r.client.Namespaces().Get(context.TODO(), "openshift-multus", metav1.GetOptions{})
+	// log.Printf("!bang Got NAMESPACE?")
+	// log.Printf("!bang checkerr: %v", checkerr)
+	log.Printf("!bang Namespace?: %+v", ns)
 
 	relatedObjects = append(relatedObjects, configv1.ObjectReference{
 		Resource: "namespaces",
@@ -279,6 +313,8 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 			return reconcile.Result{}, err
 		}
 	}
+
+	log.Printf("!bang TRACE F")
 
 	// Run a pod status check just to clear any initial inconsitencies at startup of the CNO
 	r.status.SetFromPods()

@@ -1,6 +1,7 @@
 package network
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 
@@ -14,6 +15,7 @@ const (
 	SystemCNIConfDir = "/etc/kubernetes/cni/net.d"
 	MultusCNIConfDir = "/var/run/multus/cni/net.d"
 	CNIBinDir        = "/var/lib/cni/bin"
+	MultusNamespace  = "openshift-multus"
 )
 
 // RenderMultus generates the manifests of Multus
@@ -43,6 +45,11 @@ func RenderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 		return nil, err
 	}
 	out = append(out, objs...)
+
+	log.Printf("!bang Multus render trace...")
+
+	// We want to check if there's any of the main pods left running
+	// Then, when there aren't any, we strip the finalizers.
 
 	return out, nil
 }

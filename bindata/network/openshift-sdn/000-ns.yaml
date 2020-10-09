@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: openshift-sdn
+  finalizers: []
   labels:
     name: openshift-sdn
     openshift.io/run-level: "0"
