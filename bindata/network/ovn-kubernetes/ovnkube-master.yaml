@@ -986,7 +986,6 @@ spec:
       - name: ovn-cert
         secret:
           secretName: ovn-cert
-          optional: true
       - name: ovn-master-metrics-cert
         secret:
           secretName: ovn-master-metrics-cert
