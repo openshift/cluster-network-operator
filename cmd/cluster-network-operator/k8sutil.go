@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package k8sutil
+package main
 
 import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 
@@ -26,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	discovery "k8s.io/client-go/discovery"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // ForceRunModeEnv indicates if the operator should be forced to run in either local
@@ -38,9 +38,19 @@ type RunModeType string
 const (
 	LocalRunMode   RunModeType = "local"
 	ClusterRunMode RunModeType = "cluster"
-)
+	// WatchNamespaceEnvVar is the constant for env variable WATCH_NAMESPACE
+	// which is the namespace where the watch activity happens.
+	// this value is empty if the operator is running with clusterScope.
+	WatchNamespaceEnvVar = "WATCH_NAMESPACE"
 
-var log = logf.Log.WithName("k8sutil")
+	// OperatorNameEnvVar is the constant for env variable OPERATOR_NAME
+	// which is the name of the current operator
+	OperatorNameEnvVar = "OPERATOR_NAME"
+
+	// PodNameEnvVar is the constant for env variable POD_NAME
+	// which is the name of the current pod.
+	PodNameEnvVar = "POD_NAME"
+)
 
 // GetWatchNamespace returns the namespace the operator should be watching for changes
 func GetWatchNamespace() (string, error) {
@@ -72,7 +82,7 @@ func GetOperatorNamespace() (string, error) {
 		return "", err
 	}
 	ns := strings.TrimSpace(string(nsBytes))
-	log.V(1).Info("Found namespace", "Namespace", ns)
+	log.Printf("Found namespace. Namespace: %v", ns)
 	return ns, nil
 }
 
@@ -119,14 +129,13 @@ func GetPod(ctx context.Context, client crclient.Client, ns string) (*corev1.Pod
 	if podName == "" {
 		return nil, fmt.Errorf("required env %s not set, please configure downward API", PodNameEnvVar)
 	}
-
-	log.V(1).Info("Found podname", "Pod.Name", podName)
+	log.Printf("Found podname. Pod.Name: %v", podName)
 
 	pod := &corev1.Pod{}
 	key := crclient.ObjectKey{Namespace: ns, Name: podName}
 	err := client.Get(ctx, key, pod)
 	if err != nil {
-		log.Error(err, "Failed to get Pod", "Pod.Namespace", ns, "Pod.Name", podName)
+		log.Printf("Failed to get Pod. Pod.Namespace: %v. Pod.Name: %v", ns, podName)
 		return nil, err
 	}
 
@@ -135,7 +144,7 @@ func GetPod(ctx context.Context, client crclient.Client, ns string) (*corev1.Pod
 	pod.TypeMeta.APIVersion = "v1"
 	pod.TypeMeta.Kind = "Pod"
 
-	log.V(1).Info("Found Pod", "Pod.Namespace", ns, "Pod.Name", pod.Name)
+	log.Printf("Found Pod. Pod.Namespace: %v. Pod.Name: %v", ns, pod.Name)
 
 	return pod, nil
 }
