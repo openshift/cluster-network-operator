@@ -1,6 +1,7 @@
-# cloud.google.com/go v0.49.0
+# cloud.google.com/go v0.38.0
 cloud.google.com/go/compute/metadata
 # github.com/Masterminds/goutils v1.1.0
+## explicit
 github.com/Masterminds/goutils
 # github.com/Masterminds/semver v1.5.0
 ## explicit
@@ -10,10 +11,8 @@ github.com/Masterminds/semver
 github.com/Masterminds/sprig
 # github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
-# github.com/blang/semver v3.5.1+incompatible
+# github.com/blang/semver v3.5.0+incompatible
 github.com/blang/semver
-# github.com/cespare/xxhash/v2 v2.1.1
-github.com/cespare/xxhash/v2
 # github.com/containernetworking/cni v0.7.1
 ## explicit
 github.com/containernetworking/cni/pkg/types
@@ -32,7 +31,7 @@ github.com/go-logr/logr
 # github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/sortkeys
-# github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9
+# github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef
 github.com/golang/groupcache/lru
 # github.com/golang/protobuf v1.4.2
 github.com/golang/protobuf/proto
@@ -86,7 +85,8 @@ github.com/gophercloud/utils/openstack/clientconfig
 # github.com/hashicorp/golang-lru v0.5.4
 github.com/hashicorp/golang-lru
 github.com/hashicorp/golang-lru/simplelru
-# github.com/huandu/xstrings v1.2.0
+# github.com/huandu/xstrings v1.3.2
+## explicit
 github.com/huandu/xstrings
 # github.com/imdario/mergo v0.3.9
 github.com/imdario/mergo
@@ -95,6 +95,7 @@ github.com/json-iterator/go
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mitchellh/copystructure v1.0.0
+## explicit
 github.com/mitchellh/copystructure
 # github.com/mitchellh/reflectwalk v1.0.1
 ## explicit
@@ -180,21 +181,16 @@ github.com/openshift/library-go/pkg/operator/resource/resourceapply
 github.com/openshift/library-go/pkg/operator/resource/resourcehelper
 github.com/openshift/library-go/pkg/operator/resource/resourcemerge
 github.com/openshift/library-go/pkg/operator/v1helpers
-# github.com/operator-framework/operator-sdk v0.17.0
-## explicit
-github.com/operator-framework/operator-sdk/pkg/k8sutil
-github.com/operator-framework/operator-sdk/pkg/leader
-github.com/operator-framework/operator-sdk/version
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
-# github.com/prometheus/client_golang v1.5.1
+# github.com/prometheus/client_golang v1.1.0
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
 # github.com/prometheus/client_model v0.2.0
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.9.1
+# github.com/prometheus/common v0.6.0
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
@@ -257,14 +253,14 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.0.0-20191024005414-555d28b269f0
+# golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 golang.org/x/time/rate
 # golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
 golang.org/x/xerrors
 golang.org/x/xerrors/internal
 # gomodules.xyz/jsonpatch/v2 v2.0.1
 gomodules.xyz/jsonpatch/v2
-# google.golang.org/appengine v1.6.5
+# google.golang.org/appengine v1.5.0
 google.golang.org/appengine
 google.golang.org/appengine/internal
 google.golang.org/appengine/internal/app_identity

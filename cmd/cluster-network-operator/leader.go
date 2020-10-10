@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package leader
+package main
 
 import (
 	"context"
+	"log"
 	"time"
-
-	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -26,29 +25,26 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-var log = logf.Log.WithName("leader")
 
 // maxBackoffInterval defines the maximum amount of time to wait between
 // attempts to become the leader.
 const maxBackoffInterval = time.Second * 16
 
-// Become ensures that the current pod is the leader within its namespace. If
+// BecomeLeader ensures that the current pod is the leader within its namespace. If
 // run outside a cluster, it will skip leader election and return nil. It
 // continuously tries to create a ConfigMap with the provided name and the
 // current pod set as the owner reference. Only one can exist at a time with
 // the same name, so the pod that successfully creates the ConfigMap is the
 // leader. Upon termination of that pod, the garbage collector will delete the
 // ConfigMap, enabling a different pod to become the leader.
-func Become(ctx context.Context, lockName string) error {
-	log.Info("Trying to become the leader.")
+func BecomeLeader(ctx context.Context, lockName string) error {
+	log.Printf("Trying to become the leader.")
 
-	ns, err := k8sutil.GetOperatorNamespace()
+	ns, err := GetOperatorNamespace()
 	if err != nil {
-		if err == k8sutil.ErrNoNamespace || err == k8sutil.ErrRunLocal {
-			log.Info("Skipping leader election; not running in a cluster.")
+		if err == ErrNoNamespace || err == ErrRunLocal {
+			log.Printf("Skipping leader election; not running in a cluster.")
 			return nil
 		}
 		return err
@@ -78,16 +74,16 @@ func Become(ctx context.Context, lockName string) error {
 	case err == nil:
 		for _, existingOwner := range existing.GetOwnerReferences() {
 			if existingOwner.Name == owner.Name {
-				log.Info("Found existing lock with my name. I was likely restarted.")
-				log.Info("Continuing as the leader.")
+				log.Printf("Found existing lock with my name. I was likely restarted.")
+				log.Printf("Continuing as the leader.")
 				return nil
 			}
-			log.Info("Found existing lock", "LockOwner", existingOwner.Name)
+			log.Printf("Found existing lock. LockOwner: %v", existingOwner.Name)
 		}
 	case apierrors.IsNotFound(err):
-		log.Info("No pre-existing lock was found.")
+		log.Printf("No pre-existing lock was found.")
 	default:
-		log.Error(err, "Unknown error trying to get ConfigMap")
+		log.Printf("Unknown error trying to get ConfigMap: %v", err)
 		return err
 	}
 
@@ -105,35 +101,35 @@ func Become(ctx context.Context, lockName string) error {
 		err := client.Create(ctx, cm)
 		switch {
 		case err == nil:
-			log.Info("Became the leader.")
+			log.Printf("Became the leader.")
 			return nil
 		case apierrors.IsAlreadyExists(err):
 			existingOwners := existing.GetOwnerReferences()
 			switch {
 			case len(existingOwners) != 1:
-				log.Info("Leader lock configmap must have exactly one owner reference.", "ConfigMap", existing)
+				log.Printf("Leader lock configmap must have exactly one owner reference. ConfigMap: %v", existing)
 			case existingOwners[0].Kind != "Pod":
-				log.Info("Leader lock configmap owner reference must be a pod.", "OwnerReference", existingOwners[0])
+				log.Printf("Leader lock configmap owner reference must be a pod. OwnerReference: %v", existingOwners[0])
 			default:
 				leaderPod := &corev1.Pod{}
 				key = crclient.ObjectKey{Namespace: ns, Name: existingOwners[0].Name}
 				err = client.Get(ctx, key, leaderPod)
 				switch {
 				case apierrors.IsNotFound(err):
-					log.Info("Leader pod has been deleted, waiting for garbage collection do remove the lock.")
+					log.Printf("Leader pod has been deleted, waiting for garbage collection do remove the lock.")
 				case err != nil:
 					return err
 				case isPodEvicted(*leaderPod) && leaderPod.GetDeletionTimestamp() == nil:
-					log.Info("Operator pod with leader lock has been evicted.", "leader", leaderPod.Name)
-					log.Info("Deleting evicted leader.")
+					log.Printf("Operator pod with leader lock has been evicted. leader: %v", leaderPod.Name)
+					log.Printf("Deleting evicted leader.")
 					// Pod may not delete immediately, continue with backoff
 					err := client.Delete(ctx, leaderPod)
 					if err != nil {
-						log.Error(err, "Leader pod could not be deleted.")
+						log.Printf("Leader pod could not be deleted: %v", err)
 					}
 
 				default:
-					log.Info("Not the leader. Waiting.")
+					log.Printf("Not the leader. Waiting.")
 				}
 			}
 
@@ -147,7 +143,7 @@ func Become(ctx context.Context, lockName string) error {
 				return ctx.Err()
 			}
 		default:
-			log.Error(err, "Unknown error creating ConfigMap")
+			log.Printf("Unknown error creating ConfigMap: %v", err)
 			return err
 		}
 	}
@@ -157,7 +153,7 @@ func Become(ctx context.Context, lockName string) error {
 // this code is currently running.
 // It expects the environment variable POD_NAME to be set by the downwards API
 func myOwnerRef(ctx context.Context, client crclient.Client, ns string) (*metav1.OwnerReference, error) {
-	myPod, err := k8sutil.GetPod(ctx, client, ns)
+	myPod, err := GetPod(ctx, client, ns)
 	if err != nil {
 		return nil, err
 	}
