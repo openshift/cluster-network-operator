@@ -173,6 +173,27 @@ spec:
       useExternalOpenvswitch: false
 ```
 
+Additionally, you can configure per-node verbosity for openshift-sdn. This is useful
+if you want to debug an issue, and can reproduce it on a single node. To do this,
+create a special ConfigMap with keys based on the Node's name:
+
+```yaml
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: env-overrides
+  namespace: openshift-sdn
+data:
+  # to set the node processes on a single node to verbose
+  # replace this with the node's name (from oc get nodes)
+  ip-10-0-135-96.us-east-2.compute.internal: |
+    OPENSHIFT_SDN_LOG_LEVEL=5
+  # to enable verbose logging in the sdn controller, use
+  # the special node name of _master
+  _master: |
+    OPENSHIFT_SDN_LOG_LEVEL=5
+```
+
 ### Configuring OVNKubernetes
 OVNKubernetes supports the following configuration options, all of which are optional and once set at cluster creation, they can't be changed:
 * `MTU`: The MTU to use for the geneve overlay. The default is the MTU of the node that the cluster-network-operator is first run on, minus 100 bytes for geneve overhead. If the nodes in your cluster don't all have the same MTU then you may need to set this explicitly.
@@ -191,7 +212,7 @@ spec:
       genevePort: 6081
 ```
 
-Additionally, you can configure per-node verbosity for openshift-sdn and ovn-kubernetes. This is useful
+Additionally, you can configure per-node verbosity for ovn-kubernetes. This is useful
 if you want to debug an issue, and can reproduce it on a single node. To do this,
 create a special ConfigMap with keys based on the Node's name:
 
@@ -203,21 +224,19 @@ metadata:
   namespace: openshift-ovn-kubernetes
   annotations:
 data:
-# to set the node processes on a single node to verbose
-# replace this with the node's name (from oc get nodes)
+  # to set the node processes on a single node to verbose
+  # replace this with the node's name (from oc get nodes)
   ip-10-0-135-96.us-east-2.compute.internal: |
     OVN_KUBE_LOG_LEVEL=5
     OVN_LOG_LEVEL=dbg
     OVS_LOG_LEVEL=dbg
-# To adjust master log levels, use _master
+  # to adjust master log levels, use _master
   _master: |
     OVN_KUBE_LOG_LEVEL=5
     OVN_LOG_LEVEL=dbg
 ```
 
-(For openshift-sdn, use `namespace: openshift-sdn` and, eg, `OPENSHIFT_SDN_LOG_LEVEL=5`.)
-
-### Configuring OVNKubernetes On a Hybrid Cluster
+#### Configuring OVNKubernetes On a Hybrid Cluster
 OVNKubernetes supports a hybrid cluster of both Linux and Windows nodes on x86_64 hosts. The ovn configuration is done as described above. In addition the `hybridOverlayConfig` can be included as follows:
 
 Add the following to the `spec:` section
