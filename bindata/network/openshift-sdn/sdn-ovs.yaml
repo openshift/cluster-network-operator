@@ -139,33 +139,38 @@ spec:
         livenessProbe:
           exec:
             command:
-            # Validate that ovs-vswitchd and ovsdb are running. These three commands check
-            # 1. that the pids in the pid file are up
-            # 2. that ovs-vswitchd is responding to queries
-            # 3. that ovsdb is responding to queries
-            # 4. if br0 is configured, that its management process is responding
+            # Validate that ovs-vswitchd and ovsdb are running. Check that
+            # 1. that ovs-vswitchd is responding to queries
+            # 2. that ovsdb is responding to queries
+            #
+            # Don't bother executing this if we're in systemd, as the liveness
+            # probe isn't helpful.
             - /bin/bash
             - -c
             - |
               #!/bin/bash
+              if [ -f /host/var/run/ovs-config-executed ]; then
+                exit 0
+              fi
               /usr/bin/ovs-appctl -T 5 ofproto/list > /dev/null &&
-              /usr/bin/ovs-vsctl -t 5 show > /dev/null &&
-              if /usr/bin/ovs-vsctl -t 5 br-exists br0; then /usr/bin/ovs-ofctl -t 5 -O OpenFlow13 probe br0; else true; fi
+              /usr/bin/ovs-vsctl -t 5 show > /dev/null
           initialDelaySeconds: 15
           periodSeconds: 5
           timeoutSeconds: 21
         readinessProbe:
           exec:
             command:
-            # The same validation as above, but without checking for br0
-            # This is because it's created by openshift-sdn, so looking for it
-            # won't be very meaningful.
+            # The same validation as above.
+            #
+            # Need the manual target file because ovs-appctl doesn't like
+            # being in a different namespace from ovs-vswitchd, which happens
+            # if ovs is running in systemd.
             - /bin/bash
             - -c
             - |
               #!/bin/bash
-              /usr/share/openvswitch/scripts/ovs-ctl status > /dev/null &&
-              /usr/bin/ovs-appctl -T 5 ofproto/list > /dev/null &&
+              PID=$(cat /var/run/openvswitch/ovs-vswitchd.pid)
+              /usr/bin/ovs-appctl -t "/var/run/openvswitch/ovs-vswitchd.${PID}.ctl" -T 5 ofproto/list > /dev/null &&
               /usr/bin/ovs-vsctl -t 5 show > /dev/null
           initialDelaySeconds: 15
           periodSeconds: 5
