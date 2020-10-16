@@ -412,7 +412,7 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
-metricsBindAddress: 0.0.0.0:9102
+metricsBindAddress: 0.0.0.0:29102
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
