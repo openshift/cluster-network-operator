@@ -189,11 +189,15 @@ func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]
 
 	kpcDefaults := map[string]operv1.ProxyArgumentList{
 		"metrics-bind-address": {"0.0.0.0"},
-		"metrics-port":         {"9102"},
 		"healthz-port":         {"10255"},
 		"proxy-mode":           {"iptables"},
 	}
-	kpc, err := kubeProxyConfiguration(kpcDefaults, conf, nil)
+	// Regardless of the public metrics port, kube-proxy itself must publish metrics on
+	// port 29102.
+	kpcOverrides := map[string]operv1.ProxyArgumentList{
+		"metrics-port": {"29102"},
+	}
+	kpc, err := kubeProxyConfiguration(kpcDefaults, conf, kpcOverrides)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to generate kube-proxy configuration file")
 	}
@@ -201,6 +205,7 @@ func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["KubeProxyImage"] = os.Getenv("KUBE_PROXY_IMAGE")
+	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
 	data.Data["KubeProxyConfig"] = kpc
