@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/robfig/cron/v3"
+	"github.com/robfig/cron"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
@@ -24,6 +24,8 @@ import (
 // This can be also done by re-adding the key to queue, but this is cheaper and more convenient.
 var SyntheticRequeueError = errors.New("synthetic requeue request")
 
+var defaultCacheSyncTimeout = 10 * time.Minute
+
 // baseController represents generic Kubernetes controller boiler-plate
 type baseController struct {
 	name               string
@@ -34,6 +36,7 @@ type baseController struct {
 	resyncEvery        time.Duration
 	resyncSchedules    []cron.Schedule
 	postStartHooks     []PostStartHook
+	cacheSyncTimeout   time.Duration
 }
 
 var _ Controller = &baseController{}
@@ -59,11 +62,38 @@ func (s *scheduledJob) Run() {
 	s.queue.Add(DefaultQueueKey)
 }
 
+func waitForNamedCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs ...cache.InformerSynced) error {
+	klog.Infof("Waiting for caches to sync for %s", controllerName)
+
+	if !cache.WaitForCacheSync(stopCh, cacheSyncs...) {
+		return fmt.Errorf("unable to sync caches for %s", controllerName)
+	}
+
+	klog.Infof("Caches are synced for %s ", controllerName)
+
+	return nil
+}
+
 func (c *baseController) Run(ctx context.Context, workers int) {
 	// HandleCrash recovers panics
 	defer utilruntime.HandleCrash()
-	if !cache.WaitForNamedCacheSync(c.name, ctx.Done(), c.cachesToSync...) {
-		panic("timeout waiting for informer cache") // this will be recovered using HandleCrash()
+
+	// give caches 10 minutes to sync
+	cacheSyncCtx, cacheSyncCancel := context.WithTimeout(ctx, c.cacheSyncTimeout)
+	defer cacheSyncCancel()
+	err := waitForNamedCacheSync(c.name, cacheSyncCtx.Done(), c.cachesToSync...)
+	if err != nil {
+		select {
+		case <-ctx.Done():
+			// Exit gracefully because the controller was requested to stop.
+			return
+		default:
+			// If caches did not sync after 10 minutes, it has taken oddly long and
+			// we should provide feedback. Since the control loops will never start,
+			// it is safer to exit with a good message than to continue with a dead loop.
+			// TODO: Consider making this behavior configurable.
+			klog.Exit(err)
+		}
 	}
 
 	var workerWg sync.WaitGroup
@@ -89,7 +119,7 @@ func (c *baseController) Run(ctx context.Context, workers int) {
 
 	// if scheduled run is requested, run the cron scheduler
 	if c.resyncSchedules != nil {
-		scheduler := cron.New(cron.WithSeconds())
+		scheduler := cron.New()
 		for _, s := range c.resyncSchedules {
 			scheduler.Schedule(s, newScheduledJob(c.name, c.syncContext.Queue()))
 		}
@@ -156,6 +186,7 @@ func (c *baseController) runWorker(queueCtx context.Context) {
 	var workerWaitGroup sync.WaitGroup
 	workerWaitGroup.Add(1)
 	go func() {
+		defer utilruntime.HandleCrash()
 		defer workerWaitGroup.Done()
 		for {
 			select {
@@ -214,7 +245,7 @@ func (c *baseController) processNextWorkItem(queueCtx context.Context) {
 	if err := c.reconcile(queueCtx, syncCtx); err != nil {
 		if err == SyntheticRequeueError {
 			// logging this helps detecting wedged controllers with missing pre-requirements
-			klog.Infof("%q controller requested synthetic requeue with key %q", c.name, key)
+			klog.V(5).Infof("%q controller requested synthetic requeue with key %q", c.name, key)
 		} else {
 			utilruntime.HandleError(fmt.Errorf("%q controller failed to sync %q, err: %w", c.name, key, err))
 		}
