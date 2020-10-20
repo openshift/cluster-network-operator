@@ -5,53 +5,53 @@ spec:
   - name: cluster-network-operator
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-cluster-network-operator:4.3
+      name: quay.io/openshift/origin-cluster-network-operator:latest
   - name: sdn
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-sdn:4.3
+      name: quay.io/openshift/origin-sdn:latest
   - name: kube-proxy
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-kube-proxy:4.3
+      name: quay.io/openshift/origin-kube-proxy:latest
   - name: kube-rbac-proxy
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-kube-rbac-proxy:4.3
+      name: quay.io/openshift/origin-kube-rbac-proxy:latest
   - name: multus-cni
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-multus-cni:4.3
+      name: quay.io/openshift/origin-multus-cni:latest
   - name: multus-whereabouts-ipam-cni
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-multus-whereabouts-ipam-cni:4.4
+      name: quay.io/openshift/origin-multus-whereabouts-ipam-cni:latest
   - name: multus-route-override-cni
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-multus-route-override-cni:4.4
+      name: quay.io/openshift/origin-multus-route-override-cni:latest
   - name: multus-admission-controller
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-multus-admission-controller:4.3
+      name: quay.io/openshift/origin-multus-admission-controller:latest
   - name: container-networking-plugins
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-container-networking-plugins:4.3
+      name: quay.io/openshift/origin-container-networking-plugins:latest
   - name: ovn-kubernetes
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-ovn-kubernetes:4.3
+      name: quay.io/openshift/origin-ovn-kubernetes:latest
   - name: kuryr-cni
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-kuryr-cni:4.3
+      name: quay.io/openshift/origin-kuryr-cni:latest
   - name: kuryr-controller
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-kuryr-controller:4.3
+      name: quay.io/openshift/origin-kuryr-controller:latest
   - name: network-metrics-daemon
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-network-metrics-daemon:4.5
+      name: quay.io/openshift/origin-network-metrics-daemon:latest
 
