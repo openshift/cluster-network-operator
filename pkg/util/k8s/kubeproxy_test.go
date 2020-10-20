@@ -28,6 +28,7 @@ func TestGenerateKubeProxyConfiguration(t *testing.T) {
 			output: `
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -85,6 +86,7 @@ winkernel:
 			output: `
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 1.2.3.4
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -138,6 +140,7 @@ winkernel:
 			output: `
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -191,6 +194,7 @@ winkernel:
 			output: `
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -247,6 +251,7 @@ winkernel:
 			output: `
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
