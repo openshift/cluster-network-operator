@@ -87,6 +87,7 @@ func TestKubeProxyConfig(t *testing.T) {
 	g.Expect(metricsPort).To(Equal("999"))
 	g.Expect(cfg).To(MatchYAML(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: "0.0.0.0"
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -154,6 +155,7 @@ func TestKubeProxyIPv6Config(t *testing.T) {
 	g.Expect(metricsPort).To(Equal("51999"))
 	g.Expect(cfg).To(MatchYAML(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: "::"
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -379,6 +381,7 @@ func TestRenderKubeProxy(t *testing.T) {
 			g.Expect(val).To(MatchYAML(`
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
