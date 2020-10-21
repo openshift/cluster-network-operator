@@ -244,7 +244,7 @@ func TestProxyArgs(t *testing.T) {
 	val, _, _ = uns.NestedString(cfg.Object, "bindAddress")
 	g.Expect(val).To(Equal("1.2.3.4"))
 
-	//set proxy args
+	// set proxy args
 	config.KubeProxyConfig.ProxyArguments = map[string]operv1.ProxyArgumentList{
 		"cluster-cidr":       {"1.2.3.4/5"},
 		"config-sync-period": {"1s", "2s"},
@@ -280,6 +280,26 @@ func TestProxyArgs(t *testing.T) {
 	arg, _, _ = uns.NestedString(cfg.Object, "mode")
 	g.Expect(arg).To(Equal("iptables"))
 
+	// Explicitly setting the metrics port to "9101" is allowed but does not affect
+	// the actual configuration, which uses "29101". Other port values are not
+	// allowed. (Even 29101!)
+	config.KubeProxyConfig.ProxyArguments = map[string]operv1.ProxyArgumentList{
+		"metrics-port": {"29101"},
+	}
+	errs := validateKubeProxy(config)
+	g.Expect(errs).To(HaveLen(1))
+	config.KubeProxyConfig.ProxyArguments = map[string]operv1.ProxyArgumentList{
+		"metrics-port": {"9101"},
+	}
+	errs = validateKubeProxy(config)
+	g.Expect(errs).To(HaveLen(0))
+
+	objs, err = renderOpenShiftSDN(config, manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+	cfg = getProxyConfigFile(objs)
+
+	arg, _, _ = uns.NestedString(cfg.Object, "metricsBindAddress")
+	g.Expect(arg).To(Equal("0.0.0.0:29101"))
 }
 
 func TestOpenShiftSDNIsSafe(t *testing.T) {
