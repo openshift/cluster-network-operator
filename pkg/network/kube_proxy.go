@@ -19,7 +19,7 @@ import (
 // - pluginDefaults
 // - conf.KubeProxyConfig.ProxyArguments
 // - pluginOverrides
-func kubeProxyConfiguration(pluginDefaults map[string]operv1.ProxyArgumentList, conf *operv1.NetworkSpec, pluginOverrides map[string]operv1.ProxyArgumentList) (jsonConf, metricsPort, healthzPort string, err error) {
+func kubeProxyConfiguration(pluginDefaults map[string]operv1.ProxyArgumentList, conf *operv1.NetworkSpec, pluginOverrides map[string]operv1.ProxyArgumentList) (string, error) {
 	p := conf.KubeProxyConfig
 
 	args := map[string]operv1.ProxyArgumentList{}
@@ -33,14 +33,7 @@ func kubeProxyConfiguration(pluginDefaults map[string]operv1.ProxyArgumentList, 
 	args = k8sutil.MergeKubeProxyArguments(args, p.ProxyArguments)
 	args = k8sutil.MergeKubeProxyArguments(args, pluginOverrides)
 
-	if len(args["metrics-port"]) == 1 {
-		metricsPort = args["metrics-port"][0]
-	}
-	if len(args["healthz-port"]) == 1 {
-		healthzPort = args["healthz-port"][0]
-	}
-	jsonConf, err = k8sutil.GenerateKubeProxyConfiguration(args)
-	return
+	return k8sutil.GenerateKubeProxyConfiguration(args)
 }
 
 // acceptsKubeProxyConfig determines if the desired network type allows
@@ -103,20 +96,18 @@ func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 		}
 	}
 
-	// Don't allow ports to be overridden. Before 4.7, standalone kube-proxy used the
-	// same ports as openshift-sdn (metrics 9101, healthz 10256). In 4.7 and later,
-	// the defaults are 9102 and 10255 to allow openshift-sdn and kube-proxy to be run
-	// together, but we still allow the old values to avoid breaking old clusters.
+	// Don't allow ports to be overridden. For backward compatibility, we allow
+	// explicitly specifying the (old) default values, though we prefer for them to be
+	// left blank.
 	if p.ProxyArguments != nil {
 		if val, ok := p.ProxyArguments["metrics-port"]; ok {
-			if len(val) != 1 || (val[0] != "9102" && val[0] != "9101") {
-				out = append(out, errors.Errorf("kube-proxy --metrics-port must be 9102 or 9101"))
+			if len(val) != 1 || val[0] != "9101" {
+				out = append(out, errors.Errorf("kube-proxy --metrics-port cannot be overridden"))
 			}
 		}
-
 		if val, ok := p.ProxyArguments["healthz-port"]; ok {
-			if len(val) != 1 || (val[0] != "10255" && val[0] != "10256") {
-				out = append(out, errors.Errorf("kube-proxy --healthz-port must be 10255 or 10256"))
+			if len(val) != 1 || val[0] != "10256" {
+				out = append(out, errors.Errorf("kube-proxy --healthz-port cannot be overridden"))
 			}
 		}
 	}
@@ -187,14 +178,26 @@ func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]
 		return nil, nil
 	}
 
+	metricsPort := "9102"
+	healthzPort := "10255"
+	if val, ok := conf.KubeProxyConfig.ProxyArguments["metrics-port"]; ok {
+		metricsPort = val[0]
+	}
+	if val, ok := conf.KubeProxyConfig.ProxyArguments["healthz-port"]; ok {
+		healthzPort = val[0]
+	}
+
 	kpcDefaults := map[string]operv1.ProxyArgumentList{
 		"metrics-bind-address": {"0.0.0.0"},
-		"metrics-port":         {"9102"},
 		"healthz-port":         {"10255"},
 		"proxy-mode":           {"iptables"},
 	}
-
-	kpc, metricsPort, healthzPort, err := kubeProxyConfiguration(kpcDefaults, conf, nil)
+	// Regardless of the public metrics port, kube-proxy itself must publish metrics on
+	// port 29102.
+	kpcOverrides := map[string]operv1.ProxyArgumentList{
+		"metrics-port": {"29102"},
+	}
+	kpc, err := kubeProxyConfiguration(kpcDefaults, conf, kpcOverrides)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to generate kube-proxy configuration file")
 	}
@@ -202,6 +205,7 @@ func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["KubeProxyImage"] = os.Getenv("KUBE_PROXY_IMAGE")
+	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
 	data.Data["KubeProxyConfig"] = kpc

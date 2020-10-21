@@ -49,13 +49,17 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 
 	kpcDefaults := map[string]operv1.ProxyArgumentList{
 		"metrics-bind-address":    {"0.0.0.0"},
-		"metrics-port":            {"29101"},
 		"healthz-port":            {"10256"},
 		"proxy-mode":              {"iptables"},
 		"iptables-masquerade-bit": {"0"},
 	}
-
-	kpcOverrides := map[string]operv1.ProxyArgumentList{}
+	// For backward compatibility we allow conf to specify `metrics-port: 9101` but
+	// the daemonset always configures 9101 as the secure metrics port and 29101 as
+	// the insecure metrics port exposed by kube-proxy itself. So just override
+	// the value from conf (which we know is either "9101" or unspecified).
+	kpcOverrides := map[string]operv1.ProxyArgumentList{
+		"metrics-port": {"29101"},
+	}
 	if *c.EnableUnidling {
 		// We already validated that proxy-mode was either unset or iptables.
 		kpcOverrides["proxy-mode"] = operv1.ProxyArgumentList{"unidling+iptables"}
@@ -63,7 +67,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 		kpcOverrides["proxy-mode"] = operv1.ProxyArgumentList{"disabled"}
 	}
 
-	kpc, _, _, err := kubeProxyConfiguration(kpcDefaults, conf, kpcOverrides)
+	kpc, err := kubeProxyConfiguration(kpcDefaults, conf, kpcOverrides)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build kube-proxy config")
 	}
