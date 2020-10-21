@@ -67,7 +67,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 		kpcOverrides["proxy-mode"] = operv1.ProxyArgumentList{"disabled"}
 	}
 
-	kpc, _, _, err := kubeProxyConfiguration(kpcDefaults, conf, kpcOverrides)
+	kpc, err := kubeProxyConfiguration(kpcDefaults, conf, kpcOverrides)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build kube-proxy config")
 	}
