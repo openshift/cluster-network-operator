@@ -108,6 +108,22 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVNHybridOverlayVXLANPort"] = ""
 	}
 
+	if c.HardwareOffloadConfig != nil {
+		if c.HardwareOffloadConfig.EnableHardwareOffload != nil {
+			data.Data["OVNEnableHardwareOffload"] = c.HardwareOffloadConfig.EnableHardwareOffload
+		} else {
+			data.Data["OVNEnableHardwareOffload"] = false
+		}
+		if c.HardwareOffloadConfig.HardwareOffloadPolicy != "" {
+			data.Data["OVNHardwareOffloadPolicy"] = c.HardwareOffloadConfig.HardwareOffloadPolicy
+		} else {
+			data.Data["OVNHardwareOffloadPolicy"] = "none"
+		}
+	} else {
+		data.Data["OVNEnableHardwareOffload"] = false
+		data.Data["OVNHardwareOffloadPolicy"] = ""
+	}
+
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/ovn-kubernetes"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render manifests")

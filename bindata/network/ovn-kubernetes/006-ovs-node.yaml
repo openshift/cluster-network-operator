@@ -72,6 +72,13 @@ spec:
                 exit 0
             }
             trap quit SIGTERM
+
+            # Enable OVS hardware offload
+            {{if .OVNEnableHardwareOffload}}
+            ovs-vsctl --no-wait set Open_vSwitch . other_config:hw-offload={{.OVNEnableHardwareOffload}}
+            ovs-vsctl --no-wait set Open_vSwitch . other_config:tc-policy={{.OVNHardwareOffloadPolicy}}
+            {{- end}}
+
             /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --system-id=random
             ovs-appctl vlog/set "file:${OVS_LOG_LEVEL}"
             /usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
