@@ -73,7 +73,7 @@ func TestKubeProxyConfig(t *testing.T) {
 	errs := validateKubeProxy(&config)
 	g.Expect(errs).To(HaveLen(0))
 
-	cfg, metricsPort, _, err := kubeProxyConfiguration(map[string]operv1.ProxyArgumentList{
+	cfg, err := kubeProxyConfiguration(map[string]operv1.ProxyArgumentList{
 		// special address+port combo
 		"metrics-bind-address":   {"1.2.3.4"},
 		"metrics-port":           {"999"},
@@ -84,7 +84,6 @@ func TestKubeProxyConfig(t *testing.T) {
 			"conntrack-max-per-core": {"15"},
 		})
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(metricsPort).To(Equal("999"))
 	g.Expect(cfg).To(MatchYAML(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: "0.0.0.0"
 bindAddressHardFail: false
@@ -140,7 +139,7 @@ func TestKubeProxyIPv6Config(t *testing.T) {
 	errs := validateKubeProxy(&configIPv6)
 	g.Expect(errs).To(HaveLen(0))
 
-	cfg, metricsPort, _, err := kubeProxyConfiguration(
+	cfg, err := kubeProxyConfiguration(
 		map[string]operv1.ProxyArgumentList{
 			// special address+port combo
 			"metrics-bind-address":   {"fd00:1234::4"},
@@ -152,7 +151,6 @@ func TestKubeProxyIPv6Config(t *testing.T) {
 			"conntrack-max-per-core": {"15"},
 		})
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(metricsPort).To(Equal("51999"))
 	g.Expect(cfg).To(MatchYAML(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: "::"
 bindAddressHardFail: false
