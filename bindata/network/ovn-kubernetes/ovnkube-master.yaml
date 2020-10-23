@@ -457,7 +457,7 @@ spec:
                 -s \
                 --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
                 -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
-                "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/ovn-kubernetes/services/ovnkube-master" |
+                "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/openshift-ovn-kubernetes/services/ovn-kubernetes-master" |
                   python -c 'import json,sys; print(json.load(sys.stdin)["metadata"]["creationTimestamp"])' 2>/dev/null || true
             ) || :
             if [ -n "${TS}" ]; then
@@ -467,7 +467,7 @@ spec:
             echo $(date -Iseconds) INFO: Failed to get ovnkube-master service from API. Retry "${retries}"/100 1>&2
             sleep 20
           done
-          if [ "${retries}" -ge 20 ]; then
+          if [ "${retries}" -ge 100 ]; then
             echo $(date -Iseconds) FATAL: Unable to get ovnkube-master service from API.
             exit 1
           fi
