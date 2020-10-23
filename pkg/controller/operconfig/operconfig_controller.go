@@ -25,7 +25,9 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	// "k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -35,12 +37,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// The periodic resync interval.
-// We will re-run the reconciliation logic, even if the network configuration
+// ResyncPeriod will re-run the reconciliation logic, even if the network configuration
 // hasn't changed.
 var ResyncPeriod = 5 * time.Minute
 
-// ManifestPaths is the path to the manifest templates
+// ManifestPath is the path to the manifest templates
 // bad, but there's no way to pass configuration to the reconciler right now
 var ManifestPath = "./bindata"
 
@@ -59,6 +60,7 @@ func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) *Re
 		scheme:        mgr.GetScheme(),
 		status:        status,
 		mapper:        mgr.GetRESTMapper(),
+		mgr:           mgr,
 		podReconciler: newPodReconciler(status),
 	}
 }
@@ -104,6 +106,7 @@ type ReconcileOperConfig struct {
 	scheme              *runtime.Scheme
 	status              *statusmanager.StatusManager
 	mapper              meta.RESTMapper
+	mgr                 manager.Manager
 	podReconciler       *ReconcilePods
 	namespaceController factory.Controller
 	eventRecorder       events.Recorder
@@ -249,6 +252,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	c := &finalizerController{
 		namespaceName: usingnamespace,
 		client:        r.client,
+		mgr:           r.mgr,
 	}
 
 	var eventif v1.EventInterface
@@ -349,6 +353,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 }
 
 type finalizerController struct {
+	mgr           manager.Manager
 	namespaceName string
 	client        client.Client
 }
@@ -389,6 +394,7 @@ func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncConte
 	}, ns)
 
 	log.Printf("!bang Namespace?: %+v", ns)
+	log.Printf("!bang Namespace finalizers BEFORE?: %+v", ns.Spec.Finalizers)
 
 	if err != nil {
 		// We don't care if it's not found, that's probably good.
@@ -402,6 +408,9 @@ func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncConte
 		return err
 	}
 
+	// Ok, it wasn't updating, try it with a copy? *shrug*
+	ns = ns.DeepCopy()
+
 	newFinalizers := []apiv1.FinalizerName{}
 	for _, curr := range ns.Spec.Finalizers {
 		if curr == apiv1.FinalizerKubernetes {
@@ -414,13 +423,63 @@ func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncConte
 	}
 	ns.Spec.Finalizers = newFinalizers
 	log.Printf("!bang Namespace WITH NEW FINALIZERS?: %+v", ns)
+	log.Printf("!bang Namespace finalizers AFTER?: %+v", ns.Spec.Finalizers)
 
-	err = c.client.Update(context.TODO(), ns)
+	// ---------------------------- experiment
+	// So, I think we need to update using the typed client...
+	// config, err := rest.InClusterConfig()
+	// if err != nil {
+	// 	err = errors.Wrapf(err, "Error getting InClusterConfig: %s", err)
+	// 	return err
+	// }
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(c.mgr.GetConfig())
 	if err != nil {
-		err = errors.Wrapf(err, "could not update namespace finalizers for %s", c.namespaceName)
-		log.Println(err)
+		err = errors.Wrapf(err, "Error creating clientset: %s", err)
 		return err
 	}
+
+	coreClient := clientset.CoreV1()
+
+	// And try to update it...
+	updatedns, err := coreClient.Namespaces().Update(context.TODO(), ns, metav1.UpdateOptions{})
+	if err != nil {
+		err = errors.Wrapf(err, "Error updating namespace: %s", err)
+		return err
+	}
+	log.Printf("!bang Namespace finalizers RESULT?: %+v", updatedns.Spec.Finalizers)
+
+	// _, err = coreClient.NamespacesGetter.Namespaces().Finalize(context.TODO(), ns, metav1.UpdateOptions{})
+
+	_, err = coreClient.Namespaces().Finalize(context.TODO(), ns, metav1.UpdateOptions{})
+
+	if err != nil {
+		err = errors.Wrapf(err, "Error running Finalize on namespace %s: %s", c.namespaceName, err)
+		return err
+	}
+
+	// ---------------------------- end experiment
+
+	/*
+		err = c.client.Update(context.Background(), ns)
+		log.Printf("!bang Seriously no error?: %+v", err)
+		if err != nil {
+			err = errors.Wrapf(err, "could not update namespace finalizers for %s", c.namespaceName)
+			log.Println(err)
+			return err
+		}
+	*/
+
+	// !bang TEMPORARY
+
+	checknsgain := &apiv1.Namespace{}
+	err = c.client.Get(context.Background(), client.ObjectKey{
+		Name: c.namespaceName,
+	}, checknsgain)
+
+	log.Printf("!bang Namespace finalizers AGAIN?: %+v", checknsgain.Spec.Finalizers)
+
+	// !bang TEMPORARY
 
 	// syncCtx.Recorder().Event("NamespaceFinalization", fmt.Sprintf("clearing namespace finalizer on %q", c.namespaceName))
 	// _, err = c.namespaceGetter.Namespaces().Finalize(ctx, ns, metav1.UpdateOptions{})
