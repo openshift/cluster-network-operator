@@ -5,6 +5,8 @@ kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   name: operatorpkis.network.operator.openshift.io
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
 spec:
   group: network.operator.openshift.io
   names:
