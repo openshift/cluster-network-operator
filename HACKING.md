@@ -39,12 +39,6 @@ Build binaries manually with
 ./hack/build-go.sh
 ```
 
-There is a special mode, the renderer, that emulates what the operator _would_ apply, given a fresh cluster. You can execute it manually:
-
-```
-_output/linux/amd64/cluster-network-renderer --config sample-config.yaml --out out.yaml
-```
-
 ### Building images
 By default, podman is used to build images.
 
