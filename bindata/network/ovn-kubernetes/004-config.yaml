@@ -36,3 +36,6 @@ data:
     hybrid-overlay-vxlan-port="{{.OVNHybridOverlayVXLANPort}}"
     {{- end }}
 {{- end  }}
+  _master: |
+    OVN_KUBE_LOG_LEVEL=5
+    OVN_LOG_LEVEL=dbg
