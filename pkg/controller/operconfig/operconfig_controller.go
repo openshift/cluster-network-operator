@@ -247,22 +247,26 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// usingnamespace := "openshift-multus"
-	usingnamespace := "foo-bar"
+	// usingnamespace := "foo-bar"
 
-	c := &finalizerController{
-		namespaceName: usingnamespace,
-		client:        r.client,
-		mgr:           r.mgr,
+	finalizeNamespaces := []string{"openshift-multus", "openshift-sdn"}
+
+	for _, usingnamespace := range finalizeNamespaces {
+		var c *finalizerController
+		c = &finalizerController{
+			namespaceName: usingnamespace,
+			client:        r.client,
+			mgr:           r.mgr,
+		}
+		var eventif v1.EventInterface
+		var objectref apiv1.ObjectReference
+
+		r.eventRecorder = events.NewRecorder(eventif, usingnamespace, &objectref)
+		r.namespaceController = factory.New().ResyncEvery(time.Second).WithSync(c.sync).WithInformers().ToController("myname", r.eventRecorder)
+		r.namespaceController.Run(context.TODO(), 1)
+		log.Printf("!bang CREATED NAMESPACE FINALIZER CONTROLLER: %s", usingnamespace)
+
 	}
-
-	var eventif v1.EventInterface
-	var objectref apiv1.ObjectReference
-
-	r.eventRecorder = events.NewRecorder(eventif, usingnamespace, &objectref)
-	r.namespaceController = factory.New().ResyncEvery(time.Second).WithSync(c.sync).WithInformers().ToController("myname", r.eventRecorder)
-	r.namespaceController.Run(context.TODO(), 1)
-
-	log.Printf("!bang CREATED NAMESPACE FINALIZER CONTROLLER")
 
 	// .ToController("the-nsfinalizer", eventRecorder.WithComponentSuffix("finalizer-controller"))
 
@@ -381,11 +385,9 @@ type finalizerController struct {
 
 func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 
-	log.Printf("!bang KICK OFF SYNC!!!!!!!!!!!!!")
-
 	// !bang
 	// Alright, let's try to figure out if we need to remove finalizers
-	log.Printf("!bang GETTING NAMESPACE")
+	log.Printf("!bang GETTING NAMESPACE: %s", c.namespaceName)
 
 	// Query for the namespace.
 	ns := &apiv1.Namespace{}
@@ -407,6 +409,59 @@ func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncConte
 		log.Println(err)
 		return err
 	}
+
+	// Next, check if it's been deleted.
+	// We don't care anymore if it's not deleted.
+	if ns.DeletionTimestamp == nil {
+		log.Printf("!bang ITS NOT DELETED")
+		return nil
+	}
+
+	// allow one minute of grace for most things to terminate.
+	deletedMoreThanAMinute := ns.DeletionTimestamp.Time.Add(1 * time.Minute).Before(time.Now())
+	if !deletedMoreThanAMinute {
+		syncCtx.Queue().AddAfter(c.namespaceName, 1*time.Minute)
+		return nil
+	}
+
+	// Check out how many pods there are...
+	pods := &apiv1.PodList{}
+	err = c.client.List(context.TODO(), pods, client.InNamespace(c.namespaceName))
+
+	log.Printf("!bang PODSIZE!!!!!!!!!!!!?: %v")
+
+	if err != nil {
+		err = errors.Wrapf(err, "could not query for pods %s", c.namespaceName)
+		log.Println(err)
+		return err
+	}
+
+	// Keep this running until the pods are gone...
+	if len(pods.Items) > 0 {
+		return nil
+	}
+
+	// !bang DAEMONSET LIST HERE
+	// Check out how many daemonsets there are...
+	dslist := &appsv1.DaemonSetList{}
+	err = c.client.List(context.TODO(), dslist, client.InNamespace(c.namespaceName))
+
+	log.Printf("!bang DSSIZE!!!!!!!!!!!!?: %v", len(dslist.Items))
+
+	if err != nil {
+		err = errors.Wrapf(err, "could not query for daemonsets %s", c.namespaceName)
+		log.Println(err)
+		return err
+	}
+
+	// Keep this running until the pods are gone...
+	if len(dslist.Items) > 0 {
+		return nil
+	}
+
+	// syncCtx.Recorder().Event("NamespaceFinalization", fmt.Sprintf("clearing namespace finalizer on %q", c.namespaceName))
+	// _, err = c.namespaceGetter.Namespaces().Finalize(ctx, ns, metav1.UpdateOptions{})
+	// return err
 
 	// Ok, it wasn't updating, try it with a copy? *shrug*
 	ns = ns.DeepCopy()
@@ -477,62 +532,7 @@ func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncConte
 		Name: c.namespaceName,
 	}, checknsgain)
 
-	log.Printf("!bang Namespace finalizers AGAIN?: %+v", checknsgain.Spec.Finalizers)
-
-	// !bang TEMPORARY
-
-	// syncCtx.Recorder().Event("NamespaceFinalization", fmt.Sprintf("clearing namespace finalizer on %q", c.namespaceName))
-	// _, err = c.namespaceGetter.Namespaces().Finalize(ctx, ns, metav1.UpdateOptions{})
-	// return err
-
-	// Next, check if it's been deleted.
-	// We don't care anymore if it's not deleted.
-	if ns.DeletionTimestamp == nil {
-		log.Printf("!bang ITS NOT DELETED")
-		return nil
-	}
-
-	// allow one minute of grace for most things to terminate.
-	deletedMoreThanAMinute := ns.DeletionTimestamp.Time.Add(1 * time.Minute).Before(time.Now())
-	if !deletedMoreThanAMinute {
-		syncCtx.Queue().AddAfter(c.namespaceName, 1*time.Minute)
-		return nil
-	}
-
-	// Check out how many pods there are...
-	pods := &apiv1.PodList{}
-	err = c.client.List(context.TODO(), pods, client.InNamespace(c.namespaceName))
-
-	log.Printf("!bang PODSIZE!!!!!!!!!!!!?: %v")
-
-	if err != nil {
-		err = errors.Wrapf(err, "could not query for pods %s", c.namespaceName)
-		log.Println(err)
-		return err
-	}
-
-	// Keep this running until the pods are gone...
-	if len(pods.Items) > 0 {
-		return nil
-	}
-
-	// !bang DAEMONSET LIST HERE
-	// Check out how many daemonsets there are...
-	dslist := &appsv1.DaemonSetList{}
-	err = c.client.List(context.TODO(), dslist, client.InNamespace(c.namespaceName))
-
-	log.Printf("!bang DSSIZE!!!!!!!!!!!!?: %v", len(dslist.Items))
-
-	if err != nil {
-		err = errors.Wrapf(err, "could not query for daemonsets %s", c.namespaceName)
-		log.Println(err)
-		return err
-	}
-
-	// Keep this running until the pods are gone...
-	if len(dslist.Items) > 0 {
-		return nil
-	}
+	log.Printf("!bang Namespace finalizers ARE DONE!: %+v", checknsgain.Spec.Finalizers)
 
 	return nil
 
