@@ -50,12 +50,11 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus-admission-controller")))
 
 	// Check rendered object
-	g.Expect(len(objs)).To(Equal(10))
+	g.Expect(len(objs)).To(Equal(9))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Service", "openshift-multus", "multus-admission-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "multus-admission-controller-webhook")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "multus-admission-controller-webhook")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ValidatingWebhookConfiguration", "", names.MULTUS_VALIDATING_WEBHOOK)))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("ConfigMap", "openshift-network-operator", names.SERVICE_CA_CONFIGMAP)))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus-admission-controller")))
 
 	// Make sure every obj is reasonable:
