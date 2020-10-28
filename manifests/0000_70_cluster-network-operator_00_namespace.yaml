@@ -3,6 +3,7 @@ kind: Namespace
 metadata:
   name: openshift-network-operator
   annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
     openshift.io/node-selector: ""
   labels:
     name: openshift-network-operator
