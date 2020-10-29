@@ -45,7 +45,7 @@ spec:
           value: "quay.io/openshift/origin-multus-route-override-cni:latest"
         - name: OVN_IMAGE
           value: "quay.io/openshift/origin-ovn-kubernetes:latest"
-        - name: OVN_NB_RAFT_ELECTION_TIMER
+       - name: OVN_NB_RAFT_ELECTION_TIMER
           value: "10000"
         - name: OVN_SB_RAFT_ELECTION_TIMER
           value: "16000"

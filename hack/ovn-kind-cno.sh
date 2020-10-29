@@ -10,7 +10,7 @@ CNO_PATH=${CNO_PATH:-$GOPATH/src/github.com/openshift/cluster-network-operator}
 OVN_K8S_PATH=${OVN_K8S_PATH:-$GOPATH/src/github.com/ovn-org/ovn-kubernetes}
 KIND_CONFIG=${KIND_CONFIG:-$HOME/kind-ovn-config.yaml}
 export KUBECONFIG=${HOME}/kube-ovn.conf
-NUM_MASTER_NODES=1
+NUM_MASTER_NODES=${NUM_MASTER_NODES:-1}
 OVN_KIND_VERBOSITY=${OVN_KIND_VERBOSITY:-5}
 
 # Default networks (same as in KIND)
@@ -41,9 +41,19 @@ if ! sudo iptables -C DOCKER-USER -j ACCEPT > /dev/null 2>&1; then
   sudo iptables -I DOCKER-USER -j ACCEPT
 fi
 
+if [ "$NUM_MASTER_NODES" -eq 1 ]; then
+  nodes="- role: worker
+- role: worker"
+elif [ "$NUM_MASTER_NODES" -eq 3 ]; then
+  nodes="- role: control-plane
+- role: control-plane"
+else
+  echo "Incorrect number of master nodes: ${NUM_MASTER_NODES}. Please use 1 or 3"
+  exit 1
+fi
+
  # create the config file
   cat <<EOF > ${KIND_CONFIG}
-# config for 1 control plane node and 2 workers (necessary for conformance)
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 networking:
@@ -53,8 +63,7 @@ networking:
   serviceSubnet: ${SERVICE_NETWORK:-10.96.0.0/12}
 nodes:
 - role: control-plane
-- role: worker
-- role: worker
+${nodes}
 EOF
 
 
@@ -90,7 +99,7 @@ if [ "$BUILD_OVN" = true ]; then
   pushd dist/images
   sudo cp -f ../../go-controller/_output/go/bin/* .
   cat << EOF | docker build -t origin-ovn-kubernetes:dev -f - .
-FROM quay.io/openshift/origin-ovn-kubernetes:4.5
+FROM quay.io/openshift/origin-ovn-kubernetes:4.6
 COPY ovnkube ovn-kube-util /usr/bin/
 COPY ovn-k8s-cni-overlay /usr/libexec/cni/ovn-k8s-cni-overlay
 COPY ovnkube.sh /root/
@@ -149,6 +158,12 @@ if [ "$BUILD_OVN" = true ] || [ "$BUILD_CNO" = true ]; then
   popd
 fi
 
+# CNO needs to get scheduled on first node, because thats where KIND will put /etc/kubernetes/kubeconfig
+until kubectl get pod -n openshift-network-operator -o wide | grep "ovn-control-plane ";do
+  kubectl delete pod -n openshift-network-operator --all --grace-period=0 --force
+  sleep 1
+done
+
 if ! kubectl wait -n openshift-network-operator --for condition=available deployment network-operator --timeout=120s; then
   echo "Network operator not running"
   exit 1
@@ -202,17 +217,20 @@ done
 # wait until resources are created
 sleep 30
 
-if ! kubectl wait -n openshift-ovn-kubernetes --for=condition=ready pods --all --timeout=300s ; then
-  echo "OVN-k8s pods are not running"
+# Wait for pods to come up and be ready. Note metrics pods do not currently work.
+if ! kubectl wait -n openshift-ovn-kubernetes --for=condition=ready --selector=app!=ovnkube-node-metrics,app!=ovnkube-master-metrics pods --all --timeout=300s ; then 
+  echo "OVN-k8s pods are not Ready"
   exit 1
 fi
 
 # Configuring secret for multus-admission-webhook
 # https://raw.githubusercontent.com/openshift/multus-admission-controller/master/hack/webhook-create-signed-cert.sh
 $CNO_PATH/hack/webhook-create-signed-cert.sh --service multus-admission-controller --namespace openshift-multus --secret multus-admission-controller-secret
-if ! kubectl wait -n openshift-multus --for=condition=ready pods --all --timeout=300s ; then
+
+# Wait for pods to come up and be ready. Note metrics and admission controller pods do not currently work.
+if ! kubectl wait -n openshift-multus --for=condition=ready pods --selector=app!=network-metrics-daemon,app!=multus-admission-controller --all --timeout=300s ; then
   echo "multus pods are not running"
   exit 1
 fi
 
-echo "Deployment Complete!"
+echo "Deployment Complete! Use 'kind export kubeconfig --name ovn' to access your cluster"
