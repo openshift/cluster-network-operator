@@ -3,7 +3,6 @@ package controller
 import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/clusterconfig"
 	configmapcainjector "github.com/openshift/cluster-network-operator/pkg/controller/configmap_ca_injector"
-	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
 	"github.com/openshift/cluster-network-operator/pkg/controller/operconfig"
 	"github.com/openshift/cluster-network-operator/pkg/controller/pki"
 	"github.com/openshift/cluster-network-operator/pkg/controller/proxyconfig"
@@ -20,6 +19,5 @@ func init() {
 		operconfig.Add,
 		clusterconfig.Add,
 		configmapcainjector.Add,
-		connectivitycheck.Add,
 	)
 }

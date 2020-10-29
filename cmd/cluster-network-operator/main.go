@@ -12,6 +12,7 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
 	"github.com/openshift/cluster-network-operator/pkg/controller"
+	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
@@ -102,16 +103,33 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Setup all Controllers
+	// setup signal handler for controller-runtime and context
+	// for library-go controllers
+	stopCh := signals.SetupSignalHandler()
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-stopCh
+		cancel()
+	}()
+	defer cancel()
+
+	log.Print("Starting the Cmd.")
+
+	// start library-go controllers
+	func() {
+		if err := connectivitycheck.Start(ctx, mgr.GetConfig()); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	// Setup all controller-runtime Controllers
 	log.Print("Configuring Controllers")
 	if err := controller.AddToManager(mgr); err != nil {
 		log.Fatal(err)
 	}
 
-	log.Print("Starting the Cmd.")
-
 	// Start the Cmd
-	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(stopCh); err != nil {
 		log.Fatal(err)
 	}
 }

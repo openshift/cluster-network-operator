@@ -14,7 +14,6 @@ import (
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	configv1listers "github.com/openshift/client-go/config/listers/config/v1"
 	operatorcontrolplaneclient "github.com/openshift/client-go/operatorcontrolplane/clientset/versioned"
-	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/connectivitycheckcontroller"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -26,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"k8s.io/client-go/rest"
 )
 
 type OVNKubernetesConnectivityCheckController interface {
@@ -221,10 +220,9 @@ func withTarget(label, nodeName string) func(check *v1alpha1.PodNetworkConnectiv
 	return WithTarget(label + "-" + nodeName)
 }
 
-func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
-	ctx := context.TODO()
-	kubeConfig := mgr.GetConfig()
-	protoKubeConfig := mgr.GetConfig()
+func Start(ctx context.Context, kubeConfig *rest.Config) error {
+	protoKubeConfig := rest.CopyConfig(kubeConfig)
+	protoKubeConfig.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
 	protoKubeConfig.ContentType = "application/vnd.kubernetes.protobuf"
 	eventRecorder := &loggingRecorder{}
 	kubeClient, err := kubernetes.NewForConfig(protoKubeConfig)
@@ -271,7 +269,8 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
 	)
 
 	go connectivityCheckController.Run(ctx, 1)
-
+	apiextensionsInformers.Start(ctx.Done())
+	kubeInformersForNamespaces.Start(ctx.Done())
 	<-ctx.Done()
 	return nil
 }
