@@ -34,13 +34,16 @@ spec:
         - |
           #!/bin/bash
           set -euo pipefail
-          chown -R openvswitch:openvswitch /var/run/openvswitch
-          chown -R openvswitch:openvswitch /etc/openvswitch
 
           if [ -f /host/var/run/ovs-config-executed ]; then
             echo "openvswitch is running in systemd"
             # Don't need to worry about restoring flows; this can only change if we've rebooted
             rm /var/run/openvswitch/flows.sh || true
+
+            # patch up any possible permissions issues
+            ovs_uid=$(chroot /host id -u openvswitch)
+            ovs_gid=$(chroot /host id -g openvswitch)
+            chown -R "${ovs_uid}:${ovs_gid}" /run/openvswitch
             exec tail -F /host/var/log/openvswitch/ovs-vswitchd.log /host/var/log/openvswitch/ovsdb-server.log
             # executes forever
           fi
@@ -60,6 +63,9 @@ spec:
               exit 1
             fi
           done
+
+          chown -R openvswitch:openvswitch /var/run/openvswitch
+          chown -R openvswitch:openvswitch /etc/openvswitch
 
           function quit {
               # Save the flows
