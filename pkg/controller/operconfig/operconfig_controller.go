@@ -246,26 +246,29 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		})
 	}
 
-	// usingnamespace := "openshift-multus"
-	// usingnamespace := "foo-bar"
+	// Namespace finalization setup.
+
+	// We need a typed client, because we cannot access the finalizer from the controller-runtime.
+	// This is because finalizers are a subresource, but just for namespaces.
+	clientset, err := kubernetes.NewForConfig(r.mgr.GetConfig())
+	if err != nil {
+		err = errors.Wrapf(err, "Failed to get clientset for namespace finalizer controllers: %v", err)
+		return reconcile.Result{}, err
+	}
 
 	finalizeNamespaces := []string{"openshift-multus", "openshift-sdn"}
-
-	for _, usingnamespace := range finalizeNamespaces {
-		log.Printf("!bang testing iteration: %s", usingnamespace)
-	}
 
 	for i, usingnamespace := range finalizeNamespaces {
 		var c *finalizerController
 		c = &finalizerController{
-			namespaceName: usingnamespace,
-			client:        r.client,
-			mgr:           r.mgr,
+			namespaceName:  usingnamespace,
+			client:         r.client,
+			typedclientset: clientset,
 		}
 		var eventif v1.EventInterface
 		var objectref apiv1.ObjectReference
 
-		log.Printf("!bang ------------------------------------------------------------ CREATING CONTROLLER: %s", usingnamespace)
+		log.Printf("!bang -- CREATING CONTROLLER: %s", usingnamespace)
 		r.eventRecorder[i] = events.NewRecorder(eventif, usingnamespace, &objectref)
 		r.namespaceController[i] = factory.New().ResyncEvery(time.Second).WithSync(c.sync).WithInformers().ToController(usingnamespace+"-ns-controller", r.eventRecorder[i])
 	}
@@ -273,34 +276,6 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	for j := range r.namespaceController {
 		go r.namespaceController[j].Run(context.Background(), 1)
 	}
-
-	log.Printf("!bang ----------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>> AFTER THE FORLOOP?")
-
-	// var d *finalizerController
-	// d = &finalizerController{
-	// 	namespaceName: "openshift-multus",
-	// 	client:        r.client,
-	// 	mgr:           r.mgr,
-	// }
-	// var deventif v1.EventInterface
-	// var dobjectref apiv1.ObjectReference
-
-	// r.eventRecorder = events.NewRecorder(deventif, "openshift-sdn", &dobjectref)
-	// r.namespaceController = factory.New().ResyncEvery(time.Second).WithSync(d.sync).WithInformers().ToController("myname", r.eventRecorder)
-	// r.namespaceController.Run(context.TODO(), 1)
-	// log.Printf("!bang CREATED NAMESPACE FINALIZER CONTROLLER: openshift-sdn")
-
-	// .ToController("the-nsfinalizer", eventRecorder.WithComponentSuffix("finalizer-controller"))
-
-	// .WithInformers(
-	// 	kubeInformersForTargetNamespace.Core().V1().Pods().Informer(),
-	// 	kubeInformersForTargetNamespace.Apps().V1().DaemonSets().Informer(),
-	// ).ToController(fullname, eventRecorder.WithComponentSuffix("finalizer-controller"))
-
-	// ns := (*v1.Namespaces)(nil)
-	// ns, checkerr := r.client.Namespaces().Get(context.TODO(), "openshift-multus", metav1.GetOptions{})
-	// log.Printf("!bang Got NAMESPACE?")
-	// log.Printf("!bang checkerr: %v", checkerr)
 
 	relatedObjects = append(relatedObjects, configv1.ObjectReference{
 		Resource: "namespaces",
@@ -346,8 +321,6 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 	}
 
-	log.Printf("!bang TRACE F")
-
 	// Run a pod status check just to clear any initial inconsitencies at startup of the CNO
 	r.status.SetFromPods()
 
@@ -379,37 +352,14 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 }
 
 type finalizerController struct {
-	mgr           manager.Manager
-	namespaceName string
-	client        client.Client
+	namespaceName  string
+	client         client.Client
+	typedclientset *kubernetes.Clientset
 }
-
-// func NewFinalizerController(
-// 	namespaceName string,
-// 	kubeInformersForTargetNamespace kubeinformers.SharedInformerFactory,
-// 	namespaceGetter v1.NamespacesGetter,
-// 	eventRecorder events.Recorder,
-// ) factory.Controller {
-// 	fullname := "NamespaceFinalizerController_" + namespaceName
-// 	c := &finalizerController{
-// 		name:            fullname,
-// 		namespaceName:   namespaceName,
-// 		namespaceGetter: namespaceGetter,
-// 		podLister:       kubeInformersForTargetNamespace.Core().V1().Pods().Lister(),
-// 		dsLister:        kubeInformersForTargetNamespace.Apps().V1().DaemonSets().Lister(),
-// 	}
-
-// 	return factory.New().ResyncEvery(time.Second).WithSync(c.sync).WithInformers(
-// 		kubeInformersForTargetNamespace.Core().V1().Pods().Informer(),
-// 		kubeInformersForTargetNamespace.Apps().V1().DaemonSets().Informer(),
-// 	).ToController(fullname, eventRecorder.WithComponentSuffix("finalizer-controller"))
-// }
 
 func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 
 	// !bang
-	// Alright, let's try to figure out if we need to remove finalizers
-	log.Printf("!bang GETTING NAMESPACE: %s", c.namespaceName)
 
 	// Query for the namespace.
 	ns := &apiv1.Namespace{}
@@ -417,13 +367,12 @@ func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncConte
 		Name: c.namespaceName,
 	}, ns)
 
-	log.Printf("!bang Namespace?: %+v", ns)
-	log.Printf("!bang Namespace finalizers BEFORE?: %+v", ns.Spec.Finalizers)
+	log.Printf("!bang [%v] Namespace finalizers BEFORE?: %+v", c.namespaceName, ns.Spec.Finalizers)
 
 	if err != nil {
 		// We don't care if it's not found, that's probably good.
 		if apierrors.IsNotFound(err) {
-			log.Printf("!bang IS NOT FOUND")
+			log.Printf("!bang [%v] IS NOT FOUND", c.namespaceName)
 			return nil
 		}
 
@@ -435,10 +384,11 @@ func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncConte
 	// Next, check if it's been deleted.
 	// We don't care anymore if it's not deleted.
 	if ns.DeletionTimestamp == nil {
-		log.Printf("!bang ITS NOT DELETED")
+		log.Printf("!bang [%v] ITS NOT DELETED", c.namespaceName)
 		return nil
 	}
 
+	// Now we emulate the Kubernetes finalizer, so we essentially honor it but take it over.
 	// allow one minute of grace for most things to terminate.
 	deletedMoreThanAMinute := ns.DeletionTimestamp.Time.Add(1 * time.Minute).Before(time.Now())
 	if !deletedMoreThanAMinute {
@@ -450,25 +400,23 @@ func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncConte
 	pods := &apiv1.PodList{}
 	err = c.client.List(context.TODO(), pods, client.InNamespace(c.namespaceName))
 
-	log.Printf("!bang PODSIZE!!!!!!!!!!!!?: %v")
-
 	if err != nil {
 		err = errors.Wrapf(err, "could not query for pods %s", c.namespaceName)
 		log.Println(err)
 		return err
 	}
 
+	log.Printf("!bang [%v] PODSIZE!!!!!!!!!!!!?: %v", c.namespaceName, len(pods.Items))
 	// Keep this running until the pods are gone...
 	if len(pods.Items) > 0 {
 		return nil
 	}
 
-	// !bang DAEMONSET LIST HERE
 	// Check out how many daemonsets there are...
 	dslist := &appsv1.DaemonSetList{}
 	err = c.client.List(context.TODO(), dslist, client.InNamespace(c.namespaceName))
 
-	log.Printf("!bang DSSIZE!!!!!!!!!!!!?: %v", len(dslist.Items))
+	log.Printf("!bang [%v] DSSIZE!!!!!!!!!!!!?: %v", c.namespaceName, len(dslist.Items))
 
 	if err != nil {
 		err = errors.Wrapf(err, "could not query for daemonsets %s", c.namespaceName)
@@ -476,18 +424,14 @@ func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncConte
 		return err
 	}
 
-	// Keep this running until the pods are gone...
+	// Keep this running until the ds'es are gone...
 	if len(dslist.Items) > 0 {
 		return nil
 	}
 
-	// syncCtx.Recorder().Event("NamespaceFinalization", fmt.Sprintf("clearing namespace finalizer on %q", c.namespaceName))
-	// _, err = c.namespaceGetter.Namespaces().Finalize(ctx, ns, metav1.UpdateOptions{})
-	// return err
-
-	// Ok, it wasn't updating, try it with a copy? *shrug*
 	ns = ns.DeepCopy()
 
+	// Strip out ONLY the Kubernetes finalizer, this way other finalizers are respected.
 	newFinalizers := []apiv1.FinalizerName{}
 	for _, curr := range ns.Spec.Finalizers {
 		if curr == apiv1.FinalizerKubernetes {
@@ -499,134 +443,39 @@ func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncConte
 		return nil
 	}
 	ns.Spec.Finalizers = newFinalizers
-	log.Printf("!bang Namespace WITH NEW FINALIZERS?: %+v", ns)
-	log.Printf("!bang Namespace finalizers AFTER?: %+v", ns.Spec.Finalizers)
+	log.Printf("!bang [%v] Namespace finalizers AFTER?: %+v", c.namespaceName, ns.Spec.Finalizers)
 
-	// ---------------------------- experiment
-	// So, I think we need to update using the typed client...
-	// config, err := rest.InClusterConfig()
-	// if err != nil {
-	// 	err = errors.Wrapf(err, "Error getting InClusterConfig: %s", err)
-	// 	return err
-	// }
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(c.mgr.GetConfig())
-	if err != nil {
-		err = errors.Wrapf(err, "Error creating clientset: %s", err)
-		return err
-	}
+	coreclient := c.typedclientset.CoreV1()
 
-	coreClient := clientset.CoreV1()
-
+	// ---------------------------------------------------------------------------------- this can probably be removed
+	// remove this because it
 	// And try to update it...
-	updatedns, err := coreClient.Namespaces().Update(context.TODO(), ns, metav1.UpdateOptions{})
+	updatedns, err := coreclient.Namespaces().Update(context.TODO(), ns, metav1.UpdateOptions{})
 	if err != nil {
 		err = errors.Wrapf(err, "Error updating namespace: %s", err)
 		return err
 	}
-	log.Printf("!bang Namespace finalizers RESULT?: %+v", updatedns.Spec.Finalizers)
+	log.Printf("!bang [%v] Namespace finalizers RESULT?: %+v", c.namespaceName, updatedns.Spec.Finalizers)
+	// ---------------------------------------------------------------------------------- this can probably be removed
 
-	// _, err = coreClient.NamespacesGetter.Namespaces().Finalize(context.TODO(), ns, metav1.UpdateOptions{})
-
-	_, err = coreClient.Namespaces().Finalize(context.TODO(), ns, metav1.UpdateOptions{})
+	// Run the finalizers now with our updated namespace object (which now is without the kube finalizer)
+	_, err = coreclient.Namespaces().Finalize(context.TODO(), ns, metav1.UpdateOptions{})
 
 	if err != nil {
 		err = errors.Wrapf(err, "Error running Finalize on namespace %s: %s", c.namespaceName, err)
 		return err
 	}
 
-	// ---------------------------- end experiment
-
-	/*
-		err = c.client.Update(context.Background(), ns)
-		log.Printf("!bang Seriously no error?: %+v", err)
-		if err != nil {
-			err = errors.Wrapf(err, "could not update namespace finalizers for %s", c.namespaceName)
-			log.Println(err)
-			return err
-		}
-	*/
-
-	// !bang TEMPORARY
-
+	// ---------------------------------------------------------------------- double check for finalizers.
+	// ...remove this later.
 	checknsgain := &apiv1.Namespace{}
 	err = c.client.Get(context.Background(), client.ObjectKey{
 		Name: c.namespaceName,
 	}, checknsgain)
+	// ---------------------------------------------------------------------- double check for finalizers.
 
-	log.Printf("!bang Namespace finalizers ARE DONE!: %+v", checknsgain.Spec.Finalizers)
+	log.Printf("!bang [%v] Namespace finalizers ARE DONE!: %+v", c.namespaceName, checknsgain.Spec.Finalizers)
 
 	return nil
-
-	// ns, err := c.namespaceGetter.Namespaces().Get(ctx, c.namespaceName, metav1.GetOptions{})
-	// if apierrors.IsNotFound(err) {
-	// 	return nil
-	// }
-	// if err != nil {
-	// 	return err
-	// }
-	// if ns.DeletionTimestamp == nil {
-	// 	return nil
-	// }
-
-	// // allow one minute of grace for most things to terminate.
-	// // TODO now that we have conditions, we may be able to check specific conditions
-	// deletedMoreThanAMinute := ns.DeletionTimestamp.Time.Add(1 * time.Minute).Before(time.Now())
-	// if !deletedMoreThanAMinute {
-	// 	syncCtx.Queue().AddAfter(c.namespaceName, 1*time.Minute)
-	// 	return nil
-	// }
-
-	// pods, err := c.podLister.Pods(c.namespaceName).List(labels.Everything())
-	// if err != nil {
-	// 	return err
-	// }
-	// if len(pods) > 0 {
-	// 	return nil
-	// }
-	// dses, err := c.dsLister.DaemonSets(c.namespaceName).List(labels.Everything())
-	// if err != nil {
-	// 	return err
-	// }
-	// if len(dses) > 0 {
-	// 	return nil
-	// }
-
-	// newFinalizers := []corev1.FinalizerName{}
-	// for _, curr := range ns.Spec.Finalizers {
-	// 	if curr == corev1.FinalizerKubernetes {
-	// 		continue
-	// 	}
-	// 	newFinalizers = append(newFinalizers, curr)
-	// }
-	// if reflect.DeepEqual(newFinalizers, ns.Spec.Finalizers) {
-	// 	return nil
-	// }
-	// ns.Spec.Finalizers = newFinalizers
-
-	// syncCtx.Recorder().Event("NamespaceFinalization", fmt.Sprintf("clearing namespace finalizer on %q", c.namespaceName))
-	// _, err = c.namespaceGetter.Namespaces().Finalize(ctx, ns, metav1.UpdateOptions{})
-	// return err
-
-	// ---------------------- from: https://github.com/openshift/cluster-etcd-operator/blob/master/vendor/github.com/openshift/library-go/pkg/operator/management/management_state_controller.go
-	// ManagementStateController watches changes of `managementState` field and react in case that field is set to an unsupported value.
-	// As each operator can opt-out from supporting `unmanaged` or `removed` states, this controller will add failing condition when the
-	// value for this field is set to this values for those operators.
-	// type ManagementStateController struct {
-	// 	operatorName   string
-	// 	operatorClient operatorv1helpers.OperatorClient
-	// }
-
-	// func NewOperatorManagementStateController(
-	// 	name string,
-	// 	operatorClient operatorv1helpers.OperatorClient,
-	// 	recorder events.Recorder,
-	// ) factory.Controller {
-	// 	c := &ManagementStateController{
-	// 		operatorName:   name,
-	// 		operatorClient: operatorClient,
-	// 	}
-	// 	return factory.New().WithInformers(operatorClient.Informer()).WithSync(c.sync).ResyncEvery(time.Second).ToController("ManagementStateController", recorder.WithComponentSuffix("management-state-recorder"))
-	// }
 
 }
