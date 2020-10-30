@@ -108,8 +108,8 @@ type ReconcileOperConfig struct {
 	mapper              meta.RESTMapper
 	mgr                 manager.Manager
 	podReconciler       *ReconcilePods
-	namespaceController factory.Controller
-	eventRecorder       events.Recorder
+	namespaceController [2]factory.Controller
+	eventRecorder       [2]events.Recorder
 	// namespaceGetter     v1.NamespacesGetter
 }
 
@@ -252,6 +252,10 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	finalizeNamespaces := []string{"openshift-multus", "openshift-sdn"}
 
 	for _, usingnamespace := range finalizeNamespaces {
+		log.Printf("!bang testing iteration: %s", usingnamespace)
+	}
+
+	for i, usingnamespace := range finalizeNamespaces {
 		var c *finalizerController
 		c = &finalizerController{
 			namespaceName: usingnamespace,
@@ -261,12 +265,30 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		var eventif v1.EventInterface
 		var objectref apiv1.ObjectReference
 
-		r.eventRecorder = events.NewRecorder(eventif, usingnamespace, &objectref)
-		r.namespaceController = factory.New().ResyncEvery(time.Second).WithSync(c.sync).WithInformers().ToController("myname", r.eventRecorder)
-		r.namespaceController.Run(context.TODO(), 1)
-		log.Printf("!bang CREATED NAMESPACE FINALIZER CONTROLLER: %s", usingnamespace)
-
+		log.Printf("!bang ------------------------------------------------------------ CREATING CONTROLLER: %s", usingnamespace)
+		r.eventRecorder[i] = events.NewRecorder(eventif, usingnamespace, &objectref)
+		r.namespaceController[i] = factory.New().ResyncEvery(time.Second).WithSync(c.sync).WithInformers().ToController(usingnamespace+"-ns-controller", r.eventRecorder[i])
 	}
+
+	for j := range r.namespaceController {
+		go r.namespaceController[j].Run(context.Background(), 1)
+	}
+
+	log.Printf("!bang ----------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>> AFTER THE FORLOOP?")
+
+	// var d *finalizerController
+	// d = &finalizerController{
+	// 	namespaceName: "openshift-multus",
+	// 	client:        r.client,
+	// 	mgr:           r.mgr,
+	// }
+	// var deventif v1.EventInterface
+	// var dobjectref apiv1.ObjectReference
+
+	// r.eventRecorder = events.NewRecorder(deventif, "openshift-sdn", &dobjectref)
+	// r.namespaceController = factory.New().ResyncEvery(time.Second).WithSync(d.sync).WithInformers().ToController("myname", r.eventRecorder)
+	// r.namespaceController.Run(context.TODO(), 1)
+	// log.Printf("!bang CREATED NAMESPACE FINALIZER CONTROLLER: openshift-sdn")
 
 	// .ToController("the-nsfinalizer", eventRecorder.WithComponentSuffix("finalizer-controller"))
 
