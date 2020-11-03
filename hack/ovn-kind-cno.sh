@@ -98,11 +98,19 @@ if [ "$BUILD_OVN" = true ]; then
   popd
   pushd dist/images
   sudo cp -f ../../go-controller/_output/go/bin/* .
+  sudo cp $CNO_PATH/bindata/network/ovn-kubernetes/ovnkube-cno-master.sh .
+  sudo cp $CNO_PATH/bindata/network/ovn-kubernetes/ovnkube-cno-node.sh .
+ 
   cat << EOF | docker build -t origin-ovn-kubernetes:dev -f - .
 FROM quay.io/openshift/origin-ovn-kubernetes:4.6
 COPY ovnkube ovn-kube-util /usr/bin/
 COPY ovn-k8s-cni-overlay /usr/libexec/cni/ovn-k8s-cni-overlay
 COPY ovnkube.sh /root/
+COPY ovnkube-cno-master.sh /root/
+RUN chmod +x /root/ovnkube-cno-master.sh
+COPY ovnkube-cno-node.sh /root/
+RUN chmod +x /root/ovnkube-cno-node.sh
+COPY --from=centos:7 /sbin/arping  /usr/bin/.
 EOF
   popd
   echo "Loading OVN-K8S docker image into KIND"
