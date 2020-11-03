@@ -1,12 +1,5 @@
 #!/bin/bash
 
-source "$(dirname "${BASH_SOURCE}")/init.sh"
-
-# Check for `go` binary and set ${GOPATH}.
-setup_env
-
-cd ${GOPATH}/src/${CNO_GO_PKG}
-
 if [[ ! $(which go) ]]; then
   echo "go not found on PATH. To install:"
   echo "https://golang.org/dl/"

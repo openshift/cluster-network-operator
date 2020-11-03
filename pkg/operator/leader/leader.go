@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package leader
 
 import (
 	"context"
-	"log"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 // maxBackoffInterval defines the maximum amount of time to wait between
@@ -38,25 +37,15 @@ const maxBackoffInterval = time.Second * 16
 // the same name, so the pod that successfully creates the ConfigMap is the
 // leader. Upon termination of that pod, the garbage collector will delete the
 // ConfigMap, enabling a different pod to become the leader.
-func BecomeLeader(ctx context.Context, lockName string) error {
-	log.Printf("Trying to become the leader.")
+func BecomeLeader(ctx context.Context, client crclient.Client, lockName string) error {
+	klog.Info("Trying to become the leader.")
 
 	ns, err := GetOperatorNamespace()
 	if err != nil {
 		if err == ErrNoNamespace || err == ErrRunLocal {
-			log.Printf("Skipping leader election; not running in a cluster.")
+			klog.Info("Skipping leader election; not running in a cluster.")
 			return nil
 		}
-		return err
-	}
-
-	config, err := config.GetConfig()
-	if err != nil {
-		return err
-	}
-
-	client, err := crclient.New(config, crclient.Options{})
-	if err != nil {
 		return err
 	}
 
@@ -74,16 +63,16 @@ func BecomeLeader(ctx context.Context, lockName string) error {
 	case err == nil:
 		for _, existingOwner := range existing.GetOwnerReferences() {
 			if existingOwner.Name == owner.Name {
-				log.Printf("Found existing lock with my name. I was likely restarted.")
-				log.Printf("Continuing as the leader.")
+				klog.Info("Found existing lock with my name. I was likely restarted.")
+				klog.Info("Continuing as the leader.")
 				return nil
 			}
-			log.Printf("Found existing lock. LockOwner: %v", existingOwner.Name)
+			klog.Infof("Found existing lock. LockOwner: %v", existingOwner.Name)
 		}
 	case apierrors.IsNotFound(err):
-		log.Printf("No pre-existing lock was found.")
+		klog.Info("No pre-existing lock was found.")
 	default:
-		log.Printf("Unknown error trying to get ConfigMap: %v", err)
+		klog.Infof("Unknown error trying to get ConfigMap: %v", err)
 		return err
 	}
 
@@ -98,38 +87,39 @@ func BecomeLeader(ctx context.Context, lockName string) error {
 	// try to create a lock
 	backoff := time.Second
 	for {
+		klog.V(2).Infof("Leader election: trying to create configmap %s/%s", cm.Namespace, cm.Name)
 		err := client.Create(ctx, cm)
 		switch {
 		case err == nil:
-			log.Printf("Became the leader.")
+			klog.V(1).Info("Became the leader.")
 			return nil
 		case apierrors.IsAlreadyExists(err):
 			existingOwners := existing.GetOwnerReferences()
 			switch {
 			case len(existingOwners) != 1:
-				log.Printf("Leader lock configmap must have exactly one owner reference. ConfigMap: %v", existing)
+				klog.V(1).Infof("Leader lock configmap must have exactly one owner reference. ConfigMap: %v", existing)
 			case existingOwners[0].Kind != "Pod":
-				log.Printf("Leader lock configmap owner reference must be a pod. OwnerReference: %v", existingOwners[0])
+				klog.V(1).Infof("Leader lock configmap owner reference must be a pod. OwnerReference: %v", existingOwners[0])
 			default:
 				leaderPod := &corev1.Pod{}
 				key = crclient.ObjectKey{Namespace: ns, Name: existingOwners[0].Name}
 				err = client.Get(ctx, key, leaderPod)
 				switch {
 				case apierrors.IsNotFound(err):
-					log.Printf("Leader pod has been deleted, waiting for garbage collection do remove the lock.")
+					klog.V(2).Info("Leader pod has been deleted, waiting for garbage collection to remove the lock.")
 				case err != nil:
 					return err
 				case isPodEvicted(*leaderPod) && leaderPod.GetDeletionTimestamp() == nil:
-					log.Printf("Operator pod with leader lock has been evicted. leader: %v", leaderPod.Name)
-					log.Printf("Deleting evicted leader.")
+					klog.Infof("Operator pod with leader lock has been evicted. leader: %v", leaderPod.Name)
+					klog.Info("Deleting evicted leader.")
 					// Pod may not delete immediately, continue with backoff
 					err := client.Delete(ctx, leaderPod)
 					if err != nil {
-						log.Printf("Leader pod could not be deleted: %v", err)
+						klog.Infof("Leader pod could not be deleted: %v", err)
 					}
 
 				default:
-					log.Printf("Not the leader. Waiting.")
+					klog.Info("Not the leader. Waiting.")
 				}
 			}
 
@@ -143,7 +133,7 @@ func BecomeLeader(ctx context.Context, lockName string) error {
 				return ctx.Err()
 			}
 		default:
-			log.Printf("Unknown error creating ConfigMap: %v", err)
+			klog.Infof("Unknown error creating ConfigMap: %v", err)
 			return err
 		}
 	}

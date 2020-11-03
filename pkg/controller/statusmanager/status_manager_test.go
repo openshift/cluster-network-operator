@@ -107,7 +107,7 @@ func (f *fakeRESTMapper) ResourceSingularizer(resource string) (singular string,
 func TestStatusManager_set(t *testing.T) {
 	client := fake.NewFakeClient()
 	mapper := &fakeRESTMapper{}
-	status := New(client, mapper, "testing", "1.2.3")
+	status := New(client, mapper, "testing")
 
 	co, err := getCO(client, "testing")
 	if !errors.IsNotFound(err) {
@@ -224,7 +224,7 @@ func TestStatusManager_set(t *testing.T) {
 func TestStatusManagerSetDegraded(t *testing.T) {
 	client := fake.NewFakeClient()
 	mapper := &fakeRESTMapper{}
-	status := New(client, mapper, "testing", "1.2.3")
+	status := New(client, mapper, "testing")
 
 	co, err := getCO(client, "testing")
 	if !errors.IsNotFound(err) {
@@ -315,7 +315,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	client := fake.NewFakeClient()
 	mapper := &fakeRESTMapper{}
-	status := New(client, mapper, "testing", "1.2.3")
+	status := New(client, mapper, "testing")
 
 	status.SetDaemonSets([]types.NamespacedName{
 		{Namespace: "one", Name: "alpha"},
@@ -902,7 +902,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 func TestStatusManagerSetFromDeployments(t *testing.T) {
 	client := fake.NewFakeClient()
 	mapper := &fakeRESTMapper{}
-	status := New(client, mapper, "testing", "1.2.3")
+	status := New(client, mapper, "testing")
 
 	status.SetDeployments([]types.NamespacedName{
 		{Namespace: "one", Name: "alpha"},
@@ -1212,7 +1212,7 @@ func setLastPodState(t *testing.T, client client.Client, name string, ps podStat
 func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	client := fake.NewFakeClient()
 	mapper := &fakeRESTMapper{}
-	status := New(client, mapper, "testing", "1.2.3")
+	status := New(client, mapper, "testing")
 	status.SetDaemonSets([]types.NamespacedName{
 		{Namespace: "one", Name: "alpha"},
 		{Namespace: "two", Name: "beta"},

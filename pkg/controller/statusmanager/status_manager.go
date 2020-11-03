@@ -41,10 +41,9 @@ const (
 type StatusManager struct {
 	sync.Mutex
 
-	client  client.Client
-	mapper  meta.RESTMapper
-	name    string
-	version string
+	client client.Client
+	mapper meta.RESTMapper
+	name   string
 
 	failing [maxStatusLevel]*configv1.ClusterOperatorStatusCondition
 
@@ -53,8 +52,8 @@ type StatusManager struct {
 	relatedObjects []configv1.ObjectReference
 }
 
-func New(client client.Client, mapper meta.RESTMapper, name, version string) *StatusManager {
-	return &StatusManager{client: client, mapper: mapper, name: name, version: version}
+func New(client client.Client, mapper meta.RESTMapper, name string) *StatusManager {
+	return &StatusManager{client: client, mapper: mapper, name: name}
 }
 
 // deleteRelatedObjects checks for related objects attached to ClusterOperator and deletes

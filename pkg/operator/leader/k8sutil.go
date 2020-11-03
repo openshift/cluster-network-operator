@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package leader
 
 import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 
@@ -26,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	discovery "k8s.io/client-go/discovery"
+	"k8s.io/klog/v2"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -82,7 +82,7 @@ func GetOperatorNamespace() (string, error) {
 		return "", err
 	}
 	ns := strings.TrimSpace(string(nsBytes))
-	log.Printf("Found namespace. Namespace: %v", ns)
+	klog.V(3).Infof("Found namespace. Namespace: %v", ns)
 	return ns, nil
 }
 
@@ -129,13 +129,13 @@ func GetPod(ctx context.Context, client crclient.Client, ns string) (*corev1.Pod
 	if podName == "" {
 		return nil, fmt.Errorf("required env %s not set, please configure downward API", PodNameEnvVar)
 	}
-	log.Printf("Found podname. Pod.Name: %v", podName)
+	klog.V(3).Infof("Found podname. Pod.Name: %v", podName)
 
 	pod := &corev1.Pod{}
 	key := crclient.ObjectKey{Namespace: ns, Name: podName}
 	err := client.Get(ctx, key, pod)
 	if err != nil {
-		log.Printf("Failed to get Pod. Pod.Namespace: %v. Pod.Name: %v", ns, podName)
+		klog.Infof("Failed to get Pod. Pod.Namespace: %v. Pod.Name: %v", ns, podName)
 		return nil, err
 	}
 
@@ -144,7 +144,7 @@ func GetPod(ctx context.Context, client crclient.Client, ns string) (*corev1.Pod
 	pod.TypeMeta.APIVersion = "v1"
 	pod.TypeMeta.Kind = "Pod"
 
-	log.Printf("Found Pod. Pod.Namespace: %v. Pod.Name: %v", ns, pod.Name)
+	klog.V(3).Infof("Found Pod. Pod.Namespace: %v. Pod.Name: %v", ns, pod.Name)
 
 	return pod, nil
 }
