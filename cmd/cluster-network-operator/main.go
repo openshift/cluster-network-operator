@@ -15,6 +15,7 @@ import (
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
+	_ "k8s.io/code-generator"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
