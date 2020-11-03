@@ -110,6 +110,7 @@ COPY ovnkube-cno-master.sh /root/
 RUN chmod +x /root/ovnkube-cno-master.sh
 COPY ovnkube-cno-node.sh /root/
 RUN chmod +x /root/ovnkube-cno-node.sh
+#Do we still need this
 COPY --from=centos:7 /sbin/arping  /usr/bin/.
 EOF
   popd
