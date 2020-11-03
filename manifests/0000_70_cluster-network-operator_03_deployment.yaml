@@ -5,6 +5,8 @@ metadata:
   namespace: openshift-network-operator
   labels:
     name: network-operator
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
 spec:
   selector:
     matchLabels:
