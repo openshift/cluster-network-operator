@@ -1,14 +1,12 @@
-FROM registry.svc.ci.openshift.org/openshift/release:golang-1.14 AS builder
+FROM registry.svc.ci.openshift.org/openshift/release:golang-1.15 AS builder
 WORKDIR /go/src/github.com/openshift/cluster-network-operator
 COPY . .
-RUN hack/build-go.sh; \
-    mkdir -p /tmp/build; \
-    cp /go/src/github.com/openshift/cluster-network-operator/_output/linux/$(go env GOARCH)/cluster-network-operator /tmp/build/; \
-    cp /go/src/github.com/openshift/cluster-network-operator/_output/linux/$(go env GOARCH)/cluster-network-check-endpoints /tmp/build/
+RUN hack/build-go.sh
 
 FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
-COPY --from=builder /tmp/build/cluster-network-operator /usr/bin/
-COPY --from=builder /tmp/build/cluster-network-check-endpoints /usr/bin
+COPY --from=builder  /go/src/github.com/openshift/cluster-network-operator/cluster-network-operator /usr/bin/
+COPY --from=builder  /go/src/github.com/openshift/cluster-network-operator/cluster-network-check-endpoints /usr/bin/
+
 COPY manifests /manifests
 COPY bindata /bindata
 ENV OPERATOR_NAME=cluster-network-operator

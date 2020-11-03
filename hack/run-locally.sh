@@ -67,6 +67,15 @@ function setup_operator_env() {
     if [[ -n "${plugin_image}" ]]; then
         sed -i -e "s#^${image_env_key}=.*#${image_env_key}=${plugin_image}#" "${CLUSTER_DIR}/env.sh"
     fi
+
+    # library-go controller needs to write stuff here
+    if [[ ! -w "/var/run/secrets" ]]; then
+        echo "Need /var/run/secrets to be writable, please execute"
+        echo sudo /bin/bash -c "'mkdir -p /var/run/secrets && chown ${USER} /var/run/secrets'"
+    fi
+
+    mkdir -p /var/run/secrets/kubernetes.io/serviceaccount/
+    echo -n "cluster-network-operator" > /var/run/secrets/kubernetes.io/serviceaccount/namespace
 }
 
 # Patch the CNO out of the cluster-version-operator and scale it down to zero so
@@ -296,4 +305,4 @@ fi
 
 setup_operator_env "${IMAGE_ENV_KEY}" "${PLUGIN_IMAGE}"
 
-env $(cat "${CLUSTER_DIR}/env.sh") _output/linux/amd64/cluster-network-operator
+env $(cat "${CLUSTER_DIR}/env.sh") OSDK_FORCE_RUN_MODE=local ./cluster-network-operator start --kubeconfig "${KUBECONFIG}"
