@@ -62,8 +62,14 @@ spec:
             if [[ ! -S /run/openvswitch/db.sock ]]; then
               systemctl_restart ovsdb-server
             fi
+            # We need to explicitly exit on SIGTERM, see https://github.com/openshift/cluster-dns-operator/issues/65
+            function quit {
+                exit 0
+            }
+            trap quit SIGTERM
             # Don't need to worry about restoring flows; this can only change if we've rebooted
-            exec tail -F /host/var/log/openvswitch/ovs-vswitchd.log /host/var/log/openvswitch/ovsdb-server.log
+            tail --pid=$BASHPID -F /host/var/log/openvswitch/ovs-vswitchd.log /host/var/log/openvswitch/ovsdb-server.log &
+            wait
           else
 
             echo "openvswitch is running in container"
