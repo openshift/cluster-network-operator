@@ -39,3 +39,8 @@ oc annotate --local -o yaml \
   "${RELEASE_PROFILE}" \
   "${ROKS_PROFILE}" \
   -f _output/crds/network.operator.openshift.io_operatorpkis.yaml >> manifests/0000_70_cluster-network-operator_01_pki_crd.yaml
+
+oc annotate --local -o yaml \
+  "${RELEASE_PROFILE}" \
+  "${ROKS_PROFILE}" \
+  -f _output/crds/network.operator.openshift.io_egressrouters.yaml >> manifests/0000_70_cluster-network-operator_05_egr_crd.yaml
