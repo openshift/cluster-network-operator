@@ -6,6 +6,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/attributestags"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/mtu"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/subnetpools"
@@ -112,6 +113,21 @@ func findOpenStackNetwork(client *gophercloud.ServiceClient, tag string) (networ
 	} else {
 		return empty, errors.New("multiple matching networks")
 	}
+}
+
+// Gets the MTU of a Network
+func getOpenStackNetworkMTU(client *gophercloud.ServiceClient, networkID string) (int, error) {
+	networkMTU := 0
+	type NetworkMTU struct {
+		networks.Network
+		mtu.NetworkMTUExt
+	}
+	var mtu NetworkMTU
+	err := networks.Get(client, networkID).ExtractInto(&mtu)
+	if err != nil {
+		return networkMTU, errors.Wrap(err, "failed to extract network MTU")
+	}
+	return mtu.MTU, nil
 }
 
 // Looks for a Neutron subnet by name and tag. In case of not found, looks for a
