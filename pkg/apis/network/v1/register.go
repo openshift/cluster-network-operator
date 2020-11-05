@@ -19,6 +19,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(GroupVersion,
 		&OperatorPKI{},
 		&OperatorPKIList{},
+		&EgressRouter{},
+		&EgressRouterList{},
 	)
 	metav1.AddToGroupVersion(scheme, GroupVersion)
 	return nil
