@@ -27,7 +27,6 @@ spec:
   selector:
     matchLabels:
       app: ovnkube-master
-      ovn-db-pod: "true"
   strategy:
     type: RollingUpdate
     rollingUpdate:
