@@ -315,8 +315,7 @@ run-nbdb-postStart() {
     }
 
     run-nbdb-preStop() {
-    /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl
-    exit
+    /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl exit
 
     }
 
@@ -617,8 +616,7 @@ set -x
     }
 
     run-sbdb-preStop() {
-	    /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl
-	    exit
+	    /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl exit
     }
 
     run-sbdb-readinessProbe() {
