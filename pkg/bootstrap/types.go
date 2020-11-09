@@ -32,6 +32,7 @@ type KuryrBootstrapResult struct {
 
 type OVNConfigBoostrapResult struct {
 	GatewayMode            string
+	DPUMode                string
 	EnableEgressIP         bool
 	DisableSNATMultipleGWs bool
 }
