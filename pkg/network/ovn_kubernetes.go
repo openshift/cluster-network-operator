@@ -44,6 +44,8 @@ const OVN_MASTER_DISCOVERY_BACKOFF = 120
 const OVN_LOCAL_GW_MODE = "local"
 const OVN_SHARED_GW_MODE = "shared"
 const OVN_LOG_PATTERN_CONSOLE = "%D{%Y-%m-%dT%H:%M:%S.###Z}|%05N|%c%T|%p|%m"
+const OVN_NODE_MODE_FULL = "full"
+const OVN_NODE_MODE_DPU_HOST = "dpu-host"
 
 var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
@@ -79,6 +81,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
 	data.Data["OVN_GATEWAY_MODE"] = bootstrapResult.OVN.OVNKubernetesConfig.GatewayMode
+	data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_FULL
 	data.Data["OVN_ENABLE_EGRESS_IP"] = bootstrapResult.OVN.OVNKubernetesConfig.EnableEgressIP
 	data.Data["OVN_DISABLE_SNAT_MULTIPLE_GWS"] = bootstrapResult.OVN.OVNKubernetesConfig.DisableSNATMultipleGWs
 	data.Data["OVN_NB_PORT"] = OVN_NB_PORT
@@ -193,6 +196,16 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 	objs = append(objs, manifests...)
 
+	nodeMode := bootstrapResult.OVN.OVNKubernetesConfig.NodeMode
+	if nodeMode != OVN_NODE_MODE_FULL {
+		data.Data["OVN_NODE_MODE"] = nodeMode
+		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/ovnkube-node.yaml"), &data)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to render manifests")
+		}
+		objs = append(objs, manifests...)
+	}
+
 	// obtain the current IP family mode.
 	ipFamilyMode := names.IPFamilySingleStack
 	if len(conf.ServiceNetwork) == 2 {
@@ -246,6 +259,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 func bootstrapOVNConfig(kubeClient client.Client) (*bootstrap.OVNConfigBoostrapResult, error) {
 	ovnConfigResult := &bootstrap.OVNConfigBoostrapResult{
 		GatewayMode:            OVN_SHARED_GW_MODE,
+		NodeMode:               OVN_NODE_MODE_FULL,
 		EnableEgressIP:         true,
 		DisableSNATMultipleGWs: false,
 	}
@@ -256,24 +270,43 @@ func bootstrapOVNConfig(kubeClient client.Client) (*bootstrap.OVNConfigBoostrapR
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			klog.Infof("Did not find gateway-mode-config. Using default OVN configuration: %+v", ovnConfigResult)
-			return ovnConfigResult, nil
+			klog.Infof("Did not find gateway-mode-config")
 		} else {
 			return nil, fmt.Errorf("Could not determine gateway mode: %w", err)
 		}
+	} else {
+		modeOverride := cm.Data["mode"]
+		_, disableSNATMultipleGWsOverride := cm.Data["disable-snat-multiple-gws"]
+		if modeOverride != OVN_SHARED_GW_MODE && modeOverride != OVN_LOCAL_GW_MODE {
+			klog.Warningf("gateway-mode-config does not match %q or %q, is: %q. Using default OVN configuration: %+v", OVN_LOCAL_GW_MODE, OVN_SHARED_GW_MODE, modeOverride, ovnConfigResult)
+			return ovnConfigResult, nil
+		}
+		ovnConfigResult.GatewayMode = modeOverride
+		if disableSNATMultipleGWsOverride {
+			ovnConfigResult.EnableEgressIP = false
+			ovnConfigResult.DisableSNATMultipleGWs = true
+		}
+		klog.Infof("Overriding OVN configuration to %+v", ovnConfigResult)
 	}
-	modeOverride := cm.Data["mode"]
-	_, disableSNATMultipleGWsOverride := cm.Data["disable-snat-multiple-gws"]
-	if modeOverride != OVN_SHARED_GW_MODE && modeOverride != OVN_LOCAL_GW_MODE {
-		klog.Warningf("gateway-mode-config does not match %q or %q, is: %q. Using default OVN configuration: %+v", OVN_LOCAL_GW_MODE, OVN_SHARED_GW_MODE, modeOverride, ovnConfigResult)
-		return ovnConfigResult, nil
+
+	dmc := types.NamespacedName{Namespace: "openshift-network-operator", Name: "dpu-mode-config"}
+	err = kubeClient.Get(context.TODO(), dmc, cm)
+
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			klog.Infof("Did not find dpu-mode-config")
+		} else {
+			return nil, fmt.Errorf("Could not determine Node Mode: %w", err)
+		}
+	} else {
+		nodeModeOverride := cm.Data["mode"]
+		if nodeModeOverride != OVN_NODE_MODE_DPU_HOST {
+			klog.Warningf("dpu-mode-config does not match %q, is: %q. Using OVN configuration: %+v", OVN_NODE_MODE_DPU_HOST, nodeModeOverride, ovnConfigResult)
+			return ovnConfigResult, nil
+		}
+		ovnConfigResult.NodeMode = nodeModeOverride
+		klog.Infof("Overriding OVN configuration to %+v", ovnConfigResult)
 	}
-	ovnConfigResult.GatewayMode = modeOverride
-	if disableSNATMultipleGWsOverride {
-		ovnConfigResult.EnableEgressIP = false
-		ovnConfigResult.DisableSNATMultipleGWs = true
-	}
-	klog.Infof("Overriding OVN configuration to %+v", ovnConfigResult)
 	return ovnConfigResult, nil
 }
 
