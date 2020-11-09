@@ -27,6 +27,13 @@ spec:
         openshift.io/component: network
         kubernetes.io/os: "linux"
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: network.operator.openshift.io/ovn-offload-host
+                operator: DoesNotExist
       serviceAccountName: ovn-kubernetes-node
       hostNetwork: true
       hostPID: true
@@ -267,6 +274,7 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
             ${gateway_mode_flags} \
+            --ovnkube-node-mode full \
             --metrics-bind-address "127.0.0.1:29103" \
             --metrics-enable-pprof \
             ${export_network_flows_flags}
