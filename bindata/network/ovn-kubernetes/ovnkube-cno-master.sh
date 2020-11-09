@@ -18,7 +18,7 @@ set -xe
 
 
 echo "$(date -Iseconds) - starting ovn-northd"
-echo "[run-northd] IRL <script> exec ovn-northd --no-chdir -vconsole${OVN_LOG_LEVEL} -vfile:off --ovnnb-db ${OVN_NB_DB_LIST} --ovnsb-db ${OVN_SB_DB_LIST}"
+echo "[run-northd] <script> exec ovn-northd --no-chdir -vconsole${OVN_LOG_LEVEL} -vfile:off --ovnnb-db ${OVN_NB_DB_LIST} --ovnsb-db ${OVN_SB_DB_LIST}"
    exec ovn-northd \
 	     --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
 	     --ovnnb-db "${OVN_NB_DB_LIST}" \
@@ -36,7 +36,7 @@ set -xe
             source "/env/_master"
             set +o allexport
           fi
-          echo "----------- [run-nbdb] IRL <script> -------------------"
+          echo "----------- [run-nbdb]  <script> -------------------"
  
 
 	  # initialize variables
@@ -185,7 +185,7 @@ run-nbdb-postStart() {
                 if [[ "${K8S_NODE_IP}" == "${MASTER_IP}" ]]; then
                   echo "$(date -Iseconds) - nbdb - postStart - waiting for master to be selected"
 		
-		  echo "----------- [run-nbdb-postStart] IRL <script> -------------------"
+		  echo "----------- [run-nbdb-postStart]  <script> -------------------"
  
 
                   # set the connection and disable inactivity probe
@@ -714,7 +714,7 @@ set -x
           fi
 
  
-    echo "================== northd.sh================"
+    echo "================== ovnkube-cno-master.sh================"
     
     echo " ==================== command: ${cmd}"
     
