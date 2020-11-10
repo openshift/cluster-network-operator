@@ -15,7 +15,7 @@ check: | verify test-unit
 .PHONY: check
 
 clean:
-	$(RM) cluster-network-operator
+	$(RM) cluster-network-operator cluster-nework-check-endpoints
 .PHONY: clean
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
