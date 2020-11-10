@@ -11,8 +11,13 @@ import (
 	"github.com/ghodss/yaml"
 
 	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
+	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/names"
+	cohelpers "github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
+	operstatus "github.com/openshift/library-go/pkg/operator/status"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +50,7 @@ type StatusManager struct {
 	mapper meta.RESTMapper
 	name   string
 
-	failing [maxStatusLevel]*configv1.ClusterOperatorStatusCondition
+	failing [maxStatusLevel]*operv1.OperatorCondition
 
 	daemonSets     []types.NamespacedName
 	deployments    []types.NamespacedName
@@ -107,9 +112,93 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 	}
 }
 
-// Set updates the ClusterOperator.Status with the provided conditions
-func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...configv1.ClusterOperatorStatusCondition) {
+// Set updates the operator and clusteroperator statuses with the provided conditions.
+func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv1.OperatorCondition) {
+	var operStatus *operv1.NetworkStatus
+
+	// Set status on the network.operator object
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		oc := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+		err := status.client.Get(context.TODO(), types.NamespacedName{Name: names.OPERATOR_CONFIG}, oc)
+		if err != nil {
+			// Should never happen outside of unit tests
+			return err
+		}
+
+		oldStatus := oc.Status.DeepCopy()
+
+		oc.Status.Version = os.Getenv("RELEASE_VERSION")
+
+		// If we have no conditions at all, pull them from the ClusterOperator object
+		// In other words, we're upgrading an existing cluster where we didn't set conditions here.
+		if len(oc.Status.Conditions) == 0 {
+			co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
+			err := status.client.Get(context.TODO(), types.NamespacedName{Name: status.name}, co)
+			if err != nil {
+				log.Printf("failed to retrieve ClusterOperator object: %v - continuing", err)
+			}
+
+			for _, condition := range co.Status.Conditions {
+				v1helpers.SetOperatorCondition(&oc.Status.Conditions, operv1.OperatorCondition{
+					Type:               string(condition.Type),
+					Status:             operv1.ConditionStatus(condition.Status),
+					LastTransitionTime: condition.LastTransitionTime,
+					Reason:             condition.Reason,
+					Message:            condition.Message,
+				})
+			}
+		}
+
+		for _, condition := range conditions {
+			v1helpers.SetOperatorCondition(&oc.Status.Conditions, condition)
+		}
+
+		progressingCondition := v1helpers.FindOperatorCondition(oc.Status.Conditions, operv1.OperatorStatusTypeProgressing)
+		availableCondition := v1helpers.FindOperatorCondition(oc.Status.Conditions, operv1.OperatorStatusTypeAvailable)
+		if availableCondition == nil && progressingCondition != nil && progressingCondition.Status == operv1.ConditionTrue {
+			v1helpers.SetOperatorCondition(&oc.Status.Conditions,
+				operv1.OperatorCondition{
+					Type:    operv1.OperatorStatusTypeAvailable,
+					Status:  operv1.ConditionFalse,
+					Reason:  "Startup",
+					Message: "The network is starting up",
+				},
+			)
+		}
+
+		v1helpers.SetOperatorCondition(&oc.Status.Conditions,
+			operv1.OperatorCondition{
+				Type:   operv1.OperatorStatusTypeUpgradeable,
+				Status: operv1.ConditionTrue,
+			},
+		)
+
+		operStatus = &oc.Status
+
+		if equality.Semantic.DeepEqual(&oc.Status, oldStatus) {
+			return nil
+		}
+
+		buf, err := yaml.Marshal(oc.Status.Conditions)
+		if err != nil {
+			buf = []byte(fmt.Sprintf("(failed to convert to YAML: %s)", err))
+		}
+
+		if err := status.client.Update(context.TODO(), oc); err != nil {
+			return err
+		}
+		log.Printf("Set operator conditions:\n%s", buf)
+
+		return nil
+	})
+	if err != nil {
+		log.Printf("Failed to set operator status: %v", err)
+	}
+
+	// Set status conditions on the network clusteroperator object.
+	// TODO: enable the library-go ClusterOperatorStatusController, which will
+	// do this for us. We can't use that yet, because it doesn't allow dynamic RelatedObjects[].
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
 		err := status.client.Get(context.TODO(), types.NamespacedName{Name: status.name}, co)
 		isNotFound := errors.IsNotFound(err)
@@ -123,38 +212,22 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...confi
 			co.Status.RelatedObjects = status.relatedObjects
 		}
 
-		if reachedAvailableLevel {
-			if releaseVersion := os.Getenv("RELEASE_VERSION"); len(releaseVersion) > 0 {
-				co.Status.Versions = []configv1.OperandVersion{
-					{Name: "operator", Version: releaseVersion},
-				}
-			} else {
-				co.Status.Versions = nil
+		if operStatus == nil {
+			cohelpers.SetStatusCondition(&co.Status.Conditions, configv1.ClusterOperatorStatusCondition{
+				Type:    configv1.OperatorDegraded,
+				Status:  configv1.ConditionTrue,
+				Reason:  "NoOperConfig",
+				Message: "No networks.operator.openshift.io cluster found",
+			})
+		} else {
+			co.Status.Versions = []configv1.OperandVersion{
+				{Name: "operator", Version: operStatus.Version},
+			}
+
+			for _, cond := range operStatus.Conditions {
+				cohelpers.SetStatusCondition(&co.Status.Conditions, operstatus.OperatorConditionToClusterOperatorCondition(cond))
 			}
 		}
-		for _, condition := range conditions {
-			v1helpers.SetStatusCondition(&co.Status.Conditions, condition)
-		}
-
-		progressingCondition := v1helpers.FindStatusCondition(co.Status.Conditions, configv1.OperatorProgressing)
-		availableCondition := v1helpers.FindStatusCondition(co.Status.Conditions, configv1.OperatorAvailable)
-		if availableCondition == nil && progressingCondition != nil && progressingCondition.Status == configv1.ConditionTrue {
-			v1helpers.SetStatusCondition(&co.Status.Conditions,
-				configv1.ClusterOperatorStatusCondition{
-					Type:    configv1.OperatorAvailable,
-					Status:  configv1.ConditionFalse,
-					Reason:  "Startup",
-					Message: "The network is starting up",
-				},
-			)
-		}
-
-		v1helpers.SetStatusCondition(&co.Status.Conditions,
-			configv1.ClusterOperatorStatusCondition{
-				Type:   configv1.OperatorUpgradeable,
-				Status: configv1.ConditionTrue,
-			},
-		)
 
 		if reflect.DeepEqual(*oldStatus, co.Status) {
 			return nil
@@ -164,17 +237,18 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...confi
 		if err != nil {
 			buf = []byte(fmt.Sprintf("(failed to convert to YAML: %s)", err))
 		}
+
 		if isNotFound {
 			if err := status.client.Create(context.TODO(), co); err != nil {
 				return err
 			}
-			log.Printf("Created ClusterOperator with conditions:\n%s", string(buf))
+			log.Printf("Set ClusterOperator conditions:\n%s", buf)
 			return nil
 		}
 		if err := status.client.Status().Update(context.TODO(), co); err != nil {
 			return err
 		}
-		log.Printf("Updated ClusterOperator with conditions:\n%s", string(buf))
+		log.Printf("Set ClusterOperator conditions:\n%s", buf)
 		return nil
 	})
 	if err != nil {
@@ -192,17 +266,17 @@ func (status *StatusManager) syncDegraded() {
 	}
 	status.set(
 		false,
-		configv1.ClusterOperatorStatusCondition{
-			Type:   configv1.OperatorDegraded,
-			Status: configv1.ConditionFalse,
+		operv1.OperatorCondition{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
 		},
 	)
 }
 
 func (status *StatusManager) setDegraded(statusLevel StatusLevel, reason, message string) {
-	status.failing[statusLevel] = &configv1.ClusterOperatorStatusCondition{
-		Type:    configv1.OperatorDegraded,
-		Status:  configv1.ConditionTrue,
+	status.failing[statusLevel] = &operv1.OperatorCondition{
+		Type:    operv1.OperatorStatusTypeDegraded,
+		Status:  operv1.ConditionTrue,
 		Reason:  reason,
 		Message: message,
 	}
