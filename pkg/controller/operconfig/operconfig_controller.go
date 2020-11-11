@@ -241,6 +241,13 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		Name:     names.APPLIED_NAMESPACE,
 	})
 
+	// Add operator.openshift.io/v1/network to relatedObjects for must-gather
+	relatedObjects = append(relatedObjects, configv1.ObjectReference{
+		Group:    "operator.openshift.io",
+		Resource: "network",
+		Name:     "cluster",
+	})
+
 	r.status.SetDaemonSets(daemonSets)
 	r.status.SetDeployments(deployments)
 	r.status.SetRelatedObjects(relatedObjects)
