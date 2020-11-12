@@ -66,6 +66,7 @@ netname: openshift-user-workload-monitoring
 # Namespaces which are part of the "control plane" and need to reach each other:
 # - kube-system
 # - openshift-etcd
+# - openshift-etcd-operator
 # - openshift-apiserver
 # - openshift-service-catalog-apiserver
 # - openshift-service-catalog-controller-manager
@@ -95,6 +96,15 @@ metadata:
   name: openshift-etcd
 netid: 1
 netname: openshift-etcd
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-etcd-operator
+netid: 1
+netname: openshift-etcd-operator
+
 
 ---
 apiVersion: network.openshift.io/v1
