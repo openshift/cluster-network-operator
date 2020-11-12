@@ -12,6 +12,7 @@ COPY --from=builder /tmp/build/cluster-network-operator /usr/bin/
 COPY --from=builder /tmp/build/cluster-network-renderer /usr/bin/
 COPY --from=builder /tmp/build/cluster-network-check-endpoints /usr/bin
 COPY manifests /manifests
+COPY vendor/github.com/openshift/api/operator/v1/0000_70_cluster-network-operator_01_crd.yaml manifests/0000_70_cluster-network-operator_01_crd.yaml
 COPY bindata /bindata
 ENV OPERATOR_NAME=cluster-network-operator
 CMD ["/usr/bin/cluster-network-operator"]

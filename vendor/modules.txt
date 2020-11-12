@@ -163,7 +163,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20200827090112-c05698d102cf
+# github.com/openshift/api v0.0.0-20201126092428-04abbec6c099
 ## explicit
 github.com/openshift/api
 github.com/openshift/api/apps
@@ -904,7 +904,7 @@ k8s.io/client-go/util/jsonpath
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/retry
 k8s.io/client-go/util/workqueue
-# k8s.io/code-generator v0.19.0
+# k8s.io/code-generator v0.19.2
 ## explicit
 k8s.io/code-generator
 k8s.io/code-generator/cmd/client-gen

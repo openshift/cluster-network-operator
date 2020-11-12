@@ -15,7 +15,7 @@ require (
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.1 // indirect
 	github.com/onsi/gomega v1.10.1
-	github.com/openshift/api v0.0.0-20200827090112-c05698d102cf
+	github.com/openshift/api v0.0.0-20201126092428-04abbec6c099
 	github.com/openshift/client-go v0.0.0-20200827190008-3062137373b5
 	github.com/openshift/library-go v0.0.0-20201013192036-5bd7c282e3e7
 	github.com/pkg/errors v0.9.1
@@ -28,7 +28,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.19.0
 	k8s.io/apimachinery v0.19.2
 	k8s.io/client-go v0.19.2
-	k8s.io/code-generator v0.19.0
+	k8s.io/code-generator v0.19.2
 	k8s.io/component-base v0.19.2
 	k8s.io/klog/v2 v2.3.0
 	k8s.io/kube-proxy v0.19.2

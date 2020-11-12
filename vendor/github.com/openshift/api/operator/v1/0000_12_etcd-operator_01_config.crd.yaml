@@ -3,6 +3,7 @@ kind: CustomResourceDefinition
 metadata:
   name: etcds.operator.openshift.io
   annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
 spec:
   scope: Cluster
@@ -63,6 +64,12 @@ spec:
                   \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
                 type: string
                 default: Normal
+                enum:
+                - ""
+                - Normal
+                - Debug
+                - Trace
+                - TraceAll
               managementState:
                 description: managementState indicates whether and how the operator
                   should manage the component
@@ -76,11 +83,19 @@ spec:
                 nullable: true
                 x-kubernetes-preserve-unknown-fields: true
               operatorLogLevel:
-                description: operatorLogLevel is an intent based logging for the operator
-                  itself.  It does not give fine grained control, but it is a simple
-                  way to manage coarse grained logging choices that operators have
-                  to interpret for themselves.
+                description: "operatorLogLevel is an intent based logging for the
+                  operator itself.  It does not give fine grained control, but it
+                  is a simple way to manage coarse grained logging choices that operators
+                  have to interpret for themselves. \n Valid values are: \"Normal\",
+                  \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
                 type: string
+                default: Normal
+                enum:
+                - ""
+                - Normal
+                - Debug
+                - Trace
+                - TraceAll
               succeededRevisionLimit:
                 description: succeededRevisionLimit is the number of successful static
                   pod installer revisions to keep on disk and in the api -1 = unlimited,
