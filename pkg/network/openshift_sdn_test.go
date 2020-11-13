@@ -43,24 +43,13 @@ func TestRenderOpenShiftSDN(t *testing.T) {
 
 	crd := OpenShiftSDNConfig.DeepCopy()
 	config := &crd.Spec
-	sdnConfig := config.DefaultNetwork.OpenShiftSDNConfig
 
 	errs := validateOpenShiftSDN(config)
 	g.Expect(errs).To(HaveLen(0))
 	FillDefaults(config, nil)
 
-	// Make sure the OVS daemonset isn't created
-	truth := true
-	sdnConfig.UseExternalOpenvswitch = &truth
 	objs, err := renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "ovs")))
-
-	// enable openvswitch
-	sdnConfig.UseExternalOpenvswitch = nil
-	objs, err = renderOpenShiftSDN(config, manifestDir)
-	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "ovs")))
 
 	// It's important that the namespace is first
 	g.Expect(objs[0]).To(HaveKubernetesID("Namespace", "", "openshift-sdn"))

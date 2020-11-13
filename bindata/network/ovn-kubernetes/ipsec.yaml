@@ -206,8 +206,6 @@ spec:
             sleep 60
           done
         env:
-        - name: OVS_LOG_LEVEL
-          value: info
         - name: K8S_NODE
           valueFrom:
             fieldRef:
