@@ -100,6 +100,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 		g.Expect(cur).To(Equal(upd))
 	}
 }
+
 /*
 // TestRenderOVNKubernetesIPv6 tests IPv6 support
 func TestRenderOVNKubernetesIPv6(t *testing.T) {
