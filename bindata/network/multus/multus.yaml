@@ -133,6 +133,24 @@ spec:
           value: "/usr/src/multus-cni/rhel8/bin/"
         - name: DEFAULT_SOURCE_DIRECTORY
           value: "/usr/src/multus-cni/bin/"
+      - name: egress-router-binary-copy
+        image: {{.EgressRouterImage}}
+        command: ["/entrypoint/cnibincopy.sh"]
+        volumeMounts:
+        - mountPath: /entrypoint
+          name: cni-binary-copy
+        - mountPath: /host/opt/cni/bin
+          name: cnibin
+        - mountPath: /host/etc/os-release
+          name: os-release
+          readOnly: true
+        env:
+        - name: RHEL7_SOURCE_DIRECTORY
+          value: "/usr/src/egress-router-cni/rhel7/bin/"
+        - name: RHEL8_SOURCE_DIRECTORY
+          value: "/usr/src/egress-router-cni/rhel8/bin/"
+        - name: DEFAULT_SOURCE_DIRECTORY
+          value: "/usr/src/egress-router-cni/bin/"
       - name: cni-plugins
         image: {{.CNIPluginsImage}}
         command: ["/entrypoint/cnibincopy.sh"]
