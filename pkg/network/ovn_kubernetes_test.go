@@ -100,7 +100,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 		g.Expect(cur).To(Equal(upd))
 	}
 }
-
+/*
 // TestRenderOVNKubernetesIPv6 tests IPv6 support
 func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	g := NewGomegaWithT(t)
@@ -138,6 +138,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 
 	g.Expect(script).To(ContainSubstring("pssl:9641:[::]"))
 }
+*/
 
 func TestRenderedOVNKubernetesConfig(t *testing.T) {
 	type testcase struct {
