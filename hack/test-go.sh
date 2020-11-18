@@ -7,10 +7,7 @@ setup_env
 
 cd ${GOPATH}/src/${CNO_GO_PKG}
 
-if [ -z "$PKGS" ]; then
-  # by default, test everything that's not in vendor
-  PKGS="$(go list -f '{{if len .TestGoFiles}} {{.ImportPath}} {{end}}' ./...)"
-fi
+PKGS=${PKGS:-./cmd/... ./pkg/...}
 
 CGO_ENABLED=0 go test "${goflags[@]:+${goflags[@]}}" ${PKGS}
 retcode=$?

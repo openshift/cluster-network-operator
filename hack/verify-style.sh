@@ -23,8 +23,8 @@ trap 'rc=$?' ERR
 # Go to the root of the repo
 cd "$(git rev-parse --show-cdup)"
 
-GOFILES=$(find . -path ./vendor -prune -o -name '*.go' | grep -v vendor | grep -v pkg/operator/assets)
-GOPKGS=$(go list ./... | grep -v '/vendor/' | grep -v '/generated/' | grep -v pkg/operator/assets)
+GOFILES=$(find . -path ./vendor -prune -o -name '*.go' | grep -v vendor)
+GOPKGS=$(go list ./cmd... ./pkg/...)
 
 echo "Running gofmt..."
 fmt_files=$(gofmt -l -s $GOFILES)

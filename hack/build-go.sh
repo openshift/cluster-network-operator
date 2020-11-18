@@ -5,7 +5,7 @@ set -eu
 source "$(dirname "${BASH_SOURCE}")/init.sh"
 setup_env
 
-CMDS=${CMDS:-cluster-network-operator cluster-network-renderer}
+CMDS=${CMDS:-cluster-network-operator cluster-network-renderer cluster-network-check-endpoints}
 GOFLAGS=${GOFLAGS:--mod=vendor}
 GLDFLAGS=${GLDFLAGS:-}
 
