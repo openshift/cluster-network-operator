@@ -256,6 +256,16 @@ The hybridClusterNetwork `cidr` and hostPrefix are used when adding windows node
 
 There can be at most one hybridClusterNetwork "CIDR". A future version may supports multiple `cidr`.
 
+#### Configuring IPsec with OVNKubernetes
+OVNKubernetes supports IPsec encryption of all pod traffic using the OVN IPsec functionality. Add the following to the `spec:` section of the operator config:
+
+```yaml
+spec:
+  defaultNetwork:
+    type: OVNKubernetes
+    ovnKubernetesConfig:
+      ipsecConfig: {}
+```
 
 ### Configuring Kuryr-Kubernetes
 Kuryr-Kubernetes is a CNI plugin that uses OpenStack Neutron to network OpenShift Pods, and OpenStack Octavia to create load balancers for Services. In general it is useful when OpenShift is running on an OpenStack cluster, as you can use the same SDN (OpenStack Neutron) to provide networking for both the VMs OpenShift is running on, and the Pods created by OpenShift. In such case avoidance of double encapsulation gives you two advantages: improved performace (in terms of both latency and throughput) and lower complexity of the networking architecture.

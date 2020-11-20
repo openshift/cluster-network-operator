@@ -380,6 +380,10 @@ spec:
                     done
                   fi
                 fi
+
+                {{ if .EnableIPsec }}
+                ${OVN_NB_CTL} set nb_global . ipsec=true
+                {{ end }}
           preStop:
             exec:
               command:
