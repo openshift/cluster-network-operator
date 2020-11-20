@@ -6,6 +6,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/operconfig"
 	"github.com/openshift/cluster-network-operator/pkg/controller/pki"
 	"github.com/openshift/cluster-network-operator/pkg/controller/proxyconfig"
+	signer "github.com/openshift/cluster-network-operator/pkg/controller/signer"
 )
 
 func init() {
@@ -16,5 +17,6 @@ func init() {
 		operconfig.Add,
 		clusterconfig.Add,
 		configmapcainjector.Add,
+		signer.Add,
 	)
 }
