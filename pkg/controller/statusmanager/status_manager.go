@@ -39,6 +39,7 @@ const (
 	PodDeployment
 	PKIConfig
 	RolloutHung
+	CertificateSigner
 	maxStatusLevel
 )
 
