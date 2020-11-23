@@ -48,3 +48,21 @@ spec:
       for: 10m
       labels:
         severity: warning
+    - alert: V4SubnetAllocationThresholdExceeded
+      annotations:
+        message: |
+          More than 80% of v4 subnets available to assign to the nodes are allocated. Current v4 subnet allocation percentage is {{"{{"}} $value {{"}}"}}
+      expr: |
+        ovnkube_master_allocated_v4_host_subnets/ovnkube_master_num_v4_host_subnets * 100 > 80
+      for: 10m
+      labels:
+        severity: warning
+    - alert: V6SubnetAllocationThresholdExceeded
+      annotations:
+        message: |
+          More than 80% of the v6 subnets available to assign to the nodes are allocated. Current v6 subnet allocation percentage is {{"{{"}} $value {{"}}"}}
+      expr: |
+        ovnkube_master_allocated_v6_host_subnets/ovnkube_master_num_v6_host_subnets * 100 > 80
+      for: 10m
+      labels:
+        severity: warning
