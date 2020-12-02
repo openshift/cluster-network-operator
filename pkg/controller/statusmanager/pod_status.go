@@ -11,6 +11,7 @@ import (
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -183,29 +184,29 @@ func (status *StatusManager) SetFromPods() {
 		log.Printf("Failed to set pod state (continuing): %+v\n", err)
 	}
 
-	conditions := make([]configv1.ClusterOperatorStatusCondition, 0, 2)
+	conditions := make([]operv1.OperatorCondition, 0, 2)
 	if len(progressing) > 0 {
 		conditions = append(conditions,
-			configv1.ClusterOperatorStatusCondition{
-				Type:    configv1.OperatorProgressing,
-				Status:  configv1.ConditionTrue,
+			operv1.OperatorCondition{
+				Type:    operv1.OperatorStatusTypeProgressing,
+				Status:  operv1.ConditionTrue,
 				Reason:  "Deploying",
 				Message: strings.Join(progressing, "\n"),
 			},
 		)
 	} else {
 		conditions = append(conditions,
-			configv1.ClusterOperatorStatusCondition{
-				Type:   configv1.OperatorProgressing,
-				Status: configv1.ConditionFalse,
+			operv1.OperatorCondition{
+				Type:   operv1.OperatorStatusTypeProgressing,
+				Status: operv1.ConditionFalse,
 			},
 		)
 	}
 	if reachedAvailableLevel {
 		conditions = append(conditions,
-			configv1.ClusterOperatorStatusCondition{
-				Type:   configv1.OperatorAvailable,
-				Status: configv1.ConditionTrue,
+			operv1.OperatorCondition{
+				Type:   operv1.OperatorStatusTypeAvailable,
+				Status: operv1.ConditionTrue,
 			},
 		)
 	}

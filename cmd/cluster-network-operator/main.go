@@ -1,56 +1,48 @@
 package main
 
 import (
-	"context"
 	"flag"
+	"fmt"
 	"log"
+	"math/rand"
 	"net/url"
 	"os"
-	"runtime"
+	"time"
 
-	configv1 "github.com/openshift/api/config/v1"
-	operv1 "github.com/openshift/api/operator/v1"
-	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
-	"github.com/openshift/cluster-network-operator/pkg/controller"
-	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
+	"github.com/openshift/cluster-network-operator/pkg/operator"
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+
+	_ "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/version"
+
+	utilflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 )
 
-func printVersion() {
-	log.Printf("Go Version: %s", runtime.Version())
-	log.Printf("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH)
-}
-
 const LOCK_NAME = "cluster-network-operator"
-
-// urlOnlyKubeconfig is a slight hack; we need to get the apiserver from the
-// kubeconfig but should use the in-cluster service account
-var urlOnlyKubeconfig string
-
-func init() {
-	flag.StringVar(&urlOnlyKubeconfig, "url-only-kubeconfig", "",
-		"Path to a kubeconfig, but only for the apiserver url.")
-}
+const ENV_URL_KUBECONFIG = "URL_ONLY_KUBECONFIG"
 
 func main() {
-	printVersion()
-	flag.Parse()
+	rand.Seed(time.Now().UTC().UnixNano())
 
-	namespace := "" // non-namespaced
+	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
-	// TODO: Expose metrics port after SDK uses controller-runtime's dynamic client
-	// sdk.ExposeMetricsPort()
+	logs.InitLogs()
+	defer logs.FlushLogs()
+
+	command := newNetworkOperatorCommand()
 
 	// Hack: the network operator can't use the apiserver service ip, since there's
 	// no network. We also can't hard-code it to 127.0.0.1, because we run during
 	// bootstrap. Instead, we bind-mount in the kubelet's kubeconfig, but just
 	// use it to get the apiserver url.
-	if urlOnlyKubeconfig != "" {
-		kubeconfig, err := clientcmd.LoadFromFile(urlOnlyKubeconfig)
+	if kc := os.Getenv(ENV_URL_KUBECONFIG); kc != "" {
+		kubeconfig, err := clientcmd.LoadFromFile(kc)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -69,49 +61,35 @@ func main() {
 		os.Setenv("KUBERNETES_SERVICE_PORT", url.Port())
 	}
 
-	// Get a config to talk to the apiserver
-	cfg, err := config.GetConfig()
-	if err != nil {
-		log.Fatal(err)
+	if err := command.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+}
+
+func newNetworkOperatorCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "network-operator",
+		Short: "Openshift Cluster Network Operator",
+		Long: `Run the network operator.
+This supports an additional environment variable, URL_ONLY_KUBECONFIG,
+which is a kubeconfig from which to take just the URL to the apiserver`,
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Help()
+			os.Exit(1)
+		},
 	}
 
-	// become leader
-	err = BecomeLeader(context.TODO(), LOCK_NAME)
-	if err != nil {
-		log.Fatal(err)
-	}
+	cmdcfg := controllercmd.NewControllerCommandConfig("network-operator", version.Get(), operator.RunOperator)
 
-	// Create a new Cmd to provide shared dependencies and start components
-	mgr, err := manager.New(cfg, manager.Options{
-		Namespace:          namespace,
-		MapperProvider:     k8sutil.NewDynamicRESTMapper,
-		MetricsBindAddress: "0",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
+	// We'll use our own leader election
+	cmdcfg.DisableLeaderElection = true
 
-	log.Print("Registering Components.")
-	if err := operv1.Install(mgr.GetScheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := configv1.Install(mgr.GetScheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := netopv1.Install(mgr.GetScheme()); err != nil {
-		log.Fatal(err)
-	}
+	cmd2 := cmdcfg.NewCommand()
+	cmd2.Use = "start"
+	cmd2.Short = "Start the cluster network operator"
 
-	// Setup all Controllers
-	log.Print("Configuring Controllers")
-	if err := controller.AddToManager(mgr); err != nil {
-		log.Fatal(err)
-	}
+	cmd.AddCommand(cmd2)
 
-	log.Print("Starting the Cmd.")
-
-	// Start the Cmd
-	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-		log.Fatal(err)
-	}
+	return cmd
 }

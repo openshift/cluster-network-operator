@@ -87,6 +87,9 @@ func MergeClusterConfig(operConf *operv1.NetworkSpec, clusterConf configv1.Netwo
 
 	// OpenShiftSDN (default), OVNKubernetes
 	operConf.DefaultNetwork.Type = operv1.NetworkType(clusterConf.NetworkType)
+	if operConf.ManagementState == "" {
+		operConf.ManagementState = "Managed"
+	}
 }
 
 // StatusFromOperatorConfig generates the cluster NetworkStatus from the

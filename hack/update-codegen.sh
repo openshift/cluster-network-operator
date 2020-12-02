@@ -41,3 +41,9 @@ oc annotate --local -o yaml \
   "${ROKS_PROFILE}" \
   "${SINGLE_NODE_DEV_PROFILE}" \
   -f _output/crds/network.operator.openshift.io_operatorpkis.yaml >> manifests/0000_70_cluster-network-operator_01_pki_crd.yaml
+
+# and also the CRD from library-go
+oc annotate --local -o yaml --overwrite \
+  "${RELEASE_PROFILE}" \
+  "${ROKS_PROFILE}" \
+  -f vendor/github.com/openshift/api/operator/v1/0000_70_cluster-network-operator_01_crd.yaml > manifests/0000_70_cluster-network-operator_01_crd.yaml
