@@ -23,12 +23,15 @@ spec:
         image: quay.io/openshift/origin-cluster-network-operator:latest
         command:
         - "/usr/bin/cluster-network-operator"
-        - "--url-only-kubeconfig=/etc/kubernetes/kubeconfig"
+        - "start"
+        - "--listen=0.0.0.0:9104"
         resources:
           requests:
             cpu: 10m
             memory: 50Mi
         env:
+        - name: URL_ONLY_KUBECONFIG
+          value: "/etc/kubernetes/kubeconfig"
         - name: RELEASE_VERSION
           value: "0.0.1-snapshot"
         - name: SDN_IMAGE

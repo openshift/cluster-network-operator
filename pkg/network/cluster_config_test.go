@@ -88,6 +88,7 @@ func TestMergeClusterConfig(t *testing.T) {
 
 	MergeClusterConfig(&oc, cc)
 	g.Expect(oc).To(Equal(operv1.NetworkSpec{
+		OperatorSpec:   operv1.OperatorSpec{ManagementState: "Managed"},
 		ServiceNetwork: []string{"192.168.0.0/20"},
 		ClusterNetwork: []operv1.ClusterNetworkEntry{
 			{

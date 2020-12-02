@@ -133,6 +133,11 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	if operConfig.Spec.ManagementState == operv1.Unmanaged {
+		log.Printf("Operator configuration state is %s - skipping operconfig reconciliation", operConfig.Spec.ManagementState)
+		return reconcile.Result{}, nil
+	}
+
 	// Merge in the cluster configuration, in case the administrator has updated some "downstream" fields
 	// This will also commit the change back to the apiserver.
 	if err := r.MergeClusterConfig(context.TODO(), operConfig); err != nil {
