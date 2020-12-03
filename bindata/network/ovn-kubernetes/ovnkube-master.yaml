@@ -797,7 +797,7 @@ spec:
           # Check to see if ovs is provided by the node. This is only for upgrade from 4.5->4.6 or
           # openshift-sdn to ovn-kube conversion
           if grep -q OVNKubernetes /etc/systemd/system/ovs-configuration.service ; then
-            gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
+            gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
           else
             gateway_mode_flags="--gateway-mode local --gateway-interface none"
           fi
@@ -834,7 +834,8 @@ spec:
             --nb-client-cacert /ovn-ca/ca-bundle.crt \
             --nbctl-daemon-mode \
             --nb-cert-common-name "{{.OVN_CERT_CN}}" \
-            --enable-multicast
+            --enable-multicast \
+            --disable-snat-multiple-gws
         lifecycle:
           preStop:
             exec:
