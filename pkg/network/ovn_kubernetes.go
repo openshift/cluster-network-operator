@@ -112,7 +112,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVNHybridOverlayVXLANPort"] = ""
 	}
 
-	if c.IPsecConfig != nil {
 		data.Data["EnableIPsec"] = true
 		// Only render ipsec manifest if ipsec has been enabled at cluster
 		// installation time. We will never have to delete the ipsec pod
@@ -122,9 +121,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			return nil, errors.Wrap(err, "failed to render ipsec manifest")
 		}
 		objs = append(objs, ipsecManifests...)
-	} else {
-		data.Data["EnableIPsec"] = false
-	}
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/ovn-kubernetes"), &data)
 
