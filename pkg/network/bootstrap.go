@@ -16,7 +16,7 @@ func Bootstrap(conf *operv1.NetworkSpec, client client.Client) (*bootstrap.Boots
 	case operv1.NetworkTypeOpenShiftSDN:
 		return nil, nil
 	case operv1.NetworkTypeOVNKubernetes:
-		return boostrapOVN(client)
+		return bootstrapOVN(client)
 	}
 
 	return nil, nil
