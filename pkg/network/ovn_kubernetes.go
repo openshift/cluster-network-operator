@@ -21,6 +21,7 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -32,6 +33,9 @@ const OVN_SB_RAFT_PORT = "9644"
 const CLUSTER_CONFIG_NAME = "cluster-config-v1"
 const CLUSTER_CONFIG_NAMESPACE = "kube-system"
 const OVN_CERT_CN = "ovn"
+
+const OVN_MASTER_DISCOVERY_TIMEOUT = 280
+const OVN_MASTER_DISCOVERY_POLL = 5
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
 // This creates
@@ -226,7 +230,7 @@ type replicaCountDecoder struct {
 	} `json:"controlPlane"`
 }
 
-func boostrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
+func bootstrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 	clusterConfig := &corev1.ConfigMap{}
 	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
 	masterNodeList := &corev1.NodeList{}
@@ -242,12 +246,23 @@ func boostrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 
 	controlPlaneReplicaCount, _ := strconv.Atoi(rcD.ControlPlane.Replicas)
 
-	err := wait.PollImmediate(5*time.Second, 280*time.Second, func() (bool, error) {
+	var heartBeat int
+
+	err := wait.PollImmediate(OVN_MASTER_DISCOVERY_POLL*time.Second, OVN_MASTER_DISCOVERY_TIMEOUT*time.Second, func() (bool, error) {
 		matchingLabels := &client.MatchingLabels{"node-role.kubernetes.io/master": ""}
 		if err := kubeClient.List(context.TODO(), masterNodeList, matchingLabels); err != nil {
 			return false, err
 		}
-		return len(masterNodeList.Items) != 0 && controlPlaneReplicaCount == len(masterNodeList.Items), nil
+		if len(masterNodeList.Items) != 0 && controlPlaneReplicaCount == len(masterNodeList.Items) {
+			return true, nil
+		}
+
+		heartBeat++
+		if heartBeat%3 == 0 {
+			klog.V(2).Infof("Waiting to complete OVN bootstrap: found (%d) master nodes out of (%d) expected: timing out in %d seconds",
+				len(masterNodeList.Items), controlPlaneReplicaCount, OVN_MASTER_DISCOVERY_TIMEOUT-OVN_MASTER_DISCOVERY_POLL*heartBeat)
+		}
+		return false, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("Unable to bootstrap OVN, expected amount of control plane nodes (%v) do not match found (%v): %s", controlPlaneReplicaCount, len(masterNodeList.Items), err)
