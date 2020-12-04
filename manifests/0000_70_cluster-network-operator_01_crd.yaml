@@ -221,11 +221,6 @@ spec:
                         type: object
                       ipsecConfig:
                         description: ipsecConfig enables and configures IPsec for pods on the pod network within the cluster.
-                        properties:
-                          enable:
-                            default: false
-                            description: enable enables IPsec encryption for pod-to-pod traffic on the pod network within the cluster. Default is false.
-                            type: boolean
                         type: object
                       mtu:
                         description: mtu is the MTU to use for the tunnel interface. This must be 100 bytes smaller than the uplink mtu. Default is 1400
