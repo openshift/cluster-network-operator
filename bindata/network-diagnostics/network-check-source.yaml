@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: network-check-source
+  namespace: openshift-network-diagnostics
+  annotations:
+    kubernetes.io/description: |
+      This deployment deploys the network-check-source pod that performs
+      pod network connectivity checks
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: network-check-source
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: network-check-source
+    spec:
+      serviceAccountName: network-diagnostics
+      containers:
+      - name: check-endpoints
+        image: "{{.NetworkCheckSourceImage}}"
+        imagePullPolicy: IfNotPresent
+        terminationMessagePolicy: FallbackToLogsOnError
+        command:
+          - cluster-network-check-endpoints
+        args:
+          - --listen
+          - 0.0.0.0:17698
+          - --namespace
+          - $(POD_NAMESPACE)
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        ports:
+          - name: check-endpoints
+            containerPort: 17698
+            protocol: TCP
+        resources:
+          requests:
+            memory: 50Mi
+            cpu: 10m
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: network-check-source
+  namespace: openshift-network-diagnostics
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+spec:
+  clusterIP: None
+  ports:
+  - name: check-endpoints
+    port: 17698
+    targetPort: 17698
+  selector:
+    app: network-check-source
+  type: ClusterIP
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: network-check-source
+  namespace: openshift-network-diagnostics
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+spec:
+  endpoints:
+  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    interval: 30s
+    port: check-endpoints
+    scheme: https
+    tlsConfig:
+      insecureSkipVerify: true
+  jobLabel: component
+  namespaceSelector:
+    matchNames:
+    - openshift-network-diagnostics
+  selector:
+    matchLabels:
+      app: network-check-source

@@ -1,0 +1,115 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: network-diagnostics
+  namespace: openshift-network-diagnostics
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: network-diagnostics
+  namespace: openshift-network-diagnostics
+rules:
+- apiGroups: [""]
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: network-diagnostics
+  namespace: openshift-network-diagnostics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: network-diagnostics
+  namespace: openshift-network-diagnostics
+subjects:
+- kind: ServiceAccount
+  name: network-diagnostics
+  namespace: openshift-network-diagnostics
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: network-diagnostics
+rules:
+- apiGroups: [""]
+  resources:
+  - endpoints
+  - namespaces
+  - pods
+  - services
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: [""]
+  resources:
+  - events
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+- apiGroups: ["apps"]
+  resources:
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: ["apiextensions.k8s.io"]
+  resources:
+  - customresourcedefinitions
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups: ['controlplane.operator.openshift.io']
+  resources: ['podnetworkconnectivitychecks']
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: ['controlplane.operator.openshift.io']
+  resources: ['podnetworkconnectivitychecks/status']
+  verbs: ['update']
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: network-diagnostics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: network-diagnostics
+subjects:
+- kind: ServiceAccount
+  name: network-diagnostics
+  namespace: openshift-network-diagnostics
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: network-diagnostics
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - kind: ServiceAccount
+    name: network-diagnostics
+    namespace: openshift-network-diagnostics
