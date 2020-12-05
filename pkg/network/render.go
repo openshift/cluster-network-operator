@@ -3,6 +3,8 @@ package network
 import (
 	"log"
 	"net"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -10,6 +12,7 @@ import (
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	"github.com/openshift/cluster-network-operator/pkg/render"
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -48,6 +51,13 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 
 	// render additional networks
 	o, err = renderAdditionalNetworks(conf, manifestDir)
+	if err != nil {
+		return nil, err
+	}
+	objs = append(objs, o...)
+
+	// render network diagnostics
+	o, err = renderNetworkDiagnostics(conf, manifestDir)
 	if err != nil {
 		return nil, err
 	}
@@ -408,4 +418,23 @@ func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir strin
 	}
 	out = append(out, objs...)
 	return out, nil
+}
+
+// renderNetworkDiagnostics renders the connectivity checks
+func renderNetworkDiagnostics(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+	if conf.DisableNetworkDiagnostics {
+		return nil, nil
+	}
+
+	data := render.MakeRenderData()
+	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
+	data.Data["NetworkCheckSourceImage"] = os.Getenv("NETWORK_CHECK_SOURCE_IMAGE")
+	data.Data["NetworkCheckTargetImage"] = os.Getenv("NETWORK_CHECK_TARGET_IMAGE")
+
+	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network-diagnostics"), &data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to render network-diagnostics manifests")
+	}
+
+	return manifests, nil
 }
