@@ -252,7 +252,8 @@ func TestValidateKubeProxy(t *testing.T) {
 	c.KubeProxyConfig.IptablesSyncPeriod = "asdf"
 	c.KubeProxyConfig.ProxyArguments["healthz-port"] = []string{"9102"}
 	c.KubeProxyConfig.ProxyArguments["metrics-port"] = []string{"10255"}
-	g.Expect(validateKubeProxy(c)).To(HaveLen(4))
+	c.KubeProxyConfig.ProxyArguments["feature-gates"] = []string{"FGFoo=bar,FGBaz=bah"}
+	g.Expect(validateKubeProxy(c)).To(HaveLen(5))
 }
 
 func TestFillKubeProxyDefaults(t *testing.T) {

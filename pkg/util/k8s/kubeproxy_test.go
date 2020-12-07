@@ -366,6 +366,20 @@ winkernel:
 			},
 			err: "unused arguments: conntrack-max",
 		},
+		{
+			description: "bad feature-gates syntax",
+			overrides: map[string]operv1.ProxyArgumentList{
+				"feature-gates": {"FG1=true,FG2=false,FG3=false=false"},
+			},
+			err: `invalid "FG1=true,FG2=false,FG3=false=false" (invalid value of FG3: false=false, err: strconv.ParseBool: parsing "false=false": invalid syntax)`,
+		},
+		{
+			description: "bad feature-gates value",
+			overrides: map[string]operv1.ProxyArgumentList{
+				"feature-gates": {"FG1=foo,FG2=true"},
+			},
+			err: `invalid "FG1=foo,FG2=true" (invalid value of FG1: foo, err: strconv.ParseBool: parsing "foo": invalid syntax)`,
+		},
 	}
 
 	for _, test := range tests {
@@ -380,7 +394,7 @@ winkernel:
 			}
 		} else {
 			if err == nil {
-				t.Fatalf("unexpected non-error in %q", test.description)
+				t.Fatalf("unexpected non-error in %q: config: %v, args: %v", test.description, config, args)
 			} else if !strings.Contains(err.Error(), test.err) {
 				t.Fatalf("bad error in %q: expected %q, got: %v", test.description, test.err, err)
 			}
