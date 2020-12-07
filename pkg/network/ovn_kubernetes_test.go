@@ -368,6 +368,40 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 
 }
 
+func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	conf := &crd.Spec
+	conf.DefaultNetwork.OVNKubernetesConfig.IPsecConfig = &operv1.IPsecConfig{}
+
+	expected := operv1.NetworkSpec{
+		ServiceNetwork: []string{"172.30.0.0/16"},
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+			{
+				CIDR:       "10.0.0.0/14",
+				HostPrefix: 24,
+			},
+		},
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOVNKubernetes,
+			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
+				MTU:         ptrToUint32(8854),
+				GenevePort:  ptrToUint32(8061),
+				IPsecConfig: &operv1.IPsecConfig{},
+			},
+		},
+	}
+
+	fillOVNKubernetesDefaults(conf, conf, 9000)
+
+	g.Expect(conf).To(Equal(&expected))
+
+}
 func TestValidateOVNKubernetes(t *testing.T) {
 	g := NewGomegaWithT(t)
 
