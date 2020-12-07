@@ -293,6 +293,12 @@ func TestProxyArgs(t *testing.T) {
 	}
 	errs = validateKubeProxy(config)
 	g.Expect(errs).To(HaveLen(0))
+	// Validate that we don't allow the feature-gates to be set via user config
+	config.KubeProxyConfig.ProxyArguments = map[string]operv1.ProxyArgumentList{
+		"feature-gates": {"FGBar=baz"},
+	}
+	errs = validateKubeProxy(config)
+	g.Expect(errs).To(HaveLen(1))
 
 	objs, err = renderOpenShiftSDN(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -434,6 +440,9 @@ conntrack:
   tcpEstablishedTimeout: null
 detectLocalMode: ""
 enableProfiling: false
+featureGates:
+  EndpointSlice: false
+  EndpointSliceProxying: false
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:
@@ -488,6 +497,9 @@ conntrack:
   tcpEstablishedTimeout: null
 detectLocalMode: ""
 enableProfiling: false
+featureGates:
+  EndpointSlice: false
+  EndpointSliceProxying: false
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:
