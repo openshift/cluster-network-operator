@@ -18,7 +18,6 @@ package logs
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/go-logr/logr"
 	json "k8s.io/component-base/logs/json"
@@ -85,13 +84,12 @@ func (lfr *LogFormatRegistry) Delete(name string) error {
 	return nil
 }
 
-// List names of registered log formats (sorted)
+// List names of registered log formats
 func (lfr *LogFormatRegistry) List() []string {
 	formats := make([]string, 0, len(lfr.registry))
 	for f := range lfr.registry {
 		formats = append(formats, f)
 	}
-	sort.Strings(formats)
 	return formats
 }
 
