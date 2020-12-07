@@ -233,7 +233,7 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 
 	// TODO - Need to check as IPsec will additional headers
 	if sc.MTU == nil {
-		var mtu uint32 = uint32(hostMTU) - 100 // 100 byte geneve header
+		var mtu uint32 = uint32(hostMTU) - 200 // 100 byte geneve header
 		if previous != nil && previous.DefaultNetwork.OVNKubernetesConfig != nil &&
 			previous.DefaultNetwork.OVNKubernetesConfig.MTU != nil {
 			mtu = *previous.DefaultNetwork.OVNKubernetesConfig.MTU
