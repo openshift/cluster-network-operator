@@ -393,7 +393,7 @@ spec:
                 - type
                 type: object
               type: array
-              maxItems: 1000
+              maxItems: 50
           required:
           - egress
           type: object

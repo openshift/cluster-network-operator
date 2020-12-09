@@ -34,19 +34,8 @@ spec:
         - |
           #!/bin/bash
           set -euo pipefail
-
-          if [ -f /host/var/run/ovs-config-executed ]; then
-            echo "openvswitch is running in systemd"
-            # Don't need to worry about restoring flows; this can only change if we've rebooted
-            rm /var/run/openvswitch/flows.sh || true
-
-            # patch up any possible permissions issues
-            ovs_uid=$(chroot /host id -u openvswitch)
-            ovs_gid=$(chroot /host id -g openvswitch)
-            chown -R "${ovs_uid}:${ovs_gid}" /run/openvswitch
-            exec tail -F /host/var/log/openvswitch/ovs-vswitchd.log /host/var/log/openvswitch/ovsdb-server.log
-            # executes forever
-          fi
+          chown -R openvswitch:openvswitch /var/run/openvswitch
+          chown -R openvswitch:openvswitch /etc/openvswitch
 
           # if another process is listening on the cni-server socket, wait until it exits
           retries=0
@@ -63,9 +52,6 @@ spec:
               exit 1
             fi
           done
-
-          chown -R openvswitch:openvswitch /var/run/openvswitch
-          chown -R openvswitch:openvswitch /etc/openvswitch
 
           function quit {
               # Save the flows
@@ -106,10 +92,8 @@ spec:
              echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Adding br0 if it doesn't exist ..." 2>&1
              /usr/bin/ovs-vsctl --may-exist add-br br0 -- set Bridge br0 fail_mode=secure protocols=OpenFlow13
              echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Created br0, now adding flows ..." 2>&1
-             mv /var/run/openvswitch/flows.sh /var/run/openvswitch/flows-old.sh
-             sh -x /var/run/openvswitch/flows-old.sh
+             sh -x /var/run/openvswitch/flows.sh
              echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Done restoring the existing flows ..." 2>&1
-             rm /var/run/openvswitch/flows-old.sh
           fi
           
           echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Remove other config ..." 2>&1
@@ -132,9 +116,6 @@ spec:
         - mountPath: /sys
           name: host-sys
           readOnly: true
-        - mountPath: /host
-          name: host-slash
-          readOnly: true
         - mountPath: /etc/openvswitch
           name: host-config-openvswitch
         resources:
@@ -145,38 +126,34 @@ spec:
         livenessProbe:
           exec:
             command:
-            # Validate that ovs-vswitchd and ovsdb are running. Check that
-            # 1. that ovs-vswitchd is responding to queries
-            # 2. that ovsdb is responding to queries
-            #
-            # Don't bother executing this if we're in systemd, as the liveness
-            # probe isn't helpful.
+            # Validate that ovs-vswitchd and ovsdb are running. These three commands check
+            # 1. that the pids in the pid file are up
+            # 2. that ovs-vswitchd is responding to queries
+            # 3. that ovsdb is responding to queries
+            # 4. if br0 is configured, that its management process is responding
             - /bin/bash
             - -c
             - |
               #!/bin/bash
-              if [ -f /host/var/run/ovs-config-executed ]; then
-                exit 0
-              fi
+              /usr/share/openvswitch/scripts/ovs-ctl status > /dev/null &&
               /usr/bin/ovs-appctl -T 5 ofproto/list > /dev/null &&
-              /usr/bin/ovs-vsctl -t 5 show > /dev/null
+              /usr/bin/ovs-vsctl -t 5 show > /dev/null &&
+              if /usr/bin/ovs-vsctl -t 5 br-exists br0; then /usr/bin/ovs-ofctl -t 5 -O OpenFlow13 probe br0; else true; fi
           initialDelaySeconds: 15
           periodSeconds: 5
           timeoutSeconds: 21
         readinessProbe:
           exec:
             command:
-            # The same validation as above.
-            #
-            # Need the manual target file because ovs-appctl doesn't like
-            # being in a different namespace from ovs-vswitchd, which happens
-            # if ovs is running in systemd.
+            # The same validation as above, but without checking for br0
+            # This is because it's created by openshift-sdn, so looking for it
+            # won't be very meaningful.
             - /bin/bash
             - -c
             - |
               #!/bin/bash
-              PID=$(cat /var/run/openvswitch/ovs-vswitchd.pid)
-              /usr/bin/ovs-appctl -t "/var/run/openvswitch/ovs-vswitchd.${PID}.ctl" -T 5 ofproto/list > /dev/null &&
+              /usr/share/openvswitch/scripts/ovs-ctl status > /dev/null &&
+              /usr/bin/ovs-appctl -T 5 ofproto/list > /dev/null &&
               /usr/bin/ovs-vsctl -t 5 show > /dev/null
           initialDelaySeconds: 15
           periodSeconds: 5
@@ -204,9 +181,6 @@ spec:
       - name: host-config-openvswitch
         hostPath:
           path: /var/lib/openvswitch
-      - name: host-slash
-        hostPath:
-          path: /
       tolerations:
       - operator: "Exists"
 {{- end}}
