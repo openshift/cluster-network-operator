@@ -164,6 +164,20 @@ spec:
           }
           trap cleanup SIGTERM
 
+          # Don't start IPsec until ovnkube-node has finished setting up the node
+          counter=0
+          until [ -f /etc/cni/net.d/10-ovn-kubernetes.conf ]
+          do
+            ((counter++))
+            sleep 1
+            if [ $counter -gt 300 ];
+            then
+                    echo "ovnkube-node pod has not started after $counter seconds"
+                    exit 1
+            fi
+          done
+          echo "ovnkube-node has configured node."
+
           # Workaround for https://github.com/libreswan/libreswan/issues/373
           ulimit -n 1024
 
@@ -207,6 +221,9 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
+        # To check that network setup is complete
+        - mountPath: /etc/cni/net.d
+          name: host-cni-netd
         - mountPath: /var/run/openvswitch
           name: host-var-run-ovs
         - mountPath: /var/log/openvswitch/
@@ -248,5 +265,8 @@ spec:
         hostPath:
           path: /var/lib/openvswitch/etc
           type: DirectoryOrCreate
+      - name: host-cni-netd
+        hostPath:
+          path: "{{.CNIConfDir}}"
       tolerations:
       - operator: "Exists"
