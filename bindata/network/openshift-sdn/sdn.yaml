@@ -39,7 +39,7 @@ spec:
       priorityClassName: system-node-critical
       containers:
       - name: sdn
-        image: {{.SDNImage}}
+        image: quay.io/danwinship/bz1896958:sdn
         command: 
         - /bin/bash
         - -c
