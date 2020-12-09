@@ -164,6 +164,25 @@ spec:
           }
           trap cleanup SIGTERM
 
+          # Don't start IPsec until ovnkube-node has finished setting up the node
+          counter=0
+          until [ ! -z $(kubectl get pods -l app=ovnkube-node  --field-selector spec.nodeName=${K8S_NODE} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) ]
+          do
+            ((counter++))
+            sleep 1
+            if [ $counter -gt 300 ];
+            then
+                    echo "ovnkube-node pod has not started after $counter seconds"
+                    exit 1
+            fi
+          done
+          delay=300
+          if ! kubectl wait --for=condition=ready --selector=app=ovnkube-node pod --field-selector spec.nodeName=${K8S_NODE} --timeout=${delay}s ; then
+            echo "ovnkube-node pod is not ready after $delay seconds"
+            exit 1
+          fi
+          echo "ovnkube-node has configured node."
+
           # Workaround for https://github.com/libreswan/libreswan/issues/373
           ulimit -n 1024
 
