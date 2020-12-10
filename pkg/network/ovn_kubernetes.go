@@ -8,29 +8,23 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
-	"time"
 
-	yaml "github.com/ghodss/yaml"
+	"github.com/pkg/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	types "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilnet "k8s.io/utils/net"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const OVN_NB_PORT = "9641"
 const OVN_SB_PORT = "9642"
 const OVN_NB_RAFT_PORT = "9643"
 const OVN_SB_RAFT_PORT = "9644"
-const CLUSTER_CONFIG_NAME = "cluster-config-v1"
-const CLUSTER_CONFIG_NAMESPACE = "kube-system"
 const OVN_CERT_CN = "ovn"
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
@@ -192,7 +186,6 @@ func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 }
 
 func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
-
 	if conf.DefaultNetwork.OVNKubernetesConfig == nil {
 		conf.DefaultNetwork.OVNKubernetesConfig = &operv1.OVNKubernetesConfig{}
 	}
@@ -220,37 +213,15 @@ func networkPluginName() string {
 	return "ovn-kubernetes"
 }
 
-type replicaCountDecoder struct {
-	ControlPlane struct {
-		Replicas string `json:"replicas"`
-	} `json:"controlPlane"`
-}
-
 func boostrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
-	clusterConfig := &corev1.ConfigMap{}
-	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
 	masterNodeList := &corev1.NodeList{}
-
-	if err := kubeClient.Get(context.TODO(), clusterConfigLookup, clusterConfig); err != nil {
-		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to retrieve cluster config: %s", err)
+	matchingLabels := &client.MatchingLabels{"node-role.kubernetes.io/master": ""}
+	if err := kubeClient.List(context.TODO(), masterNodeList, matchingLabels); err != nil {
+		return nil, err
 	}
 
-	rcD := replicaCountDecoder{}
-	if err := yaml.Unmarshal([]byte(clusterConfig.Data["install-config"]), &rcD); err != nil {
-		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to unmarshal install-config: %s", err)
-	}
-
-	controlPlaneReplicaCount, _ := strconv.Atoi(rcD.ControlPlane.Replicas)
-
-	err := wait.PollImmediate(5*time.Second, 280*time.Second, func() (bool, error) {
-		matchingLabels := &client.MatchingLabels{"node-role.kubernetes.io/master": ""}
-		if err := kubeClient.List(context.TODO(), masterNodeList, matchingLabels); err != nil {
-			return false, err
-		}
-		return len(masterNodeList.Items) != 0 && controlPlaneReplicaCount == len(masterNodeList.Items), nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("Unable to bootstrap OVN, expected amount of control plane nodes (%v) do not match found (%v): %s", controlPlaneReplicaCount, len(masterNodeList.Items), err)
+	if len(masterNodeList.Items) == 0 {
+		return nil, fmt.Errorf("unable to bootstrap OVN, no master nodes found")
 	}
 
 	ovnMasterIPs := make([]string, len(masterNodeList.Items))
