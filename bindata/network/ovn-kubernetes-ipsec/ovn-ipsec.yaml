@@ -149,6 +149,8 @@ spec:
           #!/bin/bash
           set -exuo pipefail
 
+          ip x s flush
+          ip x p flush
           function cleanup()
           {
             # In order to maintain traffic flows during container restart, we
@@ -163,6 +165,14 @@ spec:
             exit 0
           }
           trap cleanup SIGTERM
+
+          #awk -i inplace '/self.ike_helper.clear_tunnel_state/ { print; print "                vlog.info(\"Deleting connection %s\" % (conn))"; print "                subprocess.call([self.IPSEC, \"auto\", \"--delete\", conn])"; next }1' /usr/share/openvswitch/scripts/ovs-monitor-ipsec
+          awk -i inplace '/for row in data\[\"Interface\"\]/ { print; print "            vlog.info(\"Row: %s\" % (row))"; next }1' /usr/share/openvswitch/scripts/ovs-monitor-ipsec
+          sed -i 's/vlog.info("%s is outdated %u" % (conn, ver))/vlog.info("%s is outdated %u-%s" % (conn, ver, tunnel))/' /usr/share/openvswitch/scripts/ovs-monitor-ipsec
+          cat /usr/share/openvswitch/scripts/ovs-monitor-ipsec
+
+          
+
 
           # Don't start IPsec until ovnkube-node has finished setting up the node
           counter=0
@@ -187,15 +197,16 @@ spec:
           ulimit -n 1024
 
           # Make all ipsec state persistent across restarts.
-          rm -rf /etc/ipsec.conf /etc/ipsec.d /etc/ipsec.secrets
-          touch /etc/openvswitch/ipsec.conf
-          touch /etc/openvswitch/ipsec.secrets
-          mkdir -p /etc/openvswitch/ipsec.d
-          ln -s /etc/openvswitch/ipsec.conf /etc/ipsec.conf
-          ln -s /etc/openvswitch/ipsec.d /etc/ipsec.d
-          ln -s /etc/openvswitch/ipsec.secrets /etc/ipsec.secrets
+          #rm -rf /etc/ipsec.conf /etc/ipsec.d /etc/ipsec.secrets
+          #touch /etc/openvswitch/ipsec.conf
+          #touch /etc/openvswitch/ipsec.secrets  
+          #mkdir -p /etc/openvswitch/ipsec.d
+          #ln -s /etc/openvswitch/ipsec.conf /etc/ipsec.conf
+          #ln -s /etc/openvswitch/ipsec.d /etc/ipsec.d
+          #ln -s /etc/openvswitch/ipsec.secrets /etc/ipsec.secrets
 
-          /usr/libexec/ipsec/addconn --config /etc/openvswitch/ipsec.conf --checkconfig
+
+          /usr/libexec/ipsec/addconn --config /etc/ipsec.conf --checkconfig
           # Check kernel modules
           /usr/libexec/ipsec/_stackmanager start
           # Check nss database status
@@ -205,7 +216,7 @@ spec:
           # Start the pluto IKE daemon and use the ipsec configuration file that
           # persists across container restarts. If the container has been restarted,
           # this will contain the previous configuration from ovs-monitor-ipsec
-          /usr/libexec/ipsec/pluto --leak-detective --config /etc/openvswitch/ipsec.conf --logfile /var/log/openvswitch/libreswan.log
+          /usr/libexec/ipsec/pluto --leak-detective --config /etc/ipsec.conf --logfile /var/log/openvswitch/libreswan.log
 
           # Environment variables are for workaround for https://mail.openvswitch.org/pipermail/ovs-dev/2020-October/375734.html
           # We now start ovs-monitor-ipsec which will monitor for changes in the ovs
