@@ -84,7 +84,7 @@ func (status *StatusManager) SetFromPods() {
 
 		dsProgressing := false
 
-		if isNonCritical(ds) && ds.Status.DesiredNumberScheduled == 0 {
+		if isNonCritical(ds) && ds.Status.NumberReady == 0 && !status.everAvailable {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is waiting for other operators to become ready", dsName.String()))
 			dsProgressing = true
 		} else if ds.Status.UpdatedNumberScheduled < ds.Status.DesiredNumberScheduled {
@@ -141,7 +141,10 @@ func (status *StatusManager) SetFromPods() {
 
 		depProgressing := false
 
-		if dep.Status.UnavailableReplicas > 0 {
+		if isNonCritical(dep) && dep.Status.UnavailableReplicas > 0 && !status.everAvailable {
+			progressing = append(progressing, fmt.Sprintf("Deployment %q is waiting for other operators to become ready", depName.String()))
+			depProgressing = true
+		} else if dep.Status.UnavailableReplicas > 0 {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q is not available (awaiting %d nodes)", depName.String(), dep.Status.UnavailableReplicas))
 			depProgressing = true
 			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
@@ -209,6 +212,7 @@ func (status *StatusManager) SetFromPods() {
 				Status: operv1.ConditionTrue,
 			},
 		)
+		status.everAvailable = true
 	}
 
 	status.set(reachedAvailableLevel, conditions...)
