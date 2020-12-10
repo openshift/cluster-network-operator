@@ -20,7 +20,7 @@ import (
 // string of noProxy settings. If no user supplied noProxy settings are
 // provided, a comma-separated string of cluster-wide noProxy settings
 // are returned.
-func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructure, network *configv1.Network, cluster *corev1.ConfigMap) (string, error) {
+func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructure, network *configv1.Network, cluster *corev1.ConfigMap, dns *configv1.DNS) (string, error) {
 	// TODO: This will be flexible when master machine management is more dynamic.
 	type machineNetworkEntry struct {
 		// CIDR is the IP block address pool for machines within the cluster.
@@ -110,7 +110,7 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 			return "", fmt.Errorf("failed to parse install config replicas: %v", err)
 		}
 		for i := int64(0); i < int64(replicas); i++ {
-			etcdHost := fmt.Sprintf("etcd-%d.%s", i, infra.Status.EtcdDiscoveryDomain)
+			etcdHost := fmt.Sprintf("etcd-%d.%s", i, dns.Spec.BaseDomain)
 			set.Insert(etcdHost)
 		}
 	} else {

@@ -103,6 +103,7 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 		infraConfig := &configv1.Infrastructure{}
 		netConfig := &configv1.Network{}
 		clusterConfig := &corev1.ConfigMap{}
+		dnsConfig := &configv1.DNS{}
 
 		log.Printf("Reconciling proxy '%s'", request.Name)
 		if err := r.client.Get(context.TODO(), request.NamespacedName, proxyConfig); err != nil {
@@ -191,8 +192,14 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 					clusterConfig.Name, err))
 			return reconcile.Result{}, fmt.Errorf("failed to get configmap '%s/%s': %v", clusterConfig.Namespace, clusterConfig.Name, err)
 		}
+		if err := r.client.Get(context.TODO(), types.NamespacedName{Name: names.CLUSTER_CONFIG}, dnsConfig); err != nil {
+			log.Printf("Failed to get dns config '%s': %v", names.CLUSTER_CONFIG, err)
+			r.status.SetDegraded(statusmanager.ProxyConfig, "DNSConfigError",
+				fmt.Sprintf("Error getting dns config '%s': %v.", names.CLUSTER_CONFIG, err))
+			return reconcile.Result{}, fmt.Errorf("failed to get dns config '%s': %v", names.CLUSTER_CONFIG, err)
+		}
 		// Update proxy status.
-		if err := r.syncProxyStatus(proxyConfig, infraConfig, netConfig, clusterConfig); err != nil {
+		if err := r.syncProxyStatus(proxyConfig, infraConfig, netConfig, clusterConfig, dnsConfig); err != nil {
 			log.Printf("Could not sync proxy '%s' status: %v", proxyConfig.Name, err)
 			r.status.SetDegraded(statusmanager.ProxyConfig, "StatusError",
 				fmt.Sprintf("Could not update proxy '%s' status: %v", proxyConfig.Name, err))

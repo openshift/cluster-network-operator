@@ -61,7 +61,6 @@ func infraConfig(platform configv1.PlatformType, domain, region string) *configv
 			APIServerURL:         "https://api." + domain + ":6443",
 			APIServerInternalURL: "https://api-int." + domain + ":6443",
 			PlatformStatus:       platformStatus,
-			EtcdDiscoveryDomain:  domain,
 		},
 	}
 }
@@ -95,12 +94,24 @@ func cfgMapWithInstallConfig(key, data string) *corev1.ConfigMap {
 	return cfgMap
 }
 
+func dnsConfig(domain string) *configv1.DNS {
+	return &configv1.DNS{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-dns",
+		},
+		Spec: configv1.DNSSpec{
+			BaseDomain: domain,
+		},
+	}
+}
+
 func TestMergeUserSystemNoProxy(t *testing.T) {
 	type args struct {
 		proxy   *configv1.Proxy
 		infra   *configv1.Infrastructure
 		network *configv1.Network
 		cluster *corev1.ConfigMap
+		dns     *configv1.DNS
 	}
 	tests := []struct {
 		name    string
@@ -114,6 +125,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				infra:   infraConfig(configv1.AWSPlatformType, "test.cluster.com", "us-west-2"),
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
+				dns:     dnsConfig("test.cluster.com"),
 			},
 			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,etcd-0.test.cluster.com," +
@@ -126,6 +138,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				infra:   infraConfig(configv1.GCPPlatformType, "test.cluster.com", "us-west2"),
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
+				dns:     dnsConfig("test.cluster.com"),
 			},
 			want: ".cluster.local,.svc,10.0.0.0/16,10.128.0.0/14,127.0.0.1,169.254.169.254,172.30.0.0/16," +
 				"api-int.test.cluster.com,etcd-0.test.cluster.com,etcd-1.test.cluster.com,etcd-2.test.cluster.com," +
@@ -138,6 +151,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				infra:   infraConfig(configv1.AWSPlatformType, "test.cluster.com", "us-east-1"),
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
+				dns:     dnsConfig("test.cluster.com"),
 			},
 			want: ".cluster.local,.ec2.internal,.svc,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,etcd-0.test.cluster.com," +
@@ -150,6 +164,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				infra:   infraConfig(configv1.AWSPlatformType, "test.cluster.com", "us-west-2"),
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
+				dns:     dnsConfig("test.cluster.com"),
 			},
 			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,172.30.0.1,api-int.test.cluster.com,etcd-0.test.cluster.com," +
@@ -162,6 +177,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				infra:   infraConfig(configv1.AWSPlatformType, "test.cluster.com", "us-west-2"),
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
+				dns:     dnsConfig("test.cluster.com"),
 			},
 			want: ".cluster.local,.foo.test.com,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,api-int.test.cluster.com," +
@@ -174,6 +190,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				infra:   infraConfig(configv1.AWSPlatformType, "^&", "us-west-2"),
 				network: netConfig("10.128.0.0/14", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
+				dns:     dnsConfig("^&"),
 			},
 			wantErr: true,
 		},
@@ -183,6 +200,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				infra:   infraConfig(configv1.AWSPlatformType, "^&", "us-west-2"),
 				network: netConfig("10.128.0.0/14", ""),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
+				dns:     dnsConfig("^&"),
 			},
 			wantErr: true,
 		},
@@ -192,6 +210,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				infra:   infraConfig(configv1.AWSPlatformType, "^&", "us-west-2"),
 				network: netConfig("", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
+				dns:     dnsConfig("^&"),
 			},
 			wantErr: true,
 		},
@@ -201,6 +220,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				infra:   infraConfig(configv1.AWSPlatformType, "^&", "us-west-2"),
 				network: netConfig("", "172.30.0.0/16"),
 				cluster: cfgMap(),
+				dns:     dnsConfig("^&"),
 			},
 			wantErr: true,
 		},
@@ -210,6 +230,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				infra:   infraConfig(configv1.AWSPlatformType, "^&", "us-west-2"),
 				network: netConfig("", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig("bad-key", cfgMapData),
+				dns:     dnsConfig("^&"),
 			},
 			wantErr: true,
 		},
@@ -219,13 +240,14 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				infra:   infraConfig(configv1.AWSPlatformType, "^&", "us-west-2"),
 				network: netConfig("", "172.30.0.0/16"),
 				cluster: cfgMapWithInstallConfig("bad-key", "bad data"),
+				dns:     dnsConfig("^&"),
 			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := MergeUserSystemNoProxy(tt.args.proxy, tt.args.infra, tt.args.network, tt.args.cluster)
+			got, err := MergeUserSystemNoProxy(tt.args.proxy, tt.args.infra, tt.args.network, tt.args.cluster, tt.args.dns)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MergeUserSystemNoProxy() error = %v, wantErr %v", err, tt.wantErr)
 				return
