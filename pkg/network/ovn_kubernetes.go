@@ -118,6 +118,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["EnableIPsec"] = false
 	}
 
+	data.Data["V4JoinSubnet"] = c.V4JoinSubnet
+	data.Data["V6JoinSubnet"] = c.V6JoinSubnet
+
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/ovn-kubernetes"), &data)
 
 	if err != nil {
@@ -186,6 +189,18 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 		}
 		if oc.GenevePort != nil && (*oc.GenevePort < 1 || *oc.GenevePort > 65535) {
 			out = append(out, errors.Errorf("invalid GenevePort %d", *oc.GenevePort))
+		}
+		if oc.V4JoinSubnet != "" {
+			v4IP, _, err := net.ParseCIDR(oc.V4JoinSubnet)
+			if err != nil || utilnet.IsIPv6(v4IP) {
+				out = append(out, fmt.Errorf("invalid gateway v4 join subnet specified, subnet: %s: error: %v", oc.V4JoinSubnet, err))
+			}
+		}
+		if oc.V6JoinSubnet != "" {
+			v6IP, _, err := net.ParseCIDR(oc.V6JoinSubnet)
+			if err != nil || !utilnet.IsIPv6(v6IP) {
+				out = append(out, fmt.Errorf("invalid gateway v6 join subnet specified, subnet: %s: error: %v", oc.V6JoinSubnet, err))
+			}
 		}
 	}
 
