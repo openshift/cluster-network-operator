@@ -26,6 +26,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"k8s.io/apiserver/pkg/storage/etcd3/etcd3retry"
+
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/pkg/transport"
@@ -91,7 +93,7 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 			return fmt.Errorf(errMsg)
 		}
 		client := clientValue.Load().(*clientv3.Client)
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		// See https://github.com/etcd-io/etcd/blob/c57f8b3af865d1b531b979889c602ba14377420e/etcdctl/ctlv3/command/ep_command.go#L118
 		_, err := client.Get(ctx, path.Join("/", c.Prefix, "health"))
@@ -249,7 +251,7 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 	if transformer == nil {
 		transformer = value.IdentityTransformer
 	}
-	return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
+	return etcd3retry.NewRetryingEtcdStorage(etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging)), destroyFunc, nil
 }
 
 // startDBSizeMonitorPerEndpoint starts a loop to monitor etcd database size and update the
