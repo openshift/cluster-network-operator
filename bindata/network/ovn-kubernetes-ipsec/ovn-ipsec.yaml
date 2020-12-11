@@ -167,9 +167,12 @@ spec:
           trap cleanup SIGTERM
 
           #awk -i inplace '/self.ike_helper.clear_tunnel_state/ { print; print "                vlog.info(\"Deleting connection %s\" % (conn))"; print "                subprocess.call([self.IPSEC, \"auto\", \"--delete\", conn])"; next }1' /usr/share/openvswitch/scripts/ovs-monitor-ipsec
-          awk -i inplace '/for row in data\[\"Interface\"\]/ { print; print "            vlog.info(\"Row: %s\" % (row))"; next }1' /usr/share/openvswitch/scripts/ovs-monitor-ipsec
+          #awk -i inplace '/for row in data\[\"Interface\"\]/ { print; print "            vlog.info(\"Row: %s\" % (row))"; next }1' /usr/share/openvswitch/scripts/ovs-monitor-ipsec
           sed -i 's/vlog.info("%s is outdated %u" % (conn, ver))/vlog.info("%s is outdated %u-%s" % (conn, ver, tunnel))/' /usr/share/openvswitch/scripts/ovs-monitor-ipsec
+          awk -i inplace '/for ifname, conns in conns_dict.items/ { print; print "            vlog.info(\"ifname %s - conns %s\" % (ifname, conns))"; next }1' /usr/share/openvswitch/scripts/ovs-monitor-ipsec
+          sed -i 's/|-\\d+//' /usr/share/openvswitch/scripts/ovs-monitor-ipsec
           cat /usr/share/openvswitch/scripts/ovs-monitor-ipsec
+
 
           
 
