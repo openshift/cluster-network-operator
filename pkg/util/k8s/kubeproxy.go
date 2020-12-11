@@ -9,10 +9,10 @@ import (
 
 	"github.com/ghodss/yaml"
 	operv1 "github.com/openshift/api/operator/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	cliflag "k8s.io/component-base/cli/flag"
 	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
 )
 
@@ -80,6 +80,7 @@ func GenerateKubeProxyConfiguration(args map[string]operv1.ProxyArgumentList) (s
 	kpc.ConfigSyncPeriod.Duration = ka.getDuration("config-sync-period")
 
 	kpc.NodePortAddresses = ka.getCIDRList("node-port-addresses")
+	kpc.FeatureGates = ka.getFeatureGates("feature-gates")
 
 	if err := ka.getError(); err != nil {
 		return "", err
@@ -254,4 +255,27 @@ func (ka *kpcArgs) getPortRange(key string) string {
 		return ""
 	}
 	return value
+}
+
+// getFeatureGates parses feature-gates and returns a map[string]bool
+func (ka *kpcArgs) getFeatureGates(key string) map[string]bool {
+	val := ka.args[key]
+	if len(val) == 0 {
+		return nil
+	}
+	delete(ka.args, key)
+	fgMap := make(map[string]bool)
+	featureGates := cliflag.NewMapStringBool(&fgMap)
+	for _, v := range val {
+		err := featureGates.Set(v)
+		if err != nil {
+			ka.errs = append(ka.errs, fmt.Errorf("invalid %q (%v)", v, err))
+			continue
+		}
+	}
+	if len(fgMap) == 0 {
+		return nil
+	}
+	return fgMap
+
 }

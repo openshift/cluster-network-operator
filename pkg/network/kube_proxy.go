@@ -110,6 +110,9 @@ func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 				out = append(out, errors.Errorf("kube-proxy --healthz-port cannot be overridden"))
 			}
 		}
+		if _, ok := p.ProxyArguments["feature-gates"]; ok {
+			out = append(out, errors.Errorf("kube-proxy --feature-gates cannot be overridden"))
+		}
 	}
 
 	return out
