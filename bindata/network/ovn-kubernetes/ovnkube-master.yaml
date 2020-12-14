@@ -817,7 +817,7 @@ spec:
             --db "{{.OVN_NB_DB_LIST}}" --log-file=/run/ovn/ovn-nbctl.log)
 
           # include nbctl daemon logging, allow for ovn-nbctl to create the log file
-          tail -f --retry /run/ovn/ovn-nbctl.log &
+          tail -F /run/ovn/ovn-nbctl.log &
 
            # REMOVEME once OVN path for control socket is fixed (right now uses /var/run/openvswitch)
           ln -sf $OVN_NB_DAEMON /var/run/ovn/ || true
