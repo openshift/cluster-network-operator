@@ -56,6 +56,8 @@ spec:
           value: "quay.io/openshift/origin-multus-whereabouts-ipam-cni:latest"
         - name: ROUTE_OVERRRIDE_CNI_IMAGE
           value: "quay.io/openshift/origin-multus-route-override-cni:latest"
+        - name: MULTUS_NETWORKPOLICY_IMAGE
+          value: "quay.io/openshift/origin-multus-networkpolicy:latest"
         - name: OVN_IMAGE
           value: "quay.io/openshift/origin-ovn-kubernetes:latest"
         - name: OVN_NB_RAFT_ELECTION_TIMER

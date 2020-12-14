@@ -30,6 +30,10 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-multus-route-override-cni:latest
+  - name: multus-networkpolicy
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-multus-networkpolicy:latest 
   - name: multus-admission-controller
     from:
       kind: DockerImage
