@@ -35,6 +35,13 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	}
 	objs = append(objs, o...)
 
+	// render MultiNetworkPolicy
+	o, err = renderMultiNetworkpolicy(conf, manifestDir)
+	if err != nil {
+		return nil, err
+	}
+	objs = append(objs, o...)
+
 	// render default network
 	o, err = renderDefaultNetwork(conf, bootstrapResult, manifestDir)
 	if err != nil {
@@ -189,6 +196,12 @@ func FillDefaults(conf, previous *operv1.NetworkSpec) {
 		conf.DisableMultiNetwork = &disable
 	}
 
+	// UseMultiNetworkPolicy defaults to false
+	if conf.UseMultiNetworkPolicy == nil {
+		disable := false
+		conf.UseMultiNetworkPolicy = &disable
+	}
+
 	if len(conf.LogLevel) == 0 {
 		conf.LogLevel = "Normal"
 	}
@@ -231,6 +244,9 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 	if !reflect.DeepEqual(prev.DisableMultiNetwork, next.DisableMultiNetwork) {
 		errs = append(errs, errors.Errorf("cannot change DisableMultiNetwork"))
 	}
+
+	// Check MultiNetworkPolicy
+	errs = append(errs, isMultiNetworkpolicyChangeSafe(prev, next)...)
 
 	// Check kube-proxy
 	errs = append(errs, isKubeProxyChangeSafe(prev, next)...)
@@ -410,6 +426,28 @@ func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir strin
 	out := []*uns.Unstructured{}
 
 	objs, err := renderMultusAdmissonControllerConfig(manifestDir)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, objs...)
+	return out, nil
+}
+
+// renderMultiNetworkpolicy generates the manifests of MultiNetworkPolicy
+func renderMultiNetworkpolicy(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+	// disable it if DisableMultiNetwork = true
+	if *conf.DisableMultiNetwork {
+		return nil, nil
+	}
+
+	if conf.UseMultiNetworkPolicy == nil || !*conf.UseMultiNetworkPolicy {
+		return nil, nil
+	}
+
+	var err error
+	out := []*uns.Unstructured{}
+
+	objs, err := renderMultiNetworkpolicyConfig(manifestDir)
 	if err != nil {
 		return nil, err
 	}
