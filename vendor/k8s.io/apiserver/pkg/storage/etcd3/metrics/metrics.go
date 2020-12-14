@@ -61,13 +61,13 @@ var (
 		},
 		[]string{"endpoint"},
 	)
-	etcdRequestRetry = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:           "etcd_request_retry_total",
-			Help:           "Etcd request retry total",
+	etcdBookmarkCounts = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Name:           "etcd_bookmark_counts",
+			Help:           "Number of etcd bookmarks (progress notify events) split by kind.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"error"},
+		[]string{"resource"},
 	)
 )
 
@@ -80,7 +80,7 @@ func Register() {
 		legacyregistry.MustRegister(etcdRequestLatency)
 		legacyregistry.MustRegister(objectCounts)
 		legacyregistry.MustRegister(dbTotalSize)
-		legacyregistry.MustRegister(etcdRequestRetry)
+		legacyregistry.MustRegister(etcdBookmarkCounts)
 	})
 }
 
@@ -92,6 +92,11 @@ func UpdateObjectCount(resourcePrefix string, count int64) {
 // RecordEtcdRequestLatency sets the etcd_request_duration_seconds metrics.
 func RecordEtcdRequestLatency(verb, resource string, startTime time.Time) {
 	etcdRequestLatency.WithLabelValues(verb, resource).Observe(sinceInSeconds(startTime))
+}
+
+// RecordEtcdBookmark updates the etcd_bookmark_counts metric.
+func RecordEtcdBookmark(resource string) {
+	etcdBookmarkCounts.WithLabelValues(resource).Inc()
 }
 
 // Reset resets the etcd_request_duration_seconds metric.
@@ -107,9 +112,4 @@ func sinceInSeconds(start time.Time) float64 {
 // UpdateEtcdDbSize sets the etcd_db_total_size_in_bytes metric.
 func UpdateEtcdDbSize(ep string, size int64) {
 	dbTotalSize.WithLabelValues(ep).Set(float64(size))
-}
-
-// UpdateEtcdRequestRetry sets the etcd_request_retry_total metric.
-func UpdateEtcdRequestRetry(errorCode string) {
-	etcdRequestRetry.WithLabelValues(errorCode).Inc()
 }
