@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
@@ -185,13 +186,24 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 	}
 
+	newOperConfig := operConfig.DeepCopy()
+
 	// Bootstrap any resources
-	bootstrapResult, err := network.Bootstrap(&operConfig.Spec, r.client)
+	bootstrapResult, err := network.Bootstrap(newOperConfig, r.client)
 	if err != nil {
 		log.Printf("Failed to reconcile platform networking resources: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "BootstrapError",
 			fmt.Sprintf("Internal error while reconciling platform networking resources: %v", err))
 		return reconcile.Result{}, err
+	}
+
+	if !reflect.DeepEqual(operConfig, newOperConfig) {
+		if err := r.UpdateOperConfig(newOperConfig); err != nil {
+			log.Printf("Failed to update the operator configuration: %v", err)
+			r.status.SetDegraded(statusmanager.OperatorConfig, "UpdateOperatorConfig",
+				fmt.Sprintf("Internal error while updating operator configuration: %v", err))
+			return reconcile.Result{}, err
+		}
 	}
 
 	// Generate the objects
