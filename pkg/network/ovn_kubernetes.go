@@ -10,15 +10,15 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/pkg/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilnet "k8s.io/utils/net"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const OVN_NB_PORT = "9641"
@@ -63,7 +63,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_CONTROLLER_INACTIVITY_PROBE"] = os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
 	data.Data["OVN_NB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterIPs, OVN_NB_PORT)
 	data.Data["OVN_SB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterIPs, OVN_SB_PORT)
-	data.Data["OVN_MASTER_IP"] = bootstrapResult.OVN.MasterIPs[0]
+	data.Data["OVN_MASTER_IP"] = bootstrapResult.OVN.ClusterInitiator
 	data.Data["OVN_MIN_AVAILABLE"] = len(bootstrapResult.OVN.MasterIPs)/2 + 1
 	data.Data["LISTEN_DUAL_STACK"] = listenDualStack(bootstrapResult.OVN.MasterIPs[0])
 	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
@@ -248,7 +248,7 @@ func networkPluginName() string {
 	return "ovn-kubernetes"
 }
 
-func bootstrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
+func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 	masterNodeList := &corev1.NodeList{}
 	matchingLabels := &client.MatchingLabels{"node-role.kubernetes.io/master": ""}
 	if err := kubeClient.List(context.TODO(), masterNodeList, matchingLabels); err != nil {
@@ -276,12 +276,38 @@ func bootstrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) 
 
 	sort.Strings(ovnMasterIPs)
 
+	var clusterInitiator string
+	currentAnnotation := conf.GetAnnotations()
+	if cInitiator, ok := currentAnnotation[names.OVNRaftClusterInitiator]; ok && currentInitiatorExists(ovnMasterIPs, cInitiator) {
+		clusterInitiator = cInitiator
+	} else {
+		clusterInitiator = ovnMasterIPs[0]
+		if currentAnnotation == nil {
+			currentAnnotation = map[string]string{
+				names.OVNRaftClusterInitiator: clusterInitiator,
+			}
+		} else {
+			currentAnnotation[names.OVNRaftClusterInitiator] = clusterInitiator
+		}
+		conf.SetAnnotations(currentAnnotation)
+	}
+
 	res := bootstrap.BootstrapResult{
 		OVN: bootstrap.OVNBootstrapResult{
-			MasterIPs: ovnMasterIPs,
+			MasterIPs:        ovnMasterIPs,
+			ClusterInitiator: clusterInitiator,
 		},
 	}
 	return &res, nil
+}
+
+func currentInitiatorExists(ovnMasterIPs []string, configInitiator string) bool {
+	for _, masterIP := range ovnMasterIPs {
+		if masterIP == configInitiator {
+			return true
+		}
+	}
+	return false
 }
 
 func dbList(masterIPs []string, port string) string {
