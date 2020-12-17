@@ -8,6 +8,7 @@ COPY --from=builder  /go/src/github.com/openshift/cluster-network-operator/clust
 COPY --from=builder  /go/src/github.com/openshift/cluster-network-operator/cluster-network-check-endpoints /usr/bin/
 
 COPY manifests /manifests
+COPY vendor/github.com/openshift/api/operatorcontrolplane/v1alpha1/0000_10-pod-network-connectivity-check.crd.yaml /manifests
 COPY bindata /bindata
 ENV OPERATOR_NAME=cluster-network-operator
 CMD ["/usr/bin/cluster-network-operator"]
