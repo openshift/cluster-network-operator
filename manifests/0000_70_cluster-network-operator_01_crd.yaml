@@ -18,13 +18,18 @@ spec:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: Network describes the cluster's desired network configuration. It is consumed by the cluster-network-operator.
+        description: Network describes the cluster's desired network configuration.
+          It is consumed by the cluster-network-operator.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
             type: string
           metadata:
             type: object
@@ -32,38 +37,53 @@ spec:
             description: NetworkSpec is the top-level network configuration object.
             properties:
               additionalNetworks:
-                description: additionalNetworks is a list of extra networks to make available to pods when multiple networks are enabled.
+                description: additionalNetworks is a list of extra networks to make
+                  available to pods when multiple networks are enabled.
                 items:
-                  description: AdditionalNetworkDefinition configures an extra network that is available but not created by default. Instead, pods must request them by name. type must be specified, along with exactly one "Config" that matches the type.
+                  description: AdditionalNetworkDefinition configures an extra network
+                    that is available but not created by default. Instead, pods must
+                    request them by name. type must be specified, along with exactly
+                    one "Config" that matches the type.
                   properties:
                     name:
-                      description: name is the name of the network. This will be populated in the resulting CRD This must be unique.
+                      description: name is the name of the network. This will be populated
+                        in the resulting CRD This must be unique.
                       type: string
                     namespace:
-                      description: namespace is the namespace of the network. This will be populated in the resulting CRD If not given the network will be created in the default namespace.
+                      description: namespace is the namespace of the network. This
+                        will be populated in the resulting CRD If not given the network
+                        will be created in the default namespace.
                       type: string
                     rawCNIConfig:
-                      description: rawCNIConfig is the raw CNI configuration json to create in the NetworkAttachmentDefinition CRD
+                      description: rawCNIConfig is the raw CNI configuration json
+                        to create in the NetworkAttachmentDefinition CRD
                       type: string
                     simpleMacvlanConfig:
-                      description: SimpleMacvlanConfig configures the macvlan interface in case of type:NetworkTypeSimpleMacvlan
+                      description: SimpleMacvlanConfig configures the macvlan interface
+                        in case of type:NetworkTypeSimpleMacvlan
                       properties:
                         ipamConfig:
-                          description: IPAMConfig configures IPAM module will be used for IP Address Management (IPAM).
+                          description: IPAMConfig configures IPAM module will be used
+                            for IP Address Management (IPAM).
                           properties:
                             staticIPAMConfig:
-                              description: StaticIPAMConfig configures the static IP address in case of type:IPAMTypeStatic
+                              description: StaticIPAMConfig configures the static
+                                IP address in case of type:IPAMTypeStatic
                               properties:
                                 addresses:
-                                  description: Addresses configures IP address for the interface
+                                  description: Addresses configures IP address for
+                                    the interface
                                   items:
-                                    description: StaticIPAMAddresses provides IP address and Gateway for static IPAM addresses
+                                    description: StaticIPAMAddresses provides IP address
+                                      and Gateway for static IPAM addresses
                                     properties:
                                       address:
-                                        description: Address is the IP address in CIDR format
+                                        description: Address is the IP address in
+                                          CIDR format
                                         type: string
                                       gateway:
-                                        description: Gateway is IP inside of subnet to designate as the gateway
+                                        description: Gateway is IP inside of subnet
+                                          to designate as the gateway
                                         type: string
                                     type: object
                                   type: array
@@ -71,58 +91,80 @@ spec:
                                   description: DNS configures DNS for the interface
                                   properties:
                                     domain:
-                                      description: Domain configures the domainname the local domain used for short hostname lookups
+                                      description: Domain configures the domainname
+                                        the local domain used for short hostname lookups
                                       type: string
                                     nameservers:
-                                      description: Nameservers points DNS servers for IP lookup
+                                      description: Nameservers points DNS servers
+                                        for IP lookup
                                       items:
                                         type: string
                                       type: array
                                     search:
-                                      description: Search configures priority ordered search domains for short hostname lookups
+                                      description: Search configures priority ordered
+                                        search domains for short hostname lookups
                                       items:
                                         type: string
                                       type: array
                                   type: object
                                 routes:
-                                  description: Routes configures IP routes for the interface
+                                  description: Routes configures IP routes for the
+                                    interface
                                   items:
-                                    description: StaticIPAMRoutes provides Destination/Gateway pairs for static IPAM routes
+                                    description: StaticIPAMRoutes provides Destination/Gateway
+                                      pairs for static IPAM routes
                                     properties:
                                       destination:
-                                        description: Destination points the IP route destination
+                                        description: Destination points the IP route
+                                          destination
                                         type: string
                                       gateway:
-                                        description: Gateway is the route's next-hop IP address If unset, a default gateway is assumed (as determined by the CNI plugin).
+                                        description: Gateway is the route's next-hop
+                                          IP address If unset, a default gateway is
+                                          assumed (as determined by the CNI plugin).
                                         type: string
                                     type: object
                                   type: array
                               type: object
                             type:
-                              description: Type is the type of IPAM module will be used for IP Address Management(IPAM). The supported values are IPAMTypeDHCP, IPAMTypeStatic
+                              description: Type is the type of IPAM module will be
+                                used for IP Address Management(IPAM). The supported
+                                values are IPAMTypeDHCP, IPAMTypeStatic
                               type: string
                           type: object
                         master:
-                          description: master is the host interface to create the macvlan interface from. If not specified, it will be default route interface
+                          description: master is the host interface to create the
+                            macvlan interface from. If not specified, it will be default
+                            route interface
                           type: string
                         mode:
-                          description: 'mode is the macvlan mode: bridge, private, vepa, passthru. The default is bridge'
+                          description: 'mode is the macvlan mode: bridge, private,
+                            vepa, passthru. The default is bridge'
                           type: string
                         mtu:
-                          description: mtu is the mtu to use for the macvlan interface. if unset, host's kernel will select the value.
+                          description: mtu is the mtu to use for the macvlan interface.
+                            if unset, host's kernel will select the value.
                           format: int32
                           minimum: 0
                           type: integer
                       type: object
                     type:
-                      description: type is the type of network The supported values are NetworkTypeRaw, NetworkTypeSimpleMacvlan
+                      description: type is the type of network The supported values
+                        are NetworkTypeRaw, NetworkTypeSimpleMacvlan
                       type: string
                   type: object
                 type: array
               clusterNetwork:
-                description: clusterNetwork is the IP address pool to use for pod IPs. Some network providers, e.g. OpenShift SDN, support multiple ClusterNetworks. Others only support one. This is equivalent to the cluster-cidr.
+                description: clusterNetwork is the IP address pool to use for pod
+                  IPs. Some network providers, e.g. OpenShift SDN, support multiple
+                  ClusterNetworks. Others only support one. This is equivalent to
+                  the cluster-cidr.
                 items:
-                  description: ClusterNetworkEntry is a subnet from which to allocate PodIPs. A network of size HostPrefix (in CIDR notation) will be allocated when nodes join the cluster. If the HostPrefix field is not used by the plugin, it can be left unset. Not all network providers support multiple ClusterNetworks
+                  description: ClusterNetworkEntry is a subnet from which to allocate
+                    PodIPs. A network of size HostPrefix (in CIDR notation) will be
+                    allocated when nodes join the cluster. If the HostPrefix field
+                    is not used by the plugin, it can be left unset. Not all network
+                    providers support multiple ClusterNetworks
                   properties:
                     cidr:
                       type: string
@@ -133,37 +175,73 @@ spec:
                   type: object
                 type: array
               defaultNetwork:
-                description: defaultNetwork is the "default" network that all pods will receive
+                description: defaultNetwork is the "default" network that all pods
+                  will receive
                 properties:
                   kuryrConfig:
                     description: KuryrConfig configures the kuryr plugin
                     properties:
                       controllerProbesPort:
-                        description: The port kuryr-controller will listen for readiness and liveness requests.
+                        description: The port kuryr-controller will listen for readiness
+                          and liveness requests.
                         format: int32
                         minimum: 0
                         type: integer
                       daemonProbesPort:
-                        description: The port kuryr-daemon will listen for readiness and liveness requests.
+                        description: The port kuryr-daemon will listen for readiness
+                          and liveness requests.
                         format: int32
                         minimum: 0
                         type: integer
                       enablePortPoolsPrepopulation:
-                        description: enablePortPoolsPrepopulation when true will make Kuryr prepopulate each newly created port pool with a minimum number of ports. Kuryr uses Neutron port pooling to fight the fact that it takes a significant amount of time to create one. Instead of creating it when pod is being deployed, Kuryr keeps a number of ports ready to be attached to pods. By default port prepopulation is disabled.
+                        description: enablePortPoolsPrepopulation when true will make
+                          Kuryr prepopulate each newly created port pool with a minimum
+                          number of ports. Kuryr uses Neutron port pooling to fight
+                          the fact that it takes a significant amount of time to create
+                          one. Instead of creating it when pod is being deployed,
+                          Kuryr keeps a number of ports ready to be attached to pods.
+                          By default port prepopulation is disabled.
                         type: boolean
                       openStackServiceNetwork:
-                        description: openStackServiceNetwork contains the CIDR of network from which to allocate IPs for OpenStack Octavia's Amphora VMs. Please note that with Amphora driver Octavia uses two IPs from that network for each loadbalancer - one given by OpenShift and second for VRRP connections. As the first one is managed by OpenShift's and second by Neutron's IPAMs, those need to come from different pools. Therefore `openStackServiceNetwork` needs to be at least twice the size of `serviceNetwork`, and whole `serviceNetwork` must be overlapping with `openStackServiceNetwork`. cluster-network-operator will then make sure VRRP IPs are taken from the ranges inside `openStackServiceNetwork` that are not overlapping with `serviceNetwork`, effectivly preventing conflicts. If not set cluster-network-operator will use `serviceNetwork` expanded by decrementing the prefix size by 1.
+                        description: openStackServiceNetwork contains the CIDR of
+                          network from which to allocate IPs for OpenStack Octavia's
+                          Amphora VMs. Please note that with Amphora driver Octavia
+                          uses two IPs from that network for each loadbalancer - one
+                          given by OpenShift and second for VRRP connections. As the
+                          first one is managed by OpenShift's and second by Neutron's
+                          IPAMs, those need to come from different pools. Therefore
+                          `openStackServiceNetwork` needs to be at least twice the
+                          size of `serviceNetwork`, and whole `serviceNetwork` must
+                          be overlapping with `openStackServiceNetwork`. cluster-network-operator
+                          will then make sure VRRP IPs are taken from the ranges inside
+                          `openStackServiceNetwork` that are not overlapping with
+                          `serviceNetwork`, effectivly preventing conflicts. If not
+                          set cluster-network-operator will use `serviceNetwork` expanded
+                          by decrementing the prefix size by 1.
                         type: string
                       poolBatchPorts:
-                        description: poolBatchPorts sets a number of ports that should be created in a single batch request to extend the port pool. The default is 3. For more information about port pools see enablePortPoolsPrepopulation setting.
+                        description: poolBatchPorts sets a number of ports that should
+                          be created in a single batch request to extend the port
+                          pool. The default is 3. For more information about port
+                          pools see enablePortPoolsPrepopulation setting.
                         minimum: 0
                         type: integer
                       poolMaxPorts:
-                        description: poolMaxPorts sets a maximum number of free ports that are being kept in a port pool. If the number of ports exceeds this setting, free ports will get deleted. Setting 0 will disable this upper bound, effectively preventing pools from shrinking and this is the default value. For more information about port pools see enablePortPoolsPrepopulation setting.
+                        description: poolMaxPorts sets a maximum number of free ports
+                          that are being kept in a port pool. If the number of ports
+                          exceeds this setting, free ports will get deleted. Setting
+                          0 will disable this upper bound, effectively preventing
+                          pools from shrinking and this is the default value. For
+                          more information about port pools see enablePortPoolsPrepopulation
+                          setting.
                         minimum: 0
                         type: integer
                       poolMinPorts:
-                        description: poolMinPorts sets a minimum number of free ports that should be kept in a port pool. If the number of ports is lower than this setting, new ports will get created and added to pool. The default is 1. For more information about port pools see enablePortPoolsPrepopulation setting.
+                        description: poolMinPorts sets a minimum number of free ports
+                          that should be kept in a port pool. If the number of ports
+                          is lower than this setting, new ports will get created and
+                          added to pool. The default is 1. For more information about
+                          port pools see enablePortPoolsPrepopulation setting.
                         minimum: 1
                         type: integer
                     type: object
@@ -171,40 +249,56 @@ spec:
                     description: openShiftSDNConfig configures the openshift-sdn plugin
                     properties:
                       enableUnidling:
-                        description: enableUnidling controls whether or not the service proxy will support idling and unidling of services. By default, unidling is enabled.
+                        description: enableUnidling controls whether or not the service
+                          proxy will support idling and unidling of services. By default,
+                          unidling is enabled.
                         type: boolean
                       mode:
                         description: mode is one of "Multitenant", "Subnet", or "NetworkPolicy"
                         type: string
                       mtu:
-                        description: mtu is the mtu to use for the tunnel interface. Defaults to 1450 if unset. This must be 50 bytes smaller than the machine's uplink.
+                        description: mtu is the mtu to use for the tunnel interface.
+                          Defaults to 1450 if unset. This must be 50 bytes smaller
+                          than the machine's uplink.
                         format: int32
                         minimum: 0
                         type: integer
                       useExternalOpenvswitch:
-                        description: useExternalOpenvswitch tells the operator not to install openvswitch, because it will be provided separately. If set, you must provide it yourself.
+                        description: useExternalOpenvswitch tells the operator not
+                          to install openvswitch, because it will be provided separately.
+                          If set, you must provide it yourself.
                         type: boolean
                       vxlanPort:
-                        description: vxlanPort is the port to use for all vxlan packets. The default is 4789.
+                        description: vxlanPort is the port to use for all vxlan packets.
+                          The default is 4789.
                         format: int32
                         minimum: 0
                         type: integer
                     type: object
                   ovnKubernetesConfig:
-                    description: oVNKubernetesConfig configures the ovn-kubernetes plugin. This is currently not implemented.
+                    description: oVNKubernetesConfig configures the ovn-kubernetes
+                      plugin. This is currently not implemented.
                     properties:
                       genevePort:
-                        description: geneve port is the UDP port to be used by geneve encapulation. Default is 6081
+                        description: geneve port is the UDP port to be used by geneve
+                          encapulation. Default is 6081
                         format: int32
                         minimum: 1
                         type: integer
                       hybridOverlayConfig:
-                        description: HybridOverlayConfig configures an additional overlay network for peers that are not using OVN.
+                        description: HybridOverlayConfig configures an additional
+                          overlay network for peers that are not using OVN.
                         properties:
                           hybridClusterNetwork:
-                            description: HybridClusterNetwork defines a network space given to nodes on an additional overlay network.
+                            description: HybridClusterNetwork defines a network space
+                              given to nodes on an additional overlay network.
                             items:
-                              description: ClusterNetworkEntry is a subnet from which to allocate PodIPs. A network of size HostPrefix (in CIDR notation) will be allocated when nodes join the cluster. If the HostPrefix field is not used by the plugin, it can be left unset. Not all network providers support multiple ClusterNetworks
+                              description: ClusterNetworkEntry is a subnet from which
+                                to allocate PodIPs. A network of size HostPrefix (in
+                                CIDR notation) will be allocated when nodes join the
+                                cluster. If the HostPrefix field is not used by the
+                                plugin, it can be left unset. Not all network providers
+                                support multiple ClusterNetworks
                               properties:
                                 cidr:
                                   type: string
@@ -215,54 +309,93 @@ spec:
                               type: object
                             type: array
                           hybridOverlayVXLANPort:
-                            description: HybridOverlayVXLANPort defines the VXLAN port number to be used by the additional overlay network. Default is 4789
+                            description: HybridOverlayVXLANPort defines the VXLAN
+                              port number to be used by the additional overlay network.
+                              Default is 4789
                             format: int32
                             type: integer
                         type: object
                       ipsecConfig:
-                        description: ipsecConfig enables and configures IPsec for pods on the pod network within the cluster.
+                        description: ipsecConfig enables and configures IPsec for
+                          pods on the pod network within the cluster.
                         type: object
                       mtu:
-                        description: mtu is the MTU to use for the tunnel interface. This must be 100 bytes smaller than the uplink mtu. Default is 1400
+                        description: mtu is the MTU to use for the tunnel interface.
+                          This must be 100 bytes smaller than the uplink mtu. Default
+                          is 1400
                         format: int32
                         minimum: 0
                         type: integer
+                      v4JoinSubnet:
+                        description: v4JoinSubnet is the v4 join subnet to be used
+                          by ovn-kubernetes in case the default one is being already
+                          used by something else. Default is 100.64.0.0/16
+                        type: string
+                      v6JoinSubnet:
+                        description: v6JoinSubnet is the v6 join subnet to be used
+                          by ovn-kubernetes in case the default one is being already
+                          used by something else. Default is fd98::/48
+                        type: string
                     type: object
                   type:
-                    description: type is the type of network All NetworkTypes are supported except for NetworkTypeRaw
+                    description: type is the type of network All NetworkTypes are
+                      supported except for NetworkTypeRaw
                     type: string
                 type: object
               deployKubeProxy:
-                description: deployKubeProxy specifies whether or not a standalone kube-proxy should be deployed by the operator. Some network providers include kube-proxy or similar functionality. If unset, the plugin will attempt to select the correct value, which is false when OpenShift SDN and ovn-kubernetes are used and true otherwise.
+                description: deployKubeProxy specifies whether or not a standalone
+                  kube-proxy should be deployed by the operator. Some network providers
+                  include kube-proxy or similar functionality. If unset, the plugin
+                  will attempt to select the correct value, which is false when OpenShift
+                  SDN and ovn-kubernetes are used and true otherwise.
                 type: boolean
               disableMultiNetwork:
-                description: disableMultiNetwork specifies whether or not multiple pod network support should be disabled. If unset, this property defaults to 'false' and multiple network support is enabled.
+                description: disableMultiNetwork specifies whether or not multiple
+                  pod network support should be disabled. If unset, this property
+                  defaults to 'false' and multiple network support is enabled.
                 type: boolean
               disableNetworkDiagnostics:
                 default: false
-                description: disableNetworkDiagnostics specifies whether or not PodNetworkConnectivityCheck CRs from a test pod to every node, apiserver and LB should be disabled or not. If unset, this property defaults to 'false' and network diagnostics is enabled. Setting this to 'true' would reduce the additional load of the pods performing the checks.
+                description: disableNetworkDiagnostics specifies whether or not PodNetworkConnectivityCheck
+                  CRs from a test pod to every node, apiserver and LB should be disabled
+                  or not. If unset, this property defaults to 'false' and network
+                  diagnostics is enabled. Setting this to 'true' would reduce the
+                  additional load of the pods performing the checks.
                 type: boolean
               kubeProxyConfig:
-                description: kubeProxyConfig lets us configure desired proxy configuration. If not specified, sensible defaults will be chosen by OpenShift directly. Not consumed by all network providers - currently only openshift-sdn.
+                description: kubeProxyConfig lets us configure desired proxy configuration.
+                  If not specified, sensible defaults will be chosen by OpenShift
+                  directly. Not consumed by all network providers - currently only
+                  openshift-sdn.
                 properties:
                   bindAddress:
                     description: The address to "bind" on Defaults to 0.0.0.0
                     type: string
                   iptablesSyncPeriod:
-                    description: 'An internal kube-proxy parameter. In older releases of OCP, this sometimes needed to be adjusted in large clusters for performance reasons, but this is no longer necessary, and there is no reason to change this from the default value. Default: 30s'
+                    description: 'An internal kube-proxy parameter. In older releases
+                      of OCP, this sometimes needed to be adjusted in large clusters
+                      for performance reasons, but this is no longer necessary, and
+                      there is no reason to change this from the default value. Default:
+                      30s'
                     type: string
                   proxyArguments:
                     additionalProperties:
-                      description: ProxyArgumentList is a list of arguments to pass to the kubeproxy process
+                      description: ProxyArgumentList is a list of arguments to pass
+                        to the kubeproxy process
                       items:
                         type: string
                       type: array
-                    description: Any additional arguments to pass to the kubeproxy process
+                    description: Any additional arguments to pass to the kubeproxy
+                      process
                     type: object
                 type: object
               logLevel:
                 default: Normal
-                description: "logLevel is an intent based logging for an overall component.  It does not give fine grained control, but it is a simple way to manage coarse grained logging choices that operators have to interpret for their operands. \n Valid values are: \"Normal\", \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
+                description: "logLevel is an intent based logging for an overall component.
+                  \ It does not give fine grained control, but it is a simple way
+                  to manage coarse grained logging choices that operators have to
+                  interpret for their operands. \n Valid values are: \"Normal\", \"Debug\",
+                  \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
                 enum:
                 - ""
                 - Normal
@@ -271,17 +404,24 @@ spec:
                 - TraceAll
                 type: string
               managementState:
-                description: managementState indicates whether and how the operator should manage the component
+                description: managementState indicates whether and how the operator
+                  should manage the component
                 pattern: ^(Managed|Unmanaged|Force|Removed)$
                 type: string
               observedConfig:
-                description: observedConfig holds a sparse config that controller has observed from the cluster state.  It exists in spec because it is an input to the level for the operator
+                description: observedConfig holds a sparse config that controller
+                  has observed from the cluster state.  It exists in spec because
+                  it is an input to the level for the operator
                 nullable: true
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
               operatorLogLevel:
                 default: Normal
-                description: "operatorLogLevel is an intent based logging for the operator itself.  It does not give fine grained control, but it is a simple way to manage coarse grained logging choices that operators have to interpret for themselves. \n Valid values are: \"Normal\", \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
+                description: "operatorLogLevel is an intent based logging for the
+                  operator itself.  It does not give fine grained control, but it
+                  is a simple way to manage coarse grained logging choices that operators
+                  have to interpret for themselves. \n Valid values are: \"Normal\",
+                  \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
                 enum:
                 - ""
                 - Normal
@@ -290,18 +430,24 @@ spec:
                 - TraceAll
                 type: string
               serviceNetwork:
-                description: serviceNetwork is the ip address pool to use for Service IPs Currently, all existing network providers only support a single value here, but this is an array to allow for growth.
+                description: serviceNetwork is the ip address pool to use for Service
+                  IPs Currently, all existing network providers only support a single
+                  value here, but this is an array to allow for growth.
                 items:
                   type: string
                 type: array
               unsupportedConfigOverrides:
-                description: 'unsupportedConfigOverrides holds a sparse config that will override any previously set options.  It only needs to be the fields to override it will end up overlaying in the following order: 1. hardcoded defaults 2. observedConfig 3. unsupportedConfigOverrides'
+                description: 'unsupportedConfigOverrides holds a sparse config that
+                  will override any previously set options.  It only needs to be the
+                  fields to override it will end up overlaying in the following order:
+                  1. hardcoded defaults 2. observedConfig 3. unsupportedConfigOverrides'
                 nullable: true
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
             type: object
           status:
-            description: NetworkStatus is detailed operator status, which is distilled up to the Network clusteroperator object.
+            description: NetworkStatus is detailed operator status, which is distilled
+              up to the Network clusteroperator object.
             properties:
               conditions:
                 description: conditions is a list of conditions and their status
@@ -322,18 +468,23 @@ spec:
                   type: object
                 type: array
               generations:
-                description: generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.
+                description: generations are used to determine when an item needs
+                  to be reconciled or has changed in a way that needs a reaction.
                 items:
-                  description: GenerationStatus keeps track of the generation for a given resource so that decisions about forced updates can be made.
+                  description: GenerationStatus keeps track of the generation for
+                    a given resource so that decisions about forced updates can be
+                    made.
                   properties:
                     group:
                       description: group is the group of the thing you're tracking
                       type: string
                     hash:
-                      description: hash is an optional field set for resources without generation that are content sensitive like secrets and configmaps
+                      description: hash is an optional field set for resources without
+                        generation that are content sensitive like secrets and configmaps
                       type: string
                     lastGeneration:
-                      description: lastGeneration is the last generation of the workload controller involved
+                      description: lastGeneration is the last generation of the workload
+                        controller involved
                       format: int64
                       type: integer
                     name:
@@ -343,16 +494,19 @@ spec:
                       description: namespace is where the thing you're tracking is
                       type: string
                     resource:
-                      description: resource is the resource type of the thing you're tracking
+                      description: resource is the resource type of the thing you're
+                        tracking
                       type: string
                   type: object
                 type: array
               observedGeneration:
-                description: observedGeneration is the last generation change you've dealt with
+                description: observedGeneration is the last generation change you've
+                  dealt with
                 format: int64
                 type: integer
               readyReplicas:
-                description: readyReplicas indicates how many replicas are ready and at the desired state
+                description: readyReplicas indicates how many replicas are ready and
+                  at the desired state
                 format: int32
                 type: integer
               version:

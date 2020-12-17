@@ -809,6 +809,20 @@ spec:
             gateway_mode_flags="--gateway-mode local --gateway-interface none"
           fi
 
+          #gateway join subnets
+          gateway_v4_join_subnet=
+          gateway_v6_join_subnet=
+          V4JoinSubnet={{.V4JoinSubnet}}
+          V6JoinSubnet={{.V6JoinSubnet}}
+
+          if [[ -n $V4JoinSubnet ]]; then
+            gateway_v4_join_subnet="--gateway-v4-join-subnet=${V4JoinSubnet}"
+          fi
+
+          if [[ -n $V6JoinSubnet ]]; then
+            gateway_v6_join_subnet="--gateway-v6-join-subnet=${V6JoinSubnet}"
+          fi
+
           # start nbctl daemon for caching
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start nbctl daemon for caching"
           export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/var/run/ovn/ovn-nbctl.pid \
@@ -830,6 +844,8 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --metrics-bind-address "127.0.0.1:29102" \
             ${gateway_mode_flags} \
+            ${gateway_v4_join_subnet} \
+            ${gateway_v6_join_subnet} \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
             --sb-client-privkey /ovn-cert/tls.key \
             --sb-client-cert /ovn-cert/tls.crt \
