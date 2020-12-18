@@ -46,7 +46,11 @@ spec:
         imagePullPolicy: IfNotPresent
         resources:
           requests:
-            cpu: 10m
+            cpu: "100m"
+            memory: "50Mi"
+          limits:
+            cpu: "250m"
+            memory: "100Mi"
         ports:
         - name: metrics-port
           containerPort: 9091
