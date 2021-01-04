@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -102,20 +101,6 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 			// "metadata.google.internal." added due to https://bugzilla.redhat.com/show_bug.cgi?id=1754049
 			set.Insert("metadata", "metadata.google.internal", "metadata.google.internal.")
 		}
-	}
-
-	if len(ic.ControlPlane.Replicas) > 0 {
-		replicas, err := strconv.Atoi(ic.ControlPlane.Replicas)
-		if err != nil {
-			return "", fmt.Errorf("failed to parse install config replicas: %v", err)
-		}
-		for i := int64(0); i < int64(replicas); i++ {
-			etcdHost := fmt.Sprintf("etcd-%d.%s", i, infra.Status.EtcdDiscoveryDomain)
-			set.Insert(etcdHost)
-		}
-	} else {
-		return "", fmt.Errorf("controlplane replicas missing from install config configmap '%s/%s'",
-			cluster.Namespace, cluster.Name)
 	}
 
 	if len(network.Status.ClusterNetwork) > 0 {
