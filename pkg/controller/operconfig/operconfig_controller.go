@@ -253,6 +253,22 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		Name:     "cluster",
 	})
 
+	// Add NetworkPolicy, EgressFirewall, EgressIP, for must-gather
+	relatedObjects = append(relatedObjects, configv1.ObjectReference{
+		Group:    "networking.k8s.io",
+		Resource: "NetworkPolicy",
+	})
+
+	relatedObjects = append(relatedObjects, configv1.ObjectReference{
+		Group:    "k8s.ovn.org",
+		Resource: "EgressFirewall",
+	})
+
+	relatedObjects = append(relatedObjects, configv1.ObjectReference{
+		Group:    "k8s.ovn.org",
+		Resource: "EgressIP",
+	})
+
 	r.status.SetDaemonSets(daemonSets)
 	r.status.SetDeployments(deployments)
 	r.status.SetRelatedObjects(relatedObjects)
