@@ -80,6 +80,11 @@ type NetworkSpec struct {
 	// If not specified, sensible defaults will be chosen by OpenShift directly.
 	// Not consumed by all network providers - currently only openshift-sdn.
 	KubeProxyConfig *ProxyConfig `json:"kubeProxyConfig,omitempty"`
+
+	// exportNetworkFlows enables and configures the export of network flows from OVS
+	// by using protocols netFlow, sFlow or ipfix.
+	// +optional
+	ExportNetworkFlows *ExportNetworkFlows `json:"exportNetworkFlows,omitempty"`
 }
 
 // ClusterNetworkEntry is a subnet from which to allocate PodIPs. A network of size
@@ -337,6 +342,21 @@ type HybridOverlayConfig struct {
 }
 
 type IPsecConfig struct {
+}
+
+type ExportNetworkFlows struct {
+	// netFlow defines the netFlow collectors that will consume the flow data exported from OVS.
+	// It is a list of strings formatted as ip:port
+	// +optional
+	NetFlow []string `json:"netFlow,omitempty"`
+	// sFlow defines the sFlow collectors that will consume the flow data exported from OVS.
+	// It is a list of strings formatted as ip:port
+	// +optional
+	SFlow []string `json:"sFlow,omitempty"`
+	// ipfix defines the ipfix collectors that will consume the flow data exported from OVS.
+	// It is a list of strings formatted as ip:port
+	// +optional
+	IPFIX []string `json:"ipfix,omitempty"`
 }
 
 // NetworkType describes the network plugin type to configure

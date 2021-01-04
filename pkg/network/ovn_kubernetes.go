@@ -118,6 +118,45 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["EnableIPsec"] = false
 	}
 
+	if conf.ExportNetworkFlows != nil {
+		data.Data["EnableExportNetworkFlows"] = true
+		if conf.ExportNetworkFlows.NetFlow != nil {
+			data.Data["EnableNetFlow"] = true
+			collectors := "\\["
+			for _, v := range conf.ExportNetworkFlows.NetFlow {
+				collectors += "\\\"" + v + "\\\"" + ","
+			}
+			collectors = strings.TrimSuffix(collectors, ",") + "\\]"
+			data.Data["NetFlowCollectors"] = collectors
+		} else {
+			data.Data["EnableNetFlow"] = false
+		}
+		if conf.ExportNetworkFlows.SFlow != nil {
+			data.Data["EnableSFlow"] = true
+			collectors := "\\["
+			for _, v := range conf.ExportNetworkFlows.SFlow {
+				collectors += "\\\"" + v + "\\\"" + ","
+			}
+			collectors = strings.TrimSuffix(collectors, ",") + "\\]"
+			data.Data["SFlowCollectors"] = collectors
+		} else {
+			data.Data["EnableSFlow"] = false
+		}
+		if conf.ExportNetworkFlows.IPFIX != nil {
+			data.Data["EnableIPFIX"] = true
+			collectors := "\\["
+			for _, v := range conf.ExportNetworkFlows.IPFIX {
+				collectors += "\\\"" + v + "\\\"" + ","
+			}
+			collectors = strings.TrimSuffix(collectors, ",") + "\\]"
+			data.Data["IPFIXCollectors"] = collectors
+		} else {
+			data.Data["EnableIPFIX"] = false
+		}
+	} else {
+		data.Data["EnableExportNetworkFlows"] = false
+	}
+
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/ovn-kubernetes"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render manifests")

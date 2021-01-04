@@ -355,6 +355,32 @@ spec:
                   additional load of the pods performing the checks.
                 type: boolean
                 default: false
+              exportNetworkFlows:
+                description: exportNetworkFlows enables and configures the export
+                  of network flows from OVS by using protocols netFlow, sFlow or ipfix.
+                type: object
+                properties:
+                  ipfix:
+                    description: ipfix defines the ipfix collectors that will consume
+                      the flow data exported from OVS. It is a list of strings formatted
+                      as ip:port
+                    type: array
+                    items:
+                      type: string
+                  netFlow:
+                    description: netFlow defines the netFlow collectors that will
+                      consume the flow data exported from OVS. It is a list of strings
+                      formatted as ip:port
+                    type: array
+                    items:
+                      type: string
+                  sFlow:
+                    description: sFlow defines the sFlow collectors that will consume
+                      the flow data exported from OVS. It is a list of strings formatted
+                      as ip:port
+                    type: array
+                    items:
+                      type: string
               kubeProxyConfig:
                 description: kubeProxyConfig lets us configure desired proxy configuration.
                   If not specified, sensible defaults will be chosen by OpenShift

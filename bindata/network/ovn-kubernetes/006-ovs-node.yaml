@@ -79,6 +79,17 @@ spec:
             trap quit SIGTERM
             # Don't need to worry about restoring flows; this can only change if we've rebooted
             tail --pid=$BASHPID -F /host/var/log/openvswitch/ovs-vswitchd.log /host/var/log/openvswitch/ovsdb-server.log &
+            {{ if .EnableExportNetworkFlows }}
+            {{ if .EnableNetFlow }}
+            ovs-vsctl -- --id=@netflow create netflow targets={{ .NetFlowCollectors }} -- set bridge br-int netflow=@netflow
+            {{ end }}
+            {{ if .EnableSFlow }}
+            ovs-vsctl -- --id=@sflow create sflow agent=ovn-k8s-mp0 targets={{ .SFlowCollectors }} header=128 sampling=64 polling=10 -- set bridge br-int sflow=@sflow
+            {{ end }}
+            {{ if .EnableIPFIX }}
+            ovs-vsctl -- --id=@ipfix create ipfix targets={{ .IPFIXCollectors }} obs_domain_id=123 obs_point=456 sampling=1 -- set bridge br-int ipfix=@ipfix
+            {{ end }}
+            {{ end }}
             wait
         env:
         - name: OVS_LOG_LEVEL
