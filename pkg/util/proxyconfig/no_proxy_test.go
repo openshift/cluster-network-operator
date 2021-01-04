@@ -116,8 +116,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
 			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
-				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,etcd-0.test.cluster.com," +
-				"etcd-1.test.cluster.com,etcd-2.test.cluster.com,localhost",
+				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
 		{name: "valid proxy config with gcp provider",
@@ -128,8 +127,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
 			want: ".cluster.local,.svc,10.0.0.0/16,10.128.0.0/14,127.0.0.1,169.254.169.254,172.30.0.0/16," +
-				"api-int.test.cluster.com,etcd-0.test.cluster.com,etcd-1.test.cluster.com,etcd-2.test.cluster.com," +
-				"localhost,metadata,metadata.google.internal,metadata.google.internal.",
+				"api-int.test.cluster.com,localhost,metadata,metadata.google.internal,metadata.google.internal.",
 			wantErr: false,
 		},
 		{name: "valid proxy config using us-east-1 aws region",
@@ -140,8 +138,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
 			want: ".cluster.local,.ec2.internal,.svc,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
-				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,etcd-0.test.cluster.com," +
-				"etcd-1.test.cluster.com,etcd-2.test.cluster.com,localhost",
+				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
 		{name: "valid proxy config with single user noProxy",
@@ -152,8 +149,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
 			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
-				"169.254.169.254,172.30.0.0/16,172.30.0.1,api-int.test.cluster.com,etcd-0.test.cluster.com," +
-				"etcd-1.test.cluster.com,etcd-2.test.cluster.com,localhost",
+				"169.254.169.254,172.30.0.0/16,172.30.0.1,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
 		{name: "valid proxy config with multiple user noProxy",
@@ -164,8 +160,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
 			want: ".cluster.local,.foo.test.com,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
-				"169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,api-int.test.cluster.com," +
-				"etcd-0.test.cluster.com,etcd-1.test.cluster.com,etcd-2.test.cluster.com,localhost",
+				"169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
 		{name: "invalid api server url",
