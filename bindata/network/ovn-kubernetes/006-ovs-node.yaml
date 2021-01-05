@@ -64,9 +64,6 @@ spec:
             echo "${1//-/_2d}"
           }
 
-          # Check to see if ovs is provided by the node:
-          if [[ -L '/host/etc/systemd/system/network-online.target.wants/ovs-configuration.service' ]]; then
-            echo "openvswitch is running in systemd"
             # In some very strange corner cases, the owner for /run/openvswitch
             # can be wrong, so we need to clean up and restart.
             ovs_uid=$(chroot /host id -u openvswitch)
@@ -83,27 +80,6 @@ spec:
             # Don't need to worry about restoring flows; this can only change if we've rebooted
             tail --pid=$BASHPID -F /host/var/log/openvswitch/ovs-vswitchd.log /host/var/log/openvswitch/ovsdb-server.log &
             wait
-          else
-            echo "$(date -Iseconds) - starting ovs-daemons"
-            chown -R openvswitch:openvswitch /run/openvswitch
-            chown -R openvswitch:openvswitch /etc/openvswitch
-            # We need to explicitly exit on SIGTERM, see https://github.com/openshift/cluster-dns-operator/issues/65
-            function quit {
-                # Don't allow ovs-vswitchd to clear datapath flows on exit
-                kill -9 $(cat /var/run/openvswitch/ovs-vswitchd.pid 2>/dev/null) 2>/dev/null || true
-                kill $(cat /var/run/openvswitch/ovsdb-server.pid 2>/dev/null) 2>/dev/null || true
-                exit 0
-            }
-            trap quit SIGTERM
-            /usr/share/openvswitch/scripts/ovs-ctl start --ovs-user=openvswitch:openvswitch --system-id=random
-            ovs-appctl vlog/set "file:${OVS_LOG_LEVEL}"
-            /usr/share/openvswitch/scripts/ovs-ctl --protocol=udp --dport=6081 enable-protocol
-            echo "$(date -Iseconds) - ovs-daemons running"
-
-            tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
-            tail -F --pid=$(cat /var/run/openvswitch/ovsdb-server.pid) /var/log/openvswitch/ovsdb-server.log &
-            wait
-          fi
         env:
         - name: OVS_LOG_LEVEL
           value: info
@@ -136,17 +112,6 @@ spec:
             cpu: 100m
             memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
-        readinessProbe:
-          exec:
-            command:
-            - /bin/bash
-            - -c
-            - |
-              #!/bin/bash
-              /usr/bin/ovs-vsctl -t 5 show > /dev/null
-          initialDelaySeconds: 15
-          periodSeconds: 5
-          timeoutSeconds: 6
         terminationGracePeriodSeconds: 10
       nodeSelector:
         beta.kubernetes.io/os: "linux"
