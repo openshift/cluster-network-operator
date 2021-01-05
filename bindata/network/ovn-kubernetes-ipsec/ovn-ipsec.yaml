@@ -132,6 +132,10 @@ spec:
           name: signer-ca
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
+        resources:
+          requests:
+            cpu: 10m
+            memory: 100Mi
         terminationMessagePolicy: FallbackToLogsOnError
         terminationGracePeriodSeconds: 10
       containers:
@@ -209,6 +213,10 @@ spec:
           name: host-var-log-ovs
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
+        resources:
+          requests:
+            cpu: 10m
+            memory: 100Mi
         terminationMessagePolicy: FallbackToLogsOnError
         readinessProbe:
           exec:
