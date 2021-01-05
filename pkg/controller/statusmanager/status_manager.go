@@ -51,7 +51,8 @@ type StatusManager struct {
 	mapper meta.RESTMapper
 	name   string
 
-	failing [maxStatusLevel]*operv1.OperatorCondition
+	failing       [maxStatusLevel]*operv1.OperatorCondition
+	everAvailable bool
 
 	daemonSets     []types.NamespacedName
 	deployments    []types.NamespacedName

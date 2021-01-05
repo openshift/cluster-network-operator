@@ -8,6 +8,7 @@ metadata:
       This deployment deploys the network-check-source pod that performs
       pod network connectivity checks
     release.openshift.io/version: "{{.ReleaseVersion}}"
+    networkoperator.openshift.io/non-critical: ""
 spec:
   replicas: 1
   selector:
