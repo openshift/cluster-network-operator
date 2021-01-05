@@ -249,8 +249,10 @@ func boostrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 		}
 		return len(masterNodeList.Items) != 0 && controlPlaneReplicaCount == len(masterNodeList.Items), nil
 	})
-	if err != nil {
-		return nil, fmt.Errorf("Unable to bootstrap OVN, expected amount of control plane nodes (%v) do not match found (%v): %s", controlPlaneReplicaCount, len(masterNodeList.Items), err)
+	if wait.ErrWaitTimeout == err {
+		klog.Warningf("Timeout exceeded while bootstraping OVN, expected amount of control plane nodes (%v) do not match found (%v): %s, continuing deployment with found replicas", controlPlaneReplicaCount, len(masterNodeList.Items))
+	} else if err != nil {
+		return nil, fmt.Errorf("Unable to bootstrap OVN, err: %v", err)
 	}
 
 	ovnMasterIPs := make([]string, len(masterNodeList.Items))
