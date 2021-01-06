@@ -4,6 +4,7 @@ metadata:
   name: openshift-sdn
   annotations:
     include.release.openshift.io/self-managed-high-availability: "true"
+    networkoperator.openshift.io/ignore-errors: ""
 spec:
   distinguisherMethod:
     type: ByUser
