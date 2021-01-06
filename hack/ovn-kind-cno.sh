@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Version v1.17.0 or higher is required
-K8S_VERSION=${K8S_VERSION:-v1.18.2}
+# Version v1.19.0 or higher is required
+K8S_VERSION=${K8S_VERSION:-v1.20.0}
 BUILD_OVN=${BUILD_OVN:-false}
 BUILD_CNO=${BUILD_CNO:-false}
 BUILD_MULTUS=${BUILD_MULTUS:-false}
@@ -15,12 +15,12 @@ OVN_KIND_VERBOSITY=${OVN_KIND_VERBOSITY:-5}
 
 # Default networks (same as in KIND)
 if [ "${IP_FAMILY:-ipv4}" = "ipv6" ]; then
-  CLUSTER_CIDR=${CLUSTER_CIDR:-"fd00:10:244::/48"}
+  CLUSTER_CIDR=${CLUSTER_CIDR:-"fd00:10:244::/56"}
   SERVICE_NETWORK=${SERVICE_NETWORK:-"fd00:10:96::/112"}
   HOST_PREFIX=64
 else
   CLUSTER_CIDR=${CLUSTER_CIDR:-"10.244.0.0/16"}
-  SERVICE_NETWORK=${SERVICE_NETWORK:-"10.96.0.0/12"}
+  SERVICE_NETWORK=${SERVICE_NETWORK:-"10.96.0.0/16"}
   HOST_PREFIX=24
 fi
 
@@ -51,6 +51,10 @@ networking:
   disableDefaultCNI: true
   podSubnet: ${CLUSTER_CIDR:-10.244.0.0/16}
   serviceSubnet: ${SERVICE_NETWORK:-10.96.0.0/12}
+featureGates:
+  APIPriorityAndFairness: true
+runtimeConfig:
+  flowcontrol.apiserver.k8s.io/v1alpha1: true
 nodes:
 - role: control-plane
 - role: worker
@@ -101,12 +105,16 @@ EOF
   popd
 fi
 
+OVS_PASSWD=$(docker run -t --rm --entrypoint 'grep' quay.io/openshift/origin-ovn-kubernetes:latest openvswitch /etc/passwd)
 NODES=$(docker ps | grep "kindest/node" | awk '{ print $1 }')
 for n in $NODES; do
   echo "Modifying node $n"
   echo "Modifying os-release for Multus"
   # required for Multus platform check
   docker exec $n sed -i 's/ID=.*/ID=rhcos/' /etc/os-release
+  echo "Adding ovs user"
+  docker exec $n bash -c "echo $OVS_PASSWD >> /etc/passwd"
+  
 done
 
 # openshift-network-operator need read access to the kubeconfig
@@ -115,13 +123,16 @@ docker exec ovn-control-plane cp /etc/kubernetes/admin.conf /etc/kubernetes/kube
 docker exec ovn-control-plane chmod 666 /etc/kubernetes/kubeconfig
 
 # Create Proxy resource
-kubectl create -f https://raw.githubusercontent.com/openshift/api/e7fa4b871a25985ef0cc36c2fbd9f2cb4445dc9c/config/v1/0000_03_config-operator_01_proxy.crd.yaml
+kubectl create -f https://raw.githubusercontent.com/openshift/api/release-4.7/config/v1/0000_03_config-operator_01_proxy.crd.yaml
 
 # Create Network resource
-kubectl create -f https://raw.githubusercontent.com/openshift/api/e7fa4b871a25985ef0cc36c2fbd9f2cb4445dc9c/config/v1/0000_10_config-operator_01_network.crd.yaml
+kubectl create -f https://raw.githubusercontent.com/openshift/api/release-4.7/config/v1/0000_10_config-operator_01_network.crd.yaml
+
+# Create Infrastructure resource
+kubectl create -f https://raw.githubusercontent.com/openshift/api/release-4.7/config/v1/0000_10_config-operator_01_infrastructure.crd.yaml
 
 # Create cluster operator
-kubectl create -f https://raw.githubusercontent.com/openshift/machine-api-operator/050a65a2bdabcc2c2f17036de967c6bcee6d6a48/config/0000_00_cluster-version-operator_01_clusteroperator.crd.yaml
+kubectl create -f https://raw.githubusercontent.com/openshift/machine-api-operator/release-4.7/config/0000_00_cluster-version-operator_01_clusteroperator.crd.yaml
 
 if [ "$BUILD_OVN" = true ] || [ "$BUILD_CNO" = true ]; then
   pushd $CNO_TEMPLATES
@@ -135,30 +146,9 @@ if [ "$BUILD_OVN" = true ] || [ "$BUILD_CNO" = true ]; then
     sed -i 's/".*origin-ovn-kubernetes:.*/"origin-ovn-kubernetes:dev"/' $DEPLOYMENT_TEMPLATE
   fi
   if [ "$BUILD_CNO" = true ]; then
-    sed -i "s#quay.io/openshift/origin-cluster-network-operator:.*#$CNO_IMAGE#" $DEPLOYMENT_TEMPLATE
+   kubectl -f $DEPLOYMENT_TEMPLATE set image network-operator=$CNO_IMAGE --local -o yaml  > /tmp/ovn-kind-$DEPLOYMENT_TEMPLATE
+   cat /tmp/ovn-kind-$DEPLOYMENT_TEMPLATE > $DEPLOYMENT_TEMPLATE
   fi
-fi
-
-echo "Creating CNO operator"
-for f in $(ls $CNO_TEMPLATES| grep 0000| grep -v credentials); do
-  kubectl create -f ${CNO_TEMPLATES}/$f
-done
-
-if [ "$BUILD_OVN" = true ] || [ "$BUILD_CNO" = true ]; then
-  mv deployment.yaml.bk $DEPLOYMENT_TEMPLATE
-  popd
-fi
-
-if ! kubectl wait -n openshift-network-operator --for condition=available deployment network-operator --timeout=120s; then
-  echo "Network operator not running"
-  exit 1
-fi
-
-if [ "$BUILD_CNO" != true ]; then
-  echo "WARNING: patching CNO operator pod for OVN-K8S, deployment will no longer function if this pod is restarted"
-  CNO_POD=$(kubectl get pod -n openshift-network-operator -o jsonpath='{.items[0].metadata.name}' --field-selector status.phase=Running)
-  kubectl -n openshift-network-operator  exec $CNO_POD sed -i '/host-run-netns/{n;s/readOnly.*/mountPropagation: Bidirectional/}' /bindata/network/ovn-kubernetes/ovnkube-node.yaml > /tmp/ovnkube-node.yaml
-  kubectl cp /tmp/ovnkube-node.yaml openshift-network-operator/${CNO_POD}:/bindata/network/ovn-kubernetes/
 fi
 
 echo "Creating \"cluster-config-v1\" configMap with $NUM_MASTER_NODES master nodes"
@@ -190,6 +180,33 @@ spec:
   - ${SERVICE_NETWORK}
 EOF
 
+# OVS is expected to run in systemd but that not an option in kindest/noede
+# we need to deploy it in a pod.
+kubectl create namespace ovs-kind
+kubectl create -f $CNO_PATH/hack/ovs-kind.yaml
+
+echo "Creating CNO operator"
+for f in $(ls $CNO_TEMPLATES| grep 0000| grep -v credentials); do
+  kubectl create -f ${CNO_TEMPLATES}/$f
+done
+
+if [ "$BUILD_OVN" = true ] || [ "$BUILD_CNO" = true ]; then
+  mv deployment.yaml.bk $DEPLOYMENT_TEMPLATE
+  popd
+fi
+
+if ! kubectl wait -n openshift-network-operator --for condition=available deployment network-operator --timeout=120s; then
+  echo "Network operator not running"
+  exit 1
+fi
+
+if [ "$BUILD_CNO" != true ]; then
+  echo "WARNING: patching CNO operator pod for OVN-K8S, deployment will no longer function if this pod is restarted"
+  CNO_POD=$(kubectl get pod -n openshift-network-operator -o jsonpath='{.items[0].metadata.name}' --field-selector status.phase=Running)
+  kubectl -n openshift-network-operator  exec $CNO_POD sed -i '/host-run-netns/{n;s/readOnly.*/mountPropagation: Bidirectional/}' /bindata/network/ovn-kubernetes/ovnkube-node.yaml > /tmp/ovnkube-node.yaml
+  kubectl cp /tmp/ovnkube-node.yaml openshift-network-operator/${CNO_POD}:/bindata/network/ovn-kubernetes/
+fi
+
 for n in $NODES; do
   echo "Sym-linking cni dirs for node $n"
   docker exec $n rm -rf /opt/cni/bin
@@ -208,7 +225,7 @@ if ! kubectl wait -n openshift-ovn-kubernetes --for=condition=ready pods --all -
 fi
 
 # Configuring secret for multus-admission-webhook
-# https://raw.githubusercontent.com/openshift/multus-admission-controller/master/hack/webhook-create-signed-cert.sh
+# https://raw.githubusercontent.com/openshift/multus-admission-controller/release-4.7/hack/webhook-create-signed-cert.sh
 $CNO_PATH/hack/webhook-create-signed-cert.sh --service multus-admission-controller --namespace openshift-multus --secret multus-admission-controller-secret
 if ! kubectl wait -n openshift-multus --for=condition=ready pods --all --timeout=300s ; then
   echo "multus pods are not running"
