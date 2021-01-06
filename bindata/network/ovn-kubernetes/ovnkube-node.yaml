@@ -199,6 +199,8 @@ spec:
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
             ${gateway_mode_flags} \
             --metrics-bind-address "127.0.0.1:29103"
+            --acl-logging "{{.AclLogging}}" \
+            --acl-logging-rate-limit "{{.AclLoggingRateLimit}}"
         env:
         # for kubectl
         - name: KUBERNETES_SERVICE_PORT

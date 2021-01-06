@@ -841,7 +841,9 @@ spec:
             --nb-client-cacert /ovn-ca/ca-bundle.crt \
             --nbctl-daemon-mode \
             --nb-cert-common-name "{{.OVN_CERT_CN}}" \
-            --enable-multicast
+            --enable-multicast \
+            --acl-logging "{{.AclLogging}}" \
+            --acl-logging-rate-limit "{{.AclLoggingRateLimit}}"
         lifecycle:
           preStop:
             exec:

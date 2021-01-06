@@ -271,8 +271,12 @@ spec:
 OVN features logging for all ACL drop/reject actions, add the following `spec:` section to the operator config to configure the feature at the cluster scope
 
 ```yaml 
-spec: 
-
+spec:
+  defaultNework: 
+    type: OVNKubernetes
+    ovnKubernetesConfig:
+      aclLogging: true
+      aclLoggingRateLimit: 20
 ```
 
 ### Configuring Kuryr-Kubernetes
