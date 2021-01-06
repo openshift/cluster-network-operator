@@ -15,6 +15,8 @@ func mergeMetadataForUpdate(current, updated *uns.Unstructured) error {
 	updated.SetGeneration(current.GetGeneration())
 	updated.SetUID(current.GetUID())
 	updated.SetResourceVersion(current.GetResourceVersion())
+	updated.SetManagedFields(current.GetManagedFields())
+	updated.SetFinalizers(current.GetFinalizers())
 
 	mergeAnnotations(current, updated)
 	mergeLabels(current, updated)
@@ -91,16 +93,43 @@ func mergeServiceForUpdate(current, updated *uns.Unstructured) error {
 			}
 		}
 
-		ipFamily, found, err := uns.NestedString(current.Object, "spec", "ipFamily")
+		clusterIPs, found, err := uns.NestedStringSlice(current.Object, "spec", "clusterIPs")
 		if err != nil {
 			return err
 		}
 		if found {
-			err = uns.SetNestedField(updated.Object, ipFamily, "spec", "ipFamily")
+			err = uns.SetNestedStringSlice(updated.Object, clusterIPs, "spec", "clusterIPs")
 			if err != nil {
 				return err
 			}
 		}
+
+		ipFamilies, found, err := uns.NestedStringSlice(current.Object, "spec", "ipFamilies")
+		if err != nil {
+			return err
+		}
+		if found {
+			err = uns.SetNestedStringSlice(updated.Object, ipFamilies, "spec", "ipFamilies")
+			if err != nil {
+				return err
+			}
+		}
+
+		ipFamilyPolicy, foundOld, err := uns.NestedString(current.Object, "spec", "ipFamilyPolicy")
+		if err != nil {
+			return err
+		}
+		_, foundNew, err := uns.NestedString(updated.Object, "spec", "ipFamilyPolicy")
+		if err != nil {
+			return err
+		}
+		if foundOld && !foundNew {
+			err = uns.SetNestedField(updated.Object, ipFamilyPolicy, "spec", "ipFamilyPolicy")
+			if err != nil {
+				return err
+			}
+		}
+
 	}
 
 	return nil
@@ -147,7 +176,9 @@ func mergeAnnotations(current, updated *uns.Unstructured) {
 		curAnnotations[k] = v
 	}
 
-	updated.SetAnnotations(curAnnotations)
+	if len(curAnnotations) != 0 {
+		updated.SetAnnotations(curAnnotations)
+	}
 }
 
 // mergeLabels copies over any labels from current to updated,
@@ -164,7 +195,9 @@ func mergeLabels(current, updated *uns.Unstructured) {
 		curLabels[k] = v
 	}
 
-	updated.SetLabels(curLabels)
+	if len(curLabels) != 0 {
+		updated.SetLabels(curLabels)
+	}
 }
 
 // IsObjectSupported rejects objects with configurations we don't support.
