@@ -75,6 +75,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["LISTEN_DUAL_STACK"] = listenDualStack(bootstrapResult.OVN.MasterIPs[0])
 	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
 	data.Data["OVN_NORTHD_PROBE_INTERVAL"] = os.Getenv("OVN_NORTHD_PROBE_INTERVAL")
+	data.Data["ACLLOGGING"] = c.AclLogging
+	data.Data["ACLLOGGINGRATELIMIT"] = c.AclLoggingRateLimit
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
@@ -220,6 +222,10 @@ func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 		if !reflect.DeepEqual(pn.IPsecConfig, nn.IPsecConfig) {
 			errs = append(errs, errors.Errorf("cannot edit IPsec configuration at runtime"))
 		}
+	}
+	// This might change 
+	if !reflect.DeepEqual(pn.AclLogging, nn.AclLogging) { 
+		errs = append(errs, errors.Errorf("cannot toggle ACL logging after install time"))
 	}
 
 	return errs
