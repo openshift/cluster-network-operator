@@ -215,6 +215,14 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 		conf.DefaultNetwork.OVNKubernetesConfig = &operv1.OVNKubernetesConfig{}
 	}
 
+	const ipsecOverhead = 46 // Transport mode, AES-GCM
+	const geneveOverhead = 100
+
+	var encapOverhead uint32 = geneveOverhead
+	if conf.DefaultNetwork.OVNKubernetesConfig.IPsecConfig != nil {
+		encapOverhead += ipsecOverhead
+	}
+
 	sc := conf.DefaultNetwork.OVNKubernetesConfig
 	// MTU  is currently the only field we pull from previous.
 	// If MTU is not supplied, we infer it from the host on which CNO is running
@@ -223,7 +231,7 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 
 	// TODO - Need to check as IPsec will additional headers
 	if sc.MTU == nil {
-		var mtu uint32 = uint32(hostMTU) - 100 // 100 byte geneve header
+		var mtu uint32 = uint32(hostMTU) - encapOverhead
 		if previous != nil && previous.DefaultNetwork.OVNKubernetesConfig != nil &&
 			previous.DefaultNetwork.OVNKubernetesConfig.MTU != nil {
 			mtu = *previous.DefaultNetwork.OVNKubernetesConfig.MTU
