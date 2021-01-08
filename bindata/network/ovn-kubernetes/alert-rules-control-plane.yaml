@@ -66,3 +66,21 @@ spec:
       for: 10m
       labels:
         severity: warning
+    - alert: NorthBoundLogsNotCommitted
+      annotations:
+        message: |
+          NorthBound DB has too many logs not committed.
+      expr: |
+        ovn_db_cluster_log_not_applied{db_name="OVN_Northbound"} > 100
+      for: 10m
+      labels:
+        severity: warning
+    - alert: SouthBoundLogsNotCommitted
+      annotations:
+        message: |
+          SouthBound DB has too many logs not committed.
+      expr: |
+        ovn_db_cluster_log_not_applied{db_name="OVN_Southbound"} > 100
+      for: 10m
+      labels:
+        severity: warning 
