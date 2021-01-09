@@ -6,6 +6,28 @@ import (
 	"log"
 )
 
+// rawConfigIPAMHasDHCP determines if the rawConfig JSON data has IPAM element.
+func rawConfigIPAMHasDHCP(rawConfig map[string]interface{}) bool {
+	ipam, okipamcast := rawConfig["ipam"].(map[string]interface{})
+	if !okipamcast {
+		log.Printf("WARNING: IPAM element has data of type %T but wanted map[string]interface{}", rawConfig["ipam"])
+		return false
+	}
+	for key, value := range ipam {
+		if key == "type" {
+			typeval, oktypecast := value.(string)
+			if !oktypecast {
+				log.Printf("WARNING: IPAM type element has data of type %T but wanted string", value)
+				return false
+			}
+			if typeval == "dhcp" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // useDHCPRaw determines if the the DHCP CNI plugin running as a daemon should be rendered.
 func useDHCPRaw(addnet *operv1.AdditionalNetworkDefinition) bool {
 	// Parse the RawCNIConfig
@@ -21,23 +43,23 @@ func useDHCPRaw(addnet *operv1.AdditionalNetworkDefinition) bool {
 
 	// Cycle through the IPAM keys, and determine if the type is dhcp
 	if rawConfig["ipam"] != nil {
-		ipam, okipamcast := rawConfig["ipam"].(map[string]interface{})
-		if !okipamcast {
-			log.Printf("WARNING: IPAM element has data of type %T but wanted map[string]interface{}", rawConfig["ipam"])
+		return rawConfigIPAMHasDHCP(rawConfig)
+	}
+	// Cycle through the plugins key, and determine if the type is dhcp in each plugin map
+	if rawConfig["plugins"] != nil {
+		plugins, okpluginscast := rawConfig["plugins"].([]interface{})
+		if !okpluginscast {
+			log.Printf("WARNING: plugins element has data of type %T but wanted []interface{}", rawConfig["plugins"])
 			return false
 		}
-
-		for key, value := range ipam {
-			if key == "type" {
-				typeval, oktypecast := value.(string)
-				if !oktypecast {
-					log.Printf("WARNING: IPAM type element has data of type %T but wanted string", value)
-					return false
-				}
-
-				if typeval == "dhcp" {
-					return true
-				}
+		for _, pluginRawConfig := range plugins {
+			rawConfig, okplugincast := pluginRawConfig.(map[string]interface{})
+			if !okplugincast {
+				log.Printf("WARNING: each plugin element in plugins list has data of type %T but wanted map[string]interface{}", rawConfig)
+				return false
+			}
+			if rawConfig != nil {
+				return rawConfigIPAMHasDHCP(rawConfig)
 			}
 		}
 	}

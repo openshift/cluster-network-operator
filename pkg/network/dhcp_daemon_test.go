@@ -53,6 +53,31 @@ var DHCPConfig = operv1.Network{
 	},
 }
 
+var DHCPConfigInPlugins = operv1.Network{
+	Spec: operv1.NetworkSpec{
+		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
+			{
+				Type:         operv1.NetworkTypeRaw,
+				Name:         "net-attach-dhcp",
+				RawCNIConfig: "{\"cniVersion\":\"0.3.1\",\"name\":\"test\",\"plugins\":[{\"type\":\"macvlan\",\"master\":\"eth0\",\"mode\":\"bridge\",\"ipam\":{\"type\":\"dhcp\"}},{\"capabilities\":{\"mac\":true},\"type\":\"tuning\"}]}",
+			},
+		},
+		ServiceNetwork: []string{"172.30.0.0/16"},
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+		},
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOpenShiftSDN,
+			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
+				Mode: operv1.SDNModeNetworkPolicy,
+			},
+		},
+	},
+}
+
 var InvalidDHCPConfig = operv1.Network{
 	Spec: operv1.NetworkSpec{
 		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
@@ -60,6 +85,31 @@ var InvalidDHCPConfig = operv1.Network{
 				Type:         operv1.NetworkTypeRaw,
 				Name:         "net-attach-dhcp",
 				RawCNIConfig: "{\"cniVersion\":\"0.3.0\",\"type\":\"macvlan\",\"master\":\"eth0\",\"mode\":\"bridge\",\"ipam\":\"invalid\"}",
+			},
+		},
+		ServiceNetwork: []string{"172.30.0.0/16"},
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+		},
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOpenShiftSDN,
+			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
+				Mode: operv1.SDNModeNetworkPolicy,
+			},
+		},
+	},
+}
+
+var InvalidDHCPConfigInPlugins = operv1.Network{
+	Spec: operv1.NetworkSpec{
+		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
+			{
+				Type:         operv1.NetworkTypeRaw,
+				Name:         "net-attach-dhcp",
+				RawCNIConfig: "{\"cniVersion\":\"0.3.1\",\"name\":\"test\",\"plugins\":[{\"type\":\"macvlan\",\"master\":\"eth0\",\"mode\":\"bridge\",\"ipam\":\"invalid\"},{\"capabilities\":{\"mac\":true},\"type\":\"tuning\"}]}",
 			},
 		},
 		ServiceNetwork: []string{"172.30.0.0/16"},
@@ -175,6 +225,19 @@ func TestRenderWithDHCP(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "dhcp-daemon")))
 }
 
+// TestRenderWithDHCPInPlugins tests a rendering with the DHCP daemonset.
+func TestRenderWithDHCPInPlugins(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := DHCPConfigInPlugins.DeepCopy()
+	config := &crd.Spec
+	FillDefaults(config, nil)
+
+	objs, err := renderMultus(config, manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "dhcp-daemon")))
+}
+
 // TestRenderNoDHCP tests a rendering WITHOUT the DHCP daemonset.
 func TestRenderNoDHCP(t *testing.T) {
 	g := NewGomegaWithT(t)
@@ -193,6 +256,19 @@ func TestRenderInvalidDHCP(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	crd := InvalidDHCPConfig.DeepCopy()
+	config := &crd.Spec
+	FillDefaults(config, nil)
+
+	objs, err := renderMultus(config, manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "dhcp-daemon")))
+}
+
+// TestRenderInvalidDHCPInPlugins tests a rendering with the DHCP daemonset.
+func TestRenderInvalidDHCPInPlugins(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := InvalidDHCPConfigInPlugins.DeepCopy()
 	config := &crd.Spec
 	FillDefaults(config, nil)
 
