@@ -66,3 +66,21 @@ spec:
       for: 10m
       labels:
         severity: warning
+    - alert: NBDBConnectionErrors
+      annotations:
+        message: |
+          OVN NBDB has a high rate of connection errors
+      expr: |
+          ( rate(ovn_db_cluster_inbound_connections_error_total{db_name="OVN_Northbound"}[5m]) + rate(ovn_db_cluster_outbound_connections_error_total{db_name="OVN_Northbound"}[5m]) ) > 100
+      for: 10m
+      labels:
+        severity: warning
+    - alert: SBDBConnectionErrors
+      annotations:
+        message: |
+          OVN SBDB has a high rate of connection errors
+      expr: |
+        ( rate(ovn_db_cluster_inbound_connections_error_total{db_name="OVN_Southbound"}[5m]) + rate(ovn_db_cluster_outbound_connections_error_total{db_name="OVN_Southbound"}[5m]) ) > 100
+      for: 10m
+      labels:
+        severity: warning 
