@@ -70,12 +70,10 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 	if status.relatedObjects == nil {
 		return
 	}
-
 	for _, currentObj := range co.Status.RelatedObjects {
 		var found bool = false
 		for _, renderedObj := range status.relatedObjects {
 			found = reflect.DeepEqual(currentObj, renderedObj)
-
 			if found {
 				break
 			}
@@ -95,6 +93,11 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 				// BZ 1820472: During SDN migration, deleting a namespace object may get stuck in 'Terminating' forever if the cluster network doesn't working as expected.
 				// We choose to not delete the namespace here but to ask user do it manually after the cluster is back to normal state.
 				log.Printf("Object Kind is Namespace, skip")
+				continue
+			}
+			// @aconstan: remove this after having the PR implementing this change, integrated.
+			if gvk.Kind == "Network" && gvk.Group == "operator.openshift.io" {
+				log.Printf("Object Kind is network.operator.openshift.io, skip")
 				continue
 			}
 			log.Printf("Detected related object with GVK %+v, namespace %v and name %v not rendered by manifests, deleting...", gvk, currentObj.Namespace, currentObj.Name)
