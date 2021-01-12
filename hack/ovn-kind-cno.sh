@@ -136,13 +136,16 @@ docker exec ovn-control-plane cp /etc/kubernetes/admin.conf /etc/kubernetes/kube
 docker exec ovn-control-plane chmod 666 /etc/kubernetes/kubeconfig
 
 # Create Proxy resource
-kubectl create -f https://raw.githubusercontent.com/openshift/api/e7fa4b871a25985ef0cc36c2fbd9f2cb4445dc9c/config/v1/0000_03_config-operator_01_proxy.crd.yaml
+kubectl create -f https://raw.githubusercontent.com/openshift/api/release-4.7/config/v1/0000_03_config-operator_01_proxy.crd.yaml
 
 # Create Network resource
-kubectl create -f https://raw.githubusercontent.com/openshift/api/e7fa4b871a25985ef0cc36c2fbd9f2cb4445dc9c/config/v1/0000_10_config-operator_01_network.crd.yaml
+kubectl create -f https://raw.githubusercontent.com/openshift/api/release-4.7/config/v1/0000_10_config-operator_01_network.crd.yaml
+
+# Create Infrastructure resource
+kubectl create -f https://raw.githubusercontent.com/openshift/api/release-4.7/config/v1/0000_10_config-operator_01_infrastructure.crd.yaml
 
 # Create cluster operator
-kubectl create -f https://raw.githubusercontent.com/openshift/machine-api-operator/050a65a2bdabcc2c2f17036de967c6bcee6d6a48/config/0000_00_cluster-version-operator_01_clusteroperator.crd.yaml
+kubectl create -f https://raw.githubusercontent.com/openshift/machine-api-operator/release-4.7/config/0000_00_cluster-version-operator_01_clusteroperator.crd.yaml
 
 if [ "$BUILD_OVN" = true ] || [ "$BUILD_CNO" = true ]; then
   pushd $CNO_TEMPLATES
