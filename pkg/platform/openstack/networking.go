@@ -130,9 +130,8 @@ func getOpenStackNetworkMTU(client *gophercloud.ServiceClient, networkID string)
 	return mtu.MTU, nil
 }
 
-// Looks for a Neutron subnet by name and tag. In case of not found, looks for a
-// provided custom subnet by tag. Fails if any not found.
-func findOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, clusterID string) (subnets.Subnet, error) {
+// Looks for a Neutron subnet by name and tag. Fails if not found.
+func findOpenStackSubnet(client *gophercloud.ServiceClient, name, tag string) (subnets.Subnet, error) {
 	empty := subnets.Subnet{}
 	page, err := subnets.List(client, subnets.ListOpts{Name: name, Tags: tag}).AllPages()
 	if err != nil {
@@ -145,29 +144,43 @@ func findOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, clusterID
 	if len(subnetList) == 1 {
 		return subnetList[0], nil
 	} else if len(subnetList) == 0 {
-		// The installer tags the provided custom Network
-		primaryNetworkTag := clusterID + "-primaryClusterNetwork"
-		workerNetwork, err := findOpenStackNetwork(client, primaryNetworkTag)
-		if err != nil {
-			return empty, errors.Wrap(err, "failed to find worker nodes subnet")
-		}
-
-		if len(workerNetwork.Subnets) == 1 {
-			page, err = subnets.List(client, subnets.ListOpts{ID: workerNetwork.Subnets[0]}).AllPages()
-			if err != nil {
-				return empty, errors.Wrap(err, "failed to get subnet list")
-			}
-			subnetList, err = subnets.ExtractSubnets(page)
-			if err != nil {
-				return empty, errors.Wrap(err, "failed to extract subnets list")
-			}
-			return subnetList[0], nil
-		} else {
-			return empty, errors.New("subnet not found")
-		}
+		return empty, errors.New("subnet not found")
 	} else {
 		return empty, errors.New("multiple matching subnets")
 	}
+}
+
+func findOpenStackSubnetByNetworkTag(client *gophercloud.ServiceClient, tag string) (subnets.Subnet, error) {
+	empty := subnets.Subnet{}
+	// The installer tags the provided custom Network
+	workerNetwork, err := findOpenStackNetwork(client, tag)
+	if err != nil {
+		return empty, errors.Wrap(err, "failed to find worker nodes subnet")
+	}
+
+	if len(workerNetwork.Subnets) == 1 {
+		page, err := subnets.List(client, subnets.ListOpts{ID: workerNetwork.Subnets[0]}).AllPages()
+		if err != nil {
+			return empty, errors.Wrap(err, "failed to get subnet list")
+		}
+		subnetList, err := subnets.ExtractSubnets(page)
+		if err != nil {
+			return empty, errors.Wrap(err, "failed to extract subnets list")
+		}
+		return subnetList[0], nil
+	} else {
+		return empty, errors.New("subnet not found")
+	}
+}
+
+// Gets a Neutron subnet by ID. In case of not found fails.
+func getOpenStackSubnet(client *gophercloud.ServiceClient, id string) (subnets.Subnet, error) {
+	empty := subnets.Subnet{}
+	subnet, err := subnets.Get(client, id).Extract()
+	if err != nil {
+		return empty, errors.Wrapf(err, "failed to get subnet %s", id)
+	}
+	return *subnet, nil
 }
 
 // Looks for a Neutron subnet by name, tag, network ID, CIDR and gateway IP,

@@ -23,6 +23,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
+	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -99,6 +100,9 @@ func New(cfg, protocfg *rest.Config) (*Client, error) {
 		log.Fatal(err)
 	}
 	if err := netopv1.Install(c.Scheme()); err != nil {
+		log.Fatal(err)
+	}
+	if err := machineapi.AddToScheme(c.Scheme()); err != nil {
 		log.Fatal(err)
 	}
 

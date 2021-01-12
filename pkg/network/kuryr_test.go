@@ -31,7 +31,6 @@ var FakeBootstrapResult = bootstrap.BootstrapResult{
 		PodSubnetpool:     "pod-subnetpool-id",
 		ServiceSubnet:     "svc-subnet-id",
 		WorkerNodesRouter: "worker-nodes-router",
-		WorkerNodesSubnet: "worker-nodes-subnet",
 		OpenStackCloud: clientconfig.Cloud{
 			AuthType: "password",
 			AuthInfo: &clientconfig.AuthInfo{
