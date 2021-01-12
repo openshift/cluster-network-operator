@@ -119,11 +119,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVNHybridOverlayVXLANPort"] = ""
 	}
 
-	if c.IPsecConfig != nil {
-		data.Data["EnableIPsec"] = true
-	} else {
-		data.Data["EnableIPsec"] = false
-	}
+	data.Data["EnableIPsec"] = true
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/ovn-kubernetes"), &data)
 	if err != nil {
