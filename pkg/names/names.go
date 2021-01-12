@@ -37,6 +37,10 @@ const NonCriticalAnnotation = "networkoperator.openshift.io/non-critical"
 // that executing network migration (switching the default network type of the cluster) is allowed.
 const NetworkMigrationAnnotation = "networkoperator.openshift.io/network-migration"
 
+// RolloutHungAnnotation is set to "true" if it is detected that a rollout
+// (i.e. DaemonSet or Deployment) is not making progress.
+const RolloutHungAnnotation = "networkoperator.openshift.io/rollout-hung"
+
 // KuryrOctaviaProviderAnnotation is used to save latest Octavia provider that was configured in order to
 // prevent from reconfiguring it automatically when underlying Octavia changes.
 const KuryrOctaviaProviderAnnotation = "networkoperator.openshift.io/kuryr-octavia-provider"

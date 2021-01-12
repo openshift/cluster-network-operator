@@ -109,6 +109,8 @@ func (status *StatusManager) SetFromPods() {
 			reachedAvailableLevel = false
 		}
 
+		dsHung := "false"
+
 		if dsProgressing && !isNonCritical(ds) {
 			reachedAvailableLevel = false
 
@@ -122,9 +124,13 @@ func (status *StatusManager) SetFromPods() {
 			// Catch hung rollouts
 			if exists && (time.Since(dsState.LastChangeTime)) > ProgressTimeout {
 				hung = append(hung, fmt.Sprintf("DaemonSet %q rollout is not making progress - last change %s", dsName.String(), dsState.LastChangeTime.Format(time.RFC3339)))
+				dsHung = "true"
 			}
 		} else {
 			delete(daemonsetStates, dsName)
+		}
+		if err := status.setDSAnnotation(ds, names.RolloutHungAnnotation, dsHung); err != nil {
+			log.Printf("Error setting DaemonSet %q annotation: %v", dsName, err)
 		}
 	}
 
@@ -163,6 +169,8 @@ func (status *StatusManager) SetFromPods() {
 			reachedAvailableLevel = false
 		}
 
+		depHung := "false"
+
 		if depProgressing && !isNonCritical(dep) {
 			reachedAvailableLevel = false
 
@@ -176,9 +184,13 @@ func (status *StatusManager) SetFromPods() {
 			// Catch hung rollouts
 			if exists && (time.Since(depState.LastChangeTime)) > ProgressTimeout {
 				hung = append(hung, fmt.Sprintf("Deployment %q rollout is not making progress - last change %s", depName.String(), depState.LastChangeTime.Format(time.RFC3339)))
+				depHung = "true"
 			}
 		} else {
 			delete(deploymentStates, depName)
+		}
+		if err := status.setDepAnnotation(dep, names.RolloutHungAnnotation, depHung); err != nil {
+			log.Printf("Error setting Deployment %q annotation: %v", depName, err)
 		}
 	}
 
@@ -332,4 +344,34 @@ func (status *StatusManager) CheckCrashLoopBackOffPods(dName types.NamespacedNam
 func isNonCritical(obj metav1.Object) bool {
 	_, exists := obj.GetAnnotations()[names.NonCriticalAnnotation]
 	return exists
+}
+
+func (status *StatusManager) setDSAnnotation(obj *appsv1.DaemonSet, key, value string) error {
+	new := obj.DeepCopy()
+	anno := new.GetAnnotations()
+	if anno == nil {
+		anno = map[string]string{}
+	}
+	if anno[key] == value {
+		return nil
+	}
+
+	anno[key] = value
+	new.SetAnnotations(anno)
+	return status.client.Patch(context.TODO(), new, client.MergeFrom(obj))
+}
+
+func (status *StatusManager) setDepAnnotation(obj *appsv1.Deployment, key, value string) error {
+	new := obj.DeepCopy()
+	anno := new.GetAnnotations()
+	if anno == nil {
+		anno = map[string]string{}
+	}
+	if anno[key] == value {
+		return nil
+	}
+
+	anno[key] = value
+	new.SetAnnotations(anno)
+	return status.client.Patch(context.TODO(), new, client.MergeFrom(obj))
 }
