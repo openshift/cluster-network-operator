@@ -12,7 +12,7 @@ KIND_CONFIG=${KIND_CONFIG:-$HOME/kind-ovn-config.yaml}
 export KUBECONFIG=${HOME}/kube-ovn.conf
 NUM_MASTER_NODES=${NUM_MASTER_NODES:-1}
 OVN_KIND_VERBOSITY=${OVN_KIND_VERBOSITY:-5}
-OCP_IMAGE_VER=${OCP_IMAGE_VER=:-latest}
+OCP_IMAGE_VER=${OCP_IMAGE_VER:-latest}
 
 # Default networks (same as in KIND)
 if [ "${IP_FAMILY:-ipv4}" = "ipv6" ]; then
@@ -53,6 +53,17 @@ else
   exit 1
 fi
 
+# check if we need to build docker image with OVS
+if ! docker image inspect kindest/node:${K8S_VERSION}_ovs &> /dev/null; then
+  # build new image with ovs in it
+  cat << EOF | docker build -t kindest/node:${K8S_VERSION}_ovs -f - .
+FROM docker.io/kindest/node:${K8S_VERSION}
+RUN apt update -y
+RUN apt install -y openvswitch-switch openvswitch-common
+RUN systemctl enable openvswitch-switch
+EOF
+fi
+
  # create the config file
   cat <<EOF > ${KIND_CONFIG}
 kind: Cluster
@@ -69,7 +80,7 @@ EOF
 
 
 # Create KIND cluster
-kind create cluster --name ovn --image kindest/node:${K8S_VERSION} --config=${KIND_CONFIG} -v ${OVN_KIND_VERBOSITY}
+kind create cluster --name ovn --image kindest/node:${K8S_VERSION}_ovs --config=${KIND_CONFIG} -v ${OVN_KIND_VERBOSITY}
 
 echo -e "\n"
 
@@ -142,10 +153,10 @@ if [ "$BUILD_OVN" = true ] || [ "$BUILD_CNO" = true ]; then
   fi
   cp $DEPLOYMENT_TEMPLATE deployment.yaml.bk
   if [ "$BUILD_OVN" = true ]; then
-    sed -i 's/".*origin-ovn-kubernetes:.*/"origin-ovn-kubernetes:dev"/' $DEPLOYMENT_TEMPLATE
+    sed -i 's/origin-ovn-kubernetes:latest/origin-ovn-kubernetes:dev/' $DEPLOYMENT_TEMPLATE
   fi
   if [ "$BUILD_CNO" = true ]; then
-    sed -i "s#quay.io/openshift/origin-cluster-network-operator:.*#$CNO_IMAGE#" $DEPLOYMENT_TEMPLATE
+    sed -i "s#quay.io/openshift/origin-cluster-network-operator:latest#$CNO_IMAGE#" $DEPLOYMENT_TEMPLATE
   fi
 fi
 
