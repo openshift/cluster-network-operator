@@ -1,0 +1,13 @@
+apiVersion: controlplane.operator.openshift.io/v1alpha1
+kind: PodNetworkConnectivityCheck
+metadata:
+  name: 46-to-47-upgrade
+  namespace: openshift-network-operator
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+spec:
+  sourcePod: '46-to-47-upgrade'
+  targetEndpoint: '127.0.0.1:8080'
+
