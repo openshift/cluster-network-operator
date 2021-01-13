@@ -794,7 +794,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("error getting DaemonSet: %v", err)
 	}
 
-	if dsA.Annotations[names.RolloutHungAnnotation] != "true" {
+	if _, set := dsA.Annotations[names.RolloutHungAnnotation]; !set {
 		t.Fatalf("Expected rollout-hung annotation, but was missing")
 	}
 
@@ -840,13 +840,14 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
 	}
 
+	dsA = &appsv1.DaemonSet{} // some weird bug in the fake client that doesn't handle deleting annotations
 	err = client.Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, dsA)
 	if err != nil {
 		t.Fatalf("error getting DaemonSet: %v", err)
 	}
 
-	if dsA.Annotations[names.RolloutHungAnnotation] != "false" {
-		t.Fatalf("Expected rollout-hung annotation, but was missing")
+	if val, set := dsA.GetAnnotations()[names.RolloutHungAnnotation]; set {
+		t.Fatalf("Expected no rollout-hung annotation, but was present %s", val)
 	}
 
 	// Test non-critical DaemonSets
