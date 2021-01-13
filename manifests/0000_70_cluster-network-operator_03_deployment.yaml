@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: network-operator
-        image: quay.io/openshift/origin-cluster-network-operator:latest
+        image: quay.io/openshift/origin-cluster-network-operator:4.7
         command:
         - "/usr/bin/cluster-network-operator"
         - "start"
@@ -35,23 +35,23 @@ spec:
         - name: RELEASE_VERSION
           value: "0.0.1-snapshot"
         - name: SDN_IMAGE
-          value: "quay.io/openshift/origin-sdn:latest"
+          value: "quay.io/openshift/origin-sdn:4.7"
         - name: KUBE_PROXY_IMAGE
-          value: "quay.io/openshift/origin-kube-proxy:latest"
+          value: "quay.io/openshift/origin-kube-proxy:4.7"
         - name: KUBE_RBAC_PROXY_IMAGE
-          value: "quay.io/openshift/origin-kube-rbac-proxy:latest"
+          value: "quay.io/openshift/origin-kube-rbac-proxy:4.7"
         - name: MULTUS_IMAGE
-          value: "quay.io/openshift/origin-multus-cni:latest"
+          value: "quay.io/openshift/origin-multus-cni:4.7"
         - name: MULTUS_ADMISSION_CONTROLLER_IMAGE
-          value: "quay.io/openshift/origin-multus-admission-controller:latest"
+          value: "quay.io/openshift/origin-multus-admission-controller:4.7"
         - name: CNI_PLUGINS_IMAGE
-          value: "quay.io/openshift/origin-container-networking-plugins:latest"
+          value: "quay.io/openshift/origin-container-networking-plugins:4.7"
         - name: WHEREABOUTS_CNI_IMAGE
-          value: "quay.io/openshift/origin-multus-whereabouts-ipam-cni:latest"
+          value: "quay.io/openshift/origin-multus-whereabouts-ipam-cni:4.7"
         - name: ROUTE_OVERRRIDE_CNI_IMAGE
-          value: "quay.io/openshift/origin-multus-route-override-cni:latest"
+          value: "quay.io/openshift/origin-multus-route-override-cni:4.7"
         - name: OVN_IMAGE
-          value: "quay.io/openshift/origin-ovn-kubernetes:latest"
+          value: "quay.io/openshift/origin-ovn-kubernetes:4.7"
         - name: OVN_NB_RAFT_ELECTION_TIMER
           value: "10000"
         - name: OVN_SB_RAFT_ELECTION_TIMER
@@ -61,17 +61,17 @@ spec:
         - name: OVN_CONTROLLER_INACTIVITY_PROBE
           value: "30000"
         - name: EGRESS_ROUTER_CNI_IMAGE
-          value: "quay.io/openshift/origin-egress-router-cni:latest"
+          value: "quay.io/openshift/origin-egress-router-cni:4.7"
         - name: KURYR_DAEMON_IMAGE
-          value: "quay.io/openshift/origin-kuryr-cni:latest"
+          value: "quay.io/openshift/origin-kuryr-cni:4.7"
         - name: KURYR_CONTROLLER_IMAGE
-          value: "quay.io/openshift/origin-kuryr-controller:latest"
+          value: "quay.io/openshift/origin-kuryr-controller:4.7"
         - name: NETWORK_METRICS_DAEMON_IMAGE
-          value: "quay.io/openshift/origin-network-metrics-daemon:latest"
+          value: "quay.io/openshift/origin-network-metrics-daemon:4.7"
         - name: NETWORK_CHECK_SOURCE_IMAGE
-          value: "quay.io/openshift/origin-cluster-network-operator:latest"
+          value: "quay.io/openshift/origin-cluster-network-operator:4.7"
         - name: NETWORK_CHECK_TARGET_IMAGE
-          value: "quay.io/openshift/origin-hello-openshift:latest"
+          value: "quay.io/openshift/origin-hello-openshift:4.7"
         - name: POD_NAME
           valueFrom:
             fieldRef:
