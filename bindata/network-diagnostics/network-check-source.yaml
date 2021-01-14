@@ -20,6 +20,7 @@ spec:
     metadata:
       labels:
         app: network-check-source
+        kubernetes.io/os: "linux"
     spec:
       serviceAccountName: network-diagnostics
       containers:
@@ -51,6 +52,8 @@ spec:
           requests:
             memory: 50Mi
             cpu: 10m
+      nodeSelector:
+        beta.kubernetes.io/os: "linux"
 
 ---
 apiVersion: v1
