@@ -235,6 +235,11 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 			Namespace: obj.GetNamespace(),
 		})
 	}
+	relatedObjects = append(relatedObjects, configv1.ObjectReference{
+		Group:    "operator.openshift.io",
+		Resource: "networks",
+		Name:     "cluster",
+	})
 
 	relatedObjects = append(relatedObjects, configv1.ObjectReference{
 		Resource: "namespaces",

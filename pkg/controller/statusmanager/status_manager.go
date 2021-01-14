@@ -91,6 +91,11 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 				log.Printf("Object Kind is Namespace, skip")
 				continue
 			}
+			// @aconstan: remove this after having the PR implementing this change, integrated.
+			if gvk.Kind == "Network" && gvk.Group == "operator.openshift.io" {
+				log.Printf("Object Kind is network.operator.openshift.io, skip")
+				continue
+			}
 			log.Printf("Detected related object with GVK %+v, namespace %v and name %v not rendered by manifests, deleting...", gvk, currentObj.Namespace, currentObj.Name)
 			objToDelete := &uns.Unstructured{}
 			objToDelete.SetName(currentObj.Name)
