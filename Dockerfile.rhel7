@@ -1,4 +1,4 @@
-FROM registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6 AS builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6 AS builder
 WORKDIR /go/src/github.com/openshift/cluster-network-operator
 COPY . .
 RUN hack/build-go.sh; \
@@ -6,7 +6,7 @@ RUN hack/build-go.sh; \
     cp /go/src/github.com/openshift/cluster-network-operator/_output/linux/$(go env GOARCH)/cluster-network-operator /tmp/build/; \
     cp /go/src/github.com/openshift/cluster-network-operator/_output/linux/$(go env GOARCH)/cluster-network-renderer /tmp/build/
 
-FROM registry.svc.ci.openshift.org/ocp/4.6:base
+FROM registry.ci.openshift.org/ocp/4.6:base
 COPY --from=builder /tmp/build/cluster-network-operator /usr/bin/
 COPY --from=builder /tmp/build/cluster-network-renderer /usr/bin/
 COPY manifests /manifests
