@@ -249,7 +249,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	// Add operator.openshift.io/v1/network to relatedObjects for must-gather
 	relatedObjects = append(relatedObjects, configv1.ObjectReference{
 		Group:    "operator.openshift.io",
-		Resource: "network",
+		Resource: "networks",
 		Name:     "cluster",
 	})
 
