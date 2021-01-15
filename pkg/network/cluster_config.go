@@ -7,6 +7,7 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilnet "k8s.io/utils/net"
 
 	"github.com/pkg/errors"
 )
@@ -19,18 +20,31 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec) error {
 	// Check all networks for overlaps
 	pool := iputil.IPPool{}
 
-	if len(clusterConfig.ServiceNetwork) == 0 {
-		// Right now we only support a single service network
-		return errors.Errorf("spec.serviceNetwork must have at least 1 entry")
-	}
+	var ipv4Service, ipv6Service, ipv4Cluster, ipv6Cluster bool
+
+	// Validate ServiceNetwork values
 	for _, snet := range clusterConfig.ServiceNetwork {
 		_, cidr, err := net.ParseCIDR(snet)
 		if err != nil {
 			return errors.Wrapf(err, "could not parse spec.serviceNetwork %s", snet)
 		}
+		if utilnet.IsIPv6CIDR(cidr) {
+			ipv6Service = true
+		} else {
+			ipv4Service = true
+		}
 		if err := pool.Add(*cidr); err != nil {
 			return err
 		}
+	}
+
+	// Validate count / dual-stack-ness
+	if len(clusterConfig.ServiceNetwork) == 0 {
+		return errors.Errorf("spec.serviceNetwork must have at least 1 entry")
+	} else if len(clusterConfig.ServiceNetwork) == 2 && !(ipv4Service && ipv6Service) {
+		return errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network")
+	} else if len(clusterConfig.ServiceNetwork) > 2 {
+		return errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network")
 	}
 
 	// validate clusternetwork
@@ -42,6 +56,11 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec) error {
 		_, cidr, err := net.ParseCIDR(cnet.CIDR)
 		if err != nil {
 			return errors.Errorf("could not parse spec.clusterNetwork %s", cnet.CIDR)
+		}
+		if utilnet.IsIPv6CIDR(cidr) {
+			ipv6Cluster = true
+		} else {
+			ipv4Cluster = true
 		}
 		// ignore hostPrefix if the plugin does not use it and has it unset
 		if pluginsUsingHostPrefix.Has(clusterConfig.NetworkType) || (cnet.HostPrefix != 0) {
@@ -63,6 +82,9 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec) error {
 
 	if len(clusterConfig.ClusterNetwork) < 1 {
 		return errors.Errorf("spec.clusterNetwork must have at least 1 entry")
+	}
+	if ipv4Cluster != ipv4Service || ipv6Cluster != ipv6Service {
+		return errors.Errorf("spec.clusterNetwork and spec.serviceNetwork must either both be IPv4-only, both be IPv6-only, or both be dual-stack")
 	}
 
 	if clusterConfig.NetworkType == "" {
