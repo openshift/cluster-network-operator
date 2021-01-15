@@ -13,8 +13,10 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	utilnet "k8s.io/utils/net"
 )
 
 func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
@@ -245,19 +247,79 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 // TODO: check for overlap
 func validateIPPools(conf *operv1.NetworkSpec) []error {
 	errs := []error{}
-	for idx, pool := range conf.ClusterNetwork {
-		_, _, err := net.ParseCIDR(pool.CIDR)
+
+	// Check all networks for overlaps
+	pool := iputil.IPPool{}
+
+	var ipv4Service, ipv6Service, ipv4Cluster, ipv6Cluster bool
+
+	// Validate ServiceNetwork values
+	for _, snet := range conf.ServiceNetwork {
+		_, cidr, err := net.ParseCIDR(snet)
 		if err != nil {
-			errs = append(errs, errors.Wrapf(err, "could not parse ClusterNetwork %d CIDR %q", idx, pool.CIDR))
+			errs = append(errs, errors.Wrapf(err, "could not parse spec.serviceNetwork %s", snet))
+			continue
+		}
+		if utilnet.IsIPv6CIDR(cidr) {
+			ipv6Service = true
+		} else {
+			ipv4Service = true
+		}
+		if err := pool.Add(*cidr); err != nil {
+			errs = append(errs, err)
 		}
 	}
 
-	for idx, pool := range conf.ServiceNetwork {
-		_, _, err := net.ParseCIDR(pool)
+	// Validate count / dual-stack-ness
+	if len(conf.ServiceNetwork) == 0 {
+		errs = append(errs, errors.Errorf("spec.serviceNetwork must have at least 1 entry"))
+	} else if len(conf.ServiceNetwork) == 2 && !(ipv4Service && ipv6Service) {
+		errs = append(errs, errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network"))
+	} else if len(conf.ServiceNetwork) > 2 {
+		errs = append(errs, errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network"))
+	}
+
+	// validate clusternetwork
+	// - has an entry
+	// - it is a valid ip
+	// - has a reasonable cidr
+	// - they do not overlap and do not overlap with the service cidr
+	for _, cnet := range conf.ClusterNetwork {
+		_, cidr, err := net.ParseCIDR(cnet.CIDR)
 		if err != nil {
-			errs = append(errs, errors.Wrapf(err, "could not parse ServiceNetwork %d CIDR %q", idx, pool))
+			errs = append(errs, errors.Errorf("could not parse spec.clusterNetwork %s", cnet.CIDR))
+			continue
+		}
+		if utilnet.IsIPv6CIDR(cidr) {
+			ipv6Cluster = true
+		} else {
+			ipv4Cluster = true
+		}
+		// ignore hostPrefix if the plugin does not use it and has it unset
+		if pluginsUsingHostPrefix.Has(string(conf.DefaultNetwork.Type)) || (cnet.HostPrefix != 0) {
+			ones, bits := cidr.Mask.Size()
+			// The comparison is inverted; smaller number is larger block
+			if cnet.HostPrefix < uint32(ones) {
+				errs = append(errs, errors.Errorf("hostPrefix %d is larger than its cidr %s",
+					cnet.HostPrefix, cnet.CIDR))
+			}
+			if int(cnet.HostPrefix) > bits-2 {
+				errs = append(errs, errors.Errorf("hostPrefix %d is too small, must be a /%d or larger",
+					cnet.HostPrefix, bits-2))
+			}
+		}
+		if err := pool.Add(*cidr); err != nil {
+			errs = append(errs, err)
 		}
 	}
+
+	if len(conf.ClusterNetwork) < 1 {
+		errs = append(errs, errors.Errorf("spec.clusterNetwork must have at least 1 entry"))
+	}
+	if len(errs) == 0 && (ipv4Cluster != ipv4Service || ipv6Cluster != ipv6Service) {
+		errs = append(errs, errors.Errorf("spec.clusterNetwork and spec.serviceNetwork must either both be IPv4-only, both be IPv6-only, or both be dual-stack"))
+	}
+
 	return errs
 }
 
