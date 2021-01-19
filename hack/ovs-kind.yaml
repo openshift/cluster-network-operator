@@ -136,6 +136,9 @@ spec:
           readOnly: true
         - mountPath: /etc/openvswitch
           name: host-config-openvswitch
+        #Hack so OVN ovs pods that are tailing logs stay happy
+        - mountPath: /var/log/openvswitch
+          name: host-logs-openvswitch
         resources:
           requests:
             cpu: 100m
@@ -195,5 +198,9 @@ spec:
       - name: host-slash
         hostPath:
           path: /
+      #Hack so OVN ovs pods that are tailing logs stay happy 
+      - name: host-logs-openvswitch
+        hostPath:  
+          path: /var/log/openvswitch
       tolerations:
       - operator: "Exists"
