@@ -61,6 +61,12 @@ nodes:
 - role: worker
 EOF
 
+#If there is an existing cluster lets delete it safetly 
+if kind get clusters | grep ovn; then
+	timeout 5 kubectl --kubeconfig ${HOME}/admin.conf delete namespace ovn-kubernetes || true
+	sleep 5
+	kind delete cluster --name ${KIND_CLUSTER_NAME:-ovn}
+fi 
 
 # Create KIND cluster
 kind create cluster --name ovn --image kindest/node:${K8S_VERSION} --config=${KIND_CONFIG} -v ${OVN_KIND_VERBOSITY}
@@ -93,8 +99,8 @@ if [ "$BUILD_OVN" = true ]; then
   popd
   pushd dist/images
   sudo cp -f ../../go-controller/_output/go/bin/* .
-  cat << EOF | docker build -t origin-ovn-kubernetes:dev -f - .
-FROM quay.io/openshift/origin-ovn-kubernetes:4.5
+    cat << EOF | docker build -t origin-ovn-kubernetes:dev -f - .
+FROM quay.io/openshift/origin-ovn-kubernetes:4.7
 COPY ovnkube ovn-kube-util /usr/bin/
 COPY ovn-k8s-cni-overlay /usr/libexec/cni/ovn-k8s-cni-overlay
 COPY ovnkube.sh /root/
@@ -217,9 +223,9 @@ for n in $NODES; do
 done
 
 # wait until resources are created
-sleep 30
+sleep 300
 
-if ! kubectl wait -n openshift-ovn-kubernetes --for=condition=ready pods --all --timeout=300s ; then
+if ! kubectl wait -n openshift-ovn-kubernetes --for=condition=ready pods --all --timeout=30s ; then
   echo "OVN-k8s pods are not running"
   exit 1
 fi
@@ -229,7 +235,17 @@ fi
 $CNO_PATH/hack/webhook-create-signed-cert.sh --service multus-admission-controller --namespace openshift-multus --secret multus-admission-controller-secret
 if ! kubectl wait -n openshift-multus --for=condition=ready pods --all --timeout=300s ; then
   echo "multus pods are not running"
-  exit 1
+  kubectl get pods -n openshift-multus
+fi
+
+for n in $NODES; do
+  echo "Restarting containerd and kubelet on node: $n"
+  docker exec $n bash -c "systemctl restart containerd"
+  docker exec $n bash -c "systemctl restart kubelet" 
+done
+
+if ! kubectl wait --for=condition=ready nodes --all --timeout=300s ; then 
+   echo "nodes are not ready" 
 fi
 
 echo "Deployment Complete!"
