@@ -342,6 +342,7 @@ spec:
         - "--cni-version=0.3.1"
         - "--additional-bin-dir=/opt/multus/bin"
         - "--skip-multus-binary-copy=true"
+        - "--global-namespaces=default,openshift-multus,openshift-sriov-network-operator"
         resources:
           requests:
             cpu: 10m
