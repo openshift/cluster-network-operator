@@ -1,6 +1,7 @@
 #!/bin/bash
 # Original script found at: https://github.com/morvencao/kube-mutating-webhook-tutorial/blob/master/deployment/webhook-create-signed-cert.sh
 
+set -x
 set -e
 
 usage() {
@@ -84,7 +85,7 @@ kubectl delete csr ${csrName} 2>/dev/null || true
 
 # create  server cert/key CSR and  send to k8s API
 cat <<EOF | kubectl create -f -
-apiVersion: certificates.k8s.io/v1beta1
+apiVersion: certificates.k8s.io/v1
 kind: CertificateSigningRequest
 metadata:
   name: ${csrName}
@@ -96,6 +97,8 @@ spec:
   - digital signature
   - key encipherment
   - server auth
+  signerName: kubernetes.io/kube-apiserver-client-kubelet
+
 EOF
 
 # verify CSR has been created
