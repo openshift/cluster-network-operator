@@ -12,6 +12,9 @@ import (
 func TestIsChangeSafe(t *testing.T) {
 	g := NewGomegaWithT(t)
 
+	// NOTE: IsChangeSafe() requires you to have called Validate() beforehand, so we
+	// don't have to check that invalid configs are considered unsafe to change to.
+
 	prev := OpenShiftSDNConfig.Spec.DeepCopy()
 	FillDefaults(prev, nil)
 	next := OpenShiftSDNConfig.Spec.DeepCopy()
@@ -26,7 +29,16 @@ func TestIsChangeSafe(t *testing.T) {
 
 	next = OpenShiftSDNConfig.Spec.DeepCopy()
 	FillDefaults(next, nil)
-	next.ServiceNetwork = []string{"1.2.3.4/99", "8.8.8.0/30"}
+	next.ClusterNetwork = append(next.ClusterNetwork, operv1.ClusterNetworkEntry{
+		CIDR:       "1.2.0.0/16",
+		HostPrefix: 24,
+	})
+	err = IsChangeSafe(prev, next)
+	g.Expect(err).To(MatchError(ContainSubstring("cannot change ClusterNetwork")))
+
+	next = OpenShiftSDNConfig.Spec.DeepCopy()
+	FillDefaults(next, nil)
+	next.ServiceNetwork = []string{"1.2.3.0/24"}
 	err = IsChangeSafe(prev, next)
 	g.Expect(err).To(MatchError(ContainSubstring("cannot change ServiceNetwork")))
 
@@ -35,6 +47,71 @@ func TestIsChangeSafe(t *testing.T) {
 	next.DefaultNetwork.Type = "Kuryr"
 	err = IsChangeSafe(prev, next)
 	g.Expect(err).To(MatchError(ContainSubstring("cannot change default network type")))
+
+	// You can change a single-stack config to dual-stack
+	next = OpenShiftSDNConfig.Spec.DeepCopy()
+	FillDefaults(next, nil)
+	next.ServiceNetwork = append(next.ServiceNetwork, "fd02::/112")
+	next.ClusterNetwork = append(next.ClusterNetwork, operv1.ClusterNetworkEntry{
+		CIDR:       "fd01::/48",
+		HostPrefix: 64,
+	})
+	err = IsChangeSafe(prev, next)
+	g.Expect(err).NotTo(HaveOccurred())
+	// ...and vice-versa
+	err = IsChangeSafe(next, prev)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	// But you can't go from single-stack IPv4 to dual-stack IPv6-primary
+	next = OpenShiftSDNConfig.Spec.DeepCopy()
+	FillDefaults(next, nil)
+	next.ServiceNetwork = append([]string{"fd02::/112"}, prev.ServiceNetwork...)
+	next.ClusterNetwork = append([]operv1.ClusterNetworkEntry{{
+		CIDR:       "fd01::/48",
+		HostPrefix: 64,
+	}}, prev.ClusterNetwork...)
+	err = IsChangeSafe(prev, next)
+	g.Expect(err).To(MatchError(ContainSubstring("cannot change ServiceNetwork")))
+	// ...or vice-versa
+	err = IsChangeSafe(next, prev)
+	g.Expect(err).To(MatchError(ContainSubstring("cannot change ServiceNetwork")))
+
+	// You can add multiple ClusterNetworks of the new IP family
+	next = OpenShiftSDNConfig.Spec.DeepCopy()
+	FillDefaults(next, nil)
+	next.ServiceNetwork = append(next.ServiceNetwork, "fd02::/112")
+	next.ClusterNetwork = append(next.ClusterNetwork,
+		operv1.ClusterNetworkEntry{
+			CIDR:       "fd01::/48",
+			HostPrefix: 64,
+		},
+		operv1.ClusterNetworkEntry{
+			CIDR:       "fd02::/48",
+			HostPrefix: 64,
+		},
+	)
+	err = IsChangeSafe(prev, next)
+	g.Expect(err).NotTo(HaveOccurred())
+	// ...and vice-versa
+	err = IsChangeSafe(next, prev)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	// You can't add any new ClusterNetworks of the old IP family
+	next = OpenShiftSDNConfig.Spec.DeepCopy()
+	FillDefaults(next, nil)
+	next.ServiceNetwork = append(next.ServiceNetwork, "fd02::/112")
+	next.ClusterNetwork = append(next.ClusterNetwork,
+		operv1.ClusterNetworkEntry{
+			CIDR:       "fd01::/48",
+			HostPrefix: 64,
+		},
+		operv1.ClusterNetworkEntry{
+			CIDR:       "1.2.0.0/16",
+			HostPrefix: 24,
+		},
+	)
+	err = IsChangeSafe(prev, next)
+	g.Expect(err).To(MatchError(ContainSubstring("cannot change ClusterNetwork")))
 }
 
 func TestRenderUnknownNetwork(t *testing.T) {
