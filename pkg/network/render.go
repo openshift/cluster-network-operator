@@ -214,22 +214,15 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 
 	errs := []error{}
 
-	// TODO: implement cluster network / service network expansion
-	// We don't support cluster network changes
-	if !reflect.DeepEqual(prev.ClusterNetwork, next.ClusterNetwork) {
-		errs = append(errs, errors.Errorf("cannot change ClusterNetworks"))
-	}
-
-	// Nor can you change service network
-	if !reflect.DeepEqual(prev.ServiceNetwork, next.ServiceNetwork) {
-		errs = append(errs, errors.Errorf("cannot change ServiceNetwork"))
+	// Most ClusterNetworks/ServiceNetwork changes are not allowed
+	if err := isNetworkChangeSafe(prev, next); err != nil {
+		errs = append(errs, err)
 	}
 
 	// Check the default network
 	errs = append(errs, isDefaultNetworkChangeSafe(prev, next)...)
 
 	// Changing AdditionalNetworks is supported
-
 	if !reflect.DeepEqual(prev.DisableMultiNetwork, next.DisableMultiNetwork) {
 		errs = append(errs, errors.Errorf("cannot change DisableMultiNetwork"))
 	}
@@ -240,6 +233,65 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 	if len(errs) > 0 {
 		return errors.Errorf("invalid configuration: %v", errs)
 	}
+	return nil
+}
+
+func isNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
+	if reflect.DeepEqual(prev.ClusterNetwork, next.ClusterNetwork) && reflect.DeepEqual(prev.ServiceNetwork, next.ServiceNetwork) {
+		return nil
+	}
+
+	// Currently the only change we allow is switching to/from dual-stack.
+	//
+	// FIXME: the errors here currently do not actually mention dual-stack since it's
+	// not supported yet.
+
+	// validateIPPools() will have ensured that each config is independently either
+	// a valid single-stack config or a valid dual-stack config. Make sure we have
+	// one of each.
+	var singleStack, dualStack *operv1.NetworkSpec
+	switch {
+	case len(prev.ServiceNetwork) < len(next.ServiceNetwork):
+		// Going from single to dual
+		singleStack, dualStack = prev, next
+	case len(prev.ServiceNetwork) > len(next.ServiceNetwork):
+		// Going from dual to single
+		dualStack, singleStack = prev, next
+	default:
+		// They didn't change single-vs-dual
+		if reflect.DeepEqual(prev.ServiceNetwork, next.ServiceNetwork) {
+			return errors.Errorf("cannot change ClusterNetwork")
+		} else {
+			return errors.Errorf("cannot change ServiceNetwork")
+		}
+	}
+
+	// Validate that the shared ServiceNetwork entry is unchanged. (validateIPPools
+	// already checked that dualStack.ServiceNetwork[0] and [1] are of opposite IP
+	// families so we don't need to check that here.)
+	if singleStack.ServiceNetwork[0] != dualStack.ServiceNetwork[0] {
+		// User changed the primary service network, or tried to swap the order of
+		// the primary and secondary networks.
+		return errors.Errorf("cannot change ServiceNetwork")
+	}
+
+	// Validate that the shared ClusterNetwork entries are unchanged, and that ALL of
+	// the new ones in dualStack are of the opposite IP family from the shared ones.
+	// (ie, you cannot go from [ipv4] to [ipv4, ipv6, ipv4], even though the latter
+	// would have been valid as a new install.)
+	EntryZeroIsIPv6 := utilnet.IsIPv6CIDRString(singleStack.ClusterNetwork[0].CIDR)
+	for i := range dualStack.ClusterNetwork {
+		if i < len(singleStack.ClusterNetwork) {
+			if !reflect.DeepEqual(singleStack.ClusterNetwork[i], dualStack.ClusterNetwork[i]) {
+				// Changed or re-ordered an existing ClusterNetwork element
+				return errors.Errorf("cannot change ClusterNetwork")
+			}
+		} else if utilnet.IsIPv6CIDRString(dualStack.ClusterNetwork[i].CIDR) == EntryZeroIsIPv6 {
+			// Added a new element of the existing IP family
+			return errors.Errorf("cannot change ClusterNetwork")
+		}
+	}
+
 	return nil
 }
 
