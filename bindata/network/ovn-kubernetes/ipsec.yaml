@@ -238,10 +238,20 @@ spec:
             - -c
             - |
               #!/bin/bash
-              ovs-appctl -t ovs-monitor-ipsec ipsec/status
+              ovs-appctl -t ovs-monitor-ipsec ipsec/status && ipsec status
           initialDelaySeconds: 120
           periodSeconds: 30
           timeoutSeconds: 40
+        livenessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              #!/bin/bash
+              ovs-appctl -t ovs-monitor-ipsec ipsec/status && ipsec status
+          initialDelaySeconds: 60
+          periodSeconds: 60
         terminationGracePeriodSeconds: 10
       nodeSelector:
         beta.kubernetes.io/os: "linux"
