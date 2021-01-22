@@ -33,9 +33,10 @@ const OVN_SB_RAFT_PORT = "9644"
 const CLUSTER_CONFIG_NAME = "cluster-config-v1"
 const CLUSTER_CONFIG_NAMESPACE = "kube-system"
 const OVN_CERT_CN = "ovn"
-
-const OVN_MASTER_DISCOVERY_TIMEOUT = 280
 const OVN_MASTER_DISCOVERY_POLL = 5
+const OVN_MASTER_DISCOVERY_BACKOFF = 120
+
+var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
 // This creates
@@ -272,7 +273,7 @@ func bootstrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) 
 
 	var heartBeat int
 
-	err := wait.PollImmediate(OVN_MASTER_DISCOVERY_POLL*time.Second, OVN_MASTER_DISCOVERY_TIMEOUT*time.Second, func() (bool, error) {
+	err := wait.PollImmediate(OVN_MASTER_DISCOVERY_POLL*time.Second, time.Duration(OVN_MASTER_DISCOVERY_TIMEOUT)*time.Second, func() (bool, error) {
 		matchingLabels := &client.MatchingLabels{"node-role.kubernetes.io/master": ""}
 		if err := kubeClient.List(context.TODO(), masterNodeList, matchingLabels); err != nil {
 			return false, err
@@ -288,8 +289,20 @@ func bootstrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) 
 		}
 		return false, nil
 	})
-	if err != nil {
-		return nil, fmt.Errorf("Unable to bootstrap OVN, expected amount of control plane nodes (%v) do not match found (%v): %s", controlPlaneReplicaCount, len(masterNodeList.Items), err)
+	if wait.ErrWaitTimeout == err {
+		klog.Warningf("Timeout exceeded while bootstraping OVN, expected amount of control plane nodes (%v) do not match found (%v): %s, continuing deployment with found replicas", controlPlaneReplicaCount, len(masterNodeList.Items))
+		// On certain types of cluster this condition will never be met (assisted installer, for example)
+		// As to not hold the reconciliation loop for too long on such clusters: dynamically modify the timeout
+		// to a shorter and shorter value. Never reach 0 however as that will result in a `PollInfinity`.
+		// Right now we'll do:
+		// - First reconciliation 250 second timeout
+		// - Second reconciliation 130 second timeout
+		// - >= Third reconciliation 10 second timeout
+		if OVN_MASTER_DISCOVERY_TIMEOUT-OVN_MASTER_DISCOVERY_BACKOFF > 0 {
+			OVN_MASTER_DISCOVERY_TIMEOUT = OVN_MASTER_DISCOVERY_TIMEOUT - OVN_MASTER_DISCOVERY_BACKOFF
+		}
+	} else if err != nil {
+		return nil, fmt.Errorf("Unable to bootstrap OVN, err: %v", err)
 	}
 
 	ovnMasterIPs := make([]string, len(masterNodeList.Items))
