@@ -9,7 +9,8 @@ specific order, should have numbered prefixes, while the remaining
 objects can be unnumbered. Most operand directories start with a
 `000-ns.yaml` object to create the operand namespace before anything
 else is created. (Some reuse the namespace created by another operand,
-and depend on the code rendering the two operands in the right order.)
+and depend on the rendering code to render the two operands in the
+right order.)
 
 Some operands require creating objects of Custom Resource types that
 are defined by other OCP operators. Since the CRDs for these types may
@@ -31,29 +32,29 @@ combined status of those objects. Specifically:
   - If any operand is currently rolling out pods (or trying and
     failing to roll out pods), the operator will be `Progressing`:
 
-      - type: Progressing
-        status: "True"
-        reason: Deploying
-        message: |-
-          DaemonSet "openshift-multus/multus" is not available (awaiting 3 nodes)
-          DaemonSet "openshift-multus/network-metrics-daemon" is waiting for other operators to become ready
-          DaemonSet "openshift-multus/multus-admission-controller" is waiting for other operators to become ready
-          DaemonSet "openshift-sdn/sdn-controller" is not available (awaiting 3 nodes)
-          DaemonSet "openshift-sdn/ovs" is not available (awaiting 3 nodes)
-          DaemonSet "openshift-sdn/sdn" is not available (awaiting 3 nodes)
-          DaemonSet "openshift-network-diagnostics/network-check-target" is not available (awaiting 3 nodes)
-          Deployment "openshift-network-diagnostics/network-check-source" is waiting for other operators to become ready
-        lastTransitionTime: "2020-12-11T14:24:32Z"
+        - type: Progressing
+          status: "True"
+          reason: Deploying
+          message: |-
+            DaemonSet "openshift-multus/multus" is not available (awaiting 3 nodes)
+            DaemonSet "openshift-multus/network-metrics-daemon" is waiting for other operators to become ready
+            DaemonSet "openshift-multus/multus-admission-controller" is waiting for other operators to become ready
+            DaemonSet "openshift-sdn/sdn-controller" is not available (awaiting 3 nodes)
+            DaemonSet "openshift-sdn/ovs" is not available (awaiting 3 nodes)
+            DaemonSet "openshift-sdn/sdn" is not available (awaiting 3 nodes)
+            DaemonSet "openshift-network-diagnostics/network-check-target" is not available (awaiting 3 nodes)
+            Deployment "openshift-network-diagnostics/network-check-source" is waiting for other operators to become ready
+          lastTransitionTime: "2020-12-11T14:24:32Z"
 
   - If an operand fails to roll out for too long, the operator will
     be `Degraded`:
 
-      - type: Degraded
-        status: "True"
-        reason: RolloutHung
-        message: |-
-          DaemonSet "openshift-multus/multus" is not making progress - last change 2020-12-11T14:14:32Z"
-        lastTransitionTime: "2020-12-11T14:24:32Z"
+        - type: Degraded
+          status: "True"
+          reason: RolloutHung
+          message: |-
+            DaemonSet "openshift-multus/multus" is not making progress - last change 2020-12-11T14:14:32Z"
+          lastTransitionTime: "2020-12-11T14:24:32Z"
 
   - Once all operands report that they are fully availble, the
     operator will become `Ready`.
@@ -120,7 +121,7 @@ running because there is no concept of an "`initContainer`-only" pod.
 Multus-admission-controller is a simple admission controller that
 checks the Multus-related annotations on Pods, to provide better error
 messages when they are wrong. (The cluster will operate fine without
-this controller; it is not needed for security or functionality. It
+multus-admission-controller; it is not needed for security or functionality. It
 just makes the error handling nicer, by causing certain failures to
 happen at pod creation time rather than being reported asynchronously
 after pod creation.)
