@@ -36,10 +36,11 @@ data:
     vif_pool_driver = nested
     multi_vif_drivers = noop
 
-    enabled_handlers = vif,kuryrport,service,endpoints,kuryrloadbalancer,policy,pod_label,namespace,kuryrnetworkpolicy,kuryrnetwork{{ if .EnablePortPoolsPrepopulation }},kuryrnetwork_population{{ end }}
+    enabled_handlers = vif,kuryrport,service,endpoints,kuryrloadbalancer,policy,pod_label,namespace,openshift_machine,kuryrnetworkpolicy,kuryrnetwork{{ if .EnablePortPoolsPrepopulation }},kuryrnetwork_population{{ end }}
     pod_security_groups_driver = policy
     service_security_groups_driver = policy
     pod_subnets_driver = namespace
+    nodes_subnets_driver = openshift
 
     endpoints_driver_octavia_provider = {{ default "default" .OctaviaProvider }}
 
@@ -81,9 +82,6 @@ data:
     # so just configure openstacksdk to use it.
     cafile = /etc/ssl/certs/user-ca-bundle.crt
 {{- end }}
-
-    [pod_vif_nested]
-    worker_nodes_subnet = {{ default "\"\"" .WorkerNodesSubnet }}
 
     [vif_pool]
     ports_pool_max = {{ .PoolMaxPorts }}
