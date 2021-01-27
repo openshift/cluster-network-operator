@@ -58,7 +58,13 @@ rules:
   - securitycontextconstraints
   verbs:
   - use
-
+- apiGroups: ["machine.openshift.io"]
+  resources:
+  - machines
+  verbs:
+  - get
+  - list
+  - watch
 ---
 apiVersion: v1
 kind: ServiceAccount

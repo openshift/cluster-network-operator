@@ -11,17 +11,18 @@ require (
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/go-logr/logr v0.3.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/gophercloud/gophercloud v0.10.0
-	github.com/gophercloud/utils v0.0.0-20191020172814-bd86af96d544
+	github.com/gophercloud/gophercloud v0.14.0
+	github.com/gophercloud/utils v0.0.0-20201221031838-d93cf4b3fa50
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.1 // indirect
-	github.com/onsi/ginkgo v1.12.1 // indirect
-	github.com/onsi/gomega v1.10.1
+	github.com/onsi/gomega v1.10.2
 	github.com/openshift/api v0.0.0-20201214114959-164a2fb63b5f
 	github.com/openshift/build-machinery-go v0.0.0-20200917070002-f171684f77ab
 	github.com/openshift/client-go v0.0.0-20201020074620-f8fd44879f7c
+	github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20201201000827-1117a4fc438c // indirect
 	github.com/openshift/library-go v0.0.0-20201130154959-bd449d1e2e25
+	github.com/openshift/machine-api-operator v0.2.1-0.20201203125141-79567cb3368e
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/spf13/cobra v1.1.1
@@ -42,13 +43,16 @@ require (
 	k8s.io/component-base v0.20.0
 	k8s.io/klog/v2 v2.4.0
 	k8s.io/kube-proxy v0.20.0
+	k8s.io/kubectl v0.20.0 // indirect
 	k8s.io/kubernetes v1.20.0 // indirect
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
+	sigs.k8s.io/cluster-api-provider-openstack v0.3.3
 	sigs.k8s.io/controller-runtime v0.6.3
 	sigs.k8s.io/structured-merge-diff/v4 v4.0.2 // indirect
 )
 
 replace (
+	google.golang.org/grpc => google.golang.org/grpc v1.27.1
 	k8s.io/api => k8s.io/api v0.20.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.20.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.20.0
@@ -75,4 +79,7 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.20.0
 	k8s.io/sample-cli-plugin => k8s.io/sample-cli-plugin v0.20.0
 	k8s.io/sample-controller => k8s.io/sample-controller v0.20.0
+	sigs.k8s.io/cluster-api-provider-aws => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20201125052318-b85a18cbf338
+	sigs.k8s.io/cluster-api-provider-azure => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20201130182513-88b90230f2a4
+	sigs.k8s.io/cluster-api-provider-openstack => github.com/openshift/cluster-api-provider-openstack v0.0.0-20210107201226-5f60693f7a71
 )
