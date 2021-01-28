@@ -109,7 +109,7 @@ spec:
           readOnly: true
         resources:
           requests:
-            cpu: 100m
+            cpu: 15m
             memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
         terminationGracePeriodSeconds: 10
