@@ -266,7 +266,6 @@ github.com/openshift/client-go/operatorcontrolplane/informers/externalversions/o
 github.com/openshift/client-go/operatorcontrolplane/informers/externalversions/operatorcontrolplane/v1alpha1
 github.com/openshift/client-go/operatorcontrolplane/listers/operatorcontrolplane/v1alpha1
 # github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20201201000827-1117a4fc438c
-## explicit
 github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1
 # github.com/openshift/library-go v0.0.0-20201130154959-bd449d1e2e25
 ## explicit
@@ -344,6 +343,7 @@ github.com/stretchr/testify/assert
 github.com/vishvananda/netlink
 github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae
+## explicit
 github.com/vishvananda/netns
 # go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
 go.etcd.io/etcd/auth/authpb
@@ -420,7 +420,6 @@ golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/text v0.3.4
-## explicit
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
@@ -670,7 +669,6 @@ k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/reflect
 # k8s.io/apiserver v0.20.0 => k8s.io/apiserver v0.20.0
-## explicit
 k8s.io/apiserver/pkg/admission
 k8s.io/apiserver/pkg/admission/configuration
 k8s.io/apiserver/pkg/admission/initializer
@@ -794,8 +792,6 @@ k8s.io/apiserver/plugin/pkg/audit/truncate
 k8s.io/apiserver/plugin/pkg/audit/webhook
 k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 k8s.io/apiserver/plugin/pkg/authorizer/webhook
-# k8s.io/cli-runtime v0.20.0 => k8s.io/cli-runtime v0.20.0
-## explicit
 # k8s.io/client-go v0.20.0 => k8s.io/client-go v0.20.0
 ## explicit
 k8s.io/client-go/discovery
@@ -979,8 +975,6 @@ k8s.io/client-go/util/jsonpath
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/retry
 k8s.io/client-go/util/workqueue
-# k8s.io/cloud-provider v0.20.0 => k8s.io/cloud-provider v0.20.0
-## explicit
 # k8s.io/code-generator v0.20.0 => k8s.io/code-generator v0.20.0
 ## explicit
 k8s.io/code-generator
@@ -1065,10 +1059,6 @@ k8s.io/kube-openapi/pkg/util/sets
 # k8s.io/kube-proxy v0.20.0 => k8s.io/kube-proxy v0.20.0
 ## explicit
 k8s.io/kube-proxy/config/v1alpha1
-# k8s.io/kubectl v0.20.0 => k8s.io/kubectl v0.20.0
-## explicit
-# k8s.io/kubernetes v1.20.0
-## explicit
 # k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 ## explicit
 k8s.io/utils/buffer
@@ -1127,7 +1117,6 @@ sigs.k8s.io/controller-runtime/pkg/webhook/conversion
 sigs.k8s.io/controller-runtime/pkg/webhook/internal/certwatcher
 sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics
 # sigs.k8s.io/structured-merge-diff/v4 v4.0.2
-## explicit
 sigs.k8s.io/structured-merge-diff/v4/fieldpath
 sigs.k8s.io/structured-merge-diff/v4/merge
 sigs.k8s.io/structured-merge-diff/v4/schema
