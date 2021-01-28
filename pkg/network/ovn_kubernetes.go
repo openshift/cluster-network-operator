@@ -15,6 +15,7 @@ import (
 	yaml "github.com/ghodss/yaml"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -33,9 +34,10 @@ const OVN_SB_RAFT_PORT = "9644"
 const CLUSTER_CONFIG_NAME = "cluster-config-v1"
 const CLUSTER_CONFIG_NAMESPACE = "kube-system"
 const OVN_CERT_CN = "ovn"
-
-const OVN_MASTER_DISCOVERY_TIMEOUT = 280
 const OVN_MASTER_DISCOVERY_POLL = 5
+const OVN_MASTER_DISCOVERY_BACKOFF = 120
+
+var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
 // This creates
@@ -70,7 +72,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_CONTROLLER_INACTIVITY_PROBE"] = os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
 	data.Data["OVN_NB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterIPs, OVN_NB_PORT)
 	data.Data["OVN_SB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterIPs, OVN_SB_PORT)
-	data.Data["OVN_MASTER_IP"] = bootstrapResult.OVN.MasterIPs[0]
+	data.Data["OVN_DB_CLUSTER_INITIATOR"] = bootstrapResult.OVN.ClusterInitiator
 	data.Data["OVN_MIN_AVAILABLE"] = len(bootstrapResult.OVN.MasterIPs)/2 + 1
 	data.Data["LISTEN_DUAL_STACK"] = listenDualStack(bootstrapResult.OVN.MasterIPs[0])
 	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
@@ -254,7 +256,7 @@ type replicaCountDecoder struct {
 	} `json:"controlPlane"`
 }
 
-func bootstrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
+func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 	clusterConfig := &corev1.ConfigMap{}
 	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
 	masterNodeList := &corev1.NodeList{}
@@ -272,7 +274,7 @@ func bootstrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) 
 
 	var heartBeat int
 
-	err := wait.PollImmediate(OVN_MASTER_DISCOVERY_POLL*time.Second, OVN_MASTER_DISCOVERY_TIMEOUT*time.Second, func() (bool, error) {
+	err := wait.PollImmediate(OVN_MASTER_DISCOVERY_POLL*time.Second, time.Duration(OVN_MASTER_DISCOVERY_TIMEOUT)*time.Second, func() (bool, error) {
 		matchingLabels := &client.MatchingLabels{"node-role.kubernetes.io/master": ""}
 		if err := kubeClient.List(context.TODO(), masterNodeList, matchingLabels); err != nil {
 			return false, err
@@ -288,8 +290,20 @@ func bootstrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) 
 		}
 		return false, nil
 	})
-	if err != nil {
-		return nil, fmt.Errorf("Unable to bootstrap OVN, expected amount of control plane nodes (%v) do not match found (%v): %s", controlPlaneReplicaCount, len(masterNodeList.Items), err)
+	if wait.ErrWaitTimeout == err {
+		klog.Warningf("Timeout exceeded while bootstraping OVN, expected amount of control plane nodes (%v) do not match found (%v): %s, continuing deployment with found replicas", controlPlaneReplicaCount, len(masterNodeList.Items))
+		// On certain types of cluster this condition will never be met (assisted installer, for example)
+		// As to not hold the reconciliation loop for too long on such clusters: dynamically modify the timeout
+		// to a shorter and shorter value. Never reach 0 however as that will result in a `PollInfinity`.
+		// Right now we'll do:
+		// - First reconciliation 250 second timeout
+		// - Second reconciliation 130 second timeout
+		// - >= Third reconciliation 10 second timeout
+		if OVN_MASTER_DISCOVERY_TIMEOUT-OVN_MASTER_DISCOVERY_BACKOFF > 0 {
+			OVN_MASTER_DISCOVERY_TIMEOUT = OVN_MASTER_DISCOVERY_TIMEOUT - OVN_MASTER_DISCOVERY_BACKOFF
+		}
+	} else if err != nil {
+		return nil, fmt.Errorf("Unable to bootstrap OVN, err: %v", err)
 	}
 
 	ovnMasterIPs := make([]string, len(masterNodeList.Items))
@@ -309,12 +323,42 @@ func bootstrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) 
 
 	sort.Strings(ovnMasterIPs)
 
+	// clusterInitiator is used to avoid a split-brain scenario for the OVN NB/SB DBs. We want to consistently initialize
+	// any OVN cluster which is bootstrapped here, to the same initiator (should it still exists), hence we annotate the
+	// network.operator.openshift.io CRD with this information and always try to re-use the same member for the OVN RAFT
+	// cluster initialization
+	var clusterInitiator string
+	currentAnnotation := conf.GetAnnotations()
+	if cInitiator, ok := currentAnnotation[names.OVNRaftClusterInitiator]; ok && currentInitiatorExists(ovnMasterIPs, cInitiator) {
+		clusterInitiator = cInitiator
+	} else {
+		clusterInitiator = ovnMasterIPs[0]
+		if currentAnnotation == nil {
+			currentAnnotation = map[string]string{
+				names.OVNRaftClusterInitiator: clusterInitiator,
+			}
+		} else {
+			currentAnnotation[names.OVNRaftClusterInitiator] = clusterInitiator
+		}
+		conf.SetAnnotations(currentAnnotation)
+	}
+
 	res := bootstrap.BootstrapResult{
 		OVN: bootstrap.OVNBootstrapResult{
-			MasterIPs: ovnMasterIPs,
+			MasterIPs:        ovnMasterIPs,
+			ClusterInitiator: clusterInitiator,
 		},
 	}
 	return &res, nil
+}
+
+func currentInitiatorExists(ovnMasterIPs []string, configInitiator string) bool {
+	for _, masterIP := range ovnMasterIPs {
+		if masterIP == configInitiator {
+			return true
+		}
+	}
+	return false
 }
 
 func dbList(masterIPs []string, port string) string {
