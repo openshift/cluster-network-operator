@@ -437,6 +437,15 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("Progressing condition unexpectedly missing")
 	}
 
+	err = client.Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, dsA)
+	if err != nil {
+		t.Fatalf("error getting DaemonSet: %v", err)
+	}
+	err = client.Get(context.TODO(), types.NamespacedName{Namespace: "two", Name: "beta"}, dsB)
+	if err != nil {
+		t.Fatalf("error getting DaemonSet: %v", err)
+	}
+
 	// Update to report expected deployment size
 	dsANodes := int32(1)
 	dsBNodes := int32(3)
@@ -486,6 +495,15 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		} else {
 			// unreachable
 			t.Fatalf("Progressing condition unexpectedly missing")
+		}
+
+		err = client.Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, dsA)
+		if err != nil {
+			t.Fatalf("error getting DaemonSet: %v", err)
+		}
+		err = client.Get(context.TODO(), types.NamespacedName{Namespace: "two", Name: "beta"}, dsB)
+		if err != nil {
+			t.Fatalf("error getting DaemonSet: %v", err)
 		}
 
 		if dsA.Status.NumberUnavailable > 0 {
@@ -766,6 +784,20 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
 	}
 
+	// check hung annotation is set (also, need to refresh objects since they were updated)
+	err = client.Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, dsA)
+	if err != nil {
+		t.Fatalf("error getting DaemonSet: %v", err)
+	}
+	err = client.Get(context.TODO(), types.NamespacedName{Namespace: "two", Name: "beta"}, dsB)
+	if err != nil {
+		t.Fatalf("error getting DaemonSet: %v", err)
+	}
+
+	if _, set := dsA.Annotations[names.RolloutHungAnnotation]; !set {
+		t.Fatalf("Expected rollout-hung annotation, but was missing")
+	}
+
 	// done: numberReady -> 1, numberUnavailable -> 0
 	dsA.Status = appsv1.DaemonSetStatus{
 		CurrentNumberScheduled: 1,
@@ -806,6 +838,16 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+
+	dsA = &appsv1.DaemonSet{} // some weird bug in the fake client that doesn't handle deleting annotations
+	err = client.Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, dsA)
+	if err != nil {
+		t.Fatalf("error getting DaemonSet: %v", err)
+	}
+
+	if val, set := dsA.GetAnnotations()[names.RolloutHungAnnotation]; set {
+		t.Fatalf("Expected no rollout-hung annotation, but was present %s", val)
 	}
 
 	// Test non-critical DaemonSets
@@ -897,6 +939,10 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 
 	// Now update
+	err = client.Get(context.TODO(), nsn, dsNC)
+	if err != nil {
+		t.Fatalf("Error getting ds: %v", err)
+	}
 	dsNC.Status.NumberAvailable = 1
 	dsNC.Status.NumberUnavailable = 0
 	dsNC.Status.DesiredNumberScheduled = 1
@@ -1030,6 +1076,15 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}
 
 	// Update to report expected deployment size
+	err = client.Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, depA)
+	if err != nil {
+		t.Fatalf("error getting Deployment: %v", err)
+	}
+	err = client.Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "beta"}, depB)
+	if err != nil {
+		t.Fatalf("error getting Deployment: %v", err)
+	}
+
 	depA.Status.UnavailableReplicas = 0
 	depA.Status.AvailableReplicas = 1
 	err = client.Update(context.TODO(), depA)
@@ -1174,6 +1229,15 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+
+	err = client.Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, depA)
+	if err != nil {
+		t.Fatalf("error getting Deployment: %v", err)
+	}
+	err = client.Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "beta"}, depB)
+	if err != nil {
+		t.Fatalf("error getting Deployment: %v", err)
 	}
 
 	depB.Status.UnavailableReplicas = 0
