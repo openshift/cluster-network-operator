@@ -2,6 +2,8 @@ package bootstrap
 
 import (
 	"github.com/gophercloud/utils/openstack/clientconfig"
+
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 type KuryrBootstrapResult struct {
@@ -24,7 +26,9 @@ type KuryrBootstrapResult struct {
 }
 
 type OVNBootstrapResult struct {
-	MasterIPs []string
+	MasterIPs               []string
+	ExistingMasterDaemonset *appsv1.DaemonSet
+	ExistingNodeDaemonset   *appsv1.DaemonSet
 }
 
 type BootstrapResult struct {

@@ -3,15 +3,19 @@ package network
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/ghodss/yaml"
+	. "github.com/onsi/gomega"
+
+	appsv1 "k8s.io/api/apps/v1"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
-
-	. "github.com/onsi/gomega"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
-	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var OVNKubernetesConfig = operv1.Network{
@@ -488,6 +492,470 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	g.Expect(errs).To(HaveLen(2))
 	g.Expect(errs[0]).To(MatchError("cannot change ovn-kubernetes MTU"))
 	g.Expect(errs[1]).To(MatchError("cannot change ovn-kubernetes genevePort"))
+}
+
+// TestOVNKubernetesShouldUpdateMaster checks to see that
+func TestOVNKubernetestShouldUpdateMaster(t *testing.T) {
+
+	for idx, tc := range []struct {
+		expectNode   bool
+		expectMaster bool
+		node         string
+		master       string
+		rv           string // release version
+	}{
+
+		// No node and master - upgrade = true
+		{
+			expectNode:   true,
+			expectMaster: true,
+		},
+
+		{
+			expectNode:   true,
+			expectMaster: true,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 4.7.0-0.ci-2021-01-10-200841
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+`,
+		},
+
+		{
+			expectNode:   true,
+			expectMaster: true,
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 4.7.0-0.ci-2021-01-10-200841
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+`,
+		},
+
+		// steady state
+		{
+			expectNode:   true,
+			expectMaster: true,
+			rv:           "2.0.0",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 2.0.0
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 2.0.0
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+`,
+		},
+
+		// upgrade not yet applied
+		{
+			expectNode:   true,
+			expectMaster: false,
+			rv:           "2.0.0",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+`,
+		},
+
+		// node upgrade applied, upgrade not yet rolled out
+		{
+			expectNode:   true,
+			expectMaster: false,
+			rv:           "2.0.0",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 2.0.0
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+  generation: 2
+status:
+  currentNumberScheduled: 6
+  desiredNumberScheduled: 6
+  numberAvailable: 6
+  numberMisscheduled: 0
+  numberReady: 6
+  observedGeneration: 1
+  updatedNumberScheduled: 6
+`,
+		},
+
+		// node upgrade rolling out
+		{
+			expectNode:   true,
+			expectMaster: false,
+
+			rv: "2.0.0",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 2.0.0
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+  generation: 2
+status:
+  currentNumberScheduled: 6
+  desiredNumberScheduled: 6
+  numberAvailable: 5
+  numberUnavailable: 1
+  numberMisscheduled: 0
+  numberReady: 5
+  observedGeneration: 2
+  updatedNumberScheduled: 5
+`,
+		},
+		// node upgrade hung but not made progress
+		{
+			expectNode:   true,
+			expectMaster: false,
+			rv:           "2.0.0",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 2.0.0
+    networkoperator.openshift.io/rollout-hung: ""
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+  generation: 2
+status:
+  currentNumberScheduled: 6
+  desiredNumberScheduled: 6
+  numberAvailable: 5
+  numberUnavailable: 1
+  numberMisscheduled: 0
+  numberReady: 5
+  observedGeneration: 2
+  updatedNumberScheduled: 4
+`,
+		},
+
+		// node upgrade hung but made enough progress
+		{
+			expectNode:   true,
+			expectMaster: true,
+			rv:           "2.0.0",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 2.0.0
+    networkoperator.openshift.io/rollout-hung: ""
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+  generation: 2
+status:
+  currentNumberScheduled: 6
+  desiredNumberScheduled: 6
+  numberAvailable: 5
+  numberUnavailable: 1
+  numberMisscheduled: 0
+  numberReady: 5
+  observedGeneration: 2
+  updatedNumberScheduled: 5
+`,
+		},
+		// Upgrade rolled out, everything is good
+		{
+			expectNode:   true,
+			expectMaster: true,
+			rv:           "2.0.0",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 2.0.0
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+  generation: 2
+status:
+  currentNumberScheduled: 6
+  desiredNumberScheduled: 6
+  numberAvailable: 6
+  numberMisscheduled: 0
+  numberReady: 6
+  observedGeneration: 2
+  updatedNumberScheduled: 6
+`,
+		},
+
+		// downgrade not yet applied
+		{
+			expectNode:   false,
+			expectMaster: true,
+			rv:           "1.8.9",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+`,
+		},
+
+		// master downgrade applied, not yet rolled out
+		{
+			expectNode:   false,
+			expectMaster: true,
+			rv:           "1.8.9",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.8.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+  generation: 2
+status:
+  currentNumberScheduled: 6
+  desiredNumberScheduled: 6
+  numberAvailable: 6
+  numberMisscheduled: 0
+  numberReady: 6
+  observedGeneration: 1
+  updatedNumberScheduled: 6
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+`,
+		},
+
+		// downgrade rolling out
+		{
+			expectNode:   false,
+			expectMaster: true,
+
+			rv: "1.8.9",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.8.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+  generation: 2
+status:
+  currentNumberScheduled: 6
+  desiredNumberScheduled: 6
+  numberAvailable: 5
+  numberUnavailable: 1
+  numberMisscheduled: 0
+  numberReady: 5
+  observedGeneration: 2
+  updatedNumberScheduled: 
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9 
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+`,
+		},
+
+		// downgrade hung but not made progress
+		{
+			expectNode:   false,
+			expectMaster: true,
+			rv:           "1.8.9",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.8.9
+    networkoperator.openshift.io/rollout-hung: ""
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+  generation: 2
+status:
+  currentNumberScheduled: 3
+  desiredNumberScheduled: 3
+  numberAvailable: 2
+  numberUnavailable: 1
+  numberMisscheduled: 0
+  numberReady: 2
+  observedGeneration: 2
+  updatedNumberScheduled: 1
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9 
+  namespace: openshift-ovn-kubernetes
+`,
+		},
+
+		// downgrade hung but made enough progress
+		// except we always wait for 100% master.
+		{
+			expectNode:   false,
+			expectMaster: true,
+			rv:           "1.8.9",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.8.9
+    networkoperator.openshift.io/rollout-hung: ""
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+  generation: 2
+status:
+  currentNumberScheduled: 3
+  desiredNumberScheduled: 3
+  numberAvailable: 2
+  numberUnavailable: 1
+  numberMisscheduled: 0
+  numberReady: 2
+  observedGeneration: 2
+  updatedNumberScheduled: 3
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9 
+  namespace: openshift-ovn-kubernetes
+`,
+		},
+	} {
+		t.Run(strconv.Itoa(idx), func(t *testing.T) {
+			g := NewGomegaWithT(t)
+
+			var node *appsv1.DaemonSet
+			var master *appsv1.DaemonSet
+
+			if tc.node != "" {
+				node = &appsv1.DaemonSet{}
+				err := yaml.Unmarshal([]byte(tc.node), node)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			if tc.master != "" {
+				master = &appsv1.DaemonSet{}
+				err := yaml.Unmarshal([]byte(tc.master), master)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			updateNode, updateMaster := shouldUpdateOVNK(node, master, tc.rv)
+			g.Expect(updateNode).To(Equal(tc.expectNode), "Check node")
+			g.Expect(updateMaster).To(Equal(tc.expectMaster), "Check master")
+		})
+	}
 }
 
 func extractOVNKubeConfig(g *WithT, objs []*uns.Unstructured) string {
