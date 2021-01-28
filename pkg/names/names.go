@@ -41,6 +41,10 @@ const NetworkMigrationAnnotation = "networkoperator.openshift.io/network-migrati
 // which node IP was the raft cluster initiator. The NB and SB DB will be initialized by the same member.
 const OVNRaftClusterInitiator = "networkoperator.openshift.io/ovn-cluster-initiator"
 
+// RolloutHungAnnotation is set to "" if it is detected that a rollout
+// (i.e. DaemonSet or Deployment) is not making progress, unset otherwise.
+const RolloutHungAnnotation = "networkoperator.openshift.io/rollout-hung"
+
 // KuryrOctaviaProviderAnnotation is used to save latest Octavia provider that was configured in order to
 // prevent from reconfiguring it automatically when underlying Octavia changes.
 const KuryrOctaviaProviderAnnotation = "networkoperator.openshift.io/kuryr-octavia-provider"
