@@ -183,21 +183,22 @@ func validateKuryr(conf *operv1.NetworkSpec) []error {
 	return out
 }
 
-// isKuryrChangeSafe currently returns an error if any changes are made.
-// In the future we'll support changing some stuff.
+// isKuryrChangeSafe makes sure to only allow changes applied to kuryr.conf
+// and not to the resources created in the bootstrap process.
 func isKuryrChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	pn := prev.DefaultNetwork.KuryrConfig
 	nn := next.DefaultNetwork.KuryrConfig
+	errs := []error{}
 
-	// TODO(dulek): Some changes might be safe in the future, once we figure out how to do them.
 	if reflect.DeepEqual(pn, nn) {
-		return []error{}
+		return errs
 	}
 
-	// NOTE(dulek): We allow changes to the NetworkSpec.LogLevel, but that's on higher level,
-	//              so simply not doing anything is enough to allow it.
+	if pn.OpenStackServiceNetwork != nn.OpenStackServiceNetwork {
+		errs = append(errs, errors.Errorf("cannot change kuryr openStackServiceNetwork"))
+	}
 
-	return []error{errors.Errorf("cannot change kuryr configuration")}
+	return errs
 }
 
 func fillKuryrDefaults(conf *operv1.NetworkSpec) {
