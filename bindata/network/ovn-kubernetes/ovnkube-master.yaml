@@ -171,7 +171,24 @@ spec:
             return 1
           }
           # end of cluster_exists()
-          
+
+          OVN_ARGS="--db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
+            --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
+            --no-monitor \
+            --db-nb-cluster-local-proto=ssl \
+            --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
+            --ovn-nb-db-ssl-cert=/ovn-cert/tls.crt \
+            --ovn-nb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt"
+
+          # if ovsdb supports column diffs, disable them, since they can cause upgrade issues
+          set +e
+          /usr/share/ovn/scripts/ovn-ctl --help 2>&1 | grep -q disable-file-column-diff; RC=$?
+          set -e
+          if [[ "$RC" -eq 0 ]]; then
+            echo "column diffs supported but disabled"
+            OVN_ARGS="${OVN_ARGS} --ovsdb-disable-file-column-diff=yes"
+          fi
+
           CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
           echo "$(date -Iseconds) - starting nbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}, K8S_NODE_IP=${K8S_NODE_IP}"
           initial_raft_create=true
@@ -198,60 +215,32 @@ spec:
               echo "Cluster already exists for DB: ${db}"
               initial_raft_create=false
               # join existing cluster
-              exec /usr/share/ovn/scripts/ovn-ctl \
-              --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
+              exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
               --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
-              --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
               --db-nb-cluster-remote-addr=${init_ip} \
-              --no-monitor \
-              --db-nb-cluster-local-proto=ssl \
               --db-nb-cluster-remote-proto=ssl \
-              --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
-              --ovn-nb-db-ssl-cert=/ovn-cert/tls.crt \
-              --ovn-nb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
               --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
               run_nb_ovsdb
             else
               # either we need to initialize a new cluster or wait for master to create it
               if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
-                exec /usr/share/ovn/scripts/ovn-ctl \
-                --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
-                --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
-                --no-monitor \
-                --db-nb-cluster-local-proto=ssl \
-                --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
-                --ovn-nb-db-ssl-cert=/ovn-cert/tls.crt \
-                --ovn-nb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
+                exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
                 run_nb_ovsdb
               else
                 echo "Joining the nbdb cluster with init_ip=${init_ip}..."
-                exec /usr/share/ovn/scripts/ovn-ctl \
-                --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
+                exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
-                --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
                 --db-nb-cluster-remote-addr=${init_ip} \
-                --no-monitor \
-                --db-nb-cluster-local-proto=ssl \
                 --db-nb-cluster-remote-proto=ssl \
-                --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
-                --ovn-nb-db-ssl-cert=/ovn-cert/tls.crt \
-                --ovn-nb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
                 --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
                 run_nb_ovsdb
               fi
             fi
           else
-            exec /usr/share/ovn/scripts/ovn-ctl \
-            --db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
-            --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
-            --no-monitor \
-            --db-nb-cluster-local-proto=ssl \
-            --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
-            --ovn-nb-db-ssl-cert=/ovn-cert/tls.crt \
-            --ovn-nb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
-            --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
-            run_nb_ovsdb
+            exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
+              --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
+              run_nb_ovsdb
           fi
 
         lifecycle:
@@ -562,6 +551,23 @@ spec:
             return 1
           }
           # end of cluster_exists()
+
+          OVN_ARGS="--db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
+            --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
+            --no-monitor \
+            --db-sb-cluster-local-proto=ssl \
+            --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
+            --ovn-sb-db-ssl-cert=/ovn-cert/tls.crt \
+            --ovn-sb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt"
+
+          # if ovsdb supports column diffs, disable them, since they can cause upgrade issues
+          set +e
+          /usr/share/ovn/scripts/ovn-ctl --help 2>&1 | grep -q disable-file-column-diff; RC=$?
+          set -e
+          if [[ "$RC" -eq 0 ]]; then
+            echo "column diffs supported but disabled"
+            OVN_ARGS="${OVN_ARGS} --ovsdb-disable-file-column-diff=yes"
+          fi
           
           CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
           echo "$(date -Iseconds) - starting sbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}"
@@ -589,57 +595,29 @@ spec:
               echo "Cluster already exists for DB: ${db}"
               initial_raft_create=false
               # join existing cluster
-              exec /usr/share/ovn/scripts/ovn-ctl \
-              --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
+              exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
               --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
-              --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
               --db-sb-cluster-remote-addr=${init_ip} \
-              --no-monitor \
-              --db-sb-cluster-local-proto=ssl \
               --db-sb-cluster-remote-proto=ssl \
-              --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
-              --ovn-sb-db-ssl-cert=/ovn-cert/tls.crt \
-              --ovn-sb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
               --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
               run_sb_ovsdb
             else
               # either we need to initialize a new cluster or wait for master to create it
               if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
-                exec /usr/share/ovn/scripts/ovn-ctl \
-                --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
-                --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
-                --no-monitor \
-                --db-sb-cluster-local-proto=ssl \
-                --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
-                --ovn-sb-db-ssl-cert=/ovn-cert/tls.crt \
-                --ovn-sb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
+                exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
                 run_sb_ovsdb
               else
-                exec /usr/share/ovn/scripts/ovn-ctl \
-                --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
+                exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
-                --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
                 --db-sb-cluster-remote-addr=${init_ip} \
-                --no-monitor \
-                --db-sb-cluster-local-proto=ssl \
                 --db-sb-cluster-remote-proto=ssl \
-                --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
-                --ovn-sb-db-ssl-cert=/ovn-cert/tls.crt \
-                --ovn-sb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
                 --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
                 run_sb_ovsdb
               fi
             fi
           else
-            exec /usr/share/ovn/scripts/ovn-ctl \
-            --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
-            --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
-            --no-monitor \
-            --db-sb-cluster-local-proto=ssl \
-            --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
-            --ovn-sb-db-ssl-cert=/ovn-cert/tls.crt \
-            --ovn-sb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
+            exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
             run_sb_ovsdb
           fi
