@@ -202,7 +202,7 @@ spec:
           # We now start ovs-monitor-ipsec which will monitor for changes in the ovs
           # tunnelling configuration (for example addition of a node) and configures
           # libreswan appropriately.
-          OVS_LOGDIR=/var/log/openvswitch OVS_RUNDIR=/var/run/openvswitch OVS_PKGDATADIR=/usr/share/openvswitch /usr/share/openvswitch/scripts/ovs-ctl --ike-daemon=libreswan start-ovs-ipsec
+          OVS_LOGDIR=/var/log/openvswitch OVS_RUNDIR=/var/run/openvswitch OVS_PKGDATADIR=/usr/share/openvswitch /usr/share/openvswitch/scripts/ovs-ctl --ike-daemon=libreswan --no-restart-ike-daemon start-ovs-ipsec
 
           while true; do
             sleep 60
