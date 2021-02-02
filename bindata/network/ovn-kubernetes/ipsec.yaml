@@ -193,8 +193,6 @@ spec:
           /usr/libexec/ipsec/_stackmanager start
           # Check nss database status
           /usr/sbin/ipsec --checknss
-          # Check nflog setup
-          /usr/sbin/ipsec --checknflog
           # Start the pluto IKE daemon
           /usr/libexec/ipsec/pluto --leak-detective --config /etc/ipsec.conf --logfile /var/log/openvswitch/libreswan.log
 
