@@ -202,9 +202,7 @@ spec:
           # libreswan appropriately.
           OVS_LOGDIR=/var/log/openvswitch OVS_RUNDIR=/var/run/openvswitch OVS_PKGDATADIR=/usr/share/openvswitch /usr/share/openvswitch/scripts/ovs-ctl --ike-daemon=libreswan --no-restart-ike-daemon start-ovs-ipsec
 
-          while true; do
-            sleep 60
-          done
+          sleep infinity
         env:
         - name: OVS_LOG_LEVEL
           value: info
