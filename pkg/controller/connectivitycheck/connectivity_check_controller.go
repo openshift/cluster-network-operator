@@ -58,6 +58,7 @@ func NewNetworkConnectivityCheckController(
 			operatorcontrolplaneClient,
 			apiextensionsClient,
 			apiextensionsInformers,
+			configInformers,
 			[]factory.Informer{
 				operatorClient.Informer(),
 				kubeInformersForNamespaces.InformersFor("openshift-network-diagnostics").Core().V1().Pods().Informer(),
