@@ -19,7 +19,7 @@ require (
 	github.com/onsi/gomega v1.10.2
 	github.com/openshift/api v0.0.0-20201214114959-164a2fb63b5f
 	github.com/openshift/build-machinery-go v0.0.0-20200917070002-f171684f77ab
-	github.com/openshift/client-go v0.0.0-20201020074620-f8fd44879f7c
+	github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49
 	github.com/openshift/library-go v0.0.0-20201130154959-bd449d1e2e25
 	github.com/openshift/machine-api-operator v0.2.1-0.20201203125141-79567cb3368e
 	github.com/pkg/errors v0.9.1
@@ -45,6 +45,7 @@ require (
 )
 
 replace (
+	github.com/openshift/library-go => github.com/sanchezl/library-go v0.0.0-20210204225617-b323a3976dd5
 	google.golang.org/grpc => google.golang.org/grpc v1.27.1
 	k8s.io/api => k8s.io/api v0.20.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.20.0
