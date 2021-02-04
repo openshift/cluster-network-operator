@@ -2,14 +2,12 @@ package resourceapply
 
 import (
 	"fmt"
-
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	"github.com/openshift/api"
 	"github.com/openshift/library-go/pkg/operator/events"
-	admissionv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -31,6 +29,8 @@ var (
 func init() {
 	utilruntime.Must(api.InstallKube(genericScheme))
 	utilruntime.Must(apiextensionsv1beta1.AddToScheme(genericScheme))
+	utilruntime.Must(apiextensionsv1.AddToScheme(genericScheme))
+
 }
 
 type AssetFunc func(name string) ([]byte, error)
@@ -166,16 +166,6 @@ func ApplyDirectly(clients *ClientHolder, recorder events.Recorder, manifests As
 				result.Error = fmt.Errorf("missing kubeClient")
 			}
 			result.Result, result.Changed, result.Error = ApplyCSIDriver(clients.kubeClient.StorageV1(), recorder, t)
-		case *admissionv1.ValidatingWebhookConfiguration:
-			if clients.kubeClient == nil {
-				result.Error = fmt.Errorf("missing kubeClient")
-			}
-			result.Result, result.Changed, result.Error = ApplyValidatingWebhookConfiguration(clients.kubeClient.AdmissionregistrationV1(), recorder, t)
-		case *admissionv1.MutatingWebhookConfiguration:
-			if clients.kubeClient == nil {
-				result.Error = fmt.Errorf("missing kubeClient")
-			}
-			result.Result, result.Changed, result.Error = ApplyMutatingWebhookConfiguration(clients.kubeClient.AdmissionregistrationV1(), recorder, t)
 		default:
 			result.Error = fmt.Errorf("unhandled type %T", requiredObj)
 		}
