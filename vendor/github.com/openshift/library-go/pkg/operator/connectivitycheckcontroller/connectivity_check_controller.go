@@ -3,10 +3,12 @@ package connectivitycheckcontroller
 import (
 	"context"
 	"encoding/json"
-	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/api/operatorcontrolplane/v1alpha1"
+	configinformers "github.com/openshift/client-go/config/informers/externalversions"
+	configv1listers "github.com/openshift/client-go/config/listers/config/v1"
 	operatorcontrolplaneclient "github.com/openshift/client-go/operatorcontrolplane/clientset/versioned"
 	"github.com/openshift/library-go/pkg/operator/connectivitycheckcontroller/bindata"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -36,6 +38,7 @@ func NewConnectivityCheckController(
 	operatorcontrolplaneClient *operatorcontrolplaneclient.Clientset,
 	apiextensionsClient *apiextensionsclient.Clientset,
 	apiextensionsInformers apiextensionsinformers.SharedInformerFactory,
+	configInformers configinformers.SharedInformerFactory,
 	triggers []factory.Informer,
 	recorder events.Recorder,
 	enabledByDefault bool,
@@ -45,12 +48,14 @@ func NewConnectivityCheckController(
 		operatorClient:             operatorClient,
 		operatorcontrolplaneClient: operatorcontrolplaneClient,
 		apiextensionsClient:        apiextensionsClient,
+		clusterVersionLister:       configInformers.Config().V1().ClusterVersions().Lister(),
 		enabledByDefault:           enabledByDefault,
 	}
 
 	allTriggers := []factory.Informer{
 		operatorClient.Informer(),
 		apiextensionsInformers.Apiextensions().V1().CustomResourceDefinitions().Informer(),
+		configInformers.Config().V1().ClusterVersions().Informer(),
 	}
 	allTriggers = append(allTriggers, triggers...)
 
@@ -67,6 +72,7 @@ type connectivityCheckController struct {
 	operatorClient             v1helpers.OperatorClient
 	operatorcontrolplaneClient *operatorcontrolplaneclient.Clientset
 	apiextensionsClient        *apiextensionsclient.Clientset
+	clusterVersionLister       configv1listers.ClusterVersionLister
 
 	podNetworkConnectivityCheckFn PodNetworkConnectivityCheckFunc
 
@@ -112,19 +118,35 @@ func (c *connectivityCheckController) Sync(ctx context.Context, syncContext fact
 		return err
 	}
 
-	crd, getCRDErr := c.apiextensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, podnetworkconnectivitychecksCRDName, metav1.GetOptions{})
-	if getCRDErr != nil && !errors.IsNotFound(getCRDErr) {
-		return getCRDErr
+	// do nothing while an upgrade is in progress
+	clusterVersion, err := c.clusterVersionLister.Get("version")
+	if err != nil {
+		return err
+	}
+	desired := clusterVersion.Status.Desired.Version
+	history := clusterVersion.Status.History
+	// upgrade is in progress if there is no history, or the latest history entry matches the desired version and is not completed
+	if len(history) == 0 {
+		klog.V(1).Infof("ConnectivityCheckController is waiting for transition to first desired version (%s) to be completed.", desired)
+		return nil
+	}
+	if history[0].Version != desired {
+		klog.V(1).Infof("ConnectivityCheckController is waiting for transition to desired version (%s) to be started.", desired)
+		return nil
+	}
+	if history[0].State != configv1.CompletedUpdate {
+		klog.V(1).Infof("ConnectivityCheckController is waiting for transition to desired version (%s) to be completed.", desired)
+		return nil
+	}
+
+	// re-create crd if deleted during an upgrade
+	err = ensureConnectivityCheckCRDExists(ctx, syncContext, c.apiextensionsClient)
+	if err != nil {
+		return err
 	}
 
 	if !enabled {
-		// controller is not enabled
-		if errors.IsNotFound(getCRDErr) {
-			// crd has already been removed
-			return nil
-		}
-
-		// delete all podnetworkconnectivitychecks managed by this controller instance
+		// controller is not enabled, delete all podnetworkconnectivitychecks managed by this controller instance
 		checks, err := c.operatorcontrolplaneClient.ControlplaneV1alpha1().PodNetworkConnectivityChecks(c.namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return err
@@ -135,38 +157,7 @@ func (c *connectivityCheckController) Sync(ctx context.Context, syncContext fact
 				return err
 			}
 		}
-
-		// if there are still podnetworkconnectivitychecks resources in other namespaces, do not delete the crd
-		checks, err = c.operatorcontrolplaneClient.ControlplaneV1alpha1().PodNetworkConnectivityChecks("").List(ctx, metav1.ListOptions{})
-		if err != nil {
-			return err
-		}
-		if len(checks.Items) > 0 {
-			return nil
-		}
-
-		// if podnetworkconnectivitycheck crd is less than 2 minutes old, don't delete the crd yet. This allows another
-		// instance that has been enabled up to 2 minutes to create its podnetworkconnectivitycheck resources.
-		if crd.CreationTimestamp.Time.After(time.Now().Add(-2 * time.Minute)) {
-			return nil
-		}
-
-		// delete the podnetworkconnectivitycheck crd that should not exist
-		return c.apiextensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, crd.Name, metav1.DeleteOptions{})
-	}
-
-	// controller is enabled
-	if errors.IsNotFound(getCRDErr) {
-		// create the podnetworkconnectivitycheck crd that should exist
-		applyResults := resourceapply.ApplyDirectly(
-			resourceapply.NewClientHolder().WithAPIExtensionsClient(c.apiextensionsClient),
-			syncContext.Recorder(),
-			func(name string) ([]byte, error) { return bindata.Asset(name) },
-			"pkg/operator/connectivitycheckcontroller/manifests/controlplane.operator.openshift.io_podnetworkconnectivitychecks.yaml",
-		)
-		if applyResults[0].Error != nil {
-			return applyResults[0].Error
-		}
+		return nil
 	}
 
 	checks, err := c.podNetworkConnectivityCheckFn(ctx, syncContext)
@@ -205,6 +196,26 @@ func (c *connectivityCheckController) Sync(ctx context.Context, syncContext fact
 
 	// TODO reap old connectivity checks
 
+	return nil
+}
+
+func ensureConnectivityCheckCRDExists(ctx context.Context, syncContext factory.SyncContext, client *apiextensionsclient.Clientset) error {
+	_, err := client.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, podnetworkconnectivitychecksCRDName, metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	if errors.IsNotFound(err) {
+		// create the podnetworkconnectivitycheck crd that should exist
+		applyResults := resourceapply.ApplyDirectly(
+			resourceapply.NewClientHolder().WithAPIExtensionsClient(client),
+			syncContext.Recorder(),
+			func(name string) ([]byte, error) { return bindata.Asset(name) },
+			"pkg/operator/connectivitycheckcontroller/manifests/controlplane.operator.openshift.io_podnetworkconnectivitychecks.yaml",
+		)
+		if applyResults[0].Error != nil {
+			return applyResults[0].Error
+		}
+	}
 	return nil
 }
 
