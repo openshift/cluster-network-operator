@@ -50,7 +50,7 @@ spec:
             protocol: TCP
         resources:
           requests:
-            memory: 50Mi
+            memory: 40Mi
             cpu: 10m
       nodeSelector:
         beta.kubernetes.io/os: "linux"
