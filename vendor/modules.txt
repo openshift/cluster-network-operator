@@ -236,7 +236,7 @@ github.com/openshift/build-machinery-go/make/targets/golang
 github.com/openshift/build-machinery-go/make/targets/openshift
 github.com/openshift/build-machinery-go/make/targets/openshift/operator
 github.com/openshift/build-machinery-go/scripts
-# github.com/openshift/client-go v0.0.0-20201020074620-f8fd44879f7c
+# github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49
 ## explicit
 github.com/openshift/client-go/config/clientset/versioned
 github.com/openshift/client-go/config/clientset/versioned/scheme
@@ -267,7 +267,7 @@ github.com/openshift/client-go/operatorcontrolplane/informers/externalversions/o
 github.com/openshift/client-go/operatorcontrolplane/listers/operatorcontrolplane/v1alpha1
 # github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20201201000827-1117a4fc438c
 github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1
-# github.com/openshift/library-go v0.0.0-20201130154959-bd449d1e2e25
+# github.com/openshift/library-go v0.0.0-20201130154959-bd449d1e2e25 => github.com/sanchezl/library-go v0.0.0-20210204225617-b323a3976dd5
 ## explicit
 github.com/openshift/library-go/pkg/certs
 github.com/openshift/library-go/pkg/config/client
@@ -1039,7 +1039,7 @@ k8s.io/gengo/types
 # k8s.io/klog/v2 v2.4.0
 ## explicit
 k8s.io/klog/v2
-# k8s.io/kube-aggregator v0.19.2 => k8s.io/kube-aggregator v0.20.0
+# k8s.io/kube-aggregator v0.20.0 => k8s.io/kube-aggregator v0.20.0
 k8s.io/kube-aggregator/pkg/apis/apiregistration
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
@@ -1124,6 +1124,7 @@ sigs.k8s.io/structured-merge-diff/v4/typed
 sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.2.0
 sigs.k8s.io/yaml
+# github.com/openshift/library-go => github.com/sanchezl/library-go v0.0.0-20210204225617-b323a3976dd5
 # google.golang.org/grpc => google.golang.org/grpc v1.27.1
 # k8s.io/api => k8s.io/api v0.20.0
 # k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.20.0
