@@ -97,14 +97,14 @@ spec:
             command:
             - /usr/share/openvswitch/scripts/ovs-ctl
             - status
-          initialDelaySeconds: 15
+          initialDelaySeconds: 45
           periodSeconds: 5
         readinessProbe:
           exec:
             command:
             - /usr/share/openvswitch/scripts/ovs-ctl
             - status
-          initialDelaySeconds: 15
+          initialDelaySeconds: 45
           periodSeconds: 5
         terminationGracePeriodSeconds: 10
 
