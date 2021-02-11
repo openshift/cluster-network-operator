@@ -18,7 +18,7 @@ spec:
     - alert: NodeWithoutOVSPod
       annotations:
         message: |
-          All nodes should be running an ovs pod, {{"{{"}} $labels.node {{"}}"}} is not.
+          All nodes should be running an ovs pod, {{ $labels.node }} is not.
       expr: |
         (kube_node_info unless on(node) topk by (node) (1, kube_pod_info{namespace="openshift-sdn",  pod=~"ovs.*"})) > 0
       for: 10m
@@ -27,7 +27,7 @@ spec:
     - alert: NodeWithoutSDNPod
       annotations:
         message: |
-          All nodes should be running an sdn pod, {{"{{"}} $labels.node {{"}}"}} is not.
+          All nodes should be running an sdn pod, {{ $labels.node }} is not.
       expr: |
         (kube_node_info unless on(node) topk by (node) (1, kube_pod_info{namespace="openshift-sdn",  pod=~"sdn.*"})) > 0
       for: 10m
@@ -35,7 +35,7 @@ spec:
         severity: warning
     - alert: NodeProxyApplySlow
       annotations:
-        message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} is taking too long, on average, to apply kubernetes service rules to iptables.
+        message: SDN pod {{ $labels.pod }} on node {{ $labels.node }} is taking too long, on average, to apply kubernetes service rules to iptables.
       expr: |
         histogram_quantile(.95, kubeproxy_sync_proxy_rules_duration_seconds_bucket) 
         * on(namespace, pod) group_right topk by (namespace, pod) (1, kube_pod_info{namespace="openshift-sdn",  pod=~"sdn-[^-]*"}) > 15
@@ -50,7 +50,7 @@ spec:
         severity: warning
     - alert: NodeProxyApplyStale
       annotations:
-        message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} has stale kubernetes service rules in iptables.
+        message: SDN pod {{ $labels.pod }} on node {{ $labels.node }} has stale kubernetes service rules in iptables.
       # Query: find pods where
       #  - the queued-timestamp is at least 30 seconds after the applied-timestamp
       #  - the pod (still) exists
@@ -63,7 +63,7 @@ spec:
         severity: warning
     - alert: SDNPodNotReady
       annotations:
-        message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} is not ready.
+        message: SDN pod {{ $labels.pod }} on node {{ $labels.node }} is not ready.
       expr: |
         kube_pod_status_ready{namespace='openshift-sdn', condition='true'} == 0
       for: 10m
