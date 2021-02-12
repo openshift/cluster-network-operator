@@ -43,6 +43,9 @@ data:
 
     endpoints_driver_octavia_provider = {{ default "default" .OctaviaProvider }}
 
+    [pod_vif_nested]
+    worker_nodes_subnets = {{ .WorkerNodesSubnets }}
+
     [octavia_defaults]
     member_mode = {{ default "L3" .OctaviaMemberMode }}
     sg_mode = {{ default "update" .OctaviaSGMode }}
