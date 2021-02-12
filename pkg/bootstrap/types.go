@@ -10,6 +10,7 @@ type KuryrBootstrapResult struct {
 	ServiceSubnet            string
 	PodSubnetpool            string
 	WorkerNodesRouter        string
+	WorkerNodesSubnets       []string
 	NodesNetworkMTU          int
 	PodSecurityGroups        []string
 	ExternalNetwork          string
