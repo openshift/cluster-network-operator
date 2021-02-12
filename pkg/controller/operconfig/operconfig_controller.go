@@ -236,6 +236,11 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		})
 	}
 
+	// Be very careful of the objects added to `relatedObjects`,
+	// if the `ObjectReference` points to a specific object and
+	// that object is not explcitly skipped in `deleteRelatedObjectsNotRendered`
+	// then we'll delete it on a downgrade. Background:
+	// https://github.com/openshift/cluster-network-operator/pull/945
 	relatedObjects = append(relatedObjects, configv1.ObjectReference{
 		Resource: "namespaces",
 		Name:     names.APPLIED_NAMESPACE,
