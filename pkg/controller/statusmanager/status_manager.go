@@ -225,8 +225,10 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 				Message: "No networks.operator.openshift.io cluster found",
 			})
 		} else {
-			co.Status.Versions = []configv1.OperandVersion{
-				{Name: "operator", Version: operStatus.Version},
+			if reachedAvailableLevel {
+				co.Status.Versions = []configv1.OperandVersion{
+					{Name: "operator", Version: operStatus.Version},
+				}
 			}
 
 			for _, cond := range operStatus.Conditions {
