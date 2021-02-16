@@ -44,6 +44,17 @@ func getOC(client client.Client) (*operv1.Network, error) {
 	return oc, err
 }
 
+func getStatuses(client client.Client, name string) (*configv1.ClusterOperator, *operv1.Network, error) {
+	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	err := client.Get(context.TODO(), types.NamespacedName{Name: name}, co)
+	if err != nil {
+		return nil, nil, err
+	}
+	oc := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	err = client.Get(context.TODO(), types.NamespacedName{Name: names.OPERATOR_CONFIG}, oc)
+	return co, oc, err
+}
+
 // Tests that the parts of newConditions that are set match what's in oldConditions (but
 // doesn't look at anything else in oldConditions)
 func conditionsInclude(oldConditions, newConditions []operv1.OperatorCondition) bool {
@@ -148,13 +159,16 @@ func TestStatusManager_set(t *testing.T) {
 	}
 	status.set(false, condFail)
 
-	oc, err := getOC(client)
+	co, oc, err := getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting network.operator: %v", err)
 	}
 
 	if !conditionsEqual(oc.Status.Conditions, []operv1.OperatorCondition{condFail, condUpdate}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
 	}
 
 	condProgress := operv1.OperatorCondition{
@@ -193,7 +207,7 @@ func TestStatusManager_set(t *testing.T) {
 		Type:   operv1.OperatorStatusTypeAvailable,
 		Status: operv1.ConditionTrue,
 	}
-	status.set(false, condNoProgress, condAvailable)
+	status.set(true, condNoProgress, condAvailable)
 
 	oc, err = getOC(client)
 	if err != nil {
@@ -211,6 +225,10 @@ func TestStatusManager_set(t *testing.T) {
 	// Check that conditions are correctly mirrored to the ClusterOperator object
 	if len(co.Status.Conditions) != 4 {
 		t.Fatal("Expected status to be mirrored to the ClusterOperator object")
+	}
+	// And that Versions is now set
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
 	obj := &uns.Unstructured{}
@@ -357,7 +375,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	})
 
 	status.SetFromPods()
-	oc, err := getOC(client)
+	co, oc, err := getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -369,6 +387,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
 	}
 
 	// Create minimal DaemonSets
@@ -399,7 +420,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	status.SetFromPods()
 
 	// Since the DaemonSet.Status reports no pods Available, the status should be Progressing
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -424,6 +445,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
 	}
 
 	progressingTS := metav1.Now()
@@ -466,7 +490,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		}
 		status.SetFromPods()
 
-		oc, err = getOC(client)
+		co, oc, err = getStatuses(client, "testing")
 		if err != nil {
 			t.Fatalf("error getting ClusterOperator: %v", err)
 		}
@@ -485,6 +509,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			},
 		}) {
 			t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+		}
+		if len(co.Status.Versions) > 0 {
+			t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
 		}
 
 		// Validate that the transition time was not bumped
@@ -532,7 +559,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	time.Sleep(1 * time.Second) // minimum transition time fidelity
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -555,6 +582,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
 	// Validate that the transition time was bumped
@@ -576,7 +606,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -599,6 +629,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
 	// update the daemonset status to mimic a kubernetes rollout
@@ -617,7 +650,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -640,6 +673,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
 	// Next update: Ready -> 0 Unavailable -> 1
@@ -657,7 +693,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -680,6 +716,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
 	// Next update: updatedNumberScheduled -> 1
@@ -701,7 +740,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	time.Sleep(time.Second / 10)
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -724,6 +763,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
 	// See that the last pod state is reasonable
@@ -759,7 +801,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	setLastPodState(t, client, "testing", ps)
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -782,6 +824,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
 	// check hung annotation is set (also, need to refresh objects since they were updated)
@@ -815,7 +860,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	status.SetFromPods()
 
 	// see that the pod state is sensible
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -838,6 +883,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
 	dsA = &appsv1.DaemonSet{} // some weird bug in the fake client that doesn't handle deleting annotations
@@ -876,7 +924,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	status.SetFromPods()
 
 	// We should now be Progressing, but not un-Available
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -899,6 +947,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
 	// Mark the rollout as hung; should not change anything
@@ -913,7 +964,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	setLastPodState(t, client, "testing", ps)
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -936,6 +987,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
 	// Now update
@@ -953,7 +1007,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -976,6 +1030,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 }
 
@@ -994,7 +1051,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 
 	status.SetFromPods()
 
-	oc, err := getOC(client)
+	co, oc, err := getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -1006,6 +1063,9 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
 	}
 
 	// Create a Deployment that isn't the one we're looking for
@@ -1026,7 +1086,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -1039,6 +1099,9 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
 	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
+	}
 
 	// Create minimal Deployment
 	depA := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha"}}
@@ -1048,7 +1111,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -1074,6 +1137,9 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
 	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
+	}
 
 	// Update to report expected deployment size
 	err = client.Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, depA)
@@ -1093,7 +1159,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -1116,6 +1182,9 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
 	// Add more expected pods
@@ -1143,7 +1212,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	time.Sleep(time.Second / 10)
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -1169,6 +1238,9 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		},
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
 	ps := getLastPodState(t, client, "testing")
@@ -1204,7 +1276,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	setLastPodState(t, client, "testing", ps)
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -1230,6 +1302,9 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
 	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
+	}
 
 	err = client.Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, depA)
 	if err != nil {
@@ -1249,7 +1324,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 
 	status.SetFromPods()
 
-	oc, err = getOC(client)
+	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
@@ -1273,7 +1348,9 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
 	}
-
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
+	}
 }
 
 func getLastPodState(t *testing.T, client client.Client, name string) podState {

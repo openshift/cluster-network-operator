@@ -12,7 +12,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
-	"github.com/pkg/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,10 +50,7 @@ func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig
 	// If there are changes to the "downstream" networkconfig, commit it back
 	// to the apiserver
 	log.Println("WARNING: Network.operator.openshift.io has fields being overwritten by Network.config.openshift.io configuration")
-	if updateErr := r.UpdateOperConfig(operConfig); updateErr != nil {
-		errors.Wrap(err, updateErr.Error())
-	}
-	return nil
+	return r.UpdateOperConfig(operConfig)
 }
 
 func (r *ReconcileOperConfig) UpdateOperConfig(operConfig *operv1.Network) error {
