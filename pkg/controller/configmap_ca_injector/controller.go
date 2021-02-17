@@ -184,14 +184,14 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 			errs = append(errs, err)
 			if len(errs) > 5 {
 				r.status.SetDegraded(statusmanager.InjectorConfig, "ConfigMapUpdateFailure",
-					fmt.Sprintf("Too many errors seen when updating trusted CA configmaps"))
+					"Too many errors seen when updating trusted CA configmaps")
 				return reconcile.Result{}, fmt.Errorf("Too many errors attempting to update configmaps with CA cert. data")
 			}
 		}
 	}
 	if len(errs) > 0 {
 		r.status.SetDegraded(statusmanager.InjectorConfig, "ConfigmapUpdateFailure",
-			fmt.Sprintf("some configmaps didn't fully update with CA cert. data"))
+			"some configmaps didn't fully update with CA cert. data")
 		return reconcile.Result{}, fmt.Errorf("some configmaps didn't fully update with CA cert. data")
 	}
 	r.status.SetNotDegraded(statusmanager.InjectorConfig)

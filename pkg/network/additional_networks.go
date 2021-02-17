@@ -30,14 +30,13 @@ func renderAdditionalNetworksCRD(manifestDir string) ([]*uns.Unstructured, error
 // renderRawCNIConfig returns the RawCNIConfig manifests
 func renderRawCNIConfig(conf *operv1.AdditionalNetworkDefinition, manifestDir string) ([]*uns.Unstructured, error) {
 	var err error
-	objs := []*uns.Unstructured{}
 
 	// render RawCNIConfig manifests
 	data := render.MakeRenderData()
 	data.Data["AdditionalNetworkName"] = conf.Name
 	data.Data["AdditionalNetworkNamespace"] = conf.Namespace
 	data.Data["AdditionalNetworkConfig"] = conf.RawCNIConfig
-	objs, err = render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/raw"), &data)
+	objs, err := render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/raw"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render additional network")
 	}
@@ -123,7 +122,6 @@ func getIPAMConfigJSON(conf *operv1.IPAMConfig) (string, error) {
 // renderSimpleMacvlanConfig returns the SimpleMacvlanConfig manifests
 func renderSimpleMacvlanConfig(conf *operv1.AdditionalNetworkDefinition, manifestDir string) ([]*uns.Unstructured, error) {
 	var err error
-	objs := []*uns.Unstructured{}
 
 	// render SimpleMacvlanConfig manifests
 	data := render.MakeRenderData()
@@ -152,7 +150,7 @@ func renderSimpleMacvlanConfig(conf *operv1.AdditionalNetworkDefinition, manifes
 		}
 	}
 
-	objs, err = render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/simplemacvlan"), &data)
+	objs, err := render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/simplemacvlan"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render simplemacvlan additional network")
 	}

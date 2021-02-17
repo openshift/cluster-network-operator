@@ -31,7 +31,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
-	data.Data["InstallOVS"] = (c.UseExternalOpenvswitch == nil || *c.UseExternalOpenvswitch == false)
+	data.Data["InstallOVS"] = (c.UseExternalOpenvswitch == nil || !*c.UseExternalOpenvswitch)
 	data.Data["SDNImage"] = os.Getenv("SDN_IMAGE")
 	data.Data["CNIPluginsImage"] = os.Getenv("CNI_PLUGINS_IMAGE")
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")

@@ -365,10 +365,8 @@ func validateAdditionalNetworks(conf *operv1.NetworkSpec) []error {
 
 // renderAdditionalNetworks generates the manifests of the requested additional networks
 func renderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
-	var err error
 	ans := conf.AdditionalNetworks
 	out := []*uns.Unstructured{}
-	objs := []*uns.Unstructured{}
 
 	// validate additional network configuration
 	if errs := validateAdditionalNetworks(conf); len(errs) > 0 {
@@ -383,13 +381,13 @@ func renderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 	for _, an := range ans {
 		switch an.Type {
 		case operv1.NetworkTypeRaw:
-			objs, err = renderRawCNIConfig(&an, manifestDir)
+			objs, err := renderRawCNIConfig(&an, manifestDir)
 			if err != nil {
 				return nil, err
 			}
 			out = append(out, objs...)
 		case operv1.NetworkTypeSimpleMacvlan:
-			objs, err = renderSimpleMacvlanConfig(&an, manifestDir)
+			objs, err := renderSimpleMacvlanConfig(&an, manifestDir)
 			if err != nil {
 				return nil, err
 			}
@@ -410,9 +408,8 @@ func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir strin
 
 	var err error
 	out := []*uns.Unstructured{}
-	objs := []*uns.Unstructured{}
 
-	objs, err = renderMultusAdmissonControllerConfig(manifestDir)
+	objs, err := renderMultusAdmissonControllerConfig(manifestDir)
 	if err != nil {
 		return nil, err
 	}
