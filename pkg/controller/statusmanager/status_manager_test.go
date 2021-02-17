@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+//nolint:errcheck
 func init() {
 	configv1.AddToScheme(scheme.Scheme)
 	operv1.AddToScheme(scheme.Scheme)
@@ -270,7 +271,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	mapper := &fakeRESTMapper{}
 	status := New(client, mapper, "testing")
 
-	oc, err := getOC(client)
+	_, err := getOC(client)
 	if !errors.IsNotFound(err) {
 		t.Fatalf("unexpected error (expected Not Found): %v", err)
 	}
@@ -301,7 +302,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 
 	// Initial failure status
 	status.SetDegraded(OperatorConfig, "Operator", "")
-	oc, err = getOC(client)
+	oc, err := getOC(client)
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}

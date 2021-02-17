@@ -469,12 +469,6 @@ func tcpConnectEntry(start int, options ...func(entry *v1alpha1.LogEntry)) v1alp
 	return logEntry(true, start, v1alpha1.LogEntryReasonTCPConnect, "target-endpoint: tcp connection to host:port succeeded", options...)
 }
 
-func withLatency(latency time.Duration) func(*v1alpha1.LogEntry) {
-	return func(entry *v1alpha1.LogEntry) {
-		entry.Latency = metav1.Duration{Duration: latency}
-	}
-}
-
 func withLogMessage(message string) func(*v1alpha1.LogEntry) {
 	return func(entry *v1alpha1.LogEntry) {
 		entry.Message = message

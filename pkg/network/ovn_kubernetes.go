@@ -92,14 +92,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 	data.Data["OVN_cidr"] = ippools
 
-	var svcpools string
-	for _, net := range conf.ServiceNetwork {
-		if len(svcpools) != 0 {
-			svcpools += ","
-		}
-		svcpools += fmt.Sprintf("%s", net)
-	}
-	data.Data["OVN_service_cidr"] = svcpools
+	data.Data["OVN_service_cidr"] = strings.Join(conf.ServiceNetwork, ",")
 
 	if c.HybridOverlayConfig != nil {
 		if len(c.HybridOverlayConfig.HybridClusterNetwork) > 0 {
@@ -267,10 +260,6 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 		var geneve uint32 = uint32(6081)
 		sc.GenevePort = &geneve
 	}
-}
-
-func networkPluginName() string {
-	return "ovn-kubernetes"
 }
 
 type replicaCountDecoder struct {
