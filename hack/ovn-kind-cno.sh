@@ -233,11 +233,17 @@ fi
 # Configuring secret for multus-admission-webhook
 # https://raw.githubusercontent.com/openshift/multus-admission-controller/release-4.7/hack/webhook-create-signed-cert.sh
 $CNO_PATH/hack/webhook-create-signed-cert.sh --service multus-admission-controller --namespace openshift-multus --secret multus-admission-controller-secret
-if ! kubectl wait -n openshift-multus --for=condition=ready pods --all --timeout=300s ; then
+
+# Configuring secret for network metrics service
+# https://raw.githubusercontent.com/openshift/multus-admission-controller/release-4.7/hack/webhook-create-signed-cert.sh
+$CNO_PATH/hack/webhook-create-signed-cert.sh --service network-metrics-service --namespace openshift-multus --secret metrics-daemon-secret
+
+if ! kubectl wait -n openshift-multus --for=condition=ready pods --all --timeout=100s ; then
   echo "multus pods are not running"
   kubectl get pods -n openshift-multus
 fi
 
+# CNI binary is placed late and kubelet gets in bad state for some reason 
 for n in $NODES; do
   echo "Restarting containerd and kubelet on node: $n"
   docker exec $n bash -c "systemctl restart containerd"
