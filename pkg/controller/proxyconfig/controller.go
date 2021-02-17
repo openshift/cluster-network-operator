@@ -36,10 +36,6 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) reconcile.Reconciler {
-	if err := configv1.Install(mgr.GetScheme()); err != nil {
-		return &ReconcileProxyConfig{}
-	}
-
 	return &ReconcileProxyConfig{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status}
 }
 

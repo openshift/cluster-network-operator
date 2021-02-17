@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 
-	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
@@ -38,10 +37,6 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
 }
 
 func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) reconcile.Reconciler {
-	if err := configv1.Install(mgr.GetScheme()); err != nil {
-		return nil
-	}
-
 	return &ReconcileConfigMapInjector{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status}
 }
 
