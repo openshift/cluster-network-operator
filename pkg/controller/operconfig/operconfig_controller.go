@@ -49,8 +49,6 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) *ReconcileOperConfig {
-	configv1.Install(mgr.GetScheme())
-	operv1.Install(mgr.GetScheme())
 	return &ReconcileOperConfig{
 		client:        mgr.GetClient(),
 		scheme:        mgr.GetScheme(),
