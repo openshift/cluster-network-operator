@@ -11,8 +11,18 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 #
 # Example:
 #   make check
-check: | verify test-unit
+check: | verify test-unit golangci-lint
 .PHONY: check
+
+golangci-lint:
+	golangci-lint run --verbose --print-resources-usage --modules-download-mode=vendor --timeout=5m0s
+.PHONY: golangci-lint
+
+install.tools:
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b ${GOPATH}/bin
+.PHONY: install.tools
+
+
 
 clean:
 	$(RM) cluster-network-operator cluster-nework-check-endpoints

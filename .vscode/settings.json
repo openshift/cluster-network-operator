@@ -1,0 +1,6 @@
+{
+    "go.lintTool": "golangci-lint",
+    "go.lintFlags": [
+        "--modules-download-mode=vendor"
+    ]
+}
