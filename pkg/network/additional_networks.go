@@ -131,6 +131,10 @@ func renderSimpleMacvlanConfig(conf *operv1.AdditionalNetworkDefinition, manifes
 	if conf.SimpleMacvlanConfig == nil {
 		// no additional config, just fill default IPAM
 		data.Data["IPAMConfig"], err = getIPAMConfigJSON(nil)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to render ipam config")
+		}
+
 	} else {
 		macvlanConfig := conf.SimpleMacvlanConfig
 		data.Data["Master"] = macvlanConfig.Master
