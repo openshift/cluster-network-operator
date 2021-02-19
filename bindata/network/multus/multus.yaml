@@ -348,6 +348,7 @@ spec:
             memory: 150Mi
         securityContext:
           privileged: true
+        terminationGracePeriodSeconds: 10
         volumeMounts:
         - name: system-cni-dir
           mountPath: /host/etc/cni/net.d
