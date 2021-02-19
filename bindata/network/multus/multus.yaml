@@ -1,89 +1,4 @@
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cni-binary-copy-script
-  namespace: openshift-multus
-  annotations:
-    kubernetes.io/description: |
-      This is a script used to copy CNI binaries based on host OS
-    release.openshift.io/version: "{{.ReleaseVersion}}"
-data:
-  cnibincopy.sh: |-
-    #!/bin/bash
-
-    DESTINATION_DIRECTORY=/host/opt/cni/bin/
-
-    # Perform validation of usage
-    if [ -z "$RHEL7_SOURCE_DIRECTORY" ] ||
-       [ -z "$RHEL8_SOURCE_DIRECTORY" ] ||
-       [ -z "$DEFAULT_SOURCE_DIRECTORY" ]; then
-      echo "FATAL ERROR: You must set env variables: RHEL7_SOURCE_DIRECTORY, RHEL8_SOURCE_DIRECTORY, DEFAULT_SOURCE_DIRECTORY"
-      exit 1
-    fi
-
-    if [ ! -d "$DESTINATION_DIRECTORY" ]; then
-      echo "FATAL ERROR: Destination directory ($DESTINATION_DIRECTORY) does not exist"
-      exit 1
-    fi
-
-    # Collect host OS information
-    . /host/etc/os-release
-    rhelmajor=
-    # detect which version we're using in order to copy the proper binaries
-    case "${ID}" in
-      rhcos) rhelmajor=8
-      ;;
-      rhel) rhelmajor=$(echo "${VERSION_ID}" | cut -f 1 -d .)
-      ;;
-      fedora)
-        if [ "${VARIANT_ID}" == "coreos" ]; then
-          rhelmajor=8
-        else
-          echo "FATAL ERROR: Unsupported Fedora variant=${VARIANT_ID}"
-          exit 1
-        fi
-      ;;
-      *) echo "FATAL ERROR: Unsupported OS ID=${ID}"; exit 1
-      ;;
-    esac
-
-    # Set which directory we'll copy from, detect if it exists
-    sourcedir=
-    founddir=false
-    case "${rhelmajor}" in
-      7)
-        if [ -d "${RHEL7_SOURCE_DIRECTORY}" ]; then
-          sourcedir=${RHEL7_SOURCE_DIRECTORY}
-          founddir=true
-        fi
-      ;;
-      8)
-        if [ -d "${RHEL8_SOURCE_DIRECTORY}" ]; then
-          sourcedir=${RHEL8_SOURCE_DIRECTORY}
-          founddir=true
-        fi
-      ;;
-      *)
-        echo "ERROR: RHEL Major Version Unsupported, rhelmajor=${rhelmajor}"
-      ;;
-    esac
-
-    # When it doesn't exist, fall back to the original directory.
-    if [ "$founddir" == false ]; then
-      echo "Source directory unavailable for OS version: ${rhelmajor}"
-      sourcedir=$DEFAULT_SOURCE_DIRECTORY
-    fi
-
-    cp -rf ${sourcedir}* $DESTINATION_DIRECTORY
-
-    if [ $? -eq 0 ]; then
-      echo "Successfully copied files in ${sourcedir} to $DESTINATION_DIRECTORY"
-    else
-      echo "Failed to copy files in ${sourcedir} to $DESTINATION_DIRECTORY"
-      exit 1
-    fi
----
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
@@ -128,7 +43,7 @@ spec:
             memory: 10Mi
         volumeMounts:
         - mountPath: /entrypoint
-          name: cni-binary-copy
+          name: shell-scripts
         - mountPath: /host/opt/cni/bin
           name: cnibin
         - mountPath: /host/etc/os-release
@@ -146,7 +61,7 @@ spec:
         command: ["/entrypoint/cnibincopy.sh"]
         volumeMounts:
         - mountPath: /entrypoint
-          name: cni-binary-copy
+          name: shell-scripts
         - mountPath: /host/opt/cni/bin
           name: cnibin
         - mountPath: /host/etc/os-release
@@ -159,12 +74,29 @@ spec:
           value: "/usr/src/egress-router-cni/rhel8/bin/"
         - name: DEFAULT_SOURCE_DIRECTORY
           value: "/usr/src/egress-router-cni/bin/"
+      - name: copy-ocp-iptables-rules-plugins
+        image: {{.CNIPluginsImage}}
+        command:
+          - /bin/bash
+          - -c
+          - |
+            #!/bin/bash
+            cp -f /entrypoint/ocp-set-iptables-rules.sh /host/opt/cni/bin/ocp-set-iptables-rules
+            chmod +x /host/opt/cni/bin/ocp-set-iptables-rules
+        volumeMounts:
+        - mountPath: /entrypoint
+          name: shell-scripts
+        - mountPath: /host/opt/cni/bin
+          name: cnibin
+        - mountPath: /host/etc/os-release
+          name: os-release
+          readOnly: true
       - name: cni-plugins
         image: {{.CNIPluginsImage}}
         command: ["/entrypoint/cnibincopy.sh"]
         volumeMounts:
         - mountPath: /entrypoint
-          name: cni-binary-copy
+          name: shell-scripts
         - mountPath: /host/opt/cni/bin
           name: cnibin
         - mountPath: /host/etc/os-release
@@ -182,7 +114,7 @@ spec:
         command: ["/entrypoint/cnibincopy.sh"]
         volumeMounts:
         - mountPath: /entrypoint
-          name: cni-binary-copy
+          name: shell-scripts
         - mountPath: /host/opt/cni/bin
           name: cnibin
         - mountPath: /host/etc/os-release
@@ -204,7 +136,7 @@ spec:
             memory: 10Mi
         volumeMounts:
         - mountPath: /entrypoint
-          name: cni-binary-copy
+          name: shell-scripts
         - mountPath: /host/opt/cni/bin
           name: cnibin
         - mountPath: /host/etc/os-release
@@ -219,109 +151,10 @@ spec:
           value: "/usr/src/whereabouts/bin/"
       - name: whereabouts-cni
         image: {{.WhereaboutsImage}}
-        command:
-          - /bin/sh
-          - -c
-          - |
-            #!/bin/sh
-
-            set -u -e
-
-            CNI_BIN_DIR=${CNI_BIN_DIR:-"/host/opt/cni/bin/"}
-            WHEREABOUTS_KUBECONFIG_FILE_HOST=${WHEREABOUTS_KUBECONFIG_FILE_HOST:-"/etc/cni/net.d/whereabouts.d/whereabouts.kubeconfig"}
-            CNI_CONF_DIR=${CNI_CONF_DIR:-"/host/etc/cni/net.d"}
-
-            # Make a whereabouts.d directory (for our kubeconfig)
-
-            mkdir -p $CNI_CONF_DIR/whereabouts.d
-            WHEREABOUTS_KUBECONFIG=$CNI_CONF_DIR/whereabouts.d/whereabouts.kubeconfig
-            WHEREABOUTS_GLOBALCONFIG=$CNI_CONF_DIR/whereabouts.d/whereabouts.conf
-
-            # ------------------------------- Generate a "kube-config"
-            SERVICE_ACCOUNT_PATH=/var/run/secrets/kubernetes.io/serviceaccount
-            KUBE_CA_FILE=${KUBE_CA_FILE:-$SERVICE_ACCOUNT_PATH/ca.crt}
-            SERVICEACCOUNT_TOKEN=$(cat $SERVICE_ACCOUNT_PATH/token)
-            SKIP_TLS_VERIFY=${SKIP_TLS_VERIFY:-false}
-
-
-            # Check if we're running as a k8s pod.
-            if [ -f "$SERVICE_ACCOUNT_PATH/token" ]; then
-              # We're running as a k8d pod - expect some variables.
-              if [ -z ${KUBERNETES_SERVICE_HOST} ]; then
-                error "KUBERNETES_SERVICE_HOST not set"; exit 1;
-              fi
-              if [ -z ${KUBERNETES_SERVICE_PORT} ]; then
-                error "KUBERNETES_SERVICE_PORT not set"; exit 1;
-              fi
-
-              if [ "$SKIP_TLS_VERIFY" == "true" ]; then
-                TLS_CFG="insecure-skip-tls-verify: true"
-              elif [ -f "$KUBE_CA_FILE" ]; then
-                TLS_CFG="certificate-authority-data: $(cat $KUBE_CA_FILE | base64 | tr -d '\n')"
-              fi
-
-              # Write a kubeconfig file for the CNI plugin.  Do this
-              # to skip TLS verification for now.  We should eventually support
-              # writing more complete kubeconfig files. This is only used
-              # if the provided CNI network config references it.
-              touch $WHEREABOUTS_KUBECONFIG
-              chmod ${KUBECONFIG_MODE:-600} $WHEREABOUTS_KUBECONFIG
-              cat > $WHEREABOUTS_KUBECONFIG <<EOF
-            # Kubeconfig file for Multus CNI plugin.
-            apiVersion: v1
-            kind: Config
-            clusters:
-            - name: local
-              cluster:
-                server: ${KUBERNETES_SERVICE_PROTOCOL:-https}://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}
-                $TLS_CFG
-            users:
-            - name: whereabouts
-              user:
-                token: "${SERVICEACCOUNT_TOKEN}"
-            contexts:
-            - name: whereabouts-context
-              context:
-                cluster: local
-                user: whereabouts
-                namespace: ${WHEREABOUTS_NAMESPACE}
-            current-context: whereabouts-context
-            EOF
-
-            # Kubeconfig file for Multus CNI plugin.
-            cat > $WHEREABOUTS_GLOBALCONFIG <<EOF
-            {
-              "datastore": "kubernetes",
-              "kubernetes": {
-                "kubeconfig": "/etc/kubernetes/cni/net.d/whereabouts.d/whereabouts.kubeconfig"
-              },
-              "log_level": "debug"
-            }
-            EOF
-
-            else
-              warn "Doesn't look like we're running in a kubernetes environment (no serviceaccount token)"
-            fi
-
-            # copy whereabouts to the cni bin dir
-            # SKIPPED DUE TO FIPS COPY.
-            # cp -f /whereabouts $CNI_BIN_DIR
-
-            # ---------------------- end Generate a "kube-config".
-
-            # Unless told otherwise, sleep forever.
-            # This prevents Kubernetes from restarting the pod repeatedly.
-            should_sleep=${SLEEP:-"true"}
-            echo "Done configuring CNI.  Sleep=$should_sleep"
-            while [ "$should_sleep" == "true"  ]; do
-                sleep 1000000000000
-            done
-
-        resources:
-          requests:
-            cpu: 10m
-            memory: 10Mi
+        command: ["/entrypoint/whereabouts.sh"]
         volumeMounts:
+        - mountPath: /entrypoint
+          name: shell-scripts
         - mountPath: /host/opt/cni/bin
           name: cnibin
         - name: system-cni-dir
@@ -345,13 +178,22 @@ spec:
         command: ["/entrypoint.sh"]
         args:
         - "--multus-conf-file=auto"
-        - "--multus-autoconfig-dir=/host/var/run/multus/cni/net.d"
         - "--multus-kubeconfig-file-host=/etc/kubernetes/cni/net.d/multus.d/multus.kubeconfig"
 {{- if eq .DefaultNetworkType "OpenShiftSDN"}}
+        - "--multus-autoconfig-dir=/host/var/run/multus/cni/net.d"
         - "--readiness-indicator-file=/var/run/multus/cni/net.d/80-openshift-network.conf"
 {{- else if eq .DefaultNetworkType "OVNKubernetes"}}
         - "--readiness-indicator-file=/var/run/multus/cni/net.d/10-ovn-kubernetes.conf"
+        - "--multus-autoconfig-dir=/host/var/run/multus/cni/net.d"
+{{- else if eq .DefaultNetworkType "Kuryr"}}
+        - "--multus-autoconfig-dir=/host/var/run/multus/cni/net.d"
+{{- else }}
+        - "--multus-autoconfig-dir=/host/etc/cni/net.d"
 {{- end}}
+{{- if .DisableMultiNetwork }}
+        - "--disable-annotation-read=true"
+{{- end}}
+        - "--delegates-append={\"type\": \"ocp-set-iptables-rules\", \"name\": \"ocp-iptables-rules\", \"cniVersion\": \"0.4.0\"}"
         - "--cleanup-config-on-exit=true"
         - "--namespace-isolation=true"
         - "--multus-log-level=verbose"
@@ -392,7 +234,7 @@ spec:
           hostPath:
             path: /etc/os-release
             type: File
-        - name: cni-binary-copy
+        - name: shell-scripts
           configMap:
-            name: cni-binary-copy-script
+            name: cni-shell-scripts
             defaultMode: 0744

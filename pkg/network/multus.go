@@ -18,9 +18,6 @@ const (
 
 // renderMultus generates the manifests of Multus
 func renderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
-	if *conf.DisableMultiNetwork {
-		return nil, nil
-	}
 
 	out := []*uns.Unstructured{}
 
@@ -32,7 +29,7 @@ func renderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 	out = append(out, objs...)
 
 	usedhcp := useDHCP(conf)
-	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), usedhcp)
+	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), conf.DisableMultiNetwork, usedhcp)
 	if err != nil {
 		return nil, err
 	}
@@ -42,13 +39,14 @@ func renderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 	if err != nil {
 		return nil, err
 	}
+
 	out = append(out, objs...)
 
 	return out, nil
 }
 
 // renderMultusConfig returns the manifests of Multus
-func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool) ([]*uns.Unstructured, error) {
+func renderMultusConfig(manifestDir, defaultNetworkType string, disableMultiNetwork *bool, useDHCP bool) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 
 	// render the manifests on disk
@@ -66,6 +64,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool) ([
 	data.Data["SystemCNIConfDir"] = SystemCNIConfDir
 	data.Data["DefaultNetworkType"] = defaultNetworkType
 	data.Data["CNIBinDir"] = CNIBinDir
+	data.Data["DisableMultiNetwork"] = disableMultiNetwork
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus"), &data)
 	if err != nil {
@@ -98,8 +97,6 @@ func renderNetworkMetricsDaemon(manifestDir string) ([]*uns.Unstructured, error)
 // configuration file. By default, it is where multus looks, unless multus
 // is disabled
 func pluginCNIConfDir(conf *operv1.NetworkSpec) string {
-	if *conf.DisableMultiNetwork {
-		return SystemCNIConfDir
-	}
+	// Since Multus is always enabled, always return its preferred dir for internal components.
 	return MultusCNIConfDir
 }
