@@ -428,7 +428,7 @@ conntrack:
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
 detectLocalMode: ""
-enableProfiling: false
+enableProfiling: true
 featureGates:
   EndpointSlice: false
   EndpointSliceProxying: false
@@ -485,7 +485,7 @@ conntrack:
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
 detectLocalMode: ""
-enableProfiling: false
+enableProfiling: true
 featureGates:
   EndpointSlice: false
   EndpointSliceProxying: false
