@@ -52,6 +52,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 		"healthz-port":            {"10256"},
 		"proxy-mode":              {"iptables"},
 		"iptables-masquerade-bit": {"0"},
+		"enable-profiling":        {"true"},
 	}
 	// For backward compatibility we allow conf to specify `metrics-port: 9101` but
 	// the daemonset always configures 9101 as the secure metrics port and 29101 as
