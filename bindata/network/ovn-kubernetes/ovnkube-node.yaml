@@ -34,6 +34,24 @@ spec:
       # /run/openvswitch -> tmpfs - ovsdb sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
+      - name: ovn-acl-logging
+        image: "{{.OvnImage}}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          socat UNIX-LISTEN:/dev/acl-log/log,unlink-early,fork -
+
+        securityContext:
+          privileged: true
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        # Unix socket for slurping OVN-Controller ACL logs
+        - mountPath: /dev/acl-log/
+          name: acl-log
+
       # ovn-controller: programs the vswitch with flows from the sbdb
       - name: ovn-controller
         image: "{{.OvnImage}}"
@@ -46,12 +64,21 @@ spec:
             set -o allexport
             source "/env/${K8S_NODE}"
             set +o allexport
-          fi
+          fi  
+          
           echo "$(date -Iseconds) - starting ovn-controller"
           exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
             --no-chdir --pidfile=/var/run/ovn/ovn-controller.pid \
+            --syslog-method=unix:/dev/acl-log/log \
+            --log-file=/var/log/ovn/acl-audit-log.log \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
             -vconsole:"${OVN_LOG_LEVEL}"
+          
+          #Setup ACL logging to a file  
+          ovs-appctl -t /var/run/ovn/ovn-controller.$(cat /var/run/ovn/ovn-controller.pid).ctl vlog/set file:off
+
+          ovs-appctl -t /var/run/ovn/ovn-controller.$(cat /var/run/ovn/ovn-controller.pid).ctl vlog/set acl-log:file:info
+
         securityContext:
           privileged: true
         env:
@@ -78,6 +105,10 @@ spec:
           name: ovn-cert
         - mountPath: /ovn-ca
           name: ovn-ca
+        - mountPath: /dev/acl-log
+          name: acl-log
+        - mountPath: /var/log/ovn
+          name: node-log
         terminationMessagePolicy: FallbackToLogsOnError
         resources:
           requests:
@@ -303,6 +334,13 @@ spec:
       - name: run-ovn
         hostPath:
           path: /var/run/ovn
+      # Used for placement of ACL audit logs 
+      - name: node-log
+        hostPath: 
+          path: /var/log/ovn
+      # Used for sidecar slurping of ACL_Logs
+      - name: acl-log
+        emptyDir: {}
       # For CNI server
       - name: host-run-ovn-kubernetes
         hostPath:
@@ -335,3 +373,4 @@ spec:
           optional: true
       tolerations:
       - operator: "Exists"
+
