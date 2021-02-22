@@ -42,9 +42,7 @@ rules:
   - get
 - apiGroups: ["openstack.org"]
   resources:
-  - kuryrnets
   - kuryrnetworks
-  - kuryrnetpolicies
   - kuryrnetworkpolicies
   - kuryrports
   - kuryrloadbalancers
