@@ -176,6 +176,12 @@ spec:
           echo "$(date -Iseconds) - starting nbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}, K8S_NODE_IP=${K8S_NODE_IP}"
           initial_raft_create=true
           initialize="false"
+
+          has_disable_column_diffs=$(/usr/share/ovn/scripts/ovn-ctl --help 2>/dev/null | { grep "ovsdb-disable-file-column-diff" || true; })
+          column_diffs_arg=
+          if [[ ! -z "${has_disable_column_diffs}" ]]; then
+            column_diffs_arg="--ovsdb-disable-file-column-diff=yes"
+          fi
           
           if [[ ! -e ${ovn_db_file} ]]; then
             initialize="true"
@@ -209,7 +215,7 @@ spec:
               --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
               --ovn-nb-db-ssl-cert=/ovn-cert/tls.crt \
               --ovn-nb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
-              --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
+              --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" ${column_diffs_arg} \
               run_nb_ovsdb
             else
               # either we need to initialize a new cluster or wait for master to create it
@@ -222,7 +228,7 @@ spec:
                 --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
                 --ovn-nb-db-ssl-cert=/ovn-cert/tls.crt \
                 --ovn-nb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
-                --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
+                --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" ${column_diffs_arg} \
                 run_nb_ovsdb
               else
                 echo "Joining the nbdb cluster with init_ip=${init_ip}..."
@@ -237,7 +243,7 @@ spec:
                 --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
                 --ovn-nb-db-ssl-cert=/ovn-cert/tls.crt \
                 --ovn-nb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
-                --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
+                --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" ${column_diffs_arg} \
                 run_nb_ovsdb
               fi
             fi
@@ -250,7 +256,7 @@ spec:
             --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
             --ovn-nb-db-ssl-cert=/ovn-cert/tls.crt \
             --ovn-nb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
-            --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
+            --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" ${column_diffs_arg} \
             run_nb_ovsdb
           fi
 
@@ -573,6 +579,12 @@ spec:
           initial_raft_create=true
           initialize="false"
           
+          has_disable_column_diffs=$(/usr/share/ovn/scripts/ovn-ctl --help 2>/dev/null | { grep "ovsdb-disable-file-column-diff" || true; })
+          column_diffs_arg=
+          if [[ ! -z "${has_disable_column_diffs}" ]]; then
+            column_diffs_arg="--ovsdb-disable-file-column-diff=yes"
+          fi
+
           if [[ ! -e ${ovn_db_file} ]]; then
             initialize="true"
           fi
@@ -605,7 +617,7 @@ spec:
               --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
               --ovn-sb-db-ssl-cert=/ovn-cert/tls.crt \
               --ovn-sb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
-              --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
+              --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" ${column_diffs_arg} \
               run_sb_ovsdb
             else
               # either we need to initialize a new cluster or wait for master to create it
@@ -618,7 +630,7 @@ spec:
                 --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
                 --ovn-sb-db-ssl-cert=/ovn-cert/tls.crt \
                 --ovn-sb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
-                --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
+                --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off"  ${column_diffs_arg} \
                 run_sb_ovsdb
               else
                 exec /usr/share/ovn/scripts/ovn-ctl \
@@ -632,7 +644,7 @@ spec:
                 --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
                 --ovn-sb-db-ssl-cert=/ovn-cert/tls.crt \
                 --ovn-sb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
-                --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
+                --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off"  ${column_diffs_arg} \
                 run_sb_ovsdb
               fi
             fi
@@ -645,7 +657,7 @@ spec:
             --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
             --ovn-sb-db-ssl-cert=/ovn-cert/tls.crt \
             --ovn-sb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt \
-            --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
+            --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off"  ${column_diffs_arg} \
             run_sb_ovsdb
           fi
         lifecycle:
