@@ -2,8 +2,9 @@ package network
 
 import (
 	"encoding/json"
-	operv1 "github.com/openshift/api/operator/v1"
 	"log"
+
+	operv1 "github.com/openshift/api/operator/v1"
 )
 
 // useDHCPRaw determines if the the DHCP CNI plugin running as a daemon should be rendered.
@@ -77,7 +78,7 @@ func useDHCP(conf *operv1.NetworkSpec) bool {
 				renderdhcp = renderdhcp || useDHCPSimpleMacvlan(addnet.SimpleMacvlanConfig)
 			}
 
-			if renderdhcp == true {
+			if renderdhcp {
 				break
 			}
 		}

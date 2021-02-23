@@ -73,10 +73,3 @@ func TestSetPodNetworkConnectivityCheckCondition(t *testing.T) {
 		})
 	}
 }
-
-func assertEqualCondition(t *testing.T, expected, actual v1alpha1.PodNetworkConnectivityCheckCondition) {
-	assert.Equal(t, expected.Type, actual.Type)
-	assert.Equal(t, expected.Status, actual.Status)
-	assert.Equal(t, expected.Reason, actual.Reason)
-	assert.Equal(t, expected.Message, actual.Message)
-}

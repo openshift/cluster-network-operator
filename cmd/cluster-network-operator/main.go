@@ -23,7 +23,6 @@ import (
 	"k8s.io/component-base/logs"
 )
 
-const LOCK_NAME = "cluster-network-operator"
 const ENV_URL_KUBECONFIG = "URL_ONLY_KUBECONFIG"
 
 func main() {
@@ -75,7 +74,7 @@ func newNetworkOperatorCommand() *cobra.Command {
 This supports an additional environment variable, URL_ONLY_KUBECONFIG,
 which is a kubeconfig from which to take just the URL to the apiserver`,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
+			_ = cmd.Help()
 			os.Exit(1)
 		},
 	}
