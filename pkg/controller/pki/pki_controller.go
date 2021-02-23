@@ -169,7 +169,6 @@ func (r *PKIReconciler) setStatus() {
 type pki struct {
 	spec       netopv1.OperatorPKISpec
 	controller factory.Controller
-	lastErr    error
 }
 
 // newPKI creates a CertRotationController for the supplied configuration
@@ -243,7 +242,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 
 // sync causes the underlying cert controller to try and reconcile
 func (p *pki) sync() error {
-	runOnceCtx := context.WithValue(context.Background(), certrotation.RunOnceContextKey, true)
+	runOnceCtx := context.WithValue(context.Background(), certrotation.RunOnceContextKey, true) //nolint:staticcheck
 	return p.controller.Sync(runOnceCtx, nil)
 }
 

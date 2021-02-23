@@ -36,10 +36,6 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) reconcile.Reconciler {
-	if err := configv1.Install(mgr.GetScheme()); err != nil {
-		return &ReconcileProxyConfig{}
-	}
-
 	return &ReconcileProxyConfig{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status}
 }
 
@@ -232,6 +228,7 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 		}
 
 		// Create a configmap containing the merged proxy.trustedCA/system bundles.
+		//nolint:staticcheck // TODO:danehans maybe remove this line?
 		trustBundle, err = r.mergeTrustBundlesToConfigMap(proxyData, systemData)
 		if err != nil {
 			log.Printf("Failed to merge trustedCA and system bundles for proxy '%s': %v", names.PROXY_CONFIG, err)
@@ -373,12 +370,8 @@ func (r *ReconcileProxyConfig) mergeTrustBundlesToConfigMap(additionalData, syst
 	}
 
 	combinedTrustData := []byte{}
-	for _, d := range additionalData {
-		combinedTrustData = append(combinedTrustData, d)
-	}
-	for _, d := range systemData {
-		combinedTrustData = append(combinedTrustData, d)
-	}
+	combinedTrustData = append(combinedTrustData, additionalData...)
+	combinedTrustData = append(combinedTrustData, systemData...)
 
 	mergedCfgMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

@@ -28,7 +28,6 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) reconcile.Reconciler {
-	configv1.Install(mgr.GetScheme())
 	return &ReconcileClusterConfig{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status}
 }
 
