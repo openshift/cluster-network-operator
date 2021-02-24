@@ -51,7 +51,7 @@ spec:
           echo "$(date -Iseconds) - starting ovn-controller"
           exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
             --no-chdir --pidfile=/var/run/ovn/ovn-controller.pid \
-            --syslog-method=libc \    
+            --syslog-method=libc \
             --log-file=/var/log/ovn/acl-audit-log.log \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
             -vconsole:"${OVN_LOG_LEVEL}" -vfile:"acl_log:${OVN_LOG_LEVEL}" -vsyslog:"acl_log:${OVN_LOG_LEVEL}"
