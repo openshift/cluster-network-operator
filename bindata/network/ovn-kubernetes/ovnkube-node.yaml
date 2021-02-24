@@ -34,26 +34,6 @@ spec:
       # /run/openvswitch -> tmpfs - ovsdb sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
-      - name: ovn-acl-logging
-        image: "{{.OvnImage}}"
-        command:
-        - /bin/bash
-        - -c
-        - |
-          #!/bin/bash
-          set -euo pipefail
-          socat UNIX-LISTEN:/dev/acl-log/log,unlink-early,fork -
-
-        securityContext:
-          privileged: true
-        terminationMessagePolicy: FallbackToLogsOnError
-        volumeMounts:
-        # Unix socket for slurping OVN-Controller ACL logs
-        - mountPath: /dev/acl-log/
-          name: acl-log
-        - mountPath: /var/log/ovn
-          name: node-log
-
       # ovn-controller: programs the vswitch with flows from the sbdb
       - name: ovn-controller
         image: "{{.OvnImage}}"
@@ -114,6 +94,26 @@ spec:
           requests:
             cpu: 10m
             memory: 300Mi
+
+      - name: ovn-acl-logging
+        image: "{{.OvnImage}}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          tail --retry -f /var/log/ovn/acl-audit-log.log
+
+        securityContext:
+          privileged: true
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        # Unix socket for slurping OVN-Controller ACL logs
+        - mountPath: /dev/acl-log/
+          name: acl-log
+        - mountPath: /var/log/ovn
+          name: node-log
 
       - name: kube-rbac-proxy
         image: {{.KubeRBACProxyImage}}
