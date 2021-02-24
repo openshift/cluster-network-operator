@@ -51,6 +51,8 @@ spec:
         # Unix socket for slurping OVN-Controller ACL logs
         - mountPath: /dev/acl-log/
           name: acl-log
+        - mountPath: /var/log/ovn
+          name: node-log
 
       # ovn-controller: programs the vswitch with flows from the sbdb
       - name: ovn-controller
@@ -69,16 +71,10 @@ spec:
           echo "$(date -Iseconds) - starting ovn-controller"
           exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
             --no-chdir --pidfile=/var/run/ovn/ovn-controller.pid \
-            --syslog-method=unix:/dev/acl-log/log \
+            --syslog-method=libc \    
             --log-file=/var/log/ovn/acl-audit-log.log \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
-            -vconsole:"${OVN_LOG_LEVEL}"
-          
-          #Setup ACL logging to a file  
-          ovs-appctl -t /var/run/ovn/ovn-controller.$(cat /var/run/ovn/ovn-controller.pid).ctl vlog/set file:off
-
-          ovs-appctl -t /var/run/ovn/ovn-controller.$(cat /var/run/ovn/ovn-controller.pid).ctl vlog/set acl-log:file:info
-
+            -vconsole:"${OVN_LOG_LEVEL}" -vfile:"acl_log:${OVN_LOG_LEVEL}" -vsyslog:"acl_log:${OVN_LOG_LEVEL}"
         securityContext:
           privileged: true
         env:
@@ -109,6 +105,10 @@ spec:
           name: acl-log
         - mountPath: /var/log/ovn
           name: node-log
+        - mountPath: /dev/log
+          name: journald-socket
+        - mountPath: /var/run/systemd/journal/socket
+          name: journald-process
         terminationMessagePolicy: FallbackToLogsOnError
         resources:
           requests:
@@ -338,6 +338,12 @@ spec:
       - name: node-log
         hostPath: 
           path: /var/log/ovn
+      - name: journald-socket
+        hostPath: 
+          path: /dev/log
+      - name: journald-process
+        hostPath:
+           path: /var/run/systemd/journal/socket
       # Used for sidecar slurping of ACL_Logs
       - name: acl-log
         emptyDir: {}
