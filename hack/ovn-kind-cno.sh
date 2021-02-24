@@ -203,7 +203,7 @@ fi
 
 if ! kubectl wait -n openshift-network-operator --for condition=available deployment network-operator --timeout=120s; then
   echo "Network operator not running"
-  exit 1
+  #exit 1
 fi
 
 if [ "$BUILD_CNO" != true ]; then
@@ -227,7 +227,7 @@ sleep 300
 
 if ! kubectl wait -n openshift-ovn-kubernetes --for=condition=ready pods --all --timeout=30s ; then
   echo "OVN-k8s pods are not running"
-  exit 1
+  #exit 1
 fi
 
 # Configuring secret for multus-admission-webhook
