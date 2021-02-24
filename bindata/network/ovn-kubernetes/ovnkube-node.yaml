@@ -86,9 +86,9 @@ spec:
         - mountPath: /var/log/ovn
           name: node-log
         - mountPath: /dev/log
+          name: log-socket
+        - mountPath: /run/systemd/journal/dev-log
           name: journald-socket
-        - mountPath: /var/run/systemd/journal/socket
-          name: journald-process
         terminationMessagePolicy: FallbackToLogsOnError
         resources:
           requests:
@@ -103,7 +103,23 @@ spec:
         - |
           #!/bin/bash
           set -euo pipefail
-          tail --retry -f /var/log/ovn/acl-audit-log.log
+          tail -f /var/log/ovn/acl-audit-log.log & 
+
+          #Rotate audit log files when then get to max size
+          MaxFileSize=2048
+          while true
+          do
+
+            #Get size in bytes**
+              file_size=`du -b /var/log/ovn/acl-audit-log.log | tr -s '\t' ' ' | cut -d' ' -f1`
+              if [ $file_size -gt $MaxFileSize ];then
+                  timestamp=`date '+%Y-%m-%dT%H-%M-%S'`
+                  mv /var/log/ovn/acl-audit-log.log /var/log/ovn/acl-audit-log.$timestamp.log
+                  ovs-appctl -t /var/run/ovn/ovn-controller.$(cat /var/run/ovn/ovn-controller.pid).ctl vlog/reopen
+              fi
+
+          done
+
 
         securityContext:
           privileged: true
@@ -338,12 +354,12 @@ spec:
       - name: node-log
         hostPath: 
           path: /var/log/ovn
-      - name: journald-socket
+      - name: log-socket
         hostPath: 
           path: /dev/log
-      - name: journald-process
+      - name: journald-socket
         hostPath:
-           path: /var/run/systemd/journal/socket
+           path: /var/run/systemd/journal/dev-log
       # Used for sidecar slurping of ACL_Logs
       - name: acl-log
         emptyDir: {}
