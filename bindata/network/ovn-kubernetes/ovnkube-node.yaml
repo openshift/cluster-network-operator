@@ -54,7 +54,8 @@ spec:
             --syslog-method=libc \
             --log-file=/var/log/ovn/acl-audit-log.log \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
-            -vconsole:"${OVN_LOG_LEVEL}" -vfile:"acl_log:${OVN_LOG_LEVEL}" -vsyslog:"acl_log:${OVN_LOG_LEVEL}"
+            -vconsole:"${OVN_LOG_LEVEL}" -vconsole:"acl_log:off" \
+            -vfile:"acl_log:${OVN_LOG_LEVEL}" -vsyslog:"acl_log:${OVN_LOG_LEVEL}"
         securityContext:
           privileged: true
         env:
