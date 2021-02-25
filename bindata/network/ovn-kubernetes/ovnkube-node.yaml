@@ -51,8 +51,9 @@ spec:
           echo "$(date -Iseconds) - starting ovn-controller"
           exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
             --no-chdir --pidfile=/var/run/ovn/ovn-controller.pid \
-            --syslog-method=libc \
+            --syslog-method="${OVNPolicyAuditDestination}" \
             --log-file=/var/log/ovn/acl-audit-log.log \
+            --verbose="${OVNPolicyAuditSyslogFacility}" \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
             -vconsole:"${OVN_LOG_LEVEL}" -vconsole:"acl_log:off" \
             -vfile:"acl_log:${OVN_LOG_LEVEL}" -vsyslog:"acl_log:${OVN_LOG_LEVEL}"
@@ -102,26 +103,27 @@ spec:
         - /bin/bash
         - -c
         - |
-          #!/bin/bash
           set -euo pipefail
-          tail -f /var/log/ovn/acl-audit-log.log & 
 
+          # Redirect err to null so no messages are shown upon rotation
+          tail -F /var/log/ovn/acl-audit-log.log 2> /dev/null & 
+          
           #Rotate audit log files when then get to max size
-          MaxFileSize=2048
+          MaxFileSize="{{OVNPolicyAuditMaxFileSize}}"
+
           while true
           do
 
-            #Get size in bytes**
-              file_size=`du -b /var/log/ovn/acl-audit-log.log | tr -s '\t' ' ' | cut -d' ' -f1`
-              if [ $file_size -gt $MaxFileSize ];then
-                  timestamp=`date '+%Y-%m-%dT%H-%M-%S'`
-                  mv /var/log/ovn/acl-audit-log.log /var/log/ovn/acl-audit-log.$timestamp.log
-                  ovs-appctl -t /var/run/ovn/ovn-controller.$(cat /var/run/ovn/ovn-controller.pid).ctl vlog/reopen
-              fi
+          #Get size in bytes**
+          file_size=`du -b /var/log/ovn/acl-audit-log.log | tr -s '\t' ' ' | cut -d' ' -f1`
+          if [ $file_size -gt $MaxFileSize ];then
+            echo "Rotating OVN ACL Log File"
+            timestamp=`date '+%Y-%m-%dT%H-%M-%S'`
+            mv /var/log/ovn/acl-audit-log.log /var/log/ovn/acl-audit-log.$timestamp.log
+            ovs-appctl -t /var/run/ovn/ovn-controller.$(cat /var/run/ovn/ovn-controller.pid).ctl vlog/reopen
+          fi
 
           done
-
-
         securityContext:
           privileged: true
         terminationMessagePolicy: FallbackToLogsOnError
