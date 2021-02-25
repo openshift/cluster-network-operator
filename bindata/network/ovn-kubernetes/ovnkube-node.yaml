@@ -53,7 +53,7 @@ spec:
             --no-chdir --pidfile=/var/run/ovn/ovn-controller.pid \
             --syslog-method="${OVNPolicyAuditDestination}" \
             --log-file=/var/log/ovn/acl-audit-log.log \
-            --verbose="${OVNPolicyAuditSyslogFacility}" \
+            -vFACILITY:"${OVNPolicyAuditSyslogFacility}" \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
             -vconsole:"${OVN_LOG_LEVEL}" -vconsole:"acl_log:off" \
             -vfile:"acl_log:${OVN_LOG_LEVEL}" -vsyslog:"acl_log:${OVN_LOG_LEVEL}"
