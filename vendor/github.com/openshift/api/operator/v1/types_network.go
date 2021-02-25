@@ -325,6 +325,11 @@ type OVNKubernetesConfig struct {
 	// cluster.
 	// +optional
 	IPsecConfig *IPsecConfig `json:"ipsecConfig,omitempty"`
+	// PolicyAuditing is the configuration for network policy audit events. If unset, no 
+	// reported defaults are used.
+	// +optional
+	PolicyAuditConfig *PolicyAuditConfig `json:"policyAuditingConfig,omitempty"`
+	
 }
 
 type HybridOverlayConfig struct {
@@ -337,6 +342,36 @@ type HybridOverlayConfig struct {
 }
 
 type IPsecConfig struct {
+}
+
+type PolicyAuditConfig struct { 
+	// RateLimit is the approximate maximum number of messages to generate per-second per-node. If
+	// unset, no limit is applied.
+	// +optional
+    RateLimit *uint32 `json:"rateLimit,omitempty"`
+
+	// MaxFilesSize is the max size an ACL_audit log file is allowed to reach before rotation occurs 
+	// Default is 
+	// +optional 
+	MaxFileSize *uint32 `json:"maxFileSize,omitempty"`
+
+	// Messages are output in syslog format. Destination is the destination for policy log messages. 
+	// Regardless of this config logs will always be dumped to ovn at /var/log/ovn/ however 
+	// you may also configure additional output as follows. 
+	// Messages are output in syslog format.
+	// Valid values are:
+	// - libc, to use the libc syslog() function 
+    // - "udp:host:port" for sending syslog over UDP
+	// - "unix:file" for using the UNIX domain socket directly 
+	// - null to discard all messages logged to syslog
+	// The default is "null"
+	// to be managed by the host's journald service.
+	// +optional
+    Destination string `json:"destination,omitempty"`
+
+	// SyslogFacility the RFC5424 facility for generated messages, e.g. "kern". Default is "local0"
+	// +optional
+    SyslogFacility string `json:"syslogFacility,omitempty`
 }
 
 // NetworkType describes the network plugin type to configure
