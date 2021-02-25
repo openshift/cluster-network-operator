@@ -365,6 +365,12 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
 				MTU:        ptrToUint32(8900),
 				GenevePort: ptrToUint32(6081),
+				PolicyAuditConfig: &operv1.PolicyAuditConfig{
+					RateLimit:      ptrToUint32(20),
+					MaxFileSize:    ptrToUint32(50),
+					Destination:    "null",
+					SyslogFacility: "local0",
+				},
 			},
 		},
 	}
@@ -400,6 +406,12 @@ func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
 				MTU:         ptrToUint32(8854),
 				GenevePort:  ptrToUint32(8061),
 				IPsecConfig: &operv1.IPsecConfig{},
+				PolicyAuditConfig: &operv1.PolicyAuditConfig{
+					RateLimit:      ptrToUint32(20),
+					MaxFileSize:    ptrToUint32(50),
+					Destination:    "null",
+					SyslogFacility: "local0",
+				},
 			},
 		},
 	}

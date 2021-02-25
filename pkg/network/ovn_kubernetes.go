@@ -84,6 +84,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["NetFlowCollectors"] = ""
 	data.Data["SFlowCollectors"] = ""
 	data.Data["IPFIXCollectors"] = ""
+	data.Data["OVNPolicyAuditRateLimit"] = c.PolicyAuditConfig.RateLimit
+	data.Data["OVNPolicyAuditMaxFileSize"] = c.PolicyAuditConfig.MaxFileSize
+	data.Data["OVNPolicyAuditDestination"] = c.PolicyAuditConfig.Destination
+	data.Data["OVNPolicyAuditSyslogFacility"] = c.PolicyAuditConfig.SyslogFacility
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
@@ -240,7 +244,8 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 	return out
 }
 
-// isOVNKubernetesChangeSafe currently returns an error if any changes are made.
+// isOVNKubernetesChangeSafe currently returns an error if any changes to immutable
+// fields are made.
 // In the future, we may support rolling out MTU or other alterations.
 func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	pn := prev.DefaultNetwork.OVNKubernetesConfig
@@ -303,6 +308,28 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 		var geneve uint32 = uint32(6081)
 		sc.GenevePort = &geneve
 	}
+
+	if sc.PolicyAuditConfig == nil {
+		sc.PolicyAuditConfig = &operv1.PolicyAuditConfig{}
+	}
+
+	if sc.PolicyAuditConfig.RateLimit == nil {
+		var ratelimit uint32 = uint32(20)
+		sc.PolicyAuditConfig.RateLimit = &ratelimit
+	}
+	if sc.PolicyAuditConfig.MaxFileSize == nil {
+		var maxfilesize uint32 = uint32(50)
+		sc.PolicyAuditConfig.MaxFileSize = &maxfilesize
+	}
+	if sc.PolicyAuditConfig.Destination == "" {
+		var destination string = "null"
+		sc.PolicyAuditConfig.Destination = destination
+	}
+	if sc.PolicyAuditConfig.SyslogFacility == "" {
+		var syslogfacility string = "local0"
+		sc.PolicyAuditConfig.SyslogFacility = syslogfacility
+	}
+
 }
 
 type replicaCountDecoder struct {
