@@ -328,7 +328,7 @@ type OVNKubernetesConfig struct {
 	// PolicyAuditing is the configuration for network policy audit events. If unset, no 
 	// reported defaults are used.
 	// +optional
-	PolicyAuditConfig *PolicyAuditConfig `json:"policyAuditingConfig,omitempty"`
+	PolicyAuditConfig *PolicyAuditConfig `json:"policyAuditConfig,omitempty"`
 	
 }
 
