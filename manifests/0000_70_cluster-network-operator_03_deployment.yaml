@@ -22,16 +22,22 @@ spec:
       - name: network-operator
         image: quay.io/openshift/origin-cluster-network-operator:latest
         command:
-        - "/usr/bin/cluster-network-operator"
-        - "start"
-        - "--listen=0.0.0.0:9104"
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -o allexport
+          if [[ -f /etc/kubernetes/apiserver-url.env ]]; then
+            source /etc/kubernetes/apiserver-url.env
+          else
+            URL_ONLY_KUBECONFIG=/etc/kubernetes/kubeconfig
+          fi
+          exec /usr/bin/cluster-network-operator start --listen=0.0.0.0:9104
         resources:
           requests:
             cpu: 10m
             memory: 50Mi
         env:
-        - name: URL_ONLY_KUBECONFIG
-          value: "/etc/kubernetes/kubeconfig"
         - name: RELEASE_VERSION
           value: "0.0.1-snapshot"
         - name: SDN_IMAGE
@@ -78,17 +84,18 @@ spec:
               fieldPath: metadata.name
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
-        - mountPath: /etc/kubernetes/kubeconfig
-          name: host-kubeconfig
+        - mountPath: /etc/kubernetes
+          name: host-etc-kube
           readOnly: true
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
       priorityClassName: "system-cluster-critical"
       volumes:
-        - name: host-kubeconfig
+        - name: host-etc-kube
           hostPath:
-            path: /etc/kubernetes/kubeconfig
+            path: /etc/kubernetes
+            type: Directory
       restartPolicy: Always
       securityContext:
         runAsNonRoot: true
