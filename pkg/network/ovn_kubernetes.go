@@ -82,6 +82,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["LISTEN_DUAL_STACK"] = listenDualStack(bootstrapResult.OVN.MasterIPs[0])
 	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
 	data.Data["OVN_NORTHD_PROBE_INTERVAL"] = os.Getenv("OVN_NORTHD_PROBE_INTERVAL")
+	data.Data["OVNPolicyAuditRateLimit"] = c.PolicyAuditConfig.RateLimit
+	data.Data["OVNPolicyAuditMaxFileSize"] = c.PolicyAuditConfig.MaxFileSize
+	data.Data["OVNPolicyAuditDestination"] = c.PolicyAuditConfig.Destination
+	data.Data["OVNPolicyAuditSyslogFacility"] = c.PolicyAuditConfig.SyslogFacility
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
@@ -116,38 +120,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["EnableIPsec"] = true
 	} else {
 		data.Data["EnableIPsec"] = false
-	}
-
-	if c.PolicyAuditConfig != nil {
-		if  c.PolicyAuditConfig.RateLimit != nil { 
-			data.Data["OVNPolicyAuditRateLimit"] = c.PolicyAuditConfig.RateLimit
-		} else { 
-			// Default to 20 messages/second
-			data.Data["OVNPolicyAuditRateLimit"] = 20
-		}
-		if c.PolicyAuditConfig.MaxFileSize != nil {
-			data.Data["OVNPolicyAuditMaxFileSize"] = c.PolicyAuditConfig.MaxFileSize
-		} else { 
-			// Default to 50 MB 
-			data.Data["OVNPolicyAuditMaxFileSize"] = 50000000
-		}
-		if c.PolicyAuditConfig.Destination != "" { 
-			data.Data["OVNPolicyAuditDestination"] = c.PolicyAuditConfig.Destination
-		} else { 
-			// Default is Null
-			data.Data["OVNPolicyAuditDestination"] = "null"
-		}
-		if c.PolicyAuditConfig.SyslogFacility != "" { 
-			data.Data["OVNPolicyAuditSyslogFacility"] = c.PolicyAuditConfig.SyslogFacility
-		}else { 
-			// Default is local0
-			data.Data["OVNPolicyAuditSyslogFacility"] = "local0"
-		}
-	} else {
-		data.Data["OVNPolicyAuditRateLimit"] = 20
-		data.Data["OVNPolicyAuditMaxFileSize"] = 50000000
-		data.Data["OVNPolicyAuditDestination"] = "null"
-		data.Data["OVNPolicyAuditSyslogFacility"] = "local0"
 	}
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/ovn-kubernetes"), &data)
@@ -292,6 +264,24 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 		var geneve uint32 = uint32(6081)
 		sc.GenevePort = &geneve
 	}
+
+	if sc.PolicyAuditConfig.RateLimit == nil { 
+		var ratelimit uint32 = uint32(20)
+		sc.PolicyAuditConfig.RateLimit = &ratelimit
+	}
+	if sc.PolicyAuditConfig.MaxFileSize == nil {
+		var maxfilesize uint32 = uint32(50000000)
+		sc.PolicyAuditConfig.MaxFileSize = & maxfilesize
+	}
+	if sc.PolicyAuditConfig.Destination == "" { 
+		var destination string = string("null")
+		sc.PolicyAuditConfig.Destination = destination
+	}
+	if sc.PolicyAuditConfig.SyslogFacility == "" { 
+		var syslogfacility string = string("local0")
+		sc.PolicyAuditConfig.SyslogFacility = syslogfacility
+	}
+
 }
 
 type replicaCountDecoder struct {
