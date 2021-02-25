@@ -119,7 +119,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	if c.PolicyAuditConfig != nil {
-		
 		if  c.PolicyAuditConfig.RateLimit != nil { 
 			data.Data["OVNPolicyAuditRateLimit"] = c.PolicyAuditConfig.RateLimit
 		} else { 
@@ -144,7 +143,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			// Default is local0
 			data.Data["OVNPolicyAuditSyslogFacility"] = "local0"
 		}
-	}else { 
+	} else {
 		data.Data["OVNPolicyAuditRateLimit"] = 20
 		data.Data["OVNPolicyAuditMaxFileSize"] = 50000000
 		data.Data["OVNPolicyAuditDestination"] = "null"
