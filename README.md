@@ -267,6 +267,24 @@ spec:
       ipsecConfig: {}
 ```
 
+#### Configuring Network Policy audit logging with OVNKubernetes 
+
+OVNKubernetes supports audit logging of network policy traffic events.  Add the following to the `spec:` section of the operator config: 
+
+```yaml
+spec:
+  defaultNetwork:
+    type: OVNKubernetes
+    ovnKubernetesConfig: 
+      policyAuditingConfig:
+        maxFileSize: 1
+        rateLimit: 5
+        destination: libc
+        syslogFacility: local0
+```
+
+To understand more about each field, and to see the default values check out the [Openshift api definition](https://github.com/openshift/api/blob/master/operator/v1/types_network.go#L397)
+
 ### Configuring Kuryr-Kubernetes
 Kuryr-Kubernetes is a CNI plugin that uses OpenStack Neutron to network OpenShift Pods, and OpenStack Octavia to create load balancers for Services. In general it is useful when OpenShift is running on an OpenStack cluster, as you can use the same SDN (OpenStack Neutron) to provide networking for both the VMs OpenShift is running on, and the Pods created by OpenShift. In such case avoidance of double encapsulation gives you two advantages: improved performace (in terms of both latency and throughput) and lower complexity of the networking architecture.
 
