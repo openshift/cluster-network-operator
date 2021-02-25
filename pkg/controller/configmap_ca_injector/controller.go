@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 
-	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
@@ -38,10 +37,6 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
 }
 
 func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) reconcile.Reconciler {
-	if err := configv1.Install(mgr.GetScheme()); err != nil {
-		return nil
-	}
-
 	return &ReconcileConfigMapInjector{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status}
 }
 
@@ -189,14 +184,14 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 			errs = append(errs, err)
 			if len(errs) > 5 {
 				r.status.SetDegraded(statusmanager.InjectorConfig, "ConfigMapUpdateFailure",
-					fmt.Sprintf("Too many errors seen when updating trusted CA configmaps"))
+					"Too many errors seen when updating trusted CA configmaps")
 				return reconcile.Result{}, fmt.Errorf("Too many errors attempting to update configmaps with CA cert. data")
 			}
 		}
 	}
 	if len(errs) > 0 {
 		r.status.SetDegraded(statusmanager.InjectorConfig, "ConfigmapUpdateFailure",
-			fmt.Sprintf("some configmaps didn't fully update with CA cert. data"))
+			"some configmaps didn't fully update with CA cert. data")
 		return reconcile.Result{}, fmt.Errorf("some configmaps didn't fully update with CA cert. data")
 	}
 	r.status.SetNotDegraded(statusmanager.InjectorConfig)

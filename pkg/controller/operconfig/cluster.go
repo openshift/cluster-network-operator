@@ -2,6 +2,7 @@ package operconfig
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"reflect"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
-	"github.com/pkg/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,14 +50,17 @@ func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig
 	// If there are changes to the "downstream" networkconfig, commit it back
 	// to the apiserver
 	log.Println("WARNING: Network.operator.openshift.io has fields being overwritten by Network.config.openshift.io configuration")
-	// Have to restore the typemeta due to some weird shared cache bug --cdc
+	return r.UpdateOperConfig(operConfig)
+}
+
+func (r *ReconcileOperConfig) UpdateOperConfig(operConfig *operv1.Network) error {
 	operConfig.TypeMeta = metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}
 	us, err := k8sutil.ToUnstructured(operConfig)
 	if err != nil {
-		return errors.Wrapf(err, "failed to transmute operator config")
+		return fmt.Errorf("failed to transmute operator config, err: %v", err)
 	}
 	if err = apply.ApplyObject(context.TODO(), r.client, us); err != nil {
-		return errors.Wrapf(err, "could not apply (%s) %s/%s", operConfig.GroupVersionKind(), operConfig.GetNamespace(), operConfig.GetName())
+		return fmt.Errorf("could not apply (%s) %s/%s, err: %v", operConfig.GroupVersionKind(), operConfig.GetNamespace(), operConfig.GetName(), err)
 	}
 	return nil
 }

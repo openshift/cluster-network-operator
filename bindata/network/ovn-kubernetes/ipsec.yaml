@@ -193,8 +193,6 @@ spec:
           /usr/libexec/ipsec/_stackmanager start
           # Check nss database status
           /usr/sbin/ipsec --checknss
-          # Check nflog setup
-          /usr/sbin/ipsec --checknflog
           # Start the pluto IKE daemon
           /usr/libexec/ipsec/pluto --leak-detective --config /etc/ipsec.conf --logfile /var/log/openvswitch/libreswan.log
 
@@ -202,11 +200,9 @@ spec:
           # We now start ovs-monitor-ipsec which will monitor for changes in the ovs
           # tunnelling configuration (for example addition of a node) and configures
           # libreswan appropriately.
-          OVS_LOGDIR=/var/log/openvswitch OVS_RUNDIR=/var/run/openvswitch OVS_PKGDATADIR=/usr/share/openvswitch /usr/share/openvswitch/scripts/ovs-ctl --ike-daemon=libreswan start-ovs-ipsec
+          OVS_LOGDIR=/var/log/openvswitch OVS_RUNDIR=/var/run/openvswitch OVS_PKGDATADIR=/usr/share/openvswitch /usr/share/openvswitch/scripts/ovs-ctl --ike-daemon=libreswan --no-restart-ike-daemon start-ovs-ipsec
 
-          while true; do
-            sleep 60
-          done
+          sleep infinity
         env:
         - name: OVS_LOG_LEVEL
           value: info
@@ -238,10 +234,20 @@ spec:
             - -c
             - |
               #!/bin/bash
-              ovs-appctl -t ovs-monitor-ipsec ipsec/status
+              ovs-appctl -t ovs-monitor-ipsec ipsec/status && ipsec status
           initialDelaySeconds: 120
           periodSeconds: 30
           timeoutSeconds: 40
+        livenessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              #!/bin/bash
+              ovs-appctl -t ovs-monitor-ipsec ipsec/status && ipsec status
+          initialDelaySeconds: 60
+          periodSeconds: 60
         terminationGracePeriodSeconds: 10
       nodeSelector:
         beta.kubernetes.io/os: "linux"

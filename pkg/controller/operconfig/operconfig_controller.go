@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
@@ -34,7 +35,7 @@ import (
 // The periodic resync interval.
 // We will re-run the reconciliation logic, even if the network configuration
 // hasn't changed.
-var ResyncPeriod = 5 * time.Minute
+var ResyncPeriod = 3 * time.Minute
 
 // ManifestPaths is the path to the manifest templates
 // bad, but there's no way to pass configuration to the reconciler right now
@@ -48,8 +49,6 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) *ReconcileOperConfig {
-	configv1.Install(mgr.GetScheme())
-	operv1.Install(mgr.GetScheme())
 	return &ReconcileOperConfig{
 		client:        mgr.GetClient(),
 		scheme:        mgr.GetScheme(),
@@ -190,13 +189,24 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 	}
 
+	newOperConfig := operConfig.DeepCopy()
+
 	// Bootstrap any resources
-	bootstrapResult, err := network.Bootstrap(&operConfig.Spec, r.client)
+	bootstrapResult, err := network.Bootstrap(newOperConfig, r.client)
 	if err != nil {
 		log.Printf("Failed to reconcile platform networking resources: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "BootstrapError",
 			fmt.Sprintf("Internal error while reconciling platform networking resources: %v", err))
 		return reconcile.Result{}, err
+	}
+
+	if !reflect.DeepEqual(operConfig, newOperConfig) {
+		if err := r.UpdateOperConfig(newOperConfig); err != nil {
+			log.Printf("Failed to update the operator configuration: %v", err)
+			r.status.SetDegraded(statusmanager.OperatorConfig, "UpdateOperatorConfig",
+				fmt.Sprintf("Internal error while updating operator configuration: %v", err))
+			return reconcile.Result{}, err
+		}
 	}
 
 	// Generate the objects
@@ -249,7 +259,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	// Add operator.openshift.io/v1/network to relatedObjects for must-gather
 	relatedObjects = append(relatedObjects, configv1.ObjectReference{
 		Group:    "operator.openshift.io",
-		Resource: "network",
+		Resource: "networks",
 		Name:     "cluster",
 	})
 

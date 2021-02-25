@@ -6,13 +6,14 @@ import (
 	"crypto/x509"
 	b64 "encoding/base64"
 	"fmt"
-	"k8s.io/api/core/v1"
 	"log"
 	"net"
 	"net/http"
 	"regexp"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
+
+	v1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/Masterminds/semver"
 	"github.com/pkg/errors"
@@ -21,6 +22,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -31,6 +33,8 @@ import (
 
 	confv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
+	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	capo "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis/openstackproviderconfig/v1alpha1"
 
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 )
@@ -43,6 +47,8 @@ const (
 	UserCABundleConfigMap    = "cloud-provider-config"
 	// NOTE(dulek): This one is hardcoded in openshift/installer.
 	InfrastructureCRDName = "cluster"
+	masterMachineLabel    = "machine.openshift.io/cluster-api-machine-role"
+	machinesNamespace     = "openshift-machine-api"
 	// NOTE(ltomasbo): Amphora driver supports came on 2.11, but ovn-octavia only supports it after 2.13
 	MinOctaviaVersionWithMultipleListeners = "v2.13"
 	MinOctaviaVersionWithHTTPSMonitors     = "v2.10"
@@ -189,6 +195,57 @@ func getSavedAnnotation(kubeClient client.Client, annotation string) (string, er
 	return cm.Annotations[annotation], nil
 }
 
+func getMasterMachines(kubeClient client.Client) (*machineapi.MachineList, error) {
+	machineList := &machineapi.MachineList{}
+	listOptions := []client.ListOption{
+		client.InNamespace(machinesNamespace),
+		client.MatchingLabels{masterMachineLabel: "master"},
+	}
+	err := kubeClient.List(context.TODO(), machineList, listOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return machineList, nil
+}
+
+func getWorkersSubnetFromMasters(client *gophercloud.ServiceClient, kubeClient client.Client, clusterID string) (subnets.Subnet, error) {
+	empty := subnets.Subnet{}
+	machines, err := getMasterMachines(kubeClient)
+	if err != nil {
+		return empty, err
+	}
+	for _, machine := range machines.Items {
+		// First is good enough, we're guaranteed masters are on a single
+		// subnet.
+		providerSpec, err := capo.MachineSpecFromProviderSpec(machine.Spec.ProviderSpec)
+		if err != nil {
+			return empty, err
+		}
+		if providerSpec.PrimarySubnet != "" {
+			return getOpenStackSubnet(client, providerSpec.PrimarySubnet)
+		} else {
+			// TODO(dulek): `PrimarySubnet` is not set on most basic case, we need to look
+			//              through `Networks` in other case. This only covers pretty simple
+			//              description of the network-subnet pair to support more complicated
+			//              one we'd need a way more complicated code here.
+			if len(providerSpec.Networks) != 1 || len(providerSpec.Networks[0].Subnets) != 1 {
+				log.Printf("Failed to figure out subnet of Machine %s", machine.Name)
+				continue
+			}
+
+			subnet := providerSpec.Networks[0].Subnets[0]
+			if subnet.UUID != "" {
+				return getOpenStackSubnet(client, subnet.UUID)
+			}
+
+			return findOpenStackSubnet(client, subnet.Filter.Name, subnet.Filter.Tags)
+		}
+	}
+	// As a last resort we look for it by a tag - older versions were tagging BYON network.
+	primaryNetworkTag := clusterID + "-primaryClusterNetwork"
+	return findOpenStackSubnetByNetworkTag(client, primaryNetworkTag)
+}
+
 // Logs into OpenStack and creates all the resources that are required to run
 // Kuryr based on conf NetworkConfigSpec. Basically this includes service
 // network and subnet, pods subnetpool, security group and load balancer for
@@ -326,17 +383,18 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 	log.Printf("Pod subnetpool %s present", podSubnetpoolId)
 
-	workerSubnet, err := findOpenStackSubnet(client, generateName("nodes", clusterID), tag, clusterID)
+	workerSubnet, err := getWorkersSubnetFromMasters(client, kubeClient, clusterID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes subnet")
 	}
+	log.Printf("Found worker nodes subnet %s", workerSubnet.ID)
+
 	mtu, err := getOpenStackNetworkMTU(client, workerSubnet.NetworkID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get network MTU")
 	}
 	log.Printf("Found Nodes Network MTU %d", mtu)
 
-	log.Printf("Found worker nodes subnet %s", workerSubnet.ID)
 	router, err := ensureOpenStackRouter(client, generateName("external-router", clusterID), tag, workerSubnet.NetworkID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes router")
@@ -384,6 +442,9 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 
 	log.Print("Ensuring pods security group")
 	podSgId, err := ensureOpenStackSg(client, generateName("kuryr-pods-security-group", clusterID), tag)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to find pods security group")
+	}
 	log.Printf("Pods security group %s present", podSgId)
 
 	type sgRule struct {
@@ -520,6 +581,9 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	log.Print("Creating OpenShift API loadbalancer pool members")
 	r, _ := regexp.Compile(fmt.Sprintf("^%s-(master-port-[0-9]+|bootstrap-port)$", clusterID))
 	portList, err := listOpenStackPortsMatchingPattern(client, tag, r)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list openstack master ports")
+	}
 	addresses := make([]string, 0)
 	for _, port := range portList {
 		if len(port.FixedIPs) > 0 {
@@ -646,7 +710,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 			ServiceSubnet:            svcSubnetId,
 			PodSubnetpool:            podSubnetpoolId,
 			WorkerNodesRouter:        routerId,
-			WorkerNodesSubnet:        workerSubnet.ID,
+			WorkerNodesSubnets:       []string{workerSubnet.ID},
 			NodesNetworkMTU:          mtu,
 			PodSecurityGroups:        []string{podSgId},
 			ExternalNetwork:          externalNetwork,

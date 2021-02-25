@@ -16,6 +16,7 @@ spec:
     metadata:
       labels:
         app: network-check-target
+        kubernetes.io/os: "linux"
     spec:
       containers:
       - image: "{{.NetworkCheckTargetImage}}"
@@ -27,7 +28,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 150Mi
+            memory: 15Mi
         readinessProbe:
           httpGet:
             port: 8080
@@ -38,6 +39,8 @@ spec:
       terminationGracePeriodSeconds: 10
       tolerations:
       - operator: "Exists"
+      nodeSelector:
+        beta.kubernetes.io/os: "linux"
 
 ---
 apiVersion: v1

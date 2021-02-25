@@ -211,7 +211,8 @@ metadata:
   name: d1
 spec:
   clusterIP: cur
-  ipFamily: IPv4`)
+  ipFamilies: ["IPv4"]
+  ipFamilyPolicy: SingleStack`)
 
 	upd := UnstructuredFromYaml(t, `
 apiVersion: v1
@@ -228,9 +229,30 @@ spec:
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(ip).To(Equal("cur"))
 
-	ipFamily, _, err := uns.NestedString(upd.Object, "spec", "ipFamily")
+	ipFamily, _, err := uns.NestedStringSlice(upd.Object, "spec", "ipFamilies")
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(ipFamily).To(Equal("IPv4"))
+	g.Expect(ipFamily).To(Equal([]string{"IPv4"}))
+
+	ipfp, _, err := uns.NestedString(upd.Object, "spec", "ipFamilyPolicy")
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(ipfp).To(Equal("SingleStack"))
+
+	upd = UnstructuredFromYaml(t, `
+apiVersion: v1
+kind: Service
+metadata:
+  name: d1
+spec:
+  clusterIP: upd
+  ipFamilyPolicy: RequireDualStack`)
+
+	err = MergeObjectForUpdate(cur, upd)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	ipfp, _, err = uns.NestedString(upd.Object, "spec", "ipFamilyPolicy")
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(ipfp).To(Equal("RequireDualStack"))
+
 }
 
 func TestMergeServiceAccount(t *testing.T) {
@@ -261,6 +283,7 @@ metadata:
 	g.Expect(err).NotTo(HaveOccurred())
 
 	s, ok, err := uns.NestedSlice(upd.Object, "secrets")
+	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(ok).To(BeTrue())
 	g.Expect(s).To(ConsistOf("foo"))
 }

@@ -70,12 +70,10 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 	if status.relatedObjects == nil {
 		return
 	}
-
 	for _, currentObj := range co.Status.RelatedObjects {
 		var found bool = false
 		for _, renderedObj := range status.relatedObjects {
 			found = reflect.DeepEqual(currentObj, renderedObj)
-
 			if found {
 				break
 			}
@@ -95,6 +93,11 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 				// BZ 1820472: During SDN migration, deleting a namespace object may get stuck in 'Terminating' forever if the cluster network doesn't working as expected.
 				// We choose to not delete the namespace here but to ask user do it manually after the cluster is back to normal state.
 				log.Printf("Object Kind is Namespace, skip")
+				continue
+			}
+			// @aconstan: remove this after having the PR implementing this change, integrated.
+			if gvk.Kind == "Network" && gvk.Group == "operator.openshift.io" {
+				log.Printf("Object Kind is network.operator.openshift.io, skip")
 				continue
 			}
 			log.Printf("Detected related object with GVK %+v, namespace %v and name %v not rendered by manifests, deleting...", gvk, currentObj.Namespace, currentObj.Name)
@@ -131,9 +134,11 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 
 		oc.Status.Version = os.Getenv("RELEASE_VERSION")
 
-		// If we have no conditions at all, pull them from the ClusterOperator object
-		// In other words, we're upgrading an existing cluster where we didn't set conditions here.
-		if len(oc.Status.Conditions) == 0 {
+		// If there is no Available condition on the operator config then copy the
+		// conditions from the ClusterOperator (which will either also be empty if
+		// this is a new install, or will contain the pre-4.7 conditions if this is
+		// a 4.6->4.7 upgrade).
+		if v1helpers.FindOperatorCondition(oc.Status.Conditions, operv1.OperatorStatusTypeAvailable) == nil {
 			co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
 			err := status.client.Get(context.TODO(), types.NamespacedName{Name: status.name}, co)
 			if err != nil {
@@ -222,8 +227,10 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 				Message: "No networks.operator.openshift.io cluster found",
 			})
 		} else {
-			co.Status.Versions = []configv1.OperandVersion{
-				{Name: "operator", Version: operStatus.Version},
+			if reachedAvailableLevel {
+				co.Status.Versions = []configv1.OperandVersion{
+					{Name: "operator", Version: operStatus.Version},
+				}
 			}
 
 			for _, cond := range operStatus.Conditions {

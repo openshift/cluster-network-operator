@@ -3,6 +3,8 @@ package network
 import (
 	"context"
 	"fmt"
+	"log"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -15,9 +17,13 @@ import (
 	yaml "github.com/ghodss/yaml"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -33,9 +39,10 @@ const OVN_SB_RAFT_PORT = "9644"
 const CLUSTER_CONFIG_NAME = "cluster-config-v1"
 const CLUSTER_CONFIG_NAMESPACE = "kube-system"
 const OVN_CERT_CN = "ovn"
-
-const OVN_MASTER_DISCOVERY_TIMEOUT = 280
 const OVN_MASTER_DISCOVERY_POLL = 5
+const OVN_MASTER_DISCOVERY_BACKOFF = 120
+
+var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
 // This creates
@@ -70,11 +77,15 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_CONTROLLER_INACTIVITY_PROBE"] = os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
 	data.Data["OVN_NB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterIPs, OVN_NB_PORT)
 	data.Data["OVN_SB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterIPs, OVN_SB_PORT)
-	data.Data["OVN_MASTER_IP"] = bootstrapResult.OVN.MasterIPs[0]
+	data.Data["OVN_DB_CLUSTER_INITIATOR"] = bootstrapResult.OVN.ClusterInitiator
 	data.Data["OVN_MIN_AVAILABLE"] = len(bootstrapResult.OVN.MasterIPs)/2 + 1
 	data.Data["LISTEN_DUAL_STACK"] = listenDualStack(bootstrapResult.OVN.MasterIPs[0])
 	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
 	data.Data["OVN_NORTHD_PROBE_INTERVAL"] = os.Getenv("OVN_NORTHD_PROBE_INTERVAL")
+	data.Data["OVNPolicyAuditRateLimit"] = c.PolicyAuditConfig.RateLimit
+	data.Data["OVNPolicyAuditMaxFileSize"] = c.PolicyAuditConfig.MaxFileSize
+	data.Data["OVNPolicyAuditDestination"] = c.PolicyAuditConfig.Destination
+	data.Data["OVNPolicyAuditSyslogFacility"] = c.PolicyAuditConfig.SyslogFacility
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
@@ -85,14 +96,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 	data.Data["OVN_cidr"] = ippools
 
-	var svcpools string
-	for _, net := range conf.ServiceNetwork {
-		if len(svcpools) != 0 {
-			svcpools += ","
-		}
-		svcpools += fmt.Sprintf("%s", net)
-	}
-	data.Data["OVN_service_cidr"] = svcpools
+	data.Data["OVN_service_cidr"] = strings.Join(conf.ServiceNetwork, ",")
 
 	if c.HybridOverlayConfig != nil {
 		if len(c.HybridOverlayConfig.HybridClusterNetwork) > 0 {
@@ -153,6 +157,24 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/ovn-kubernetes"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render manifests")
+	}
+
+	updateNode, updateMaster := shouldUpdateOVNK(bootstrapResult.OVN.ExistingNodeDaemonset, bootstrapResult.OVN.ExistingMasterDaemonset, os.Getenv("RELEASE_VERSION"))
+
+	// If we need to delay master or node daemonset rollout, then we'll replace the new one with the existing one
+	if !updateMaster {
+		us, err := k8s.ToUnstructured(bootstrapResult.OVN.ExistingMasterDaemonset)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to transmute existing master daemonset")
+		}
+		objs = k8s.ReplaceObj(objs, us)
+	}
+	if !updateNode {
+		us, err := k8s.ToUnstructured(bootstrapResult.OVN.ExistingNodeDaemonset)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to transmute existing node daemonset")
+		}
+		objs = k8s.ReplaceObj(objs, us)
 	}
 
 	objs = append(objs, manifests...)
@@ -274,10 +296,24 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 		var geneve uint32 = uint32(6081)
 		sc.GenevePort = &geneve
 	}
-}
 
-func networkPluginName() string {
-	return "ovn-kubernetes"
+	if sc.PolicyAuditConfig.RateLimit == nil { 
+		var ratelimit uint32 = uint32(20)
+		sc.PolicyAuditConfig.RateLimit = &ratelimit
+	}
+	if sc.PolicyAuditConfig.MaxFileSize == nil {
+		var maxfilesize uint32 = uint32(50000000)
+		sc.PolicyAuditConfig.MaxFileSize = & maxfilesize
+	}
+	if sc.PolicyAuditConfig.Destination == "" { 
+		var destination string = string("null")
+		sc.PolicyAuditConfig.Destination = destination
+	}
+	if sc.PolicyAuditConfig.SyslogFacility == "" { 
+		var syslogfacility string = string("local0")
+		sc.PolicyAuditConfig.SyslogFacility = syslogfacility
+	}
+
 }
 
 type replicaCountDecoder struct {
@@ -286,7 +322,7 @@ type replicaCountDecoder struct {
 	} `json:"controlPlane"`
 }
 
-func bootstrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
+func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 	clusterConfig := &corev1.ConfigMap{}
 	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
 	masterNodeList := &corev1.NodeList{}
@@ -304,7 +340,7 @@ func bootstrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) 
 
 	var heartBeat int
 
-	err := wait.PollImmediate(OVN_MASTER_DISCOVERY_POLL*time.Second, OVN_MASTER_DISCOVERY_TIMEOUT*time.Second, func() (bool, error) {
+	err := wait.PollImmediate(OVN_MASTER_DISCOVERY_POLL*time.Second, time.Duration(OVN_MASTER_DISCOVERY_TIMEOUT)*time.Second, func() (bool, error) {
 		matchingLabels := &client.MatchingLabels{"node-role.kubernetes.io/master": ""}
 		if err := kubeClient.List(context.TODO(), masterNodeList, matchingLabels); err != nil {
 			return false, err
@@ -320,8 +356,20 @@ func bootstrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) 
 		}
 		return false, nil
 	})
-	if err != nil {
-		return nil, fmt.Errorf("Unable to bootstrap OVN, expected amount of control plane nodes (%v) do not match found (%v): %s", controlPlaneReplicaCount, len(masterNodeList.Items), err)
+	if wait.ErrWaitTimeout == err {
+		klog.Warningf("Timeout exceeded while bootstraping OVN, expected amount of control plane nodes (%v) do not match found (%v): %s, continuing deployment with found replicas", controlPlaneReplicaCount, len(masterNodeList.Items))
+		// On certain types of cluster this condition will never be met (assisted installer, for example)
+		// As to not hold the reconciliation loop for too long on such clusters: dynamically modify the timeout
+		// to a shorter and shorter value. Never reach 0 however as that will result in a `PollInfinity`.
+		// Right now we'll do:
+		// - First reconciliation 250 second timeout
+		// - Second reconciliation 130 second timeout
+		// - >= Third reconciliation 10 second timeout
+		if OVN_MASTER_DISCOVERY_TIMEOUT-OVN_MASTER_DISCOVERY_BACKOFF > 0 {
+			OVN_MASTER_DISCOVERY_TIMEOUT = OVN_MASTER_DISCOVERY_TIMEOUT - OVN_MASTER_DISCOVERY_BACKOFF
+		}
+	} else if err != nil {
+		return nil, fmt.Errorf("Unable to bootstrap OVN, err: %v", err)
 	}
 
 	ovnMasterIPs := make([]string, len(masterNodeList.Items))
@@ -341,12 +389,65 @@ func bootstrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) 
 
 	sort.Strings(ovnMasterIPs)
 
+	// clusterInitiator is used to avoid a split-brain scenario for the OVN NB/SB DBs. We want to consistently initialize
+	// any OVN cluster which is bootstrapped here, to the same initiator (should it still exists), hence we annotate the
+	// network.operator.openshift.io CRD with this information and always try to re-use the same member for the OVN RAFT
+	// cluster initialization
+	var clusterInitiator string
+	currentAnnotation := conf.GetAnnotations()
+	if cInitiator, ok := currentAnnotation[names.OVNRaftClusterInitiator]; ok && currentInitiatorExists(ovnMasterIPs, cInitiator) {
+		clusterInitiator = cInitiator
+	} else {
+		clusterInitiator = ovnMasterIPs[0]
+		if currentAnnotation == nil {
+			currentAnnotation = map[string]string{
+				names.OVNRaftClusterInitiator: clusterInitiator,
+			}
+		} else {
+			currentAnnotation[names.OVNRaftClusterInitiator] = clusterInitiator
+		}
+		conf.SetAnnotations(currentAnnotation)
+	}
+
+	// Retrieve existing daemonsets - used for deciding if upgrades should happen
+	masterDS := &appsv1.DaemonSet{}
+	nsn := types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ovnkube-master"}
+	if err := kubeClient.Get(context.TODO(), nsn, masterDS); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to retrieve existing master DaemonSet: %w", err)
+		} else {
+			masterDS = nil
+		}
+	}
+
+	nodeDS := &appsv1.DaemonSet{}
+	nsn = types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ovnkube-node"}
+	if err := kubeClient.Get(context.TODO(), nsn, nodeDS); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to retrieve existing node DaemonSet: %w", err)
+		} else {
+			nodeDS = nil
+		}
+	}
+
 	res := bootstrap.BootstrapResult{
 		OVN: bootstrap.OVNBootstrapResult{
-			MasterIPs: ovnMasterIPs,
+			MasterIPs:               ovnMasterIPs,
+			ClusterInitiator:        clusterInitiator,
+			ExistingMasterDaemonset: masterDS,
+			ExistingNodeDaemonset:   nodeDS,
 		},
 	}
 	return &res, nil
+}
+
+func currentInitiatorExists(ovnMasterIPs []string, configInitiator string) bool {
+	for _, masterIP := range ovnMasterIPs {
+		if masterIP == configInitiator {
+			return true
+		}
+	}
+	return false
 }
 
 func dbList(masterIPs []string, port string) string {
@@ -365,4 +466,118 @@ func listenDualStack(masterIP string) string {
 		// IPv4 master, be IPv4-only for backward-compatibility
 		return ""
 	}
+}
+
+// shouldUpdateOVNK determines if we should roll out changes to
+// the master and node daemonsets.
+//
+// On upgrades, we roll out nodes first, then masters. Downgrades, we do the
+// opposite.
+func shouldUpdateOVNK(existingNode, existingMaster *appsv1.DaemonSet, releaseVersion string) (updateNode, updateMaster bool) {
+	// Fresh cluster - full steam ahead!
+	if existingNode == nil || existingMaster == nil {
+		return true, true
+	}
+
+	nodeVersion := existingNode.GetAnnotations()["release.openshift.io/version"]
+	masterVersion := existingMaster.GetAnnotations()["release.openshift.io/version"]
+
+	// shortcut - we're all rolled out.
+	// Return true so that we reconcile any changes that somehow could have happened.
+	if nodeVersion == releaseVersion && masterVersion == releaseVersion {
+		return true, true
+	}
+
+	// compute version delta
+	// versionUpgrade means the existing daemonSet needs an upgrade.
+	masterDelta := compareVersions(masterVersion, releaseVersion)
+	nodeDelta := compareVersions(nodeVersion, releaseVersion)
+
+	if masterDelta == versionUnknown || nodeDelta == versionUnknown {
+		log.Printf("WARNING: could not determine ovn-kubernetes daemonset update directions; node: %s, master: %s, release: %s",
+			nodeVersion, masterVersion, releaseVersion)
+
+		return true, true
+	}
+
+	// 9 cases
+	// +-------------+---------------+-----------------+------------------+
+	// |    Delta    |  master upg.  |    master OK    |   master downg.  |
+	// +-------------+---------------+-----------------+------------------+
+	// | node upg.   | upgrade node  | error           | error            |
+	// | node OK     | wait for node | done            | error            |
+	// | node downg. | error         | wait for master | downgrade master |
+	// +-------------+---------------+-----------------+------------------++
+
+	// both older (than CNO)
+	// Update node only.
+	if masterDelta == versionUpgrade && nodeDelta == versionUpgrade {
+		log.Printf("Upgrading OVN-Kubernetes node before master")
+		return true, false
+	}
+
+	// master older, node updated
+	// update master if node is rolled out
+	if masterDelta == versionUpgrade && nodeDelta == versionSame {
+		if daemonSetProgressing(existingNode, true) {
+			log.Printf("Waiting for OVN-Kubernetes node update to roll out before updating master")
+			return true, false
+		}
+		return true, true
+	}
+
+	// both newer
+	// downgrade master before node
+	if masterDelta == versionDowngrade && nodeDelta == versionDowngrade {
+		log.Printf("Downgrading OVN-Kubernetes master before node")
+		return false, true
+	}
+
+	// master same, node needs downgrade
+	// wait for master rollout
+	if masterDelta == versionSame && nodeDelta == versionDowngrade {
+		if daemonSetProgressing(existingMaster, false) {
+			log.Printf("Waiting for OVN-Kubernetes master update to roll out")
+			return false, true
+		}
+		return true, true
+	}
+
+	// unlikely, should be caught above
+	if masterDelta == versionSame && nodeDelta == versionSame {
+		return true, true
+	}
+
+	log.Printf("WARNING: ovn-kubernetes daemonset versions inconsistent. node: %s, master: %s, release: %s",
+		nodeVersion, masterVersion, releaseVersion)
+	return true, true
+}
+
+// daemonSetProgressing returns true if a daemonset is rolling out a change.
+// If allowHung is true, then treat a daemonset hung at 90% as "done" for our purposes.
+func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
+	status := ds.Status
+
+	// Copy-pasted from status_manager: Determine if a DaemonSet is progressing
+	progressing := (status.UpdatedNumberScheduled < status.DesiredNumberScheduled ||
+		status.NumberUnavailable > 0 ||
+		status.NumberAvailable == 0 ||
+		ds.Generation > status.ObservedGeneration)
+
+	if !progressing {
+		return false
+	}
+
+	// If we're hung, but max(90% of nodes, 1) have been updated, then act as if not progressing
+	if allowHung {
+		_, hung := ds.GetAnnotations()[names.RolloutHungAnnotation]
+		maxBehind := int(math.Max(1, math.Floor(float64(status.DesiredNumberScheduled)*0.1)))
+		numBehind := int(status.DesiredNumberScheduled - status.UpdatedNumberScheduled)
+		if hung && numBehind <= maxBehind {
+			log.Printf("WARNING: daemonset %s/%s rollout seems to have hung with %d out of %d behind, force-continuing", ds.Namespace, ds.Name, numBehind, status.DesiredNumberScheduled)
+			return false
+		}
+	}
+
+	return true
 }

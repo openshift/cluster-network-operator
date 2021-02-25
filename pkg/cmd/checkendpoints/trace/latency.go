@@ -26,11 +26,11 @@ func (r *LatencyInfo) connectStart(addr string) {
 }
 
 func (r *LatencyInfo) dnsDone() {
-	r.DNS = time.Now().Sub(r.DNSStart)
+	r.DNS = time.Since(r.DNSStart)
 }
 
 func (r *LatencyInfo) connectDone(addr string) {
-	r.Connect = time.Now().Sub(r.ConnectStart)
+	r.Connect = time.Since(r.ConnectStart)
 }
 
 func WithLatencyInfoCapture(ctx context.Context) (context.Context, *LatencyInfo) {

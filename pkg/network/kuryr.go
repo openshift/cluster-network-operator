@@ -46,8 +46,8 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	// general kuryr options
 	data.Data["ResourceTags"] = "openshiftClusterID=" + b.ClusterID
 	data.Data["PodSecurityGroups"] = strings.Join(b.PodSecurityGroups, ",")
-	data.Data["WorkerNodesSubnet"] = b.WorkerNodesSubnet
 	data.Data["WorkerNodesRouter"] = b.WorkerNodesRouter
+	data.Data["WorkerNodesSubnets"] = strings.Join(b.WorkerNodesSubnets, ",")
 	data.Data["PodSubnetpool"] = b.PodSubnetpool
 	data.Data["ServiceSubnet"] = b.ServiceSubnet
 	data.Data["ExternalNetwork"] = b.ExternalNetwork

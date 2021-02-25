@@ -203,7 +203,11 @@ fi
 
 if ! kubectl wait -n openshift-network-operator --for condition=available deployment network-operator --timeout=120s; then
   echo "Network operator not running"
+<<<<<<< HEAD
   #exit 1
+=======
+  exit 1
+>>>>>>> 6fc394bc1c86aec22c85ddd8a9c4bd10a7122cb8
 fi
 
 if [ "$BUILD_CNO" != true ]; then
