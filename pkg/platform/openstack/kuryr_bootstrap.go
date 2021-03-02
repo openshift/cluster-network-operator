@@ -703,6 +703,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 			ServiceSubnet:            svcSubnetId,
 			PodSubnetpool:            podSubnetpoolId,
 			WorkerNodesRouter:        routerId,
+			WorkerNodesSubnets:       []string{workerSubnet.ID},
 			NodesNetworkMTU:          mtu,
 			PodSecurityGroups:        []string{podSgId},
 			ExternalNetwork:          externalNetwork,
