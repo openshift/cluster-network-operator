@@ -12,6 +12,10 @@ spec:
   selector:
       matchLabels:
         app: network-check-target
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
   template:
     metadata:
       labels:
