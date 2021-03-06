@@ -23,6 +23,8 @@ spec:
       app: sdn
   updateStrategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
   template:
     metadata:
       labels:
