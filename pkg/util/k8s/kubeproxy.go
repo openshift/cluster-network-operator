@@ -82,6 +82,8 @@ func GenerateKubeProxyConfiguration(args map[string]operv1.ProxyArgumentList) (s
 	kpc.NodePortAddresses = ka.getCIDRList("node-port-addresses")
 	kpc.FeatureGates = ka.getFeatureGates("feature-gates")
 
+	kpc.EnableProfiling = ka.getBool("enable-profiling")
+
 	if err := ka.getError(); err != nil {
 		return "", err
 	}
