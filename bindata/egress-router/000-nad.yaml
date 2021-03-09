@@ -1,0 +1,25 @@
+---
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: egress-router-cni-nad
+  namespace: "{{.EgressRouterNamespace}}"
+  annotations:
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  config: '{
+    "cniVersion": "0.4.0",
+    "type": "egress-router",
+    "name": "egress-router-cni-nad",
+    "ip": {
+      "addresses": [
+        "{{.Addresses}}"
+        ],
+      "destinations": [
+        "{{.AllowedDestinations}}"
+        ],
+      "gateway": "{{.Gateway}}"
+        },
+      "log_file": "/tmp/egress-router-log",
+      "log_level": "debug"
+    }'
