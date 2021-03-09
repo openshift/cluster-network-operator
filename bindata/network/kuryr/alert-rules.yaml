@@ -65,7 +65,7 @@ spec:
       annotations:
         message: Running out of quota for {{"{{"}} $labels.resource {{"}}"}}.
       expr: |
-        kuryr_quota_free_count < 10
+        kuryr_quota_free_count > 0 and kuryr_quota_free_count < 10
       labels:
         severity: warning
     - alert: InsuficientResourceQuota
