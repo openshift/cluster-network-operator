@@ -9,8 +9,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"regexp"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -540,84 +538,6 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	lbClient, err := openstack.NewLoadBalancerV2(provider, gophercloud.EndpointOpts{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create Octavia client")
-	}
-
-	// We need first usable IP from services CIDR
-	// This will get us the first one (subnet IP)
-	apiIP := iputil.FirstUsableIP(*svcNet)
-	log.Printf("Creating OpenShift API loadbalancer with IP %s", apiIP.String())
-	lbId, err := ensureOpenStackLb(lbClient, generateName("kuryr-api-loadbalancer", clusterID), apiIP.String(), svcSubnetId, tag)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create OpenShift API loadbalancer")
-	}
-	log.Printf("OpenShift API loadbalancer %s present", lbId)
-
-	log.Print("Creating OpenShift API loadbalancer pool")
-	poolId, err := ensureOpenStackLbPool(lbClient, generateName("kuryr-api-loadbalancer-pool", clusterID), lbId)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create OpenShift API loadbalancer pool")
-	}
-	log.Printf("OpenShift API loadbalancer pool %s present", poolId)
-
-	log.Print("Creating OpenShift API loadbalancer health monitor")
-	monitorId, err := ensureOpenStackLbMonitor(lbClient, "kuryr-api-loadbalancer-monitor", poolId)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create OpenShift API loadbalancer health monitor")
-	}
-	log.Printf("OpenShift API loadbalancer health monitor %s present", monitorId)
-
-	log.Print("Creating OpenShift API loadbalancer listener")
-	listenerId, err := ensureOpenStackLbListener(lbClient, generateName("kuryr-api-loadbalancer-listener", clusterID),
-		lbId, poolId, 443)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create OpenShift API loadbalancer listener")
-	}
-	log.Printf("OpenShift API loadbalancer listener %s present", listenerId)
-
-	// We need to list all master ports and add them to the LB pool. We also add the
-	// bootstrap node port as for a portion of installation only it provides access to
-	// the API. With healthchecks enabled for the pool we'll get masters added automatically
-	// when they're up and ready.
-	log.Print("Creating OpenShift API loadbalancer pool members")
-	r, _ := regexp.Compile(fmt.Sprintf("^%s-(master-port-[0-9]+|bootstrap-port|master-[0-9]+)$", clusterID))
-	portList, err := listOpenStackPortsMatchingPattern(client, tag, r)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to list openstack master ports")
-	}
-
-	addresses := make([]string, 0)
-	for _, port := range portList {
-		if len(port.FixedIPs) > 0 {
-			portIp := port.FixedIPs[0].IPAddress
-			addresses = append(addresses, portIp)
-			log.Printf("Found port %s with IP %s", port.ID, portIp)
-
-			// We want bootstrap to stop being used as soon as possible, as it will serve
-			// outdated data during the bootstrap transition period.
-			weight := 100
-			if strings.HasSuffix(port.Name, "bootstrap-port") {
-				weight = 1
-			}
-
-			memberId, err := ensureOpenStackLbPoolMember(lbClient, port.Name, lbId,
-				poolId, portIp, svcSubnetId, 6443, weight)
-			if err != nil {
-				log.Printf("Failed to add port %s (%s) to LB pool %s: %s", port.ID, port.Name, poolId, err)
-				continue
-			}
-			log.Printf("Added member %s to LB pool %s", memberId, poolId)
-		} else {
-			log.Printf("Matching port %s has no IP", port.ID)
-		}
-	}
-
-	if len(portList) == 0 {
-		return nil, errors.New("No master ports found. Load Balancer members not ensured.")
-	}
-
-	err = purgeOpenStackLbPoolMember(lbClient, poolId, addresses)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed on purging invalid LB members from LB pool")
 	}
 
 	log.Print("Ensuring certificates")
