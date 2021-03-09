@@ -38,6 +38,7 @@ const (
 	InjectorConfig
 	PodDeployment
 	PKIConfig
+	EgressRouterConfig
 	RolloutHung
 	CertificateSigner
 	maxStatusLevel
