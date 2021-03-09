@@ -51,7 +51,6 @@ const (
 	machinesNamespace     = "openshift-machine-api"
 	// NOTE(ltomasbo): Amphora driver supports came on 2.11, but ovn-octavia only supports it after 2.13
 	MinOctaviaVersionWithMultipleListeners = "v2.13"
-	MinOctaviaVersionWithHTTPSMonitors     = "v2.10"
 	MinOctaviaVersionWithProviders         = "v2.6"
 	MinOctaviaVersionWithTagSupport        = "v2.5"
 	MinOctaviaVersionWithTimeouts          = "v2.1"
@@ -558,13 +557,6 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		return nil, errors.Wrap(err, "failed to create OpenShift API loadbalancer pool")
 	}
 	log.Printf("OpenShift API loadbalancer pool %s present", poolId)
-
-	log.Print("Creating OpenShift API loadbalancer health monitor")
-	monitorId, err := ensureOpenStackLbMonitor(lbClient, "kuryr-api-loadbalancer-monitor", poolId)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create OpenShift API loadbalancer health monitor")
-	}
-	log.Printf("OpenShift API loadbalancer health monitor %s present", monitorId)
 
 	log.Print("Creating OpenShift API loadbalancer listener")
 	listenerId, err := ensureOpenStackLbListener(lbClient, generateName("kuryr-api-loadbalancer-listener", clusterID),

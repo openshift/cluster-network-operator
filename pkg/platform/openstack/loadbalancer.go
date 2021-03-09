@@ -1,8 +1,9 @@
 package openstack
 
 import (
-	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/providers"
 	"log"
+
+	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/providers"
 
 	"github.com/pkg/errors"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/apiversions"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/listeners"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/loadbalancers"
-	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/monitors"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools"
 )
 
@@ -190,6 +190,8 @@ func ensureOpenStackLb(client *gophercloud.ServiceClient, name, vipAddress, vipS
 		Name:        name,
 		VipAddress:  vipAddress,
 		VipSubnetID: vipSubnetId,
+		// do not hardcode it, just for testing
+		Provider   : 'ovn',
 	}
 	if octaviaTagSupport {
 		createOpts.Tags = []string{tag}
@@ -210,12 +212,17 @@ func ensureOpenStackLb(client *gophercloud.ServiceClient, name, vipAddress, vipS
 
 // Looks for a Octavia load balancer pool by name and LB ID. If it does
 // not exist creates it. Will fail if multiple LB pools are matching all criteria.
+// We force the protocol to be TCP since the OVN provider for Octavia only
+// supports TCP and UDP protocols, not HTTPS.
+// Since OVN is the default driver for recent versions of OSP, for now
+// we will create listeners with TCP and rollback to HTTPS later once it's
+// supported in the provider.
 func ensureOpenStackLbPool(client *gophercloud.ServiceClient, name, lbId string) (string, error) {
 	page, err := pools.List(client, pools.ListOpts{
 		Name:           name,
 		LoadbalancerID: lbId,
-		Protocol:       "HTTPS",
-		LBMethod:       "ROUND_ROBIN",
+		Protocol:       "TCP",
+		LBMethod:       "SOURCE_IP",
 	}).AllPages()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get LB pools list")
@@ -232,8 +239,8 @@ func ensureOpenStackLbPool(client *gophercloud.ServiceClient, name, lbId string)
 		opts := pools.CreateOpts{
 			Name:           name,
 			LoadbalancerID: lbId,
-			Protocol:       pools.ProtocolHTTPS,
-			LBMethod:       pools.LBMethodRoundRobin,
+			Protocol:       pools.ProtocolTCP,
+			LBMethod:       pools.LBMethodSourceIp,
 		}
 		poolsObj, err := pools.Create(client, opts).Extract()
 		if err != nil {
@@ -246,56 +253,6 @@ func ensureOpenStackLbPool(client *gophercloud.ServiceClient, name, lbId string)
 		}
 
 		return poolsObj.ID, nil
-	}
-}
-
-// Looks for Octavia load balancer health monitor by name and pool ID. If it does
-// not exist creates it. Will fail if multiple LB health monitors are matching all criteria.
-func ensureOpenStackLbMonitor(client *gophercloud.ServiceClient, name, poolId string) (string, error) {
-	octaviaHTTPSMonitors, err := IsOctaviaVersionSupported(client, MinOctaviaVersionWithHTTPSMonitors)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to determine if Octavia supports HTTPS health monitors")
-	}
-
-	page, err := monitors.List(client, monitors.ListOpts{
-		Name:   name,
-		PoolID: poolId,
-	}).AllPages()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get LB monitors list")
-	}
-	monitorsList, err := monitors.ExtractMonitors(page)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to extract LB monitors list")
-	}
-	if len(monitorsList) > 1 {
-		return "", errors.Errorf("found multiple LB monitors matching name %s, pool %s, cannot proceed", name, poolId)
-	} else if len(monitorsList) == 1 {
-		return monitorsList[0].ID, nil
-	} else {
-		opts := monitors.CreateOpts{
-			Name:       name,
-			PoolID:     poolId,
-			Type:       monitors.TypeTCP,
-			MaxRetries: 3,
-			Delay:      10,
-			Timeout:    10,
-		}
-		if octaviaHTTPSMonitors {
-			// TODO(dulek): Octavia is a wild animal. So in OpenStack Stein the meaning of HTTPS type of health monitor
-			//              changed. Before, it was a simple TLS handshake. Now it's really doing an HTTPS connection to
-			//              a certain URL and TLS-HELLO is the new HTTPS. We're going to stick with the simple TCP check
-			//              for Octavia's prior to Stein and in Stein we switch to proper HTTPS healthcheck. The former
-			//              behavior can be removed once we stop supporting OpenStack Queens and Rocky.
-			opts.URLPath = "/healthz"
-			opts.Type = monitors.TypeHTTPS
-		}
-		monitorObj, err := monitors.Create(client, opts).Extract()
-		if err != nil {
-			return "", errors.Wrap(err, "failed to create LB monitor")
-		}
-
-		return monitorObj.ID, nil
 	}
 }
 
@@ -345,10 +302,15 @@ func ensureOpenStackLbPoolMember(client *gophercloud.ServiceClient, name, lbId, 
 // Looks for a Octavia load balancer listeners by name, port, pool ID and LB ID.
 // If it does not exist creates it. Will fail if multiple LB listeners are
 // matching all criteria.
+// We force the protocol to be TCP since the OVN provider for Octavia only
+// supports TCP and UDP protocols, not HTTPS.
+// Since OVN is the default driver for recent versions of OSP, for now
+// we will create listeners with TCP and rollback to HTTPS later once it's
+// supported in the provider.
 func ensureOpenStackLbListener(client *gophercloud.ServiceClient, name, lbId, poolId string, port int) (string, error) {
 	page, err := listeners.List(client, listeners.ListOpts{
 		Name:           name,
-		Protocol:       "HTTPS",
+		Protocol:       "TCP",
 		ProtocolPort:   port,
 		DefaultPoolID:  poolId,
 		LoadbalancerID: lbId,
@@ -367,7 +329,7 @@ func ensureOpenStackLbListener(client *gophercloud.ServiceClient, name, lbId, po
 	} else {
 		opts := listeners.CreateOpts{
 			Name:           name,
-			Protocol:       listeners.ProtocolHTTPS,
+			Protocol:       listeners.ProtocolTCP,
 			ProtocolPort:   port,
 			DefaultPoolID:  poolId,
 			LoadbalancerID: lbId,
