@@ -1,5 +1,6 @@
 package statusmanager
 
+//nolint:staticcheck
 import (
 	"context"
 	"encoding/json"
