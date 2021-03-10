@@ -9,7 +9,7 @@ require (
 	github.com/containernetworking/cni v0.8.0
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
-	github.com/go-logr/logr v0.3.0 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/gophercloud/gophercloud v0.14.0
 	github.com/gophercloud/utils v0.0.0-20201221031838-d93cf4b3fa50
@@ -17,7 +17,7 @@ require (
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.1 // indirect
 	github.com/onsi/gomega v1.10.2
-	github.com/openshift/api v0.0.0-20201214114959-164a2fb63b5f
+	github.com/openshift/api v0.0.0-20210304195353-475eac5412b1
 	github.com/openshift/build-machinery-go v0.0.0-20200917070002-f171684f77ab
 	github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49
 	github.com/openshift/library-go v0.0.0-20201130154959-bd449d1e2e25
@@ -29,19 +29,21 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
-	golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb // indirect
+	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 // indirect
+	golang.org/x/text v0.3.5 // indirect
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.20.0
+	k8s.io/api v0.20.4
 	k8s.io/apiextensions-apiserver v0.20.0
-	k8s.io/apimachinery v0.20.0
+	k8s.io/apimachinery v0.20.4
 	k8s.io/client-go v0.20.0
 	k8s.io/code-generator v0.20.0
 	k8s.io/component-base v0.20.0
-	k8s.io/klog/v2 v2.4.0
+	k8s.io/klog/v2 v2.6.0
 	k8s.io/kube-proxy v0.20.0
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/cluster-api-provider-openstack v0.3.3
 	sigs.k8s.io/controller-runtime v0.6.3
+	sigs.k8s.io/structured-merge-diff/v4 v4.1.0 // indirect
 )
 
 replace (
