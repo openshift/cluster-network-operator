@@ -14,6 +14,10 @@ spec:
   selector:
     matchLabels:
       app: network-check-source
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
   strategy:
     type: Recreate
   template:
