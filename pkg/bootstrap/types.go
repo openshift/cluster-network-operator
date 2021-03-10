@@ -31,6 +31,7 @@ type OVNBootstrapResult struct {
 	ClusterInitiator        string
 	ExistingMasterDaemonset *appsv1.DaemonSet
 	ExistingNodeDaemonset   *appsv1.DaemonSet
+	ExistingIPsecDaemonset  *appsv1.DaemonSet
 }
 
 type BootstrapResult struct {
