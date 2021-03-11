@@ -55,7 +55,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	c := conf.DefaultNetwork.OVNKubernetesConfig
 
 	objs := []*uns.Unstructured{}
-
+	print("hi")
+	print(conf)
 	// render the manifests on disk
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
@@ -265,19 +266,19 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 		sc.GenevePort = &geneve
 	}
 
-	if sc.PolicyAuditConfig.RateLimit == nil { 
+	if sc.PolicyAuditConfig.RateLimit == nil {
 		var ratelimit uint32 = uint32(20)
 		sc.PolicyAuditConfig.RateLimit = &ratelimit
 	}
 	if sc.PolicyAuditConfig.MaxFileSize == nil {
 		var maxfilesize uint32 = uint32(50000000)
-		sc.PolicyAuditConfig.MaxFileSize = & maxfilesize
+		sc.PolicyAuditConfig.MaxFileSize = &maxfilesize
 	}
-	if sc.PolicyAuditConfig.Destination == "" { 
+	if sc.PolicyAuditConfig.Destination == "" {
 		var destination string = string("null")
 		sc.PolicyAuditConfig.Destination = destination
 	}
-	if sc.PolicyAuditConfig.SyslogFacility == "" { 
+	if sc.PolicyAuditConfig.SyslogFacility == "" {
 		var syslogfacility string = string("local0")
 		sc.PolicyAuditConfig.SyslogFacility = syslogfacility
 	}
