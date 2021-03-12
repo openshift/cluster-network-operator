@@ -579,7 +579,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	// the API. With healthchecks enabled for the pool we'll get masters added automatically
 	// when they're up and ready.
 	log.Print("Creating OpenShift API loadbalancer pool members")
-	r, _ := regexp.Compile(fmt.Sprintf("^%s-(master-port-[0-9]+|bootstrap-port+|master-[0-9])$", clusterID))
+	r, _ := regexp.Compile(fmt.Sprintf("^%s-(master-port-[0-9]+|bootstrap-port|master-[0-9]+)$", clusterID))
 	portList, err := listOpenStackPortsMatchingPattern(client, tag, r)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list openstack master ports")
