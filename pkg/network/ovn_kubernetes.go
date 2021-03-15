@@ -81,6 +81,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["LISTEN_DUAL_STACK"] = listenDualStack(bootstrapResult.OVN.MasterIPs[0])
 	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
 	data.Data["OVN_NORTHD_PROBE_INTERVAL"] = os.Getenv("OVN_NORTHD_PROBE_INTERVAL")
+	data.Data["NetFlowCollectors"] = ""
+	data.Data["SFlowCollectors"] = ""
+	data.Data["IPFIXCollectors"] = ""
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
@@ -133,6 +136,31 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			// IPsec has never started
 			data.Data["OVNIPsecDaemonsetEnable"] = false
 			data.Data["OVNIPsecEnable"] = false
+		}
+	}
+
+	exportNetworkFlows := conf.ExportNetworkFlows
+	if exportNetworkFlows != nil {
+		if exportNetworkFlows.NetFlow != nil {
+			var collectors strings.Builder
+			for _, v := range exportNetworkFlows.NetFlow.Collectors {
+				collectors.WriteString(string(v) + ",")
+			}
+			data.Data["NetFlowCollectors"] = strings.TrimSuffix(collectors.String(), ",")
+		}
+		if exportNetworkFlows.SFlow != nil {
+			var collectors strings.Builder
+			for _, v := range exportNetworkFlows.SFlow.Collectors {
+				collectors.WriteString(string(v) + ",")
+			}
+			data.Data["SFlowCollectors"] = strings.TrimSuffix(collectors.String(), ",")
+		}
+		if exportNetworkFlows.IPFIX != nil {
+			var collectors strings.Builder
+			for _, v := range exportNetworkFlows.IPFIX.Collectors {
+				collectors.WriteString(string(v) + ",")
+			}
+			data.Data["IPFIXCollectors"] = strings.TrimSuffix(collectors.String(), ",")
 		}
 	}
 
