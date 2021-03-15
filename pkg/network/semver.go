@@ -1,18 +1,38 @@
 package network
 
-import "github.com/Masterminds/semver"
+import (
+	"github.com/Masterminds/semver"
+	"k8s.io/klog/v2"
+)
+
+type versionChange int
 
 const (
-	versionUpgrade   = -1
-	versionSame      = 0
-	versionDowngrade = 1
-	versionUnknown   = 2
+	versionUpgrade   versionChange = -1
+	versionSame      versionChange = 0
+	versionDowngrade versionChange = 1
+	versionUnknown   versionChange = 2
 )
+
+func (v versionChange) String() string {
+	switch v {
+	case versionUpgrade:
+		return "upgrade"
+	case versionSame:
+		return "same"
+	case versionDowngrade:
+		return "downgrade"
+	case versionUnknown:
+		return "unknown"
+	}
+	klog.Warningf("unhandled versionChange value %v", v)
+	return "UNHANDLED"
+}
 
 // compareVersions compares two semver versions
 // if fromVersion is older than toVersion, returns versionOlder
 // likewise, if fromVersion is newer, returns versionNewer
-func compareVersions(fromVersion, toVersion string) int {
+func compareVersions(fromVersion, toVersion string) versionChange {
 	if fromVersion == toVersion {
 		return versionSame
 	}
@@ -27,5 +47,5 @@ func compareVersions(fromVersion, toVersion string) int {
 		return versionUnknown
 	}
 
-	return v1.Compare(v2)
+	return versionChange(v1.Compare(v2))
 }

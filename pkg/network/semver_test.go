@@ -11,7 +11,7 @@ func TestDirection(t *testing.T) {
 	for idx, tc := range []struct {
 		from   string
 		to     string
-		result int
+		result versionChange
 	}{
 		{
 			"1.2.3",
