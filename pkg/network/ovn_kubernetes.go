@@ -3,7 +3,6 @@ package network
 import (
 	"context"
 	"fmt"
-	"log"
 	"math"
 	"net"
 	"os"
@@ -458,6 +457,7 @@ func shouldUpdateOVNK(existingNode, existingMaster *appsv1.DaemonSet, releaseVer
 	// shortcut - we're all rolled out.
 	// Return true so that we reconcile any changes that somehow could have happened.
 	if nodeVersion == releaseVersion && masterVersion == releaseVersion {
+		klog.V(2).Infof("OVN-Kubernetes master and node already at release version %s; no changes required", releaseVersion)
 		return true, true
 	}
 
@@ -467,11 +467,14 @@ func shouldUpdateOVNK(existingNode, existingMaster *appsv1.DaemonSet, releaseVer
 	nodeDelta := compareVersions(nodeVersion, releaseVersion)
 
 	if masterDelta == versionUnknown || nodeDelta == versionUnknown {
-		log.Printf("WARNING: could not determine ovn-kubernetes daemonset update directions; node: %s, master: %s, release: %s",
+		klog.Warningf("could not determine ovn-kubernetes daemonset update directions; node: %s, master: %s, release: %s",
 			nodeVersion, masterVersion, releaseVersion)
 
 		return true, true
 	}
+
+	klog.V(2).Infof("OVN-Kubernetes master version %s -> latest %s; delta %s", masterVersion, releaseVersion, masterDelta)
+	klog.V(2).Infof("OVN-Kubernetes node version %s -> latest %s; delta %s", nodeVersion, releaseVersion, nodeDelta)
 
 	// 9 cases
 	// +-------------+---------------+-----------------+------------------+
@@ -485,7 +488,7 @@ func shouldUpdateOVNK(existingNode, existingMaster *appsv1.DaemonSet, releaseVer
 	// both older (than CNO)
 	// Update node only.
 	if masterDelta == versionUpgrade && nodeDelta == versionUpgrade {
-		log.Printf("Upgrading OVN-Kubernetes node before master")
+		klog.V(2).Infof("Upgrading OVN-Kubernetes node before master")
 		return true, false
 	}
 
@@ -493,16 +496,17 @@ func shouldUpdateOVNK(existingNode, existingMaster *appsv1.DaemonSet, releaseVer
 	// update master if node is rolled out
 	if masterDelta == versionUpgrade && nodeDelta == versionSame {
 		if daemonSetProgressing(existingNode, true) {
-			log.Printf("Waiting for OVN-Kubernetes node update to roll out before updating master")
+			klog.V(2).Infof("Waiting for OVN-Kubernetes node update to roll out before updating master")
 			return true, false
 		}
+		klog.V(2).Infof("OVN-Kubernetes node update rolled out; now updating master")
 		return true, true
 	}
 
 	// both newer
 	// downgrade master before node
 	if masterDelta == versionDowngrade && nodeDelta == versionDowngrade {
-		log.Printf("Downgrading OVN-Kubernetes master before node")
+		klog.V(2).Infof("Downgrading OVN-Kubernetes master before node")
 		return false, true
 	}
 
@@ -510,9 +514,10 @@ func shouldUpdateOVNK(existingNode, existingMaster *appsv1.DaemonSet, releaseVer
 	// wait for master rollout
 	if masterDelta == versionSame && nodeDelta == versionDowngrade {
 		if daemonSetProgressing(existingMaster, false) {
-			log.Printf("Waiting for OVN-Kubernetes master update to roll out")
+			klog.V(2).Infof("Waiting for OVN-Kubernetes master downgrade to roll out before downgrading node")
 			return false, true
 		}
+		klog.V(2).Infof("OVN-Kubernetes master update rolled out; now downgrading node")
 		return true, true
 	}
 
@@ -521,7 +526,7 @@ func shouldUpdateOVNK(existingNode, existingMaster *appsv1.DaemonSet, releaseVer
 		return true, true
 	}
 
-	log.Printf("WARNING: ovn-kubernetes daemonset versions inconsistent. node: %s, master: %s, release: %s",
+	klog.Warningf("OVN-Kubernetes daemonset versions inconsistent. node: %s, master: %s, release: %s",
 		nodeVersion, masterVersion, releaseVersion)
 	return true, true
 }
@@ -537,7 +542,16 @@ func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 		status.NumberAvailable == 0 ||
 		ds.Generation > status.ObservedGeneration)
 
+	s := "progressing"
 	if !progressing {
+		s = "complete"
+	}
+	klog.V(2).Infof("daemonset %s/%s rollout %s; %d/%d scheduled; %d unavailable; %d available; generation %s -> %s",
+		ds.Namespace, ds.Name, s, status.UpdatedNumberScheduled, status.DesiredNumberScheduled,
+		status.NumberUnavailable, status.NumberAvailable, ds.Generation, status.ObservedGeneration)
+
+	if !progressing {
+		klog.V(2).Infof("daemonset %s/%s rollout complete", ds.Namespace, ds.Name)
 		return false
 	}
 
@@ -547,7 +561,7 @@ func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 		maxBehind := int(math.Max(1, math.Floor(float64(status.DesiredNumberScheduled)*0.1)))
 		numBehind := int(status.DesiredNumberScheduled - status.UpdatedNumberScheduled)
 		if hung && numBehind <= maxBehind {
-			log.Printf("WARNING: daemonset %s/%s rollout seems to have hung with %d out of %d behind, force-continuing", ds.Namespace, ds.Name, numBehind, status.DesiredNumberScheduled)
+			klog.Warningf("daemonset %s/%s rollout seems to have hung with %d/%d behind, force-continuing", ds.Namespace, ds.Name, numBehind, status.DesiredNumberScheduled)
 			return false
 		}
 	}
