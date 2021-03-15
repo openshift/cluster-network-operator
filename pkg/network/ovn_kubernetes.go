@@ -123,38 +123,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["EnableIPsec"] = false
 	}
 
-	if c.PolicyAuditConfig != nil {
-		if  c.PolicyAuditConfig.RateLimit != nil { 
-			data.Data["OVNPolicyAuditRateLimit"] = c.PolicyAuditConfig.RateLimit
-		} else { 
-			// Default to 20 messages/second
-			data.Data["OVNPolicyAuditRateLimit"] = 20
-		}
-		if c.PolicyAuditConfig.MaxFileSize != nil {
-			data.Data["OVNPolicyAuditMaxFileSize"] = c.PolicyAuditConfig.MaxFileSize
-		} else { 
-			// Default to 50 MB 
-			data.Data["OVNPolicyAuditMaxFileSize"] = 50000000
-		}
-		if c.PolicyAuditConfig.Destination != "" { 
-			data.Data["OVNPolicyAuditDestination"] = c.PolicyAuditConfig.Destination
-		} else { 
-			// Default is Null
-			data.Data["OVNPolicyAuditDestination"] = "null"
-		}
-		if c.PolicyAuditConfig.SyslogFacility != "" { 
-			data.Data["OVNPolicyAuditSyslogFacility"] = c.PolicyAuditConfig.SyslogFacility
-		}else { 
-			// Default is local0
-			data.Data["OVNPolicyAuditSyslogFacility"] = "local0"
-		}
-	} else {
-		data.Data["OVNPolicyAuditRateLimit"] = 20
-		data.Data["OVNPolicyAuditMaxFileSize"] = 50000000
-		data.Data["OVNPolicyAuditDestination"] = "null"
-		data.Data["OVNPolicyAuditSyslogFacility"] = "local0"
-	}
-
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/ovn-kubernetes"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render manifests")
@@ -296,6 +264,10 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 	if sc.GenevePort == nil {
 		var geneve uint32 = uint32(6081)
 		sc.GenevePort = &geneve
+	}
+	
+	if sc.PolicyAuditConfig == nil { 
+		sc.PolicyAuditConfig = &operv1.PolicyAuditConfig{}
 	}
 
 	if sc.PolicyAuditConfig.RateLimit == nil {

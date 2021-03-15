@@ -20,38 +20,44 @@ spec:
     spec:
       containers:
       - name: network-operator
-        image: quay.io/openshift/origin-cluster-network-operator:4.7
+        image: quay.io/openshift/origin-cluster-network-operator:latest
         command:
-        - "/usr/bin/cluster-network-operator"
-        - "start"
-        - "--listen=0.0.0.0:9104"
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -o allexport
+          if [[ -f /etc/kubernetes/apiserver-url.env ]]; then
+            source /etc/kubernetes/apiserver-url.env
+          else
+            URL_ONLY_KUBECONFIG=/etc/kubernetes/kubeconfig
+          fi
+          exec /usr/bin/cluster-network-operator start --listen=0.0.0.0:9104
         resources:
           requests:
             cpu: 10m
             memory: 50Mi
         env:
-        - name: URL_ONLY_KUBECONFIG
-          value: "/etc/kubernetes/kubeconfig"
         - name: RELEASE_VERSION
           value: "0.0.1-snapshot"
         - name: SDN_IMAGE
-          value: "quay.io/openshift/origin-sdn:4.7"
+          value: "quay.io/openshift/origin-sdn:latest"
         - name: KUBE_PROXY_IMAGE
-          value: "quay.io/openshift/origin-kube-proxy:4.7"
+          value: "quay.io/openshift/origin-kube-proxy:latest"
         - name: KUBE_RBAC_PROXY_IMAGE
-          value: "quay.io/openshift/origin-kube-rbac-proxy:4.7"
+          value: "quay.io/openshift/origin-kube-rbac-proxy:latest"
         - name: MULTUS_IMAGE
-          value: "quay.io/openshift/origin-multus-cni:4.7"
+          value: "quay.io/openshift/origin-multus-cni:latest"
         - name: MULTUS_ADMISSION_CONTROLLER_IMAGE
-          value: "quay.io/openshift/origin-multus-admission-controller:4.7"
+          value: "quay.io/openshift/origin-multus-admission-controller:latest"
         - name: CNI_PLUGINS_IMAGE
-          value: "quay.io/openshift/origin-container-networking-plugins:4.7"
+          value: "quay.io/openshift/origin-container-networking-plugins:latest"
         - name: WHEREABOUTS_CNI_IMAGE
-          value: "quay.io/openshift/origin-multus-whereabouts-ipam-cni:4.7"
+          value: "quay.io/openshift/origin-multus-whereabouts-ipam-cni:latest"
         - name: ROUTE_OVERRRIDE_CNI_IMAGE
-          value: "quay.io/openshift/origin-multus-route-override-cni:4.7"
+          value: "quay.io/openshift/origin-multus-route-override-cni:latest"
         - name: OVN_IMAGE
-          value: "quay.io/openshift/origin-ovn-kubernetes:4.7"
+          value: "quay.io/openshift/origin-ovn-kubernetes:latest"
         - name: OVN_NB_RAFT_ELECTION_TIMER
           value: "10000"
         - name: OVN_SB_RAFT_ELECTION_TIMER
@@ -61,34 +67,35 @@ spec:
         - name: OVN_CONTROLLER_INACTIVITY_PROBE
           value: "30000"
         - name: EGRESS_ROUTER_CNI_IMAGE
-          value: "quay.io/openshift/origin-egress-router-cni:4.7"
+          value: "quay.io/openshift/origin-egress-router-cni:latest"
         - name: KURYR_DAEMON_IMAGE
-          value: "quay.io/openshift/origin-kuryr-cni:4.7"
+          value: "quay.io/openshift/origin-kuryr-cni:latest"
         - name: KURYR_CONTROLLER_IMAGE
-          value: "quay.io/openshift/origin-kuryr-controller:4.7"
+          value: "quay.io/openshift/origin-kuryr-controller:latest"
         - name: NETWORK_METRICS_DAEMON_IMAGE
-          value: "quay.io/openshift/origin-network-metrics-daemon:4.7"
+          value: "quay.io/openshift/origin-network-metrics-daemon:latest"
         - name: NETWORK_CHECK_SOURCE_IMAGE
-          value: "quay.io/openshift/origin-cluster-network-operator:4.7"
+          value: "quay.io/openshift/origin-cluster-network-operator:latest"
         - name: NETWORK_CHECK_TARGET_IMAGE
-          value: "quay.io/openshift/origin-hello-openshift:4.7"
+          value: "quay.io/openshift/origin-hello-openshift:latest"
         - name: POD_NAME
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
-        - mountPath: /etc/kubernetes/kubeconfig
-          name: host-kubeconfig
+        - mountPath: /etc/kubernetes
+          name: host-etc-kube
           readOnly: true
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
       priorityClassName: "system-cluster-critical"
       volumes:
-        - name: host-kubeconfig
+        - name: host-etc-kube
           hostPath:
-            path: /etc/kubernetes/kubeconfig
+            path: /etc/kubernetes
+            type: Directory
       restartPolicy: Always
       securityContext:
         runAsNonRoot: true

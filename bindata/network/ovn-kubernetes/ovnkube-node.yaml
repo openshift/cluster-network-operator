@@ -83,12 +83,12 @@ spec:
           name: ovn-cert
         - mountPath: /ovn-ca
           name: ovn-ca
-        - mountPath: /dev/acl-log
-          name: acl-log
-        - mountPath: /var/log/ovn
-          name: node-log
-        - mountPath: /dev/log
-          name: log-socket
+        #- mountPath: /dev/acl-log
+        #  name: acl-log
+        #- mountPath: /var/log/ovn
+        #  name: node-log
+        #- mountPath: /dev/log
+        #  name: log-socket
         - mountPath: /run/systemd/journal/dev-log
           name: journald-socket
         terminationMessagePolicy: FallbackToLogsOnError
@@ -108,8 +108,8 @@ spec:
           # Redirect err to null so no messages are shown upon rotation
           tail -F /var/log/ovn/acl-audit-log.log 2> /dev/null & 
           
-          #Rotate audit log files when then get to max size
-          MaxFileSize="{{.OVNPolicyAuditMaxFileSize}}"
+          #Rotate audit log files when then get to max size (in bytes)
+          MaxFileSize=$(( "{{.OVNPolicyAuditMaxFileSize}}"*1000000 )) 
 
           while true
           do
@@ -124,13 +124,11 @@ spec:
           fi
 
           done
-        securityContext:
-          privileged: true
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         # Unix socket for slurping OVN-Controller ACL logs
-        - mountPath: /dev/acl-log/
-          name: acl-log
+        #- mountPath: /dev/acl-log/
+        #  name: acl-log
         - mountPath: /var/log/ovn
           name: node-log
 

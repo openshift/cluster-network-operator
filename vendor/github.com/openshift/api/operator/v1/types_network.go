@@ -60,6 +60,16 @@ type NetworkSpec struct {
 	// 'false' and multiple network support is enabled.
 	DisableMultiNetwork *bool `json:"disableMultiNetwork,omitempty"`
 
+	// useMultiNetworkPolicy enables a controller which allows for
+	// MultiNetworkPolicy objects to be used on additional networks as
+	// created by Multus CNI. MultiNetworkPolicy are similar to NetworkPolicy
+	// objects, but NetworkPolicy objects only apply to the primary interface.
+	// With MultiNetworkPolicy, you can control the traffic that a pod can receive
+	// over the secondary interfaces. If unset, this property defaults to 'false'
+	// and MultiNetworkPolicy objects are ignored. If 'disableMultiNetwork' is
+	// 'true' then the value of this field is ignored.
+	UseMultiNetworkPolicy *bool `json:"useMultiNetworkPolicy,omitempty"`
+
 	// deployKubeProxy specifies whether or not a standalone kube-proxy should
 	// be deployed by the operator. Some network providers include kube-proxy
 	// or similar functionality. If unset, the plugin will attempt to select
@@ -325,11 +335,10 @@ type OVNKubernetesConfig struct {
 	// cluster.
 	// +optional
 	IPsecConfig *IPsecConfig `json:"ipsecConfig,omitempty"`
-	// PolicyAuditing is the configuration for network policy audit events. If unset, no 
+	// PolicyAuditConfig is the configuration for network policy audit events. If unset,
 	// reported defaults are used.
 	// +optional
 	PolicyAuditConfig *PolicyAuditConfig `json:"policyAuditConfig,omitempty"`
-	
 }
 
 type HybridOverlayConfig struct {
@@ -344,34 +353,41 @@ type HybridOverlayConfig struct {
 type IPsecConfig struct {
 }
 
-type PolicyAuditConfig struct { 
-	// RateLimit is the approximate maximum number of messages to generate per-second per-node. If
-	// unset, no limit is applied.
+type PolicyAuditConfig struct {
+	// rateLimit is the approximate maximum number of messages to generate per-second per-node. If
+	// unset the default of 20 msg/sec is used.
+	// +kubebuilder:default=20
+	// +kubebuilder:validation:Minimum=1
 	// +optional
-    RateLimit *uint32 `json:"rateLimit,omitempty"`
+	RateLimit *uint32 `json:"rateLimit,omitempty"`
 
-	// MaxFilesSize is the max size an ACL_audit log file is allowed to reach before rotation occurs 
-	// Default is 
-	// +optional 
+	// maxFilesSize is the max size an ACL_audit log file is allowed to reach before rotation occurs
+	// Units are in MB and the Default is 50MB
+	// +kubebuilder:default=50
+	// +kubebuilder:validation:Minimum=1
+	// +optional
 	MaxFileSize *uint32 `json:"maxFileSize,omitempty"`
 
-	// Messages are output in syslog format. Destination is the destination for policy log messages. 
-	// Regardless of this config logs will always be dumped to ovn at /var/log/ovn/ however 
-	// you may also configure additional output as follows. 
-	// Messages are output in syslog format.
+	// destination is the location for policy log messages.
+	// Regardless of this config, persistent logs will always be dumped to the host
+	// at /var/log/ovn/ however
+	// Additionally syslog output may be configured as follows.
 	// Valid values are:
-	// - libc, to use the libc syslog() function 
-    // - "udp:host:port" for sending syslog over UDP
-	// - "unix:file" for using the UNIX domain socket directly 
-	// - null to discard all messages logged to syslog
+	// - "libc" -> to use the libc syslog() function of the host node's journdald process
+	// - "udp:host:port" -> for sending syslog over UDP
+	// - "unix:file" -> for using the UNIX domain socket directly
+	// - "null" -> to discard all messages logged to syslog
 	// The default is "null"
-	// to be managed by the host's journald service.
+	// +kubebuilder:default=null
+	// +kubebuilder:pattern='^libc$|^null$|^udp:(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]):([0-9]){0,5}$|^unix:(\/[^\/ ]*)+([^\/\s])$'
 	// +optional
-    Destination string `json:"destination,omitempty"`
+	Destination string `json:"destination,omitempty"`
 
 	// SyslogFacility the RFC5424 facility for generated messages, e.g. "kern". Default is "local0"
+	// +kubebuilder:default=local0
+	// +kubebuilder:pattern='^kern$|^user$|^mail$|^daemon$|^auth$|^syslog$|^lpr$|^news$|^uucp$|^clock$|^ftp$|^ntp$|^audit$|^alert$|^clock2$|^local[0-7]$'
 	// +optional
-    SyslogFacility string `json:"syslogFacility,omitempty`
+	SyslogFacility string `json:"syslogFacility,omitempty"`
 }
 
 // NetworkType describes the network plugin type to configure

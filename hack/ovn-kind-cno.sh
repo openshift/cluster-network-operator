@@ -129,16 +129,17 @@ docker exec ovn-control-plane cp /etc/kubernetes/admin.conf /etc/kubernetes/kube
 docker exec ovn-control-plane chmod 666 /etc/kubernetes/kubeconfig
 
 # Create Proxy resource
-kubectl create -f https://raw.githubusercontent.com/openshift/api/release-4.7/config/v1/0000_03_config-operator_01_proxy.crd.yaml
+kubectl create -f https://raw.githubusercontent.com/astoycos/api/enableacllogging/config/v1/0000_03_config-operator_01_proxy.crd.yaml
 
-# Create Network resource
-kubectl create -f https://raw.githubusercontent.com/openshift/api/release-4.7/config/v1/0000_10_config-operator_01_network.crd.yaml
+# Create Network config resource and iperator Resource 
+kubectl create -f https://raw.githubusercontent.com/astoycos/api/enableacllogging/config/v1/0000_10_config-operator_01_network.crd.yaml
 
 # Create Infrastructure resource
-kubectl create -f https://raw.githubusercontent.com/openshift/api/release-4.7/config/v1/0000_10_config-operator_01_infrastructure.crd.yaml
+kubectl create -f https://raw.githubusercontent.com/astoycos/api/enableacllogging/config/v1/0000_10_config-operator_01_infrastructure.crd.yaml
 
 # Create cluster operator
 kubectl create -f https://raw.githubusercontent.com/openshift/machine-api-operator/release-4.7/config/0000_00_cluster-version-operator_01_clusteroperator.crd.yaml
+#kubectl create -f /manifests/0000_70_cluster-network-operator_01_crd.yaml
 
 if [ "$BUILD_OVN" = true ] || [ "$BUILD_CNO" = true ]; then
   pushd $CNO_TEMPLATES
@@ -171,6 +172,7 @@ data:
       replicas: ${NUM_MASTER_NODES}
 EOF
 
+
 echo "Creating OVN CNO config"
 cat << EOF | kubectl create -f -
 apiVersion: config.openshift.io/v1
@@ -186,16 +188,34 @@ spec:
   - ${SERVICE_NETWORK}
 EOF
 
+
 # OVS is expected to run in systemd but that not an option in kindest/noede
 # we need to deploy it in a pod.
 kubectl create namespace ovs-kind
 kubectl create -f $CNO_PATH/hack/ovs-kind.yaml
 
 echo "Creating CNO operator"
-for f in $(ls $CNO_TEMPLATES| grep 0000| grep -v credentials); do
+for f in $(ls $CNO_TEMPLATES| grep 0000 | grep -v credentials); do
   kubectl create -f ${CNO_TEMPLATES}/$f
 done
 
+echo "Configuring OVN CNO"
+cat << EOF | kubectl apply -f -
+apiVersion: operator.openshift.io/v1
+kind: Network
+metadata:
+  name: cluster
+spec:
+  defaultNetwork:
+    type: OVNKubernetes
+    ovnKubernetesConfig:  
+      policyAuditingConfig:
+        maxFileSize: 1
+        rateLimit: 5
+        destination: libc
+EOF
+
+echo "Replacing CNO Deployment With Original"
 if [ "$BUILD_OVN" = true ] || [ "$BUILD_CNO" = true ]; then
   mv deployment.yaml.bk $DEPLOYMENT_TEMPLATE
   popd
@@ -203,11 +223,7 @@ fi
 
 if ! kubectl wait -n openshift-network-operator --for condition=available deployment network-operator --timeout=120s; then
   echo "Network operator not running"
-<<<<<<< HEAD
   #exit 1
-=======
-  exit 1
->>>>>>> 6fc394bc1c86aec22c85ddd8a9c4bd10a7122cb8
 fi
 
 if [ "$BUILD_CNO" != true ]; then
