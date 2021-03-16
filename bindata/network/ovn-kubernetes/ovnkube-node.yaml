@@ -298,7 +298,7 @@ spec:
           path: /var/lib/openvswitch/data
       - name: etc-openvswitch
         hostPath:
-          path: /var/lib/openvswitch/etc
+          path: /host/etc/openvswitch
       - name: run-openvswitch
         hostPath:
           path: /var/run/openvswitch
