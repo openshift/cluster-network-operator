@@ -784,6 +784,10 @@ spec:
           containerPort: {{.OVN_SB_PORT}}
         - name: sb-db-raft-port
           containerPort: {{.OVN_SB_RAFT_PORT}}
+        resources:
+          requests:
+            cpu: 10m
+            memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
       # ovnkube master: convert kubernetes objects in to nbdb logical network components
