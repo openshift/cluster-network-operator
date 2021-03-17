@@ -141,6 +141,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render manifests")
 	}
+	objs = append(objs, manifests...)
 
 	updateNode, updateMaster := shouldUpdateOVNK(bootstrapResult.OVN.ExistingNodeDaemonset, bootstrapResult.OVN.ExistingMasterDaemonset, os.Getenv("RELEASE_VERSION"))
 
@@ -160,7 +161,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		objs = k8s.ReplaceObj(objs, us)
 	}
 
-	objs = append(objs, manifests...)
 	return objs, nil
 }
 
@@ -469,7 +469,6 @@ func shouldUpdateOVNK(existingNode, existingMaster *appsv1.DaemonSet, releaseVer
 	if masterDelta == versionUnknown || nodeDelta == versionUnknown {
 		log.Printf("WARNING: could not determine ovn-kubernetes daemonset update directions; node: %s, master: %s, release: %s",
 			nodeVersion, masterVersion, releaseVersion)
-
 		return true, true
 	}
 
