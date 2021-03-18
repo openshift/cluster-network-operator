@@ -79,6 +79,59 @@ func TestValidateClusterConfig(t *testing.T) {
 	haveError(cc, "spec.networkType is required")
 }
 
+func TestValidateClusterConfigDualStack(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	cc := *ClusterConfig.DeepCopy()
+	err := ValidateClusterConfig(cc)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	haveError := func(cfg configv1.NetworkSpec, substr string) {
+		t.Helper()
+		err = ValidateClusterConfig(cc)
+		g.Expect(err).To(MatchError(ContainSubstring(substr)))
+	}
+
+	// Multiple ServiceNetworks of same family
+	cc = *ClusterConfig.DeepCopy()
+	cc.ServiceNetwork = append(cc.ServiceNetwork, "192.168.128.0/20")
+	haveError(cc, "at most one IPv4 and one IPv6")
+
+	// Too many ServiceNetworks
+	cc = *ClusterConfig.DeepCopy()
+	cc.ServiceNetwork = append(cc.ServiceNetwork, "192.168.128.0/20")
+	cc.ServiceNetwork = append(cc.ServiceNetwork, "fd02::/112")
+	haveError(cc, "at most one IPv4 and one IPv6")
+
+	// Dual-Stack Service but Single-Stack Cluster
+	cc = *ClusterConfig.DeepCopy()
+	cc.ServiceNetwork = append(cc.ServiceNetwork, "fd02::/112")
+	haveError(cc, "both be IPv4-only, both be IPv6-only, or both be dual-stack")
+
+	// Dual-Stack Cluster but Single-Stack Service
+	cc = *ClusterConfig.DeepCopy()
+	cc.ClusterNetwork = append(cc.ClusterNetwork, configv1.ClusterNetworkEntry{
+		CIDR:       "fd01::/48",
+		HostPrefix: 64,
+	})
+	haveError(cc, "both be IPv4-only, both be IPv6-only, or both be dual-stack")
+
+	// IPv4 Cluster but IPv6 Service
+	cc = *ClusterConfig.DeepCopy()
+	cc.ServiceNetwork[0] = "fd02::/112"
+	haveError(cc, "both be IPv4-only, both be IPv6-only, or both be dual-stack")
+
+	// Proper dual-stack
+	cc = *ClusterConfig.DeepCopy()
+	cc.ServiceNetwork = append(cc.ServiceNetwork, "fd02::/112")
+	cc.ClusterNetwork = append(cc.ClusterNetwork, configv1.ClusterNetworkEntry{
+		CIDR:       "fd01::/48",
+		HostPrefix: 64,
+	})
+	err = ValidateClusterConfig(cc)
+	g.Expect(err).NotTo(HaveOccurred())
+}
+
 func TestMergeClusterConfig(t *testing.T) {
 	g := NewGomegaWithT(t)
 
