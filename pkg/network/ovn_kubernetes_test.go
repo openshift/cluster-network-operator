@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -12,10 +13,12 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 )
 
 var OVNKubernetesConfig = operv1.Network{
@@ -924,6 +927,7 @@ metadata:
   annotations:
     release.openshift.io/version: 1.9.9 
   namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
 `,
 		},
 
@@ -960,6 +964,7 @@ metadata:
   annotations:
     release.openshift.io/version: 1.9.9 
   namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
 `,
 		},
 	} {
@@ -968,6 +973,13 @@ metadata:
 
 			var node *appsv1.DaemonSet
 			var master *appsv1.DaemonSet
+			crd := OVNKubernetesConfig.DeepCopy()
+			config := &crd.Spec
+			os.Setenv("RELEASE_VERSION", tc.rv)
+
+			errs := validateOVNKubernetes(config)
+			g.Expect(errs).To(HaveLen(0))
+			FillDefaults(config, nil)
 
 			if tc.node != "" {
 				node = &appsv1.DaemonSet{}
@@ -985,11 +997,44 @@ metadata:
 				}
 			}
 
+			usNode, _ := k8s.ToUnstructured(node)
+			usMaster, _ := k8s.ToUnstructured(master)
+
+			bootstrapResult := &bootstrap.BootstrapResult{
+				OVN: bootstrap.OVNBootstrapResult{
+					MasterIPs:               []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+					ExistingMasterDaemonset: master,
+					ExistingNodeDaemonset:   node,
+				},
+			}
+
+			objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+			g.Expect(err).NotTo(HaveOccurred())
+
+			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+			renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-master", "openshift-ovn-kubernetes", objs)
+
+			// if we expect a node update, the original node and the rendered one must be different
+			g.Expect(tc.expectNode).To(Equal(!reflect.DeepEqual(renderedNode, usNode)), "Check node rendering")
+			// if we expect a master update, the original master and the rendered one must be different
+			g.Expect(tc.expectMaster).To(Equal(!reflect.DeepEqual(renderedMaster, usMaster)), "Check master rendering")
+
 			updateNode, updateMaster := shouldUpdateOVNK(node, master, tc.rv)
 			g.Expect(updateNode).To(Equal(tc.expectNode), "Check node")
 			g.Expect(updateMaster).To(Equal(tc.expectMaster), "Check master")
 		})
 	}
+}
+
+func findInObjs(group, kind, name, namespace string, objs []*uns.Unstructured) *uns.Unstructured {
+	for _, obj := range objs {
+		if (obj.GroupVersionKind().GroupKind() == schema.GroupKind{Group: group, Kind: kind} &&
+			obj.GetNamespace() == namespace &&
+			obj.GetName() == name) {
+			return obj
+		}
+	}
+	return nil
 }
 
 func extractOVNKubeConfig(g *WithT, objs []*uns.Unstructured) string {
