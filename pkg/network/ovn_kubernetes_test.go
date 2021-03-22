@@ -167,6 +167,7 @@ encap-port="8061"
 service-cidrs="172.30.0.0/16"
 ovn-config-namespace="openshift-ovn-kubernetes"
 apiserver="https://1.1.1.1:1111"
+host-network-namespace="openshift-host-network"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -188,6 +189,7 @@ encap-port="8061"
 service-cidrs="172.30.0.0/16"
 ovn-config-namespace="openshift-ovn-kubernetes"
 apiserver="https://1.1.1.1:1111"
+host-network-namespace="openshift-host-network"
 no-hostsubnet-nodes="kubernetes.io/os=windows"
 
 [ovnkubernetesfeature]
@@ -218,6 +220,7 @@ encap-port="8061"
 service-cidrs="172.30.0.0/16"
 ovn-config-namespace="openshift-ovn-kubernetes"
 apiserver="https://1.1.1.1:1111"
+host-network-namespace="openshift-host-network"
 no-hostsubnet-nodes="kubernetes.io/os=windows"
 
 [ovnkubernetesfeature]
@@ -251,6 +254,7 @@ encap-port="8061"
 service-cidrs="172.30.0.0/16"
 ovn-config-namespace="openshift-ovn-kubernetes"
 apiserver="https://1.1.1.1:1111"
+host-network-namespace="openshift-host-network"
 no-hostsubnet-nodes="kubernetes.io/os=windows"
 
 [ovnkubernetesfeature]
