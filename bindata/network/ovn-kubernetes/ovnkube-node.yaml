@@ -31,7 +31,7 @@ spec:
       priorityClassName: "system-node-critical"
       # volumes in all containers:
       # (container) -> (host)
-      # /etc/openvswitch -> /host/etc/openvswitch - ovsdb system id
+      # /etc/openvswitch -> /etc/openvswitch - ovsdb system id
       # /var/lib/openvswitch -> /var/lib/openvswitch/data - ovsdb data
       # /run/openvswitch -> tmpfs - ovsdb sockets
       # /env -> configmap env-overrides - debug overrides
@@ -298,7 +298,7 @@ spec:
           path: /var/lib/openvswitch/data
       - name: etc-openvswitch
         hostPath:
-          path: /host/etc/openvswitch
+          path: /etc/openvswitch
       - name: run-openvswitch
         hostPath:
           path: /var/run/openvswitch
