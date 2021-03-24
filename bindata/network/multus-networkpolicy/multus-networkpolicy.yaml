@@ -1,0 +1,65 @@
+---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: multus-networkpolicy
+  namespace: openshift-multus
+  labels:
+    app: multus-networkpolicy
+  annotations:
+    kubernetes.io/description: |
+      This DaemonSet launches the Multus networkpolicy component on each node.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+    matchLabels:
+      app: multus-networkpolicy
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: multus-networkpolicy
+        component: network
+        type: infra
+        openshift.io/component: network
+    spec:
+      containers:
+      - name: multus-networkpolicy
+        image: {{.MultiNetworkPolicyImage}}
+        command: ["/usr/bin/multi-networkpolicy-iptables"]
+        args:
+        - "--host-prefix=/host"
+        - "--container-runtime-endpoint=/run/crio/crio.sock"
+        - "--pod-iptables=/var/lib/multi-networkpolicy/iptables"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "50Mi"
+          limits:
+            cpu: "100m"
+            memory: "50Mi"
+        securityContext:
+          privileged: true
+          capabilities:
+            add: ["SYS_ADMIN", "SYS_NET_ADMIN"]
+        volumeMounts:
+        - name: host
+          mountPath: /host
+        - name: var-lib-multinetworkpolicy
+          mountPath: /var/lib/multi-networkpolicy
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: "system-node-critical"
+      restartPolicy: Always
+      serviceAccountName: multus
+      tolerations:
+      - operator: Exists
+      volumes:
+        - name: host
+          hostPath:
+            path: /
+        - name: var-lib-multinetworkpolicy
+          hostPath:
+            path: /var/lib/multi-networkpolicy
