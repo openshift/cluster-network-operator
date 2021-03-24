@@ -180,7 +180,7 @@ spec:
           # Check to see if ovs is provided by the node. This is only for upgrade from 4.5->4.6 or
           # openshift-sdn to ovn-kube conversion
           if grep -q OVNKubernetes /etc/systemd/system/ovs-configuration.service ; then
-            gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
+            gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
           else
             gateway_mode_flags="--gateway-mode local --gateway-interface none"
           fi
@@ -200,6 +200,7 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
             ${gateway_mode_flags} \
+            --disable-snat-multiple-gws \
             --metrics-bind-address "127.0.0.1:29103"
         env:
         # for kubectl
