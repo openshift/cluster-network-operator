@@ -17,7 +17,7 @@ require (
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.1 // indirect
 	github.com/onsi/gomega v1.10.2
-	github.com/openshift/api v0.0.0-20210304195353-475eac5412b1
+	github.com/openshift/api v0.0.0-20210325044225-ef3741adfc31
 	github.com/openshift/build-machinery-go v0.0.0-20200917070002-f171684f77ab
 	github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49
 	github.com/openshift/library-go v0.0.0-20201130154959-bd449d1e2e25
@@ -29,16 +29,16 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
-	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 // indirect
+	golang.org/x/net v0.0.0-20210324205630-d1beb07c2056 // indirect
 	golang.org/x/text v0.3.5 // indirect
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.20.4
+	k8s.io/api v0.20.5
 	k8s.io/apiextensions-apiserver v0.20.0
-	k8s.io/apimachinery v0.20.4
+	k8s.io/apimachinery v0.20.5
 	k8s.io/client-go v0.20.0
 	k8s.io/code-generator v0.20.0
 	k8s.io/component-base v0.20.0
-	k8s.io/klog/v2 v2.6.0
+	k8s.io/klog/v2 v2.8.0
 	k8s.io/kube-proxy v0.20.0
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/cluster-api-provider-openstack v0.3.3
