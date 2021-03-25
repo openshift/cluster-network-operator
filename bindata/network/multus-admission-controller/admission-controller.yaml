@@ -47,6 +47,7 @@ spec:
         resources:
           requests:
             cpu: 10m
+            memory: 50Mi
         ports:
         - name: metrics-port
           containerPort: 9091
