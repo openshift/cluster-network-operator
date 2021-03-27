@@ -1,4 +1,3 @@
-{{if .OVNIPsecDaemonsetEnable}}
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
@@ -274,4 +273,3 @@ spec:
           path: "{{.CNIConfDir}}"
       tolerations:
       - operator: "Exists"
-{{end}}
