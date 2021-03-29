@@ -64,6 +64,7 @@ data:
     resource_tags = {{ default "" .ResourceTags }}
     external_svc_net = {{ .ExternalNetwork }}
     network_device_mtu = {{ .NodesNetworkMTU }}
+    network_availablity_zones = {{ .NetworkAZs }}
 
     [neutron]
     auth_type = {{ default "password" .OpenStackCloud.AuthType }}
