@@ -63,12 +63,22 @@ spec:
         - /bin/bash
         - -c
         - |
-          set -xe
+          set -xem
           if [[ -f /env/_master ]]; then
             set -o allexport
             source /env/_master
             set +o allexport
           fi
+
+          quit() {
+            echo "$(date -Iseconds) - stopping ovn-northd"
+            OVN_MANAGE_OVSDB=no /usr/share/ovn/scripts/ovn-ctl stop_northd
+            echo "$(date -Iseconds) - ovn-northd stopped"
+            rm -f /var/run/ovn/ovn-northd.pid
+            exit 0
+          }
+          # end of quit
+          trap quit TERM INT
 
           echo "$(date -Iseconds) - starting ovn-northd"
           exec ovn-northd \
@@ -78,7 +88,16 @@ spec:
             --pidfile /var/run/ovn/ovn-northd.pid \
             -p /ovn-cert/tls.key \
             -c /ovn-cert/tls.crt \
-            -C /ovn-ca/ca-bundle.crt 
+            -C /ovn-ca/ca-bundle.crt &
+
+          wait $!
+        lifecycle:
+          preStop:
+            exec:
+              command:
+                - OVN_MANAGE_OVSDB=no
+                - /usr/share/ovn/scripts/ovn-ctl
+                - stop_northd
         env:
         - name: OVN_LOG_LEVEL
           value: info 
@@ -110,12 +129,22 @@ spec:
         - /bin/bash
         - -c
         - |
-          set -xe
+          set -xem
           if [[ -f /env/_master ]]; then
             set -o allexport
             source /env/_master
             set +o allexport
           fi
+
+          quit() {
+            echo "$(date -Iseconds) - stopping nbdb"
+            /usr/share/ovn/scripts/ovn-ctl stop_nb_ovsdb
+            echo "$(date -Iseconds) - nbdb stopped"
+            rm -f /var/run/ovn/ovnnb_db.pid
+            exit 0
+          }
+          # end of quit
+          trap quit TERM INT
 
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
           # initialize variables
@@ -222,13 +251,15 @@ spec:
               --db-nb-cluster-remote-addr=${init_ip} \
               --db-nb-cluster-remote-proto=ssl \
               --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
-              run_nb_ovsdb
+              run_nb_ovsdb &
+              wait $!
             else
               # either we need to initialize a new cluster or wait for master to create it
               if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                 exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
-                run_nb_ovsdb
+                run_nb_ovsdb &
+                wait $!
               else
                 echo "Joining the nbdb cluster with init_ip=${init_ip}..."
                 exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
@@ -236,13 +267,15 @@ spec:
                 --db-nb-cluster-remote-addr=${init_ip} \
                 --db-nb-cluster-remote-proto=ssl \
                 --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
-                run_nb_ovsdb
+                run_nb_ovsdb &
+                wait $!
               fi
             fi
           else
             exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
               --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
-              run_nb_ovsdb
+              run_nb_ovsdb &
+              wait $!
           fi
 
         lifecycle:
@@ -497,12 +530,22 @@ spec:
         - /bin/bash
         - -c
         - |
-          set -x
+          set -xm
           if [[ -f /env/_master ]]; then
             set -o allexport
             source /env/_master
             set +o allexport
           fi
+
+          quit() {
+            echo "$(date -Iseconds) - stopping sbdb"
+            /usr/share/ovn/scripts/ovn-ctl stop_sb_ovsdb
+            echo "$(date -Iseconds) - sbdb stopped"
+            rm -f /var/run/ovn/ovnsb_db.pid
+            exit 0
+          }
+          # end of quit
+          trap quit TERM INT
 
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
@@ -610,26 +653,30 @@ spec:
               --db-sb-cluster-remote-addr=${init_ip} \
               --db-sb-cluster-remote-proto=ssl \
               --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
-              run_sb_ovsdb
+              run_sb_ovsdb &
+              wait $!
             else
               # either we need to initialize a new cluster or wait for master to create it
               if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                 exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
-                run_sb_ovsdb
+                run_sb_ovsdb &
+                wait $!
               else
                 exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
                 --db-sb-cluster-remote-addr=${init_ip} \
                 --db-sb-cluster-remote-proto=ssl \
                 --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
-                run_sb_ovsdb
+                run_sb_ovsdb &
+                wait $!
               fi
             fi
           else
             exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
-            run_sb_ovsdb
+            run_sb_ovsdb &
+            wait $!
           fi
         lifecycle:
           postStart:
