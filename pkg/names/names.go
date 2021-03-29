@@ -103,3 +103,26 @@ const KURYR_ADMISSION_CONTROLLER_SECRET = "kuryr-dns-admission-controller-secret
 
 // KURYR_WEB_HOOK_SECRET is the name of the secret used in the kuryr-dns-admission-controller DaemonSet
 const KURYR_WEBHOOK_SECRET = "kuryr-webhook-secret"
+
+// constants for namespace and custom resource names
+// namespace in which ingress controller objects are created
+const IngressControllerNamespace = "openshift-ingress-operator"
+
+// namespace representing host network traffic
+// this is also the namespace where to set the ingress label
+const HostNetworkNamespace = "openshift-host-network"
+
+// label for ingress policy group
+const PolicyGroupLabelIngress = "policy-group.network.openshift.io/ingress"
+
+// legacy label for ingress policy group
+const PolicyGroupLabelLegacy = "network.openshift.io/policy-group"
+
+// we use empty label values for policy groups
+const PolicyGroupLabelIngressValue = ""
+
+// value for legacy policy group label
+const PolicyGroupLabelLegacyValue = "ingress"
+
+// default ingress controller name
+const DefaultIngressControllerName = "default"
