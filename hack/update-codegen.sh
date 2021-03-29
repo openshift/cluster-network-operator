@@ -47,3 +47,10 @@ oc annotate --local -o yaml --overwrite \
   "${RELEASE_PROFILE}" \
   "${ROKS_PROFILE}" \
   -f vendor/github.com/openshift/api/operator/v1/0000_70_cluster-network-operator_01_crd.yaml > manifests/0000_70_cluster-network-operator_01_crd.yaml
+
+echo "${HEADER}" > manifests/0000_70_cluster-network-operator_01_egr_crd.yaml
+oc annotate --local -o yaml --overwrite \
+  "${RELEASE_PROFILE}" \
+  "${ROKS_PROFILE}" \
+  "${SINGLE_NODE_DEV_PROFILE}" \
+  -f vendor/github.com/openshift/api/networkoperator/v1/001-egressrouter.crd.yaml >> manifests/0000_70_cluster-network-operator_01_egr_crd.yaml
