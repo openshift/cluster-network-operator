@@ -243,6 +243,7 @@ spec:
               --db-nb-cluster-remote-proto=ssl \
               --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
               run_nb_ovsdb &
+
               wait $!
             else
               # either we need to initialize a new cluster or wait for master to create it
@@ -250,6 +251,7 @@ spec:
                 exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
                 run_nb_ovsdb &
+
                 wait $!
               else
                 echo "Joining the nbdb cluster with init_ip=${init_ip}..."
@@ -259,6 +261,7 @@ spec:
                 --db-nb-cluster-remote-proto=ssl \
                 --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
                 run_nb_ovsdb &
+
                 wait $!
               fi
             fi
@@ -266,6 +269,7 @@ spec:
             exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
               --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
               run_nb_ovsdb &
+
               wait $!
           fi
 
@@ -636,6 +640,7 @@ spec:
               --db-sb-cluster-remote-proto=ssl \
               --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
               run_sb_ovsdb &
+
               wait $!
             else
               # either we need to initialize a new cluster or wait for master to create it
@@ -643,6 +648,7 @@ spec:
                 exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
                 run_sb_ovsdb &
+
                 wait $!
               else
                 exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
@@ -651,6 +657,7 @@ spec:
                 --db-sb-cluster-remote-proto=ssl \
                 --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
                 run_sb_ovsdb &
+
                 wait $!
               fi
             fi
@@ -658,6 +665,7 @@ spec:
             exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
             run_sb_ovsdb &
+
             wait $!
           fi
         lifecycle:
