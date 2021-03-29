@@ -61,22 +61,35 @@ spec:
         - /bin/bash
         - -c
         - |
-          set -xe
+          set -xem
           if [[ -f /env/_master ]]; then
             set -o allexport
             source /env/_master
             set +o allexport
           fi
 
+          # We need to clean up on SIGTERM, as in some cases (upgrade+reboot)
+          # our preStop doesn't get called. When OpenShift graceful reboot
+          # is fixed (planned for 4.9+) this should be moved to preStop.
+          function quit {
+            echo "$(date -Iseconds) - stopping ovn-northd"
+            OVN_MANAGE_OVSDB=no /usr/share/ovn/scripts/ovn-ctl stop_northd
+            echo "$(date -Iseconds) - ovn-northd stopped"
+            exit 0
+          }
+          trap quit SIGTERM
+
           echo "$(date -Iseconds) - starting ovn-northd"
-          exec ovn-northd \
+          ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off \
             --ovnnb-db "{{.OVN_NB_DB_LIST}}" \
             --ovnsb-db "{{.OVN_SB_DB_LIST}}" \
             --pidfile /var/run/ovn/ovn-northd.pid \
             -p /ovn-cert/tls.key \
             -c /ovn-cert/tls.crt \
-            -C /ovn-ca/ca-bundle.crt 
+            -C /ovn-ca/ca-bundle.crt &
+
+          wait $!
         env:
         - name: OVN_LOG_LEVEL
           value: info 
