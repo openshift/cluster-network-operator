@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: host-network-namespace-quotas
+  namespace: openshift-host-network
+spec:
+  hard:
+    limits.cpu: "0"
+    limits.memory: 0Ki
+    pods: "0"
+    count/deployments.apps: "0"
+    count/daemonsets.apps: "0"
