@@ -112,8 +112,17 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["WebhookCert"] = b.WebhookCert
 	data.Data["WebhookKey"] = b.WebhookKey
 
-	// Nodes Network MTU
-	data.Data["NodesNetworkMTU"] = b.NodesNetworkMTU
+	// Pods Network MTU
+	mtu := b.PodsNetworkMTU
+	if c.MTU != nil {
+		if mtu >= *c.MTU {
+			mtu = *c.MTU
+		} else {
+			return nil, errors.Errorf("Configured MTU (%d) is incompatible with OpenShift nodes network MTU (%d).", *c.MTU, mtu)
+		}
+	}
+	c.MTU = &mtu
+	data.Data["PodsNetworkMTU"] = mtu
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/kuryr"), &data)
 	if err != nil {
@@ -196,6 +205,12 @@ func validateKuryr(conf *operv1.NetworkSpec) []error {
 		}
 	}
 
+	if kc != nil {
+		if kc.MTU != nil && (*kc.MTU < 576 || *kc.MTU > 65536) {
+			out = append(out, errors.Errorf("invalid MTU %d", *kc.MTU))
+		}
+	}
+
 	return out
 }
 
@@ -214,10 +229,14 @@ func isKuryrChangeSafe(prev, next *operv1.NetworkSpec) []error {
 		errs = append(errs, errors.Errorf("cannot change kuryr openStackServiceNetwork"))
 	}
 
+	if !reflect.DeepEqual(pn.MTU, nn.MTU) {
+		errs = append(errs, errors.Errorf("cannot change mtu for the Pods Network"))
+	}
+
 	return errs
 }
 
-func fillKuryrDefaults(conf *operv1.NetworkSpec) {
+func fillKuryrDefaults(conf, previous *operv1.NetworkSpec) {
 	if conf.DefaultNetwork.KuryrConfig == nil {
 		// We don't have anything required in KuryrConfig yet, so we can just create it if needed.
 		conf.DefaultNetwork.KuryrConfig = &operv1.KuryrConfig{}
@@ -247,5 +266,13 @@ func fillKuryrDefaults(conf *operv1.NetworkSpec) {
 	if kc.PoolBatchPorts == nil {
 		var batchPorts uint = 3
 		kc.PoolBatchPorts = &batchPorts
+	}
+	// MTU  is currently the only field we pull from previous.
+	if kc.MTU == nil {
+		if previous != nil && previous.DefaultNetwork.KuryrConfig != nil &&
+			previous.DefaultNetwork.KuryrConfig.MTU != nil {
+			mtu := *previous.DefaultNetwork.KuryrConfig.MTU
+			kc.MTU = &mtu
+		}
 	}
 }

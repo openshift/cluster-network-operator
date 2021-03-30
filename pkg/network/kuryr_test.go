@@ -135,6 +135,10 @@ func TestValidateKuryr(t *testing.T) {
 	config.DefaultNetwork.KuryrConfig.OpenStackServiceNetwork = "172.30.0.0/15"
 	err = validateKuryr(config)
 	g.Expect(err).To(BeEmpty())
+
+	mtu := uint32(70000)
+	config.DefaultNetwork.KuryrConfig.MTU = &mtu
+	errExpect("invalid MTU 70000")
 }
 
 func TestFillKuryrDefaults(t *testing.T) {
@@ -168,7 +172,7 @@ func TestFillKuryrDefaults(t *testing.T) {
 		},
 	}
 
-	fillKuryrDefaults(conf)
+	fillKuryrDefaults(conf, nil)
 
 	g.Expect(conf).To(Equal(&expected))
 
