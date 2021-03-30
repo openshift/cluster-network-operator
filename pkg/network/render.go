@@ -450,7 +450,7 @@ func fillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int)
 	case operv1.NetworkTypeOVNKubernetes:
 		fillOVNKubernetesDefaults(conf, previous, hostMTU)
 	case operv1.NetworkTypeKuryr:
-		fillKuryrDefaults(conf)
+		fillKuryrDefaults(conf, previous)
 	default:
 	}
 }
