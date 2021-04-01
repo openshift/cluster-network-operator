@@ -185,6 +185,16 @@ spec:
             gateway_mode_flags="--gateway-mode local --gateway-interface none"
           fi
 
+          export_network_flows_flags=
+          if [[ -n "${NETFLOW_COLLECTORS}" ]] ; then
+            export_network_flows_flags="--netflow-targets ${NETFLOW_COLLECTORS}"
+          fi
+          if [[ -n "${SFLOW_COLLECTORS}" ]] ; then
+            export_network_flows_flags="$export_network_flows_flags --sflow-targets ${SFLOW_COLLECTORS}"
+          fi
+          if [[ -n "${IPFIX_COLLECTORS}" ]] ; then
+            export_network_flows_flags="$export_network_flows_flags --ipfix-targets ${IPFIX_COLLECTORS}"
+          fi
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --nb-address "{{.OVN_NB_DB_LIST}}" \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
@@ -201,7 +211,8 @@ spec:
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
             ${gateway_mode_flags} \
             --disable-snat-multiple-gws \
-            --metrics-bind-address "127.0.0.1:29103"
+            --metrics-bind-address "127.0.0.1:29103" \
+            ${export_network_flows_flags}
         env:
         # for kubectl
         - name: KUBERNETES_SERVICE_PORT
@@ -212,6 +223,18 @@ spec:
           value: "{{.OVN_CONTROLLER_INACTIVITY_PROBE}}"
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
+        {{ if .NetFlowCollectors }}
+        - name: NETFLOW_COLLECTORS
+          value: "{{.NetFlowCollectors}}"
+        {{ end }}
+        {{ if .SFlowCollectors }}
+        - name: SFLOW_COLLECTORS
+          value: "{{.SFlowCollectors}}"
+        {{ end }}
+        {{ if .IPFIXCollectors }}
+        - name: IPFIX_COLLECTORS
+          value: "{{.IPFIXCollectors}}"
+        {{ end }}
         - name: K8S_NODE
           valueFrom:
             fieldRef:
