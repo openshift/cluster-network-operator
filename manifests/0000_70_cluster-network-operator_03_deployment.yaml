@@ -79,7 +79,7 @@ spec:
         - name: NETWORK_CHECK_SOURCE_IMAGE
           value: "quay.io/openshift/origin-cluster-network-operator:latest"
         - name: NETWORK_CHECK_TARGET_IMAGE
-          value: "quay.io/openshift/origin-hello-openshift:latest"
+          value: "quay.io/openshift/origin-cluster-network-operator:latest"
         - name: POD_NAME
           valueFrom:
             fieldRef:

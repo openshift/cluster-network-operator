@@ -25,7 +25,7 @@ install.tools:
 
 
 clean:
-	$(RM) cluster-network-operator cluster-nework-check-endpoints
+	$(RM) cluster-network-operator cluster-network-check-endpoints cluster-network-check-target
 .PHONY: clean
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
