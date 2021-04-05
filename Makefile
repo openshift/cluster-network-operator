@@ -5,7 +5,16 @@ all: build
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	targets/openshift/deps-gomod.mk \
+	targets/openshift/operator/profile-manifests.mk \
 )
+
+# This will include additional actions on the update and verify targets to ensure that profile patches are applied
+# to manifest files
+# $0 - macro name
+# $1 - target name
+# $2 - profile patches directory
+# $3 - manifests directory
+$(call add-profile-manifests,manifests,./profile-patches,./manifests)
 
 # Run core verification and all self contained tests.
 #
