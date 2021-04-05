@@ -1,13 +1,13 @@
+# *** AUTOMATICALLY GENERATED FILE - DO NOT EDIT ***
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: network-operator
-  namespace: openshift-network-operator
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
   labels:
     name: network-operator
-  annotations:
-    include.release.openshift.io/self-managed-high-availability: "true"
-    include.release.openshift.io/single-node-developer: "true"
+  name: network-operator
+  namespace: openshift-network-operator
 spec:
   selector:
     matchLabels:
@@ -20,9 +20,7 @@ spec:
         name: network-operator
     spec:
       containers:
-      - name: network-operator
-        image: quay.io/openshift/origin-cluster-network-operator:latest
-        command:
+      - command:
         - /bin/bash
         - -c
         - |
@@ -34,33 +32,29 @@ spec:
             URL_ONLY_KUBECONFIG=/etc/kubernetes/kubeconfig
           fi
           exec /usr/bin/cluster-network-operator start --listen=0.0.0.0:9104
-        resources:
-          requests:
-            cpu: 10m
-            memory: 50Mi
         env:
         - name: RELEASE_VERSION
-          value: "0.0.1-snapshot"
+          value: 0.0.1-snapshot
         - name: SDN_IMAGE
-          value: "quay.io/openshift/origin-sdn:latest"
+          value: quay.io/openshift/origin-sdn:latest
         - name: KUBE_PROXY_IMAGE
-          value: "quay.io/openshift/origin-kube-proxy:latest"
+          value: quay.io/openshift/origin-kube-proxy:latest
         - name: KUBE_RBAC_PROXY_IMAGE
-          value: "quay.io/openshift/origin-kube-rbac-proxy:latest"
+          value: quay.io/openshift/origin-kube-rbac-proxy:latest
         - name: MULTUS_IMAGE
-          value: "quay.io/openshift/origin-multus-cni:latest"
+          value: quay.io/openshift/origin-multus-cni:latest
         - name: MULTUS_ADMISSION_CONTROLLER_IMAGE
-          value: "quay.io/openshift/origin-multus-admission-controller:latest"
+          value: quay.io/openshift/origin-multus-admission-controller:latest
         - name: CNI_PLUGINS_IMAGE
-          value: "quay.io/openshift/origin-container-networking-plugins:latest"
+          value: quay.io/openshift/origin-container-networking-plugins:latest
         - name: WHEREABOUTS_CNI_IMAGE
-          value: "quay.io/openshift/origin-multus-whereabouts-ipam-cni:latest"
+          value: quay.io/openshift/origin-multus-whereabouts-ipam-cni:latest
         - name: ROUTE_OVERRRIDE_CNI_IMAGE
-          value: "quay.io/openshift/origin-multus-route-override-cni:latest"
+          value: quay.io/openshift/origin-multus-route-override-cni:latest
         - name: MULTUS_NETWORKPOLICY_IMAGE
-          value: "quay.io/openshift/origin-multus-networkpolicy:latest"
+          value: quay.io/openshift/origin-multus-networkpolicy:latest
         - name: OVN_IMAGE
-          value: "quay.io/openshift/origin-ovn-kubernetes:latest"
+          value: quay.io/openshift/origin-ovn-kubernetes:latest
         - name: OVN_NB_RAFT_ELECTION_TIMER
           value: "10000"
         - name: OVN_SB_RAFT_ELECTION_TIMER
@@ -70,46 +64,50 @@ spec:
         - name: OVN_CONTROLLER_INACTIVITY_PROBE
           value: "30000"
         - name: EGRESS_ROUTER_CNI_IMAGE
-          value: "quay.io/openshift/origin-egress-router-cni:latest"
+          value: quay.io/openshift/origin-egress-router-cni:latest
         - name: KURYR_DAEMON_IMAGE
-          value: "quay.io/openshift/origin-kuryr-cni:latest"
+          value: quay.io/openshift/origin-kuryr-cni:latest
         - name: KURYR_CONTROLLER_IMAGE
-          value: "quay.io/openshift/origin-kuryr-controller:latest"
+          value: quay.io/openshift/origin-kuryr-controller:latest
         - name: NETWORK_METRICS_DAEMON_IMAGE
-          value: "quay.io/openshift/origin-network-metrics-daemon:latest"
+          value: quay.io/openshift/origin-network-metrics-daemon:latest
         - name: NETWORK_CHECK_SOURCE_IMAGE
-          value: "quay.io/openshift/origin-cluster-network-operator:latest"
+          value: quay.io/openshift/origin-cluster-network-operator:latest
         - name: NETWORK_CHECK_TARGET_IMAGE
-          value: "quay.io/openshift/origin-cluster-network-operator:latest"
+          value: quay.io/openshift/origin-cluster-network-operator:latest
         - name: POD_NAME
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        image: quay.io/openshift/origin-cluster-network-operator:latest
+        name: network-operator
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /etc/kubernetes
           name: host-etc-kube
           readOnly: true
       hostNetwork: true
-      nodeSelector:
-        node-role.kubernetes.io/master: ""
-      priorityClassName: "system-cluster-critical"
-      volumes:
-        - name: host-etc-kube
-          hostPath:
-            path: /etc/kubernetes
-            type: Directory
+      priorityClassName: system-cluster-critical
       restartPolicy: Always
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
       tolerations:
-      - key: "node-role.kubernetes.io/master"
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
         operator: Exists
-        effect: NoSchedule
-      - key: "node.kubernetes.io/not-ready"
+      - effect: NoSchedule
+        key: node.kubernetes.io/not-ready
         operator: Exists
-        effect: NoSchedule
-      - key: node.kubernetes.io/network-unavailable
+      - effect: NoSchedule
+        key: node.kubernetes.io/network-unavailable
         operator: Exists
-        effect: NoSchedule
+      volumes:
+      - hostPath:
+          path: /etc/kubernetes
+          type: Directory
+        name: host-etc-kube
