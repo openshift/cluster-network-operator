@@ -1,8 +1,10 @@
 aliases:
   kuryr-reviewers:
-  - celebdor
   - luis5tb
   - MaysaMacedo
   - dulek
+  - gryf
   kuryr-approvers:
   - dulek
+  - MaysaMacedo
+  - luis5tb
