@@ -42,6 +42,11 @@ spec:
             path: /
           initialDelaySeconds: 30
           timeoutSeconds: 10
+        env:
+        - name: K8S_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
       serviceAccount: default
       terminationGracePeriodSeconds: 10
       tolerations:
