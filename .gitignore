@@ -1,6 +1,6 @@
-cluster-network-operator
-cluster-network-check-endpoints
-cluster-network-check-target
+/cluster-network-operator
+/cluster-network-check-endpoints
+/cluster-network-check-target
 
 # Temporary Build Files
 tmp/_output
