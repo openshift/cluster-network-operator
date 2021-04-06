@@ -9,7 +9,6 @@ require (
 	github.com/containernetworking/cni v0.8.0
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/gophercloud/gophercloud v0.14.0
 	github.com/gophercloud/utils v0.0.0-20201221031838-d93cf4b3fa50
@@ -17,8 +16,8 @@ require (
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.1 // indirect
 	github.com/onsi/gomega v1.10.2
-	github.com/openshift/api v0.0.0-20210325163602-e37aaed4c278
-	github.com/openshift/build-machinery-go v0.0.0-20200917070002-f171684f77ab
+	github.com/openshift/api v0.0.0-20210402143208-92e9dab578e8
+	github.com/openshift/build-machinery-go v0.0.0-20210209125900-0da259a2c359
 	github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49
 	github.com/openshift/library-go v0.0.0-20201130154959-bd449d1e2e25
 	github.com/openshift/machine-api-operator v0.2.1-0.20201203125141-79567cb3368e
@@ -32,13 +31,13 @@ require (
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 // indirect
 	golang.org/x/text v0.3.5 // indirect
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.20.4
+	k8s.io/api v0.21.0-rc.0
 	k8s.io/apiextensions-apiserver v0.20.0
-	k8s.io/apimachinery v0.20.4
+	k8s.io/apimachinery v0.21.0-rc.0
 	k8s.io/client-go v0.20.0
-	k8s.io/code-generator v0.20.0
+	k8s.io/code-generator v0.21.0-rc.0
 	k8s.io/component-base v0.20.0
-	k8s.io/klog/v2 v2.6.0
+	k8s.io/klog/v2 v2.8.0
 	k8s.io/kube-proxy v0.20.0
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/cluster-api-provider-openstack v0.3.3
