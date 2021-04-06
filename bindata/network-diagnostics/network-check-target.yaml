@@ -6,7 +6,7 @@ metadata:
   annotations:
     kubernetes.io/description: |
       This daemonset deploys the network-check-target pods that run
-      a dummy hello-openshift app to be checked by network-check-source pod
+      a dummy app to be checked by network-check-source pod
     release.openshift.io/version: "{{.ReleaseVersion}}"
     networkoperator.openshift.io/non-critical: ""
 spec:
@@ -27,6 +27,8 @@ spec:
       - image: "{{.NetworkCheckTargetImage}}"
         imagePullPolicy: IfNotPresent
         name: network-check-target-container
+        command:
+          - cluster-network-check-target
         ports:
         - containerPort: 8080
           protocol: TCP
