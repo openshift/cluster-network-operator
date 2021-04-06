@@ -97,7 +97,8 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec) error {
 // MergeClusterConfig merges the cluster configuration into the real
 // CRD configuration.
 func MergeClusterConfig(operConf *operv1.NetworkSpec, clusterConf configv1.NetworkSpec) {
-	operConf.ServiceNetwork = clusterConf.ServiceNetwork
+	operConf.ServiceNetwork = make([]string, len(clusterConf.ServiceNetwork))
+	copy(operConf.ServiceNetwork, clusterConf.ServiceNetwork)
 
 	operConf.ClusterNetwork = []operv1.ClusterNetworkEntry{}
 	for _, cnet := range clusterConf.ClusterNetwork {
