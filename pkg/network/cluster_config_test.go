@@ -157,6 +157,26 @@ func TestMergeClusterConfig(t *testing.T) {
 			Type: "None",
 		},
 	}))
+
+	cc.ServiceNetwork = append(cc.ServiceNetwork, "2001:db8::2/64")
+	MergeClusterConfig(&oc, cc)
+	g.Expect(oc).To(Equal(operv1.NetworkSpec{
+		OperatorSpec:   operv1.OperatorSpec{ManagementState: "Managed"},
+		ServiceNetwork: []string{"192.168.0.0/20", "2001:db8::2/64"},
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.0.0.0/22",
+				HostPrefix: 24,
+			},
+			{
+				CIDR:       "10.2.0.0/22",
+				HostPrefix: 23,
+			},
+		},
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: "None",
+		},
+	}))
 }
 
 func TestStatusFromConfig(t *testing.T) {
