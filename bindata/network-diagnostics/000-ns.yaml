@@ -4,3 +4,4 @@ metadata:
   name: openshift-network-diagnostics
   annotations:
     openshift.io/node-selector: "" #override default node selector
+    workload.openshift.io/allowed: "management"
