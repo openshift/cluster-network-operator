@@ -8,7 +8,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller"
 	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
-	"github.com/openshift/cluster-network-operator/pkg/operator/leader"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/rest"
@@ -46,10 +45,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	cfg := controllerConfig.KubeConfig
 	if o.client, err = client.New(cfg, controllerConfig.ProtoKubeConfig); err != nil {
 		return err
-	}
-
-	if err := leader.BecomeLeader(ctx, o.client.Dynamic(), LOCK_NAME); err != nil {
-		return fmt.Errorf("Failed to become leader: %w", err)
 	}
 
 	// initialize the controller-runtime environment
