@@ -81,9 +81,6 @@ which is a kubeconfig from which to take just the URL to the apiserver`,
 
 	cmdcfg := controllercmd.NewControllerCommandConfig("network-operator", version.Get(), operator.RunOperator)
 
-	// We'll use our own leader election
-	cmdcfg.DisableLeaderElection = true
-
 	cmd2 := cmdcfg.NewCommand()
 	cmd2.Use = "start"
 	cmd2.Short = "Start the cluster network operator"
