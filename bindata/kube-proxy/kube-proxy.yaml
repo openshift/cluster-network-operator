@@ -25,6 +25,8 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: kube-proxy
         component: network

@@ -9,3 +9,4 @@ metadata:
   annotations:
     openshift.io/node-selector: "" #override default node selector
     openshift.io/description: "kubernetes service proxy"
+    workload.openshift.io/allowed: "management"
