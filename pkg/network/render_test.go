@@ -46,7 +46,7 @@ func TestIsChangeSafe(t *testing.T) {
 	FillDefaults(next, nil)
 	next.DefaultNetwork.Type = "Kuryr"
 	err = IsChangeSafe(prev, next)
-	g.Expect(err).To(MatchError(ContainSubstring("cannot change default network type")))
+	g.Expect(err).To(MatchError(ContainSubstring("cannot change default network type when not doing migration")))
 
 	// You can change a single-stack config to dual-stack
 	next = OpenShiftSDNConfig.Spec.DeepCopy()
@@ -112,6 +112,22 @@ func TestIsChangeSafe(t *testing.T) {
 	)
 	err = IsChangeSafe(prev, next)
 	g.Expect(err).To(MatchError(ContainSubstring("cannot change ClusterNetwork")))
+
+	// You can't change default network type to non-target migration network type
+	next = OpenShiftSDNConfig.Spec.DeepCopy()
+	FillDefaults(next, nil)
+	prev.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
+	next.DefaultNetwork.Type = "Kuryr"
+	err = IsChangeSafe(prev, next)
+	g.Expect(err).To(MatchError(ContainSubstring("can only change default network type to the target migration network type")))
+
+	// You can't change the migration network type when it is not null.
+	next = OpenShiftSDNConfig.Spec.DeepCopy()
+	FillDefaults(next, nil)
+	next.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
+	prev.Migration = &operv1.NetworkMigration{NetworkType: "Kuryr"}
+	err = IsChangeSafe(prev, next)
+	g.Expect(err).To(MatchError(ContainSubstring("cannot change migration network type after migration is start")))
 }
 
 func TestRenderUnknownNetwork(t *testing.T) {

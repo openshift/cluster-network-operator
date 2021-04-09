@@ -175,17 +175,14 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	// Compare against previous applied configuration to see if this change
 	// is safe.
 	if prev != nil {
-		// Check if the operator is put in the 'Network Migration' mode.
-		if _, ok := operConfig.GetAnnotations()[names.NetworkMigrationAnnotation]; !ok {
-			// We may need to fill defaults here -- sort of as a poor-man's
-			// upconversion scheme -- if we add additional fields to the config.
-			err = network.IsChangeSafe(prev, &operConfig.Spec)
-			if err != nil {
-				log.Printf("Not applying unsafe change: %v", err)
-				r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
-					fmt.Sprintf("Not applying unsafe configuration change: %v. Use 'oc edit network.operator.openshift.io cluster' to undo the change.", err))
-				return reconcile.Result{}, err
-			}
+		// We may need to fill defaults here -- sort of as a poor-man's
+		// upconversion scheme -- if we add additional fields to the config.
+		err = network.IsChangeSafe(prev, &operConfig.Spec)
+		if err != nil {
+			log.Printf("Not applying unsafe change: %v", err)
+			r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
+				fmt.Sprintf("Not applying unsafe configuration change: %v. Use 'oc edit network.operator.openshift.io cluster' to undo the change.", err))
+			return reconcile.Result{}, err
 		}
 	}
 
