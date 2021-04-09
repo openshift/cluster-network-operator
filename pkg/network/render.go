@@ -232,6 +232,9 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 		errs = append(errs, err)
 	}
 
+	// Check the network migration
+	errs = append(errs, isMigrationChangeSafe(prev, next)...)
+
 	// Check the default network
 	errs = append(errs, isDefaultNetworkChangeSafe(prev, next)...)
 
@@ -456,20 +459,37 @@ func fillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int)
 }
 
 func isDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
+
 	if prev.DefaultNetwork.Type != next.DefaultNetwork.Type {
-		return []error{errors.Errorf("cannot change default network type")}
+		if prev.Migration == nil {
+			return []error{errors.Errorf("cannot change default network type when not doing migration")}
+		} else {
+			if prev.Migration.NetworkType != next.DefaultNetwork.Type {
+				return []error{errors.Errorf("can only change default network type to the target migration network type")}
+			}
+		}
 	}
 
-	switch prev.DefaultNetwork.Type {
-	case operv1.NetworkTypeOpenShiftSDN:
-		return isOpenShiftSDNChangeSafe(prev, next)
-	case operv1.NetworkTypeOVNKubernetes:
-		return isOVNKubernetesChangeSafe(prev, next)
-	case operv1.NetworkTypeKuryr:
-		return isKuryrChangeSafe(prev, next)
-	default:
-		return nil
+	if prev.Migration == nil {
+		switch prev.DefaultNetwork.Type {
+		case operv1.NetworkTypeOpenShiftSDN:
+			return isOpenShiftSDNChangeSafe(prev, next)
+		case operv1.NetworkTypeOVNKubernetes:
+			return isOVNKubernetesChangeSafe(prev, next)
+		case operv1.NetworkTypeKuryr:
+			return isKuryrChangeSafe(prev, next)
+		default:
+			return nil
+		}
 	}
+	return nil
+}
+
+func isMigrationChangeSafe(prev, next *operv1.NetworkSpec) []error {
+	if prev.Migration != nil && next.Migration != nil && prev.Migration.NetworkType != next.Migration.NetworkType {
+		return []error{errors.Errorf("cannot change migration network type after migration is start")}
+	}
+	return nil
 }
 
 // ValidateAdditionalNetworks validates additional networks configs
