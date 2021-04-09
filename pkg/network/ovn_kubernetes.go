@@ -174,7 +174,24 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 	objs = append(objs, manifests...)
 
-	updateNode, updateMaster := shouldUpdateOVNK(bootstrapResult.OVN.ExistingNodeDaemonset, bootstrapResult.OVN.ExistingMasterDaemonset, os.Getenv("RELEASE_VERSION"))
+	// obtain the current IP family mode.
+	ipFamilyMode := names.IPFamilySingleStack
+	if len(conf.ServiceNetwork) == 2 {
+		ipFamilyMode = names.IPFamilyDualStack
+	}
+	// check if the IP family mode has changed and control the conversion process.
+	updateNode, updateMaster := shouldUpdateOVNKonIPFamilyChange(bootstrapResult.OVN.ExistingNodeDaemonset, bootstrapResult.OVN.ExistingMasterDaemonset, ipFamilyMode)
+	// annotate the daemonset and the daemonset template with the current IP family mode,
+	// this triggers a daemonset restart if there are changes.
+	err = setOVNDaemonsetAnnotation(objs, names.NetworkIPFamilyModeAnnotation, ipFamilyMode)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to set IP family %s annotation on daemonsets", ipFamilyMode)
+	}
+
+	// don't process upgrades if we are handling a dual-stack conversion.
+	if updateMaster && updateNode {
+		updateNode, updateMaster = shouldUpdateOVNKonUpgrade(bootstrapResult.OVN.ExistingNodeDaemonset, bootstrapResult.OVN.ExistingMasterDaemonset, os.Getenv("RELEASE_VERSION"))
+	}
 
 	// If we need to delay master or node daemonset rollout, then we'll replace the new one with the existing one
 	if !updateMaster {
@@ -495,12 +512,44 @@ func listenDualStack(masterIP string) string {
 	}
 }
 
-// shouldUpdateOVNK determines if we should roll out changes to
-// the master and node daemonsets.
-//
-// On upgrades, we roll out nodes first, then masters. Downgrades, we do the
-// opposite.
-func shouldUpdateOVNK(existingNode, existingMaster *appsv1.DaemonSet, releaseVersion string) (updateNode, updateMaster bool) {
+// shouldUpdateOVNKonIPFamilyChange determines if we should roll out changes to
+// the master and node daemonsets on IP family configuration changes.
+// We rollout changes on masters first when there is a configuration change.
+// Configuration changes take precedence over upgrades.
+func shouldUpdateOVNKonIPFamilyChange(existingNode, existingMaster *appsv1.DaemonSet, ipFamilyMode string) (updateNode, updateMaster bool) {
+	// Fresh cluster - full steam ahead!
+	if existingNode == nil || existingMaster == nil {
+		return true, true
+	}
+	// check current daemonsets IP family mode
+	nodeIPFamilyMode := existingNode.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+	masterIPFamilyMode := existingMaster.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+	// if there are no annotations this is a fresh cluster
+	if nodeIPFamilyMode == "" || masterIPFamilyMode == "" {
+		return true, true
+	}
+	// exit if there are no IP family mode changes
+	if nodeIPFamilyMode == ipFamilyMode && masterIPFamilyMode == ipFamilyMode {
+		return true, true
+	}
+	// If the master config has changed update only the master, the node will be updated later
+	if masterIPFamilyMode != ipFamilyMode {
+		klog.V(2).Infof("IP family mode change detected to %s, updating OVN-Kubernetes master", ipFamilyMode)
+		return false, true
+	}
+	// Don't rollout the changes on nodes until the master daemonset rollout has finished
+	if daemonSetProgressing(existingMaster, false) {
+		klog.V(2).Infof("Waiting for OVN-Kubernetes master daemonset IP family mode rollout before updating node")
+		return false, true
+	}
+	klog.V(2).Infof("OVN-Kubernetes master daemonset rollout complete, updating IP family mode on node daemonset")
+	return true, true
+}
+
+// shouldUpdateOVNKonUpgrade determines if we should roll out changes to
+// the master and node daemonsets on upgrades. We roll out nodes first,
+// then masters. Downgrades, we do the opposite.
+func shouldUpdateOVNKonUpgrade(existingNode, existingMaster *appsv1.DaemonSet, releaseVersion string) (updateNode, updateMaster bool) {
 	// Fresh cluster - full steam ahead!
 	if existingNode == nil || existingMaster == nil {
 		return true, true
@@ -621,4 +670,32 @@ func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 	}
 
 	return true
+}
+
+// setOVNDaemonsetAnnotation annotates the OVNkube master and node daemonset
+// it also annotated the template with the provided key and value to force the rollout
+func setOVNDaemonsetAnnotation(objs []*uns.Unstructured, key, value string) error {
+	for _, obj := range objs {
+		if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "DaemonSet" &&
+			(obj.GetName() == "ovnkube-master" || obj.GetName() == "ovnkube-node") {
+			// set daemonset annotation
+			anno := obj.GetAnnotations()
+			if anno == nil {
+				anno = map[string]string{}
+			}
+			anno[key] = value
+			obj.SetAnnotations(anno)
+
+			// set pod template annotation
+			anno, _, _ = uns.NestedStringMap(obj.Object, "spec", "template", "metadata", "annotations")
+			if anno == nil {
+				anno = map[string]string{}
+			}
+			anno[key] = value
+			if err := uns.SetNestedStringMap(obj.Object, anno, "spec", "template", "metadata", "annotations"); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
