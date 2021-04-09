@@ -12,6 +12,7 @@ type KuryrBootstrapResult struct {
 	WorkerNodesRouter        string
 	WorkerNodesSubnets       []string
 	NodesNetworkMTU          int
+	NetworkAZs               []string
 	PodSecurityGroups        []string
 	ExternalNetwork          string
 	ClusterID                string

@@ -389,13 +389,13 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 	log.Printf("Found worker nodes subnet %s", workerSubnet.ID)
 
-	mtu, err := getOpenStackNetworkMTU(client, workerSubnet.NetworkID)
+	mtu, azs, err := getOpenStackNetworkMTUAndAZs(client, workerSubnet.NetworkID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get network MTU")
 	}
-	log.Printf("Found Nodes Network MTU %d", mtu)
+	log.Printf("Found Nodes Network MTU %d and AZs %v", mtu, azs)
 
-	router, err := ensureOpenStackRouter(client, generateName("external-router", clusterID), tag, workerSubnet.NetworkID)
+	router, err := ensureOpenStackRouter(client, generateName("external-router", clusterID), tag, workerSubnet.NetworkID, azs)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes router")
 	}

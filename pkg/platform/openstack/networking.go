@@ -116,18 +116,17 @@ func findOpenStackNetwork(client *gophercloud.ServiceClient, tag string) (networ
 }
 
 // Gets the MTU of a Network
-func getOpenStackNetworkMTU(client *gophercloud.ServiceClient, networkID string) (int, error) {
-	networkMTU := 0
+func getOpenStackNetworkMTUAndAZs(client *gophercloud.ServiceClient, networkID string) (int, []string, error) {
 	type NetworkMTU struct {
 		networks.Network
 		mtu.NetworkMTUExt
 	}
-	var mtu NetworkMTU
-	err := networks.Get(client, networkID).ExtractInto(&mtu)
+	var network NetworkMTU
+	err := networks.Get(client, networkID).ExtractInto(&network)
 	if err != nil {
-		return networkMTU, errors.Wrap(err, "failed to extract network MTU")
+		return 0, []string{}, errors.Wrap(err, "failed to extract network MTU")
 	}
-	return mtu.MTU, nil
+	return network.MTU, network.Network.AvailabilityZoneHints, nil
 }
 
 // Looks for a Neutron subnet by name and tag. Fails if not found.
@@ -240,7 +239,7 @@ func ensureOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, netId, 
 // Looks for a Neutron router by name and tag. If not found, provides
 // the router used by the custom Network. If no router exists, creates
 // a new one. Fails if multiple routers match.
-func ensureOpenStackRouter(client *gophercloud.ServiceClient, name, tag, networkID string) (routers.Router, error) {
+func ensureOpenStackRouter(client *gophercloud.ServiceClient, name, tag, networkID string, azs []string) (routers.Router, error) {
 	empty := routers.Router{}
 	page, err := routers.List(client, routers.ListOpts{Name: name, Tags: tag}).AllPages()
 	if err != nil {
@@ -271,7 +270,7 @@ func ensureOpenStackRouter(client *gophercloud.ServiceClient, name, tag, network
 			}
 		}
 
-		router, err := routers.Create(client, routers.CreateOpts{Name: name}).Extract()
+		router, err := routers.Create(client, routers.CreateOpts{Name: name, AvailabilityZoneHints: azs}).Extract()
 		if err != nil {
 			return empty, errors.Wrap(err, "failed to create router")
 		}

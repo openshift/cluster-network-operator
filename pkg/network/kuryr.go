@@ -112,8 +112,9 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["WebhookCert"] = b.WebhookCert
 	data.Data["WebhookKey"] = b.WebhookKey
 
-	// Nodes Network MTU
+	// Nodes Network MTU and AZs
 	data.Data["NodesNetworkMTU"] = b.NodesNetworkMTU
+	data.Data["NetworkAZs"] = strings.Join(b.NetworkAZs, ",")
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/kuryr"), &data)
 	if err != nil {
