@@ -807,7 +807,8 @@ spec:
           export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/var/run/ovn/ovn-nbctl.pid \
             --detach \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
-            --db "{{.OVN_NB_DB_LIST}}" --log-file=/run/ovn/ovn-nbctl.log)
+            --db "{{.OVN_NB_DB_LIST}}" --log-file=/run/ovn/ovn-nbctl.log \
+            -vreconnect:file:info)
 
           # include nbctl daemon logging, allow for ovn-nbctl to create the log file
           tail -F /run/ovn/ovn-nbctl.log &
