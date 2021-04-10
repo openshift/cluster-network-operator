@@ -558,6 +558,14 @@ func TestOVNKubernetestShouldUpdateMaster(t *testing.T) {
 		{
 			expectNode:   true,
 			expectMaster: true,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+`,
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+`,
 		},
 
 		{
@@ -572,6 +580,10 @@ metadata:
   namespace: openshift-ovn-kubernetes
   name: ovnkube-node
 `,
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+`,
 		},
 
 		{
@@ -585,6 +597,10 @@ metadata:
     release.openshift.io/version: 4.7.0-0.ci-2021-01-10-200841
   namespace: openshift-ovn-kubernetes
   name: ovnkube-master
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
 `,
 		},
 
@@ -993,24 +1009,26 @@ metadata:
 			g.Expect(errs).To(HaveLen(0))
 			FillDefaults(config, nil)
 
-			if tc.node != "" {
-				node = &appsv1.DaemonSet{}
-				err := yaml.Unmarshal([]byte(tc.node), node)
-				if err != nil {
-					t.Fatal(err)
-				}
+			node = &appsv1.DaemonSet{}
+			err := yaml.Unmarshal([]byte(tc.node), node)
+			if err != nil {
+				t.Fatal(err)
 			}
 
-			if tc.master != "" {
-				master = &appsv1.DaemonSet{}
-				err := yaml.Unmarshal([]byte(tc.master), master)
-				if err != nil {
-					t.Fatal(err)
-				}
+			master = &appsv1.DaemonSet{}
+			err = yaml.Unmarshal([]byte(tc.master), master)
+			if err != nil {
+				t.Fatal(err)
 			}
 
-			usNode, _ := k8s.ToUnstructured(node)
-			usMaster, _ := k8s.ToUnstructured(master)
+			usNode, err := k8s.ToUnstructured(node)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			usMaster, err := k8s.ToUnstructured(master)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
 
 			bootstrapResult := &bootstrap.BootstrapResult{
 				OVN: bootstrap.OVNBootstrapResult{
