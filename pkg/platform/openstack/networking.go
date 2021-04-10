@@ -116,8 +116,8 @@ func findOpenStackNetwork(client *gophercloud.ServiceClient, tag string) (networ
 }
 
 // Gets the MTU of a Network
-func getOpenStackNetworkMTU(client *gophercloud.ServiceClient, networkID string) (int, error) {
-	networkMTU := 0
+func getOpenStackNetworkMTU(client *gophercloud.ServiceClient, networkID string) (uint32, error) {
+	var networkMTU uint32 = 0
 	type NetworkMTU struct {
 		networks.Network
 		mtu.NetworkMTUExt
@@ -127,7 +127,7 @@ func getOpenStackNetworkMTU(client *gophercloud.ServiceClient, networkID string)
 	if err != nil {
 		return networkMTU, errors.Wrap(err, "failed to extract network MTU")
 	}
-	return mtu.MTU, nil
+	return uint32(mtu.MTU), nil
 }
 
 // Looks for a Neutron subnet by name and tag. Fails if not found.
