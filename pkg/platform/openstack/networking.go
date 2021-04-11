@@ -1,8 +1,6 @@
 package openstack
 
 import (
-	"regexp"
-
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/attributestags"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
@@ -338,27 +336,6 @@ func ensureOpenStackRouterInterface(client *gophercloud.ServiceClient, routerId 
 		return errors.Wrap(err, "failed to add interface")
 	}
 	return nil
-}
-
-// Looks up OpenStack ports by tag and regexp pattern matched against name.
-// Returns a slice with matched Ports.
-func listOpenStackPortsMatchingPattern(client *gophercloud.ServiceClient, tag string, pattern *regexp.Regexp) ([]ports.Port, error) {
-	page, err := ports.List(client, ports.ListOpts{Tags: tag}).AllPages()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get port list")
-	}
-	portList, err := ports.ExtractPorts(page)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to extract ports list")
-	}
-	result := []ports.Port{}
-	for _, port := range portList {
-		if pattern.MatchString(port.Name) {
-			result = append(result, port)
-		}
-	}
-
-	return result, nil
 }
 
 // Looks for a Neutron Port by name, tag and network ID. If it does not exist
