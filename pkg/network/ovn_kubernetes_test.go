@@ -12,12 +12,14 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 )
 
@@ -294,6 +296,9 @@ enabled=true`,
 			g.Expect(err).NotTo(HaveOccurred())
 			confFile := extractOVNKubeConfig(g, objs)
 			g.Expect(confFile).To(Equal(strings.TrimSpace(tc.expected)))
+			// check that the daemonset has the IP family mode annotations
+			ipFamilyMode := names.IPFamilySingleStack
+			g.Expect(checkDaemonsetAnnotation(g, objs, names.NetworkIPFamilyModeAnnotation, ipFamilyMode)).To(BeTrue())
 		})
 	}
 
@@ -543,8 +548,8 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	g.Expect(errs[1]).To(MatchError("cannot change ovn-kubernetes genevePort"))
 }
 
-// TestOVNKubernetesShouldUpdateMaster checks to see that
-func TestOVNKubernetestShouldUpdateMaster(t *testing.T) {
+// TestOVNKubernetesShouldUpdateMasterOnUpgrade checks to see that
+func TestOVNKubernetestShouldUpdateMasterOnUpgrade(t *testing.T) {
 
 	for idx, tc := range []struct {
 		expectNode   bool
@@ -554,7 +559,7 @@ func TestOVNKubernetestShouldUpdateMaster(t *testing.T) {
 		rv           string // release version
 	}{
 
-		// No node and master - upgrade = true
+		// No node and master - upgrade = true and config the same
 		{
 			expectNode:   true,
 			expectMaster: true,
@@ -1031,10 +1036,307 @@ metadata:
 			// if we expect a master update, the original master and the rendered one must be different
 			g.Expect(tc.expectMaster).To(Equal(!reflect.DeepEqual(renderedMaster, usMaster)), "Check master rendering")
 
-			updateNode, updateMaster := shouldUpdateOVNK(node, master, tc.rv)
+			updateNode, updateMaster := shouldUpdateOVNKonUpgrade(node, master, tc.rv)
 			g.Expect(updateNode).To(Equal(tc.expectNode), "Check node")
 			g.Expect(updateMaster).To(Equal(tc.expectMaster), "Check master")
 		})
+	}
+}
+
+func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
+
+	for _, tc := range []struct {
+		name         string
+		node         *appsv1.DaemonSet
+		master       *appsv1.DaemonSet
+		ipFamilyMode string
+		expectNode   bool
+		expectMaster bool
+	}{
+		{
+			name:         "all empty",
+			node:         &appsv1.DaemonSet{},
+			master:       &appsv1.DaemonSet{},
+			expectNode:   true,
+			expectMaster: true,
+			ipFamilyMode: names.IPFamilySingleStack,
+		},
+		{
+			name:         "fresh cluster",
+			node:         &appsv1.DaemonSet{},
+			master:       &appsv1.DaemonSet{},
+			expectNode:   true,
+			expectMaster: true,
+			ipFamilyMode: names.IPFamilySingleStack,
+		},
+		{
+			name: "no configuration change",
+			node: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ovnkube-node",
+					Namespace: "openshift-ovn-kubernetes",
+					Annotations: map[string]string{
+						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
+					},
+				},
+			},
+			master: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ovnkube-master",
+					Namespace: "openshift-ovn-kubernetes",
+					Annotations: map[string]string{
+						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
+					},
+					Generation: 1,
+				},
+				Status: appsv1.DaemonSetStatus{
+					CurrentNumberScheduled: 3,
+					DesiredNumberScheduled: 3,
+					NumberAvailable:        3,
+					NumberMisscheduled:     0,
+					NumberReady:            3,
+					ObservedGeneration:     2,
+					UpdatedNumberScheduled: 3,
+				},
+			},
+			expectNode:   true,
+			expectMaster: true,
+			ipFamilyMode: names.IPFamilySingleStack,
+		},
+		{
+			name: "configuration changed",
+			node: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ovnkube-node",
+					Namespace: "openshift-ovn-kubernetes",
+					Annotations: map[string]string{
+						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
+					},
+				},
+			},
+			master: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ovnkube-master",
+					Namespace: "openshift-ovn-kubernetes",
+					Annotations: map[string]string{
+						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
+					},
+				},
+			},
+			expectNode:   false,
+			expectMaster: true,
+			ipFamilyMode: names.IPFamilyDualStack,
+		},
+		{
+			name: "configuration changed, master updated and node remaining",
+			node: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ovnkube-node",
+					Namespace: "openshift-ovn-kubernetes",
+					Annotations: map[string]string{
+						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
+					},
+				},
+			},
+			master: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ovnkube-master",
+					Namespace: "openshift-ovn-kubernetes",
+					Annotations: map[string]string{
+						names.NetworkIPFamilyModeAnnotation: names.IPFamilyDualStack,
+					},
+					Generation: 1,
+				},
+				Status: appsv1.DaemonSetStatus{
+					CurrentNumberScheduled: 3,
+					DesiredNumberScheduled: 3,
+					NumberAvailable:        3,
+					NumberMisscheduled:     0,
+					NumberReady:            3,
+					ObservedGeneration:     2,
+					UpdatedNumberScheduled: 3,
+				},
+			},
+			expectNode:   true,
+			expectMaster: true,
+			ipFamilyMode: names.IPFamilyDualStack,
+		},
+		{
+			name: "configuration changed, master updated and node remaining but still rolling out",
+			node: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ovnkube-node",
+					Namespace: "openshift-ovn-kubernetes",
+					Annotations: map[string]string{
+						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
+					},
+				},
+			},
+			master: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ovnkube-master",
+					Namespace: "openshift-ovn-kubernetes",
+					Annotations: map[string]string{
+						names.NetworkIPFamilyModeAnnotation: names.IPFamilyDualStack,
+					},
+					Generation: 1,
+				},
+				Status: appsv1.DaemonSetStatus{
+					CurrentNumberScheduled: 3,
+					DesiredNumberScheduled: 3,
+					NumberAvailable:        2,
+					NumberUnavailable:      1,
+					NumberMisscheduled:     0,
+					NumberReady:            2,
+					ObservedGeneration:     2,
+					UpdatedNumberScheduled: 3,
+				},
+			},
+			expectNode:   false,
+			expectMaster: true,
+			ipFamilyMode: names.IPFamilyDualStack,
+		},
+		// this should not be possible, because configuration changes always update master first
+		{
+			name: "configuration changed, node updated and master remaining",
+			node: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ovnkube-node",
+					Namespace: "openshift-ovn-kubernetes",
+					Annotations: map[string]string{
+						names.NetworkIPFamilyModeAnnotation: names.IPFamilyDualStack,
+					},
+				},
+			},
+			master: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ovnkube-master",
+					Namespace: "openshift-ovn-kubernetes",
+					Annotations: map[string]string{
+						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
+					},
+					Generation: 2,
+				},
+				Status: appsv1.DaemonSetStatus{
+					CurrentNumberScheduled: 3,
+					DesiredNumberScheduled: 3,
+					NumberAvailable:        3,
+					NumberMisscheduled:     0,
+					NumberReady:            3,
+					ObservedGeneration:     2,
+					UpdatedNumberScheduled: 3,
+				},
+			},
+			expectNode:   false,
+			expectMaster: true,
+			ipFamilyMode: names.IPFamilyDualStack,
+		},
+	} {
+
+		t.Run(tc.name, func(t *testing.T) {
+			updateNode, updateMaster := shouldUpdateOVNKonIPFamilyChange(tc.node, tc.master, tc.ipFamilyMode)
+			if updateNode != tc.expectNode {
+				t.Errorf("Expected node update: %v received %v", tc.expectNode, updateNode)
+			}
+			if updateMaster != tc.expectMaster {
+				t.Errorf("Expected node update: %v received %v", tc.expectNode, updateNode)
+			}
+
+		})
+	}
+
+}
+
+func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
+	//cluster was in single-stack and receives a converts to dual-stack
+	config := &operv1.NetworkSpec{
+		ServiceNetwork: []string{"172.30.0.0/16", "fd00:3:2:1::/112"},
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+			{
+				CIDR:       "fd00:1:2:3::/64",
+				HostPrefix: 56,
+			},
+		},
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOVNKubernetes,
+			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
+				GenevePort: ptrToUint32(8061),
+			},
+		},
+	}
+	errs := validateOVNKubernetes(config)
+	if len(errs) > 0 {
+		t.Errorf("Unexpected error: %v", errs)
+	}
+	FillDefaults(config, nil)
+
+	// at the same time we have an upgrade
+	os.Setenv("RELEASE_VERSION", "2.0.0")
+
+	// bootstrap also represents current status
+	// the current cluster is single-stack and has version 1.9.9
+	bootstrapResult := &bootstrap.BootstrapResult{
+		OVN: bootstrap.OVNBootstrapResult{
+			MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+			ExistingMasterDaemonset: &appsv1.DaemonSet{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "apps/v1",
+					Kind:       "DaemonSet",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ovnkube-master",
+					Namespace: "openshift-ovn-kubernetes",
+					Annotations: map[string]string{
+						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
+						"release.openshift.io/version":      "1.9.9",
+					},
+				},
+			},
+			ExistingNodeDaemonset: &appsv1.DaemonSet{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "apps/v1",
+					Kind:       "DaemonSet",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ovnkube-node",
+					Namespace: "openshift-ovn-kubernetes",
+					Annotations: map[string]string{
+						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
+						"release.openshift.io/version":      "1.9.9",
+					},
+				},
+			},
+		},
+	}
+	usNode, err := k8s.ToUnstructured(bootstrapResult.OVN.ExistingNodeDaemonset)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	usMaster, err := k8s.ToUnstructured(bootstrapResult.OVN.ExistingMasterDaemonset)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// the new rendered config should hold the node to do the dualstack conversion
+	// the upgrade code holds the masters to update the nodes first
+	objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+	renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-master", "openshift-ovn-kubernetes", objs)
+
+	// the node has to be the same
+	if !reflect.DeepEqual(usNode, renderedNode) {
+		t.Errorf("node daemonset are not equal, dual-stack should upgrade masters first %+v", renderedNode)
+	}
+	// the master has to use the new annotations for dual-stack so it has to be mutated
+	if reflect.DeepEqual(usMaster, renderedMaster) {
+		t.Errorf("master daemonset are equal, dual-stack should modify masters")
 	}
 }
 
@@ -1059,6 +1361,46 @@ func extractOVNKubeConfig(g *WithT, objs []*uns.Unstructured) string {
 		}
 	}
 	return ""
+}
+
+// checkDaemonsetAnnotation check that all the daemonset have the annotation with the
+// same key and value
+func checkDaemonsetAnnotation(g *WithT, objs []*uns.Unstructured, key, value string) bool {
+	if key == "" || value == "" {
+		return false
+	}
+	foundMaster, foundNode := false, false
+	for _, obj := range objs {
+		if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "DaemonSet" &&
+			(obj.GetName() == "ovnkube-master" || obj.GetName() == "ovnkube-node") {
+
+			// check daemonset annotation
+			anno := obj.GetAnnotations()
+			if anno == nil {
+				return false
+			}
+			v, ok := anno[key]
+			if !ok || v != value {
+				return false
+			}
+			// check template annotation
+			anno, _, _ = uns.NestedStringMap(obj.Object, "spec", "template", "metadata", "annotations")
+			if anno == nil {
+				return false
+			}
+			v, ok = anno[key]
+			if !ok || v != value {
+				return false
+			}
+			// record the daemonsets we have checked
+			if obj.GetName() == "ovnkube-master" {
+				foundMaster = true
+			} else {
+				foundNode = true
+			}
+		}
+	}
+	return foundMaster && foundNode
 }
 
 func ptrToUint32(x uint32) *uint32 {
