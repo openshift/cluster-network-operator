@@ -443,7 +443,7 @@ spec:
 Users can configure static IPAM with following parameters:
 
 * `addresses`:
-  * `address`: Address is the IP address in CIDR format, optional
+  * `address`: Address is the IP address in CIDR format, optional (if no address, assume address will be supplied as pod annotation, k8s.v1.cni.cncf.io/networks)
   * `gateway`: Gateway is IP inside of subnet to designate as the gateway, optional
 * `routes`: optional
   * `destination`: Destination points the IP route destination
