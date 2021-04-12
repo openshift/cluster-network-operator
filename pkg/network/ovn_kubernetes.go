@@ -649,7 +649,7 @@ func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 	if !progressing {
 		s = "complete"
 	}
-	klog.V(2).Infof("daemonset %s/%s rollout %s; %d/%d scheduled; %d unavailable; %d available; generation %s -> %s",
+	klog.V(2).Infof("daemonset %s/%s rollout %s; %d/%d scheduled; %d unavailable; %d available; generation %d -> %d",
 		ds.Namespace, ds.Name, s, status.UpdatedNumberScheduled, status.DesiredNumberScheduled,
 		status.NumberUnavailable, status.NumberAvailable, ds.Generation, status.ObservedGeneration)
 
