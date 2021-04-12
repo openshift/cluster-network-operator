@@ -75,7 +75,7 @@ function setup_operator_env() {
     fi
 
     mkdir -p /var/run/secrets/kubernetes.io/serviceaccount/
-    echo -n "cluster-network-operator" > /var/run/secrets/kubernetes.io/serviceaccount/namespace
+    echo -n "openshift-network-operator" > /var/run/secrets/kubernetes.io/serviceaccount/namespace
 }
 
 # Patch the CNO out of the cluster-version-operator and scale it down to zero so
