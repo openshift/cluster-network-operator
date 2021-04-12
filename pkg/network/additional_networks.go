@@ -64,10 +64,11 @@ func validateRaw(conf *operv1.AdditionalNetworkDefinition) []error {
 
 // staticIPAMConfig for json generation for static IPAM
 type staticIPAMConfig struct {
-	Type      string              `json:"type"`
-	Routes    []*cnitypes.Route   `json:"routes"`
-	Addresses []staticIPAMAddress `json:"addresses,omitempty"`
-	DNS       cnitypes.DNS        `json:"dns"`
+	Type         string              `json:"type"`
+	Routes       []*cnitypes.Route   `json:"routes,omitempty"`
+	Addresses    []staticIPAMAddress `json:"addresses,omitempty"`
+	DNS          *cnitypes.DNS       `json:"dns,omitempty"`
+	Capabilities []string            `json:"capabilities,omitempty"`
 }
 
 // staticIPAMAddress for json generation for static IPAM
@@ -80,21 +81,33 @@ type staticIPAMAddress struct {
 func getStaticIPAMConfigJSON(conf *operv1.StaticIPAMConfig) (string, error) {
 	staticIPAMConfig := staticIPAMConfig{}
 	staticIPAMConfig.Type = "static"
-	for _, address := range conf.Addresses {
-		staticIPAMConfig.Addresses = append(staticIPAMConfig.Addresses, staticIPAMAddress{AddressStr: address.Address, Gateway: net.ParseIP(address.Gateway)})
-	}
-	for _, route := range conf.Routes {
-		_, dest, err := net.ParseCIDR(route.Destination)
-		if err != nil {
-			return "", errors.Wrap(err, "failed to parse macvlan route")
+	if conf == nil {
+		// ip address will be supplied as runtimeConfig in nil StaticIPAMConfig case
+		staticIPAMConfig.Capabilities = []string{"ips"}
+	} else {
+		if conf.Addresses != nil {
+			for _, address := range conf.Addresses {
+				staticIPAMConfig.Addresses = append(staticIPAMConfig.Addresses, staticIPAMAddress{AddressStr: address.Address, Gateway: net.ParseIP(address.Gateway)})
+			}
 		}
-		staticIPAMConfig.Routes = append(staticIPAMConfig.Routes, &cnitypes.Route{Dst: *dest, GW: net.ParseIP(route.Gateway)})
-	}
+		// add capability in case of no address configured
+		if len(conf.Addresses) == 0 {
+			staticIPAMConfig.Capabilities = []string{"ips"}
+		}
+		for _, route := range conf.Routes {
+			_, dest, err := net.ParseCIDR(route.Destination)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to parse macvlan route")
+			}
+			staticIPAMConfig.Routes = append(staticIPAMConfig.Routes, &cnitypes.Route{Dst: *dest, GW: net.ParseIP(route.Gateway)})
+		}
 
-	if conf.DNS != nil {
-		staticIPAMConfig.DNS.Nameservers = append(staticIPAMConfig.DNS.Nameservers, conf.DNS.Nameservers...)
-		staticIPAMConfig.DNS.Domain = conf.DNS.Domain
-		staticIPAMConfig.DNS.Search = append(staticIPAMConfig.DNS.Search, conf.DNS.Search...)
+		if conf.DNS != nil {
+			staticIPAMConfig.DNS = &cnitypes.DNS{}
+			staticIPAMConfig.DNS.Nameservers = append(staticIPAMConfig.DNS.Nameservers, conf.DNS.Nameservers...)
+			staticIPAMConfig.DNS.Domain = conf.DNS.Domain
+			staticIPAMConfig.DNS.Search = append(staticIPAMConfig.DNS.Search, conf.DNS.Search...)
+		}
 	}
 
 	jsonByte, err := json.Marshal(staticIPAMConfig)
@@ -191,8 +204,10 @@ func validateIPAMConfig(conf *operv1.IPAMConfig) []error {
 
 	switch conf.Type {
 	case operv1.IPAMTypeStatic:
-		outStatic := validateStaticIPAMConfig(conf.StaticIPAMConfig)
-		out = append(out, outStatic...)
+		if conf.StaticIPAMConfig != nil {
+			outStatic := validateStaticIPAMConfig(conf.StaticIPAMConfig)
+			out = append(out, outStatic...)
+		}
 	case operv1.IPAMTypeDHCP:
 	default:
 		out = append(out, errors.Errorf("invalid IPAM type: %s", conf.Type))

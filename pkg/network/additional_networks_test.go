@@ -67,6 +67,10 @@ var StaticIPAMConfig = operv1.IPAMConfig{
 	},
 }
 
+var NilStaticIPAMConfig = operv1.IPAMConfig{
+	Type: operv1.IPAMTypeStatic,
+}
+
 func TestRenderAdditionalNetworksCRD(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -189,6 +193,20 @@ func TestGetStaticIPAMConfigJSON(t *testing.T) {
 	g.Expect(obj.DNS.Search).To(HaveLen(2))
 	g.Expect(obj.DNS.Search[0]).To(Equal("testdomain1.example"))
 	g.Expect(obj.DNS.Search[1]).To(Equal("testdomain2.example"))
+}
+
+func TestGetNilStaticIPAMConfigJSON(t *testing.T) {
+	g := NewGomegaWithT(t)
+	cfg, err := getIPAMConfigJSON(&NilStaticIPAMConfig)
+	g.Expect(err).NotTo(HaveOccurred())
+	obj := staticIPAMConfig{}
+	err = json.Unmarshal([]byte(cfg), &obj)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(obj.Addresses).To(BeNil())
+	g.Expect(obj.Routes).To(BeNil())
+	g.Expect(obj.DNS).To(BeNil())
+	g.Expect(obj.Capabilities).To(HaveLen(1))
+	g.Expect(obj.Capabilities[0]).To(Equal("ips"))
 }
 
 func TestGetDHCPIPAMConfigJSON(t *testing.T) {
