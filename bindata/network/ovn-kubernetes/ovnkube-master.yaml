@@ -563,6 +563,34 @@ spec:
           }
           # end of cluster_exists()
           
+          pid_exists () {
+              # This is better than "kill -0" because it doesn't require permission to
+              # send a signal (so daemon_status in particular works as non-root).
+              test -n "$1" && test -d /proc/"$1"
+          }
+
+          pidfile_is_running () {
+              pidfile=$1
+              test -e "$pidfile" && [ -s "$pidfile" ] && pid=`cat "$pidfile"` && pid_exists "$pid"
+          } >/dev/null 2>&1
+
+          # We need to clean up on SIGTERM, as in some cases (upgrade+reboot)
+          # our preStop doesn't get called. When OpenShift graceful reboot
+          # is fixed (planned for 4.9+) this should be moved to preStop.
+          function quit {
+            echo "$(date -Iseconds) - stopping sbdb"
+            for i in 1 2 3 4 5; do
+                ovs-appctl -T 1 -t /var/run/ovn/ovnsb_db.ctl exit
+                if pidfile_is_running /var/run/ovn/ovnsb_db.pid; then :; else
+                    break
+                fi
+                sleep 2
+            done
+            echo "$(date -Iseconds) - sbdb stopped"
+            exit 0
+          }
+          trap quit SIGTERM
+
           CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
           echo "$(date -Iseconds) - starting sbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}"
           initial_raft_create=true
@@ -589,7 +617,7 @@ spec:
               echo "Cluster already exists for DB: ${db}"
               initial_raft_create=false
               # join existing cluster
-              exec /usr/share/ovn/scripts/ovn-ctl \
+              /usr/share/ovn/scripts/ovn-ctl \
               --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
               --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
               --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
@@ -605,7 +633,7 @@ spec:
             else
               # either we need to initialize a new cluster or wait for master to create it
               if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
-                exec /usr/share/ovn/scripts/ovn-ctl \
+                /usr/share/ovn/scripts/ovn-ctl \
                 --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
                 --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
                 --no-monitor \
@@ -616,7 +644,7 @@ spec:
                 --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
                 run_sb_ovsdb
               else
-                exec /usr/share/ovn/scripts/ovn-ctl \
+                /usr/share/ovn/scripts/ovn-ctl \
                 --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
                 --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
                 --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
@@ -632,7 +660,7 @@ spec:
               fi
             fi
           else
-            exec /usr/share/ovn/scripts/ovn-ctl \
+            /usr/share/ovn/scripts/ovn-ctl \
             --db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
@@ -643,6 +671,8 @@ spec:
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off" \
             run_sb_ovsdb
           fi
+
+          wait $(cat /var/run/ovn/ovnsb_db.pid)
         lifecycle:
           postStart:
             exec:
