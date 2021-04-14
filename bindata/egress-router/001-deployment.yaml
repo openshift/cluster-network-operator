@@ -1,0 +1,25 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: egress-router-cni-deployment
+  namespace: "{{.EgressRouterNamespace}}"
+  annotations:
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+  labels:
+    app: egress-router-cni
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: egress-router-cni
+  template:
+    metadata:
+      labels:
+        app: egress-router-cni
+      annotations:
+        k8s.v1.cni.cncf.io/networks: egress-router-cni-nad
+    spec:
+      containers:
+        - name: egress-router-cni-pod
+          image: "{{.EgressRouterPodImage}}"
