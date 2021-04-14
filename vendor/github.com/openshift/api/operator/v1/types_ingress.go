@@ -2,6 +2,7 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -59,6 +60,17 @@ type IngressControllerSpec struct {
 	//
 	// +optional
 	Domain string `json:"domain,omitempty"`
+
+	// httpErrorCodePages specifies a configmap with custom error pages.
+	// The administrator must create this configmap in the openshift-config namespace.
+	// This configmap should have keys in the format "error-page-<error code>.http",
+	// where <error code> is an HTTP error code.
+	// For example, "error-page-503.http" defines an error page for HTTP 503 responses.
+	// Currently only error pages for 503 and 404 responses can be customized.
+	// Each value in the configmap should be the full response, including HTTP headers.
+	// Eg- https://raw.githubusercontent.com/openshift/router/fadab45747a9b30cc3f0a4b41ad2871f95827a93/images/router/haproxy/conf/error-page-503.http
+	// If this field is empty, the ingress controller uses the default error pages.
+	HttpErrorCodePages configv1.ConfigMapNameReference `json:"httpErrorCodePages,omitempty"`
 
 	// replicas is the desired number of ingress controller replicas. If unset,
 	// defaults to 2.
@@ -187,6 +199,14 @@ type IngressControllerSpec struct {
 	//
 	// +optional
 	TuningOptions IngressControllerTuningOptions `json:"tuningOptions,omitempty"`
+
+	// unsupportedConfigOverrides allows specifying unsupported
+	// configuration options.  Its use is unsupported.
+	//
+	// +optional
+	// +nullable
+	// +kubebuilder:pruning:PreserveUnknownFields
+	UnsupportedConfigOverrides runtime.RawExtension `json:"unsupportedConfigOverrides"`
 }
 
 // NodePlacement describes node scheduling configuration for an ingress
