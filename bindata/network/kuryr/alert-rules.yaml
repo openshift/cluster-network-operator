@@ -51,7 +51,7 @@ spec:
       annotations:
         message: Subnet {{"{{"}} $labels.subnet_name {{"}}"}} is getting out of ports.
       expr: |
-        kuryr_port_quota_per_subnet < 10
+        kuryr_port_quota_per_subnet > 0 and kuryr_port_quota_per_subnet < 10
       labels:
         severity: warning
     - alert: InsuficientPortsOnNetwork
