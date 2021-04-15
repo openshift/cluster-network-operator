@@ -14,7 +14,7 @@ func Bootstrap(conf *operv1.NetworkSpec, client client.Client) (*bootstrap.Boots
 	case operv1.NetworkTypeKuryr:
 		return openstack.BootstrapKuryr(conf, client)
 	case operv1.NetworkTypeOpenShiftSDN:
-		return nil, nil
+		return bootstrapSDN(conf, client)
 	case operv1.NetworkTypeOVNKubernetes:
 		return boostrapOVN(client)
 	}
