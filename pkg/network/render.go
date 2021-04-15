@@ -435,7 +435,7 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 
 	switch dn.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
-		return renderOpenShiftSDN(conf, manifestDir)
+		return renderOpenShiftSDN(conf, bootstrapResult, manifestDir)
 	case operv1.NetworkTypeOVNKubernetes:
 		return renderOVNKubernetes(conf, bootstrapResult, manifestDir)
 	case operv1.NetworkTypeKuryr:
