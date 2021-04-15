@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"github.com/gophercloud/utils/openstack/clientconfig"
 
+	configv1 "github.com/openshift/api/config/v1"
 	appsv1 "k8s.io/api/apps/v1"
 )
 
@@ -33,9 +34,15 @@ type OVNBootstrapResult struct {
 	ExistingNodeDaemonset   *appsv1.DaemonSet
 	ExistingIPsecDaemonset  *appsv1.DaemonSet
 	GatewayMode             string
+	Platform                configv1.PlatformType
 }
 
 type BootstrapResult struct {
 	Kuryr KuryrBootstrapResult
 	OVN   OVNBootstrapResult
+	SDN   SDNBootstrapResult
+}
+
+type SDNBootstrapResult struct {
+	Platform configv1.PlatformType
 }
