@@ -17,6 +17,8 @@ spec:
   template:
     metadata:
       name: kuryr-controller
+      annotations:
+        workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: kuryr-controller
         component: network

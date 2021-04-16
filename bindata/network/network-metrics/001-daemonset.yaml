@@ -19,6 +19,8 @@ spec:
       maxUnavailable: 33%
   template:
     metadata:
+      annotations:
+        workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: network-metrics-daemon
         component: network

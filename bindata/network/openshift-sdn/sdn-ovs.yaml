@@ -18,6 +18,8 @@ spec:
       maxUnavailable: 10%
   template:
     metadata:
+      annotations:
+        workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: ovs
         component: network

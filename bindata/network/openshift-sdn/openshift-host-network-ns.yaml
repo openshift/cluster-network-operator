@@ -7,4 +7,5 @@ metadata:
     policy-group.network.openshift.io/host-network: ""
   annotations:
     openshift.io/description: "Namespace for enabling network policy specification for host network traffic. Can be used to allow access to or from host network components"
+    workload.openshift.io/allowed: "management"
 
