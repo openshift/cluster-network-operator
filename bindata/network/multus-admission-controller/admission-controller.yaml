@@ -20,6 +20,8 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: multus-admission-controller
         namespace: openshift-multus

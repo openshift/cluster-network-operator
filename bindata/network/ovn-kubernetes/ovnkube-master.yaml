@@ -36,6 +36,8 @@ spec:
       maxUnavailable: 1
   template:
     metadata:
+      annotations:
+        workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: ovnkube-master
         ovn-db-pod: "true"

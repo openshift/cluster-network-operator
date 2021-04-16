@@ -9,3 +9,4 @@ metadata:
   annotations:
     openshift.io/node-selector: "" #override default node selector
     openshift.io/description: "Multus network plugin components"
+    workload.openshift.io/allowed: "management"

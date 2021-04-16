@@ -15,6 +15,8 @@ spec:
       name: network-operator
   template:
     metadata:
+      annotations:
+        workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         name: network-operator
     spec:
