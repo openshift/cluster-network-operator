@@ -91,8 +91,8 @@ func (r *ReconcileIngressConfigs) Reconcile(request reconcile.Request) (reconcil
 		log.Printf("Unable to retrieve IngressController.operator.openshift.io object: %v", err)
 		return reconcile.Result{}, err
 	}
-	addLabel := ingressControllerConfig.Spec.EndpointPublishingStrategy != nil &&
-		ingressControllerConfig.Spec.EndpointPublishingStrategy.Type == operv1.HostNetworkStrategyType
+	addLabel := ingressControllerConfig.Status.EndpointPublishingStrategy != nil &&
+		ingressControllerConfig.Status.EndpointPublishingStrategy.Type == operv1.HostNetworkStrategyType
 
 	err = r.updatePolicyGroupLabelOnNamespace(names.HostNetworkNamespace, addLabel)
 	if err != nil {
