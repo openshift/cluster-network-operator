@@ -15,7 +15,7 @@ spec:
     metadata:
       name: kuryr-cni
       annotations:
-        workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: kuryr-cni
         component: network
