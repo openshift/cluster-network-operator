@@ -164,5 +164,11 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec, oldStatus *configv1.
 		status.ClusterNetworkMTU = int(*operConf.DefaultNetwork.KuryrConfig.MTU)
 	}
 
+	// Set migration in the config status
+	if operConf.Migration != nil {
+		status.Migration = &configv1.NetworkMigration{NetworkType: string(operConf.Migration.NetworkType)}
+	} else {
+		status.Migration = nil
+	}
 	return &status
 }
