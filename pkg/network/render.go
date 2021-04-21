@@ -256,6 +256,14 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec) error {
 }
 
 func isNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
+	// Forbid changing service network during a migration
+	if prev.Migration != nil {
+		if !reflect.DeepEqual(prev.ServiceNetwork, next.ServiceNetwork) {
+			return errors.Errorf("cannot change ServiceNetwork during migration")
+		}
+		return nil
+	}
+
 	if reflect.DeepEqual(prev.ClusterNetwork, next.ClusterNetwork) && reflect.DeepEqual(prev.ServiceNetwork, next.ServiceNetwork) {
 		return nil
 	}
