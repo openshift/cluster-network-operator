@@ -795,13 +795,13 @@ spec:
             set +o allexport
           fi
 
-          gateway_mode_flags=
-          # Check to see if ovs is provided by the node. This is only for upgrade from 4.5->4.6 or
-          # openshift-sdn to ovn-kube conversion
-          if grep -q OVNKubernetes /etc/systemd/system/ovs-configuration.service ; then
+          if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
             gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
+          elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
+            gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
           else
-            gateway_mode_flags="--gateway-mode local --gateway-interface none"
+            echo "Invalid OVN_GATEWAY_MODE: \"{{.OVN_GATEWAY_MODE}}\". Must be \"local\" or \"shared\"."
+            exit 1
           fi
 
           # start nbctl daemon for caching

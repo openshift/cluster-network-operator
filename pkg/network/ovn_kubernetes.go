@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"math"
 	"net"
 	"os"
@@ -41,6 +42,7 @@ const OVN_CERT_CN = "ovn"
 const OVN_MASTER_DISCOVERY_POLL = 5
 const OVN_MASTER_DISCOVERY_BACKOFF = 120
 
+var OVN_GATEWAY_MODE = "shared"
 var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
@@ -67,6 +69,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["GenevePort"] = c.GenevePort
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
+	data.Data["OVN_GATEWAY_MODE"] = OVN_GATEWAY_MODE
 	data.Data["OVN_NB_PORT"] = OVN_NB_PORT
 	data.Data["OVN_SB_PORT"] = OVN_SB_PORT
 	data.Data["OVN_NB_RAFT_PORT"] = OVN_NB_RAFT_PORT
@@ -210,6 +213,26 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	return objs, nil
+}
+
+// returns the value of mode found in the openshift-ovn-kubernetes/gateway-mode-config configMap
+// if it exists, otherwise returns whatever the global OVN_GATEWAY_MODE is set to (shared)
+func GetGatewayMode(kubeClient client.Client) string {
+	cm := &corev1.ConfigMap{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
+		ObjectMeta: metav1.ObjectMeta{Name: "gateway-mode-config"},
+	}
+	nsn := types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "gateway-mode-config"}
+	err := kubeClient.Get(context.TODO(), nsn, cm)
+	if err != nil {
+		klog.Warningf("Did not find gateway-mode-config. Using default mode: %s", OVN_GATEWAY_MODE)
+	}
+	if cm.Data["mode"] != "shared" && cm.Data["mode"] != "local" {
+		klog.Warningf("Ignoring gateway-mode-config %s. Does not match \"shared\" or \"local\"", cm.Data["mode"])
+	} else {
+		OVN_GATEWAY_MODE = cm.Data["mode"]
+	}
+	return OVN_GATEWAY_MODE
 }
 
 // validateOVNKubernetes checks that the ovn-kubernetes specific configuration
@@ -368,6 +391,8 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 	if err := yaml.Unmarshal([]byte(clusterConfig.Data["install-config"]), &rcD); err != nil {
 		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to unmarshal install-config: %s", err)
 	}
+
+	OVN_GATEWAY_MODE = GetGatewayMode(kubeClient)
 
 	controlPlaneReplicaCount, _ := strconv.Atoi(rcD.ControlPlane.Replicas)
 
