@@ -1,0 +1,10 @@
+# Example ConfigMap to use if wanting to use local gateway mode instead of the default shared mode
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: gateway-mode-config
+    namespace: openshift-network-operator
+data:
+    mode: "local"
+immutable: true
+
