@@ -441,7 +441,6 @@ conntrack:
 detectLocalMode: ""
 enableProfiling: true
 featureGates:
-  EndpointSlice: false
   EndpointSliceProxying: false
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
@@ -498,7 +497,6 @@ conntrack:
 detectLocalMode: ""
 enableProfiling: true
 featureGates:
-  EndpointSlice: false
   EndpointSliceProxying: false
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
