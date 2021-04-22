@@ -818,6 +818,27 @@ spec:
            # REMOVEME once OVN path for control socket is fixed (right now uses /var/run/openvswitch)
           ln -sf $OVN_NB_DAEMON /var/run/ovn/ || true
 
+          # Check both nbServer and sbServer to make sure both are active before starting ovnkube-master
+          OVN_SSL_DB_CHK="--no-leader-only -t 5 -p /ovn-cert/tls.key -c /ovn-cert/tls.crt \
+                          -C /ovn-ca/ca-bundle.crt --db "{{.OVN_NB_DB_LIST}}" find SSL"
+          retries=0
+          while ! ovn-nbctl ${OVN_SSL_DB_CHK}; do
+             (( retries += 1 ))
+            if [[ "${retries}" -gt 10 ]]; then
+              echo "Northbound DB Server status not active for longtime. Continuing..."
+            fi
+            sleep 1
+          done
+
+          retries=0
+          while ! ovn-sbctl ${OVN_SSL_DB_CHK}; do
+             (( retries += 1 ))
+            if [[ "${retries}" -gt 10 ]]; then
+              echo "Southbound DB Server status not active for longtime. Continuing..."
+            fi
+            sleep 1
+          done
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --init-master "${K8S_NODE}" \
