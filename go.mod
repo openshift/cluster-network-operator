@@ -16,7 +16,7 @@ require (
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.1 // indirect
 	github.com/onsi/gomega v1.10.2
-	github.com/openshift/api v0.0.0-20210409143810-a99ffa1cac67
+	github.com/openshift/api v0.0.0-20210420151714-a3c8fa53e01b
 	github.com/openshift/build-machinery-go v0.0.0-20210209125900-0da259a2c359
 	github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49
 	github.com/openshift/library-go v0.0.0-20201130154959-bd449d1e2e25
@@ -28,12 +28,11 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
-	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 // indirect
-	golang.org/x/text v0.3.5 // indirect
+	golang.org/x/net v0.0.0-20210420210106-798c2154c571 // indirect
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.21.0-rc.0
+	k8s.io/api v0.21.0
 	k8s.io/apiextensions-apiserver v0.20.0
-	k8s.io/apimachinery v0.21.0-rc.0
+	k8s.io/apimachinery v0.21.0
 	k8s.io/client-go v0.20.0
 	k8s.io/code-generator v0.21.0-rc.0
 	k8s.io/component-base v0.20.0
@@ -42,7 +41,7 @@ require (
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/cluster-api-provider-openstack v0.3.3
 	sigs.k8s.io/controller-runtime v0.6.3
-	sigs.k8s.io/structured-merge-diff/v4 v4.1.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.1.1 // indirect
 )
 
 replace (
