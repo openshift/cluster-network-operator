@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: gateway-mode-config
-  namespace: openshift-ovn-kubernetes
+  namespace: openshift-network-operator
 data:
-  mode: "shared"
+  mode: "borked"
 immutable: true

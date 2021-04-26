@@ -222,7 +222,7 @@ func GetGatewayMode(kubeClient client.Client) string {
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
 		ObjectMeta: metav1.ObjectMeta{Name: "gateway-mode-config"},
 	}
-	nsn := types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "gateway-mode-config"}
+	nsn := types.NamespacedName{Namespace: "openshift-network-operator", Name: "gateway-mode-config"}
 	err := kubeClient.Get(context.TODO(), nsn, cm)
 	if err != nil {
 		klog.Warningf("Did not find gateway-mode-config. Using default mode: %s", OVN_GATEWAY_MODE)
