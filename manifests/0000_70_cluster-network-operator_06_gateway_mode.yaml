@@ -4,5 +4,5 @@ metadata:
   name: gateway-mode-config
   namespace: openshift-ovn-kubernetes
 data:
-  mode: "local"
+  mode: "shared"
 immutable: true
