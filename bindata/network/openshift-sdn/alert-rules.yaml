@@ -15,15 +15,6 @@ spec:
     # note: all joins on kube_pod_* need a a "topk by (key) (1, <metric> )"
     # otherwise you will generate query errors when kube_state_metrics is being
     # upgraded and there are duplicate rows on the "right" side of the join.
-    - alert: NodeWithoutOVSPod
-      annotations:
-        message: |
-          All nodes should be running an ovs pod, {{"{{"}} $labels.node {{"}}"}} is not.
-      expr: |
-        (kube_node_info unless on(node) topk by (node) (1, kube_pod_info{namespace="openshift-sdn",  pod=~"ovs.*"})) > 0
-      for: 10m
-      labels:
-        severity: warning
     - alert: NodeWithoutSDNPod
       annotations:
         message: |
