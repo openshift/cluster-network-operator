@@ -126,7 +126,7 @@ func (f *fakeRESTMapper) ResourceSingularizer(resource string) (singular string,
 }
 
 func TestStatusManager_set(t *testing.T) {
-	client := fake.NewFakeClient()
+	client := fake.NewClientBuilder().WithRuntimeObjects().Build()
 	mapper := &fakeRESTMapper{}
 	status := New(client, mapper, "testing")
 
@@ -268,7 +268,7 @@ func TestStatusManager_set(t *testing.T) {
 }
 
 func TestStatusManagerSetDegraded(t *testing.T) {
-	client := fake.NewFakeClient()
+	client := fake.NewClientBuilder().WithRuntimeObjects().Build()
 	mapper := &fakeRESTMapper{}
 	status := New(client, mapper, "testing")
 
@@ -363,7 +363,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 }
 
 func TestStatusManagerSetFromDaemonSets(t *testing.T) {
-	client := fake.NewFakeClient()
+	client := fake.NewClientBuilder().WithRuntimeObjects().Build()
 	mapper := &fakeRESTMapper{}
 	status := New(client, mapper, "testing")
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
@@ -1039,7 +1039,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 }
 
 func TestStatusManagerSetFromDeployments(t *testing.T) {
-	client := fake.NewFakeClient()
+	client := fake.NewClientBuilder().WithRuntimeObjects().Build()
 	mapper := &fakeRESTMapper{}
 	status := New(client, mapper, "testing")
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
@@ -1391,7 +1391,7 @@ func setLastPodState(t *testing.T, client client.Client, name string, ps podStat
 }
 
 func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
-	client := fake.NewFakeClient()
+	client := fake.NewClientBuilder().WithRuntimeObjects().Build()
 	mapper := &fakeRESTMapper{}
 	status := New(client, mapper, "testing")
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}

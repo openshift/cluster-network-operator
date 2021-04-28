@@ -51,16 +51,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// label "config.openshift.io/inject-trusted-cabundle".
 	pred := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return shouldUpdateConfigMaps(e.MetaNew)
+			return shouldUpdateConfigMaps(e.ObjectNew)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			return false
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
-			return shouldUpdateConfigMaps(e.Meta)
+			return shouldUpdateConfigMaps(e.Object)
 		},
 		GenericFunc: func(e event.GenericEvent) bool {
-			return shouldUpdateConfigMaps(e.Meta)
+			return shouldUpdateConfigMaps(e.Object)
 		},
 	}
 
@@ -85,7 +85,7 @@ type ReconcileConfigMapInjector struct {
 // config.openshift.io/inject-trusted-cabundle = true have the certificate information stored in trusted-ca-bundle's ca-bundle.crt entry.
 // 2. a configmap in any namespace with the label config.openshift.io/inject-trusted-cabundle = true and will insure that it contains the ca-bundle.crt
 // entry in the configmap named trusted-ca-bundle in namespace openshift-config-managed.
-func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log.Printf("Reconciling configmap from  %s/%s\n", request.Namespace, request.Name)
 
 	trustedCAbundleConfigMap := &corev1.ConfigMap{}
@@ -93,7 +93,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 		Namespace: names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS,
 		Name:      names.TRUSTED_CA_BUNDLE_CONFIGMAP,
 	}
-	err := r.client.Get(context.TODO(), trustedCAbundleConfigMapName, trustedCAbundleConfigMap)
+	err := r.client.Get(ctx, trustedCAbundleConfigMapName, trustedCAbundleConfigMap)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", trustedCAbundleConfigMapName.Namespace, trustedCAbundleConfigMapName.Name)
@@ -118,7 +118,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 
 		configMapList := &corev1.ConfigMapList{}
 		matchingLabels := &client.MatchingLabels{names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL: "true"}
-		err = r.client.List(context.TODO(), configMapList, matchingLabels)
+		err = r.client.List(ctx, configMapList, matchingLabels)
 		if err != nil {
 			log.Println(err)
 			r.status.SetDegraded(statusmanager.InjectorConfig, "ListConfigMapError",
@@ -136,7 +136,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 			Namespace: request.Namespace,
 			Name:      request.Name,
 		}
-		err = r.client.Get(context.TODO(), requestedCAbundleConfigMapName, requestedCAbundleConfigMap)
+		err = r.client.Get(ctx, requestedCAbundleConfigMapName, requestedCAbundleConfigMap)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", request.Namespace, request.Name)
@@ -155,7 +155,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 	for _, configMap := range configMapsToChange {
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			retrievedConfigMap := &corev1.ConfigMap{}
-			err = r.client.Get(context.TODO(), types.NamespacedName{Namespace: configMap.Namespace, Name: configMap.Name}, retrievedConfigMap)
+			err = r.client.Get(ctx, types.NamespacedName{Namespace: configMap.Namespace, Name: configMap.Name}, retrievedConfigMap)
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -173,7 +173,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(request reconcile.Request) (recon
 				// Nothing to update the new and old configmap object would be the same.
 				return nil
 			}
-			err = r.client.Update(context.TODO(), configMapToUpdate)
+			err = r.client.Update(ctx, configMapToUpdate)
 			if err != nil {
 				log.Println(err)
 				return err

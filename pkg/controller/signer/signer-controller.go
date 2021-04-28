@@ -93,9 +93,9 @@ type ReconcileCSR struct {
 }
 
 // Reconcile CSR
-func (r *ReconcileCSR) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	csr := &csrv1.CertificateSigningRequest{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, csr)
+	err := r.client.Get(ctx, request.NamespacedName, csr)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -134,7 +134,7 @@ func (r *ReconcileCSR) Reconcile(request reconcile.Request) (reconcile.Result, e
 			Message: "Automatically approved by " + signerName})
 		// Update status to "Approved"
 		//nolint:staticcheck
-		csr, err = r.clientset.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), request.Name, csr, metav1.UpdateOptions{})
+		csr, err = r.clientset.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, request.Name, csr, metav1.UpdateOptions{})
 		if err != nil {
 			log.Printf("Unable to approve certificate for %v and signer %v: %v", request.Name, signerName, err)
 			return reconcile.Result{}, err
@@ -149,7 +149,7 @@ func (r *ReconcileCSR) Reconcile(request reconcile.Request) (reconcile.Result, e
 
 	// Get our CA that was created by the operatorpki.
 	caSecret := &corev1.Secret{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "signer-ca"}, caSecret)
+	err = r.client.Get(ctx, types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "signer-ca"}, caSecret)
 	if err != nil {
 		signerFailure(r, csr, "CAFailure",
 			fmt.Sprintf("Could not get CA certificate and key: %v", err))
@@ -199,7 +199,7 @@ func (r *ReconcileCSR) Reconcile(request reconcile.Request) (reconcile.Result, e
 		return reconcile.Result{}, nil
 	}
 
-	err = r.client.Status().Update(context.TODO(), csr)
+	err = r.client.Status().Update(ctx, csr)
 	if err != nil {
 		log.Printf("Unable to update signed certificate for %v and signer %v: %v", request.Name, signerName, err)
 		return reconcile.Result{}, err
