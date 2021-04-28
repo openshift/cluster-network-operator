@@ -50,10 +50,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// We only care about a configmap source with a specific name/namespace,
 	// so filter events before they are provided to the controller event handlers.
 	pred := predicate.Funcs{
-		UpdateFunc:  func(e event.UpdateEvent) bool { return handleConfigMap(e.MetaNew) },
-		DeleteFunc:  func(e event.DeleteEvent) bool { return handleConfigMap(e.Meta) },
-		CreateFunc:  func(e event.CreateEvent) bool { return handleConfigMap(e.Meta) },
-		GenericFunc: func(e event.GenericEvent) bool { return handleConfigMap(e.Meta) },
+		UpdateFunc:  func(e event.UpdateEvent) bool { return handleConfigMap(e.ObjectNew) },
+		DeleteFunc:  func(e event.DeleteEvent) bool { return handleConfigMap(e.Object) },
+		CreateFunc:  func(e event.CreateEvent) bool { return handleConfigMap(e.Object) },
+		GenericFunc: func(e event.GenericEvent) bool { return handleConfigMap(e.Object) },
 	}
 
 	// Watch for changes to the additional trust bundle configmap.
@@ -88,7 +88,7 @@ type ReconcileProxyConfig struct {
 // Reconcile expects request to refer to a cluster-scoped proxy object
 // named "cluster" or a configmap object in namespace "openshift-config"
 // and will ensure either object is in the desired state.
-func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	validate := true
 	trustBundle := &corev1.ConfigMap{}
 
@@ -101,7 +101,7 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 		clusterConfig := &corev1.ConfigMap{}
 
 		log.Printf("Reconciling proxy '%s'", request.Name)
-		if err := r.client.Get(context.TODO(), request.NamespacedName, proxyConfig); err != nil {
+		if err := r.client.Get(ctx, request.NamespacedName, proxyConfig); err != nil {
 			if apierrors.IsNotFound(err) {
 				// Request object not found, could have been deleted after reconcile request.
 				// Return and don't requeue
@@ -167,19 +167,19 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 		}
 
 		// Only proceed if the required config objects can be collected.
-		if err := r.client.Get(context.TODO(), types.NamespacedName{Name: names.CLUSTER_CONFIG}, infraConfig); err != nil {
+		if err := r.client.Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, infraConfig); err != nil {
 			log.Printf("Failed to get infrastructure config '%s': %v", names.CLUSTER_CONFIG, err)
 			r.status.SetDegraded(statusmanager.ProxyConfig, "InfraConfigError",
 				fmt.Sprintf("Error getting infrastructure config %s: %v", names.CLUSTER_CONFIG, err))
 			return reconcile.Result{}, fmt.Errorf("failed to get infrastructure config '%s': %v", names.CLUSTER_CONFIG, err)
 		}
-		if err := r.client.Get(context.TODO(), types.NamespacedName{Name: names.CLUSTER_CONFIG}, netConfig); err != nil {
+		if err := r.client.Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, netConfig); err != nil {
 			log.Printf("Failed to get network config '%s': %v", names.CLUSTER_CONFIG, err)
 			r.status.SetDegraded(statusmanager.ProxyConfig, "NetworkConfigError",
 				fmt.Sprintf("Error getting network config '%s': %v.", names.CLUSTER_CONFIG, err))
 			return reconcile.Result{}, fmt.Errorf("failed to get network config '%s': %v", names.CLUSTER_CONFIG, err)
 		}
-		if err := r.client.Get(context.TODO(), types.NamespacedName{Name: "cluster-config-v1", Namespace: "kube-system"},
+		if err := r.client.Get(ctx, types.NamespacedName{Name: "cluster-config-v1", Namespace: "kube-system"},
 			clusterConfig); err != nil {
 			log.Printf("Failed to get configmap '%s/%s': %v", clusterConfig.Namespace, clusterConfig.Name, err)
 			r.status.SetDegraded(statusmanager.ProxyConfig, "ClusterConfigError",
@@ -197,7 +197,7 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 		log.Printf("Reconciling proxy '%s' complete", request.Name)
 	case request.Namespace == names.ADDL_TRUST_BUNDLE_CONFIGMAP_NS:
 		log.Printf("Reconciling additional trust bundle configmap '%s/%s'", request.Namespace, request.Name)
-		if err := r.client.Get(context.TODO(), request.NamespacedName, trustBundle); err != nil {
+		if err := r.client.Get(ctx, request.NamespacedName, trustBundle); err != nil {
 			if apierrors.IsNotFound(err) {
 				// Request object not found, could have been deleted after reconcile request.
 				// Return and don't requeue
@@ -240,7 +240,7 @@ func (r *ReconcileProxyConfig) Reconcile(request reconcile.Request) (reconcile.R
 		}
 
 		proxyConfig := &configv1.Proxy{}
-		if err := r.client.Get(context.TODO(), names.Proxy(), proxyConfig); err != nil {
+		if err := r.client.Get(ctx, names.Proxy(), proxyConfig); err != nil {
 			if apierrors.IsNotFound(err) {
 				// Request object not found, could have been deleted after reconcile request.
 				// Return and don't requeue

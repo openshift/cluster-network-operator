@@ -104,7 +104,7 @@ type ReconcileOperConfig struct {
 
 // Reconcile updates the state of the cluster to match that which is desired
 // in the operator configuration (Network.operator.openshift.io)
-func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log.Printf("Reconciling Network.operator.openshift.io %s\n", request.Name)
 
 	// We won't create more than one network
@@ -115,7 +115,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Fetch the Network.operator.openshift.io instance
 	operConfig := &operv1.Network{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}}
-	err := r.client.Get(context.TODO(), request.NamespacedName, operConfig)
+	err := r.client.Get(ctx, request.NamespacedName, operConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			r.status.SetDegraded(statusmanager.OperatorConfig, "NoOperatorConfig",
@@ -139,7 +139,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Merge in the cluster configuration, in case the administrator has updated some "downstream" fields
 	// This will also commit the change back to the apiserver.
-	if err := r.MergeClusterConfig(context.TODO(), operConfig); err != nil {
+	if err := r.MergeClusterConfig(ctx, operConfig); err != nil {
 		log.Printf("Failed to merge the cluster configuration: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "MergeClusterConfig",
 			fmt.Sprintf("Internal error while merging cluster configuration and operator configuration: %v", err))
@@ -158,7 +158,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Retrieve the previously applied operator configuration
-	prev, err := GetAppliedConfiguration(context.TODO(), r.client, operConfig.ObjectMeta.Name)
+	prev, err := GetAppliedConfiguration(ctx, r.client, operConfig.ObjectMeta.Name)
 	if err != nil {
 		log.Printf("Failed to retrieve previously applied configuration: %v", err)
 		// FIXME: operator status?
@@ -297,7 +297,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 
 		// Open question: should an error here indicate we will never retry?
-		if err := apply.ApplyObject(context.TODO(), r.client, obj); err != nil {
+		if err := apply.ApplyObject(ctx, r.client, obj); err != nil {
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
 			log.Println(err)
 

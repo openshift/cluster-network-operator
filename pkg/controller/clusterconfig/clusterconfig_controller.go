@@ -62,7 +62,7 @@ type ReconcileClusterConfig struct {
 // Reconcile propagates changes from the cluster config to the operator config.
 // In other words, it watches Network.config.openshift.io/v1/cluster and updates
 // Network.operator.openshift.io/v1/cluster.
-func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log.Printf("Reconciling Network.config.openshift.io %s\n", request.Name)
 
 	// We won't create more than one network
@@ -73,7 +73,7 @@ func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile
 
 	// Fetch the cluster config
 	clusterConfig := &configv1.Network{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, clusterConfig)
+	err := r.client.Get(ctx, request.NamespacedName, clusterConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -95,7 +95,7 @@ func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
-	operatorConfig, err := r.UpdateOperatorConfig(context.TODO(), *clusterConfig)
+	operatorConfig, err := r.UpdateOperatorConfig(ctx, *clusterConfig)
 	if err != nil {
 		log.Printf("Failed to generate NetworkConfig CRD: %v", err)
 		r.status.SetDegraded(statusmanager.ClusterConfig, "UpdateOperatorConfig",
@@ -104,7 +104,7 @@ func (r *ReconcileClusterConfig) Reconcile(request reconcile.Request) (reconcile
 	}
 
 	if operatorConfig != nil {
-		if err := apply.ApplyObject(context.TODO(), r.client, operatorConfig); err != nil {
+		if err := apply.ApplyObject(ctx, r.client, operatorConfig); err != nil {
 			log.Printf("Could not apply operator config: %v", err)
 			r.status.SetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",
 				fmt.Sprintf("Error while trying to update operator configuration: %v", err))
