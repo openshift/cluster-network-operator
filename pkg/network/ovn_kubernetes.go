@@ -3,6 +3,8 @@ package network
 import (
 	"context"
 	"fmt"
+	"log"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -15,9 +17,13 @@ import (
 	yaml "github.com/ghodss/yaml"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -112,8 +118,26 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render manifests")
 	}
-
 	objs = append(objs, manifests...)
+
+	updateNode, updateMaster := shouldUpdateOVNK(bootstrapResult.OVN.ExistingNodeDaemonset, bootstrapResult.OVN.ExistingMasterDaemonset, os.Getenv("RELEASE_VERSION"))
+
+	// If we need to delay master or node daemonset rollout, then we'll replace the new one with the existing one
+	if !updateMaster {
+		us, err := k8s.ToUnstructured(bootstrapResult.OVN.ExistingMasterDaemonset)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to transmute existing master daemonset")
+		}
+		objs = k8s.ReplaceObj(objs, us)
+	}
+	if !updateNode {
+		us, err := k8s.ToUnstructured(bootstrapResult.OVN.ExistingNodeDaemonset)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to transmute existing node daemonset")
+		}
+		objs = k8s.ReplaceObj(objs, us)
+	}
+
 	return objs, nil
 }
 
@@ -269,10 +293,32 @@ func boostrapOVN(kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 	}
 
 	sort.Strings(ovnMasterIPs)
+	// Retrieve existing daemonsets - used for deciding if upgrades should happen
+	masterDS := &appsv1.DaemonSet{}
+	nsn := types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ovnkube-master"}
+	if err := kubeClient.Get(context.TODO(), nsn, masterDS); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to retrieve existing master DaemonSet: %w", err)
+		} else {
+			masterDS = nil
+		}
+	}
+
+	nodeDS := &appsv1.DaemonSet{}
+	nsn = types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ovnkube-node"}
+	if err := kubeClient.Get(context.TODO(), nsn, nodeDS); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to retrieve existing node DaemonSet: %w", err)
+		} else {
+			nodeDS = nil
+		}
+	}
 
 	res := bootstrap.BootstrapResult{
 		OVN: bootstrap.OVNBootstrapResult{
-			MasterIPs: ovnMasterIPs,
+			MasterIPs:               ovnMasterIPs,
+			ExistingMasterDaemonset: masterDS,
+			ExistingNodeDaemonset:   nodeDS,
 		},
 	}
 	return &res, nil
@@ -294,4 +340,117 @@ func listenDualStack(masterIP string) string {
 		// IPv4 master, be IPv4-only for backward-compatibility
 		return ""
 	}
+}
+
+// shouldUpdateOVNK determines if we should roll out changes to
+// the master and node daemonsets.
+//
+// On upgrades, we roll out nodes first, then masters. Downgrades, we do the
+// opposite.
+func shouldUpdateOVNK(existingNode, existingMaster *appsv1.DaemonSet, releaseVersion string) (updateNode, updateMaster bool) {
+	// Fresh cluster - full steam ahead!
+	if existingNode == nil || existingMaster == nil {
+		return true, true
+	}
+
+	nodeVersion := existingNode.GetAnnotations()["release.openshift.io/version"]
+	masterVersion := existingMaster.GetAnnotations()["release.openshift.io/version"]
+
+	// shortcut - we're all rolled out.
+	// Return true so that we reconcile any changes that somehow could have happened.
+	if nodeVersion == releaseVersion && masterVersion == releaseVersion {
+		return true, true
+	}
+
+	// compute version delta
+	// versionUpgrade means the existing daemonSet needs an upgrade.
+	masterDelta := compareVersions(masterVersion, releaseVersion)
+	nodeDelta := compareVersions(nodeVersion, releaseVersion)
+
+	if masterDelta == versionUnknown || nodeDelta == versionUnknown {
+		log.Printf("WARNING: could not determine ovn-kubernetes daemonset update directions; node: %s, master: %s, release: %s",
+			nodeVersion, masterVersion, releaseVersion)
+		return true, true
+	}
+
+	// 9 cases
+	// +-------------+---------------+-----------------+------------------+
+	// |    Delta    |  master upg.  |    master OK    |   master downg.  |
+	// +-------------+---------------+-----------------+------------------+
+	// | node upg.   | upgrade node  | error           | error            |
+	// | node OK     | wait for node | done            | error            |
+	// | node downg. | error         | wait for master | downgrade master |
+	// +-------------+---------------+-----------------+------------------++
+
+	// both older (than CNO)
+	// Update node only.
+	if masterDelta == versionUpgrade && nodeDelta == versionUpgrade {
+		log.Printf("Upgrading OVN-Kubernetes node before master")
+		return true, false
+	}
+
+	// master older, node updated
+	// update master if node is rolled out
+	if masterDelta == versionUpgrade && nodeDelta == versionSame {
+		if daemonSetProgressing(existingNode, true) {
+			log.Printf("Waiting for OVN-Kubernetes node update to roll out before updating master")
+			return true, false
+		}
+		return true, true
+	}
+
+	// both newer
+	// downgrade master before node
+	if masterDelta == versionDowngrade && nodeDelta == versionDowngrade {
+		log.Printf("Downgrading OVN-Kubernetes master before node")
+		return false, true
+	}
+
+	// master same, node needs downgrade
+	// wait for master rollout
+	if masterDelta == versionSame && nodeDelta == versionDowngrade {
+		if daemonSetProgressing(existingMaster, false) {
+			log.Printf("Waiting for OVN-Kubernetes master update to roll out")
+			return false, true
+		}
+		return true, true
+	}
+
+	// unlikely, should be caught above
+	if masterDelta == versionSame && nodeDelta == versionSame {
+		return true, true
+	}
+
+	log.Printf("WARNING: ovn-kubernetes daemonset versions inconsistent. node: %s, master: %s, release: %s",
+		nodeVersion, masterVersion, releaseVersion)
+	return true, true
+}
+
+// daemonSetProgressing returns true if a daemonset is rolling out a change.
+// If allowHung is true, then treat a daemonset hung at 90% as "done" for our purposes.
+func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
+	status := ds.Status
+
+	// Copy-pasted from status_manager: Determine if a DaemonSet is progressing
+	progressing := (status.UpdatedNumberScheduled < status.DesiredNumberScheduled ||
+		status.NumberUnavailable > 0 ||
+		status.NumberAvailable == 0 ||
+		ds.Generation > status.ObservedGeneration)
+
+	if !progressing {
+		return false
+	}
+
+	// If we're hung, but max(90% of nodes, 1) have been updated, then act as if not progressing
+	if allowHung {
+		_, hung := ds.GetAnnotations()[names.RolloutHungAnnotation]
+		maxBehind := int(math.Max(1, math.Floor(float64(status.DesiredNumberScheduled)*0.1)))
+		numBehind := int(status.DesiredNumberScheduled - status.UpdatedNumberScheduled)
+		if hung && numBehind <= maxBehind {
+			log.Printf("WARNING: daemonset %s/%s rollout seems to have hung with %d out of %d behind, force-continuing", ds.Namespace, ds.Name, numBehind, status.DesiredNumberScheduled)
+			return false
+		}
+	}
+
+	return true
 }
