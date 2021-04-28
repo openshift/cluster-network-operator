@@ -48,6 +48,7 @@ require (
 replace (
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.2
 	google.golang.org/grpc => google.golang.org/grpc v1.27.1
+	k8s.io/apiserver => github.com/openshift/kubernetes-apiserver v0.0.0-20210419140141-620426e63a99 // points to temporary-watch-reduction-patch-1.21 to pick up k/k/pull/100959
 	sigs.k8s.io/cluster-api-provider-aws => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20201125052318-b85a18cbf338
 	sigs.k8s.io/cluster-api-provider-azure => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20201130182513-88b90230f2a4
 	sigs.k8s.io/cluster-api-provider-openstack => github.com/openshift/cluster-api-provider-openstack v0.0.0-20210107201226-5f60693f7a71

@@ -620,6 +620,8 @@ github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20201201000827-1117a4fc43
 github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20201201000827-1117a4fc438c/go.mod h1:21N0wWjiTQypZ7WosEYhcGJHr9JoDR1RBFztE0NvdYM=
 github.com/openshift/cluster-api-provider-openstack v0.0.0-20210107201226-5f60693f7a71 h1:Gaj4J4dMKp5TP7neC/G9MhP/ubjMb47E68wLA0gvaZU=
 github.com/openshift/cluster-api-provider-openstack v0.0.0-20210107201226-5f60693f7a71/go.mod h1:efR1hWzxt003gtKnSXZDcLbVk2C335u/qUtbB+FMVrc=
+github.com/openshift/kubernetes-apiserver v0.0.0-20210419140141-620426e63a99 h1:KrCYRAJcgZYzMCB1PjJHJMYPu/d+dEkelq5eYyi0fDw=
+github.com/openshift/kubernetes-apiserver v0.0.0-20210419140141-620426e63a99/go.mod h1:w2YSn4/WIwYuxG5zJmcqtRdtqgW/J2JRgFAqps3bBpg=
 github.com/openshift/library-go v0.0.0-20200512120242-21a1ff978534/go.mod h1:2kWwXTkpoQJUN3jZ3QW88EIY1hdRMqxgRs2hheEW/pg=
 github.com/openshift/library-go v0.0.0-20200909173121-1d055d971916/go.mod h1:6vwp+YhYOIlj8MpkQKkebTTSn2TuYyvgiAFQ206jIEQ=
 github.com/openshift/library-go v0.0.0-20201109112824-093ad3cf6600 h1:BjzxCCiWcRwOq3LAKZxZWmY6wD85D5462KpG1p7zMRw=
