@@ -18,6 +18,7 @@ spec:
       labels:
         app: egress-router-cni
       annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
         k8s.v1.cni.cncf.io/networks: egress-router-cni-nad
     spec:
       containers:
