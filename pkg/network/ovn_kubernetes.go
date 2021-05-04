@@ -67,6 +67,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["GenevePort"] = c.GenevePort
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
+	data.Data["OVN_GATEWAY_MODE"] = bootstrapResult.OVN.GatewayMode
 	data.Data["OVN_NB_PORT"] = OVN_NB_PORT
 	data.Data["OVN_SB_PORT"] = OVN_SB_PORT
 	data.Data["OVN_NB_RAFT_PORT"] = OVN_NB_RAFT_PORT
@@ -210,6 +211,30 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	return objs, nil
+}
+
+// returns the value of mode found in the openshift-ovn-kubernetes/gateway-mode-config configMap
+// if it exists, otherwise returns whatever the global OVN_GATEWAY_MODE is set to (shared)
+func GetGatewayMode(kubeClient client.Client) (string, error) {
+	defaultGatewayMode := "shared"
+	cm := &corev1.ConfigMap{}
+	nsn := types.NamespacedName{Namespace: "openshift-network-operator", Name: "gateway-mode-config"}
+	err := kubeClient.Get(context.TODO(), nsn, cm)
+
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			klog.Warningf("Did not find gateway-mode-config. Using default mode: \"%s\"", defaultGatewayMode)
+			return defaultGatewayMode, nil
+		} else {
+			return "", fmt.Errorf("Could not determine gateway mode: %w", err)
+		}
+	}
+	if cm.Data["mode"] != "shared" && cm.Data["mode"] != "local" {
+		klog.Warningf("Ignoring gateway-mode-config %s. Does not match \"shared\" or \"local\"", cm.Data["mode"])
+		return defaultGatewayMode, nil
+	}
+	klog.Infof("Overriding OVN gateway mode to %s", cm.Data["mode"])
+	return cm.Data["mode"], nil
 }
 
 // validateOVNKubernetes checks that the ovn-kubernetes specific configuration
@@ -369,11 +394,16 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to unmarshal install-config: %s", err)
 	}
 
+	gatewayMode, err := GetGatewayMode(kubeClient)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to bootstrap OVN, undetermined gateway-mode: '%s'", err)
+	}
+
 	controlPlaneReplicaCount, _ := strconv.Atoi(rcD.ControlPlane.Replicas)
 
 	var heartBeat int
 
-	err := wait.PollImmediate(OVN_MASTER_DISCOVERY_POLL*time.Second, time.Duration(OVN_MASTER_DISCOVERY_TIMEOUT)*time.Second, func() (bool, error) {
+	err = wait.PollImmediate(OVN_MASTER_DISCOVERY_POLL*time.Second, time.Duration(OVN_MASTER_DISCOVERY_TIMEOUT)*time.Second, func() (bool, error) {
 		matchingLabels := &client.MatchingLabels{"node-role.kubernetes.io/master": ""}
 		if err := kubeClient.List(context.TODO(), masterNodeList, matchingLabels); err != nil {
 			return false, err
@@ -480,6 +510,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 			ExistingMasterDaemonset: masterDS,
 			ExistingNodeDaemonset:   nodeDS,
 			ExistingIPsecDaemonset:  ipsecDS,
+			GatewayMode:             gatewayMode,
 		},
 	}
 	return &res, nil

@@ -32,6 +32,7 @@ type OVNBootstrapResult struct {
 	ExistingMasterDaemonset *appsv1.DaemonSet
 	ExistingNodeDaemonset   *appsv1.DaemonSet
 	ExistingIPsecDaemonset  *appsv1.DaemonSet
+	GatewayMode             string
 }
 
 type BootstrapResult struct {
