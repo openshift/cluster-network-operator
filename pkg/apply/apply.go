@@ -11,6 +11,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -34,32 +35,42 @@ func ApplyObject(ctx context.Context, client k8sclient.Client, obj *uns.Unstruct
 	// Get existing
 	existing := &uns.Unstructured{}
 	existing.SetGroupVersionKind(gvk)
-	err := client.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, existing)
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := client.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, existing)
 
-	if err != nil && apierrors.IsNotFound(err) {
-		log.Printf("does not exist, creating %s", objDesc)
-		err := client.Create(ctx, obj)
+		if err != nil && apierrors.IsNotFound(err) {
+			log.Printf("does not exist, creating %s", objDesc)
+			err := client.Create(ctx, obj)
+			if err != nil {
+				log.Printf("create of %s was unsucessful", objDesc)
+				return err
+			}
+			log.Printf("successfully created %s", objDesc)
+			return nil
+		}
 		if err != nil {
-			return errors.Wrapf(err, "could not create %s", objDesc)
+			log.Printf("could not retrieve %s", objDesc)
+			return err
 		}
-		log.Printf("successfully created %s", objDesc)
+
+		// Merge the desired object with what actually exists
+		if err := MergeObjectForUpdate(existing, obj); err != nil {
+			log.Printf("could not merge %s with existing", objDesc)
+			return err
+		}
+		if !equality.Semantic.DeepEqual(existing, obj) {
+			if err := client.Update(ctx, obj); err != nil {
+				log.Printf("update of %s was unsuccessful", objDesc)
+				return err
+			} else {
+				log.Printf("update was successful")
+			}
+		}
 		return nil
-	}
+	})
+
 	if err != nil {
-		return errors.Wrapf(err, "could not retrieve existing %s", objDesc)
+		return errors.Wrapf(err, "ApplyObject of %s was unsuccessful", objDesc)
 	}
-
-	// Merge the desired object with what actually exists
-	if err := MergeObjectForUpdate(existing, obj); err != nil {
-		return errors.Wrapf(err, "could not merge object %s with existing", objDesc)
-	}
-	if !equality.Semantic.DeepEqual(existing, obj) {
-		if err := client.Update(ctx, obj); err != nil {
-			return errors.Wrapf(err, "could not update object %s", objDesc)
-		} else {
-			log.Printf("update was successful")
-		}
-	}
-
 	return nil
 }
