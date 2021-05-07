@@ -113,6 +113,29 @@ func TestIsChangeSafe(t *testing.T) {
 	err = IsChangeSafe(prev, next)
 	g.Expect(err).To(MatchError(ContainSubstring("cannot change ClusterNetwork")))
 
+	// You can change cluster network during migration
+	next = OpenShiftSDNConfig.Spec.DeepCopy()
+	FillDefaults(next, nil)
+	prev.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
+	next.DefaultNetwork.Type = "OVNKubernetes"
+	next.ClusterNetwork = append(next.ClusterNetwork,
+		operv1.ClusterNetworkEntry{
+			CIDR:       "1.2.0.0/16",
+			HostPrefix: 24,
+		},
+	)
+	err = IsChangeSafe(prev, next)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	// You can't change service network during migration
+	next = OpenShiftSDNConfig.Spec.DeepCopy()
+	FillDefaults(next, nil)
+	prev.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
+	next.DefaultNetwork.Type = "OVNKubernetes"
+	next.ServiceNetwork = []string{"1.2.3.0/24"}
+	err = IsChangeSafe(prev, next)
+	g.Expect(err).To(MatchError(ContainSubstring("cannot change ServiceNetwork during migration")))
+
 	// You can't change default network type to non-target migration network type
 	next = OpenShiftSDNConfig.Spec.DeepCopy()
 	FillDefaults(next, nil)
