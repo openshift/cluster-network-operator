@@ -99,11 +99,11 @@ func newPKIReconciler(mgr manager.Manager, status *statusmanager.StatusManager) 
 }
 
 // Reconcile configures a CertRotationController from a PKI object
-func (r *PKIReconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *PKIReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log.Printf("Reconciling pki.network.operator.openshift.io %s\n", request.NamespacedName)
 
 	obj := &netopv1.OperatorPKI{}
-	err := r.mgr.GetClient().Get(context.TODO(), request.NamespacedName, obj)
+	err := r.mgr.GetClient().Get(ctx, request.NamespacedName, obj)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Printf("PKI %s seems to have been deleted\n", request.NamespacedName)

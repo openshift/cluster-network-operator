@@ -71,13 +71,13 @@ type ReconcileIngressConfigs struct {
 // When the endpointPublishingStrategy is changed to anything other than
 // HostNetwork, it reconciles and removes these labels from the host network
 // namespace.
-func (r *ReconcileIngressConfigs) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileIngressConfigs) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	if request.Namespace != names.IngressControllerNamespace || request.Name != names.DefaultIngressControllerName {
 		return reconcile.Result{}, nil
 	}
 	log.Printf("Reconciling update to IngressController %s/%s\n", request.Namespace, request.Name)
 	ingressControllerConfig := &operv1.IngressController{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "IngressController"}}
-	err := r.client.Get(context.TODO(), request.NamespacedName, ingressControllerConfig)
+	err := r.client.Get(ctx, request.NamespacedName, ingressControllerConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Printf("Ingress Controller configuration %s was deleted", request.NamespacedName.String())

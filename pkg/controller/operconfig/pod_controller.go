@@ -1,6 +1,7 @@
 package operconfig
 
 import (
+	"context"
 	"log"
 
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
@@ -29,7 +30,7 @@ func (r *ReconcilePods) SetResources(resources []types.NamespacedName) {
 
 // Reconcile updates the ClusterOperator.Status to match the current state of the
 // watched Deployments/DaemonSets
-func (r *ReconcilePods) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcilePods) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	found := false
 	for _, name := range r.resources {
 		if name.Namespace == request.Namespace && name.Name == request.Name {

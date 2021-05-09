@@ -86,11 +86,11 @@ func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.Status
 	}, nil
 }
 
-func (r EgressRouterReconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	klog.Infof("Reconciling egressrouter.network.operator.openshift.io %s\n", request.NamespacedName)
 
 	obj := &netopv1.EgressRouter{}
-	err := r.mgr.GetClient().Get(context.TODO(), request.NamespacedName, obj)
+	err := r.mgr.GetClient().Get(ctx, request.NamespacedName, obj)
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {
