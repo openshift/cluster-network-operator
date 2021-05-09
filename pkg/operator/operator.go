@@ -88,7 +88,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// Start controllers
 	klog.Info("Starting controller-manager")
 	go func() {
-		err := o.manager.Start(ctx.Done())
+		err := o.manager.Start(ctx)
 		if err != nil {
 			klog.Fatalf("Failed to start controller-runtime manager: %v", err)
 		}
