@@ -462,9 +462,9 @@ spec:
                 --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
                 -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
                 "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/ovn-kubernetes/services/ovnkube-master" |
-                  python -c 'import json,sys; print(json.load(sys.stdin)["metadata"]["creationTimestamp"])' 2>/dev/null || true
+                  python -c 'import json,sys; print(json.load(sys.stdin)["metadata"]["creationTimestamp"])'
             ) || :
-            if [ -n "${TS}" ]; then
+            if [ ! -z "TS" ]; then
               break
             fi
             (( retries += 1 ))
