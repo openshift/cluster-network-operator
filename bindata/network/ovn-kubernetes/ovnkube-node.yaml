@@ -267,7 +267,6 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
             ${gateway_mode_flags} \
-            --disable-snat-multiple-gws \
             --metrics-bind-address "127.0.0.1:29103" \
             ${export_network_flows_flags}
         env:
