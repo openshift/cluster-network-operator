@@ -259,7 +259,7 @@ spec:
 
                   # set the connection and disable inactivity probe
                   retries=0
-                  while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=60000; do
+                  while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=15000; do
                     (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
                     echo "$(date -Iseconds) - ERROR RESTARTING - nbdb - too many failed ovn-nbctl attempts, giving up"
@@ -644,7 +644,7 @@ spec:
 
                   # set the connection and disable inactivity probe
                   retries=0
-                  while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=60000; do
+                  while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=15000; do
                     (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
                     echo "$(date -Iseconds) - ERROR RESTARTING - sbdb - too many failed ovn-sbctl attempts, giving up"
