@@ -269,6 +269,7 @@ spec:
             ${gateway_mode_flags} \
             --disable-snat-multiple-gws \
             --metrics-bind-address "127.0.0.1:29103" \
+            --metrics-enable-pprof \
             ${export_network_flows_flags}
         env:
         # for kubectl
