@@ -838,7 +838,6 @@ spec:
             --nbctl-daemon-mode \
             --nb-cert-common-name "{{.OVN_CERT_CN}}" \
             --enable-multicast \
-            --disable-snat-multiple-gws \
             --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
         lifecycle:
           preStop:
