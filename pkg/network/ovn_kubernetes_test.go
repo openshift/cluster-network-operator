@@ -171,6 +171,7 @@ host-network-namespace="openshift-host-network"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
+enable-egress-firewall=true
 
 [gateway]
 mode=local
@@ -194,6 +195,7 @@ no-hostsubnet-nodes="kubernetes.io/os=windows"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
+enable-egress-firewall=true
 
 [gateway]
 mode=local
@@ -225,6 +227,7 @@ no-hostsubnet-nodes="kubernetes.io/os=windows"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
+enable-egress-firewall=true
 
 [gateway]
 mode=local
@@ -259,6 +262,7 @@ no-hostsubnet-nodes="kubernetes.io/os=windows"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
+enable-egress-firewall=true
 
 [gateway]
 mode=local
