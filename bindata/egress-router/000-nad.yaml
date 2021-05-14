@@ -15,9 +15,10 @@ spec:
       "addresses": [
         "{{.Addresses}}"
         ],
-      "destinations": [
-        "{{.AllowedDestinations}}"
-        ],
+      "destinations": "{{.AllowedDestinations}}"
+      {{ $fallbackip := .FallbackIP}} {{ if ne $fallbackip "" }}
+        "fallbackIP": "{{$fallbackip}}"
+      {{ end }}
       "gateway": "{{.Gateway}}"
         },
       "log_file": "/tmp/egress-router-log",
