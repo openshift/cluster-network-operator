@@ -27,6 +27,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
+      priorityClassName: "system-node-critical"
       tolerations:
       - operator: Exists
       initContainers:
