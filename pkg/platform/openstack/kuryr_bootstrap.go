@@ -49,10 +49,7 @@ const (
 	machinesNamespace     = "openshift-machine-api"
 	// NOTE(ltomasbo): Amphora driver supports came on 2.11, but ovn-octavia only supports it after 2.13
 	MinOctaviaVersionWithMultipleListeners = "v2.13"
-	MinOctaviaVersionWithHTTPSMonitors     = "v2.10"
 	MinOctaviaVersionWithProviders         = "v2.6"
-	MinOctaviaVersionWithTagSupport        = "v2.5"
-	MinOctaviaVersionWithTimeouts          = "v2.1"
 	KuryrNamespace                         = "openshift-kuryr"
 	KuryrConfigMapName                     = "kuryr-config"
 	DNSNamespace                           = "openshift-dns"
@@ -206,6 +203,48 @@ func getMasterMachines(kubeClient client.Client) (*machineapi.MachineList, error
 	return machineList, nil
 }
 
+func ensureSubnetGatewayGuardSvc(kubeClient client.Client, requestedIP string) (clusterIP net.IP, err error) {
+	// Check if namespace exists.
+	ns := v1.Namespace{}
+	err = kubeClient.Get(context.TODO(), client.ObjectKey{Name: KuryrNamespace}, &ns)
+	if err != nil && apierrors.IsNotFound(err) {
+		ns = v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: KuryrNamespace,
+			},
+		}
+		err = kubeClient.Create(context.TODO(), &ns)
+	}
+	if err != nil {
+		return clusterIP, err
+	}
+
+	svc := v1.Service{}
+	err = kubeClient.Get(context.TODO(), client.ObjectKey{
+		Name:      "service-subnet-gateway-ip",
+		Namespace: KuryrNamespace,
+	}, &svc)
+
+	if err != nil && apierrors.IsNotFound(err) {
+		svc = v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-subnet-gateway-ip",
+				Namespace: KuryrNamespace,
+			},
+			Spec: v1.ServiceSpec{
+				ClusterIP: requestedIP, // K8s ignores ""
+				Ports:     []v1.ServicePort{{Port: 80}},
+			},
+		}
+		err = kubeClient.Create(context.TODO(), &svc)
+	}
+	if err == nil {
+		clusterIP = net.ParseIP(svc.Spec.ClusterIP)
+	}
+
+	return clusterIP, err
+}
+
 func getWorkersSubnetFromMasters(client *gophercloud.ServiceClient, kubeClient client.Client, clusterID string) (subnets.Subnet, error) {
 	empty := subnets.Subnet{}
 	machines, err := getMasterMachines(kubeClient)
@@ -333,6 +372,56 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	tag := "openshiftClusterID=" + clusterID
 	log.Printf("Using %s as resources tag", tag)
 
+	lbClient, err := openstack.NewLoadBalancerV2(provider, gophercloud.EndpointOpts{})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create Octavia client")
+	}
+
+	log.Print("Checking OVN Octavia driver support")
+	octaviaProviderSupport, err := IsOctaviaVersionSupported(lbClient, MinOctaviaVersionWithProviders)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to determine if Octavia supports providers")
+	}
+
+	log.Print("Checking Double Listeners Octavia support")
+	octaviaMultipleListenersSupport, err := IsOctaviaVersionSupported(lbClient, MinOctaviaVersionWithMultipleListeners)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to determine if Octavia supports double listeners")
+	}
+
+	// Logic here is as follows:
+	// 1. We don't want to suddenly reconfigure Kuryr to use different provider, so we always try to fetch the currently
+	//    used one from annotation added to kuryr-config ConfigMap first.
+	// 2. If fetching annotation fails, then either it's the first run and we're yet to create the ConfigMap or user
+	//    deleted the annotation in order for us to trigger the reconfiguration. In both cases proceed with detection:
+	//    a. Check if Octavia version supports provider discovery.
+	//    b. List providers and look for OVN one.
+	//    c. If it's present configure Kuryr to use it.
+	//    d. In case of any issues just use whatever the default is.
+	octaviaProvider, err := getSavedAnnotation(kubeClient, names.KuryrOctaviaProviderAnnotation)
+	if err != nil && !apierrors.IsNotFound(err) { // Ignore 404, just do the normal discovery then.
+		return nil, errors.Wrap(err, "failed to get kuryr-config ConfigMap")
+	}
+	if octaviaProvider != "" {
+		log.Printf("Detected that Kuryr was already configured to use %s LB provider. Making sure to keep it that way.",
+			octaviaProvider)
+	} else {
+		octaviaProvider = "default"
+		if octaviaProviderSupport {
+			providerList, err := listOpenStackOctaviaProviders(lbClient)
+			if err != nil {
+				log.Print("failed to get lbs provider list, using default octavia provider")
+			} else {
+				for _, provider := range providerList {
+					if provider.Name == OVNProvider {
+						log.Print("OVN Provider is enabled and Kuryr will use it")
+						octaviaProvider = OVNProvider
+					}
+				}
+			}
+		}
+	}
+
 	log.Print("Ensuring services network")
 	svcNetId, err := ensureOpenStackNetwork(client, generateName("kuryr-service-network", clusterID), tag)
 	if err != nil {
@@ -347,23 +436,69 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		return nil, errors.Wrapf(err, "Failed to parse ServiceNetwork CIDR %s", conf.ServiceNetwork[0])
 	}
 
+	svcSubnetName := generateName("kuryr-service-subnet", clusterID)
 	openStackSvcCIDR := kc.OpenStackServiceNetwork
 	_, openStackSvcNet, _ := net.ParseCIDR(openStackSvcCIDR)
 	allocationRanges := iputil.UsableNonOverlappingRanges(*openStackSvcNet, *svcNet)
 	// OpenShift will use svcNet range. In allocationRanges we have parts of openStackSvcNet that are not overlapping
-	// with svcNet. We will put gatewayIP on the highest usable IP from those ranges. We need to exclude that IP from
+	// with svcNet. We will put svcSubnetGatewayIP on the highest usable IP from those ranges. We need to exclude that IP from
 	// the ranges we pass to Neutron or it will complain.
-	gatewayIP := allocationRanges[len(allocationRanges)-1].End
-	allocationRanges[len(allocationRanges)-1].End = iputil.IterateIP4(gatewayIP, -1)
+	svcSubnetGatewayIP := allocationRanges[len(allocationRanges)-1].End
+	allocationRanges[len(allocationRanges)-1].End = iputil.IterateIP4(svcSubnetGatewayIP, -1)
 
-	log.Printf("Ensuring services subnet with %s CIDR (services from %s) and %s gateway with allocation pools %+v",
-		openStackSvcCIDR, conf.ServiceNetwork[0], gatewayIP.String(), allocationRanges)
-	svcSubnetId, err := ensureOpenStackSubnet(client, generateName("kuryr-service-subnet", clusterID), tag,
-		svcNetId, openStackSvcCIDR, gatewayIP.String(), allocationRanges)
+	log.Printf("Looking for existing services subnet with %s CIDR (services from %s) and %s gateway",
+		openStackSvcCIDR, svcNet.String(), svcSubnetGatewayIP)
+	var svcSubnetId string
+	svcSubnet, err := findOpenStackSubnetByDetails(client, svcSubnetName, tag, svcNetId, openStackSvcCIDR, svcSubnetGatewayIP.String())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create service subnet")
+		return nil, errors.Wrap(err, "failed to lookup service subnet")
 	}
-	log.Printf("Services subnet %s present", svcSubnetId)
+	if svcSubnet != nil {
+		// Even if we use OVN now, we don't want to change the old Amphora-style subnet.
+		svcSubnetId = svcSubnet.ID
+		log.Printf("Found existing services subnet %s", svcSubnetId)
+	} else {
+		// No old subnet, either this is fresh installation or 4.8 installed on OVN from the beginning
+		if octaviaProvider == "default" {
+			// This means we need to create amphora-style inflated subnet
+			svcSubnetId, err = createOpenStackSubnet(client, svcSubnetName, tag, svcNetId, openStackSvcCIDR, svcSubnetGatewayIP.String(), allocationRanges)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to create service subnet")
+			}
+		} else {
+			// Fresh installation and OVN, we need to lookup or create smaller subnet.
+			// We lookup without gateway IP. If we'll find the subnet we'll take it from there.
+			// If not, we'll create a Service to reserve an IP and use that one.
+			log.Printf("Looking for existing services subnet with %s CIDR", svcNet.String())
+			svcSubnet, err = findOpenStackSubnetByDetails(client, svcSubnetName, tag, svcNetId, svcNet.String(), "")
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to lookup service subnet")
+			}
+			if svcSubnet != nil {
+				svcSubnetId = svcSubnet.ID
+				svcSubnetGatewayIP = net.ParseIP(svcSubnet.GatewayIP)
+				log.Printf("Found existing services subnet %s", svcSubnetId)
+				// Recreate the guard service if needed.
+				svcSubnetGatewayIP, err = ensureSubnetGatewayGuardSvc(kubeClient, svcSubnetGatewayIP.String())
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to create a Service to guard gateway IP on services subnet")
+				}
+			}
+			if len(svcSubnetId) == 0 {
+				// We need to reserve an IP for the gateway, so we'll create a dummy Service
+				// and use the IP K8s assigns to it.
+				svcSubnetGatewayIP, err = ensureSubnetGatewayGuardSvc(kubeClient, "")
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to create a Service to guard gateway IP on services subnet")
+				}
+				// We need to create it then
+				svcSubnetId, err = createOpenStackSubnet(client, svcSubnetName, tag, svcNetId, svcNet.String(), svcSubnetGatewayIP.String(), nil)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to create service subnet")
+				}
+			}
+		}
+	}
 
 	// Pod subnetpool
 	podSubnetCidrs := make([]string, len(conf.ClusterNetwork))
@@ -414,9 +549,9 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 
 	if !lookupOpenStackPort(ps, svcSubnetId) {
-		log.Printf("Ensuring service subnet router port with %s IP", gatewayIP.String())
+		log.Printf("Ensuring service subnet router port with %s IP", svcSubnetGatewayIP.String())
 		portId, err := ensureOpenStackPort(client, generateName("kuryr-service-subnet-router-port", clusterID), tag,
-			svcNetId, svcSubnetId, gatewayIP.String())
+			svcNetId, svcSubnetId, svcSubnetGatewayIP.String())
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create service subnet router port")
 		}
@@ -535,11 +670,6 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 	log.Print("All old SG rules removed")
 
-	lbClient, err := openstack.NewLoadBalancerV2(provider, gophercloud.EndpointOpts{})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create Octavia client")
-	}
-
 	log.Print("Ensuring certificates")
 	ca, key, err := ensureCA(kubeClient)
 	if err != nil {
@@ -548,51 +678,6 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	webhookCert, webhookKey, err := ensureCertificate(kubeClient, ca, key)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to ensure Certificate")
-	}
-
-	log.Print("Checking OVN Octavia driver support")
-	octaviaProviderSupport, err := IsOctaviaVersionSupported(lbClient, MinOctaviaVersionWithProviders)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to determine if Octavia supports providers")
-	}
-
-	log.Print("Checking Double Listeners Octavia support")
-	octaviaMultipleListenersSupport, err := IsOctaviaVersionSupported(lbClient, MinOctaviaVersionWithMultipleListeners)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to determine if Octavia supports double listeners")
-	}
-
-	// Logic here is as follows:
-	// 1. We don't want to suddenly reconfigure Kuryr to use different provider, so we always try to fetch the currently
-	//    used one from annotation added to kuryr-config ConfigMap first.
-	// 2. If fetching annotation fails, then either it's the first run and we're yet to create the ConfigMap or user
-	//    deleted the annotation in order for us to trigger the reconfiguration. In both cases proceed with detection:
-	//    a. Check if Octavia version supports provider discovery.
-	//    b. List providers and look for OVN one.
-	//    c. If it's present configure Kuryr to use it.
-	//    d. In case of any issues just use whatever the default is.
-	octaviaProvider, err := getSavedAnnotation(kubeClient, names.KuryrOctaviaProviderAnnotation)
-	if err != nil && !apierrors.IsNotFound(err) { // Ignore 404, just do the normal discovery then.
-		return nil, errors.Wrap(err, "failed to get kuryr-config ConfigMap")
-	}
-	if octaviaProvider != "" {
-		log.Printf("Detected that Kuryr was already configured to use %s LB provider. Making sure to keep it that way.",
-			octaviaProvider)
-	} else {
-		octaviaProvider = "default"
-		if octaviaProviderSupport {
-			providerList, err := listOpenStackOctaviaProviders(lbClient)
-			if err != nil {
-				log.Print("failed to get lbs provider list, using default octavia provider")
-			} else {
-				for _, provider := range providerList {
-					if provider.Name == OVNProvider {
-						log.Print("OVN Provider is enabled and Kuryr will use it")
-						octaviaProvider = OVNProvider
-					}
-				}
-			}
-		}
 	}
 
 	octaviaVersion, err := getSavedAnnotation(kubeClient, names.KuryrOctaviaVersionAnnotation)
