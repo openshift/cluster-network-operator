@@ -25,6 +25,7 @@ spec:
         app: network-check-target
         kubernetes.io/os: "linux"
     spec:
+      priorityClassName: openshift-user-critical
       containers:
       - image: "{{.NetworkCheckTargetImage}}"
         imagePullPolicy: IfNotPresent
