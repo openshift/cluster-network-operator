@@ -100,6 +100,8 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 			// From https://cloud.google.com/vpc/docs/special-configurations add GCP metadata.
 			// "metadata.google.internal." added due to https://bugzilla.redhat.com/show_bug.cgi?id=1754049
 			set.Insert("metadata", "metadata.google.internal", "metadata.google.internal.")
+		case configv1.BareMetalPlatformType:
+			set.Insert("metal3-state.openshift-machine-api")
 		}
 	}
 
