@@ -32,7 +32,6 @@ type OVNBootstrapResult struct {
 	ClusterInitiator        string
 	ExistingMasterDaemonset *appsv1.DaemonSet
 	ExistingNodeDaemonset   *appsv1.DaemonSet
-	ExistingIPsecDaemonset  *appsv1.DaemonSet
 	GatewayMode             string
 	Platform                configv1.PlatformType
 }

@@ -372,10 +372,8 @@ spec:
                   fi
                 fi
 
-                {{ if .OVNIPsecEnable }}
+                {{ if .EnableIPsec }}
                 ${OVN_NB_CTL} set nb_global . ipsec=true
-                {{ else }}
-                ${OVN_NB_CTL} set nb_global . ipsec=false
                 {{ end }}
           preStop:
             exec:
