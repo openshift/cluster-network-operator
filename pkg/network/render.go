@@ -405,15 +405,15 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 // validateMultus validates the combination of DisableMultiNetwork and AddtionalNetworks
 func validateMultus(conf *operv1.NetworkSpec) []error {
 	// DisableMultiNetwork defaults to false
-	deployMultus := true
+	multusEnabled := true
 	if conf.DisableMultiNetwork != nil && *conf.DisableMultiNetwork {
-		deployMultus = false
+		multusEnabled = false
 	}
 
-	// Additional Networks are useless without Multus, so don't let them
+	// Additional Networks are useless without enabling Multus, so don't let them
 	// exist without Multus and confuse things (for now)
-	if !deployMultus && len(conf.AdditionalNetworks) > 0 {
-		return []error{errors.Errorf("additional networks cannot be specified without deploying Multus")}
+	if !multusEnabled && len(conf.AdditionalNetworks) > 0 {
+		return []error{errors.Errorf("additional networks cannot be specified without enabling Multus")}
 	}
 	return []error{}
 }

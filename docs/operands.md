@@ -103,7 +103,8 @@ when using OpenShift SDN.
 
 ## Multus
 
-Multus is deployed as long as `.spec.disableMultiNetwork` is not set.
+Multus is always deployed. When setting `.spec.disableMultiNetwork`, Multus is deployed and active but will ignore reading pod annotations to attach additional networks.
+
 The `multus` DaemonSet copies all of the (non-network-plugin-specific)
 CNI plugin binaries onto each node. Currently this is:
 
@@ -124,7 +125,7 @@ messages when they are wrong. (The cluster will operate fine without
 multus-admission-controller; it is not needed for security or functionality. It
 just makes the error handling nicer, by causing certain failures to
 happen at pod creation time rather than being reported asynchronously
-after pod creation.)
+after pod creation.) The Multus-admission-controller will not be deployed in the case that `.spec.disableMultiNetwork` is set.
 
 The network-metrics-daemon gathers metrics about Multus-created
 network interfaces, to provide to Prometheus.
