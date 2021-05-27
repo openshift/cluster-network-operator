@@ -13,13 +13,13 @@ spec:
     "name": "egress-router-cni-nad",
     "ip": {
       "addresses": [
-        "{{.Addresses}}"
+        "{{.Addresses}}/24"
         ],
       "destinations": [
-        "{{.AllowedDestinations}}"
+      {{range $i, $val := .AllowedDestinations}}{{if $i}},{{end}}{{if and ($val.Port) ($val.Protocol)}}{{if $val.TargetPort}}"{{$val.Port}} {{$val.Protocol}} {{$val.DestinationIP}}/30 {{$val.TargetPort}}"{{else}}"{{$val.Port}} {{$val.Protocol}} {{$val.DestinationIP}}/30"{{end}}{{else}}"{{$val.DestinationIP}}/30"{{end}}{{end}}
         ],
       "gateway": "{{.Gateway}}"
         },
       "log_file": "/tmp/egress-router-log",
       "log_level": "debug"
-    }'
+      }'

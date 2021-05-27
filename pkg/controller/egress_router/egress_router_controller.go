@@ -173,7 +173,7 @@ func (r *EgressRouterReconciler) ensureEgressRouter(manifestDir string, namespac
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["EgressRouterNamespace"] = namespace
-	if isItValidCidr(string(router.Spec.Addresses[0].IP)) {
+	if isItValidIPAddress(router.Spec.Addresses[0].IP) {
 		data.Data["Addresses"] = router.Spec.Addresses[0].IP
 	}
 	if isItValidIPAddress(router.Spec.Addresses[0].Gateway) {
@@ -182,7 +182,7 @@ func (r *EgressRouterReconciler) ensureEgressRouter(manifestDir string, namespac
 	data.Data["AllowedDestinations"] = router.Spec.Redirect.RedirectRules
 	data.Data["mode"] = router.Spec.Mode
 	data.Data["network_interfaces"] = router.Spec.NetworkInterface
-	data.Data["EgressRouterPodImage"] = os.Getenv("EGRESS_ROUTER_CNI_IMAGE")
+	data.Data["EgressRouterPodImage"] = "registry.redhat.io/openshift3/ose-pod"
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "egress-router"), &data)
 	if err != nil {
 		return err
@@ -200,15 +200,6 @@ func (r *EgressRouterReconciler) ensureEgressRouter(manifestDir string, namespac
 	}
 
 	return nil
-}
-
-func isItValidCidr(cidr string) bool {
-	_, _, err := net.ParseCIDR(cidr)
-	if err != nil {
-		klog.Error(err)
-		return false
-	}
-	return true
 }
 
 func isItValidIPAddress(ip string) bool {
