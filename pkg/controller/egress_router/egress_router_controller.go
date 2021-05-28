@@ -4,6 +4,7 @@ package egress_router
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net"
@@ -165,7 +166,33 @@ func (r *EgressRouterReconciler) setStatus() {
 	}
 }
 
+// getAllowedDestinationsConfigJSONi generates AllowedDestinations json config
+// order of the fields need to match egress-route-cni macvlan module
+func getAllowedDestinationsConfigJSON(RedirectRules []netopv1.L4RedirectRule) (string, error) {
+	config := make([]string, len(RedirectRules))
+
+	for idx, rule := range RedirectRules {
+		if rule.Port != 0 && len(rule.Protocol) != 0 {
+			if rule.TargetPort != 0 {
+				config[idx] = fmt.Sprintf("%d %s %s %d", rule.Port, rule.Protocol, rule.DestinationIP, rule.TargetPort)
+			} else {
+				config[idx] = fmt.Sprintf("%d %s %s", rule.Port, rule.Protocol, rule.DestinationIP)
+			}
+		} else {
+			config[idx] = rule.DestinationIP
+		}
+	}
+
+	jsonByte, err := json.Marshal(config)
+	if err != nil {
+		return "", nil
+	}
+
+	return string(jsonByte), nil
+}
+
 func (r *EgressRouterReconciler) ensureEgressRouter(manifestDir string, namespace string, router *netopv1.EgressRouter, EgressRouterOwnerReferences []v1.OwnerReference) error {
+	var err error
 	if len(router.Spec.Addresses) == 0 {
 		return fmt.Errorf("Error: router without addresses")
 	}
@@ -179,7 +206,11 @@ func (r *EgressRouterReconciler) ensureEgressRouter(manifestDir string, namespac
 	if isItValidIPAddress(router.Spec.Addresses[0].Gateway) {
 		data.Data["Gateway"] = router.Spec.Addresses[0].Gateway
 	}
-	data.Data["AllowedDestinations"] = router.Spec.Redirect.RedirectRules
+	data.Data["AllowedDestinations"], err = getAllowedDestinationsConfigJSON(router.Spec.Redirect.RedirectRules)
+	if err != nil {
+		return errors.Wrap(err, "failed to render AllowedDestinations config")
+	}
+	data.Data["FallbackIP"] = router.Spec.Redirect.FallbackIP
 	data.Data["mode"] = router.Spec.Mode
 	data.Data["network_interfaces"] = router.Spec.NetworkInterface
 	data.Data["EgressRouterPodImage"] = os.Getenv("EGRESS_ROUTER_CNI_IMAGE")
