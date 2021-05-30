@@ -231,11 +231,13 @@ func fillOpenShiftSDNDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 func sdnPluginName(n operv1.SDNMode) string {
 	switch n {
 	case operv1.SDNModeSubnet:
-		return "redhat/openshift-ovs-subnet"
+		//return "redhat/openshift-ovs-subnet"
+		return "redhat/openshift-ovs-multitenant"
 	case operv1.SDNModeMultitenant:
 		return "redhat/openshift-ovs-multitenant"
 	case operv1.SDNModeNetworkPolicy:
-		return "redhat/openshift-ovs-networkpolicy"
+		return "redhat/openshift-ovs-multitenant"
+		//return "redhat/openshift-ovs-networkpolicy"
 	}
 	return ""
 }
