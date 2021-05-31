@@ -65,16 +65,16 @@ data:
     auth_type = {{ default "password" .OpenStackCloud.AuthType }}
     auth_url = {{ $AuthInfo.AuthURL }}
     insecure = {{ .OpenStackInsecureAPI }}
-    token = {{ default "\"\"" $AuthInfo.Token }}
-    password = {{ default "\"\"" $AuthInfo.Password }}
-    username = {{ default "\"\"" $AuthInfo.Username }}
-    project_domain_name = {{ default "\"\"" $AuthInfo.ProjectDomainName }}
+    token = {{ default "\"\"" (iniEscapeCharacters $AuthInfo.Token) }}
+    password = {{ default "\"\"" (iniEscapeCharacters $AuthInfo.Password) }}
+    username = {{ default "\"\"" (iniEscapeCharacters $AuthInfo.Username) }}
+    project_domain_name = {{ default "\"\"" (iniEscapeCharacters $AuthInfo.ProjectDomainName) }}
     project_domain_id = {{ default "\"\"" $AuthInfo.ProjectDomainID }}
     project_id = {{ default "\"\"" $AuthInfo.ProjectID }}
-    project_name = {{ default "\"\"" $AuthInfo.ProjectName }}
-    user_domain_name = {{ default "\"\"" $AuthInfo.UserDomainName }}
+    project_name = {{ default "\"\"" (iniEscapeCharacters $AuthInfo.ProjectName) }}
+    user_domain_name = {{ default "\"\"" (iniEscapeCharacters $AuthInfo.UserDomainName) }}
     user_domain_id = {{ default "\"\"" $AuthInfo.UserDomainID }}
-    region_name = {{ default "\"\"" .OpenStackCloud.RegionName }}
+    region_name = {{ default "\"\"" (iniEscapeCharacters .OpenStackCloud.RegionName) }}
 {{- if .UserCACertificate }}
     # There's no good way to just "append" user-provided certs to system ones,
     # so just configure openstacksdk to use it.
