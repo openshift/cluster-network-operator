@@ -23,6 +23,7 @@ data:
  
     [ovnkubernetesfeature]
     enable-egress-ip=true
+    enable-egress-firewall=true
 
     [gateway]
     mode=local
