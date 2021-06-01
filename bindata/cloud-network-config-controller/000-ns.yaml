@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-cloud-network-config-controller
+  labels:
+    openshift.io/run-level: "0"
+    openshift.io/cluster-monitoring: "true"
+  annotations:
+    openshift.io/node-selector: ""
+    openshift.io/description: "OpenShift cloud network config controller namespace - a controller used to manage cloud-level network configuration"
+    workload.openshift.io/allowed: "management"

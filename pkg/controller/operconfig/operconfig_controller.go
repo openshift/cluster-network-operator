@@ -260,7 +260,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		Name:     "cluster",
 	})
 
-	// Add NetworkPolicy, EgressFirewall, EgressIP, for must-gather
+	// Add NetworkPolicy, EgressFirewall, EgressIP, CloudPrivateIPConfig for must-gather
 	relatedObjects = append(relatedObjects, configv1.ObjectReference{
 		Group:    "networking.k8s.io",
 		Resource: "NetworkPolicy",
@@ -274,6 +274,11 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	relatedObjects = append(relatedObjects, configv1.ObjectReference{
 		Group:    "k8s.ovn.org",
 		Resource: "EgressIP",
+	})
+
+	relatedObjects = append(relatedObjects, configv1.ObjectReference{
+		Group:    "cloud.network.openshift.io",
+		Resource: "CloudPrivateIPConfig",
 	})
 
 	r.status.SetDaemonSets(daemonSets)

@@ -62,3 +62,8 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-network-metrics-daemon:latest
+  - name: cloud-network-config-controller
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-cloud-network-config-controller:latest
+

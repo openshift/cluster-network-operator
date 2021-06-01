@@ -33,15 +33,15 @@ type OVNBootstrapResult struct {
 	ExistingMasterDaemonset *appsv1.DaemonSet
 	ExistingNodeDaemonset   *appsv1.DaemonSet
 	GatewayMode             string
-	Platform                configv1.PlatformType
 }
 
 type BootstrapResult struct {
 	Kuryr KuryrBootstrapResult
 	OVN   OVNBootstrapResult
-	SDN   SDNBootstrapResult
+	Cloud CloudBootstrapResult
 }
 
-type SDNBootstrapResult struct {
+type CloudBootstrapResult struct {
 	Platform configv1.PlatformType
+	Region   string
 }

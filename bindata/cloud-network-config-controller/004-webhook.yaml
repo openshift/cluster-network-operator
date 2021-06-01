@@ -1,0 +1,25 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: cloud-network-config-controller-webhook
+  labels:
+    app: cloud-network-config-admission-controller
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+webhooks:
+  - name: cloudprivateipconfigs.cloud.network.openshift.io
+    clientConfig:
+      service:
+        name: cloud-network-config-admission-controller
+        namespace: openshift-cloud-network-config-controller
+        path: "/cloudprivateipconfigs"
+    rules:
+      - operations: [ "CREATE", "UPDATE" ]
+        apiGroups: ["cloud.network.openshift.io"]
+        apiVersions: ["v1"]
+        resources: ["cloudprivateipconfigs"]
+    sideEffects: NoneOnDryRun
+    admissionReviewVersions:
+    - v1
+    timeoutSeconds: 30

@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	v1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -71,6 +72,17 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 		return nil, err
 	}
 	objs = append(objs, o...)
+
+	if bootstrapResult.Cloud.Platform == v1.AWSPlatformType ||
+		bootstrapResult.Cloud.Platform == v1.AzurePlatformType ||
+		bootstrapResult.Cloud.Platform == v1.GCPPlatformType {
+		// render cloud network config controller
+		o, err = renderCloudNetworkConfigController(conf, bootstrapResult.Cloud, manifestDir)
+		if err != nil {
+			return nil, err
+		}
+		objs = append(objs, o...)
+	}
 
 	log.Printf("Render phase done, rendered %d objects", len(objs))
 	return objs, nil
@@ -613,5 +625,25 @@ func renderNetworkDiagnostics(conf *operv1.NetworkSpec, manifestDir string) ([]*
 		return nil, errors.Wrap(err, "failed to render network-diagnostics manifests")
 	}
 
+	return manifests, nil
+}
+
+// renderCloudNetworkConfigController renders the cloud network config controller
+func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrapResult bootstrap.CloudBootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+	data := render.MakeRenderData()
+	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
+	data.Data["CloudProvider"] = cloudBootstrapResult.Platform
+	data.Data["CloudRegion"] = cloudBootstrapResult.Region
+	data.Data["CloudProviderAWS"] = v1.AWSPlatformType
+	data.Data["CloudProviderAzure"] = v1.AzurePlatformType
+	data.Data["CloudProviderGCP"] = v1.GCPPlatformType
+	data.Data["CloudNetworkConfigControllerImage"] = os.Getenv("CLOUD_NETWORK_CONFIG_CONTROLLER_IMAGE")
+	data.Data["KubernetesServiceHost"] = os.Getenv("KUBERNETES_SERVICE_HOST")
+	data.Data["KubernetesServicePort"] = os.Getenv("KUBERNETES_SERVICE_PORT")
+
+	manifests, err := render.RenderDir(filepath.Join(manifestDir, "cloud-network-config-controller"), &data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to render cloud-network-config-controller manifests")
+	}
 	return manifests, nil
 }

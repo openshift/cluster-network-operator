@@ -47,7 +47,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 	data.Data["Mode"] = c.Mode
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
-	if bootstrapResult.SDN.Platform == configv1.AzurePlatformType {
+	if bootstrapResult.Cloud.Platform == configv1.AzurePlatformType {
 		data.Data["SDNPlatformAzure"] = true
 	} else {
 		data.Data["SDNPlatformAzure"] = false
@@ -282,8 +282,20 @@ func clusterNetwork(conf *operv1.NetworkSpec) (string, error) {
 }
 
 func bootstrapSDN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
+	cloudRes, err := bootstrapCloud(conf, kubeClient)
+	if err != nil {
+		return nil, err
+	}
+	res := bootstrap.BootstrapResult{
+		Cloud: *cloudRes,
+	}
+	return &res, nil
+}
+
+func bootstrapCloud(conf *operv1.Network, kubeClient client.Client) (*bootstrap.CloudBootstrapResult, error) {
 
 	var platformType configv1.PlatformType
+	var region string
 
 	infraConfig := &configv1.Infrastructure{}
 	if err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
@@ -295,12 +307,16 @@ func bootstrapSDN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 		if infraConfig.Status.PlatformStatus.Type != "" {
 			platformType = infraConfig.Status.PlatformStatus.Type
 		}
+		if platformType == configv1.AWSPlatformType {
+			region = infraConfig.Status.PlatformStatus.AWS.Region
+		} else if platformType == configv1.GCPPlatformType {
+			region = infraConfig.Status.PlatformStatus.GCP.Region
+		}
 	}
 
-	res := bootstrap.BootstrapResult{
-		SDN: bootstrap.SDNBootstrapResult{
-			Platform: platformType,
-		},
+	res := bootstrap.CloudBootstrapResult{
+		Platform: platformType,
+		Region:   region,
 	}
 	return &res, nil
 }

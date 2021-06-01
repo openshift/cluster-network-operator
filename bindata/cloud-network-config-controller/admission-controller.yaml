@@ -1,0 +1,69 @@
+---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: cloud-network-config-admission-controller
+  namespace: openshift-cloud-network-config-controller
+  labels:
+    app: cloud-network-config-admission-controller
+  annotations:
+    kubernetes.io/description: |
+      This daemon set launches the cloud network config admission controller component on each master node.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+    networkoperator.openshift.io/non-critical: ""
+spec:
+  selector:
+    matchLabels:
+      app: cloud-network-config-admission-controller
+      namespace: openshift-cloud-network-config-controller
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: cloud-network-config-admission-controller
+        namespace: openshift-cloud-network-config-controller
+        component: network
+        type: infra
+        openshift.io/component: network
+    spec:
+      containers:
+      - name: cloud-network-config-admission-controller
+        image: {{.CloudNetworkConfigControllerImage}}
+        command:
+        - /usr/bin/cloud-network-config-admission-controller
+        volumeMounts:
+        - name: webhook-certs
+          mountPath: /run/secrets/tls
+          readOnly: True
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KubernetesServicePort}}"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KubernetesServiceHost}}"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        ports:
+        - containerPort: 8443
+          name: https
+        terminationMessagePolicy: FallbackToLogsOnError
+      serviceAccountName: cloud-network-config-controller
+      priorityClassName: "system-cluster-critical"
+      restartPolicy: Always
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      volumes:
+      - name: webhook-certs
+        secret:
+          secretName: cloud-network-config-admission-controller-secret
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: Exists
+        effect: NoSchedule

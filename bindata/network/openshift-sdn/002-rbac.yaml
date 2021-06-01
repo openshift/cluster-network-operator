@@ -39,6 +39,16 @@ rules:
   - list
   - watch
   - patch
+- apiGroups: ["cloud.network.openshift.io"]
+  resources:
+  - cloudprivateipconfigs
+  verbs:
+  - create
+  - delete
+  - update
+  - get
+  - list
+  - watch
 - apiGroups: ["extensions"]
   resources:
   - networkpolicies
