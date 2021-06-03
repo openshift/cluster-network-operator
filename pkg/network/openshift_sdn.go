@@ -290,12 +290,10 @@ func bootstrapSDN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 		return nil, fmt.Errorf("failed to get infrastructure 'config': %v", err)
 	}
 
-	if infraConfig != nil {
-		klog.V(2).Infof("Openshift-SDN: Bootstrap SDN infraConfig Platform: %v ", infraConfig.Status.PlatformStatus.Type)
-		if infraConfig.Status.PlatformStatus.Type != "" {
-			platformType = infraConfig.Status.PlatformStatus.Type
-		}
+	if infraConfig.Status.PlatformStatus != nil {
+		platformType = infraConfig.Status.PlatformStatus.Type
 	}
+	klog.V(2).Infof("Openshift-SDN: Bootstrap SDN infraConfig Platform: %q", platformType)
 
 	res := bootstrap.BootstrapResult{
 		SDN: bootstrap.SDNBootstrapResult{
