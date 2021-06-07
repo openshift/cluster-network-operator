@@ -24,3 +24,5 @@ spec:
       containers:
         - name: egress-router-cni-pod
           image: "{{.EgressRouterPodImage}}"
+          securityContext:
+            privileged: true
