@@ -186,7 +186,7 @@ func (r *ReconcileOperConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Bootstrap any resources
-	bootstrapResult, err := network.Bootstrap(&operConfig.Spec, r.client)
+	bootstrapResult, err := network.Bootstrap(operConfig, r.client)
 	if err != nil {
 		log.Printf("Failed to reconcile platform networking resources: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "BootstrapError",

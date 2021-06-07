@@ -63,7 +63,7 @@ func TestRenderOpenShiftSDN(t *testing.T) {
 
 	// enable openvswitch
 	sdnConfig.UseExternalOpenvswitch = nil
-	objs, err = renderOpenShiftSDN(config, manifestDir)
+	objs, err = renderOpenShiftSDN(config, bootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "ovs")))
 
