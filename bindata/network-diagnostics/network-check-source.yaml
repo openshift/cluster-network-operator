@@ -10,12 +10,14 @@ metadata:
     release.openshift.io/version: "{{.ReleaseVersion}}"
     networkoperator.openshift.io/non-critical: ""
 spec:
-  replicas: 1
+  replicas: 1 
   selector:
     matchLabels:
       app: network-check-source
-  strategy:
-    type: Recreate
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate: 
+      maxUnavailable: 10%
   template:
     metadata:
       annotations:
