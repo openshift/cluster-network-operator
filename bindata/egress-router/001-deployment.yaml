@@ -24,3 +24,5 @@ spec:
       containers:
         - name: egress-router-cni-pod
           image: "{{.EgressRouterPodImage}}"
+          command: ['/bin/sh', '-c', 'sleep infinity']
+          terminationMessagePolicy: FallbackToLogsOnError
