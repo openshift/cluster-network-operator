@@ -24,6 +24,7 @@ spec:
         app: network-check-source
         kubernetes.io/os: "linux"
     spec:
+      priorityClassName: openshift-user-critical
       serviceAccountName: network-diagnostics
       containers:
       - name: check-endpoints
