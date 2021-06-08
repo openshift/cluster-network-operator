@@ -62,3 +62,7 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-network-metrics-daemon:latest
+  - name: network-tools
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-network-tools:latest
