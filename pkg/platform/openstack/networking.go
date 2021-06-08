@@ -181,58 +181,67 @@ func getOpenStackSubnet(client *gophercloud.ServiceClient, id string) (subnets.S
 	return *subnet, nil
 }
 
-// Looks for a Neutron subnet by name, tag, network ID, CIDR and gateway IP,
-// if it does not exist creates it using allocationRanges as allocation pools.
-// Will fail if two subnets match all the criteria.
-func ensureOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, netId, cidr, gatewayIp string, allocationRanges []iputil.IPRange) (string, error) {
+// Looks for a Neutron subnet by name, tag, network ID, CIDR and (optionally) gateway IP,
+// if it does not exist returns nil. Will fail if two subnets match all the criteria.
+func findOpenStackSubnetByDetails(client *gophercloud.ServiceClient, name, tag, netId, cidr, gatewayIp string) (*subnets.Subnet, error) {
 	dhcp := false
-	page, err := subnets.List(client, subnets.ListOpts{
+	listOpts := subnets.ListOpts{
 		Name:       name,
 		Tags:       tag,
 		NetworkID:  netId,
 		CIDR:       cidr,
-		GatewayIP:  gatewayIp,
 		IPVersion:  4,
 		EnableDHCP: &dhcp,
-	}).AllPages()
+	}
+	if len(gatewayIp) != 0 {
+		listOpts.GatewayIP = gatewayIp
+	}
+	page, err := subnets.List(client, listOpts).AllPages()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get subnet list")
+		return nil, errors.Wrap(err, "failed to get subnet list")
 	}
 	subnetList, err := subnets.ExtractSubnets(page)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to extract subnets list")
+		return nil, errors.Wrap(err, "failed to extract subnets list")
 	}
-	if len(subnetList) > 1 {
-		return "", errors.Errorf("found multiple subnets matching name %s and tag %s, cannot proceed", name, tag)
-	} else if len(subnetList) == 1 {
-		return subnetList[0].ID, nil
+	if len(subnetList) == 1 {
+		return &subnetList[0], nil
+	} else if len(subnetList) == 0 {
+		return nil, nil
 	} else {
+		return nil, errors.Errorf("found multiple subnets matching name %s and tag %s, cannot proceed", name, tag)
+	}
+}
+
+func createOpenStackSubnet(client *gophercloud.ServiceClient, name, tag, netId, cidr, gatewayIp string, allocationRanges []iputil.IPRange) (string, error) {
+	dhcp := false
+	opts := subnets.CreateOpts{
+		Name:       name,
+		NetworkID:  netId,
+		CIDR:       cidr,
+		GatewayIP:  &gatewayIp,
+		IPVersion:  gophercloud.IPv4,
+		EnableDHCP: &dhcp,
+	}
+	if allocationRanges != nil {
 		var allocationPools []subnets.AllocationPool
 		for _, r := range allocationRanges {
 			allocationPools = append(allocationPools, subnets.AllocationPool{
 				Start: r.Start.String(), End: r.End.String()})
 		}
-		opts := subnets.CreateOpts{
-			Name:            name,
-			NetworkID:       netId,
-			CIDR:            cidr,
-			GatewayIP:       &gatewayIp,
-			IPVersion:       gophercloud.IPv4,
-			EnableDHCP:      &dhcp,
-			AllocationPools: allocationPools,
-		}
-		subnetObj, err := subnets.Create(client, opts).Extract()
-		if err != nil {
-			return "", errors.Wrap(err, "failed to create subnet")
-		}
-
-		_, err = tagResource(client, "subnets", subnetObj.ID, tag)
-		if err != nil {
-			return "", errors.Wrap(err, "failed to tag created subnet")
-		}
-
-		return subnetObj.ID, nil
+		opts.AllocationPools = allocationPools
 	}
+	subnetObj, err := subnets.Create(client, opts).Extract()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to create subnet")
+	}
+
+	_, err = tagResource(client, "subnets", subnetObj.ID, tag)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to tag created subnet")
+	}
+
+	return subnetObj.ID, nil
 }
 
 // Looks for a Neutron router by name and tag. If not found, provides
