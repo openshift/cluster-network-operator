@@ -74,6 +74,9 @@ spec:
         - name: webhook-certs
           mountPath: /etc/webhook
           readOnly: True
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
       serviceAccountName: multus
       priorityClassName: "system-cluster-critical"
       restartPolicy: Always
