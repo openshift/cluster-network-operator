@@ -45,6 +45,7 @@ require (
 )
 
 replace (
+	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
 	github.com/openshift/library-go => github.com/sanchezl/library-go v0.0.0-20210204225617-b323a3976dd5
 	google.golang.org/grpc => google.golang.org/grpc v1.27.1
 	k8s.io/api => k8s.io/api v0.20.0
