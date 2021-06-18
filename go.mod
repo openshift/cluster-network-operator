@@ -16,7 +16,7 @@ require (
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.1 // indirect
 	github.com/onsi/gomega v1.10.5
-	github.com/openshift/api v0.0.0-20210526151222-14f26e4285a4
+	github.com/openshift/api v0.0.0-20210617200138-9f677aa140c1
 	github.com/openshift/build-machinery-go v0.0.0-20210423112049-9415d7ebd33e
 	github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49
 	github.com/openshift/library-go v0.0.0-20210204161529-5c46b163e958

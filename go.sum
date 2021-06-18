@@ -568,8 +568,8 @@ github.com/openshift/api v0.0.0-20200827090112-c05698d102cf/go.mod h1:M3xexPhgM8
 github.com/openshift/api v0.0.0-20200901182017-7ac89ba6b971/go.mod h1:M3xexPhgM8DISzzRpuFUy+jfPjQPIcs9yqEYj17mXV8=
 github.com/openshift/api v0.0.0-20201019163320-c6a5ec25f267/go.mod h1:RDvBcRQMGLa3aNuDuejVBbTEQj/2i14NXdpOLqbNBvM=
 github.com/openshift/api v0.0.0-20201214114959-164a2fb63b5f/go.mod h1:aqU5Cq+kqKKPbDMqxo9FojgDeSpNJI7iuskjXjtojDg=
-github.com/openshift/api v0.0.0-20210526151222-14f26e4285a4 h1:LAyGrHE231oACoTiskwprbZatnQRVc5HSC605T++StE=
-github.com/openshift/api v0.0.0-20210526151222-14f26e4285a4/go.mod h1:izBmoXbUu3z5kUa4FjZhvekTsyzIWiOoaIgJiZBBMQs=
+github.com/openshift/api v0.0.0-20210617200138-9f677aa140c1 h1:qwYANvePJZhyBTFPn6kMPqyuPq4Zh8fmgWRtfOPLHgM=
+github.com/openshift/api v0.0.0-20210617200138-9f677aa140c1/go.mod h1:izBmoXbUu3z5kUa4FjZhvekTsyzIWiOoaIgJiZBBMQs=
 github.com/openshift/build-machinery-go v0.0.0-20200211121458-5e3d6e570160/go.mod h1:1CkcsT3aVebzRBzVTSbiKSkJMsC/CASqxesfqEMfJEc=
 github.com/openshift/build-machinery-go v0.0.0-20200424080330-082bf86082cc/go.mod h1:1CkcsT3aVebzRBzVTSbiKSkJMsC/CASqxesfqEMfJEc=
 github.com/openshift/build-machinery-go v0.0.0-20200819073603-48aa266c95f7/go.mod h1:b1BuldmJlbA/xYtdZvKi+7j5YGB44qJUJDZ9zwiNCfE=
@@ -1195,6 +1195,7 @@ k8s.io/api v0.18.6/go.mod h1:eeyxr+cwCjMdLAmr2W3RyDI0VvTawSg/3RFFBEnmZGI=
 k8s.io/api v0.19.0/go.mod h1:I1K45XlvTrDjmj5LoM5LuP/KYrhWbjUKT/SoPG0qTjw=
 k8s.io/api v0.19.2/go.mod h1:IQpK0zFQ1xc5iNIQPqzgoOwuFugaYHK4iCknlAQP9nI=
 k8s.io/api v0.20.0/go.mod h1:HyLC5l5eoS/ygQYl1BXBgFzWNlkHiAuyNAbevIn+FKg=
+k8s.io/api v0.21.0 h1:gu5iGF4V6tfVCQ/R+8Hc0h7H1JuEhzyEi9S4R5LM8+Y=
 k8s.io/api v0.21.0/go.mod h1:+YbrhBBGgsxbF6o6Kj4KJPJnBmAKuXDeS3E18bgHNVU=
 k8s.io/api v0.21.1 h1:94bbZ5NTjdINJEdzOkpS4vdPhkb1VFpTYC9zh43f75c=
 k8s.io/api v0.21.1/go.mod h1:FstGROTmsSHBarKc8bylzXih8BLNYTiS3TZcsoEDg2s=
@@ -1216,6 +1217,7 @@ k8s.io/apimachinery v0.18.6/go.mod h1:OaXp26zu/5J7p0f92ASynJa1pZo06YlV9fG7BoWbCk
 k8s.io/apimachinery v0.19.0/go.mod h1:DnPGDnARWFvYa3pMHgSxtbZb7gpzzAZ1pTfaUNDVlmA=
 k8s.io/apimachinery v0.19.2/go.mod h1:DnPGDnARWFvYa3pMHgSxtbZb7gpzzAZ1pTfaUNDVlmA=
 k8s.io/apimachinery v0.20.0/go.mod h1:WlLqWAHZGg07AeltaI0MV5uk1Omp8xaN0JGLY6gkRpU=
+k8s.io/apimachinery v0.21.0 h1:3Fx+41if+IRavNcKOz09FwEXDBG6ORh6iMsTSelhkMA=
 k8s.io/apimachinery v0.21.0/go.mod h1:jbreFvJo3ov9rj7eWT7+sYiRx+qZuCYXwWT1bcDswPY=
 k8s.io/apimachinery v0.21.1 h1:Q6XuHGlj2xc+hlMCvqyYfbv3H7SRGn2c8NycxJquDVs=
 k8s.io/apimachinery v0.21.1/go.mod h1:jbreFvJo3ov9rj7eWT7+sYiRx+qZuCYXwWT1bcDswPY=
@@ -1242,6 +1244,7 @@ k8s.io/code-generator v0.18.6/go.mod h1:TgNEVx9hCyPGpdtCWA34olQYLkh3ok9ar7XfSsr8
 k8s.io/code-generator v0.19.0/go.mod h1:moqLn7w0t9cMs4+5CQyxnfA/HV8MF6aAVENF+WZZhgk=
 k8s.io/code-generator v0.19.2/go.mod h1:moqLn7w0t9cMs4+5CQyxnfA/HV8MF6aAVENF+WZZhgk=
 k8s.io/code-generator v0.20.0/go.mod h1:UsqdF+VX4PU2g46NC2JRs4gc+IfrctnwHb76RNbWHJg=
+k8s.io/code-generator v0.21.0 h1:LGWJOvkbBNpuRBqBRXUjzfvymUh7F/iR2KDpwLnqCM4=
 k8s.io/code-generator v0.21.0/go.mod h1:hUlps5+9QaTrKx+jiM4rmq7YmH8wPOIko64uZCHDh6Q=
 k8s.io/code-generator v0.21.1 h1:jvcxHpVu5dm/LMXr3GOj/jroiP8+v2YnJE9i2OVRenk=
 k8s.io/code-generator v0.21.1/go.mod h1:hUlps5+9QaTrKx+jiM4rmq7YmH8wPOIko64uZCHDh6Q=
