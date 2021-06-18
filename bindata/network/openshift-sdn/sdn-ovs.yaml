@@ -129,6 +129,11 @@ spec:
             # Load any flows that we saved
             echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Loading previous flows ..." 2>&1
             if [[ -f /var/run/openvswitch/flows.sh ]]; then
+
+              # There's a bug in the ovs-save script which causes flows.sh to specify
+              # OpenFlow14, replace that to OpenFlow13 which is the only version we support.
+              sed -i 's/OpenFlow[0-9][0-9]/OpenFlow13/g' /var/run/openvswitch/flows.sh
+
               echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Adding br0 if it doesn't exist ..." 2>&1
               /usr/bin/ovs-vsctl --may-exist add-br br0 -- set Bridge br0 fail_mode=secure protocols=OpenFlow13
               echo "$(date -u "+%Y-%m-%d %H:%M:%S") info: Created br0, now adding flows ..." 2>&1
