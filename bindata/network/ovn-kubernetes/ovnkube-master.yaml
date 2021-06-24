@@ -76,7 +76,8 @@ spec:
             --pidfile /var/run/ovn/ovn-northd.pid \
             -p /ovn-cert/tls.key \
             -c /ovn-cert/tls.crt \
-            -C /ovn-ca/ca-bundle.crt 
+            -C /ovn-ca/ca-bundle.crt \
+            --ssl-ciphers 'HIGH:!aNULL:!MD5:@SECLEVEL=1'
         env:
         - name: OVN_LOG_LEVEL
           value: info 
@@ -268,7 +269,9 @@ spec:
 
                   # set the connection and disable inactivity probe
                   retries=0
-                  while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=60000; do
+                  while ! ovn-nbctl --no-leader-only -t 5 set-ssl '' '' '' '' 'HIGH:!aNULL:!MD5:@SECLEVEL=1' \
+                    -- set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} \
+                    -- set connection . inactivity_probe=60000; do
                     (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
                     echo "$(date -Iseconds) - ERROR RESTARTING - nbdb - too many failed ovn-nbctl attempts, giving up"
@@ -658,7 +661,9 @@ spec:
 
                   # set the connection and disable inactivity probe
                   retries=0
-                  while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=60000; do
+                  while ! ovn-sbctl --no-leader-only -t 5 set-ssl '' '' '' '' 'HIGH:!aNULL:!MD5:@SECLEVEL=1' \
+                    -- set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} \
+                    -- set connection . inactivity_probe=60000; do
                     (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
                     echo "$(date -Iseconds) - ERROR RESTARTING - sbdb - too many failed ovn-sbctl attempts, giving up"
