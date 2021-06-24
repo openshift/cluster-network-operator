@@ -1,6 +1,8 @@
 package network
 
 import (
+	"context"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -9,9 +11,15 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	configv1 "github.com/openshift/api/config/v1"
 	netv1 "github.com/openshift/api/network/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -24,7 +32,7 @@ import (
 // - the sdn daemonset
 // - the openvswitch daemonset
 // and some other small things.
-func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	c := conf.DefaultNetwork.OpenShiftSDNConfig
 
 	objs := []*uns.Unstructured{}
@@ -40,6 +48,11 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 	data.Data["Mode"] = c.Mode
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
+	if bootstrapResult.SDN.Platform == configv1.AzurePlatformType {
+		data.Data["SDNPlatformAzure"] = true
+	} else {
+		data.Data["SDNPlatformAzure"] = false
+	}
 
 	clusterNetwork, err := clusterNetwork(conf)
 	if err != nil {
@@ -74,6 +87,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 	}
 
 	objs = append(objs, manifests...)
+
 	return objs, nil
 }
 
@@ -254,4 +268,26 @@ func clusterNetwork(conf *operv1.NetworkSpec) (string, error) {
 	}
 
 	return string(cnBuf), nil
+}
+
+func bootstrapSDN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
+
+	var platformType configv1.PlatformType
+
+	infraConfig := &configv1.Infrastructure{}
+	if err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
+		return nil, fmt.Errorf("failed to get infrastructure 'config': %v", err)
+	}
+
+	if infraConfig.Status.PlatformStatus != nil {
+		platformType = infraConfig.Status.PlatformStatus.Type
+	}
+	klog.V(2).Infof("Openshift-SDN: Bootstrap SDN infraConfig Platform: %q", platformType)
+
+	res := bootstrap.BootstrapResult{
+		SDN: bootstrap.SDNBootstrapResult{
+			Platform: platformType,
+		},
+	}
+	return &res, nil
 }

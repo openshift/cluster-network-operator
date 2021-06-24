@@ -9,12 +9,12 @@ import (
 )
 
 // Bootstrap creates resources required by SDN on the cloud.
-func Bootstrap(conf *operv1.NetworkSpec, client client.Client) (*bootstrap.BootstrapResult, error) {
-	switch conf.DefaultNetwork.Type {
+func Bootstrap(conf *operv1.Network, client client.Client) (*bootstrap.BootstrapResult, error) {
+	switch conf.Spec.DefaultNetwork.Type {
 	case operv1.NetworkTypeKuryr:
-		return openstack.BootstrapKuryr(conf, client)
+		return openstack.BootstrapKuryr(&conf.Spec, client)
 	case operv1.NetworkTypeOpenShiftSDN:
-		return nil, nil
+		return bootstrapSDN(conf, client)
 	case operv1.NetworkTypeOVNKubernetes:
 		return boostrapOVN(client)
 	}
