@@ -412,7 +412,7 @@ conntrack:
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
 detectLocalMode: ""
-enableProfiling: false
+enableProfiling: true
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:
@@ -465,7 +465,7 @@ conntrack:
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
 detectLocalMode: ""
-enableProfiling: false
+enableProfiling: true
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:

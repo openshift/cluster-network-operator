@@ -53,6 +53,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Un
 		"healthz-port":            {"10256"},
 		"proxy-mode":              {"iptables"},
 		"iptables-masquerade-bit": {"0"},
+		"enable-profiling":        {"true"},
 	}
 
 	kpcOverrides := map[string]operv1.ProxyArgumentList{}
