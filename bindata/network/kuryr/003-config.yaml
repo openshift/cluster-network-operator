@@ -65,26 +65,6 @@ data:
     external_svc_net = {{ .ExternalNetwork }}
     network_device_mtu = {{ .PodsNetworkMTU }}
 
-    [neutron]
-    auth_type = {{ default "password" .OpenStackCloud.AuthType }}
-    auth_url = {{ $AuthInfo.AuthURL }}
-    insecure = {{ .OpenStackInsecureAPI }}
-    token = {{ default "\"\"" (iniEscapeCharacters $AuthInfo.Token) }}
-    password = {{ default "\"\"" (iniEscapeCharacters $AuthInfo.Password) }}
-    username = {{ default "\"\"" (iniEscapeCharacters $AuthInfo.Username) }}
-    project_domain_name = {{ default "\"\"" (iniEscapeCharacters $AuthInfo.ProjectDomainName) }}
-    project_domain_id = {{ default "\"\"" $AuthInfo.ProjectDomainID }}
-    project_id = {{ default "\"\"" $AuthInfo.ProjectID }}
-    project_name = {{ default "\"\"" (iniEscapeCharacters $AuthInfo.ProjectName) }}
-    user_domain_name = {{ default "\"\"" (iniEscapeCharacters $AuthInfo.UserDomainName) }}
-    user_domain_id = {{ default "\"\"" $AuthInfo.UserDomainID }}
-    region_name = {{ default "\"\"" (iniEscapeCharacters .OpenStackCloud.RegionName) }}
-{{- if .UserCACertificate }}
-    # There's no good way to just "append" user-provided certs to system ones,
-    # so just configure openstacksdk to use it.
-    cafile = /etc/ssl/certs/user-ca-bundle.crt
-{{- end }}
-
     [vif_pool]
     ports_pool_max = {{ .PoolMaxPorts }}
     ports_pool_min = {{ .PoolMinPorts }}
