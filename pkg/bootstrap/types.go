@@ -40,6 +40,7 @@ type OVNBootstrapResult struct {
 	ExistingNodeDaemonset   *appsv1.DaemonSet
 	Platform                configv1.PlatformType
 	OVNKubernetesConfig     *OVNConfigBoostrapResult
+	PrePullerDaemonset      *appsv1.DaemonSet
 }
 
 type BootstrapResult struct {
