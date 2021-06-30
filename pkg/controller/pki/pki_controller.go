@@ -210,7 +210,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			Namespace: config.Namespace,
 			Name:      config.Name + "-cert",
 			Validity:  OneYear / 2,
-			Refresh:   OneYear / 4,
+			Refresh:   20 * time.Minute,
 			CertCreator: &certrotation.ServingRotation{
 				Hostnames: func() []string { return []string{spec.TargetCert.CommonName} },
 
