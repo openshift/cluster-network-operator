@@ -89,3 +89,35 @@ spec:
         histogram_quantile(0.95, rate(kuryr_cni_request_duration_seconds_bucket[10m])) > 30
       labels:
         severity: warning
+    - alert: KuryrLoadBalancerWithError
+      annotations:
+        message: Load Balancer {{"{{"}} $labels.lb_name {{"}}"}} is with {{"{{"}} $labels.kuryr_critical_lb_state {{"}}"}} state for more then 5m.
+      expr: |
+        kuryr_critical_lb_state{kuryr_critical_lb_state='ERROR'} == 1
+      for: 5m
+      labels:
+        severity: critical
+    - alert: KuryrLoadBalancerDeleted
+      annotations:
+        message: Load Balancer {{"{{"}} $labels.lb_name {{"}}"}} is not present for more then 5m.
+      expr: |
+        kuryr_critical_lb_state{kuryr_critical_lb_state='DELETED'} == 1
+      for: 5m
+      labels:
+        severity: critical
+    - alert: LimitedLoadBalancerMembers
+      annotations:
+        message: Low number of Members on Load Balancer {{"{{"}} $labels.lb_name {{"}}"}} with pool {{"{{"}} $labels.lb_pool_name {{"}}"}} for more then 5 min.
+      expr: |
+        kuryr_critical_lb_members_count == 1
+      for: 5m
+      labels:
+        severity: warning
+    - alert: InsuficientLoadBalancerMembers
+      annotations:
+        message: No Members on Load Balancer {{"{{"}} $labels.lb_name {{"}}"}} with pool {{"{{"}} $labels.lb_pool_name {{"}}"}} for more then 5 min.
+      expr: |
+        kuryr_critical_lb_members_count == 0
+      for: 5m
+      labels:
+        severity: critical
