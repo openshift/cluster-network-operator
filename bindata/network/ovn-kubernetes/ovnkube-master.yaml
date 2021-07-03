@@ -182,15 +182,6 @@ spec:
             --ovn-nb-db-ssl-cert=/ovn-cert/tls.crt \
             --ovn-nb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt"
 
-          # if ovsdb supports column diffs, disable them, since they can cause upgrade issues
-          set +e
-          /usr/share/ovn/scripts/ovn-ctl --help 2>&1 | grep -q disable-file-column-diff; RC=$?
-          set -e
-          if [[ "$RC" -eq 0 ]]; then
-            echo "column diffs supported but disabled"
-            OVN_ARGS="${OVN_ARGS} --ovsdb-disable-file-column-diff=yes"
-          fi
-
           CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
           echo "$(date -Iseconds) - starting nbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}, K8S_NODE_IP=${K8S_NODE_IP}"
           initial_raft_create=true
@@ -567,15 +558,6 @@ spec:
             --ovn-sb-db-ssl-cert=/ovn-cert/tls.crt \
             --ovn-sb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt"
 
-          # if ovsdb supports column diffs, disable them, since they can cause upgrade issues
-          set +e
-          /usr/share/ovn/scripts/ovn-ctl --help 2>&1 | grep -q disable-file-column-diff; RC=$?
-          set -e
-          if [[ "$RC" -eq 0 ]]; then
-            echo "column diffs supported but disabled"
-            OVN_ARGS="${OVN_ARGS} --ovsdb-disable-file-column-diff=yes"
-          fi
-          
           CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
           echo "$(date -Iseconds) - starting sbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}"
           initial_raft_create=true
