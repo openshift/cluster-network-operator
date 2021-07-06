@@ -121,3 +121,17 @@ spec:
       for: 5m
       labels:
         severity: critical
+    - alert: KuryrLoadBalancerNotReady
+      annotations:
+        message: Kuryr noticed an Octavia load balancer unexpectedly stuck in PENDING_* state in the last 20 minutes. Most likely this indicates an issue with OpenStack Octavia.
+      expr: |
+        changes(kuryr_load_balancer_readiness_total[20m]) > 0
+      labels:
+        severity: critical
+    - alert: KuryrPortNotReady
+      annotations:
+        message: Kuryr noticed that a Neutron port was in unexpected DOWN state in the last 20 minutes. Most likely this indicates an issue with OpenStack Neutron.
+      expr: |
+        changes(kuryr_port_readiness_total[20m]) > 0
+      labels:
+        severity: critical
