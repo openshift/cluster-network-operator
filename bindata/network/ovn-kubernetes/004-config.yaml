@@ -16,6 +16,7 @@ data:
     service-cidrs="{{.OVN_service_cidr}}"
     ovn-config-namespace="openshift-ovn-kubernetes"
     apiserver="{{.K8S_APISERVER}}"
+    host-network-namespace="openshift-host-network"
 {{- if .OVNHybridOverlayEnable }}
     no-hostsubnet-nodes="kubernetes.io/os=windows"
 {{- end  }}
