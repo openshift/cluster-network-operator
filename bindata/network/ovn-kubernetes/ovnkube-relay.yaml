@@ -1,5 +1,5 @@
 ---
-kind: DaemonSet
+kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: ovnkube-relay
@@ -9,6 +9,7 @@ metadata:
       This daemonset launches the ovn-kubernetes OVN relay networking components.
     release.openshift.io/version: "{{.ReleaseVersion}}"
 spec:
+  replicas: 2
   selector:
     matchLabels:
       app: ovnkube-relay
@@ -41,6 +42,7 @@ spec:
       # ovn-relay: programs the vswitch with flows from the sbdb
       - name: ovn-relay
         image: "{{.OvnImage}}"
+        #image: registry.build01.ci.openshift.org/ci-ln-q4s05d2/stable@sha256:d800722549b1662175495416177ad1364faa9077c185e5fa00573c4abd7eb81e
         command:
         - /bin/bash
         - -c
