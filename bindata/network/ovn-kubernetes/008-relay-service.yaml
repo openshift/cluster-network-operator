@@ -1,0 +1,18 @@
+---
+# service to expose the ovn-relay pod
+apiVersion: v1
+kind: Service
+metadata:
+  name: ovnkube-relay
+  namespace: openshift-ovn-kubernetes
+spec:
+  selector:
+    app: ovnkube-relay
+  ports:
+  - name: south
+    port: {{.OVN_SB_PORT}}
+    protocol: TCP
+    targetPort: {{.OVN_SB_PORT}}
+  sessionAffinity: None
+  clusterIP: None
+  type: ClusterIP
