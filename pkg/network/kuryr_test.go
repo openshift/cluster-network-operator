@@ -67,7 +67,10 @@ func TestRenderKuryr(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-kuryr", "kuryr-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-kuryr", "kuryr-cni")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ConfigMap", "openshift-kuryr", "kuryr-config")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("CustomResourceDefinition", "", "kuryrnets.openstack.org")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("CustomResourceDefinition", "", "kuryrnetworks.openstack.org")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("CustomResourceDefinition", "", "kuryrports.openstack.org")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("CustomResourceDefinition", "", "kuryrnetworkpolicies.openstack.org")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("CustomResourceDefinition", "", "kuryrloadbalancers.openstack.org")))
 }
 
 func TestValidateKuryr(t *testing.T) {
