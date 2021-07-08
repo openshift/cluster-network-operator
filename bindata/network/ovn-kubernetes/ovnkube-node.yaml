@@ -252,7 +252,7 @@ spec:
           if [[ -n "${IPFIX_COLLECTORS}" ]] ; then
             export_network_flows_flags="$export_network_flows_flags --ipfix-targets ${IPFIX_COLLECTORS}"
           fi
-          ovs-appctl vlog/set "syslog:${OVS_LOG_LEVEL}"
+          ovs-appctl vlog/set "syslog:${OVS_SYS_LOG_LEVEL}"
 
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --nb-address "{{.OVN_NB_DB_LIST}}" \
@@ -282,7 +282,7 @@ spec:
           value: "{{.OVN_CONTROLLER_INACTIVITY_PROBE}}"
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
-        - name: OVS_LOG_LEVEL
+        - name: OVS_SYS_LOG_LEVEL
           value: info
         {{ if .NetFlowCollectors }}
         - name: NETFLOW_COLLECTORS
