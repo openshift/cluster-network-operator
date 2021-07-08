@@ -2,17 +2,17 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: ovnkube-relay
+  name: ovnkube-sbdb-relay
   namespace: openshift-ovn-kubernetes
   annotations:
     kubernetes.io/description: |
-      This daemonset launches the ovn-kubernetes OVN relay networking components.
+      This daemonset launches the ovn-kubernetes OVN SBDB relay networking components.
     release.openshift.io/version: "{{.ReleaseVersion}}"
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: ovnkube-relay
+      app: ovnkube-sbdb-relay
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -22,7 +22,7 @@ spec:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
-        app: ovnkube-relay
+        app: ovnkube-sbdb-relay
         component: network
         type: infra
         openshift.io/component: network
@@ -39,8 +39,8 @@ spec:
       # /run/openvswitch -> tmpfs - ovsdb sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
-      # ovn-relay: programs the vswitch with flows from the sbdb
-      - name: ovn-relay
+      # ovn-sbdb-relay: programs the vswitch with flows from the sbdb
+      - name: ovn-sbdb-relay
         image: "{{.OvnImage}}"
         #image: registry.build01.ci.openshift.org/ci-ln-q4s05d2/stable@sha256:d800722549b1662175495416177ad1364faa9077c185e5fa00573c4abd7eb81e
         command:
@@ -54,7 +54,7 @@ spec:
             set +o allexport
           fi  
           
-          echo "$(date -Iseconds) - starting ovsdb-server as ovn-relay"
+          echo "$(date -Iseconds) - starting ovsdb-server as ovn-sbdb-relay"
           ovsdb-server -vconsole:emer -vsyslog:err -vfile:info \
             --no-chdir \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \

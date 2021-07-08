@@ -3,11 +3,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: ovnkube-relay
+  name: ovnkube-sbdb-relay
   namespace: openshift-ovn-kubernetes
 spec:
   selector:
-    app: ovnkube-relay
+    app: ovnkube-sbdb-relay
   ports:
   - name: south
     port: {{.OVN_SB_PORT}}
