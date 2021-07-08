@@ -58,6 +58,7 @@ spec:
           ovsdb-server -vconsole:emer -vsyslog:err -vfile:info \
             --no-chdir \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
+            --remote=pssl:"${K8S_NODE_IP}":"{{.OVN_SB_PORT}}" \
             --pidfile=/var/run/ovn/ovsdb-relay.pid \
             --unixctl=/var/run/ovn/ovnsb_relay_db.ctl \
             --log-file=/var/log/ovn/ovsdb-relay.log \
@@ -71,6 +72,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: K8S_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         volumeMounts:
         - mountPath: /run/openvswitch
           name: run-openvswitch
