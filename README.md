@@ -497,6 +497,3 @@ oc -n openshift-network-operator delete configmap applied-cluster
 ```
 
 Be warned: this is an unsafe operation! It may cause the entire cluster to lose connectivity or even be permanently broken. For example, changing the ServiceNetwork will cause existing services to be unreachable, as their ServiceIP won't be reassigned.
-
-# Development
-See [HACKING.md](HACKING.md).
