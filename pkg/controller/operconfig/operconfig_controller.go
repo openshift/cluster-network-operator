@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -301,6 +302,11 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
 			log.Println(err)
 
+			// If error comes from nonexistent namespace print out a help message.
+			if obj.GroupVersionKind().Kind == "NetworkAttachmentDefinition" && strings.Contains(err.Error(), "namespaces") {
+				log.Println("Namespace error for networkattachment definition, consider possible solutions: (1) Edit config files to include existing namespace (2) Create non-existent namespace (3) Delete erroneous network-attachment-definition")
+			}
+
 			// Ignore errors if we've asked to do so.
 			anno := obj.GetAnnotations()
 			if anno != nil {
@@ -315,7 +321,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	// Run a pod status check just to clear any initial inconsitencies at startup of the CNO
+	// Run a pod status check just to clear any initial inconsistencies at startup of the CNO
 	r.status.SetFromPods()
 
 	// Update Network.config.openshift.io.Status
