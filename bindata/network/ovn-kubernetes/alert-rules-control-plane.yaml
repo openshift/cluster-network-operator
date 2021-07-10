@@ -66,3 +66,21 @@ spec:
       for: 10m
       labels:
         severity: warning
+    - alert: NBDBLongElectionTimer
+      annotations:
+        message: |
+          OVN NB DB raft cluster has a high election timer interval.
+      expr: |
+        ovn_db_cluster_election_timer{db_name="OVN_Northbound"} > 3000
+      for: 10m
+      labels:
+        severity: warning
+    - alert: SBDBLongElectionTimer
+      annotations:
+        message: |
+          OVN SBDB raft cluster has a high election timer interval.
+      expr: |
+        ovn_db_cluster_election_timer{db_name="OVN_Southbound"} > 3000
+      for: 10m
+      labels:
+        severity: warning
