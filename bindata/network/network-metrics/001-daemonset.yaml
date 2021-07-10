@@ -69,6 +69,9 @@ spec:
             - name: metrics-certs
               mountPath: /etc/metrics
               readOnly: True
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
       volumes:
         - name: metrics-certs
           secret:
