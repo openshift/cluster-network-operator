@@ -9,7 +9,7 @@ metadata:
       This daemonset launches the ovn-kubernetes OVN SBDB relay networking components.
     release.openshift.io/version: "{{.ReleaseVersion}}"
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: ovnkube-sbdb-relay
