@@ -55,6 +55,7 @@ spec:
           fi  
           
           echo "$(date -Iseconds) - starting ovsdb-server as ovn-sbdb-relay"
+          echo "Starting on node $HOSTNAME"
           ovsdb-server -vconsole:emer -vsyslog:err -vfile:info \
             --no-chdir \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
