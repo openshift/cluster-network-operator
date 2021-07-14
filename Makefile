@@ -31,7 +31,12 @@ install.tools:
 	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b ${GOPATH}/bin
 .PHONY: install.tools
 
-
+update-crds:
+	go get github.com/openshift/api
+	go mod vendor
+	go mod tidy
+	./hack/update-crds.sh
+.PHONY: update-crds
 
 clean:
 	$(RM) cluster-network-operator cluster-network-check-endpoints cluster-network-check-target
