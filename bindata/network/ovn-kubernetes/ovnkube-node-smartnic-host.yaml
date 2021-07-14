@@ -2,7 +2,7 @@
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: ovnkube-node
+  name: ovnkube-node-smart-nic-host
   namespace: openshift-ovn-kubernetes
   annotations:
     kubernetes.io/description: |
@@ -11,7 +11,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: ovnkube-node
+      app: ovnkube-node-smart-nic-host
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -21,7 +21,7 @@ spec:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
-        app: ovnkube-node
+        app: ovnkube-node-smart-nic-host
         component: network
         type: infra
         openshift.io/component: network
@@ -33,124 +33,12 @@ spec:
             nodeSelectorTerms:
             - matchExpressions:
               - key: network.operator.openshift.io/ovn-offload-host
-                operator: DoesNotExist
+                operator: Exists
       serviceAccountName: ovn-kubernetes-node
       hostNetwork: true
       hostPID: true
       priorityClassName: "system-node-critical"
-      # volumes in all containers:
-      # (container) -> (host)
-      # /etc/openvswitch -> /etc/openvswitch - ovsdb system id
-      # /var/lib/openvswitch -> /var/lib/openvswitch/data - ovsdb data
-      # /run/openvswitch -> tmpfs - ovsdb sockets
-      # /env -> configmap env-overrides - debug overrides
       containers:
-      # ovn-controller: programs the vswitch with flows from the sbdb
-      - name: ovn-controller
-        image: "{{.OvnImage}}"
-        command:
-        - /bin/bash
-        - -c
-        - |
-          set -e
-          if [[ -f "/env/${K8S_NODE}" ]]; then
-            set -o allexport
-            source "/env/${K8S_NODE}"
-            set +o allexport
-          fi  
-          
-          echo "$(date -Iseconds) - starting ovn-controller"
-          exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
-            --no-chdir --pidfile=/var/run/ovn/ovn-controller.pid \
-            --syslog-method="{{.OVNPolicyAuditDestination}}" \
-            --log-file=/var/log/ovn/acl-audit-log.log \
-            -vFACILITY:"{{.OVNPolicyAuditSyslogFacility}}" \
-            -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
-            -vconsole:"${OVN_LOG_LEVEL}" -vconsole:"acl_log:off" \
-            -vsyslog:"acl_log:info" \
-            -vfile:"acl_log:info"
-        securityContext:
-          privileged: true
-        env:
-        - name: OVN_LOG_LEVEL
-          value: info
-        - name: K8S_NODE
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        volumeMounts:
-        - mountPath: /run/openvswitch
-          name: run-openvswitch
-        - mountPath: /run/ovn/
-          name: run-ovn
-        - mountPath: /etc/openvswitch
-          name: etc-openvswitch
-        - mountPath: /etc/ovn/
-          name: etc-openvswitch
-        - mountPath: /var/lib/openvswitch
-          name: var-lib-openvswitch
-        - mountPath: /env
-          name: env-overrides
-        - mountPath: /ovn-cert
-          name: ovn-cert
-        - mountPath: /ovn-ca
-          name: ovn-ca
-        - mountPath: /var/log/ovn
-          name: node-log
-        - mountPath: /dev/log
-          name: log-socket
-        terminationMessagePolicy: FallbackToLogsOnError
-        resources:
-          requests:
-            cpu: 10m
-            memory: 300Mi
-      - name: ovn-acl-logging
-        image: "{{.OvnImage}}"
-        command:
-        - /bin/bash
-        - -c
-        - |
-          set -euo pipefail
-
-          # Rotate audit log files when then get to max size (in bytes)
-          MAXFILESIZE=$(( "{{.OVNPolicyAuditMaxFileSize}}"*1000000 )) 
-          LOGFILE=/var/log/ovn/acl-audit-log.log
-          CONTROLLERPID=$(cat /run/ovn/ovn-controller.pid)
-
-          # Redirect err to null so no messages are shown upon rotation
-          tail -F ${LOGFILE} 2> /dev/null &
-
-          while true
-          do
-            # Make sure ovn-controller's logfile exists, and get current size in bytes 
-            if [ -f "$LOGFILE" ]; then 
-              file_size=`du -b ${LOGFILE} | tr -s '\t' ' ' | cut -d' ' -f1`
-            else 
-              ovs-appctl -t /var/run/ovn/ovn-controller.${CONTROLLERPID}.ctl vlog/reopen
-              file_size=`du -b ${LOGFILE} | tr -s '\t' ' ' | cut -d' ' -f1`
-            fi 
-            
-            if [ $file_size -gt $MAXFILESIZE ];then
-              echo "Rotating OVN ACL Log File"
-              timestamp=`date '+%Y-%m-%dT%H-%M-%S'`
-              mv ${LOGFILE} /var/log/ovn/acl-audit-log.$timestamp.log
-              ovs-appctl -t /run/ovn/ovn-controller.${CONTROLLERPID}.ctl vlog/reopen
-              CONTROLLERPID=$(cat /run/ovn/ovn-controller.pid)
-            fi
-
-            # sleep for 30 seconds to avoid wasting CPU 
-            sleep 30 
-          done
-        resources:
-          requests:
-            cpu: 10m
-            memory: 20Mi
-        terminationMessagePolicy: FallbackToLogsOnError
-        volumeMounts:
-        - mountPath: /var/log/ovn
-          name: node-log
-        - mountPath: /run/ovn/
-          name: run-ovn
       - name: kube-rbac-proxy
         image: {{.KubeRBACProxyImage}}
         command:
@@ -168,7 +56,7 @@ spec:
           TS=$(date +%s)
           WARN_TS=$(( ${TS} + $(( 20 * 60)) ))
           HAS_LOGGED_INFO=0
-          
+
           log_missing_certs(){
               CUR_TS=$(date +%s)
               if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
@@ -182,7 +70,7 @@ spec:
             log_missing_certs
             sleep 5
           done
-          
+
           echo $(date -Iseconds) INFO: ovn-node-metrics-certs mounted, starting kube-rbac-proxy
           exec /usr/bin/kube-rbac-proxy \
             --logtostderr \
@@ -259,6 +147,7 @@ spec:
           if [[ -n "${IPFIX_COLLECTORS}" ]] ; then
             export_network_flows_flags="$export_network_flows_flags --ipfix-targets ${IPFIX_COLLECTORS}"
           fi
+
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --nb-address "{{.OVN_NB_DB_LIST}}" \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
@@ -274,7 +163,7 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
             ${gateway_mode_flags} \
-            --ovnkube-node-mode full \
+            --ovnkube-node-mode smart-nic-host \
             --metrics-bind-address "127.0.0.1:29103" \
             --metrics-enable-pprof \
             ${export_network_flows_flags}
@@ -320,15 +209,14 @@ spec:
           name: host-slash
           readOnly: true
           mountPropagation: HostToContainer
-        # for the CNI server socket
-        - mountPath: /run/ovn-kubernetes/
+        # We mount our socket here
+        - mountPath: /run/ovn-kubernetes
           name: host-run-ovn-kubernetes
-        # accessing bind-mounted net namespaces
         - mountPath: /run/netns
           name: host-run-netns
           readOnly: true
           mountPropagation: HostToContainer
-        # for installing the CNI plugin binary
+        # CNI related mounts which we take over
         - mountPath: /cni-bin-dir
           name: host-cni-bin
         # for installing the CNI configuration file
@@ -357,7 +245,7 @@ spec:
           name: ovn-ca
         resources:
           requests:
-            cpu: 10m
+            cpu: 100m
             memory: 300Mi
         lifecycle:
           preStop:
@@ -375,7 +263,6 @@ spec:
       - name: systemd-units
         hostPath:
           path: /etc/systemd/system
-      # used for iptables wrapper scripts
       - name: host-slash
         hostPath:
           path: /
@@ -394,13 +281,6 @@ spec:
       - name: run-ovn
         hostPath:
           path: /var/run/ovn
-      # Used for placement of ACL audit logs 
-      - name: node-log
-        hostPath: 
-          path: /var/log/ovn
-      - name: log-socket
-        hostPath: 
-          path: /dev/log
       # For CNI server
       - name: host-run-ovn-kubernetes
         hostPath:

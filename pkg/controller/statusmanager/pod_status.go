@@ -97,9 +97,6 @@ func (status *StatusManager) SetFromPods() {
 			if !isNonCritical(ds) {
 				hung = append(hung, status.CheckCrashLoopBackOffPods(dsName, ds.Spec.Selector.MatchLabels, "DaemonSet")...)
 			}
-		} else if ds.Status.NumberAvailable == 0 { // NOTE: update this if we ever expect empty (unscheduled) daemonsets ~cdc
-			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not yet scheduled on any nodes", dsName.String()))
-			dsProgressing = true
 		} else if ds.Generation > ds.Status.ObservedGeneration {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q update is being processed (generation %d, observed generation %d)", dsName.String(), ds.Generation, ds.Status.ObservedGeneration))
 			dsProgressing = true
