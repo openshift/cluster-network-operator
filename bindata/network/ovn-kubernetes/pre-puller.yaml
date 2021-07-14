@@ -1,0 +1,40 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: ovnkube-upgrades-prepuller
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    kubernetes.io/description: |
+      This daemonset launches the pre-puller component during upgrades that pulls the image onto the node.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+    matchLabels:
+      app: ovnkube-upgrades-prepuller
+  template:
+    metadata:
+      labels:
+        app: ovnkube-upgrades-prepuller
+        component: network
+        type: infra
+        openshift.io/component: network
+        kubernetes.io/os: "linux"
+    spec:
+      serviceAccountName: ovn-kubernetes-node
+      hostNetwork: true
+      priorityClassName: "system-node-critical"
+      containers:
+        # ovnkube-upgrades-prepuller: no-op container that simply pulls the new image during upgrades
+      - name: ovnkube-upgrades-prepuller
+        image: "{{.OvnImage}}"
+        imagePullPolicy: Always
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "$(date -Iseconds) - finished pulling ovnkube-node image."
+          sleep infinity
+      nodeSelector:
+        beta.kubernetes.io/os: "linux"
+      tolerations:
+      - operator: "Exists"

@@ -7,10 +7,11 @@ import (
 
 	"github.com/pkg/errors"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 )
 
-// ToUnstructured convers an arbitrary object (which MUST obey the
+// ToUnstructured converts an arbitrary object (which MUST obey the
 // k8s object conventions) to an Unstructured
 func ToUnstructured(obj interface{}) (*uns.Unstructured, error) {
 	b, err := json.Marshal(obj)
@@ -63,6 +64,31 @@ func ReplaceObj(objs []*uns.Unstructured, new *uns.Unstructured) []*uns.Unstruct
 	if !replaced {
 		klog.V(3).Infof("Warning: ReplaceObj() didn't find replacement for %s %s/%s, skipping",
 			new.GroupVersionKind().GroupKind(), new.GetNamespace(), new.GetName())
+	}
+
+	return out
+}
+
+// RemoveObjByGroupKindName will remove a given object from the list of objects.
+// It will match on the object's kind, namespace and name. If the object isn't found
+// in the list, it will not be removed.
+func RemoveObjByGroupKindName(objs []*uns.Unstructured, group, kind, namespace, name string) []*uns.Unstructured {
+	out := make([]*uns.Unstructured, 0, len(objs))
+
+	removed := false
+	for _, obj := range objs {
+		// if the object in the list
+		if (obj.GroupVersionKind().GroupKind() == schema.GroupKind{Group: group, Kind: kind} &&
+			obj.GetNamespace() == namespace && obj.GetName() == name) {
+			removed = true
+		} else {
+			out = append(out, obj)
+		}
+	}
+
+	if !removed {
+		klog.V(3).Infof("Warning: RemoveObjByKindName() didn't find the object to be removed for %s/%s %s/%s, skipping",
+			group, kind, namespace, name)
 	}
 
 	return out

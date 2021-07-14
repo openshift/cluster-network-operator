@@ -34,6 +34,7 @@ type OVNBootstrapResult struct {
 	ExistingNodeDaemonset   *appsv1.DaemonSet
 	GatewayMode             string
 	Platform                configv1.PlatformType
+	PrePullerDaemonset      *appsv1.DaemonSet
 }
 
 type BootstrapResult struct {
