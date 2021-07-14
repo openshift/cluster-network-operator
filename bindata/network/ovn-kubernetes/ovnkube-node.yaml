@@ -360,6 +360,63 @@ spec:
             command: ["test", "-f", "/etc/cni/net.d/10-ovn-kubernetes.conf"]
           initialDelaySeconds: 5
           periodSeconds: 5
+      {{- if .OVNPlatformAzure}}
+      - name: drop-icmp
+        image: "{{.OvnImage}}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+
+          touch /var/run/add_iptables.sh
+          chmod 0755 /var/run/add_iptables.sh
+          cat <<'EOF' > /var/run/add_iptables.sh
+          #!/bin/sh
+          if [ -z "$3" ]
+          then
+               echo "Called with host address missing, ignore"
+               exit 0
+          fi
+          echo "Adding ICMP drop rule for '$3' "
+          if iptables -C CHECK_ICMP_SOURCE -p icmp -s $3 -j ICMP_ACTION
+          then
+               echo "iptables already set for $3"
+          else
+               iptables -A CHECK_ICMP_SOURCE -p icmp -s $3 -j ICMP_ACTION
+          fi
+          EOF
+
+          echo "I$(date "+%m%d %H:%M:%S.%N") - drop-icmp - start drop-icmp ${K8S_NODE}"
+          iptables -X CHECK_ICMP_SOURCE || true
+          iptables -N CHECK_ICMP_SOURCE || true
+          iptables -F CHECK_ICMP_SOURCE
+          iptables -D INPUT -p icmp --icmp-type fragmentation-needed -j CHECK_ICMP_SOURCE || true
+          iptables -I INPUT -p icmp --icmp-type fragmentation-needed -j CHECK_ICMP_SOURCE
+          iptables -N ICMP_ACTION || true
+          iptables -F ICMP_ACTION
+          iptables -A ICMP_ACTION -j LOG
+          iptables -A ICMP_ACTION -j DROP
+          oc observe pods -n openshift-ovn-kubernetes -l app=ovnkube-node -a '{ .status.hostIP }' -- /var/run/add_iptables.sh
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/bash", "-c", "echo drop-icmp done"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /
+          name: host-slash
+        resources:
+          requests:
+            cpu: 5m
+            memory: 20Mi
+        env:
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+      {{- end}}
       nodeSelector:
         beta.kubernetes.io/os: "linux"
       volumes:
