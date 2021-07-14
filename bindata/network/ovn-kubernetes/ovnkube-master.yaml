@@ -798,6 +798,13 @@ spec:
            # REMOVEME once OVN path for control socket is fixed (right now uses /var/run/openvswitch)
           ln -sf $OVN_NB_DAEMON /var/run/ovn/ || true
 
+          gw_interface_flag=
+          # if br-ex1 is configured on the node, we want to use it for external
+          # gateway traffic
+          if [ -d /sys/class/net/br-ex1 ]; then
+            gw_interface_flag="--egw-interface=br-ex1"
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --init-master "${K8S_NODE}" \
@@ -819,7 +826,8 @@ spec:
             --nbctl-daemon-mode \
             --nb-cert-common-name "{{.OVN_CERT_CN}}" \
             --enable-multicast \
-            --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
+            --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}" \
+            "${gw_interface_flag}"
         lifecycle:
           preStop:
             exec:
