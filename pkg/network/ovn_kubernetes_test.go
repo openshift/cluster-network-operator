@@ -162,6 +162,8 @@ func TestRenderedOVNKubernetesConfig(t *testing.T) {
 mtu="1500"
 cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=750000
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -185,6 +187,8 @@ nodeport=true`,
 mtu="1500"
 cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=750000
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -217,6 +221,8 @@ cluster-subnets="10.132.0.0/14"`,
 mtu="1500"
 cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=750000
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -252,6 +258,8 @@ hybrid-overlay-vxlan-port="9000"`,
 mtu="1500"
 cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=750000
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"

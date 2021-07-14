@@ -11,6 +11,8 @@ data:
     mtu="{{.MTU}}"
     cluster-subnets="{{.OVN_cidr}}"
     encap-port="{{.GenevePort}}"
+    enable-lflow-cache=true
+    lflow-cache-limit-kb=750000
 
     [kubernetes]
     service-cidrs="{{.OVN_service_cidr}}"
