@@ -27,13 +27,19 @@ type KuryrBootstrapResult struct {
 	UserCACert               string
 }
 
+type OVNConfigBoostrapResult struct {
+	GatewayMode            string
+	EnableEgressIP         bool
+	DisableSNATMutlipleGWs bool
+}
+
 type OVNBootstrapResult struct {
 	MasterIPs               []string
 	ClusterInitiator        string
 	ExistingMasterDaemonset *appsv1.DaemonSet
 	ExistingNodeDaemonset   *appsv1.DaemonSet
-	GatewayMode             string
 	Platform                configv1.PlatformType
+	OVNKubernetesConfig     *OVNConfigBoostrapResult
 }
 
 type BootstrapResult struct {
