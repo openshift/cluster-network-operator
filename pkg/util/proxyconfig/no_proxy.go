@@ -75,7 +75,9 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 	}
 
 	if len(network.Status.ServiceNetwork) > 0 {
-		set.Insert(network.Status.ServiceNetwork[0])
+		for _, nss := range network.Status.ServiceNetwork {
+			set.Insert(nss)
+		}
 	} else {
 		return "", fmt.Errorf("serviceNetwork missing from network '%s' status", network.Name)
 	}
