@@ -40,6 +40,8 @@ const CLUSTER_CONFIG_NAMESPACE = "kube-system"
 const OVN_CERT_CN = "ovn"
 const OVN_MASTER_DISCOVERY_POLL = 5
 const OVN_MASTER_DISCOVERY_BACKOFF = 120
+const OVN_LOCAL_GW_MODE = "local"
+const OVN_SHARED_GW_MODE = "shared"
 
 var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
@@ -67,7 +69,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["GenevePort"] = c.GenevePort
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
-	data.Data["OVN_GATEWAY_MODE"] = bootstrapResult.OVN.GatewayMode
+	data.Data["OVN_GATEWAY_MODE"] = bootstrapResult.OVN.OVNKubernetesConfig.GatewayMode
+	data.Data["OVN_ENABLE_EGRESS_IP"] = bootstrapResult.OVN.OVNKubernetesConfig.EnableEgressIP
+	data.Data["OVN_DISABLE_SNAT_MULTIPLE_GWS"] = bootstrapResult.OVN.OVNKubernetesConfig.DisableSNATMutlipleGWs
 	data.Data["OVN_NB_PORT"] = OVN_NB_PORT
 	data.Data["OVN_SB_PORT"] = OVN_SB_PORT
 	data.Data["OVN_NB_RAFT_PORT"] = OVN_NB_RAFT_PORT
@@ -194,28 +198,40 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	return objs, nil
 }
 
-// returns the value of mode found in the openshift-ovn-kubernetes/gateway-mode-config configMap
-// if it exists, otherwise returns whatever the global OVN_GATEWAY_MODE is set to (shared)
-func GetGatewayMode(kubeClient client.Client) (string, error) {
-	defaultGatewayMode := "shared"
+// bootstrapOVNConfig returns the value of mode found in the openshift-ovn-kubernetes/gateway-mode-config configMap
+// if it exists, otherwise returns default configuration for OCP clusters using OVN-Kubernetes
+func bootstrapOVNConfig(kubeClient client.Client) (*bootstrap.OVNConfigBoostrapResult, error) {
+	ovnConfigResult := &bootstrap.OVNConfigBoostrapResult{
+		GatewayMode:            OVN_SHARED_GW_MODE,
+		EnableEgressIP:         true,
+		DisableSNATMutlipleGWs: false,
+	}
+
 	cm := &corev1.ConfigMap{}
 	nsn := types.NamespacedName{Namespace: "openshift-network-operator", Name: "gateway-mode-config"}
 	err := kubeClient.Get(context.TODO(), nsn, cm)
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			klog.Warningf("Did not find gateway-mode-config. Using default mode: \"%s\"", defaultGatewayMode)
-			return defaultGatewayMode, nil
+			klog.Infof("Did not find gateway-mode-config. Using default OVN configuration: %+v", ovnConfigResult)
+			return ovnConfigResult, nil
 		} else {
-			return "", fmt.Errorf("Could not determine gateway mode: %w", err)
+			return nil, fmt.Errorf("Could not determine gateway mode: %w", err)
 		}
 	}
-	if cm.Data["mode"] != "shared" && cm.Data["mode"] != "local" {
-		klog.Warningf("Ignoring gateway-mode-config %s. Does not match \"shared\" or \"local\"", cm.Data["mode"])
-		return defaultGatewayMode, nil
+	modeOverride := cm.Data["mode"]
+	_, disableSNATMultipleGWsOverride := cm.Data["disable-snat-multiple-gws"]
+	if modeOverride != OVN_SHARED_GW_MODE && modeOverride != OVN_LOCAL_GW_MODE {
+		klog.Warningf("gateway-mode-config does not match %q or %q, is: %q. Using default OVN configuration: %+v", OVN_LOCAL_GW_MODE, OVN_SHARED_GW_MODE, modeOverride, ovnConfigResult)
+		return ovnConfigResult, nil
 	}
-	klog.Infof("Overriding OVN gateway mode to %s", cm.Data["mode"])
-	return cm.Data["mode"], nil
+	ovnConfigResult.GatewayMode = modeOverride
+	if disableSNATMultipleGWsOverride {
+		ovnConfigResult.EnableEgressIP = false
+		ovnConfigResult.DisableSNATMutlipleGWs = true
+	}
+	klog.Infof("Overriding OVN configuration to %+v", ovnConfigResult)
+	return ovnConfigResult, nil
 }
 
 // validateOVNKubernetes checks that the ovn-kubernetes specific configuration
@@ -378,9 +394,9 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to unmarshal install-config: %s", err)
 	}
 
-	gatewayMode, err := GetGatewayMode(kubeClient)
+	ovnConfigResult, err := bootstrapOVNConfig(kubeClient)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to bootstrap OVN, undetermined gateway-mode: '%s'", err)
+		return nil, fmt.Errorf("Unable to bootstrap OVN config, err: %v", err)
 	}
 
 	controlPlaneReplicaCount, _ := strconv.Atoi(rcD.ControlPlane.Replicas)
@@ -483,7 +499,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 			ClusterInitiator:        clusterInitiator,
 			ExistingMasterDaemonset: masterDS,
 			ExistingNodeDaemonset:   nodeDS,
-			GatewayMode:             gatewayMode,
+			OVNKubernetesConfig:     ovnConfigResult,
 		},
 	}
 	return &res, nil

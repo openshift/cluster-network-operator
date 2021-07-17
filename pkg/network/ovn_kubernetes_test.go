@@ -61,6 +61,11 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	bootstrapResult := &bootstrap.BootstrapResult{
 		OVN: bootstrap.OVNBootstrapResult{
 			MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+				GatewayMode:            "shared",
+				EnableEgressIP:         true,
+				DisableSNATMutlipleGWs: false,
+			},
 		},
 	}
 
@@ -124,6 +129,11 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	bootstrapResult := &bootstrap.BootstrapResult{
 		OVN: bootstrap.OVNBootstrapResult{
 			MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+				GatewayMode:            "shared",
+				EnableEgressIP:         true,
+				DisableSNATMutlipleGWs: false,
+			},
 		},
 	}
 	objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
@@ -137,6 +147,11 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	bootstrapResult = &bootstrap.BootstrapResult{
 		OVN: bootstrap.OVNBootstrapResult{
 			MasterIPs: []string{"fd01::1", "fd01::2", "fd01::3"},
+			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+				GatewayMode:            "shared",
+				EnableEgressIP:         true,
+				DisableSNATMutlipleGWs: false,
+			},
 		},
 	}
 	objs, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
@@ -174,7 +189,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 
 [gateway]
-mode=local
+mode=shared
 nodeport=true`,
 		},
 
@@ -198,7 +213,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 
 [gateway]
-mode=local
+mode=shared
 nodeport=true
 
 [hybridoverlay]
@@ -230,7 +245,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 
 [gateway]
-mode=local
+mode=shared
 nodeport=true
 
 [hybridoverlay]
@@ -265,7 +280,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 
 [gateway]
-mode=local
+mode=shared
 nodeport=true
 
 [hybridoverlay]
@@ -298,6 +313,11 @@ enabled=true`,
 			bootstrapResult := &bootstrap.BootstrapResult{
 				OVN: bootstrap.OVNBootstrapResult{
 					MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+					OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+						GatewayMode:            "shared",
+						EnableEgressIP:         true,
+						DisableSNATMutlipleGWs: false,
+					},
 				},
 			}
 			objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
@@ -1048,6 +1068,11 @@ metadata:
 					MasterIPs:               []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
 					ExistingMasterDaemonset: master,
 					ExistingNodeDaemonset:   node,
+					OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+						GatewayMode:            "shared",
+						EnableEgressIP:         true,
+						DisableSNATMutlipleGWs: false,
+					},
 				},
 			}
 
@@ -1335,6 +1360,11 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 						"release.openshift.io/version":      "1.9.9",
 					},
 				},
+			},
+			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+				GatewayMode:            "shared",
+				EnableEgressIP:         true,
+				DisableSNATMutlipleGWs: false,
 			},
 		},
 	}
