@@ -371,6 +371,8 @@ func (r *ReconcileProxyConfig) mergeTrustBundlesToConfigMap(additionalData, syst
 
 	combinedTrustData := []byte{}
 	combinedTrustData = append(combinedTrustData, additionalData...)
+	// add a newline here so that CVO can digest user and system certs correctly
+	combinedTrustData = append(combinedTrustData, []byte("\n")...)
 	combinedTrustData = append(combinedTrustData, systemData...)
 
 	mergedCfgMap := &corev1.ConfigMap{
