@@ -69,8 +69,10 @@ spec:
         ports:
         - name: metrics-port
           containerPort: 9654
+{{- if not .ExternalControlPlane }}
       nodeSelector:
         node-role.kubernetes.io/master: ""
+{{- end }}
       tolerations:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"

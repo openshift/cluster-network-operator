@@ -14,6 +14,7 @@ import (
 	"time"
 
 	yaml "github.com/ghodss/yaml"
+	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -53,6 +54,13 @@ var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 // - the ovnkube-master deployment
 // and some other small things.
 func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+
+	// TODO: Fix operator behavior when running in a cluster with an externalized control plane.
+	// For now, return an error since we don't have any master nodes to run the ovn-master daemonset.
+	if bootstrapResult.ExternalControlPlane {
+		return nil, fmt.Errorf("Unable to render OVN in a cluster with an external control plane")
+	}
+
 	c := conf.DefaultNetwork.OVNKubernetesConfig
 
 	objs := []*uns.Unstructured{}
@@ -389,6 +397,12 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to retrieve cluster config: %s", err)
 	}
 
+	infraConfig := &configv1.Infrastructure{}
+	if err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
+		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to retrieve infrastructure 'cluster': %v", err)
+	}
+	externalControlPlane := infraConfig.Status.ControlPlaneTopology == configv1.ExternalTopologyMode
+
 	rcD := replicaCountDecoder{}
 	if err := yaml.Unmarshal([]byte(clusterConfig.Data["install-config"]), &rcD); err != nil {
 		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to unmarshal install-config: %s", err)
@@ -494,6 +508,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 	}
 
 	res := bootstrap.BootstrapResult{
+		ExternalControlPlane: externalControlPlane,
 		OVN: bootstrap.OVNBootstrapResult{
 			MasterIPs:               ovnMasterIPs,
 			ClusterInitiator:        clusterInitiator,
