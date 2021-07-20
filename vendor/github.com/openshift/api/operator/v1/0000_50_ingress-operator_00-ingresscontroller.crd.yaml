@@ -2,6 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    api-approved.openshift.io: https://github.com/openshift/api/pull/616
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
     include.release.openshift.io/single-node-developer: "true"
@@ -44,6 +45,53 @@ spec:
             description: spec is the specification of the desired behavior of the
               IngressController.
             properties:
+              clientTLS:
+                description: clientTLS specifies settings for requesting and verifying
+                  client certificates, which can be used to enable mutual TLS for
+                  edge-terminated and reencrypt routes.
+                properties:
+                  allowedSubjectPatterns:
+                    description: allowedSubjectPatterns specifies a list of regular
+                      expressions that should be matched against the distinguished
+                      name on a valid client certificate to filter requests.  The
+                      regular expressions must use PCRE syntax.  If this list is empty,
+                      no filtering is performed.  If the list is nonempty, then at
+                      least one pattern must match a client certificate's distinguished
+                      name or else the ingress controller rejects the certificate
+                      and denies the connection.
+                    items:
+                      type: string
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  clientCA:
+                    description: clientCA specifies a configmap containing the PEM-encoded
+                      CA certificate bundle that should be used to verify a client's
+                      certificate.  The administrator must create this configmap in
+                      the openshift-config namespace.
+                    properties:
+                      name:
+                        description: name is the metadata.name of the referenced config
+                          map
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  clientCertificatePolicy:
+                    description: "clientCertificatePolicy specifies whether the ingress
+                      controller requires clients to provide certificates.  This field
+                      accepts the values \"Required\" or \"Optional\". \n Note that
+                      the ingress controller only checks client certificates for edge-terminated
+                      and reencrypt TLS routes; it cannot check certificates for cleartext
+                      HTTP or passthrough TLS routes."
+                    enum:
+                    - ""
+                    - Required
+                    - Optional
+                    type: string
+                required:
+                - clientCA
+                - clientCertificatePolicy
+                type: object
               defaultCertificate:
                 description: "defaultCertificate is a reference to a secret containing
                   the default certificate served by the ingress controller. When Routes
@@ -849,10 +897,7 @@ spec:
                   example, given a specification to use the Intermediate profile deployed
                   on release X.Y.Z, an upgrade to release X.Y.Z+1 may cause a new
                   profile configuration to be applied to the ingress controller, resulting
-                  in a rollout. \n Note that the minimum TLS version for ingress controllers
-                  is 1.1, and the maximum TLS version is 1.2.  An implication of this
-                  restriction is that the Modern TLS profile type cannot be used because
-                  it requires TLS 1.3."
+                  in a rollout."
                 properties:
                   custom:
                     description: "custom is a user-defined TLS security profile. Be

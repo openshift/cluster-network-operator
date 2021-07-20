@@ -62,6 +62,11 @@ type DNSSpec struct {
 	//
 	// +optional
 	NodePlacement DNSNodePlacement `json:"nodePlacement,omitempty"`
+
+	// managementState indicates whether the DNS operator should manage cluster
+	// DNS
+	// +optional
+	ManagementState ManagementState `json:"managementState,omitempty"`
 }
 
 // Server defines the schema for a server that runs per instance of CoreDNS.
@@ -110,9 +115,14 @@ type DNSNodePlacement struct {
 
 	// tolerations is a list of tolerations applied to DNS pods.
 	//
-	// The default is an empty list.  This default is subject to change.
+	// If empty, the DNS operator sets a toleration for the
+	// "node-role.kubernetes.io/master" taint.  This default is subject to
+	// change.  Specifying tolerations without including a toleration for
+	// the "node-role.kubernetes.io/master" taint may be risky as it could
+	// lead to an outage if all worker nodes become unavailable.
 	//
-	// See https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+	// Note that the daemon controller adds some tolerations as well.  See
+	// https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
 	//
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
