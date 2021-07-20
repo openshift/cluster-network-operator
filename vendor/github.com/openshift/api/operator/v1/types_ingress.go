@@ -158,13 +158,15 @@ type IngressControllerSpec struct {
 	// to release X.Y.Z+1 may cause a new profile configuration to be applied to the ingress
 	// controller, resulting in a rollout.
 	//
-	// Note that the minimum TLS version for ingress controllers is 1.1, and
-	// the maximum TLS version is 1.2.  An implication of this restriction
-	// is that the Modern TLS profile type cannot be used because it
-	// requires TLS 1.3.
-	//
 	// +optional
 	TLSSecurityProfile *configv1.TLSSecurityProfile `json:"tlsSecurityProfile,omitempty"`
+
+	// clientTLS specifies settings for requesting and verifying client
+	// certificates, which can be used to enable mutual TLS for
+	// edge-terminated and reencrypt routes.
+	//
+	// +optional
+	ClientTLS ClientTLS `json:"clientTLS"`
 
 	// routeAdmission defines a policy for handling new route claims (for example,
 	// to allow or deny claims across namespaces).
@@ -583,6 +585,57 @@ type EndpointPublishingStrategy struct {
 	// Present only if type is NodePortService.
 	// +optional
 	NodePort *NodePortStrategy `json:"nodePort,omitempty"`
+}
+
+// ClientCertificatePolicy describes the policy for client certificates.
+// +kubebuilder:validation:Enum="";Required;Optional
+type ClientCertificatePolicy string
+
+const (
+	// ClientCertificatePolicyRequired indicates that a client certificate
+	// should be required.
+	ClientCertificatePolicyRequired ClientCertificatePolicy = "Required"
+
+	// ClientCertificatePolicyOptional indicates that a client certificate
+	// should be requested but not required.
+	ClientCertificatePolicyOptional ClientCertificatePolicy = "Optional"
+)
+
+// ClientTLS specifies TLS configuration to enable client-to-server
+// authentication, which can be used for mutual TLS.
+type ClientTLS struct {
+	// clientCertificatePolicy specifies whether the ingress controller
+	// requires clients to provide certificates.  This field accepts the
+	// values "Required" or "Optional".
+	//
+	// Note that the ingress controller only checks client certificates for
+	// edge-terminated and reencrypt TLS routes; it cannot check
+	// certificates for cleartext HTTP or passthrough TLS routes.
+	//
+	// +kubebuilder:validation:Required
+	// +required
+	ClientCertificatePolicy ClientCertificatePolicy `json:"clientCertificatePolicy"`
+
+	// clientCA specifies a configmap containing the PEM-encoded CA
+	// certificate bundle that should be used to verify a client's
+	// certificate.  The administrator must create this configmap in the
+	// openshift-config namespace.
+	//
+	// +kubebuilder:validation:Required
+	// +required
+	ClientCA configv1.ConfigMapNameReference `json:"clientCA"`
+
+	// allowedSubjectPatterns specifies a list of regular expressions that
+	// should be matched against the distinguished name on a valid client
+	// certificate to filter requests.  The regular expressions must use
+	// PCRE syntax.  If this list is empty, no filtering is performed.  If
+	// the list is nonempty, then at least one pattern must match a client
+	// certificate's distinguished name or else the ingress controller
+	// rejects the certificate and denies the connection.
+	//
+	// +listType=atomic
+	// +optional
+	AllowedSubjectPatterns []string `json:"allowedSubjectPatterns,omitempty"`
 }
 
 // RouteAdmissionPolicy is an admission policy for allowing new route claims.
