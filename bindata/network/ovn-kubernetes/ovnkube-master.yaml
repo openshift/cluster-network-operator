@@ -383,7 +383,9 @@ spec:
                 - /var/run/ovn/ovnnb_db.ctl
                 - exit
         readinessProbe:
+{{ if not .IsSNO }}
           initialDelaySeconds: 90
+{{ end }}
           timeoutSeconds: 5
           exec:
             command:
@@ -729,7 +731,9 @@ spec:
                 - /var/run/ovn/ovnsb_db.ctl
                 - exit
         readinessProbe:
+{{ if not .IsSNO }}
           initialDelaySeconds: 90
+{{ end }}
           timeoutSeconds: 5
           exec:
             command:
