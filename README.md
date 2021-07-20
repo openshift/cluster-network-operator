@@ -229,7 +229,6 @@ data:
   ip-10-0-135-96.us-east-2.compute.internal: |
     OVN_KUBE_LOG_LEVEL=5
     OVN_LOG_LEVEL=dbg
-    OVS_SYS_LOG_LEVEL=dbg
   # to adjust master log levels, use _master
   _master: |
     OVN_KUBE_LOG_LEVEL=5
