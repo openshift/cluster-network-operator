@@ -252,8 +252,6 @@ spec:
           if [[ -n "${IPFIX_COLLECTORS}" ]] ; then
             export_network_flows_flags="$export_network_flows_flags --ipfix-targets ${IPFIX_COLLECTORS}"
           fi
-          ovs-appctl vlog/set "syslog:${OVS_SYS_LOG_LEVEL}"
-
           gw_interface_flag=
           # if br-ex1 is configured on the node, we want to use it for external gateway traffic
           if [ -d /sys/class/net/br-ex1 ]; then
@@ -292,8 +290,6 @@ spec:
           value: "{{.OVN_CONTROLLER_INACTIVITY_PROBE}}"
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
-        - name: OVS_SYS_LOG_LEVEL
-          value: info
         {{ if .NetFlowCollectors }}
         - name: NETFLOW_COLLECTORS
           value: "{{.NetFlowCollectors}}"
