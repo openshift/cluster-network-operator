@@ -46,6 +46,8 @@ type BootstrapResult struct {
 	Kuryr KuryrBootstrapResult
 	OVN   OVNBootstrapResult
 	SDN   SDNBootstrapResult
+
+	ExternalControlPlane bool
 }
 
 type SDNBootstrapResult struct {
