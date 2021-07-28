@@ -293,7 +293,7 @@ func TestProxyArgs(t *testing.T) {
 	g.Expect(errs).To(HaveLen(0))
 	// Validate that we don't allow the feature-gates to be set via user config
 	config.KubeProxyConfig.ProxyArguments = map[string]operv1.ProxyArgumentList{
-		"feature-gates": {"FGBar=baz"},
+		"feature-gates": {"FGBar=true"},
 	}
 	errs = validateKubeProxy(config)
 	g.Expect(errs).To(HaveLen(1))
