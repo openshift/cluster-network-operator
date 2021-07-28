@@ -6,28 +6,32 @@ import (
 	"crypto/x509"
 	b64 "encoding/base64"
 	"fmt"
+	"golang.org/x/net/http/httpproxy"
 	"log"
 	"net"
 	"net/http"
+	"net/url"
+	"os"
 
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/Masterminds/semver"
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
-
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/utils/openstack/clientconfig"
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/platform/openstack/util/cert"
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 
 	confv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
@@ -330,18 +334,55 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 		return nil, errors.Wrap(err, "failed to get cloud provider CA certificate")
 	}
 
+	// We cannot rely on the inject-proxy annotation because the CVO, which is
+	// responsible to inject the proxy env vars, is not available before CNO.
+	proxyConfig := &configv1.Proxy{}
+	err = kubeClient.Get(context.TODO(), types.NamespacedName{Name: names.CLUSTER_CONFIG}, proxyConfig)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	transport := http.Transport{}
+	noProxy := proxyConfig.Status.NoProxy
+	httpProxy := proxyConfig.Status.HTTPProxy
+	httpsProxy := proxyConfig.Status.HTTPSProxy
+	hasProxy := len(httpsProxy) > 0 || len(httpProxy) > 0 || len(noProxy) > 0
+	if hasProxy {
+		os.Setenv("NO_PROXY", noProxy)
+		os.Setenv("HTTP_PROXY", httpProxy)
+		os.Setenv("HTTPS_PROXY", httpsProxy)
+		// The env vars are not propagated to different libs when not set on
+		// main(), so we'll load it directly here and rely on http lib to choose
+		// the proxy URL.
+		proxyfunc := httpproxy.FromEnvironment().ProxyFunc()
+		transport.Proxy = func(req *http.Request) (*url.URL, error) {
+			return proxyfunc(req.URL)
+		}
+		provider.HTTPClient = http.Client{Transport: &transport}
+
+		// Due to an issue in the urllib3 library https://github.com/psf/requests/issues/5939
+		// Kuryr will currently default to use http scheme when https is set.
+		proxyUrl, err := url.Parse(httpsProxy)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse cluster-wide proxy https URL")
+		}
+
+		if proxyUrl.Scheme == "https" {
+			if len(httpProxy) > 0 {
+				log.Printf("Kuryr requires proxy to use http scheme. Defaulting proxy to %s", httpProxy)
+				httpsProxy = httpProxy
+			} else {
+				return nil, errors.New("Kuryr currently requires proxy to use http scheme.")
+			}
+		}
+	}
+
 	if userCACert != "" {
 		certPool, err := x509.SystemCertPool()
 		if err == nil {
 			certPool.AppendCertsFromPEM([]byte(userCACert))
-			client := http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{
-						RootCAs: certPool,
-					},
-				},
-			}
-			provider.HTTPClient = client
+			transport.TLSClientConfig = &tls.Config{RootCAs: certPool}
+			provider.HTTPClient = http.Client{Transport: &transport}
 		}
 	}
 
@@ -734,6 +775,9 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 			WebhookKey:               b64.StdEncoding.EncodeToString(webhookKey),
 			WebhookCert:              b64.StdEncoding.EncodeToString(webhookCert),
 			UserCACert:               userCACert,
+			HttpProxy:                httpProxy,
+			HttpsProxy:               httpsProxy,
+			NoProxy:                  noProxy,
 		}}
 	return &res, nil
 }
