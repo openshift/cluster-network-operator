@@ -43,6 +43,10 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	// OpenStack cloud CA certificate provided by the user to the installer
 	data.Data["UserCACertificate"] = b.UserCACert
 
+	data.Data["HttpsProxy"] = b.HttpsProxy
+	data.Data["HttpProxy"] = b.HttpProxy
+	data.Data["NoProxy"] = b.NoProxy
+
 	// general kuryr options
 	data.Data["ResourceTags"] = "openshiftClusterID=" + b.ClusterID
 	data.Data["PodSecurityGroups"] = strings.Join(b.PodSecurityGroups, ",")

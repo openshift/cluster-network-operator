@@ -52,6 +52,18 @@ spec:
           value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: KUBERNETES_SERVICE_HOST
           value: "{{.KUBERNETES_SERVICE_HOST}}"
+{{- if .HttpProxy }}
+        - name: HTTP_PROXY
+          value: {{ .HttpProxy }}
+{{- end }}
+{{- if .HttpsProxy }}
+        - name: HTTPS_PROXY
+          value: {{ .HttpsProxy }}
+{{- end }}
+{{- if .NoProxy }}
+        - name: NO_PROXY
+          value: {{ .NoProxy }}
+{{- end }}
         volumeMounts:
         - name: config-volume
           mountPath: "/etc/kuryr"
