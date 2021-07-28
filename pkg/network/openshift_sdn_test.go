@@ -446,8 +446,6 @@ conntrack:
   tcpEstablishedTimeout: null
 detectLocalMode: ""
 enableProfiling: true
-featureGates:
-  EndpointSliceProxying: false
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:
@@ -502,8 +500,6 @@ conntrack:
   tcpEstablishedTimeout: null
 detectLocalMode: ""
 enableProfiling: true
-featureGates:
-  EndpointSliceProxying: false
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:
