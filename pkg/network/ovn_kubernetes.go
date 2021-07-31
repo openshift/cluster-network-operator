@@ -166,6 +166,12 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		}
 	}
 
+	if len(bootstrapResult.OVN.MasterIPs) == 1 {
+		data.Data["IsSNO"] = true
+	} else {
+		data.Data["IsSNO"] = false
+	}
+
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/ovn-kubernetes"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render manifests")
