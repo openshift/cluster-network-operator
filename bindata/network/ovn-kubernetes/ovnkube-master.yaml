@@ -248,9 +248,9 @@ spec:
                 if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - nbdb - postStart - waiting for master to be selected"
 
-                  # set the connection and disable inactivity probe
+                  # set the connection and inactivity probe
                   retries=0
-                  while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=60000; do
+                  while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_NB_INACTIVITY_PROBE}}; do
                     (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
                     echo "$(date -Iseconds) - ERROR RESTARTING - nbdb - too many failed ovn-nbctl attempts, giving up"
@@ -622,9 +622,9 @@ spec:
                 if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - sdb - postStart - waiting for master to be selected"
 
-                  # set the connection and disable inactivity probe
+                  # set the connection and inactivity probe
                   retries=0
-                  while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe=60000; do
+                  while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_CONTROLLER_INACTIVITY_PROBE}}; do
                     (( retries += 1 ))
                   if [[ "${retries}" -gt 40 ]]; then
                     echo "$(date -Iseconds) - ERROR RESTARTING - sbdb - too many failed ovn-sbctl attempts, giving up"
