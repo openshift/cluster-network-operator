@@ -71,8 +71,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 	// the insecure metrics port exposed by kube-proxy itself. So just override
 	// the value from conf (which we know is either "9101" or unspecified).
 	kpcOverrides := map[string]operv1.ProxyArgumentList{
-		"metrics-port":  {"29101"},
-		"feature-gates": {"EndpointSliceProxying=false"},
+		"metrics-port": {"29101"},
 	}
 	if *c.EnableUnidling {
 		// We already validated that proxy-mode was either unset or iptables.
