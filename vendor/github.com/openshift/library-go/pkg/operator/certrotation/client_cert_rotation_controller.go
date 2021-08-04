@@ -60,7 +60,7 @@ func NewCertRotationController(
 		OperatorClient:   operatorClient,
 	}
 	return factory.New().
-		ResyncEvery(30*time.Second).
+		ResyncEvery(time.Minute).
 		WithSync(c.Sync).
 		WithInformers(
 			signingRotation.Informer.Informer(),

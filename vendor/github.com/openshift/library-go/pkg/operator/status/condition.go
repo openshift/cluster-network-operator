@@ -41,6 +41,7 @@ func UnionCondition(conditionType string, defaultConditionStatus operatorv1.Cond
 			}
 		}
 	}
+	sort.Sort(byConditionType(badConditions))
 
 	unionedCondition := operatorv1.OperatorCondition{Type: conditionType, Status: operatorv1.ConditionUnknown}
 	if len(interestingConditions) == 0 {
@@ -151,4 +152,18 @@ func unionReason(unionConditionType string, conditions []operatorv1.OperatorCond
 	}
 	sort.Strings(typeReasons)
 	return strings.Join(typeReasons, "::")
+}
+
+type byConditionType []operatorv1.OperatorCondition
+
+var _ sort.Interface = byConditionType{}
+
+func (s byConditionType) Len() int {
+	return len(s)
+}
+func (s byConditionType) Less(i, j int) bool {
+	return s[i].Type < s[j].Type
+}
+func (s byConditionType) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
 }
