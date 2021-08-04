@@ -33,7 +33,7 @@ func NewOperatorManagementStateController(
 		operatorName:   name,
 		operatorClient: operatorClient,
 	}
-	return factory.New().WithInformers(operatorClient.Informer()).WithSync(c.sync).ResyncEvery(time.Second).ToController("ManagementStateController", recorder.WithComponentSuffix("management-state-recorder"))
+	return factory.New().WithInformers(operatorClient.Informer()).WithSync(c.sync).ResyncEvery(time.Minute).ToController("ManagementStateController", recorder.WithComponentSuffix("management-state-recorder"))
 }
 
 func (c ManagementStateController) sync(ctx context.Context, syncContext factory.SyncContext) error {
