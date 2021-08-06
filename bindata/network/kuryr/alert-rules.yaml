@@ -43,7 +43,7 @@ spec:
       annotations:
         message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} is not ready.
       expr: |
-        kube_pod_status_ready{namespace='openshift-kuryr', condition='true'} == 0
+        sum by(pod, namespace) (kube_pod_status_ready{condition="true",namespace="openshift-kuryr"}) * on(pod, namespace) group_right() kube_pod_info == 0
       for: 10m
       labels:
         severity: warning
