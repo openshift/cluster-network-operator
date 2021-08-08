@@ -31,7 +31,7 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	objs = append(objs, o...)
 
 	// render MultusAdmissionController
-	o, err = renderMultusAdmissionController(conf, manifestDir)
+	o, err = renderMultusAdmissionController(conf, manifestDir, bootstrapResult.ExternalControlPlane)
 	if err != nil {
 		return nil, err
 	}
@@ -559,7 +559,7 @@ func renderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 }
 
 // renderMultusAdmissionController generates the manifests of Multus Admission Controller
-func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string, externalControlPlane bool) ([]*uns.Unstructured, error) {
 	if *conf.DisableMultiNetwork {
 		return nil, nil
 	}
@@ -567,7 +567,7 @@ func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir strin
 	var err error
 	out := []*uns.Unstructured{}
 
-	objs, err := renderMultusAdmissonControllerConfig(manifestDir)
+	objs, err := renderMultusAdmissonControllerConfig(manifestDir, externalControlPlane)
 	if err != nil {
 		return nil, err
 	}

@@ -52,6 +52,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 	} else {
 		data.Data["SDNPlatformAzure"] = false
 	}
+	data.Data["ExternalControlPlane"] = bootstrapResult.ExternalControlPlane
 
 	clusterNetwork, err := clusterNetwork(conf)
 	if err != nil {
@@ -295,6 +296,7 @@ func bootstrapSDN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 	klog.V(2).Infof("Openshift-SDN: Bootstrap SDN infraConfig Platform: %q", platformType)
 
 	res := bootstrap.BootstrapResult{
+		ExternalControlPlane: infraConfig.Status.ControlPlaneTopology == configv1.ExternalTopologyMode,
 		SDN: bootstrap.SDNBootstrapResult{
 			Platform: platformType,
 		},

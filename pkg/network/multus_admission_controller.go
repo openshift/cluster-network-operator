@@ -11,7 +11,7 @@ import (
 )
 
 // renderMultusAdmissonControllerConfig returns the manifests of Multus Admisson Controller
-func renderMultusAdmissonControllerConfig(manifestDir string) ([]*uns.Unstructured, error) {
+func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPlane bool) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 
 	// render the manifests on disk
@@ -20,6 +20,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string) ([]*uns.Unstructur
 	data.Data["MultusAdmissionControllerImage"] = os.Getenv("MULTUS_ADMISSION_CONTROLLER_IMAGE")
 	data.Data["MultusValidatingWebhookName"] = names.MULTUS_VALIDATING_WEBHOOK
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
+	data.Data["ExternalControlPlane"] = externalControlPlane
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus-admission-controller"), &data)
 	if err != nil {

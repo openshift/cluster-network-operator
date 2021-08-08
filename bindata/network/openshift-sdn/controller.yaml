@@ -49,8 +49,10 @@ spec:
         - mountPath: /env
           name: env-overrides
       hostNetwork: true
+{{- if not .ExternalControlPlane }}
       nodeSelector:
         node-role.kubernetes.io/master: ""
+{{- end }}
       priorityClassName: "system-cluster-critical"
       restartPolicy: Always
       serviceAccountName: sdn-controller
