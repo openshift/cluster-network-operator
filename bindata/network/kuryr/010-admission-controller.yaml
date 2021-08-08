@@ -51,8 +51,10 @@ spec:
             cpu: 10m
       priorityClassName: "system-cluster-critical"
       restartPolicy: Always
+{{- if not .ExternalControlPlane }}
       nodeSelector:
         node-role.kubernetes.io/master: ""
+{{- end }}
       volumes:
       - name: webhook-certs
         secret:

@@ -28,6 +28,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 
 	confv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
@@ -713,9 +714,15 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 	octaviaVersion = maxOctaviaVersion.Original()
 
+	infraConfig := &confv1.Infrastructure{}
+	if err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
+		return nil, fmt.Errorf("failed to get infrastructure 'cluster': %v", err)
+	}
+
 	log.Print("Kuryr bootstrap finished")
 
 	res := bootstrap.BootstrapResult{
+		ExternalControlPlane: infraConfig.Status.ControlPlaneTopology == confv1.ExternalTopologyMode,
 		Kuryr: bootstrap.KuryrBootstrapResult{
 			ServiceSubnet:            svcSubnetId,
 			PodSubnetpool:            podSubnetpoolId,
