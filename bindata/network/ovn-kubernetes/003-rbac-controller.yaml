@@ -52,7 +52,7 @@ rules:
   verbs:
   - list
   - watch
-- apiGroups: ["extensions", "networking.k8s.io"]
+- apiGroups: ["networking.k8s.io"]
   resources:
   - networkpolicies
   verbs:
