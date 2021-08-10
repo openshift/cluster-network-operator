@@ -14,6 +14,7 @@ import (
 	"time"
 
 	yaml "github.com/ghodss/yaml"
+	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -89,6 +90,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNPolicyAuditMaxFileSize"] = c.PolicyAuditConfig.MaxFileSize
 	data.Data["OVNPolicyAuditDestination"] = c.PolicyAuditConfig.Destination
 	data.Data["OVNPolicyAuditSyslogFacility"] = c.PolicyAuditConfig.SyslogFacility
+	if bootstrapResult.OVN.Platform == configv1.AzurePlatformType {
+		data.Data["OVNPlatformAzure"] = true
+	} else {
+		data.Data["OVNPlatformAzure"] = false
+	}
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
@@ -389,6 +395,17 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to retrieve cluster config: %s", err)
 	}
 
+	infraConfig := &configv1.Infrastructure{}
+	if err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
+		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to retrieve infrastructure 'cluster': %v", err)
+	}
+
+	var platformType configv1.PlatformType
+	if infraConfig.Status.PlatformStatus != nil {
+		platformType = infraConfig.Status.PlatformStatus.Type
+	}
+	klog.V(2).Infof("Openshift-OVN: Bootstrap OVN infraConfig Platform: %q", platformType)
+
 	rcD := replicaCountDecoder{}
 	if err := yaml.Unmarshal([]byte(clusterConfig.Data["install-config"]), &rcD); err != nil {
 		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to unmarshal install-config: %s", err)
@@ -511,6 +528,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 			ExistingNodeDaemonset:   nodeDS,
 			GatewayMode:             gatewayMode,
 			PrePullerDaemonset:      prePullerDS,
+			Platform:                platformType,
 		},
 	}
 	return &res, nil
