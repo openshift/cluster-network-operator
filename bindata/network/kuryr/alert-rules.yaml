@@ -14,8 +14,7 @@ spec:
     rules:
     - alert: NoRunningKuryrKubernetes
       annotations:
-        message: |
-          There is no running kuryr controller
+        summary: There is no running kuryr controller
       expr: |
         absent(up{job="kuryr-controller",namespace="openshift-kuryr"} ==1)
       for: 10m
@@ -23,8 +22,7 @@ spec:
         severity: warning
     - alert: NodeWithoutKuryrCNIPodRunning
       annotations:
-        message: |
-          All nodes should be running a kuryr-cni pod, {{"{{"}} $labels.node {{"}}"}} is not.
+        summary: All nodes should be running a kuryr-cni pod, {{"{{"}} $labels.node {{"}}"}} is not.
       expr: |
         (kube_node_info unless on(node) kube_pod_info{namespace="openshift-kuryr",  pod=~"kuryr-cni.*"}) > 0
       for: 20m
@@ -32,7 +30,7 @@ spec:
         severity: warning
     - alert: KuryrPodsCrashLooping
       annotations:
-        message: Pod {{"{{"}} $labels.namespace{{"}}"}}/{{"{{"}} $labels.pod{{"}}"}} ({{"{{"}} $labels.container
+        summary: Pod {{"{{"}} $labels.namespace{{"}}"}}/{{"{{"}} $labels.pod{{"}}"}} ({{"{{"}} $labels.container
           {{"}}"}}) is restarting {{"{{"}} printf "%.2f" $value {{"}}"}} times / 5 minutes.
       expr: |
         rate(kube_pod_container_status_restarts_total{namespace="openshift-kuryr"}[15m]) * 60 * 5 > 0
@@ -41,7 +39,7 @@ spec:
         severity: warning
     - alert: KuryrSDNPodNotReady
       annotations:
-        message: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} is not ready.
+        summary: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} is not ready.
       expr: |
         sum by(pod, namespace) (kube_pod_status_ready{condition="true",namespace="openshift-kuryr"}) * on(pod, namespace) group_right() kube_pod_info == 0
       for: 10m
@@ -49,49 +47,49 @@ spec:
         severity: warning
     - alert: LimitedPortsOnNetwork
       annotations:
-        message: Subnet {{"{{"}} $labels.subnet_name {{"}}"}} is getting out of ports.
+        summary: Subnet {{"{{"}} $labels.subnet_name {{"}}"}} is getting out of ports.
       expr: |
         kuryr_port_quota_per_subnet > 0 and kuryr_port_quota_per_subnet < 10
       labels:
         severity: warning
     - alert: InsuficientPortsOnNetwork
       annotations:
-        message: Subnet {{"{{"}} $labels.subnet_name {{"}}"}} does not have available ports.
+        summary: Subnet {{"{{"}} $labels.subnet_name {{"}}"}} does not have available ports.
       expr: |
         kuryr_port_quota_per_subnet == 0
       labels:
         severity: critical
     - alert: LimitedResourceQuota
       annotations:
-        message: Running out of quota for {{"{{"}} $labels.resource {{"}}"}}.
+        summary: Running out of quota for {{"{{"}} $labels.resource {{"}}"}}.
       expr: |
         kuryr_quota_free_count > 0 and kuryr_quota_free_count < 10
       labels:
         severity: warning
     - alert: InsuficientResourceQuota
       annotations:
-        message: There is no quota for {{"{{"}} $labels.resource {{"}}"}}.
+        summary: There is no quota for {{"{{"}} $labels.resource {{"}}"}}.
       expr: |
         kuryr_quota_free_count == 0
       labels:
         severity: critical
     - alert: PodCreationSlow
       annotations:
-        message: The cluster is taking too long, on average, to make pods to running status.
+        summary: The cluster is taking too long, on average, to make pods to running status.
       expr: |
         histogram_quantile(0.95, sum(rate(kuryr_pod_creation_latency_bucket[10m])) by (le)) > 120
       labels:
         severity: warning
     - alert: KuryrCNISlow
       annotations:
-        message: Kuryr CNI pod {{"{{"}} $labels.pod {{"}}"}} is taking too long, on average, to perform CNI {{"{{"}} $labels.command {{"}}"}} requests.
+        summary: Kuryr CNI pod {{"{{"}} $labels.pod {{"}}"}} is taking too long, on average, to perform CNI {{"{{"}} $labels.command {{"}}"}} requests.
       expr: |
         histogram_quantile(0.95, rate(kuryr_cni_request_duration_seconds_bucket[10m])) > 30
       labels:
         severity: warning
     - alert: KuryrLoadBalancerWithError
       annotations:
-        message: Load Balancer {{"{{"}} $labels.lb_name {{"}}"}} is with {{"{{"}} $labels.kuryr_critical_lb_state {{"}}"}} state for more then 5m.
+        summary: Load Balancer {{"{{"}} $labels.lb_name {{"}}"}} is with {{"{{"}} $labels.kuryr_critical_lb_state {{"}}"}} state for more then 5m.
       expr: |
         kuryr_critical_lb_state{kuryr_critical_lb_state='ERROR'} == 1
       for: 5m
@@ -99,7 +97,7 @@ spec:
         severity: critical
     - alert: KuryrLoadBalancerDeleted
       annotations:
-        message: Load Balancer {{"{{"}} $labels.lb_name {{"}}"}} is not present for more then 5m.
+        summary: Load Balancer {{"{{"}} $labels.lb_name {{"}}"}} is not present for more then 5m.
       expr: |
         kuryr_critical_lb_state{kuryr_critical_lb_state='DELETED'} == 1
       for: 5m
@@ -107,7 +105,7 @@ spec:
         severity: critical
     - alert: LimitedLoadBalancerMembers
       annotations:
-        message: Low number of Members on Load Balancer {{"{{"}} $labels.lb_name {{"}}"}} with pool {{"{{"}} $labels.lb_pool_name {{"}}"}} for more then 5 min.
+        summary: Low number of Members on Load Balancer {{"{{"}} $labels.lb_name {{"}}"}} with pool {{"{{"}} $labels.lb_pool_name {{"}}"}} for more then 5 min.
       expr: |
         kuryr_critical_lb_members_count == 1
       for: 5m
@@ -115,7 +113,7 @@ spec:
         severity: warning
     - alert: InsuficientLoadBalancerMembers
       annotations:
-        message: No Members on Load Balancer {{"{{"}} $labels.lb_name {{"}}"}} with pool {{"{{"}} $labels.lb_pool_name {{"}}"}} for more then 5 min.
+        summary: No Members on Load Balancer {{"{{"}} $labels.lb_name {{"}}"}} with pool {{"{{"}} $labels.lb_pool_name {{"}}"}} for more then 5 min.
       expr: |
         kuryr_critical_lb_members_count == 0
       for: 5m
@@ -123,14 +121,14 @@ spec:
         severity: critical
     - alert: KuryrLoadBalancerNotReady
       annotations:
-        message: Kuryr noticed an Octavia load balancer unexpectedly stuck in PENDING_* state in the last 20 minutes. Most likely this indicates an issue with OpenStack Octavia.
+        summary: Kuryr noticed an Octavia load balancer unexpectedly stuck in PENDING_* state in the last 20 minutes. Most likely this indicates an issue with OpenStack Octavia.
       expr: |
         changes(kuryr_load_balancer_readiness_total[20m]) > 0
       labels:
         severity: critical
     - alert: KuryrPortNotReady
       annotations:
-        message: Kuryr noticed that a Neutron port was in unexpected DOWN state in the last 20 minutes. Most likely this indicates an issue with OpenStack Neutron.
+        summary: Kuryr noticed that a Neutron port was in unexpected DOWN state in the last 20 minutes. Most likely this indicates an issue with OpenStack Neutron.
       expr: |
         changes(kuryr_port_readiness_total[20m]) > 0
       labels:
