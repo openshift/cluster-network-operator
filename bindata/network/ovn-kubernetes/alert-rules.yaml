@@ -14,8 +14,7 @@ spec:
     rules:
     - alert: NodeWithoutOVNKubeNodePodRunning
       annotations:
-        message: |
-          All Linux nodes should be running an ovnkube-node pod, {{"{{"}} $labels.node {{"}}"}} is not.
+        summary: All Linux nodes should be running an ovnkube-node pod, {{"{{"}} $labels.node {{"}}"}} is not.
       expr: |
         (kube_node_info unless on(node) (kube_pod_info{namespace="openshift-ovn-kubernetes",pod=~"ovnkube-node.*"}
         or kube_node_labels{label_kubernetes_io_os="windows"})) > 0
@@ -24,7 +23,7 @@ spec:
         severity: warning
     - alert: NetworkPodsCrashLooping
       annotations:
-        message: Pod {{"{{"}} $labels.namespace{{"}}"}}/{{"{{"}} $labels.pod{{"}}"}} ({{"{{"}} $labels.container
+        summary: Pod {{"{{"}} $labels.namespace{{"}}"}}/{{"{{"}} $labels.pod{{"}}"}} ({{"{{"}} $labels.container
           {{"}}"}}) is restarting {{"{{"}} printf "%.2f" $value {{"}}"}} times / 5 minutes.
       expr: |
         rate(kube_pod_container_status_restarts_total{namespace="openshift-ovn-kubernetes"}[15m]) * 60 * 5 > 0
