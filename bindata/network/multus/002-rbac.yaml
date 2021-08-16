@@ -79,6 +79,21 @@ subjects:
   namespace: openshift-multus
 
 ---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: multus-whereabouts
+  namespace: openshift-multus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: whereabouts-cni
+subjects:
+- kind: ServiceAccount
+  name: multus
+  namespace: openshift-multus
+
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -97,3 +112,18 @@ rules:
   - update
   - patch
   - delete
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: openshift-multus
+  name: whereabouts-cni
+rules:
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - '*'
+
