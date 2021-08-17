@@ -14,8 +14,7 @@ spec:
     rules:
     - alert: NoRunningOvnMaster
       annotations:
-        message: |
-          There is no running ovn-kubernetes master
+        summary: There is no running ovn-kubernetes master
       expr: |
         absent(up{job="ovnkube-master", namespace="openshift-ovn-kubernetes"} == 1)
       for: 10m
@@ -23,8 +22,7 @@ spec:
         severity: warning
     - alert: NoOvnMasterLeader
       annotations:
-        message: |
-          There is no ovn-kubernetes master leader
+        summary: There is no ovn-kubernetes master leader
       expr: |
         max(ovnkube_master_leader) == 0
       for: 10m
@@ -32,8 +30,7 @@ spec:
         severity: warning
     - alert: NorthboundStale
       annotations:
-        message: |
-          ovn-kubernetes has not written anything to the northbound database for too long
+        summary: ovn-kubernetes has not written anything to the northbound database for too long
       expr: |
          time() - max(ovn_nb_e2e_timestamp) > 300
       for: 10m
@@ -41,8 +38,7 @@ spec:
         severity: warning
     - alert: SouthboundStale
       annotations:
-        message: |
-          ovn-northd has not successfully synced any changes to the southbound DB for too long
+        summary: ovn-northd has not successfully synced any changes to the southbound DB for too long
       expr: |
         max(ovn_nb_e2e_timestamp) - max(ovn_sb_e2e_timestamp) > 120
       for: 10m
@@ -50,8 +46,7 @@ spec:
         severity: warning
     - alert: V4SubnetAllocationThresholdExceeded
       annotations:
-        message: |
-          More than 80% of v4 subnets available to assign to the nodes are allocated. Current v4 subnet allocation percentage is {{"{{"}} $value {{"}}"}}
+        summary: More than 80% of v4 subnets available to assign to the nodes are allocated. Current v4 subnet allocation percentage is {{"{{"}} $value {{"}}"}}
       expr: |
         ovnkube_master_allocated_v4_host_subnets/ovnkube_master_num_v4_host_subnets * 100 > 80
       for: 10m
@@ -59,8 +54,7 @@ spec:
         severity: warning
     - alert: V6SubnetAllocationThresholdExceeded
       annotations:
-        message: |
-          More than 80% of the v6 subnets available to assign to the nodes are allocated. Current v6 subnet allocation percentage is {{"{{"}} $value {{"}}"}}
+        summary: More than 80% of the v6 subnets available to assign to the nodes are allocated. Current v6 subnet allocation percentage is {{"{{"}} $value {{"}}"}}
       expr: |
         ovnkube_master_allocated_v6_host_subnets/ovnkube_master_num_v6_host_subnets * 100 > 80
       for: 10m
