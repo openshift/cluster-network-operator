@@ -73,7 +73,7 @@ func NewClusterOperatorStatusController(
 		clusterOperatorLister: clusterOperatorInformer.Lister(),
 		operatorClient:        operatorClient,
 		degradedInertia:       MustNewInertia(2 * time.Minute).Inertia,
-		controllerFactory: factory.New().ResyncEvery(time.Second).WithInformers(
+		controllerFactory: factory.New().ResyncEvery(time.Minute).WithInformers(
 			operatorClient.Informer(),
 			clusterOperatorInformer.Informer(),
 		),
@@ -150,8 +150,6 @@ func (c StatusSyncer) Sync(ctx context.Context, syncCtx factory.SyncContext) err
 	clusterOperatorObj := originalClusterOperatorObj.DeepCopy()
 
 	if detailedSpec.ManagementState == operatorv1.Unmanaged && !management.IsOperatorAlwaysManaged() {
-		clusterOperatorObj.Status = configv1.ClusterOperatorStatus{}
-
 		configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorAvailable, Status: configv1.ConditionUnknown, Reason: "Unmanaged"})
 		configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorProgressing, Status: configv1.ConditionUnknown, Reason: "Unmanaged"})
 		configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorDegraded, Status: configv1.ConditionUnknown, Reason: "Unmanaged"})
