@@ -18,8 +18,8 @@ require (
 	github.com/onsi/gomega v1.10.5
 	github.com/openshift/api v0.0.0-20210720160326-96bb0f993a66
 	github.com/openshift/build-machinery-go v0.0.0-20210712174854-1bb7fd1518d3
-	github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49
-	github.com/openshift/library-go v0.0.0-20210204161529-5c46b163e958
+	github.com/openshift/client-go v0.0.0-20210521082421-73d9475a9142
+	github.com/openshift/library-go v0.0.0-20210708173104-7e7d216ed91c
 	github.com/openshift/machine-api-operator v0.2.1-0.20201203125141-79567cb3368e
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.9.0
@@ -31,11 +31,11 @@ require (
 	golang.org/x/net v0.0.0-20210420210106-798c2154c571 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.21.1
-	k8s.io/apiextensions-apiserver v0.21.0
+	k8s.io/apiextensions-apiserver v0.21.1
 	k8s.io/apimachinery v0.21.1
-	k8s.io/client-go v0.21.0
+	k8s.io/client-go v0.21.1
 	k8s.io/code-generator v0.21.1
-	k8s.io/component-base v0.21.0
+	k8s.io/component-base v0.21.1
 	k8s.io/klog/v2 v2.8.0
 	k8s.io/kube-proxy v0.21.0
 	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009
