@@ -39,13 +39,6 @@ rules:
   - list
   - watch
   - patch
-- apiGroups: ["extensions"]
-  resources:
-  - networkpolicies
-  verbs:
-  - get
-  - list
-  - watch
 - apiGroups: ["networking.k8s.io"]
   resources:
   - networkpolicies
@@ -53,7 +46,7 @@ rules:
   - get
   - list
   - watch
-- apiGroups: [""]
+- apiGroups: ["", "events.k8s.io"]
   resources:
   - events
   verbs:
