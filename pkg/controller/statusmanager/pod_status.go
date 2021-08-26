@@ -84,7 +84,7 @@ func (status *StatusManager) SetFromPods() {
 
 		dsProgressing := false
 
-		if isNonCritical(ds) && ds.Status.NumberReady == 0 && !status.everAvailable {
+		if isNonCritical(ds) && ds.Status.NumberReady == 0 && !status.installComplete {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is waiting for other operators to become ready", dsName.String()))
 			dsProgressing = true
 		} else if ds.Status.UpdatedNumberScheduled < ds.Status.DesiredNumberScheduled {
@@ -148,7 +148,7 @@ func (status *StatusManager) SetFromPods() {
 
 		depProgressing := false
 
-		if isNonCritical(dep) && dep.Status.UnavailableReplicas > 0 && !status.everAvailable {
+		if isNonCritical(dep) && dep.Status.UnavailableReplicas > 0 && !status.installComplete {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q is waiting for other operators to become ready", depName.String()))
 			depProgressing = true
 		} else if dep.Status.UnavailableReplicas > 0 {
@@ -226,7 +226,10 @@ func (status *StatusManager) SetFromPods() {
 				Status: operv1.ConditionTrue,
 			},
 		)
-		status.everAvailable = true
+	}
+
+	if reachedAvailableLevel && len(progressing) == 0 {
+		status.installComplete = true
 	}
 
 	status.set(reachedAvailableLevel, conditions...)
