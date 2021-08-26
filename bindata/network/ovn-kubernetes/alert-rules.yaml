@@ -30,3 +30,19 @@ spec:
       for: 1h
       labels:
         severity: warning
+    - alert: PodCreationLatencyExceeded
+      annotations:
+        summary: The latency between pod creation request seen by ovnkube-node and setting the ovnkube annotations is high. Current time is {{"{{"}} $value {{"}}"}}.
+      expr: |
+        pod_creation_latency_seconds > x
+      for: 10m
+      labels:
+        severity: warning
+    - alert: NodeNotReady
+      annotations:
+        summary: The duration for the node to get to ready state
+      expr: |
+        ready_duration_seconds > y
+      for: 10m
+      labels:
+        severity: warning

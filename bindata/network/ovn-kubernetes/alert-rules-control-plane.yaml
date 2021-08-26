@@ -28,6 +28,14 @@ spec:
       for: 10m
       labels:
         severity: warning
+    - alert: MasterNotReady
+      annotations:
+        summary: The duration for the master to get to ready state
+      expr: |
+        ready_duration_seconds > y
+      for: 10m
+      labels:
+        severity: warning
     - alert: NorthboundStale
       annotations:
         summary: ovn-kubernetes has not written anything to the northbound database for too long
@@ -60,3 +68,4 @@ spec:
       for: 10m
       labels:
         severity: warning
+    
