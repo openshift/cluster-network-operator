@@ -66,6 +66,8 @@ metadata:
   namespace: openshift-network-diagnostics
   annotations:
     include.release.openshift.io/self-managed-high-availability: "true"
+  labels:
+    app: network-check-source
 spec:
   clusterIP: None
   ports:
