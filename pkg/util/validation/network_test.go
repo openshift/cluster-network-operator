@@ -47,3 +47,33 @@ func TestURI(t *testing.T) {
 	}
 
 }
+
+func TestIPCIDR(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	validIPCIDRs := []string{
+		"fd2e:6f44:5dd8::1",
+		"fd02::/112",
+		"192.168.0.1",
+		"192.168.0.1/8",
+	}
+
+	invalidIPCIDRs := []string{
+		"redhat.com",
+		"123.10",
+		"2600:14a0::/256",
+		"fd01::/48,fd02::/112",
+	}
+
+	for _, ip := range validIPCIDRs {
+		t.Log("valid ip:", ip)
+		err := IPAddressOrCIDR(ip)
+		g.Expect(err).NotTo(HaveOccurred())
+	}
+
+	for _, ip := range invalidIPCIDRs {
+		t.Log("invalid ip:", ip)
+		err := IPAddressOrCIDR(ip)
+		g.Expect(err).To(HaveOccurred())
+	}
+}
