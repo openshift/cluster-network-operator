@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"k8s.io/apimachinery/pkg/types"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -65,7 +64,7 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 			for _, v := range strings.Split(proxyConfig.NoProxy, ",") {
 				v = strings.TrimSpace(v)
 				errDomain := validation.DomainName(v, true)
-				_, _, errCIDR := net.ParseCIDR(v)
+				errCIDR := validation.IPAddressOrCIDR(v)
 				if errDomain != nil && errCIDR != nil {
 					return fmt.Errorf("invalid noProxy: %v", v)
 				}
