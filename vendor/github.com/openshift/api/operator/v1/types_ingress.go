@@ -28,6 +28,9 @@ import (
 //
 // Whenever possible, sensible defaults for the platform are used. See each
 // field for more details.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type IngressController struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -190,6 +193,28 @@ type IngressControllerSpec struct {
 	//
 	// +optional
 	HTTPHeaders *IngressControllerHTTPHeaders `json:"httpHeaders,omitempty"`
+
+	// httpEmptyRequestsPolicy describes how HTTP connections should be
+	// handled if the connection times out before a request is received.
+	// Allowed values for this field are "Respond" and "Ignore".  If the
+	// field is set to "Respond", the ingress controller sends an HTTP 400
+	// or 408 response, logs the connection (if access logging is enabled),
+	// and counts the connection in the appropriate metrics.  If the field
+	// is set to "Ignore", the ingress controller closes the connection
+	// without sending a response, logging the connection, or incrementing
+	// metrics.  The default value is "Respond".
+	//
+	// Typically, these connections come from load balancers' health probes
+	// or Web browsers' speculative connections ("preconnect") and can be
+	// safely ignored.  However, these requests may also be caused by
+	// network errors, and so setting this field to "Ignore" may impede
+	// detection and diagnosis of problems.  In addition, these requests may
+	// be caused by port scans, in which case logging empty requests may aid
+	// in detecting intrusion attempts.
+	//
+	// +optional
+	// +kubebuilder:default:="Respond"
+	HTTPEmptyRequestsPolicy HTTPEmptyRequestsPolicy `json:"httpEmptyRequestsPolicy,omitempty"`
 
 	// tuningOptions defines parameters for adjusting the performance of
 	// ingress controller pods. All fields are optional and will use their
@@ -905,6 +930,17 @@ type IngressControllerCaptureHTTPCookieUnion struct {
 	NamePrefix string `json:"namePrefix"`
 }
 
+// LoggingPolicy indicates how an event should be logged.
+// +kubebuilder:validation:Enum=Log;Ignore
+type LoggingPolicy string
+
+const (
+	// LoggingPolicyLog indicates that an event should be logged.
+	LoggingPolicyLog LoggingPolicy = "Log"
+	// LoggingPolicyIgnore indicates that an event should not be logged.
+	LoggingPolicyIgnore LoggingPolicy = "Ignore"
+)
+
 // AccessLogging describes how client requests should be logged.
 type AccessLogging struct {
 	// destination is where access logs go.
@@ -949,6 +985,21 @@ type AccessLogging struct {
 	// +optional
 	// +kubebuilder:validation:MaxItems=1
 	HTTPCaptureCookies []IngressControllerCaptureHTTPCookie `json:"httpCaptureCookies,omitempty"`
+
+	// logEmptyRequests specifies how connections on which no request is
+	// received should be logged.  Typically, these empty requests come from
+	// load balancers' health probes or Web browsers' speculative
+	// connections ("preconnect"), in which case logging these requests may
+	// be undesirable.  However, these requests may also be caused by
+	// network errors, in which case logging empty requests may be useful
+	// for diagnosing the errors.  In addition, these requests may be caused
+	// by port scans, in which case logging empty requests may aid in
+	// detecting intrusion attempts.  Allowed values for this field are
+	// "Log" and "Ignore".  The default value is "Log".
+	//
+	// +optional
+	// +kubebuilder:default:="Log"
+	LogEmptyRequests LoggingPolicy `json:"logEmptyRequests,omitempty"`
 }
 
 // IngressControllerLogging describes what should be logged where.
@@ -1133,7 +1184,81 @@ type IngressControllerTuningOptions struct {
 	// +kubebuilder:validation:Maximum=64
 	// +optional
 	ThreadCount int32 `json:"threadCount,omitempty"`
+
+	// clientTimeout defines how long a connection will be held open while
+	// waiting for a client response.
+	//
+	// If unset, the default timeout is 30s
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Format=duration
+	// +optional
+	ClientTimeout *metav1.Duration `json:"clientTimeout,omitempty"`
+
+	// clientFinTimeout defines how long a connection will be held open while
+	// waiting for the client response to the server/backend closing the
+	// connection.
+	//
+	// If unset, the default timeout is 1s
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Format=duration
+	// +optional
+	ClientFinTimeout *metav1.Duration `json:"clientFinTimeout,omitempty"`
+
+	// serverTimeout defines how long a connection will be held open while
+	// waiting for a server/backend response.
+	//
+	// If unset, the default timeout is 30s
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Format=duration
+	// +optional
+	ServerTimeout *metav1.Duration `json:"serverTimeout,omitempty"`
+
+	// serverFinTimeout defines how long a connection will be held open while
+	// waiting for the server/backend response to the client closing the
+	// connection.
+	//
+	// If unset, the default timeout is 1s
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Format=duration
+	// +optional
+	ServerFinTimeout *metav1.Duration `json:"serverFinTimeout,omitempty"`
+
+	// tunnelTimeout defines how long a tunnel connection (including
+	// websockets) will be held open while the tunnel is idle.
+	//
+	// If unset, the default timeout is 1h
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Format=duration
+	// +optional
+	TunnelTimeout *metav1.Duration `json:"tunnelTimeout,omitempty"`
+
+	// tlsInspectDelay defines how long the router can hold data to find a
+	// matching route.
+	//
+	// Setting this too short can cause the router to fall back to the default
+	// certificate for edge-terminated or reencrypt routes even when a better
+	// matching certificate could be used.
+	//
+	// If unset, the default inspect delay is 5s
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Format=duration
+	// +optional
+	TLSInspectDelay *metav1.Duration `json:"tlsInspectDelay,omitempty"`
 }
+
+// HTTPEmptyRequestsPolicy indicates how HTTP connections for which no request
+// is received should be handled.
+// +kubebuilder:validation:Enum=Respond;Ignore
+type HTTPEmptyRequestsPolicy string
+
+const (
+	// HTTPEmptyRequestsPolicyRespond indicates that the ingress controller
+	// should respond to empty requests.
+	HTTPEmptyRequestsPolicyRespond HTTPEmptyRequestsPolicy = "Respond"
+	// HTTPEmptyRequestsPolicyIgnore indicates that the ingress controller
+	// should ignore empty requests.
+	HTTPEmptyRequestsPolicyIgnore HTTPEmptyRequestsPolicy = "Ignore"
+)
 
 var (
 	// Available indicates the ingress controller deployment is available.
@@ -1216,6 +1341,9 @@ type IngressControllerStatus struct {
 // +kubebuilder:object:root=true
 
 // IngressControllerList contains a list of IngressControllers.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type IngressControllerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
