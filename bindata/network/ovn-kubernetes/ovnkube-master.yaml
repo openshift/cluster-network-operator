@@ -794,13 +794,12 @@ spec:
             --detach \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
             --db "{{.OVN_NB_DB_LIST}}" --log-file=/run/ovn/ovn-nbctl.log \
+            --monitor \
+            --unixctl=/var/run/ovn/ovn-nbctl.ctl \
             -vreconnect:file:info)
 
           # include nbctl daemon logging, allow for ovn-nbctl to create the log file
           tail -F /run/ovn/ovn-nbctl.log &
-
-           # REMOVEME once OVN path for control socket is fixed (right now uses /var/run/openvswitch)
-          ln -sf $OVN_NB_DAEMON /var/run/ovn/ || true
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
           exec /usr/bin/ovnkube \
