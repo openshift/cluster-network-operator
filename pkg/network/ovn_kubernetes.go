@@ -175,6 +175,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		updateNode, updateMaster = shouldUpdateOVNKonUpgrade(bootstrapResult.OVN.ExistingNodeDaemonset, bootstrapResult.OVN.ExistingMasterDaemonset, os.Getenv("RELEASE_VERSION"))
 	}
 
+	renderPrePull := false
+	if updateNode {
+		updateNode, renderPrePull = shouldUpdateOVNKonPrepull(bootstrapResult.OVN.ExistingNodeDaemonset, bootstrapResult.OVN.PrePullerDaemonset, os.Getenv("RELEASE_VERSION"))
+	}
+
 	// If we need to delay master or node daemonset rollout, then we'll replace the new one with the existing one
 	if !updateMaster {
 		us, err := k8s.ToUnstructured(bootstrapResult.OVN.ExistingMasterDaemonset)
@@ -189,6 +194,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			return nil, errors.Wrap(err, "failed to transmute existing node daemonset")
 		}
 		objs = k8s.ReplaceObj(objs, us)
+	}
+
+	if !renderPrePull {
+		// remove prepull from the list of objects to render.
+		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", "openshift-ovn-kubernetes", "ovnkube-upgrades-prepuller")
 	}
 
 	return objs, nil
@@ -477,6 +487,16 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 		}
 	}
 
+	prePullerDS := &appsv1.DaemonSet{}
+	nsn = types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ovnkube-upgrades-prepuller"}
+	if err := kubeClient.Get(context.TODO(), nsn, prePullerDS); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to retrieve existing prepuller DaemonSet: %w", err)
+		} else {
+			prePullerDS = nil
+		}
+	}
+
 	res := bootstrap.BootstrapResult{
 		OVN: bootstrap.OVNBootstrapResult{
 			MasterIPs:               ovnMasterIPs,
@@ -484,6 +504,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 			ExistingMasterDaemonset: masterDS,
 			ExistingNodeDaemonset:   nodeDS,
 			GatewayMode:             gatewayMode,
+			PrePullerDaemonset:      prePullerDS,
 		},
 	}
 	return &res, nil
@@ -548,6 +569,49 @@ func shouldUpdateOVNKonIPFamilyChange(existingNode, existingMaster *appsv1.Daemo
 	}
 	klog.V(2).Infof("OVN-Kubernetes master daemonset rollout complete, updating IP family mode on node daemonset")
 	return true, true
+}
+
+// shouldUpdateOVNKonPrepull implements a simple pre-pulling daemonset. It ensures the ovn-k
+// container image is (probably) already pulled by every node.
+// If the existing node daemonset has a different version then what we would like to apply, we first
+// roll out a no-op daemonset. Then, when that has rolled out to 100% of the cluster or has stopped
+// progressing, proceed with the node upgrade.
+func shouldUpdateOVNKonPrepull(existingNode, prePuller *appsv1.DaemonSet, releaseVersion string) (updateNode, renderPrepull bool) {
+	// Fresh cluster - full steam ahead! No need to wait for pre-puller.
+	if existingNode == nil {
+		klog.V(3).Infof("Fresh cluster, no need for prepuller")
+		return true, false
+	}
+
+	// if node is already upgraded, then no need to pre-pull
+	// Return true so that we reconcile any changes that somehow could have happened.
+	existingNodeVersion := existingNode.GetAnnotations()["release.openshift.io/version"]
+	if existingNodeVersion == releaseVersion {
+		klog.V(3).Infof("OVN-Kubernetes node is already in the expected release.")
+		return true, false
+	}
+
+	// at this point, we've determined we need an upgrade
+	if prePuller == nil {
+		klog.Infof("Rolling out the no-op prepuller daemonset...")
+		return false, true
+	}
+
+	// If pre-puller just pulled a new upgrade image and then we
+	// downgrade immediately, we might wanna make prepuller pull the downgrade image.
+	existingPrePullerVersion := prePuller.GetAnnotations()["release.openshift.io/version"]
+	if existingPrePullerVersion != releaseVersion {
+		klog.Infof("Rendering prepuller daemonset to update its image...")
+		return false, true
+	}
+
+	if daemonSetProgressing(prePuller, true) {
+		klog.Infof("Waiting for ovnkube-upgrades-prepuller daemonset to finish pulling the image before updating node")
+		return false, true
+	}
+
+	klog.Infof("OVN-Kube upgrades-prepuller daemonset rollout complete, now starting node rollouts")
+	return true, false
 }
 
 // shouldUpdateOVNKonUpgrade determines if we should roll out changes to

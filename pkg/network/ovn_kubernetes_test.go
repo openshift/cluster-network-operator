@@ -560,17 +560,20 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 func TestOVNKubernetestShouldUpdateMasterOnUpgrade(t *testing.T) {
 
 	for idx, tc := range []struct {
-		expectNode   bool
-		expectMaster bool
-		node         string
-		master       string
-		rv           string // release version
+		expectNode    bool
+		expectMaster  bool
+		expectPrePull bool
+		node          string
+		master        string
+		prepull       string
+		rv            string // release version
 	}{
 
-		// No node and master - upgrade = true and config the same
+		// No node, prepuller and master - upgrade = true and config the same
 		{
-			expectNode:   true,
-			expectMaster: true,
+			expectNode:    true,
+			expectMaster:  true,
+			expectPrePull: false,
 			node: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -580,10 +583,11 @@ apiVersion: apps/v1
 kind: DaemonSet
 `,
 		},
-
+		// PrePuller has to pull image before node can upgrade
 		{
-			expectNode:   true,
-			expectMaster: true,
+			expectNode:    false,
+			expectMaster:  true,
+			expectPrePull: true,
 			node: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -602,6 +606,11 @@ kind: DaemonSet
 		{
 			expectNode:   true,
 			expectMaster: true,
+			// Note: For reducing testing complexity, prepuller is set to false
+			// because it hits the condition where the node's version (null) is same
+			// as release version (null). In reality if node's version is differnt
+			// from expected, prePull will be true.
+			expectPrePull: false,
 			master: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -617,11 +626,12 @@ kind: DaemonSet
 `,
 		},
 
-		// steady state
+		// steady state, no prepuller
 		{
-			expectNode:   true,
-			expectMaster: true,
-			rv:           "2.0.0",
+			expectNode:    true,
+			expectMaster:  true,
+			expectPrePull: false,
+			rv:            "2.0.0",
 			master: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -637,16 +647,17 @@ kind: DaemonSet
 metadata:
   annotations:
     release.openshift.io/version: 2.0.0
-  namespace: openshift-ovn-kubernetes
-  name: ovnkube-node
+namespace: openshift-ovn-kubernetes
+name: ovnkube-node
 `,
 		},
 
-		// upgrade not yet applied
+		// upgrade not yet applied, expecting prepuller to get created
 		{
-			expectNode:   true,
-			expectMaster: false,
-			rv:           "2.0.0",
+			expectNode:    false,
+			expectMaster:  false,
+			expectPrePull: true,
+			rv:            "2.0.0",
 			master: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -667,11 +678,91 @@ metadata:
 `,
 		},
 
-		// node upgrade applied, upgrade not yet rolled out
+		// upgrade not yet applied, prepuller rolling out
 		{
-			expectNode:   true,
-			expectMaster: false,
-			rv:           "2.0.0",
+			expectNode:    false,
+			expectMaster:  false,
+			expectPrePull: true,
+			rv:            "2.0.0",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+`,
+			prepull: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 2.0.0
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-upgrades-prepuller
+  generation: 2
+status:
+  currentNumberScheduled: 6
+  desiredNumberScheduled: 6
+  numberAvailable: 6
+  numberMisscheduled: 0
+  numberReady: 6
+  observedGeneration: 1
+  updatedNumberScheduled: 6
+`,
+		},
+
+		// upgrade not yet applied, prepuller having wrong image version
+		{
+			expectNode:    false,
+			expectMaster:  false,
+			expectPrePull: true,
+			rv:            "2.0.0",
+			master: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-master
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+`,
+			prepull: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 2.0.1
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-upgrades-prepuller
+`,
+		},
+
+		// node upgrade applied, upgrade not yet rolled out, prepuller has done its work.
+		{
+			expectNode:    true,
+			expectMaster:  false,
+			expectPrePull: false,
+			rv:            "2.0.0",
 			master: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -703,8 +794,9 @@ status:
 
 		// node upgrade rolling out
 		{
-			expectNode:   true,
-			expectMaster: false,
+			expectNode:    true,
+			expectMaster:  false,
+			expectPrePull: false,
 
 			rv: "2.0.0",
 			master: `
@@ -736,11 +828,13 @@ status:
   updatedNumberScheduled: 5
 `,
 		},
+
 		// node upgrade hung but not made progress
 		{
-			expectNode:   true,
-			expectMaster: false,
-			rv:           "2.0.0",
+			expectNode:    true,
+			expectMaster:  false,
+			expectPrePull: false,
+			rv:            "2.0.0",
 			master: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -774,9 +868,10 @@ status:
 
 		// node upgrade hung but made enough progress
 		{
-			expectNode:   true,
-			expectMaster: true,
-			rv:           "2.0.0",
+			expectNode:    true,
+			expectMaster:  true,
+			expectPrePull: false,
+			rv:            "2.0.0",
 			master: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -807,11 +902,13 @@ status:
   updatedNumberScheduled: 5
 `,
 		},
+
 		// Upgrade rolled out, everything is good
 		{
-			expectNode:   true,
-			expectMaster: true,
-			rv:           "2.0.0",
+			expectNode:    true,
+			expectMaster:  true,
+			expectPrePull: false,
+			rv:            "2.0.0",
 			master: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -843,9 +940,10 @@ status:
 
 		// downgrade not yet applied
 		{
-			expectNode:   false,
-			expectMaster: true,
-			rv:           "1.8.9",
+			expectNode:    false,
+			expectMaster:  true,
+			expectPrePull: false,
+			rv:            "1.8.9",
 			master: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -868,9 +966,10 @@ metadata:
 
 		// master downgrade applied, not yet rolled out
 		{
-			expectNode:   false,
-			expectMaster: true,
-			rv:           "1.8.9",
+			expectNode:    false,
+			expectMaster:  true,
+			expectPrePull: false,
+			rv:            "1.8.9",
 			master: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -902,10 +1001,10 @@ metadata:
 
 		// downgrade rolling out
 		{
-			expectNode:   false,
-			expectMaster: true,
-
-			rv: "1.8.9",
+			expectNode:    false,
+			expectMaster:  true,
+			expectPrePull: false,
+			rv:            "1.8.9",
 			master: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -930,7 +1029,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   annotations:
-    release.openshift.io/version: 1.9.9 
+    release.openshift.io/version: 1.9.9
   namespace: openshift-ovn-kubernetes
   name: ovnkube-node
 `,
@@ -938,9 +1037,10 @@ metadata:
 
 		// downgrade hung but not made progress
 		{
-			expectNode:   false,
-			expectMaster: true,
-			rv:           "1.8.9",
+			expectNode:    false,
+			expectMaster:  true,
+			expectPrePull: false,
+			rv:            "1.8.9",
 			master: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -966,7 +1066,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   annotations:
-    release.openshift.io/version: 1.9.9 
+    release.openshift.io/version: 1.9.9
   namespace: openshift-ovn-kubernetes
   name: ovnkube-node
 `,
@@ -975,9 +1075,10 @@ metadata:
 		// downgrade hung but made enough progress
 		// except we always wait for 100% master.
 		{
-			expectNode:   false,
-			expectMaster: true,
-			rv:           "1.8.9",
+			expectNode:    false,
+			expectMaster:  true,
+			expectPrePull: false,
+			rv:            "1.8.9",
 			master: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -1003,7 +1104,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   annotations:
-    release.openshift.io/version: 1.9.9 
+    release.openshift.io/version: 1.9.9
   namespace: openshift-ovn-kubernetes
   name: ovnkube-node
 `,
@@ -1014,6 +1115,7 @@ metadata:
 
 			var node *appsv1.DaemonSet
 			var master *appsv1.DaemonSet
+			var prepuller *appsv1.DaemonSet
 			crd := OVNKubernetesConfig.DeepCopy()
 			config := &crd.Spec
 			os.Setenv("RELEASE_VERSION", tc.rv)
@@ -1043,11 +1145,28 @@ metadata:
 				t.Errorf("Unexpected error: %v", err)
 			}
 
+			var usPrePuller *uns.Unstructured
+			if tc.prepull != "" {
+				prepuller = &appsv1.DaemonSet{}
+				err = yaml.Unmarshal([]byte(tc.prepull), prepuller)
+				if err != nil {
+					t.Fatal(err)
+				}
+				usPrePuller, err = k8s.ToUnstructured(prepuller)
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+			} else {
+				prepuller = nil
+				usPrePuller = nil
+			}
+
 			bootstrapResult := &bootstrap.BootstrapResult{
 				OVN: bootstrap.OVNBootstrapResult{
 					MasterIPs:               []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
 					ExistingMasterDaemonset: master,
 					ExistingNodeDaemonset:   node,
+					PrePullerDaemonset:      prepuller,
 				},
 			}
 
@@ -1056,15 +1175,23 @@ metadata:
 
 			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 			renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-master", "openshift-ovn-kubernetes", objs)
+			renderedPrePuller := findInObjs("apps", "DaemonSet", "ovnkube-upgrades-prepuller", "openshift-ovn-kubernetes", objs)
 
 			// if we expect a node update, the original node and the rendered one must be different
 			g.Expect(tc.expectNode).To(Equal(!reflect.DeepEqual(renderedNode, usNode)), "Check node rendering")
 			// if we expect a master update, the original master and the rendered one must be different
 			g.Expect(tc.expectMaster).To(Equal(!reflect.DeepEqual(renderedMaster, usMaster)), "Check master rendering")
+			// if we expect a prepuller update, the original prepuller and the rendered one must be different
+			g.Expect(tc.expectPrePull).To(Equal(!reflect.DeepEqual(renderedPrePuller, usPrePuller)), "Check prepuller rendering")
 
 			updateNode, updateMaster := shouldUpdateOVNKonUpgrade(node, master, tc.rv)
-			g.Expect(updateNode).To(Equal(tc.expectNode), "Check node")
 			g.Expect(updateMaster).To(Equal(tc.expectMaster), "Check master")
+			if updateNode {
+				var updatePrePuller bool
+				updateNode, updatePrePuller = shouldUpdateOVNKonPrepull(node, prepuller, tc.rv)
+				g.Expect(updatePrePuller).To(Equal(tc.expectPrePull), "Check prepuller")
+			}
+			g.Expect(updateNode).To(Equal(tc.expectNode), "Check node")
 		})
 	}
 }
