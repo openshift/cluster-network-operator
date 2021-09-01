@@ -19,5 +19,5 @@ func Bootstrap(conf *operv1.Network, client client.Client) (*bootstrap.Bootstrap
 		return bootstrapOVN(conf, client)
 	}
 
-	return nil, nil
+	return &bootstrap.BootstrapResult{}, nil
 }
