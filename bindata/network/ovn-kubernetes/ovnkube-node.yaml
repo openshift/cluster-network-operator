@@ -289,7 +289,7 @@ spec:
         - name: OVN_CONTROLLER_INACTIVITY_PROBE
           value: "{{.OVN_CONTROLLER_INACTIVITY_PROBE}}"
         - name: OVN_KUBE_LOG_LEVEL
-          value: "4"
+          value: "5"
         {{ if .NetFlowCollectors }}
         - name: NETFLOW_COLLECTORS
           value: "{{.NetFlowCollectors}}"
