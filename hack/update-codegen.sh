@@ -6,12 +6,21 @@ set -o pipefail
 
 SCRIPT_ROOT="$(dirname "${BASH_SOURCE[0]}")/.."
 
-if ( ! ( command -v controller-gen > /dev/null )  || test "$(controller-gen --version)" != "Version: v0.4.0" ); then
-  echo "controller-gen not found or out-of-date, installing sigs.k8s.io/controller-tools@v0.4.0..."
+get_latest_release() {
+  curl --silent "https://api.github.com/repos/kubernetes-sigs/controller-tools/releases/latest" |
+  grep '"tag_name":' |
+  sed -E 's/.*"([^"]+)".*/\1/'
+}
+
+# Get latest tagged release of controller-gen
+LATEST_CONTROLLER_GEN_VER=$(get_latest_release)
+
+if ( ! ( command -v controller-gen > /dev/null )  || test "$(controller-gen --version)" != "Version: ${LATEST_CONTROLLER_GEN_VER}" ); then
+  echo "controller-gen not found or out-of-date, installing latest version sigs.k8s.io/controller-tools@${LATEST_CONTROLLER_GEN_VER}"
   olddir="${PWD}"
   builddir="$(mktemp -d)"
   cd "${builddir}"
-  GO111MODULE=on go get -u sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.0
+  GO111MODULE=on go get sigs.k8s.io/controller-tools/cmd/controller-gen
   cd "${olddir}"
   if [[ "${builddir}" == /tmp/* ]]; then #paranoia
       rm -rf "${builddir}"
