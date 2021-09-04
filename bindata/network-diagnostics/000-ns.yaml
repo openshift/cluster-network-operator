@@ -2,6 +2,8 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: openshift-network-diagnostics
+  labels:
+    openshift.io/cluster-monitoring: "true"
   annotations:
     openshift.io/node-selector: "" #override default node selector
     workload.openshift.io/allowed: "management"
