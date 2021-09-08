@@ -3,6 +3,7 @@ package validation
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -77,4 +78,15 @@ func URI(uri string) (string, error) {
 	}
 
 	return parsed.Scheme, nil
+}
+
+// IPAddressOrCIDR validates ip as being a valid IP or CIDR (IPv4/IPv6)
+func IPAddressOrCIDR(ip string) error {
+	if net.ParseIP(ip) == nil {
+		if _, _, err := net.ParseCIDR(ip); err != nil {
+			return fmt.Errorf("invalid IP/CIDR: %v", ip)
+		}
+	}
+
+	return nil
 }
