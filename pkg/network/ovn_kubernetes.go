@@ -197,25 +197,28 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 // returns the value of mode found in the openshift-ovn-kubernetes/gateway-mode-config configMap
 // if it exists, otherwise returns whatever the global OVN_GATEWAY_MODE is set to (shared)
 func GetGatewayMode(kubeClient client.Client) (string, error) {
-	defaultGatewayMode := "shared"
+	// defaultGatewayMode := "shared"
 	cm := &corev1.ConfigMap{}
 	nsn := types.NamespacedName{Namespace: "openshift-network-operator", Name: "gateway-mode-config"}
 	err := kubeClient.Get(context.TODO(), nsn, cm)
 
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			klog.Warningf("Did not find gateway-mode-config. Using default mode: \"%s\"", defaultGatewayMode)
-			return defaultGatewayMode, nil
-		} else {
-			return "", fmt.Errorf("Could not determine gateway mode: %w", err)
-		}
+		return "local", nil
+		// if apierrors.IsNotFound(err) {
+		// 	klog.Warningf("Did not find gateway-mode-config. Using default mode: \"%s\"", defaultGatewayMode)
+		// 	return defaultGatewayMode, nil
+		// } else {
+		// 	return "", fmt.Errorf("Could not determine gateway mode: %w", err)
+		// }
 	}
-	if cm.Data["mode"] != "shared" && cm.Data["mode"] != "local" {
-		klog.Warningf("Ignoring gateway-mode-config %s. Does not match \"shared\" or \"local\"", cm.Data["mode"])
-		return defaultGatewayMode, nil
-	}
-	klog.Infof("Overriding OVN gateway mode to %s", cm.Data["mode"])
+	cm.Data["mode"] = "local"
 	return cm.Data["mode"], nil
+	// if cm.Data["mode"] != "shared" && cm.Data["mode"] != "local" {
+	// 	klog.Warningf("Ignoring gateway-mode-config %s. Does not match \"shared\" or \"local\"", cm.Data["mode"])
+	// 	return defaultGatewayMode, nil
+	// }
+	// klog.Infof("Overriding OVN gateway mode to %s", cm.Data["mode"])
+	// return cm.Data["mode"], nil
 }
 
 // validateOVNKubernetes checks that the ovn-kubernetes specific configuration

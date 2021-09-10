@@ -16,11 +16,14 @@ GOFMT ?=gofmt
 GOFMT_FLAGS ?=-s -l
 GOLINT ?=golint
 
-go_version :=$(shell $(GO) version | sed -E -e 's/.*go([0-9]+.[0-9]+.[0-9]+).*/\1/')
-GO_REQUIRED_MIN_VERSION ?=1.15.2
-ifneq "$(GO_REQUIRED_MIN_VERSION)" ""
-$(call require_minimal_version,$(GO),GO_REQUIRED_MIN_VERSION,$(go_version))
-endif
+go_version :=$(shell $(GO) version | sed -E -e 's/.*go([0-9]+\.[0-9]+(\.[0-9]+)?)(.*)/\1/')
+
+$(info    go_version is $(go_version))
+
+# GO_REQUIRED_MIN_VERSION ?=1.14.4
+# ifneq "$(GO_REQUIRED_MIN_VERSION)" ""
+# $(call require_minimal_version,$(GO),GO_REQUIRED_MIN_VERSION,$(go_version))
+# endif
 
 # Projects not using modules can clear the variable, but by default we want to prevent
 # our projects with modules to unknowingly ignore vendor folder until golang is fixed to use
