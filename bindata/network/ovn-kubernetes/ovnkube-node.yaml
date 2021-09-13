@@ -60,6 +60,7 @@ spec:
             -vFACILITY:"{{.OVNPolicyAuditSyslogFacility}}" \
             -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
             -vconsole:"${OVN_LOG_LEVEL}" -vconsole:"acl_log:off" \
+            -vPATTERN:console:"{{.OVN_LOG_PATTERN_CONSOLE}}" \
             -vsyslog:"acl_log:info" \
             -vfile:"acl_log:info"
         securityContext:
