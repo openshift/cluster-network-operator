@@ -61,7 +61,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 	data.Data["ClusterNetwork"] = clusterNetwork
 
 	kpcDefaults := map[string]operv1.ProxyArgumentList{
-		"metrics-bind-address":    {"0.0.0.0"},
+		"metrics-bind-address":    {"127.0.0.1"},
 		"healthz-port":            {"10256"},
 		"proxy-mode":              {"iptables"},
 		"iptables-masquerade-bit": {"0"},
