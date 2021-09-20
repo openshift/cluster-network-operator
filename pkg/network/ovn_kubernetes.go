@@ -43,6 +43,7 @@ const OVN_MASTER_DISCOVERY_POLL = 5
 const OVN_MASTER_DISCOVERY_BACKOFF = 120
 const OVN_LOCAL_GW_MODE = "local"
 const OVN_SHARED_GW_MODE = "shared"
+const OVN_LOG_PATTERN_CONSOLE = "%D{%Y-%m-%dT%H:%M:%S.###Z}|%05N|%c%T|%p|%m"
 
 var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
@@ -113,6 +114,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNPolicyAuditMaxFileSize"] = c.PolicyAuditConfig.MaxFileSize
 	data.Data["OVNPolicyAuditDestination"] = c.PolicyAuditConfig.Destination
 	data.Data["OVNPolicyAuditSyslogFacility"] = c.PolicyAuditConfig.SyslogFacility
+	data.Data["OVN_LOG_PATTERN_CONSOLE"] = OVN_LOG_PATTERN_CONSOLE
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
