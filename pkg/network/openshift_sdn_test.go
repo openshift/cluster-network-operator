@@ -303,7 +303,7 @@ func TestProxyArgs(t *testing.T) {
 	cfg = getProxyConfigFile(objs)
 
 	arg, _, _ = uns.NestedString(cfg.Object, "metricsBindAddress")
-	g.Expect(arg).To(Equal("0.0.0.0:29101"))
+	g.Expect(arg).To(Equal("127.0.0.1:29101"))
 }
 
 func TestOpenShiftSDNIsSafe(t *testing.T) {
@@ -463,7 +463,7 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
-metricsBindAddress: 0.0.0.0:29101
+metricsBindAddress: 127.0.0.1:29101
 mode: unidling+iptables
 nodePortAddresses: null
 oomScoreAdj: null
@@ -517,7 +517,7 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
-metricsBindAddress: 0.0.0.0:29101
+metricsBindAddress: 127.0.0.1:29101
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
