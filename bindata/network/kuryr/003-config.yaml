@@ -62,7 +62,7 @@ data:
     project = {{ default "\"\"" $AuthInfo.ProjectID }}
     pod_security_groups = {{ default "default" .PodSecurityGroups }}
     resource_tags = {{ default "" .ResourceTags }}
-    external_svc_net = {{ .ExternalNetwork }}
+    external_svc_net = {{ default "\"\"" .ExternalNetwork }}
     network_device_mtu = {{ .PodsNetworkMTU }}
 
     [vif_pool]
