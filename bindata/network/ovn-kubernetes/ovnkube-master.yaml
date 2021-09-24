@@ -73,12 +73,8 @@ spec:
           echo "$(date -Iseconds) - starting ovn-northd"
           exec ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off "-vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-            --ovnnb-db "{{.OVN_NB_DB_LIST}}" \
-            --ovnsb-db "{{.OVN_SB_DB_LIST}}" \
             --pidfile /var/run/ovn/ovn-northd.pid \
-            -p /ovn-cert/tls.key \
-            -c /ovn-cert/tls.crt \
-            -C /ovn-ca/ca-bundle.crt 
+            --ovnnb-db="{{.OVN_NB_DB_LIST}}" --ovnsb-db="{{.OVN_SB_DB_LIST}}"
         env:
         - name: OVN_LOG_LEVEL
           value: info 
@@ -102,249 +98,40 @@ spec:
             cpu: 10m
             memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
-
-      # nbdb: the northbound, or logical network object DB. In raft mode 
-      - name: nbdb
-        image: "{{.OvnImage}}"
+        ports:
+        - name: nb-db-port
+          containerPort: 9641
+        - name: sb-db-port
+          containerPort: 9642
+        - name: nb-db-raft-port
+          containerPort: {{.OVN_NB_RAFT_PORT}}
+      - name: sb-ovsdb
+        image: "quay.io/mmahmoud/ovsdb-etcd:latest"
         command:
         - /bin/bash
         - -c
         - |
-          set -xe
-          if [[ -f /env/_master ]]; then
-            set -o allexport
-            source /env/_master
-            set +o allexport
-          fi
+          set -x
+           ovn_sb_port=${OVN_SB_PORT:-9642}
+           ovsdb_etcd_schemas_dir=${OVSDB_ETCD_SCHEMAS_DIR:-/root/ovsdb-etcd/schemas}
+           ovsdb_etcd_prefix=${OVSDB_ETCD_PREFIX:-"ovsdb"}
+           ovsdb_etcd_sb_log_level=${OVSDB_ETCD_NB_LOG_LEVEL:-"3"}
+           ovsdb_etcd_sb_unix_socket=${OVSDB_ETCD_NB_UNIX_SOCKET:-"/var/run/ovn/ovnsb_db.sock"}
+           OVN_LOGDIR=/var/log/ovn
+           sb_pid_file=${OVN_LOGDIR}/ovnsb_etcd.pid
+           sb_cpuprofile_file=${OVN_LOGDIR}/sb_cpuprofile.prof
+           mkdir -p ${OVN_LOGDIR}
+           echo "================= start sb-ovsdb-etcd server ============================ "
+           /root/server -logtostderr=false -log_file=${OVN_LOGDIR}/sb-ovsdb-etcd.log -v=${ovsdb_etcd_sb_log_level} -tcp-address=:${ovn_sb_port} \
+           -unix-address=${ovsdb_etcd_sb_unix_socket} -etcd-members="{{.OVN_ETCD_MEMBERS_LIST}}" -schema-basedir=${ovsdb_etcd_schemas_dir} \
+           -database-prefix=${ovsdb_etcd_prefix} -service-name=sb -schema-file=ovn-sb.ovsschema -pid-file=${sb_pid_file} \
+           -load-server-data=false -cpu-profile=${nb_cpuprofile_file}
 
-          bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
-          # initialize variables
-          ovn_kubernetes_namespace=openshift-ovn-kubernetes
-          ovndb_ctl_ssl_opts="-p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt"
-          transport="ssl"
-          ovn_raft_conn_ip_url_suffix=""
-          if [[ "${K8S_NODE_IP}" == *":"* ]]; then
-            ovn_raft_conn_ip_url_suffix=":[::]"
-          fi
-          db="nb"
-          db_port="{{.OVN_NB_PORT}}"
-          ovn_db_file="/etc/ovn/ovn${db}_db.db"
-          # checks if a db pod is part of a current cluster
-          db_part_of_cluster() {
-            local pod=${1}
-            local db=${2}
-            local port=${3}
-            echo "Checking if ${pod} is part of cluster"
-            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
-            init_ip=$(timeout 5 kubectl get pod -n ${ovn_kubernetes_namespace} ${pod} -o=jsonpath='{.status.podIP}')
-            if [[ $? != 0 ]]; then
-              echo "Unable to get ${pod} ip "
-              return 1
-            fi
-            echo "Found ${pod} ip: $init_ip"
-            init_ip=$(bracketify $init_ip)
-            target=$(ovn-${db}ctl --timeout=5 --db=${transport}:${init_ip}:${port} ${ovndb_ctl_ssl_opts} \
-                      --data=bare --no-headings --columns=target list connection)
-            if [[ "${target}" != "p${transport}:${port}${ovn_raft_conn_ip_url_suffix}" ]]; then
-              echo "Unable to check correct target ${target} "
-              return 1
-            fi
-            echo "${pod} is part of cluster"
-            return 0
-          }
-          # end of db_part_of_cluster
-          
-          # Checks if cluster has already been initialized.
-          # If not it returns false and sets init_ip to CLUSTER_INITIATOR_IP
-          cluster_exists() {
-            local db=${1}
-            local port=${2}
-            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
-            db_pods=$(timeout 5 kubectl get pod -n ${ovn_kubernetes_namespace} -o=jsonpath='{.items[*].metadata.name}' | egrep -o 'ovnkube-master-\w+' | grep -v "metrics")
-
-            for db_pod in $db_pods; do
-              if db_part_of_cluster $db_pod $db $port; then
-                echo "${db_pod} is part of current cluster with ip: ${init_ip}!"
-                return 0
-              fi
-            done
-            # if we get here  there is no cluster, set init_ip and get out
-            init_ip=$(bracketify $CLUSTER_INITIATOR_IP)
-            return 1
-          }
-          # end of cluster_exists()
-
-          OVN_ARGS="--db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
-            --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
-            --no-monitor \
-            --db-nb-cluster-local-proto=ssl \
-            --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
-            --ovn-nb-db-ssl-cert=/ovn-cert/tls.crt \
-            --ovn-nb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt"
-
-          CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
-          echo "$(date -Iseconds) - starting nbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}, K8S_NODE_IP=${K8S_NODE_IP}"
-          initial_raft_create=true
-          initialize="false"
-          
-          if [[ ! -e ${ovn_db_file} ]]; then
-            initialize="true"
-          fi
-
-          if [[ "${initialize}" == "true" ]]; then
-            # check to see if a cluster already exists. If it does, just join it.
-            counter=0
-            cluster_found=false
-            while [ $counter -lt 5 ]; do
-              if cluster_exists ${db} ${db_port}; then
-                cluster_found=true
-                break
-              fi
-              sleep 1
-              counter=$((counter+1))
-            done
-
-            if ${cluster_found}; then
-              echo "Cluster already exists for DB: ${db}"
-              initial_raft_create=false
-              # join existing cluster
-              exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
-              --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
-              --db-nb-cluster-remote-addr=${init_ip} \
-              --db-nb-cluster-remote-proto=ssl \
-              --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-              run_nb_ovsdb
-            else
-              # either we need to initialize a new cluster or wait for master to create it
-              if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
-                exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
-                --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-                run_nb_ovsdb
-              else
-                echo "Joining the nbdb cluster with init_ip=${init_ip}..."
-                exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
-                --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
-                --db-nb-cluster-remote-addr=${init_ip} \
-                --db-nb-cluster-remote-proto=ssl \
-                --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-                run_nb_ovsdb
-              fi
-            fi
-          else
-            exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
-              --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-              run_nb_ovsdb
-          fi
-
-        lifecycle:
-          postStart:
-            exec:
-              command:
-              - /bin/bash
-              - -c
-              - |
-                set -x
-                CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
-                if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
-                  echo "$(date -Iseconds) - nbdb - postStart - waiting for master to be selected"
-
-                  # set the connection and inactivity probe
-                  retries=0
-                  while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_NB_INACTIVITY_PROBE}}; do
-                    (( retries += 1 ))
-                  if [[ "${retries}" -gt 40 ]]; then
-                    echo "$(date -Iseconds) - ERROR RESTARTING - nbdb - too many failed ovn-nbctl attempts, giving up"
-                      exit 1
-                  fi
-                  sleep 2
-                  done
-
-                  # Upgrade the db if required.
-                  DB_SCHEMA="/usr/share/ovn/ovn-nb.ovsschema"
-                  DB_SERVER="unix:/var/run/ovn/ovnnb_db.sock"
-                  schema_name=$(ovsdb-tool schema-name $DB_SCHEMA)
-                  db_version=$(ovsdb-client -t 10 get-schema-version "$DB_SERVER" "$schema_name")
-                  target_version=$(ovsdb-tool schema-version "$DB_SCHEMA")
-
-                  if ovsdb-tool compare-versions "$db_version" == "$target_version"; then
-                    :
-                  elif ovsdb-tool compare-versions "$db_version" ">" "$target_version"; then
-                      echo "Database $schema_name has newer schema version ($db_version) than our local schema ($target_version), possibly an upgrade is partially complete?"
-                  else
-                      echo "Upgrading database $schema_name from schema version $db_version to $target_version"
-                      ovsdb-client -t 30 convert "$DB_SERVER" "$DB_SCHEMA"
-                  fi
-                fi
-                #configure northd_probe_interval
-                OVN_NB_CTL="ovn-nbctl -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
-                --db "{{.OVN_NB_DB_LIST}}""
-                northd_probe_interval=${OVN_NORTHD_PROBE_INTERVAL:-5000}
-                echo "Setting northd probe interval to ${northd_probe_interval} ms"
-                retries=0
-                current_probe_interval=0
-                while [[ "${retries}" -lt 10 ]]; do
-                  current_probe_interval=$(${OVN_NB_CTL} --if-exists get NB_GLOBAL . options:northd_probe_interval)
-                  if [[ $? == 0 ]]; then
-                    current_probe_interval=$(echo ${current_probe_interval} | tr -d '\"')
-                    break
-                  else
-                    sleep 2
-                    (( retries += 1 ))
-                  fi
-                done
-
-                if [[ "${current_probe_interval}" != "${northd_probe_interval}" ]]; then
-                  retries=0
-                  while [[ "${retries}" -lt 10 ]]; do
-                    ${OVN_NB_CTL} set NB_GLOBAL . options:northd_probe_interval=${northd_probe_interval}
-                    if [[ $? != 0 ]]; then
-                      echo "Failed to set northd probe interval to ${northd_probe_interval}. retrying....."
-                      sleep 2
-                      (( retries += 1 ))
-                    else
-                      echo "Successfully set northd probe interval to ${northd_probe_interval} ms"
-                      break
-                    fi
-                  done
-                fi
-
-                {{ if .EnableIPsec }}
-                ${OVN_NB_CTL} set nb_global . ipsec=true
-                {{ end }}
-          preStop:
-            exec:
-              command:
-                - /usr/bin/ovn-appctl
-                - -t
-                - /var/run/ovn/ovnnb_db.ctl
-                - exit
-        readinessProbe:
-{{ if not .IsSNO }}
-          initialDelaySeconds: 90
-{{ end }}
-          timeoutSeconds: 5
-          exec:
-            command:
-            - /bin/bash
-            - -c
-            - |
-              set -xeo pipefail
-              leader_status=$(/usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=3 cluster/status OVN_Northbound  2>/dev/null | { grep "Leader: unknown" || true; })
-              if [[ ! -z "${leader_status}" ]]; then
-                echo "NB DB Raft leader is unknown to the cluster node."
-                exit 1
-              fi
-
-        env:
-        - name: OVN_LOG_LEVEL
-          value: info 
-        - name: OVN_NORTHD_PROBE_INTERVAL
-          value: "{{.OVN_NORTHD_PROBE_INTERVAL}}"
-        - name: K8S_NODE_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
         volumeMounts:
+        # for checking ovs-configuration service
+        - mountPath: /etc/systemd/system
+          name: systemd-units
+          readOnly: true
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
         - mountPath: /etc/ovn/
@@ -355,22 +142,35 @@ spec:
           name: run-openvswitch
         - mountPath: /run/ovn/
           name: run-ovn
+        - mountPath: /run/ovnkube-config/
+          name: ovnkube-config
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert
           name: ovn-cert
         - mountPath: /ovn-ca
           name: ovn-ca
+
         resources:
           requests:
-            cpu: 10m
+            cpu: 100m
             memory: 300Mi
-        ports:
-        - name: nb-db-port
-          containerPort: {{.OVN_NB_PORT}}
-        - name: nb-db-raft-port
-          containerPort: {{.OVN_NB_RAFT_PORT}}
-        terminationMessagePolicy: FallbackToLogsOnError
+        env:
+        - name: OVN_DAEMONSET_VERSION
+          value: "3"
+        - name: OVSDB_ETCD_MAX_TXN_OPS
+          value: "102400"
+        - name: OVSDB_ETCD_MAX_REQUEST_BYTES
+          value: "157286400"
+
+        - name: OVN_LOG_LEVEL
+          value: info
+        - name: OVN_SB_RAFT_ELECTION_TIMER
+          value: "{{.OVN_SB_RAFT_ELECTION_TIMER}}"
+        - name: K8S_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
 
       - name: kube-rbac-proxy
         image: {{.KubeRBACProxyImage}}
@@ -423,208 +223,33 @@ spec:
           mountPath: /etc/pki/tls/metrics-cert
           readOnly: True
 
-      # sbdb: The southbound, or flow DB. In raft mode 
-      - name: sbdb
-        image: "{{.OvnImage}}"
+      - name: nb-ovsdb
+        image: "quay.io/mmahmoud/ovsdb-etcd:latest"
         command:
         - /bin/bash
         - -c
         - |
           set -x
-          if [[ -f /env/_master ]]; then
-            set -o allexport
-            source /env/_master
-            set +o allexport
-          fi
+           ovn_nb_port=${OVN_NB_PORT:-9641}
+           ovsdb_etcd_schemas_dir=${OVSDB_ETCD_SCHEMAS_DIR:-/root/ovsdb-etcd/schemas}
+           ovsdb_etcd_prefix=${OVSDB_ETCD_PREFIX:-"ovsdb"}
+           ovsdb_etcd_nb_log_level=${OVSDB_ETCD_NB_LOG_LEVEL:-"3"}
+           ovsdb_etcd_nb_unix_socket=${OVSDB_ETCD_NB_UNIX_SOCKET:-"/var/run/ovn/ovnnb_db.sock"}
+           OVN_LOGDIR=/var/log/ovn
+           nb_pid_file=${OVN_LOGDIR}/ovnnb_etcd.pid
+           nb_cpuprofile_file=${OVN_LOGDIR}/nb_cpuprofile.prof
+           mkdir -p ${OVN_LOGDIR}
+           echo "================= start nb-ovsdb-etcd server ============================ "
+           /root/server -logtostderr=false -log_file=${OVN_LOGDIR}/nb-ovsdb-etcd.log -v=${ovsdb_etcd_nb_log_level} -tcp-address=:${ovn_nb_port} \
+           -unix-address=${ovsdb_etcd_nb_unix_socket} -etcd-members="{{.OVN_ETCD_MEMBERS_LIST}}" -schema-basedir=${ovsdb_etcd_schemas_dir} \
+           -database-prefix=${ovsdb_etcd_prefix} -service-name=nb -schema-file=ovn-nb.ovsschema -pid-file=${nb_pid_file} \
+           -load-server-data=false -cpu-profile=${nb_cpuprofile_file}
 
-          bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
-
-          # initialize variables
-          ovn_kubernetes_namespace=openshift-ovn-kubernetes
-          ovndb_ctl_ssl_opts="-p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt"
-          transport="ssl"
-          ovn_raft_conn_ip_url_suffix=""
-          if [[ "${K8S_NODE_IP}" == *":"* ]]; then
-            ovn_raft_conn_ip_url_suffix=":[::]"
-          fi
-          db="sb"
-          db_port="{{.OVN_SB_PORT}}"
-          ovn_db_file="/etc/ovn/ovn${db}_db.db"
-          # checks if a db pod is part of a current cluster
-          db_part_of_cluster() {
-            local pod=${1}
-            local db=${2}
-            local port=${3}
-            echo "Checking if ${pod} is part of cluster"
-            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
-            init_ip=$(timeout 5 kubectl get pod -n ${ovn_kubernetes_namespace} ${pod} -o=jsonpath='{.status.podIP}')
-            if [[ $? != 0 ]]; then
-              echo "Unable to get ${pod} ip "
-              return 1
-            fi
-            echo "Found ${pod} ip: $init_ip"
-            init_ip=$(bracketify $init_ip)
-            target=$(ovn-${db}ctl --timeout=5 --db=${transport}:${init_ip}:${port} ${ovndb_ctl_ssl_opts} \
-                      --data=bare --no-headings --columns=target list connection)
-            if [[ "${target}" != "p${transport}:${port}${ovn_raft_conn_ip_url_suffix}" ]]; then
-              echo "Unable to check correct target ${target} "
-              return 1
-            fi
-            echo "${pod} is part of cluster"
-            return 0
-          }
-          # end of db_part_of_cluster
-          
-          # Checks if cluster has already been initialized.
-          # If not it returns false and sets init_ip to CLUSTER_INITIATOR_IP
-          cluster_exists() {
-            local db=${1}
-            local port=${2}
-            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
-            db_pods=$(timeout 5 kubectl get pod -n ${ovn_kubernetes_namespace} -o=jsonpath='{.items[*].metadata.name}' | egrep -o 'ovnkube-master-\w+' | grep -v "metrics")
-
-            for db_pod in $db_pods; do
-              if db_part_of_cluster $db_pod $db $port; then
-                echo "${db_pod} is part of current cluster with ip: ${init_ip}!"
-                return 0
-              fi
-            done
-            # if we get here  there is no cluster, set init_ip and get out
-            init_ip=$(bracketify $CLUSTER_INITIATOR_IP)
-            return 1
-          }
-          # end of cluster_exists()
-
-          OVN_ARGS="--db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
-            --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
-            --no-monitor \
-            --db-sb-cluster-local-proto=ssl \
-            --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
-            --ovn-sb-db-ssl-cert=/ovn-cert/tls.crt \
-            --ovn-sb-db-ssl-ca-cert=/ovn-ca/ca-bundle.crt"
-
-          CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
-          echo "$(date -Iseconds) - starting sbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}"
-          initial_raft_create=true
-          initialize="false"
-          
-          if [[ ! -e ${ovn_db_file} ]]; then
-            initialize="true"
-          fi
-
-          if [[ "${initialize}" == "true" ]]; then
-            # check to see if a cluster already exists. If it does, just join it.
-            counter=0
-            cluster_found=false
-            while [ $counter -lt 5 ]; do
-              if cluster_exists ${db} ${db_port}; then
-                cluster_found=true
-                break
-              fi
-              sleep 1
-              counter=$((counter+1))
-            done
-
-            if ${cluster_found}; then
-              echo "Cluster already exists for DB: ${db}"
-              initial_raft_create=false
-              # join existing cluster
-              exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
-              --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
-              --db-sb-cluster-remote-addr=${init_ip} \
-              --db-sb-cluster-remote-proto=ssl \
-              --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-              run_sb_ovsdb
-            else
-              # either we need to initialize a new cluster or wait for master to create it
-              if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
-                exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
-                --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-                run_sb_ovsdb
-              else
-                exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
-                --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
-                --db-sb-cluster-remote-addr=${init_ip} \
-                --db-sb-cluster-remote-proto=ssl \
-                --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-                run_sb_ovsdb
-              fi
-            fi
-          else
-            exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
-            --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-            run_sb_ovsdb
-          fi
-        lifecycle:
-          postStart:
-            exec:
-              command:
-              - /bin/bash
-              - -c
-              - |
-                set -x
-                CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
-                if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
-                  echo "$(date -Iseconds) - sdb - postStart - waiting for master to be selected"
-
-                  # set the connection and inactivity probe
-                  retries=0
-                  while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_CONTROLLER_INACTIVITY_PROBE}}; do
-                    (( retries += 1 ))
-                  if [[ "${retries}" -gt 40 ]]; then
-                    echo "$(date -Iseconds) - ERROR RESTARTING - sbdb - too many failed ovn-sbctl attempts, giving up"
-                      exit 1
-                  fi
-                  sleep 2
-                  done
-
-                  # Upgrade the db if required.
-                  DB_SCHEMA="/usr/share/ovn/ovn-sb.ovsschema"
-                  DB_SERVER="unix:/var/run/ovn/ovnsb_db.sock"
-                  schema_name=$(ovsdb-tool schema-name $DB_SCHEMA)
-                  db_version=$(ovsdb-client -t 10 get-schema-version "$DB_SERVER" "$schema_name")
-                  target_version=$(ovsdb-tool schema-version "$DB_SCHEMA")
-
-                  if ovsdb-tool compare-versions "$db_version" == "$target_version"; then
-                    :
-                  elif ovsdb-tool compare-versions "$db_version" ">" "$target_version"; then
-                      echo "Database $schema_name has newer schema version ($db_version) than our local schema ($target_version), possibly an upgrade is partially complete?"
-                  else
-                      echo "Upgrading database $schema_name from schema version $db_version to $target_version"
-                      ovsdb-client -t 30 convert "$DB_SERVER" "$DB_SCHEMA"
-                  fi
-                fi
-          preStop:
-            exec:
-              command:
-                - /usr/bin/ovn-appctl
-                - -t
-                - /var/run/ovn/ovnsb_db.ctl
-                - exit
-        readinessProbe:
-{{ if not .IsSNO }}
-          initialDelaySeconds: 90
-{{ end }}
-          timeoutSeconds: 5
-          exec:
-            command:
-            - /bin/bash
-            - -c
-            - |
-              set -xeo pipefail
-              leader_status=$(/usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=3 cluster/status OVN_Southbound  2>/dev/null | { grep "Leader: unknown" || true; })
-              if [[ ! -z "${leader_status}" ]]; then
-                echo "SB DB Raft leader is unknown to the cluster node."
-                exit 1
-              fi
-        env:
-        - name: OVN_LOG_LEVEL
-          value: info 
-        - name: K8S_NODE_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
         volumeMounts:
+        # for checking ovs-configuration service
+        - mountPath: /etc/systemd/system
+          name: systemd-units
+          readOnly: true
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
         - mountPath: /etc/ovn/
@@ -635,23 +260,35 @@ spec:
           name: run-openvswitch
         - mountPath: /run/ovn/
           name: run-ovn
+        - mountPath: /run/ovnkube-config/
+          name: ovnkube-config
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert
           name: ovn-cert
         - mountPath: /ovn-ca
           name: ovn-ca
-        ports:
-        - name: sb-db-port
-          containerPort: {{.OVN_SB_PORT}}
-        - name: sb-db-raft-port
-          containerPort: {{.OVN_SB_RAFT_PORT}}
+
         resources:
           requests:
-            cpu: 10m
+            cpu: 100m
             memory: 300Mi
-        terminationMessagePolicy: FallbackToLogsOnError
+        env:
+        - name: OVN_DAEMONSET_VERSION
+          value: "3"
+        - name: OVSDB_ETCD_MAX_TXN_OPS
+          value: "102400"
+        - name: OVSDB_ETCD_MAX_REQUEST_BYTES
+          value: "157286400"
 
+        - name: OVN_LOG_LEVEL
+          value: info
+        - name: OVN_SB_RAFT_ELECTION_TIMER
+          value: "{{.OVN_SB_RAFT_ELECTION_TIMER}}"
+        - name: K8S_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
       # ovnkube master: convert kubernetes objects in to nbdb logical network components
       - name: ovnkube-master
         image: "{{.OvnImage}}"
@@ -679,8 +316,7 @@ spec:
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start nbctl daemon for caching"
           export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/var/run/ovn/ovn-nbctl.pid \
             --detach \
-            -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
-            --db "{{.OVN_NB_DB_LIST}}" --log-file=/run/ovn/ovn-nbctl.log \
+            --db "tcp:localhost:9641" --log-file=/run/ovn/ovn-nbctl.log \
             --monitor \
             --unixctl=/var/run/ovn/ovn-nbctl.ctl \
             -vreconnect:file:info)
@@ -697,17 +333,9 @@ spec:
             --metrics-bind-address "127.0.0.1:29102" \
             --metrics-enable-pprof \
             ${gateway_mode_flags} \
-            --sb-address "{{.OVN_SB_DB_LIST}}" \
-            --sb-client-privkey /ovn-cert/tls.key \
-            --sb-client-cert /ovn-cert/tls.crt \
-            --sb-client-cacert /ovn-ca/ca-bundle.crt \
-            --sb-cert-common-name "{{.OVN_CERT_CN}}" \
-            --nb-address "{{.OVN_NB_DB_LIST}}" \
-            --nb-client-privkey /ovn-cert/tls.key \
-            --nb-client-cert /ovn-cert/tls.crt \
-            --nb-client-cacert /ovn-ca/ca-bundle.crt \
+            --sb-address "tcp:127.0.0.1:9642" \
+            --nb-address "tcp:127.0.0.1:9641" \
             --nbctl-daemon-mode \
-            --nb-cert-common-name "{{.OVN_CERT_CN}}" \
             --enable-multicast \
             {{- if .OVN_DISABLE_SNAT_MULTIPLE_GWS }}
             --disable-snat-multiple-gws \
@@ -755,63 +383,7 @@ spec:
         - name: metrics-port
           containerPort: 29102
         terminationMessagePolicy: FallbackToLogsOnError
-      # ovn-dbchecker: monitor clustered ovn databases for db health and stale raft members
-      - name: ovn-dbchecker
-        image: "{{.OvnImage}}"
-        command:
-        - /bin/bash
-        - -c
-        - |
-          set -xe
-          if [[ -f "/env/_master" ]]; then
-            set -o allexport
-            source "/env/_master"
-            set +o allexport
-          fi
 
-          echo "I$(date "+%m%d %H:%M:%S.%N") - ovn-dbchecker - start ovn-dbchecker"
-          exec /usr/bin/ovndbchecker \
-            --config-file=/run/ovnkube-config/ovnkube.conf \
-            --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            --sb-address "{{.OVN_SB_DB_LIST}}" \
-            --sb-client-privkey /ovn-cert/tls.key \
-            --sb-client-cert /ovn-cert/tls.crt \
-            --sb-client-cacert /ovn-ca/ca-bundle.crt \
-            --sb-cert-common-name "{{.OVN_CERT_CN}}" \
-            --sb-raft-election-timer "{{.OVN_SB_RAFT_ELECTION_TIMER}}" \
-            --nb-address "{{.OVN_NB_DB_LIST}}" \
-            --nb-client-privkey /ovn-cert/tls.key \
-            --nb-client-cert /ovn-cert/tls.crt \
-            --nb-client-cacert /ovn-ca/ca-bundle.crt \
-            --nb-cert-common-name "{{.OVN_CERT_CN}}" \
-            --nb-raft-election-timer "{{.OVN_NB_RAFT_ELECTION_TIMER}}"
-        volumeMounts:
-        - mountPath: /etc/openvswitch/
-          name: etc-openvswitch
-        - mountPath: /etc/ovn/
-          name: etc-openvswitch
-        - mountPath: /var/lib/openvswitch/
-          name: var-lib-openvswitch
-        - mountPath: /run/openvswitch/
-          name: run-openvswitch
-        - mountPath: /run/ovn/
-          name: run-ovn
-        - mountPath: /run/ovnkube-config/
-          name: ovnkube-config
-        - mountPath: /env
-          name: env-overrides
-        - mountPath: /ovn-cert
-          name: ovn-cert
-        - mountPath: /ovn-ca
-          name: ovn-ca
-        resources:
-          requests:
-            cpu: 10m
-            memory: 300Mi
-        env:
-        - name: OVN_KUBE_LOG_LEVEL
-          value: "4"
-        terminationMessagePolicy: FallbackToLogsOnError
       nodeSelector:
         node-role.kubernetes.io/master: ""
         beta.kubernetes.io/os: "linux"

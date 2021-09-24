@@ -44,7 +44,8 @@ const OVN_MASTER_DISCOVERY_BACKOFF = 120
 const OVN_LOCAL_GW_MODE = "local"
 const OVN_SHARED_GW_MODE = "shared"
 const OVN_LOG_PATTERN_CONSOLE = "%D{%Y-%m-%dT%H:%M:%S.###Z}|%05N|%c%T|%p|%m"
-
+const OVN_ETCD_PORT = "9480"
+const OVN_ETCD_MEMBERS_PORT = "9479"
 var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
@@ -102,6 +103,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_NB_INACTIVITY_PROBE"] = nb_inactivity_probe
 	data.Data["OVN_NB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterIPs, OVN_NB_PORT)
 	data.Data["OVN_SB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterIPs, OVN_SB_PORT)
+	data.Data["OVN_ETCD_DB_LIST"] = etcddbList(bootstrapResult.OVN.MasterIPs, OVN_ETCD_PORT)
+	data.Data["OVN_ETCD_MEMBERS_LIST"] = etcdMembersdbList(bootstrapResult.OVN.MasterIPs, OVN_ETCD_MEMBERS_PORT)
 	data.Data["OVN_DB_CLUSTER_INITIATOR"] = bootstrapResult.OVN.ClusterInitiator
 	data.Data["OVN_MIN_AVAILABLE"] = len(bootstrapResult.OVN.MasterIPs)/2 + 1
 	data.Data["LISTEN_DUAL_STACK"] = listenDualStack(bootstrapResult.OVN.MasterIPs[0])
@@ -538,6 +541,16 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 		}
 	}
 
+	etcdDS := &appsv1.DaemonSet{}
+	nsn = types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ovnkube-etcd"}
+	if err := kubeClient.Get(context.TODO(), nsn, etcdDS); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to retrieve existing etcd DaemonSet: %w", err)
+		} else {
+			etcdDS = nil
+		}
+	}
+
 	nodeDS := &appsv1.DaemonSet{}
 	nsn = types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ovnkube-node"}
 	if err := kubeClient.Get(context.TODO(), nsn, nodeDS); err != nil {
@@ -564,6 +577,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 			MasterIPs:               ovnMasterIPs,
 			ClusterInitiator:        clusterInitiator,
 			ExistingMasterDaemonset: masterDS,
+			ExistingEtcdDaemonset:   etcdDS,
 			ExistingNodeDaemonset:   nodeDS,
 			OVNKubernetesConfig:     ovnConfigResult,
 			PrePullerDaemonset:      prePullerDS,
@@ -585,7 +599,23 @@ func currentInitiatorExists(ovnMasterIPs []string, configInitiator string) bool 
 func dbList(masterIPs []string, port string) string {
 	addrs := make([]string, len(masterIPs))
 	for i, ip := range masterIPs {
-		addrs[i] = "ssl:" + net.JoinHostPort(ip, port)
+		addrs[i] = "tcp:" + net.JoinHostPort(ip, port)
+	}
+	return strings.Join(addrs, ",")
+}
+
+func etcdMembersdbList(masterIPs []string, port string) string {
+	addrs := make([]string, len(masterIPs))
+	for i, ip := range masterIPs {
+		addrs[i] = net.JoinHostPort(ip, port)
+	}
+	return strings.Join(addrs, ",")
+}
+
+func etcddbList(masterIPs []string, port string) string {
+	addrs := make([]string, len(masterIPs))
+	for i, ip := range masterIPs {
+		addrs[i] = "etcd" + ip + "=" + "http://" + net.JoinHostPort(ip, port)
 	}
 	return strings.Join(addrs, ",")
 }

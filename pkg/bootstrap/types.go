@@ -40,6 +40,7 @@ type OVNBootstrapResult struct {
 	MasterIPs               []string
 	ClusterInitiator        string
 	ExistingMasterDaemonset *appsv1.DaemonSet
+	ExistingEtcdDaemonset   *appsv1.DaemonSet
 	ExistingNodeDaemonset   *appsv1.DaemonSet
 	Platform                configv1.PlatformType
 	OVNKubernetesConfig     *OVNConfigBoostrapResult

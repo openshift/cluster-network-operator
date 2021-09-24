@@ -1,0 +1,180 @@
+# The ovnkube control-plane components
+
+# The pod disruption budget ensures that we keep a raft quorum
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: ovn-raft-quorum-guard
+  namespace: openshift-ovn-kubernetes
+spec:
+  minAvailable: {{.OVN_MIN_AVAILABLE}}
+  selector:
+    matchLabels:
+      app: ovnkube-etcd
+
+---
+
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: ovnkube-etcd
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    kubernetes.io/description: |
+      This daemonset launches etcd server.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+    matchLabels:
+      app: ovnkube-etcd
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # by default, Deployments spin up the new pod before terminating the old one
+      # but we don't want that - because ovsdb holds the lock.
+      maxSurge: 0
+      maxUnavailable: 1
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: ovnkube-etcd
+        ovn-db-pod: "true"
+        component: network
+        type: infra
+        openshift.io/component: network
+        kubernetes.io/os: "linux"
+    spec:
+      serviceAccountName: ovn-kubernetes-controller
+      hostNetwork: true
+      priorityClassName: "system-cluster-critical"
+      # volumes in all containers:
+      # (container) -> (host)
+      # /etc/openvswitch -> /var/lib/ovn/etc - ovsdb data
+      # /var/lib/openvswitch -> /var/lib/ovn/data - ovsdb pki state
+      # /run/openvswitch -> tmpfs - sockets
+      # /env -> configmap env-overrides - debug overrides
+      containers:
+      # etcd
+      - name: etcd
+        image: "quay.io/mmahmoud/etcd:latest"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -x
+          # OVSDB-etcd variables
+          ovsdb_etcd_max_txn_ops=${OVSDB_ETCD_MAX_TXN_OPS:-"102400"}                      # etcd default is 128
+          ovsdb_etcd_max_request_bytes=${OVSDB_ETCD_MAX_REQUEST_BYTES:-"157286400"}       # 150 MByte
+          ovsdb_etcd_warning_apply_duration=${OVSDB_ETCD_WARNING_APPLY_DURATION:-"1s"}    # etcd default is 100ms
+          ovsdb_etcd_election_timeout=${OVSDB_ETCD_ELECTION_TIMEOUT:-"1000"}              # etcd default
+          ovsdb_etcd_quota_backend_bytes=${OVSDB_ETCD_QUOTA_BACKEND_BYTES:-"8589934592"}  # 8 GByte
+          ETCD_PEER_PORT=9480
+          ETCD_CLIENT_PORT=9479
+          echo "================= start etcd server ============================ "
+          mkdir -p /etc/etcd
+          /usr/local/bin/etcd --data-dir /etc/etcd/ \
+          --name "etcd${MY_POD_IP}" \
+          --initial-advertise-peer-urls http://${MY_POD_IP}:${ETCD_PEER_PORT} \
+          --listen-peer-urls http://${MY_POD_IP}:${ETCD_PEER_PORT} \
+          --listen-client-urls http://${MY_POD_IP}:${ETCD_CLIENT_PORT},http://localhost:${ETCD_CLIENT_PORT} \
+          --advertise-client-urls http://${MY_POD_IP}:${ETCD_CLIENT_PORT} \
+          --initial-cluster-token etcd-cluster-1 \
+          --initial-cluster "{{.OVN_ETCD_DB_LIST}}" \
+          --initial-cluster-state new \
+          --max-txn-ops ${ovsdb_etcd_max_txn_ops} \
+          --max-request-bytes ${ovsdb_etcd_max_request_bytes} \
+          --experimental-txn-mode-write-with-shared-buffer=true \
+          --experimental-warning-apply-duration=${ovsdb_etcd_warning_apply_duration} \
+          --election-timeout=${ovsdb_etcd_election_timeout} \
+          --quota-backend-bytes=${ovsdb_etcd_quota_backend_bytes} \
+          --grpc-keepalive-timeout=60s --auto-compaction-retention=5m \
+          --log-level=error
+
+        terminationMessagePolicy: FallbackToLogsOnError
+
+        volumeMounts:
+        # for checking ovs-configuration service
+        - mountPath: /etc/systemd/system
+          name: systemd-units
+          readOnly: true
+        - mountPath: /etc/openvswitch/
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch/
+          name: var-lib-openvswitch
+        - mountPath: /run/openvswitch/
+          name: run-openvswitch
+        - mountPath: /env
+          name: env-overrides
+        - mountPath: /ovn-cert
+          name: ovn-cert
+        - mountPath: /ovn-ca
+          name: ovn-ca
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+        env:
+        - name: OVSDB_ETCD_MAX_TXN_OPS
+          value: "102400"
+        - name: OVSDB_ETCD_MAX_REQUEST_BYTES
+          value: "157286400"
+        - name: MY_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        ports:
+        - containerPort: 2479
+          name: client
+        - containerPort: 2480
+          name: peer
+        terminationMessagePolicy: FallbackToLogsOnError
+      # end of container
+
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+        beta.kubernetes.io/os: "linux"
+      volumes:
+      # for checking ovs-configuration service
+      - name: systemd-units
+        hostPath:
+          path: /etc/systemd/system
+      - name: etc-openvswitch
+        hostPath:
+          path: /var/lib/ovn/etc
+      - name: var-lib-openvswitch
+        hostPath:
+          path: /var/lib/ovn/data
+      - name: run-openvswitch
+        hostPath:
+          path: /var/run/openvswitch
+      - name: run-ovn
+        hostPath:
+          path: /var/run/ovn
+      - name: ovnkube-config
+        configMap:
+          name: ovnkube-config
+      - name: env-overrides
+        configMap:
+          name: env-overrides
+          optional: true
+      - name: ovn-ca
+        configMap:
+          name: ovn-ca
+      - name: ovn-cert
+        secret:
+          secretName: ovn-cert
+      - name: ovn-master-metrics-cert
+        secret:
+          secretName: ovn-master-metrics-cert
+          optional: true
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+      - key: "node.kubernetes.io/network-unavailable"
+        operator: "Exists"
