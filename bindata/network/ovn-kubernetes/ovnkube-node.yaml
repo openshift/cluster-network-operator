@@ -299,7 +299,7 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
             ${gateway_mode_flags} \
-            {{ if eq .OVN_DPU_MODE "dpu-host" }}
+            {{- if eq .OVN_DPU_MODE "dpu-host" }}
             --ovnkube-node-mode dpu-host \
             {{ end }}
             --metrics-bind-address "127.0.0.1:29103" \
