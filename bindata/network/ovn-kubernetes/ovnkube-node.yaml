@@ -301,7 +301,7 @@ spec:
             ${gateway_mode_flags} \
             {{- if eq .OVN_DPU_MODE "dpu-host" }}
             --ovnkube-node-mode dpu-host \
-            {{ end }}
+            {{- end }}
             --metrics-bind-address "127.0.0.1:29103" \
             --metrics-enable-pprof \
             {{- if .OVN_DISABLE_SNAT_MULTIPLE_GWS }}
