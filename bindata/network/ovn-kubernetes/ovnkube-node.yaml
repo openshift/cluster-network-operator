@@ -300,7 +300,7 @@ spec:
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
             ${gateway_mode_flags} \
             {{- if eq .OVN_DPU_MODE "dpu-host" }}
-            --ovnkube-node-mode dpu-host \
+            --ovnkube-node-mode smart-nic-host \
             {{- end }}
             --metrics-bind-address "127.0.0.1:29103" \
             --metrics-enable-pprof \
