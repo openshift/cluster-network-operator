@@ -284,6 +284,11 @@ spec:
             gw_interface_flag="--exgw-interface=br-ex1"
           fi
 
+          node_mgmt_port_netdev_flags=
+          if [[ -n "${OVNKUBE_NODE_MGMT_PORT_NETDEV}" ]] ; then
+            node_mgmt_port_netdev_flags="--ovnkube-node-mgmt-port-netdev ${OVNKUBE_NODE_MGMT_PORT_NETDEV}"
+          fi
+
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --nb-address "{{.OVN_NB_DB_LIST}}" \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
@@ -301,6 +306,7 @@ spec:
             ${gateway_mode_flags} \
             {{- if eq .OVN_DPU_MODE "dpu-host" }}
             --ovnkube-node-mode smart-nic-host \
+            ${node_mgmt_port_netdev_flags} \
             {{- end }}
             --metrics-bind-address "127.0.0.1:29103" \
             --metrics-enable-pprof \

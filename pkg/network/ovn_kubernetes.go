@@ -284,7 +284,7 @@ func bootstrapOVNConfig(kubeClient client.Client) (*bootstrap.OVNConfigBoostrapR
 		ovnConfigResult.GatewayMode = modeOverride
 		if disableSNATMultipleGWsOverride {
 			ovnConfigResult.EnableEgressIP = false
-			ovnConfigResult.DisableSNATMutlipleGWs = true
+			ovnConfigResult.DisableSNATMultipleGWs = true
 		}
 		klog.Infof("Overriding OVN configuration to %+v", ovnConfigResult)
 	}
