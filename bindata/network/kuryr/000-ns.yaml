@@ -6,6 +6,9 @@ metadata:
     name: openshift-kuryr
     openshift.io/run-level: "0"
     openshift.io/cluster-monitoring: "true"
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
   annotations:
     openshift.io/node-selector: "" #override default node selector
     openshift.io/description: "Kuryr-Kubernetes components"
