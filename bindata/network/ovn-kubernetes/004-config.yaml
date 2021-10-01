@@ -28,7 +28,8 @@ data:
     [gateway]
     mode=local
     nodeport=true
-{{ if .OVNHybridOverlayEnable }}
+{{- if .OVNHybridOverlayEnable }}
+
     [hybridoverlay]
     enabled=true
     {{- if .OVNHybridOverlayNetCIDR }}
@@ -37,4 +38,17 @@ data:
     {{- if .OVNHybridOverlayVXLANPort}}
     hybrid-overlay-vxlan-port="{{.OVNHybridOverlayVXLANPort}}"
     {{- end }}
+{{- end  }}
+{{- if .IsSNO }}
+
+    [masterha]
+    {{- /* 
+    Even in case of SNO there will be only one ovn-master, we set dedicated values for leader election 
+    durations in SNO, as disabling it can cause issues on scaling out SNO again. 
+    The whole discussion can be found at https://coreos.slack.com/archives/CDCP2LA9L/p1627402405090600. 
+    Recommended values at https://github.com/openshift/enhancements/blame/84e894ead7b188a1013556e0ba6973b8463995f1/CONVENTIONS.md#L183
+    */}}
+    election-lease-duration=137
+    election-renew-deadline=107
+    election-retry-period=26
 {{- end  }}

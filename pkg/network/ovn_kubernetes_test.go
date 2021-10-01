@@ -153,6 +153,7 @@ func TestRenderedOVNKubernetesConfig(t *testing.T) {
 		desc                string
 		expected            string
 		hybridOverlayConfig *operv1.HybridOverlayConfig
+		masterIPs           []string
 	}
 	testcases := []testcase{
 		{
@@ -176,8 +177,8 @@ enable-egress-firewall=true
 [gateway]
 mode=local
 nodeport=true`,
+			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
 		},
-
 		{
 			desc: "HybridOverlay",
 			expected: `
@@ -209,6 +210,7 @@ cluster-subnets="10.132.0.0/14"`,
 					{CIDR: "10.132.0.0/14", HostPrefix: 23},
 				},
 			},
+			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
 		},
 		{
 			desc: "HybridOverlay with custom VXLAN port",
@@ -244,6 +246,7 @@ hybrid-overlay-vxlan-port="9000"`,
 				},
 				HybridOverlayVXLANPort: ptrToUint32(9000),
 			},
+			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
 		},
 		{
 			desc: "HybridOverlay enabled with no ClusterNetworkEntry",
@@ -272,6 +275,35 @@ nodeport=true
 enabled=true`,
 
 			hybridOverlayConfig: &operv1.HybridOverlayConfig{},
+			masterIPs:           []string{"1.2.3.4", "2.3.4.5"},
+		},
+		{
+			desc: "Single Node OpenShift should contain SNO specific leader election settings",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://1.1.1.1:1111"
+host-network-namespace="openshift-host-network"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+
+[gateway]
+mode=local
+nodeport=true
+
+[masterha]
+election-lease-duration=137
+election-renew-deadline=107
+election-retry-period=26`,
+			masterIPs: []string{"1.2.3.4"},
 		},
 	}
 	g := NewGomegaWithT(t)
@@ -285,6 +317,7 @@ enabled=true`,
 			if tc.hybridOverlayConfig != nil {
 				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = tc.hybridOverlayConfig
 			}
+
 			//set a few inputs so that the tests are not machine dependant
 			OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.MTU = ptrToUint32(1500)
 
@@ -297,7 +330,7 @@ enabled=true`,
 
 			bootstrapResult := &bootstrap.BootstrapResult{
 				OVN: bootstrap.OVNBootstrapResult{
-					MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+					MasterIPs: tc.masterIPs,
 				},
 			}
 			objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
