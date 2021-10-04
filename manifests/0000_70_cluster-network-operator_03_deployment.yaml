@@ -53,6 +53,8 @@ spec:
           value: "quay.io/openshift/origin-multus-admission-controller:latest"
         - name: CNI_PLUGINS_IMAGE
           value: "quay.io/openshift/origin-container-networking-plugins:latest"
+        - name: BOND_CNI_PLUGIN_IMAGE
+          value: "quay.io/openshift/origin-network-interface-bond-cni:latest"
         - name: WHEREABOUTS_CNI_IMAGE
           value: "quay.io/openshift/origin-multus-whereabouts-ipam-cni:latest"
         - name: ROUTE_OVERRRIDE_CNI_IMAGE

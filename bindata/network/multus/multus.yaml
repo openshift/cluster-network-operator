@@ -261,6 +261,24 @@ spec:
           value: "/usr/src/plugins/rhel8/bin/"
         - name: DEFAULT_SOURCE_DIRECTORY
           value: "/usr/src/plugins/bin/"
+      - name: bond-cni-plugin
+        image: {{.BondCNIPluginImage}}
+        command: ["/entrypoint/cnibincopy.sh"]
+        volumeMounts:
+        - mountPath: /entrypoint
+          name: cni-binary-copy
+        - mountPath: /host/opt/cni/bin
+          name: cnibin
+        - mountPath: /host/etc/os-release
+          name: os-release
+          readOnly: true
+        env:
+        - name: RHEL7_SOURCE_DIRECTORY
+          value: "/bondcni/rhel7"
+        - name: RHEL8_SOURCE_DIRECTORY
+          value: "/bondcni/rhel8"
+        - name: DEFAULT_SOURCE_DIRECTORY
+          value: "/bondcni"          
       - name: routeoverride-cni
         image: {{.RouteOverrideImage}}
         command: ["/entrypoint/cnibincopy.sh"]
