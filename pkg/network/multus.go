@@ -56,6 +56,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool) ([
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["MultusImage"] = os.Getenv("MULTUS_IMAGE")
 	data.Data["CNIPluginsImage"] = os.Getenv("CNI_PLUGINS_IMAGE")
+	data.Data["BondCNIPluginImage"] = os.Getenv("BOND_CNI_PLUGIN_IMAGE")
 	data.Data["WhereaboutsImage"] = os.Getenv("WHEREABOUTS_CNI_IMAGE")
 	data.Data["EgressRouterImage"] = os.Getenv("EGRESS_ROUTER_CNI_IMAGE")
 	data.Data["RouteOverrideImage"] = os.Getenv("ROUTE_OVERRRIDE_CNI_IMAGE")
