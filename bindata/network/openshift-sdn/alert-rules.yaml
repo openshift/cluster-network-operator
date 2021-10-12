@@ -15,6 +15,14 @@ spec:
     # note: all joins on kube_pod_* need a a "topk by (key) (1, <metric> )"
     # otherwise you will generate query errors when kube_state_metrics is being
     # upgraded and there are duplicate rows on the "right" side of the join.
+    - alert: NodeWithoutSDNController
+      annotations:
+        summary: All control plane nodes should be running a sdn controller pod, {{"{{"}} $labels.node {{"}}"}} is not.
+      expr: |
+          count(kube_node_role{role="master"} == 1) != count(kube_pod_info{namespace="openshift-sdn",  pod=~"sdn-controller.*"})
+      for: 10m
+      labels:
+        severity: warning
     - alert: NodeWithoutSDNPod
       annotations:
         summary: All nodes should be running an sdn pod, {{"{{"}} $labels.node {{"}}"}} is not.
