@@ -19,7 +19,7 @@ spec:
       annotations:
         summary: All nodes should be running an sdn pod, {{"{{"}} $labels.node {{"}}"}} is not.
       expr: |
-        (kube_node_info unless on(node) topk by (node) (1, kube_pod_info{namespace="openshift-sdn",  pod=~"sdn.*"})) > 0
+        (kube_node_info unless on(node) topk by (node) (1, kube_pod_info{namespace="openshift-sdn",  pod=~"sdn-[^-]*"})) > 0
       for: 10m
       labels:
         severity: warning
@@ -27,7 +27,7 @@ spec:
       annotations:
         summary: SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} is taking too long, on average, to apply kubernetes service rules to iptables.
       expr: |
-        histogram_quantile(.95, kubeproxy_sync_proxy_rules_duration_seconds_bucket) 
+        histogram_quantile(.95, kubeproxy_sync_proxy_rules_duration_seconds_bucket)
         * on(namespace, pod) group_right topk by (namespace, pod) (1, kube_pod_info{namespace="openshift-sdn",  pod=~"sdn-[^-]*"}) > 15
       labels:
         severity: warning
