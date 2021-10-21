@@ -80,7 +80,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["CNIBinDir"] = CNIBinDir
 	data.Data["OVN_GATEWAY_MODE"] = bootstrapResult.OVN.OVNKubernetesConfig.GatewayMode
 	data.Data["OVN_ENABLE_EGRESS_IP"] = bootstrapResult.OVN.OVNKubernetesConfig.EnableEgressIP
-	data.Data["OVN_DISABLE_SNAT_MULTIPLE_GWS"] = bootstrapResult.OVN.OVNKubernetesConfig.DisableSNATMutlipleGWs
+	data.Data["OVN_DISABLE_SNAT_MULTIPLE_GWS"] = bootstrapResult.OVN.OVNKubernetesConfig.DisableSNATMultipleGWs
 	data.Data["OVN_NB_PORT"] = OVN_NB_PORT
 	data.Data["OVN_SB_PORT"] = OVN_SB_PORT
 	data.Data["OVN_NB_RAFT_PORT"] = OVN_NB_RAFT_PORT
@@ -247,7 +247,7 @@ func bootstrapOVNConfig(kubeClient client.Client) (*bootstrap.OVNConfigBoostrapR
 	ovnConfigResult := &bootstrap.OVNConfigBoostrapResult{
 		GatewayMode:            OVN_SHARED_GW_MODE,
 		EnableEgressIP:         true,
-		DisableSNATMutlipleGWs: false,
+		DisableSNATMultipleGWs: false,
 	}
 
 	cm := &corev1.ConfigMap{}
@@ -271,7 +271,7 @@ func bootstrapOVNConfig(kubeClient client.Client) (*bootstrap.OVNConfigBoostrapR
 	ovnConfigResult.GatewayMode = modeOverride
 	if disableSNATMultipleGWsOverride {
 		ovnConfigResult.EnableEgressIP = false
-		ovnConfigResult.DisableSNATMutlipleGWs = true
+		ovnConfigResult.DisableSNATMultipleGWs = true
 	}
 	klog.Infof("Overriding OVN configuration to %+v", ovnConfigResult)
 	return ovnConfigResult, nil
