@@ -64,7 +64,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 				GatewayMode:            "shared",
 				EnableEgressIP:         true,
-				DisableSNATMutlipleGWs: false,
+				DisableSNATMultipleGWs: false,
 			},
 		},
 	}
@@ -132,7 +132,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 				GatewayMode:            "shared",
 				EnableEgressIP:         true,
-				DisableSNATMutlipleGWs: false,
+				DisableSNATMultipleGWs: false,
 			},
 		},
 	}
@@ -150,7 +150,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 				GatewayMode:            "shared",
 				EnableEgressIP:         true,
-				DisableSNATMutlipleGWs: false,
+				DisableSNATMultipleGWs: false,
 			},
 		},
 	}
@@ -359,7 +359,7 @@ election-retry-period=26`,
 					OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 						GatewayMode:            "shared",
 						EnableEgressIP:         true,
-						DisableSNATMutlipleGWs: false,
+						DisableSNATMultipleGWs: false,
 					},
 				},
 			}
@@ -1232,7 +1232,7 @@ metadata:
 					OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 						GatewayMode:            "shared",
 						EnableEgressIP:         true,
-						DisableSNATMutlipleGWs: false,
+						DisableSNATMultipleGWs: false,
 					},
 					PrePullerDaemonset: prepuller,
 				},
@@ -1534,7 +1534,7 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 				GatewayMode:            "shared",
 				EnableEgressIP:         true,
-				DisableSNATMutlipleGWs: false,
+				DisableSNATMultipleGWs: false,
 			},
 		},
 	}
