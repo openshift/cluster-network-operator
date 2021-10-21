@@ -33,7 +33,7 @@ type KuryrBootstrapResult struct {
 type OVNConfigBoostrapResult struct {
 	GatewayMode            string
 	EnableEgressIP         bool
-	DisableSNATMutlipleGWs bool
+	DisableSNATMultipleGWs bool
 }
 
 type OVNBootstrapResult struct {
