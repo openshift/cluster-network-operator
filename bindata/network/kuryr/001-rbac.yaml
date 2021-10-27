@@ -63,6 +63,11 @@ rules:
   - get
   - list
   - watch
+- apiGroups: ["", "events.k8s.io"]
+  resources:
+  - events
+  verbs:
+  - create
 ---
 apiVersion: v1
 kind: ServiceAccount
