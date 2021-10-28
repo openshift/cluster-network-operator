@@ -44,6 +44,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 	data.Data["Mode"] = c.Mode
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
+	data.Data["PlatformType"] = bootstrapResult.Cloud.PlatformType
 	if bootstrapResult.Cloud.PlatformType == configv1.AzurePlatformType {
 		data.Data["SDNPlatformAzure"] = true
 	} else {
