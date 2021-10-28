@@ -37,7 +37,9 @@ spec:
             set +o allexport
           fi
 
-          exec openshift-sdn-controller --v=${OPENSHIFT_SDN_LOG_LEVEL:-2}
+          exec openshift-sdn-controller \
+           --platform-type {{.PlatformType}} \
+           --v=${OPENSHIFT_SDN_LOG_LEVEL:-2}
         resources:
           requests:
             cpu: 10m

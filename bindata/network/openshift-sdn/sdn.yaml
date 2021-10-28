@@ -94,6 +94,7 @@ spec:
           # Launch the network process
           exec /usr/bin/openshift-sdn-node \
             --node-name ${K8S_NODE_NAME} --node-ip ${K8S_NODE_IP} \
+            --platform-type {{.PlatformType}} \
             --proxy-config /config/kube-proxy-config.yaml \
             --v ${OPENSHIFT_SDN_LOG_LEVEL:-2}
         securityContext:
