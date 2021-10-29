@@ -7,8 +7,8 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-// getDefaultMTU gets the mtu of the default route.
-func getDefaultMTU() (int, error) {
+// GetDefaultMTU gets the mtu of the default route.
+func GetDefaultMTU() (int, error) {
 	// Get the interface with the default route
 	// TODO(cdc) handle v6-only nodes
 	routes, err := netlink.RouteList(nil, netlink.FAMILY_ALL)
@@ -41,4 +41,13 @@ func getDefaultMTU() (int, error) {
 	}
 
 	return mtu, nil
+}
+
+// GetDevMTU gets the mtu of an interface.
+func GetDevMTU(dev string) (int, error) {
+	link, err := netlink.LinkByName(dev)
+	if err != nil {
+		return 0, errors.Wrapf(err, "could not retrieve link %s", dev)
+	}
+	return link.Attrs().MTU, nil
 }

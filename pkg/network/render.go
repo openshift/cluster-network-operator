@@ -181,7 +181,7 @@ func Validate(conf *operv1.NetworkSpec) error {
 // Defaults are carried forward from previous if it is provided. This is so we
 // can change defaults as we move forward, but won't disrupt existing clusters.
 func FillDefaults(conf, previous *operv1.NetworkSpec) {
-	hostMTU, err := getDefaultMTU()
+	hostMTU, err := GetDefaultMTU()
 	if hostMTU == 0 {
 		hostMTU = 1500
 	}

@@ -7,6 +7,7 @@ FROM registry.ci.openshift.org/openshift/origin-v4.0:base
 COPY --from=builder  /go/src/github.com/openshift/cluster-network-operator/cluster-network-operator /usr/bin/
 COPY --from=builder  /go/src/github.com/openshift/cluster-network-operator/cluster-network-check-endpoints /usr/bin/
 COPY --from=builder  /go/src/github.com/openshift/cluster-network-operator/cluster-network-check-target /usr/bin/
+COPY --from=builder  /go/src/github.com/openshift/cluster-network-operator/cluster-network-pod-mtu-setter /usr/bin/
 
 COPY manifests /manifests
 COPY bindata /bindata
