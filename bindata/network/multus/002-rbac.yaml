@@ -112,6 +112,11 @@ rules:
   - update
   - patch
   - delete
+- apiGroups: [""]
+  resources:
+  - pods
+  verbs:
+  - list
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
