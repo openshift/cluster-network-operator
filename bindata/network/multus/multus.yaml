@@ -455,3 +455,39 @@ spec:
           configMap:
             name: cni-binary-copy-script
             defaultMode: 0744
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ip-reconciler
+  namespace: openshift-multus
+  labels:
+    tier: node
+    app: whereabouts
+spec:
+  # reconcile loop every 5 minutes, starting at the top of the hour
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          priorityClassName: "system-cluster-critical"
+          serviceAccountName: multus
+          containers:
+            - name: whereabouts
+              image: {{.WhereaboutsImage}}
+              resources:
+                requests:
+                  cpu: "25m"
+                  memory: "25Mi"
+              command:
+              - /ip-reconciler
+              - -log-level=verbose
+              volumeMounts:
+                - name: cni-net-dir
+                  mountPath: /host/etc/cni/net.d
+          volumes:
+            - name: cni-net-dir
+              hostPath:
+                path: {{ .SystemCNIConfDir }}
+          restartPolicy: OnFailure
