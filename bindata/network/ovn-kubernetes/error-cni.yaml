@@ -1,0 +1,154 @@
+{{- if eq .OVN_NODE_MODE "dpu" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: error-cni-script
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    kubernetes.io/description: |
+      This is a script that serves as the CNI on DPU. Only host network supported, so returns error to cmdAdd() calls.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+data:
+  error-cni.sh: |-
+    #!/bin/bash
+    set -e
+
+    cniVersionStr="0.4.0"
+    addErrorStr="Only host backed pods supported on DPU in Infra Cluster."
+    unknownErrorStr="Unknown cni command: $CNI_COMMAND"
+
+    case $CNI_COMMAND in
+    ADD)
+    echo "{
+      \"cniVersion\": \"${cniVersionStr}\",
+      \"code\": 7,
+      \"msg\": \"Not Supported\",
+      \"details\": \"${addErrorStr}\"
+    }"
+        exit 1 
+    ;;
+
+    DEL)
+    ;;
+
+    GET)
+    ;;
+
+    VERSION)
+    echo "{
+      \"cniVersion\": \"${cniVersionStr}\", 
+      \"supportedVersions\": [ \"0.3.0\", \"0.3.1\", \"0.4.0\" ] 
+    }"
+    ;;
+
+    *)
+    echo "{
+      \"cniVersion\": \"${cniVersionStr}\",
+      \"code\": 4,
+      \"msg\": \"Invalid Configuration\",
+      \"details\": \"${unknownErrorStr}\"
+    }"
+        exit 1 
+    ;;
+
+    esac
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: error-cni-conf
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    kubernetes.io/description: |
+      This is the Error-CNI Readiness Indicator File to let Multus know CNI is ready.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+data:
+  08-error-cni.conf: |-
+    {"cniVersion":"0.4.0","name":"error-cni","type":"error-cni"}
+
+---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: error-cni-plugin
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    kubernetes.io/description: |
+      This daemon installs the Error-CNI on DPU worker nodes in the Infra-Cluster.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+    matchLabels:
+      app: error-cni-plugin
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: error-cni-plugin
+        component: network
+        type: infra
+        openshift.io/component: network
+        kubernetes.io/os: "linux"
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/os: linux
+        network.operator.openshift.io/dpu: ''
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: network.operator.openshift.io/dpu
+                operator: Exists
+      priorityClassName: "system-node-critical"
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: error-cni-init
+        image: {{.OvnImage}}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            #!/bin/sh
+            set -u -e
+            # Copy files stored in ConfigMap to mounted host directories 
+            cp -f /script-dir/error-cni.sh /cni-bin-dir/error-cni
+            cp -f /conf-dir/08-error-cni.conf /etc/cni/net.d/.
+            # Overwrite the OVN-Kubernetes conf file until Multus is updated
+            # to use a directory as the readiness-indicator-file
+            cp -f /conf-dir/08-error-cni.conf /etc/cni/net.d/10-ovn-kubernetes.conf
+            # RestartPolicy for pods in DaemonSets must be always, so sleep forever
+            trap : TERM INT; sleep infinity & wait
+        volumeMounts:
+        - mountPath: /script-dir
+          name: error-cni-script-config-map
+        - mountPath: /conf-dir
+          name: error-cni-conf-config-map
+        - mountPath: /cni-bin-dir
+          name: host-cni-bin
+        - mountPath: /etc/cni/net.d
+          name: host-cni-netd
+      volumes:
+        - name: error-cni-script-config-map
+          configMap:
+            name: error-cni-script
+            defaultMode: 0755
+        - name: error-cni-conf-config-map
+          configMap:
+            name: error-cni-conf
+            defaultMode: 0644
+        - name: host-cni-bin
+          hostPath:
+            path: "{{.CNIBinDir}}"
+        - name: host-cni-netd
+          hostPath:
+            path: "{{.CNIConfDir}}"
+{{- end }}

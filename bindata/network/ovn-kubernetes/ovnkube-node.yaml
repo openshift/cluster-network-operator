@@ -50,6 +50,8 @@ spec:
                 {{ else }}
                 operator: DoesNotExist
                 {{ end }}
+              - key: network.operator.openshift.io/dpu
+                operator: DoesNotExist
       serviceAccountName: ovn-kubernetes-node
       hostNetwork: true
       hostPID: true
