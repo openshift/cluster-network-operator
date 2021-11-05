@@ -46,6 +46,7 @@ const OVN_SHARED_GW_MODE = "shared"
 const OVN_LOG_PATTERN_CONSOLE = "%D{%Y-%m-%dT%H:%M:%S.###Z}|%05N|%c%T|%p|%m"
 const OVN_NODE_MODE_FULL = "full"
 const OVN_NODE_MODE_DPU_HOST = "dpu-host"
+const OVN_NODE_MODE_DPU = "dpu"
 
 var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
@@ -197,9 +198,18 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	objs = append(objs, manifests...)
 
 	nodeMode := bootstrapResult.OVN.OVNKubernetesConfig.NodeMode
-	if nodeMode != OVN_NODE_MODE_FULL {
+	if nodeMode == OVN_NODE_MODE_DPU_HOST {
 		data.Data["OVN_NODE_MODE"] = nodeMode
 		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/ovnkube-node.yaml"), &data)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to render manifests")
+		}
+		objs = append(objs, manifests...)
+	} else if nodeMode == OVN_NODE_MODE_DPU {
+		// "OVN_NODE_MODE" not set when render.RenderDir() called above,
+		// so render just the error-cni.yaml with "OVN_NODE_MODE" set.
+		data.Data["OVN_NODE_MODE"] = nodeMode
+		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/error-cni.yaml"), &data)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to render manifests")
 		}
@@ -300,8 +310,9 @@ func bootstrapOVNConfig(kubeClient client.Client) (*bootstrap.OVNConfigBoostrapR
 		}
 	} else {
 		nodeModeOverride := cm.Data["mode"]
-		if nodeModeOverride != OVN_NODE_MODE_DPU_HOST {
-			klog.Warningf("dpu-mode-config does not match %q, is: %q. Using OVN configuration: %+v", OVN_NODE_MODE_DPU_HOST, nodeModeOverride, ovnConfigResult)
+		if nodeModeOverride != OVN_NODE_MODE_DPU_HOST && nodeModeOverride != OVN_NODE_MODE_DPU {
+			klog.Warningf("dpu-mode-config does not match %q or %q, is: %q. Using OVN configuration: %+v",
+				OVN_NODE_MODE_DPU_HOST, OVN_NODE_MODE_DPU, nodeModeOverride, ovnConfigResult)
 			return ovnConfigResult, nil
 		}
 		ovnConfigResult.NodeMode = nodeModeOverride
