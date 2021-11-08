@@ -47,6 +47,7 @@ const OVN_LOG_PATTERN_CONSOLE = "%D{%Y-%m-%dT%H:%M:%S.###Z}|%05N|%c%T|%p|%m"
 const OVN_NODE_MODE_FULL = "full"
 const OVN_NODE_MODE_DPU_HOST = "dpu-host"
 const OVN_NODE_MODE_DPU = "dpu"
+const OVN_NODE_SELECTOR_DPU = "network.operator.openshift.io/dpu: ''"
 
 var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
@@ -214,6 +215,20 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			return nil, errors.Wrap(err, "failed to render manifests")
 		}
 		objs = append(objs, manifests...)
+
+		// Run KubeProxy on DPU
+		// DPU_DEV_PREVIEW
+		// Node Mode is currently configured via a stand-alone configMap and stored
+		// in bootstrapResult. Once out of DevPreview, CNO API will be expanded to
+		// include Node Mode and it will be stored in conf (operv1.NetworkSpec) and
+		// defaultDeployKubeProxy() will have access and this can be removed.
+		if conf.DeployKubeProxy == nil {
+			v := true
+			conf.DeployKubeProxy = &v
+		} else {
+			*conf.DeployKubeProxy = true
+		}
+		fillKubeProxyDefaults(conf, nil)
 	}
 
 	// obtain the current IP family mode.

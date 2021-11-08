@@ -52,7 +52,14 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	objs = append(objs, o...)
 
 	// render kube-proxy
-	o, err = renderStandaloneKubeProxy(conf, manifestDir)
+	// DPU_DEV_PREVIEW
+	// There is currently a restriction that renderStandaloneKubeProxy() is
+	// called after renderDefaultNetwork(). The OVN-Kubernetes code is enabling
+	// KubeProxy in Node Mode of "dpu". Once out of DevPreview, CNO API will be
+	// expanded to include Node Mode and it will be stored in conf (operv1.NetworkSpec)
+	// and KubeProxy can read Node Mode and be enabled in KubeProxy code, removing this
+	// dependency.
+	o, err = renderStandaloneKubeProxy(conf, bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, err
 	}

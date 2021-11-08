@@ -10,6 +10,7 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
 )
@@ -176,7 +177,7 @@ func isKubeProxyChangeSafe(prev, next *operv1.NetworkSpec) []error {
 
 // renderStandaloneKubeProxy renders the standalone kube-proxy if installation was
 // requested.
-func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	if !*conf.DeployKubeProxy {
 		return nil, nil
 	}
@@ -214,6 +215,17 @@ func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, manifestDir string) ([]
 	data.Data["KubeProxyConfig"] = kpc
 	data.Data["MetricsPort"] = metricsPort
 	data.Data["HealthzPort"] = healthzPort
+	data.Data["KUBE_PROXY_NODE_SELECTOR"] = ""
+	// DPU_DEV_PREVIEW
+	// Node Mode is currently configured via a stand-alone configMap and stored
+	// in bootstrapResult. Once out of DevPreview, CNO API will be expanded to
+	// include Node Mode and it will be stored in conf (operv1.NetworkSpec) and
+	// this code will not need to access bootstrapResult.OVN.OVNKubernetesConfig.
+	if bootstrapResult != nil && bootstrapResult.OVN.OVNKubernetesConfig != nil {
+		if bootstrapResult.OVN.OVNKubernetesConfig.NodeMode == OVN_NODE_MODE_DPU {
+			data.Data["KUBE_PROXY_NODE_SELECTOR"] = OVN_NODE_SELECTOR_DPU
+		}
+	}
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "kube-proxy"), &data)
 	if err != nil {
