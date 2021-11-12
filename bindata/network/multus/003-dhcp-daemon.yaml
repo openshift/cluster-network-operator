@@ -49,6 +49,10 @@ spec:
         - "daemon"
         - "-hostprefix"
         - "/host"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 65Mi
         securityContext:
           privileged: true
         volumeMounts:
