@@ -66,3 +66,7 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-network-tools:latest
+  - name: network-interface-bond-cni
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-network-interface-bond-cni:latest
