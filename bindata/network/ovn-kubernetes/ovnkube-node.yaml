@@ -334,6 +334,15 @@ spec:
           if [[ -n "${IPFIX_COLLECTORS}" ]] ; then
             export_network_flows_flags="$export_network_flows_flags --ipfix-targets ${IPFIX_COLLECTORS}"
           fi
+          if [[ -n "${IPFIX_CACHE_MAX_FLOWS}" ]] ; then
+            export_network_flows_flags="$export_network_flows_flags --ipfix-cache-max-flows ${IPFIX_CACHE_MAX_FLOWS}"
+          fi
+          if [[ -n "${IPFIX_CACHE_ACTIVE_TIMEOUT}" ]] ; then
+            export_network_flows_flags="$export_network_flows_flags --ipfix-cache-active-timeout ${IPFIX_CACHE_ACTIVE_TIMEOUT}"
+          fi
+          if [[ -n "${IPFIX_SAMPLING}" ]] ; then
+            export_network_flows_flags="$export_network_flows_flags --ipfix-sampling ${IPFIX_SAMPLING}"
+          fi
           gw_interface_flag=
           # if br-ex1 is configured on the node, we want to use it for external gateway traffic
           if [ -d /sys/class/net/br-ex1 ]; then
@@ -390,6 +399,18 @@ spec:
         {{ if .IPFIXCollectors }}
         - name: IPFIX_COLLECTORS
           value: "{{.IPFIXCollectors}}"
+        {{ end }}
+        {{ if .IPFIXCacheMaxFlows }}
+        - name: IPFIX_CACHE_MAX_FLOWS
+          value: "{{.IPFIXCacheMaxFlows}}"
+        {{ end }}
+        {{ if .IPFIXCacheActiveTimeout }}
+        - name: IPFIX_CACHE_ACTIVE_TIMEOUT
+          value: "{{.IPFIXCacheActiveTimeout}}"
+        {{ end }}
+        {{ if .IPFIXSampling }}
+        - name: IPFIX_SAMPLING
+          value: "{{.IPFIXSampling}}"
         {{ end }}
         - name: K8S_NODE
           valueFrom:
