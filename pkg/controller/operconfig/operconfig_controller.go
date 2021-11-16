@@ -228,12 +228,15 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// Set up the Pod reconciler before we start creating DaemonSets/Deployments
 	daemonSets := []types.NamespacedName{}
 	deployments := []types.NamespacedName{}
+	pods := []types.NamespacedName{}
 	relatedObjects := []configv1.ObjectReference{}
 	for _, obj := range objs {
 		if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "DaemonSet" {
 			daemonSets = append(daemonSets, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()})
 		} else if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "Deployment" {
 			deployments = append(deployments, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()})
+		} else if obj.GetAPIVersion() == "v1" && obj.GetKind() == "Pod" {
+			pods = append(deployments, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()})
 		}
 		restMapping, err := r.mapper.RESTMapping(obj.GroupVersionKind().GroupKind())
 		if err != nil {
@@ -278,6 +281,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	r.status.SetDaemonSets(daemonSets)
 	r.status.SetDeployments(deployments)
+	r.status.SetPods(pods)
 	r.status.SetRelatedObjects(relatedObjects)
 
 	allResources := []types.NamespacedName{}
@@ -316,7 +320,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// Run a pod status check just to clear any initial inconsitencies at startup of the CNO
-	r.status.SetFromPods()
+	r.status.SetFromRollout()
 
 	// Update Network.config.openshift.io.Status
 	status, err := r.ClusterNetworkStatus(context.TODO(), operConfig)

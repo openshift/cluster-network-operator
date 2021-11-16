@@ -55,6 +55,7 @@ type StatusManager struct {
 	failing         [maxStatusLevel]*operv1.OperatorCondition
 	installComplete bool
 
+	pods           []types.NamespacedName
 	daemonSets     []types.NamespacedName
 	deployments    []types.NamespacedName
 	relatedObjects []configv1.ObjectReference
@@ -310,6 +311,12 @@ func (status *StatusManager) SetNotDegraded(statusLevel StatusLevel) {
 	status.Lock()
 	defer status.Unlock()
 	status.setNotDegraded(statusLevel)
+}
+
+func (status *StatusManager) SetPods(pods []types.NamespacedName) {
+	status.Lock()
+	defer status.Unlock()
+	status.pods = pods
 }
 
 func (status *StatusManager) SetDaemonSets(daemonSets []types.NamespacedName) {

@@ -32,12 +32,13 @@ const (
 	lastSeenAnnotation = "network.operator.openshift.io/last-seen-state"
 )
 
-// podState is a snapshot of the last-seen-state and last-changed-times
+// rolloutState is a snapshot of the last-seen-state and last-changed-times
 // for pod-creating entities, as marshalled to json in an annotation
-type podState struct {
+type rolloutState struct {
 	// "public" for marshalling to json, since we can't have complex keys
 	DaemonsetStates  []daemonsetState
 	DeploymentStates []deploymentState
+	PodStates        []podState
 }
 
 // daemonsetState is the internal state we use to check if a rollout has
@@ -57,19 +58,27 @@ type deploymentState struct {
 	LastChangeTime time.Time
 }
 
-// SetFromPods sets the operator Degraded/Progressing/Available status, based on
-// the current status of the manager's DaemonSets and Deployments.
-func (status *StatusManager) SetFromPods() {
+// podState  is the same as daemonsetState.. but for pods!
+type podState struct {
+	types.NamespacedName
+
+	LastSeenStatus v1.PodStatus
+	LastChangeTime time.Time
+}
+
+// SetFromRollout sets the operator Degraded/Progressing/Available status, based on
+// the current status of the manager's DaemonSets, Deployments and Pods.
+func (status *StatusManager) SetFromRollout() {
 	status.Lock()
 	defer status.Unlock()
 
 	targetLevel := os.Getenv("RELEASE_VERSION")
-	reachedAvailableLevel := (len(status.daemonSets) + len(status.deployments)) > 0
+	reachedAvailableLevel := (len(status.daemonSets) + len(status.deployments) + len(status.pods)) > 0
 
 	progressing := []string{}
 	hung := []string{}
 
-	daemonsetStates, deploymentStates := status.getLastPodState()
+	daemonsetStates, deploymentStates, podStates := status.getLastRolloutState()
 
 	for _, dsName := range status.daemonSets {
 		ds := &appsv1.DaemonSet{}
@@ -196,8 +205,67 @@ func (status *StatusManager) SetFromPods() {
 		}
 	}
 
+	// Bare pods are assumed to be jobs that are run to completion
+	for _, podName := range status.pods {
+		pod := &v1.Pod{}
+		if err := status.client.Get(context.TODO(), podName, pod); err != nil {
+			log.Printf("Error getting Pod %q: %v", podName.String(), err)
+			progressing = append(progressing, fmt.Sprintf("Waiting for Pod %q to be created", podName.String()))
+			reachedAvailableLevel = false
+			// Assume the OperConfig Controller is in the process of reconciling
+			// things; it will set a Degraded status if it fails.
+			continue
+		}
+
+		podProgressing := false
+
+		switch pod.Status.Phase {
+		case v1.PodSucceeded:
+		case v1.PodFailed:
+			hung = append(progressing, fmt.Sprintf("Pod %q has failed", podName.String()))
+		case v1.PodPending:
+			progressing = append(progressing, fmt.Sprintf("Pod %q is pending", podName.String()))
+			podProgressing = true
+		case v1.PodRunning:
+			progressing = append(progressing, fmt.Sprintf("Pod %q is progressing", podName.String()))
+			podProgressing = true
+		default:
+			progressing = append(progressing, fmt.Sprintf("Pod %q state is unknown", podName.String()))
+			podProgressing = true
+		}
+
+		// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
+		if !isNonCritical(pod) {
+			hung = append(hung, status.CheckCrashLoopBackOffPod(pod)...)
+		}
+
+		var depHung *string
+		if podProgressing && !isNonCritical(pod) {
+			reachedAvailableLevel = false
+
+			podState, exists := podStates[podName]
+			if !exists || !reflect.DeepEqual(podState.LastSeenStatus, pod.Status) {
+				podState.LastChangeTime = time.Now()
+				pod.Status.DeepCopyInto(&podState.LastSeenStatus)
+				podStates[podName] = podState
+			}
+
+			// Catch hung rollouts
+			if exists && (time.Since(podState.LastChangeTime)) > ProgressTimeout {
+				hung = append(hung, fmt.Sprintf("Pod %q rollout is not making progress - last change %s", podName.String(), podState.LastChangeTime.Format(time.RFC3339)))
+				empty := ""
+				depHung = &empty
+			}
+		} else {
+			delete(podStates, podName)
+		}
+		if err := status.setPodAnnotation(pod, names.RolloutHungAnnotation, depHung); err != nil {
+			log.Printf("Error setting Pod %q annotation: %v", podName, err)
+		}
+	}
+
 	status.setNotDegraded(PodDeployment)
-	if err := status.setLastPodState(daemonsetStates, deploymentStates); err != nil {
+	if err := status.setLastRolloutState(daemonsetStates, deploymentStates, podStates); err != nil {
 		log.Printf("Failed to set pod state (continuing): %+v\n", err)
 	}
 
@@ -226,9 +294,6 @@ func (status *StatusManager) SetFromPods() {
 				Status: operv1.ConditionTrue,
 			},
 		)
-	}
-
-	if reachedAvailableLevel && len(progressing) == 0 {
 		status.installComplete = true
 	}
 
@@ -240,33 +305,34 @@ func (status *StatusManager) SetFromPods() {
 	}
 }
 
-// getLastPodState reads the last-seen daemonset + deployment state
+// getLastRolloutState reads the last-seen daemonset + deployment state
 // from the clusteroperator annotation and parses it. On error, it returns
 // an empty state, since this should not block updating operator status.
-func (status *StatusManager) getLastPodState() (map[types.NamespacedName]daemonsetState, map[types.NamespacedName]deploymentState) {
+func (status *StatusManager) getLastRolloutState() (map[types.NamespacedName]daemonsetState, map[types.NamespacedName]deploymentState, map[types.NamespacedName]podState) {
 	// with maps allocated
 	daemonsetStates := map[types.NamespacedName]daemonsetState{}
 	deploymentStates := map[types.NamespacedName]deploymentState{}
+	podStates := map[types.NamespacedName]podState{}
 
 	// Load the last-seen snapshot from our annotation
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
 	err := status.client.Get(context.TODO(), types.NamespacedName{Name: status.name}, co)
 	if err != nil {
 		log.Printf("Failed to get ClusterOperator: %v", err)
-		return daemonsetStates, deploymentStates
+		return daemonsetStates, deploymentStates, podStates
 	}
 
 	lsbytes := co.Annotations[lastSeenAnnotation]
 	if lsbytes == "" {
-		return daemonsetStates, deploymentStates
+		return daemonsetStates, deploymentStates, podStates
 	}
 
-	out := podState{}
+	out := rolloutState{}
 	err = json.Unmarshal([]byte(lsbytes), &out)
 	if err != nil {
 		// No need to return error; just move on
 		log.Printf("failed to unmashal last-seen-status: %v", err)
-		return daemonsetStates, deploymentStates
+		return daemonsetStates, deploymentStates, podStates
 	}
 
 	for _, ds := range out.DaemonsetStates {
@@ -277,29 +343,40 @@ func (status *StatusManager) getLastPodState() (map[types.NamespacedName]daemons
 		deploymentStates[ds.NamespacedName] = ds
 	}
 
-	return daemonsetStates, deploymentStates
+	for _, ps := range out.PodStates {
+		podStates[ps.NamespacedName] = ps
+	}
+
+	return daemonsetStates, deploymentStates, podStates
 }
 
-func (status *StatusManager) setLastPodState(
+func (status *StatusManager) setLastRolloutState(
 	dss map[types.NamespacedName]daemonsetState,
-	deps map[types.NamespacedName]deploymentState) error {
+	deps map[types.NamespacedName]deploymentState,
+	pods map[types.NamespacedName]podState) error {
 
-	ps := podState{
+	rs := rolloutState{
 		DaemonsetStates:  make([]daemonsetState, 0, len(dss)),
 		DeploymentStates: make([]deploymentState, 0, len(deps)),
+		PodStates:        make([]podState, 0, len(pods)),
 	}
 
 	for nsn, ds := range dss {
 		ds.NamespacedName = nsn
-		ps.DaemonsetStates = append(ps.DaemonsetStates, ds)
+		rs.DaemonsetStates = append(rs.DaemonsetStates, ds)
 	}
 
 	for nsn, ds := range deps {
 		ds.NamespacedName = nsn
-		ps.DeploymentStates = append(ps.DeploymentStates, ds)
+		rs.DeploymentStates = append(rs.DeploymentStates, ds)
 	}
 
-	lsbytes, err := json.Marshal(ps)
+	for nsn, ps := range pods {
+		ps.NamespacedName = nsn
+		rs.PodStates = append(rs.PodStates, ps)
+	}
+
+	lsbytes, err := json.Marshal(rs)
 	if err != nil {
 		return err
 	}
@@ -328,18 +405,40 @@ func (status *StatusManager) setLastPodState(
 func (status *StatusManager) CheckCrashLoopBackOffPods(dName types.NamespacedName, selector map[string]string, kind string) []string {
 	hung := []string{}
 	pods := &v1.PodList{}
+	prefix := fmt.Sprintf("%s %q rollout is not making progress", kind, dName.String())
 	err := status.client.List(context.TODO(), pods, client.InNamespace(dName.Namespace), client.MatchingLabels(selector))
 	if err != nil {
 		log.Printf("Error getting pods from %s %q: %v", kind, dName.String(), err)
 	}
 	for _, pod := range pods.Items {
-		for _, container := range pod.Status.ContainerStatuses {
-			if container.State.Waiting != nil {
-				if container.State.Waiting.Reason == "CrashLoopBackOff" {
-					hung = append(hung, fmt.Sprintf("%s %q rollout is not making progress - pod %s is in CrashLoopBackOff State", kind, dName.String(), pod.Name))
-					// we can break once we find at least one container crashing in this pod
-					break
+
+		hung = append(hung, status.checkCrashLoopBackOffPodWithPrefix(&pod, prefix)...)
+	}
+	return hung
+}
+
+// CheckCrashLoopBackOffPod checks a pod with any containers in the CrashLoopBackoff
+// state. It returns a human-readable string for any pod in such a state.
+func (status *StatusManager) CheckCrashLoopBackOffPod(pod *v1.Pod) []string {
+	return status.checkCrashLoopBackOffPodWithPrefix(pod, "")
+}
+
+// CheckCrashLoopBackOffPod checks a pod with any containers in the CrashLoopBackoff
+// state. It returns a human-readable string for any pod in such a state with the given
+// prefix if any.
+func (status *StatusManager) checkCrashLoopBackOffPodWithPrefix(pod *v1.Pod, prefix string) []string {
+	hung := []string{}
+
+	for _, container := range pod.Status.ContainerStatuses {
+		if container.State.Waiting != nil {
+			if container.State.Waiting.Reason == "CrashLoopBackOff" {
+				if prefix != "" {
+					hung = append(hung, fmt.Sprintf("%s - pod %s is in CrashLoopBackOff State", prefix, pod.Name))
+				} else {
+					hung = append(hung, fmt.Sprintf("Pod %s is in CrashLoopBackOff State", pod.Name))
 				}
+				// we can break once we find at least one container crashing in this pod
+				break
 			}
 		}
 	}
@@ -354,32 +453,22 @@ func isNonCritical(obj metav1.Object) bool {
 // setDSAnnotation sets an annotation on a daemonset; or unsets it if value is nil
 func (status *StatusManager) setDSAnnotation(obj *appsv1.DaemonSet, key string, value *string) error {
 	new := obj.DeepCopy()
-	anno := new.GetAnnotations()
-
-	existing, set := anno[key]
-	if value != nil && set && existing == *value {
-		return nil
-	}
-	if !set && value == nil {
-		return nil
-	}
-
-	if value != nil {
-		if anno == nil {
-			anno = map[string]string{}
-		}
-		anno[key] = *value
-	} else {
-		delete(anno, key)
-	}
-	new.SetAnnotations(anno)
-	return status.client.Patch(context.TODO(), new, client.MergeFrom(obj))
+	return status.patchAnnotation(obj, new, key, value)
 }
 
 // setDepAnnotation sets an annotation on a Deployment. If value is nil,
 // it unsets the annotation
 func (status *StatusManager) setDepAnnotation(obj *appsv1.Deployment, key string, value *string) error {
 	new := obj.DeepCopy()
+	return status.patchAnnotation(obj, new, key, value)
+}
+
+func (status *StatusManager) setPodAnnotation(obj *v1.Pod, key string, value *string) error {
+	new := obj.DeepCopy()
+	return status.patchAnnotation(obj, new, key, value)
+}
+
+func (status *StatusManager) patchAnnotation(old client.Object, new client.Object, key string, value *string) error {
 	anno := new.GetAnnotations()
 
 	existing, set := anno[key]
@@ -399,5 +488,5 @@ func (status *StatusManager) setDepAnnotation(obj *appsv1.Deployment, key string
 		delete(anno, key)
 	}
 	new.SetAnnotations(anno)
-	return status.client.Patch(context.TODO(), new, client.MergeFrom(obj))
+	return status.client.Patch(context.TODO(), new, client.MergeFrom(old))
 }

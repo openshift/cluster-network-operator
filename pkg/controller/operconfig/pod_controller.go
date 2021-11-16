@@ -43,7 +43,7 @@ func (r *ReconcilePods) Reconcile(ctx context.Context, request reconcile.Request
 	}
 
 	log.Printf("Reconciling update to %s/%s\n", request.Namespace, request.Name)
-	r.status.SetFromPods()
+	r.status.SetFromRollout()
 
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
 }
