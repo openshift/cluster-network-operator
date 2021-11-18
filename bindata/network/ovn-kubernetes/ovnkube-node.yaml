@@ -214,10 +214,34 @@ spec:
           cp -f /usr/libexec/cni/ovn-k8s-cni-overlay /cni-bin-dir/
           ovn_config_namespace=openshift-ovn-kubernetes
           echo "I$(date "+%m%d %H:%M:%S.%N") - disable conntrack on geneve port"
-          iptables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
-          iptables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
-          ip6tables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
-          ip6tables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
+          if iptables -t raw -C PREROUTING -p udp --dport 6081 -j NOTRACK
+          then
+              echo "iptables already exists for iptables -t raw -A PREROUTING -p udp --dport 6081 -j NOTRACK"
+          else
+              echo "adding iptables -t raw -A PREROUTING -p udp --dport 6081 -j NOTRACK"
+              iptables -t raw -A PREROUTING -p udp --dport 6081 -j NOTRACK
+          fi
+          if iptables -t raw -C OUTPUT -p udp --dport 6081 -j NOTRACK
+          then
+              echo "iptables already exists for iptables -t raw -A OUTPUT -p udp --dport 6081 -j NOTRACK"
+          else
+              echo "adding iptables -t raw -A OUTPUT -p udp --dport 6081 -j NOTRACK"
+              iptables -t raw -A OUTPUT -p udp --dport 6081 -j NOTRACK
+          fi
+          if ip6tables -t raw -C PREROUTING -p udp --dport 6081 -j NOTRACK
+          then
+              echo "ip6tables already exists for ip6tables -t raw -A PREROUTING -p udp --dport 6081 -j NOTRACK"
+          else
+              echo "adding ip6tables -t raw -A PREROUTING -p udp --dport 6081 -j NOTRACK"
+              ip6tables -t raw -A PREROUTING -p udp --dport 6081 -j NOTRACK
+          fi
+          if ip6tables -t raw -C OUTPUT -p udp --dport 6081 -j NOTRACK
+          then
+              echo "ip6tables already exists for ip6tables -t raw -A OUTPUT -p udp --dport 6081 -j NOTRACK"
+          else
+              echo "adding ip6tables -t raw -A OUTPUT -p udp --dport 6081 -j NOTRACK"
+              ip6tables -t raw -A OUTPUT -p udp --dport 6081 -j NOTRACK
+          fi
           retries=0
           while true; do
             # TODO: change to use '--request-timeout=30s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
