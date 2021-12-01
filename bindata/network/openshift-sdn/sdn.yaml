@@ -250,25 +250,25 @@ spec:
                exit 0
           fi
           echo "Adding ICMP drop rule for '$3' "
-          if iptables -C CHECK_ICMP_SOURCE -p icmp -s $3 -j ICMP_ACTION
+          if iptables -C AZURE_CHECK_ICMP_SOURCE -p icmp -s $3 -j AZURE_ICMP_ACTION
           then
                echo "iptables already set for $3"
           else
-               iptables -A CHECK_ICMP_SOURCE -p icmp -s $3 -j ICMP_ACTION
+               iptables -A AZURE_CHECK_ICMP_SOURCE -p icmp -s $3 -j AZURE_ICMP_ACTION
           fi
           EOF
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - drop-icmp - start drop-icmp ${K8S_NODE}"
-          iptables -X CHECK_ICMP_SOURCE || true
-          iptables -N CHECK_ICMP_SOURCE || true
-          iptables -F CHECK_ICMP_SOURCE
-          iptables -D INPUT -p icmp --icmp-type fragmentation-needed -j CHECK_ICMP_SOURCE || true
-          iptables -I INPUT -p icmp --icmp-type fragmentation-needed -j CHECK_ICMP_SOURCE
-          iptables -N ICMP_ACTION || true
-          iptables -F ICMP_ACTION
-          iptables -A ICMP_ACTION -j LOG
-          iptables -A ICMP_ACTION -j DROP
-          oc observe pods -n openshift-sdn -l app=sdn -a '{ .status.hostIP }' -- /var/run/add_iptables.sh
+          iptables -X AZURE_CHECK_ICMP_SOURCE || true
+          iptables -N AZURE_CHECK_ICMP_SOURCE || true
+          iptables -F AZURE_CHECK_ICMP_SOURCE
+          iptables -D INPUT -p icmp --icmp-type fragmentation-needed -j AZURE_CHECK_ICMP_SOURCE || true
+          iptables -I INPUT -p icmp --icmp-type fragmentation-needed -j AZURE_CHECK_ICMP_SOURCE
+          iptables -N AZURE_ICMP_ACTION || true
+          iptables -F AZURE_ICMP_ACTION
+          iptables -A AZURE_ICMP_ACTION -j LOG
+          iptables -A AZURE_ICMP_ACTION -j DROP
+          /host/usr/bin/oc observe pods -n openshift-sdn -l app=sdn -a '{ .status.hostIP }' -- /var/run/add_iptables.sh
         lifecycle:
           preStop:
             exec:
@@ -276,7 +276,7 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
-        - mountPath: /
+        - mountPath: /host
           name: host-slash
         resources:
           requests:
