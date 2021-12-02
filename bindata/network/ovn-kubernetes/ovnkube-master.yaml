@@ -244,6 +244,22 @@ spec:
               - -c
               - |
                 set -x
+                # Upgrade the db if required.
+                DB_SCHEMA="/usr/share/ovn/ovn-nb.ovsschema"
+                DB_SERVER="unix:/var/run/ovn/ovnnb_db.sock"
+                schema_name=$(ovsdb-tool schema-name $DB_SCHEMA)
+                db_version=$(ovsdb-client -t 10 get-schema-version "$DB_SERVER" "$schema_name")
+                target_version=$(ovsdb-tool schema-version "$DB_SCHEMA")
+
+                if ovsdb-tool compare-versions "$db_version" == "$target_version"; then
+                  :
+                elif ovsdb-tool compare-versions "$db_version" ">" "$target_version"; then
+                    echo "Database $schema_name has newer schema version ($db_version) than our local schema ($target_version), possibly an upgrade is partially complete?"
+                else
+                    echo "Upgrading database $schema_name from schema version $db_version to $target_version"
+                    ovsdb-client -t 30 convert "$DB_SERVER" "$DB_SCHEMA"
+                fi
+
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
                 if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - nbdb - postStart - waiting for master to be selected"
@@ -258,22 +274,6 @@ spec:
                   fi
                   sleep 2
                   done
-
-                  # Upgrade the db if required.
-                  DB_SCHEMA="/usr/share/ovn/ovn-nb.ovsschema"
-                  DB_SERVER="unix:/var/run/ovn/ovnnb_db.sock"
-                  schema_name=$(ovsdb-tool schema-name $DB_SCHEMA)
-                  db_version=$(ovsdb-client -t 10 get-schema-version "$DB_SERVER" "$schema_name")
-                  target_version=$(ovsdb-tool schema-version "$DB_SCHEMA")
-
-                  if ovsdb-tool compare-versions "$db_version" == "$target_version"; then
-                    :
-                  elif ovsdb-tool compare-versions "$db_version" ">" "$target_version"; then
-                      echo "Database $schema_name has newer schema version ($db_version) than our local schema ($target_version), possibly an upgrade is partially complete?"
-                  else
-                      echo "Upgrading database $schema_name from schema version $db_version to $target_version"
-                      ovsdb-client -t 30 convert "$DB_SERVER" "$DB_SCHEMA"
-                  fi
                 fi
                 #configure northd_probe_interval
                 OVN_NB_CTL="ovn-nbctl -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
@@ -563,6 +563,22 @@ spec:
               - -c
               - |
                 set -x
+                # Upgrade the db if required.
+                DB_SCHEMA="/usr/share/ovn/ovn-sb.ovsschema"
+                DB_SERVER="unix:/var/run/ovn/ovnsb_db.sock"
+                schema_name=$(ovsdb-tool schema-name $DB_SCHEMA)
+                db_version=$(ovsdb-client -t 10 get-schema-version "$DB_SERVER" "$schema_name")
+                target_version=$(ovsdb-tool schema-version "$DB_SCHEMA")
+
+                if ovsdb-tool compare-versions "$db_version" == "$target_version"; then
+                  :
+                elif ovsdb-tool compare-versions "$db_version" ">" "$target_version"; then
+                    echo "Database $schema_name has newer schema version ($db_version) than our local schema ($target_version), possibly an upgrade is partially complete?"
+                else
+                    echo "Upgrading database $schema_name from schema version $db_version to $target_version"
+                    ovsdb-client -t 30 convert "$DB_SERVER" "$DB_SCHEMA"
+                fi
+
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
                 if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - sdb - postStart - waiting for master to be selected"
@@ -577,22 +593,6 @@ spec:
                   fi
                   sleep 2
                   done
-
-                  # Upgrade the db if required.
-                  DB_SCHEMA="/usr/share/ovn/ovn-sb.ovsschema"
-                  DB_SERVER="unix:/var/run/ovn/ovnsb_db.sock"
-                  schema_name=$(ovsdb-tool schema-name $DB_SCHEMA)
-                  db_version=$(ovsdb-client -t 10 get-schema-version "$DB_SERVER" "$schema_name")
-                  target_version=$(ovsdb-tool schema-version "$DB_SCHEMA")
-
-                  if ovsdb-tool compare-versions "$db_version" == "$target_version"; then
-                    :
-                  elif ovsdb-tool compare-versions "$db_version" ">" "$target_version"; then
-                      echo "Database $schema_name has newer schema version ($db_version) than our local schema ($target_version), possibly an upgrade is partially complete?"
-                  else
-                      echo "Upgrading database $schema_name from schema version $db_version to $target_version"
-                      ovsdb-client -t 30 convert "$DB_SERVER" "$DB_SCHEMA"
-                  fi
                 fi
           preStop:
             exec:
