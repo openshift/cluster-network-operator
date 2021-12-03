@@ -75,6 +75,24 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
 	data.Data["K8S_APISERVER"] = fmt.Sprintf("https://%s:%s", os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT"))
 	data.Data["MTU"] = c.MTU
+	data.Data["RoutableMTU"] = nil
+
+	if conf.Migration != nil && conf.Migration.MTU != nil {
+		if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
+			data.Data["MTU"] = conf.Migration.MTU.Network.From
+			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.To
+		} else {
+			data.Data["MTU"] = conf.Migration.MTU.Network.To
+			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.From
+		}
+
+		// c.MTU is used to set the applied network configuration MTU
+		// MTU migration procedure:
+		//  1. User sets the MTU they want to migrate to
+		//  2. CNO sets the MTU as applied
+		//  3. User can then set the MTU as configured
+		c.MTU = conf.Migration.MTU.Network.To
+	}
 	data.Data["GenevePort"] = c.GenevePort
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
@@ -326,6 +344,16 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 	return out
 }
 
+func getOVNEncapOverhead(conf *operv1.NetworkSpec) uint32 {
+	const geneveOverhead = 100
+	const ipsecOverhead = 46 // Transport mode, AES-GCM
+	var encapOverhead uint32 = geneveOverhead
+	if conf.DefaultNetwork.OVNKubernetesConfig.IPsecConfig != nil {
+		encapOverhead += ipsecOverhead
+	}
+	return encapOverhead
+}
+
 // isOVNKubernetesChangeSafe currently returns an error if any changes to immutable
 // fields are made.
 // In the future, we may support rolling out MTU or other alterations.
@@ -334,9 +362,31 @@ func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	nn := next.DefaultNetwork.OVNKubernetesConfig
 	errs := []error{}
 
-	if !reflect.DeepEqual(pn.MTU, nn.MTU) {
-		errs = append(errs, errors.Errorf("cannot change ovn-kubernetes MTU"))
+	if next.Migration != nil && next.Migration.MTU != nil {
+		mtuNet := next.Migration.MTU.Network
+		mtuMach := next.Migration.MTU.Machine
+
+		// For MTU values provided for migration, verify that:
+		//  - The current and target MTUs for the CNI are provided
+		//  - The machine target MTU is provided
+		//  - The current MTU actually matches the MTU known as current
+		//  - The machine target MTU has a valid overhead with the CNI target MTU
+		if mtuNet == nil || mtuMach == nil || mtuNet.From == nil || mtuNet.To == nil || mtuMach.To == nil {
+			errs = append(errs, errors.Errorf("invalid Migration.MTU, at least one of the required fields is missing"))
+		} else {
+			// Only check next.Migration.MTU.Network.From when it changes
+			checkPrevMTU := prev.Migration == nil || prev.Migration.MTU == nil || prev.Migration.MTU.Network == nil || !reflect.DeepEqual(prev.Migration.MTU.Network.From, next.Migration.MTU.Network.From)
+			if checkPrevMTU && *next.Migration.MTU.Network.From != *pn.MTU {
+				errs = append(errs, errors.Errorf("invalid Migration.MTU.Network.From(%d) not equal to the currently applied MTU(%d)", *next.Migration.MTU.Network.From, *pn.MTU))
+			}
+			if (*next.Migration.MTU.Network.To + getOVNEncapOverhead(next)) > *next.Migration.MTU.Machine.To {
+				errs = append(errs, errors.Errorf("invalid Migration.MTU.Machine.To(%d), has to be at least %d", *next.Migration.MTU.Machine.To, *next.Migration.MTU.Network.To+getOVNEncapOverhead(next)))
+			}
+		}
+	} else if !reflect.DeepEqual(pn.MTU, nn.MTU) {
+		errs = append(errs, errors.Errorf("cannot change ovn-kubernetes MTU without migration"))
 	}
+
 	if !reflect.DeepEqual(pn.GenevePort, nn.GenevePort) {
 		errs = append(errs, errors.Errorf("cannot change ovn-kubernetes genevePort"))
 	}
@@ -366,14 +416,6 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 		conf.DefaultNetwork.OVNKubernetesConfig = &operv1.OVNKubernetesConfig{}
 	}
 
-	const ipsecOverhead = 46 // Transport mode, AES-GCM
-	const geneveOverhead = 100
-
-	var encapOverhead uint32 = geneveOverhead
-	if conf.DefaultNetwork.OVNKubernetesConfig.IPsecConfig != nil {
-		encapOverhead += ipsecOverhead
-	}
-
 	sc := conf.DefaultNetwork.OVNKubernetesConfig
 	// MTU  is currently the only field we pull from previous.
 	// If MTU is not supplied, we infer it from the host on which CNO is running
@@ -382,7 +424,7 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 
 	// TODO - Need to check as IPsec will additional headers
 	if sc.MTU == nil {
-		var mtu uint32 = uint32(hostMTU) - encapOverhead
+		var mtu uint32 = uint32(hostMTU) - getOVNEncapOverhead(conf)
 		if previous != nil && previous.DefaultNetwork.OVNKubernetesConfig != nil &&
 			previous.DefaultNetwork.OVNKubernetesConfig.MTU != nil {
 			mtu = *previous.DefaultNetwork.OVNKubernetesConfig.MTU
