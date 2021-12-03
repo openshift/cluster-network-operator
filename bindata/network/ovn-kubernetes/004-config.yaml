@@ -9,6 +9,9 @@ data:
   ovnkube.conf:   |-
     [default]
     mtu="{{.MTU}}"
+    {{- if .RoutableMTU }}
+    routable-mtu="{{.RoutableMTU}}"
+    {{- end }}
     cluster-subnets="{{.OVN_cidr}}"
     encap-port="{{.GenevePort}}"
     enable-lflow-cache=true
