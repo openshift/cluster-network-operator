@@ -62,10 +62,8 @@ func TestRenderOVNKubernetes(t *testing.T) {
 		OVN: bootstrap.OVNBootstrapResult{
 			MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				GatewayMode:            "shared",
-				NodeMode:               "full",
-				EnableEgressIP:         true,
-				DisableSNATMultipleGWs: false,
+				GatewayMode: "shared",
+				NodeMode:    "full",
 			},
 		},
 	}
@@ -131,10 +129,8 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 		OVN: bootstrap.OVNBootstrapResult{
 			MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				GatewayMode:            "shared",
-				NodeMode:               "full",
-				EnableEgressIP:         true,
-				DisableSNATMultipleGWs: false,
+				GatewayMode: "shared",
+				NodeMode:    "full",
 			},
 		},
 	}
@@ -150,10 +146,8 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 		OVN: bootstrap.OVNBootstrapResult{
 			MasterIPs: []string{"fd01::1", "fd01::2", "fd01::3"},
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				GatewayMode:            "shared",
-				NodeMode:               "full",
-				EnableEgressIP:         true,
-				DisableSNATMultipleGWs: false,
+				GatewayMode: "shared",
+				NodeMode:    "full",
 			},
 		},
 	}
@@ -360,10 +354,8 @@ election-retry-period=26`,
 				OVN: bootstrap.OVNBootstrapResult{
 					MasterIPs: tc.masterIPs,
 					OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-						GatewayMode:            "shared",
-						NodeMode:               "full",
-						EnableEgressIP:         true,
-						DisableSNATMultipleGWs: false,
+						GatewayMode: "shared",
+						NodeMode:    "full",
 					},
 				},
 			}
@@ -1234,10 +1226,8 @@ metadata:
 					ExistingMasterDaemonset: master,
 					ExistingNodeDaemonset:   node,
 					OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-						GatewayMode:            "shared",
-						NodeMode:               "full",
-						EnableEgressIP:         true,
-						DisableSNATMultipleGWs: false,
+						GatewayMode: "shared",
+						NodeMode:    "full",
 					},
 					PrePullerDaemonset: prepuller,
 				},
@@ -1537,10 +1527,8 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 				},
 			},
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				GatewayMode:            "shared",
-				NodeMode:               "full",
-				EnableEgressIP:         true,
-				DisableSNATMultipleGWs: false,
+				GatewayMode: "shared",
+				NodeMode:    "full",
 			},
 		},
 	}
