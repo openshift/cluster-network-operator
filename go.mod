@@ -19,7 +19,7 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.1 // indirect
 	github.com/onsi/ginkgo v1.16.4 // indirect
 	github.com/onsi/gomega v1.13.0
-	github.com/openshift/api v0.0.0-20210817132244-67c28690af52
+	github.com/openshift/api v0.0.0-20211203184245-fb6f933bb8d5
 	github.com/openshift/build-machinery-go v0.0.0-20210712174854-1bb7fd1518d3
 	github.com/openshift/client-go v0.0.0-20210521082421-73d9475a9142
 	github.com/openshift/library-go v0.0.0-20210708173104-7e7d216ed91c

@@ -472,7 +472,7 @@ func isDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 		if prev.Migration == nil {
 			return []error{errors.Errorf("cannot change default network type when not doing migration")}
 		} else {
-			if prev.Migration.NetworkType != next.DefaultNetwork.Type {
+			if operv1.NetworkType(prev.Migration.NetworkType) != next.DefaultNetwork.Type {
 				return []error{errors.Errorf("can only change default network type to the target migration network type")}
 			}
 		}
