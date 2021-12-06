@@ -24,9 +24,7 @@ data:
 {{- end  }}
  
     [ovnkubernetesfeature]
-{{- if .OVN_ENABLE_EGRESS_IP}}
     enable-egress-ip=true
-{{- end}}
     enable-egress-firewall=true
 
     [gateway]
