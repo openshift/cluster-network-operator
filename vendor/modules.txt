@@ -174,7 +174,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20210817132244-67c28690af52
+# github.com/openshift/api v0.0.0-20211203184245-fb6f933bb8d5
 ## explicit
 github.com/openshift/api
 github.com/openshift/api/apiserver
@@ -200,6 +200,8 @@ github.com/openshift/api/imageregistry/v1
 github.com/openshift/api/kubecontrolplane
 github.com/openshift/api/kubecontrolplane/v1
 github.com/openshift/api/legacyconfig/v1
+github.com/openshift/api/machine
+github.com/openshift/api/machine/v1beta1
 github.com/openshift/api/network
 github.com/openshift/api/network/v1
 github.com/openshift/api/networkoperator
@@ -228,6 +230,8 @@ github.com/openshift/api/security
 github.com/openshift/api/security/v1
 github.com/openshift/api/servicecertsigner
 github.com/openshift/api/servicecertsigner/v1alpha1
+github.com/openshift/api/sharedresource
+github.com/openshift/api/sharedresource/v1alpha1
 github.com/openshift/api/template
 github.com/openshift/api/template/v1
 github.com/openshift/api/user
