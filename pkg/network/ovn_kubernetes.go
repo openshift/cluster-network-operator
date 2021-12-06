@@ -82,7 +82,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["GenevePort"] = c.GenevePort
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
-	data.Data["OVN_GATEWAY_MODE"] = bootstrapResult.OVN.OVNKubernetesConfig.GatewayMode
 	data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_FULL
 	data.Data["OVN_NB_PORT"] = OVN_NB_PORT
 	data.Data["OVN_SB_PORT"] = OVN_SB_PORT
@@ -157,6 +156,12 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["EnableIPsec"] = true
 	} else {
 		data.Data["EnableIPsec"] = false
+	}
+
+	if c.GatewayConfig != nil && c.GatewayConfig.RoutingViaHost {
+		data.Data["OVN_GATEWAY_MODE"] = OVN_LOCAL_GW_MODE
+	} else {
+		data.Data["OVN_GATEWAY_MODE"] = OVN_SHARED_GW_MODE
 	}
 
 	exportNetworkFlows := conf.ExportNetworkFlows
@@ -277,36 +282,16 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	return objs, nil
 }
 
-// bootstrapOVNConfig returns the value of mode found in the openshift-ovn-kubernetes/gateway-mode-config configMap
+// bootstrapOVNConfig returns the value of mode found in the openshift-ovn-kubernetes/dpu-mode-config configMap
 // if it exists, otherwise returns default configuration for OCP clusters using OVN-Kubernetes
-func bootstrapOVNConfig(kubeClient client.Client) (*bootstrap.OVNConfigBoostrapResult, error) {
+func bootstrapOVNConfig(conf *operv1.Network, kubeClient client.Client) (*bootstrap.OVNConfigBoostrapResult, error) {
 	ovnConfigResult := &bootstrap.OVNConfigBoostrapResult{
-		GatewayMode:            OVN_SHARED_GW_MODE,
-		NodeMode:               OVN_NODE_MODE_FULL,
+		NodeMode: OVN_NODE_MODE_FULL,
 	}
-
+	bootstrapOVNGatewayConfig(conf, kubeClient)
 	cm := &corev1.ConfigMap{}
-	nsn := types.NamespacedName{Namespace: "openshift-network-operator", Name: "gateway-mode-config"}
-	err := kubeClient.Get(context.TODO(), nsn, cm)
-
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			klog.Infof("Did not find gateway-mode-config")
-		} else {
-			return nil, fmt.Errorf("Could not determine gateway mode: %w", err)
-		}
-	} else {
-		modeOverride := cm.Data["mode"]
-		if modeOverride != OVN_SHARED_GW_MODE && modeOverride != OVN_LOCAL_GW_MODE {
-			klog.Warningf("gateway-mode-config does not match %q or %q, is: %q. Using default OVN configuration: %+v", OVN_LOCAL_GW_MODE, OVN_SHARED_GW_MODE, modeOverride, ovnConfigResult)
-			return ovnConfigResult, nil
-		}
-		ovnConfigResult.GatewayMode = modeOverride
-		klog.Infof("Overriding OVN configuration to %+v", ovnConfigResult)
-	}
-
 	dmc := types.NamespacedName{Namespace: "openshift-network-operator", Name: "dpu-mode-config"}
-	err = kubeClient.Get(context.TODO(), dmc, cm)
+	err := kubeClient.Get(context.TODO(), dmc, cm)
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -473,6 +458,36 @@ type replicaCountDecoder struct {
 	} `json:"controlPlane"`
 }
 
+// bootstrapOVNGatewayConfig sets the Network.operator.openshift.io.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig value
+// based on the values from the "gateway-mode-config" map if any
+func bootstrapOVNGatewayConfig(conf *operv1.Network, kubeClient client.Client) {
+	// handle upgrade logic for gateway mode in OVN-K plugin (migration from hidden config map to using proper API)
+	// TODO: Remove this logic in future releases when we are sure everyone has migrated away from the config-map
+	cm := &corev1.ConfigMap{}
+	nsn := types.NamespacedName{Namespace: "openshift-network-operator", Name: "gateway-mode-config"}
+	err := kubeClient.Get(context.TODO(), nsn, cm)
+	modeOverride := OVN_SHARED_GW_MODE
+	routeViaHost := false
+
+	if err != nil {
+		klog.Infof("Did not find gateway-mode-config. Using default gateway mode: %s", OVN_SHARED_GW_MODE)
+	} else {
+		modeOverride = cm.Data["mode"]
+		if modeOverride != OVN_SHARED_GW_MODE && modeOverride != OVN_LOCAL_GW_MODE {
+			klog.Warningf("gateway-mode-config does not match %q or %q, is: %q. Using default gateway mode: %s",
+				OVN_LOCAL_GW_MODE, OVN_SHARED_GW_MODE, modeOverride, OVN_SHARED_GW_MODE)
+			modeOverride = OVN_SHARED_GW_MODE
+		}
+	}
+	if modeOverride == OVN_LOCAL_GW_MODE {
+		routeViaHost = true
+	}
+	conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig = &operv1.GatewayConfig{
+		RoutingViaHost: routeViaHost,
+	}
+	klog.Infof("Gateway mode is %s", modeOverride)
+}
+
 func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
 	clusterConfig := &corev1.ConfigMap{}
 	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
@@ -499,7 +514,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to unmarshal install-config: %s", err)
 	}
 
-	ovnConfigResult, err := bootstrapOVNConfig(kubeClient)
+	ovnConfigResult, err := bootstrapOVNConfig(conf, kubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to bootstrap OVN config, err: %v", err)
 	}
