@@ -53,6 +53,25 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 		data.Data["SDNPlatformAzure"] = false
 	}
 	data.Data["ExternalControlPlane"] = bootstrapResult.ExternalControlPlane
+	data.Data["RoutableMTU"] = nil
+	data.Data["MTU"] = nil
+
+	if conf.Migration != nil && conf.Migration.MTU != nil {
+		if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
+			data.Data["MTU"] = conf.Migration.MTU.Network.From
+			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.To
+		} else {
+			data.Data["MTU"] = conf.Migration.MTU.Network.To
+			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.From
+		}
+
+		// c.MTU is used to set the applied network configuration MTU
+		// MTU migration procedure:
+		//  1. User sets the MTU they want to migrate to
+		//  2. CNO sets the MTU as applied
+		//  3. User can then set the MTU as configured
+		c.MTU = conf.Migration.MTU.Network.To
+	}
 
 	clusterNetwork, err := clusterNetwork(conf)
 	if err != nil {
@@ -169,8 +188,30 @@ func isOpenShiftSDNChangeSafe(prev, next *operv1.NetworkSpec) []error {
 		errs = append(errs, errors.Errorf("cannot change openshift-sdn vxlanPort"))
 	}
 
-	if !reflect.DeepEqual(pn.MTU, nn.MTU) {
-		errs = append(errs, errors.Errorf("cannot change openshift-sdn mtu"))
+	if next.Migration != nil && next.Migration.MTU != nil {
+		mtuNet := next.Migration.MTU.Network
+		mtuMach := next.Migration.MTU.Machine
+
+		// For MTU values provided for migration, verify that:
+		//  - The current and target MTUs for the CNI are provided
+		//  - The machine target MTU is provided
+		//  - The current MTU actually matches the MTU known as current
+		//  - The machine target MTU has a valid overhead with the CNI target MTU
+		sdnOverhead := uint32(50) // 50 byte VXLAN header
+		if mtuNet == nil || mtuMach == nil || mtuNet.From == nil || mtuNet.To == nil || mtuMach.To == nil {
+			errs = append(errs, errors.Errorf("invalid Migration.MTU, at least one of the required fields is missing"))
+		} else {
+			// Only check next.Migration.MTU.Network.From when it changes
+			checkPrevMTU := prev.Migration == nil || prev.Migration.MTU == nil || prev.Migration.MTU.Network == nil || !reflect.DeepEqual(prev.Migration.MTU.Network.From, next.Migration.MTU.Network.From)
+			if checkPrevMTU && *next.Migration.MTU.Network.From != *pn.MTU {
+				errs = append(errs, errors.Errorf("invalid Migration.MTU.Network.From(%d) not equal to the currently applied MTU(%d)", *next.Migration.MTU.Network.From, *pn.MTU))
+			}
+			if (*next.Migration.MTU.Network.To + sdnOverhead) > *next.Migration.MTU.Machine.To {
+				errs = append(errs, errors.Errorf("invalid Migration.MTU.Machine.To(%d), has to be at least %d", *next.Migration.MTU.Machine.To, *next.Migration.MTU.Network.To+sdnOverhead))
+			}
+		}
+	} else if !reflect.DeepEqual(pn.MTU, nn.MTU) {
+		errs = append(errs, errors.Errorf("cannot change openshift-sdn mtu without migration"))
 	}
 
 	// It is allowed to change useExternalOpenvswitch and enableUnidling
