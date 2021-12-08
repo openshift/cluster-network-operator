@@ -197,5 +197,9 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	// validate that Multus is still rendered
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus")))
 
+	// validate that the openshift-network-features namespace and role bindings are still rendered
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("Role", "openshift-config-managed", "openshift-network-public-role")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("RoleBinding", "openshift-config-managed", "openshift-network-public-role-binding")))
+
 	// TODO(cdc) validate that kube-proxy is rendered
 }
