@@ -72,6 +72,12 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	}
 	objs = append(objs, o...)
 
+	o, err = renderNetworkPublic(manifestDir)
+	if err != nil {
+		return nil, err
+	}
+	objs = append(objs, o...)
+
 	log.Printf("Render phase done, rendered %d objects", len(objs))
 	return objs, nil
 }
@@ -613,5 +619,16 @@ func renderNetworkDiagnostics(conf *operv1.NetworkSpec, manifestDir string) ([]*
 		return nil, errors.Wrap(err, "failed to render network-diagnostics manifests")
 	}
 
+	return manifests, nil
+}
+
+// renderNetworkPublic renders the common objects related to the openshift-network-features configmap
+func renderNetworkPublic(manifestDir string) ([]*uns.Unstructured, error) {
+	data := render.MakeRenderData()
+
+	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network", "public"), &data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to render network/public manifests")
+	}
 	return manifests, nil
 }

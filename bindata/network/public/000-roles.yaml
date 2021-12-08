@@ -1,0 +1,31 @@
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: openshift-network-public-role
+  namespace: openshift-config-managed
+  annotations:
+    openshift.io/description: "Can read the openshift-network-features ConfigMap values"
+rules:
+  - apiGroups: [ "" ]
+    resources:
+      - configmaps
+    resourceNames:
+      - openshift-network-features
+    verbs:
+      - get
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: openshift-network-public-role-binding
+  namespace: openshift-config-managed
+  annotations:
+    openshift.io/description: "Grants access from any authenticated user to the openshift-network-features ConfigMap"
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: 'system:authenticated'
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: openshift-network-public-role
