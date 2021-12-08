@@ -6,6 +6,15 @@ metadata:
 data:
   kube-proxy-config.yaml: |-
 {{.KubeProxyConfig | indent 4}}
+{{- if or .MTU .RoutableMTU }}
+  mtu.yaml: |-
+  {{- if .MTU }}
+    mtu: {{.MTU}}
+  {{- end}}
+  {{- if .RoutableMTU}}
+    routable-mtu: {{.RoutableMTU}}
+  {{- end}}
+{{- end}}
 ---
 kind: DaemonSet
 apiVersion: apps/v1
@@ -91,10 +100,16 @@ spec:
           rm -f /etc/cni/net.d/80-openshift-network.conf
           cp -f /opt/cni/bin/openshift-sdn /host-cni-bin/
 
+          mtu_override_flag=
+          if [[ -f /config/mtu.yaml ]]; then
+            mtu_override_flag="--mtu-override /config/mtu.yaml"
+          fi
+
           # Launch the network process
           exec /usr/bin/openshift-sdn-node \
             --node-name ${K8S_NODE_NAME} --node-ip ${K8S_NODE_IP} \
             --proxy-config /config/kube-proxy-config.yaml \
+            ${mtu_override_flag} \
             --v ${OPENSHIFT_SDN_LOG_LEVEL:-2}
         securityContext:
           privileged: true
