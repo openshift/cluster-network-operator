@@ -88,6 +88,17 @@ rules:
   - list
   - watch
   - update
+- apiGroups: ["cloud.network.openshift.io"]
+  resources:
+  - cloudprivateipconfigs
+  verbs:
+  - create
+  - patch
+  - update
+  - delete
+  - get
+  - list
+  - watch
 - apiGroups: ["apiextensions.k8s.io"]
   resources: 
   - customresourcedefinitions

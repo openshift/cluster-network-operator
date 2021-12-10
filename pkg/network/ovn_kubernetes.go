@@ -115,6 +115,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNPolicyAuditDestination"] = c.PolicyAuditConfig.Destination
 	data.Data["OVNPolicyAuditSyslogFacility"] = c.PolicyAuditConfig.SyslogFacility
 	data.Data["OVN_LOG_PATTERN_CONSOLE"] = OVN_LOG_PATTERN_CONSOLE
+	data.Data["PlatformType"] = bootstrapResult.Cloud.PlatformType
 	if bootstrapResult.Cloud.PlatformType == configv1.AzurePlatformType {
 		data.Data["OVNPlatformAzure"] = true
 	} else {

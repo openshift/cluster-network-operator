@@ -186,6 +186,7 @@ service-cidrs="172.30.0.0/16"
 ovn-config-namespace="openshift-ovn-kubernetes"
 apiserver="https://1.1.1.1:1111"
 host-network-namespace="openshift-host-network"
+platform-type=""
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -212,6 +213,7 @@ ovn-config-namespace="openshift-ovn-kubernetes"
 apiserver="https://1.1.1.1:1111"
 host-network-namespace="openshift-host-network"
 no-hostsubnet-nodes="kubernetes.io/os=windows"
+platform-type=""
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -247,6 +249,7 @@ ovn-config-namespace="openshift-ovn-kubernetes"
 apiserver="https://1.1.1.1:1111"
 host-network-namespace="openshift-host-network"
 no-hostsubnet-nodes="kubernetes.io/os=windows"
+platform-type=""
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -285,6 +288,7 @@ ovn-config-namespace="openshift-ovn-kubernetes"
 apiserver="https://1.1.1.1:1111"
 host-network-namespace="openshift-host-network"
 no-hostsubnet-nodes="kubernetes.io/os=windows"
+platform-type=""
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -315,6 +319,7 @@ service-cidrs="172.30.0.0/16"
 ovn-config-namespace="openshift-ovn-kubernetes"
 apiserver="https://1.1.1.1:1111"
 host-network-namespace="openshift-host-network"
+platform-type=""
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
