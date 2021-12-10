@@ -115,7 +115,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNPolicyAuditDestination"] = c.PolicyAuditConfig.Destination
 	data.Data["OVNPolicyAuditSyslogFacility"] = c.PolicyAuditConfig.SyslogFacility
 	data.Data["OVN_LOG_PATTERN_CONSOLE"] = OVN_LOG_PATTERN_CONSOLE
-	if bootstrapResult.OVN.Platform == configv1.AzurePlatformType {
+	if bootstrapResult.Cloud.PlatformType == configv1.AzurePlatformType {
 		data.Data["OVNPlatformAzure"] = true
 	} else {
 		data.Data["OVNPlatformAzure"] = false
@@ -438,12 +438,6 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 	}
 	externalControlPlane := infraConfig.Status.ControlPlaneTopology == configv1.ExternalTopologyMode
 
-	var platformType configv1.PlatformType
-	if infraConfig.Status.PlatformStatus != nil {
-		platformType = infraConfig.Status.PlatformStatus.Type
-	}
-	klog.V(2).Infof("Openshift-OVN: Bootstrap OVN infraConfig Platform: %q", platformType)
-
 	rcD := replicaCountDecoder{}
 	if err := yaml.Unmarshal([]byte(clusterConfig.Data["install-config"]), &rcD); err != nil {
 		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to unmarshal install-config: %s", err)
@@ -558,7 +552,13 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 		}
 	}
 
+	cloudRes, err := bootstrapCloud(conf, kubeClient)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to bootstrap cloud infrastructure, err: %v", err)
+	}
+
 	res := bootstrap.BootstrapResult{
+		Cloud:                *cloudRes,
 		ExternalControlPlane: externalControlPlane,
 		OVN: bootstrap.OVNBootstrapResult{
 			MasterIPs:               ovnMasterIPs,
@@ -567,7 +567,6 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 			ExistingNodeDaemonset:   nodeDS,
 			OVNKubernetesConfig:     ovnConfigResult,
 			PrePullerDaemonset:      prePullerDS,
-			Platform:                platformType,
 		},
 	}
 	return &res, nil
