@@ -163,6 +163,9 @@ spec:
       - operator: Exists
       nodeSelector:
         kubernetes.io/os: linux
+{{- if .KUBE_PROXY_NODE_SELECTOR }}
+        {{ .KUBE_PROXY_NODE_SELECTOR }}
+{{- end }}
       volumes:
       - name: host-slash
         hostPath:

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	. "github.com/onsi/gomega"
@@ -342,6 +343,14 @@ func TestFillKubeProxyDefaults(t *testing.T) {
 	}
 }
 
+var FakeKubeProxyBootstrapResult = bootstrap.BootstrapResult{
+	OVN: bootstrap.OVNBootstrapResult{
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			NodeMode: "full",
+		},
+	},
+}
+
 func TestRenderKubeProxy(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -360,7 +369,7 @@ func TestRenderKubeProxy(t *testing.T) {
 
 	fillKubeProxyDefaults(c, nil)
 
-	objs, err := renderStandaloneKubeProxy(c, manifestDir)
+	objs, err := renderStandaloneKubeProxy(c, &FakeKubeProxyBootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	g.Expect(objs).To(HaveLen(10))
