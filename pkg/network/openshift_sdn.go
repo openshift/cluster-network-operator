@@ -1,7 +1,6 @@
 package network
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"os"
@@ -12,8 +11,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
-	types "k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +44,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 	data.Data["Mode"] = c.Mode
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
-	if bootstrapResult.SDN.Platform == configv1.AzurePlatformType {
+	if bootstrapResult.Cloud.PlatformType == configv1.AzurePlatformType {
 		data.Data["SDNPlatformAzure"] = true
 	} else {
 		data.Data["SDNPlatformAzure"] = false
@@ -282,24 +279,12 @@ func clusterNetwork(conf *operv1.NetworkSpec) (string, error) {
 }
 
 func bootstrapSDN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
-
-	var platformType configv1.PlatformType
-
-	infraConfig := &configv1.Infrastructure{}
-	if err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
-		return nil, fmt.Errorf("failed to get infrastructure 'config': %v", err)
+	cloudRes, err := bootstrapCloud(conf, kubeClient)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to bootstrap cloud infrastructure, err: %v", err)
 	}
-
-	if infraConfig.Status.PlatformStatus != nil {
-		platformType = infraConfig.Status.PlatformStatus.Type
-	}
-	klog.V(2).Infof("Openshift-SDN: Bootstrap SDN infraConfig Platform: %q", platformType)
-
 	res := bootstrap.BootstrapResult{
-		ExternalControlPlane: infraConfig.Status.ControlPlaneTopology == configv1.ExternalTopologyMode,
-		SDN: bootstrap.SDNBootstrapResult{
-			Platform: platformType,
-		},
+		Cloud: *cloudRes,
 	}
 	return &res, nil
 }
