@@ -27,6 +27,13 @@ spec:
         openshift.io/component: network
         kubernetes.io/os: "linux"
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: network.operator.openshift.io/dpu-host
+                operator: DoesNotExist
       serviceAccountName: ovn-kubernetes-node
       hostNetwork: true
       priorityClassName: "system-node-critical"

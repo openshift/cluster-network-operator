@@ -2,7 +2,11 @@
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
+  {{ if eq .OVN_NODE_MODE "dpu-host" }}
+  name: ovnkube-node-dpu-host
+  {{ else }}
   name: ovnkube-node
+  {{ end }}
   namespace: openshift-ovn-kubernetes
   annotations:
     kubernetes.io/description: |
@@ -11,7 +15,11 @@ metadata:
 spec:
   selector:
     matchLabels:
+      {{ if eq .OVN_NODE_MODE "dpu-host" }}
+      app: ovnkube-node-dpu-host
+      {{ else }}
       app: ovnkube-node
+      {{ end }}
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -21,12 +29,29 @@ spec:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
+        {{ if eq .OVN_NODE_MODE "dpu-host" }}
+        app: ovnkube-node-dpu-host
+        {{ else }}
         app: ovnkube-node
+        {{ end }}
         component: network
         type: infra
         openshift.io/component: network
         kubernetes.io/os: "linux"
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: network.operator.openshift.io/dpu-host
+                {{ if eq .OVN_NODE_MODE "dpu-host" }}
+                operator: Exists
+                {{ else }}
+                operator: DoesNotExist
+                {{ end }}
+              - key: network.operator.openshift.io/dpu
+                operator: DoesNotExist
       serviceAccountName: ovn-kubernetes-node
       hostNetwork: true
       hostPID: true
@@ -38,6 +63,7 @@ spec:
       # /run/openvswitch -> tmpfs - ovsdb sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
+      {{ if eq .OVN_NODE_MODE "full" }}
       # ovn-controller: programs the vswitch with flows from the sbdb
       - name: ovn-controller
         image: "{{.OvnImage}}"
@@ -145,6 +171,7 @@ spec:
           name: node-log
         - mountPath: /run/ovn/
           name: run-ovn
+      {{ end }}
       - name: kube-rbac-proxy
         image: {{.KubeRBACProxyImage}}
         command:
@@ -261,6 +288,11 @@ spec:
             gw_interface_flag="--exgw-interface=br-ex1"
           fi
 
+          node_mgmt_port_netdev_flags=
+          if [[ -n "${OVNKUBE_NODE_MGMT_PORT_NETDEV}" ]] ; then
+            node_mgmt_port_netdev_flags="--ovnkube-node-mgmt-port-netdev ${OVNKUBE_NODE_MGMT_PORT_NETDEV}"
+          fi
+
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --nb-address "{{.OVN_NB_DB_LIST}}" \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
@@ -276,6 +308,10 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
             ${gateway_mode_flags} \
+            {{- if eq .OVN_NODE_MODE "dpu-host" }}
+            --ovnkube-node-mode dpu-host \
+            ${node_mgmt_port_netdev_flags} \
+            {{- end }}
             --metrics-bind-address "127.0.0.1:29103" \
             --metrics-enable-pprof \
             {{- if .OVN_DISABLE_SNAT_MULTIPLE_GWS }}
@@ -467,6 +503,7 @@ spec:
       - name: run-ovn
         hostPath:
           path: /var/run/ovn
+      {{ if eq .OVN_NODE_MODE "full" }}
       # Used for placement of ACL audit logs 
       - name: node-log
         hostPath: 
@@ -474,6 +511,7 @@ spec:
       - name: log-socket
         hostPath: 
           path: /dev/log
+      {{ end }}
       # For CNI server
       - name: host-run-ovn-kubernetes
         hostPath:
