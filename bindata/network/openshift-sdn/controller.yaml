@@ -54,6 +54,59 @@ spec:
         volumeMounts:
         - mountPath: /env
           name: env-overrides
+      - name: kube-rbac-proxy
+        image: {{.KubeRBACProxyImage}}
+        command:
+          - /bin/bash
+          - -c
+          - |
+            #!/bin/bash
+            set -euo pipefail
+            TLS_PK=/etc/pki/tls/metrics-certs/tls.key
+            TLS_CERT=/etc/pki/tls/metrics-certs/tls.crt
+
+            # As the secret mount is optional we must wait for the files to be present.
+            # The service is created in monitor.yaml and this is created in controller.yaml.
+            # If it isn't created there is probably an issue so we want to crashloop.
+            TS=$(date +%s)
+            WARN_TS=$(( ${TS} + $(( 20 * 60)) ))
+            HAS_LOGGED_INFO=0
+
+            log_missing_certs(){
+                CUR_TS=$(date +%s)
+                if [[ "${CUR_TS}" -gt "${WARN_TS}"  ]]; then
+                  echo $(date -Iseconds) WARN: sdn-controller-metrics-certs not mounted after 20 minutes.
+                elif [[ "${HAS_LOGGED_INFO}" -eq 0 ]] ; then
+                  echo $(date -Iseconds) INFO: sdn-controller-metrics-certs not mounted. Waiting 20 minutes.
+                  HAS_LOGGED_INFO=1
+                fi
+            }
+
+            while [[ ! -f "${TLS_PK}" ||  ! -f "${TLS_CERT}" ]] ; do
+              log_missing_certs
+              sleep 5
+            done
+
+            echo $(date -Iseconds) INFO: sdn-controller-metrics-certs mounted, starting kube-rbac-proxy
+            exec /usr/bin/kube-rbac-proxy \
+              --logtostderr \
+              --secure-listen-address=:9106 \
+              --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
+              --upstream=http://127.0.0.1:29100/ \
+              --tls-private-key-file=${TLS_PK} \
+              --tls-cert-file=${TLS_CERT}
+        ports:
+          - containerPort: 9106
+            name: https
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+          - name: sdn-controller-metrics-certs
+            mountPath: /etc/pki/tls/metrics-certs
+            readOnly: True
       hostNetwork: true
 {{- if not .ExternalControlPlane }}
       nodeSelector:
@@ -76,4 +129,10 @@ spec:
       - name: env-overrides
         configMap:
           name: env-overrides
+          optional: true
+      # Must be optional because the sdn-controller-metrics-certs is a service serving
+      # certificate and those cannot be generated without the SDN running
+      - name: sdn-controller-metrics-certs
+        secret:
+          secretName: sdn-controller-metrics-certs
           optional: true
