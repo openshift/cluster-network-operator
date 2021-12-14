@@ -62,10 +62,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 		OVN: bootstrap.OVNBootstrapResult{
 			MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				GatewayMode:            "shared",
-				NodeMode:               "full",
-				EnableEgressIP:         true,
-				DisableSNATMultipleGWs: false,
+				NodeMode: "full",
 			},
 		},
 	}
@@ -131,10 +128,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 		OVN: bootstrap.OVNBootstrapResult{
 			MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				GatewayMode:            "shared",
-				NodeMode:               "full",
-				EnableEgressIP:         true,
-				DisableSNATMultipleGWs: false,
+				NodeMode: "full",
 			},
 		},
 	}
@@ -150,10 +144,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 		OVN: bootstrap.OVNBootstrapResult{
 			MasterIPs: []string{"fd01::1", "fd01::2", "fd01::3"},
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				GatewayMode:            "shared",
-				NodeMode:               "full",
-				EnableEgressIP:         true,
-				DisableSNATMultipleGWs: false,
+				NodeMode: "full",
 			},
 		},
 	}
@@ -171,6 +162,7 @@ func TestRenderedOVNKubernetesConfig(t *testing.T) {
 		desc                string
 		expected            string
 		hybridOverlayConfig *operv1.HybridOverlayConfig
+		gatewayConfig       *operv1.GatewayConfig
 		masterIPs           []string
 	}
 	testcases := []testcase{
@@ -221,7 +213,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 
 [gateway]
-mode=shared
+mode=local
 nodeport=true
 
 [hybridoverlay]
@@ -231,6 +223,9 @@ cluster-subnets="10.132.0.0/14"`,
 				HybridClusterNetwork: []operv1.ClusterNetworkEntry{
 					{CIDR: "10.132.0.0/14", HostPrefix: 23},
 				},
+			},
+			gatewayConfig: &operv1.GatewayConfig{
+				RoutingViaHost: true,
 			},
 			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
 		},
@@ -256,7 +251,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 
 [gateway]
-mode=shared
+mode=local
 nodeport=true
 
 [hybridoverlay]
@@ -269,6 +264,9 @@ hybrid-overlay-vxlan-port="9000"`,
 					{CIDR: "10.132.0.0/14", HostPrefix: 23},
 				},
 				HybridOverlayVXLANPort: ptrToUint32(9000),
+			},
+			gatewayConfig: &operv1.GatewayConfig{
+				RoutingViaHost: true,
 			},
 			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
 		},
@@ -332,6 +330,9 @@ election-lease-duration=137
 election-renew-deadline=107
 election-retry-period=26`,
 			masterIPs: []string{"1.2.3.4"},
+			gatewayConfig: &operv1.GatewayConfig{
+				RoutingViaHost: false,
+			},
 		},
 	}
 	g := NewGomegaWithT(t)
@@ -344,6 +345,9 @@ election-retry-period=26`,
 			OVNKubeConfig := OVNKubernetesConfig.DeepCopy()
 			if tc.hybridOverlayConfig != nil {
 				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = tc.hybridOverlayConfig
+			}
+			if tc.hybridOverlayConfig != nil {
+				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig = tc.gatewayConfig
 			}
 
 			//set a few inputs so that the tests are not machine dependant
@@ -360,10 +364,7 @@ election-retry-period=26`,
 				OVN: bootstrap.OVNBootstrapResult{
 					MasterIPs: tc.masterIPs,
 					OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-						GatewayMode:            "shared",
-						NodeMode:               "full",
-						EnableEgressIP:         true,
-						DisableSNATMultipleGWs: false,
+						NodeMode: "full",
 					},
 				},
 			}
@@ -1234,10 +1235,7 @@ metadata:
 					ExistingMasterDaemonset: master,
 					ExistingNodeDaemonset:   node,
 					OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-						GatewayMode:            "shared",
-						NodeMode:               "full",
-						EnableEgressIP:         true,
-						DisableSNATMultipleGWs: false,
+						NodeMode: "full",
 					},
 					PrePullerDaemonset: prepuller,
 				},
@@ -1537,10 +1535,7 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 				},
 			},
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				GatewayMode:            "shared",
-				NodeMode:               "full",
-				EnableEgressIP:         true,
-				DisableSNATMultipleGWs: false,
+				NodeMode: "full",
 			},
 		},
 	}
