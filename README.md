@@ -195,10 +195,14 @@ data:
 ```
 
 ### Configuring OVNKubernetes
-OVNKubernetes supports the following configuration options, all of which are optional and once set at cluster creation, they can't be changed:
+OVNKubernetes supports the following configuration options, all of which are optional and once set at cluster creation, they can't be changed except for `gatewayConfig` which can be changed at runtime:
 * `MTU`: The MTU to use for the geneve overlay. The default is the MTU of the node that the cluster-network-operator is first run on, minus 100 bytes for geneve overhead. If the nodes in your cluster don't all have the same MTU then you may need to set this explicitly.
 * `genevePort`: The UDP port to use for the Geneve overlay. The default is 6081.
 * `hybridOverlayConfig`: hybrid linux/windows cluster (see below).
+* `ipsecConfig`: enables and configures IPsec for pods on the pod network within the cluster.
+* `policyAuditConfig`: holds the configuration for network policy audit events.
+* `gatewayConfig`: holds the configuration for node gateway options.
+  * `routingViaHost`: If set to true, pod egress traffic will touch host networking stack before being sent out.
 
 These configuration flags are only in the Operator configuration object.
 
@@ -210,6 +214,8 @@ spec:
     ovnKubernetesConfig:
       mtu: 1400
       genevePort: 6081
+      gatewayConfig:
+        routingViaHost: false
 ```
 
 Additionally, you can configure per-node verbosity for ovn-kubernetes. This is useful
