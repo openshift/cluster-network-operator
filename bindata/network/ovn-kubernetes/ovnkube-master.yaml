@@ -422,8 +422,7 @@ spec:
         - name: ovn-master-metrics-cert
           mountPath: /etc/pki/tls/metrics-cert
           readOnly: True
-
-      # sbdb: The southbound, or flow DB. In raft mode 
+      # sbdb: The southbound, or flow DB. In raft mode
       - name: sbdb
         image: "{{.OvnImage}}"
         command:
