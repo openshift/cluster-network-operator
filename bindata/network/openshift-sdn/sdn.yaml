@@ -111,7 +111,7 @@ spec:
             --platform-type {{.PlatformType}} \
             --proxy-config /config/kube-proxy-config.yaml \
             ${mtu_override_flag} \
-            --v ${OPENSHIFT_SDN_LOG_LEVEL:-2}
+            --v 5
         securityContext:
           privileged: true
         volumeMounts:
