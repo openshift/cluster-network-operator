@@ -56,6 +56,15 @@ spec:
       - operator: "Exists"
       nodeSelector:
         beta.kubernetes.io/os: "linux"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: network.operator.openshift.io/dpu-host
+                operator: DoesNotExist
+              - key: network.operator.openshift.io/dpu
+                operator: DoesNotExist
 
 ---
 apiVersion: v1
