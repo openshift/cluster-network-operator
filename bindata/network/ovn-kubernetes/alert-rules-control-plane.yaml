@@ -32,7 +32,7 @@ spec:
       annotations:
         summary: ovn-kubernetes has not written anything to the northbound database for too long
       expr: |
-         time() - max(ovn_nb_e2e_timestamp) > 300
+         time() - max(ovnkube_master_nb_e2e_timestamp) > 120
       for: 10m
       labels:
         severity: warning
@@ -40,7 +40,7 @@ spec:
       annotations:
         summary: ovn-northd has not successfully synced any changes to the southbound DB for too long
       expr: |
-        max(ovn_nb_e2e_timestamp) - max(ovn_sb_e2e_timestamp) > 120
+        max(ovnkube_master_nb_e2e_timestamp) - max(ovnkube_master_sb_e2e_timestamp) > 120
       for: 10m
       labels:
         severity: warning
