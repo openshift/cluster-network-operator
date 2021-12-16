@@ -70,3 +70,7 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-network-interface-bond-cni:latest
+  - name: cloud-network-config-controller
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-cloud-network-config-controller:latest

@@ -40,7 +40,6 @@ type OVNBootstrapResult struct {
 	ClusterInitiator        string
 	ExistingMasterDaemonset *appsv1.DaemonSet
 	ExistingNodeDaemonset   *appsv1.DaemonSet
-	Platform                configv1.PlatformType
 	OVNKubernetesConfig     *OVNConfigBoostrapResult
 	PrePullerDaemonset      *appsv1.DaemonSet
 }
@@ -48,11 +47,12 @@ type OVNBootstrapResult struct {
 type BootstrapResult struct {
 	Kuryr KuryrBootstrapResult
 	OVN   OVNBootstrapResult
-	SDN   SDNBootstrapResult
 
 	ExternalControlPlane bool
+	Cloud                CloudBootstrapResult
 }
 
-type SDNBootstrapResult struct {
-	Platform configv1.PlatformType
+type CloudBootstrapResult struct {
+	PlatformType   configv1.PlatformType
+	PlatformRegion string
 }

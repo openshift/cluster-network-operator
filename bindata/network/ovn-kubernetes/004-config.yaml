@@ -22,6 +22,7 @@ data:
 {{- if .OVNHybridOverlayEnable }}
     no-hostsubnet-nodes="kubernetes.io/os=windows"
 {{- end  }}
+    platform-type="{{.PlatformType}}"
  
     [ovnkubernetesfeature]
     enable-egress-ip=true

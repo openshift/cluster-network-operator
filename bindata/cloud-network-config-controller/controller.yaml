@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-network-config-controller
+  namespace: openshift-cloud-network-config-controller
+  annotations:
+    kubernetes.io/description: |
+      This deployment launches the cloud network config controller which manages cloud-level network configurations
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+    networkoperator.openshift.io/non-critical: ""
+spec:
+  selector:
+    matchLabels:
+      app: cloud-network-config-controller
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      name: cloud-network-config-controller
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: cloud-network-config-controller
+        component: network
+        type: infra
+        openshift.io/component: network
+    spec:
+      serviceAccountName: cloud-network-config-controller
+      priorityClassName: system-cluster-critical
+      containers:
+      - name: controller
+        image: {{.CloudNetworkConfigControllerImage}}
+        imagePullPolicy: IfNotPresent
+        command: ["/usr/bin/cloud-network-config-controller"]
+        args: ["-platform-type", "{{.PlatformType}}", "-platform-region", "{{.PlatformRegion}}", "-secret-name", "cloud-credentials"]
+        env:
+        - name: CONTROLLER_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CONTROLLER_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KubernetesServicePort}}"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KubernetesServiceHost}}"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        volumeMounts:
+        - name: cloud-provider-secret
+          mountPath: "/etc/secret/cloudprovider"
+          readOnly: true
+        terminationMessagePolicy: FallbackToLogsOnError
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoSchedule"
+      volumes:
+      - name: cloud-provider-secret
+        secret:
+          secretName: cloud-credentials
