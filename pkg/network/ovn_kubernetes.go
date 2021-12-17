@@ -307,7 +307,9 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient client.Client) (*bootst
 	ovnConfigResult := &bootstrap.OVNConfigBoostrapResult{
 		NodeMode: OVN_NODE_MODE_FULL,
 	}
-	bootstrapOVNGatewayConfig(conf, kubeClient)
+	if conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig == nil {
+		bootstrapOVNGatewayConfig(conf, kubeClient)
+	}
 	cm := &corev1.ConfigMap{}
 	dmc := types.NamespacedName{Namespace: "openshift-network-operator", Name: "dpu-mode-config"}
 	err := kubeClient.Get(context.TODO(), dmc, cm)
