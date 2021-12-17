@@ -505,7 +505,7 @@ func isDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 		}
 	}
 
-	if prev.Migration == nil {
+	if prev.Migration == nil || prev.Migration.NetworkType == "" {
 		switch prev.DefaultNetwork.Type {
 		case operv1.NetworkTypeOpenShiftSDN:
 			return isOpenShiftSDNChangeSafe(prev, next)
