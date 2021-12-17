@@ -618,15 +618,55 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	prev.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = nil
 	next.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = nil
 
-	// change the mtu
+	// change the mtu without migration
 	next.DefaultNetwork.OVNKubernetesConfig.MTU = ptrToUint32(70000)
 
 	// change the geneve port
 	next.DefaultNetwork.OVNKubernetesConfig.GenevePort = ptrToUint32(34001)
 	errs = isOVNKubernetesChangeSafe(prev, next)
 	g.Expect(errs).To(HaveLen(2))
-	g.Expect(errs[0]).To(MatchError("cannot change ovn-kubernetes MTU"))
+	g.Expect(errs[0]).To(MatchError("cannot change ovn-kubernetes MTU without migration"))
 	g.Expect(errs[1]).To(MatchError("cannot change ovn-kubernetes genevePort"))
+
+	next.DefaultNetwork.OVNKubernetesConfig.MTU = prev.DefaultNetwork.OVNKubernetesConfig.MTU
+	next.DefaultNetwork.OVNKubernetesConfig.GenevePort = prev.DefaultNetwork.OVNKubernetesConfig.GenevePort
+
+	// mtu migration
+
+	// valid mtu migration
+	next.Migration = &operv1.NetworkMigration{
+		MTU: &operv1.MTUMigration{
+			Network: &operv1.MTUMigrationValues{
+				From: prev.DefaultNetwork.OVNKubernetesConfig.MTU,
+				To:   ptrToUint32(1300),
+			},
+			Machine: &operv1.MTUMigrationValues{
+				To: ptrToUint32(1500),
+			},
+		},
+	}
+	errs = isOVNKubernetesChangeSafe(prev, next)
+	g.Expect(errs).To(BeEmpty())
+
+	// missing fields
+	next.Migration.MTU.Network.From = nil
+	errs = isOVNKubernetesChangeSafe(prev, next)
+	g.Expect(errs).To(HaveLen(1))
+	g.Expect(errs[0]).To(MatchError("invalid Migration.MTU, at least one of the required fields is missing"))
+
+	// invalid Migration.MTU.Network.From, not equal to previously applied MTU
+	next.Migration.MTU.Network.From = ptrToUint32(*prev.DefaultNetwork.OVNKubernetesConfig.MTU + 100)
+	errs = isOVNKubernetesChangeSafe(prev, next)
+	g.Expect(errs).To(HaveLen(1))
+	g.Expect(errs[0]).To(MatchError(fmt.Sprintf("invalid Migration.MTU.Network.From(%d) not equal to the currently applied MTU(%d)", *next.Migration.MTU.Network.From, *prev.DefaultNetwork.OVNKubernetesConfig.MTU)))
+
+	next.Migration.MTU.Network.From = prev.DefaultNetwork.OVNKubernetesConfig.MTU
+
+	// invalid Migration.MTU.Host.To, not big enough to accommodate next.Migration.MTU.Network.To with encap overhead
+	next.Migration.MTU.Network.To = ptrToUint32(1500)
+	errs = isOVNKubernetesChangeSafe(prev, next)
+	g.Expect(errs).To(HaveLen(1))
+	g.Expect(errs[0]).To(MatchError(fmt.Sprintf("invalid Migration.MTU.Machine.To(%d), has to be at least %d", *next.Migration.MTU.Machine.To, *next.Migration.MTU.Network.To+getOVNEncapOverhead(next))))
 }
 
 // TestOVNKubernetesShouldUpdateMasterOnUpgrade checks to see that
