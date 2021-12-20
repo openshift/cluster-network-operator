@@ -25,6 +25,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/platform/openstack/util/cert"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
@@ -754,15 +755,15 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootst
 	}
 	octaviaVersion = maxOctaviaVersion.Original()
 
-	infraConfig := &confv1.Infrastructure{}
-	if err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
-		return nil, fmt.Errorf("failed to get infrastructure 'cluster': %v", err)
+	infraConfig, err := platform.BootstrapInfra(kubeClient)
+	if err != nil {
+		return nil, err
 	}
 
 	log.Print("Kuryr bootstrap finished")
 
 	res := bootstrap.BootstrapResult{
-		ExternalControlPlane: infraConfig.Status.ControlPlaneTopology == confv1.ExternalTopologyMode,
+		Infra: *infraConfig,
 		Kuryr: bootstrap.KuryrBootstrapResult{
 			ServiceSubnet:            svcSubnetId,
 			PodSubnetpool:            podSubnetpoolId,

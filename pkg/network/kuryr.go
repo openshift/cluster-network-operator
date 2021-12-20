@@ -44,7 +44,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["UserCACertificate"] = b.UserCACert
 
 	// ExternalControlPlane
-	data.Data["ExternalControlPlane"] = bootstrapResult.ExternalControlPlane
+	data.Data["ExternalControlPlane"] = bootstrapResult.Infra.ExternalControlPlane
 
 	data.Data["HttpsProxy"] = b.HttpsProxy
 	data.Data["HttpProxy"] = b.HttpProxy
