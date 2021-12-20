@@ -333,9 +333,7 @@ func TestOpenShiftSDNIsSafe(t *testing.T) {
 	g.Expect(errs[1]).To(MatchError("cannot change openshift-sdn vxlanPort"))
 	g.Expect(errs[2]).To(MatchError("cannot change openshift-sdn mtu without migration"))
 
-	next.DefaultNetwork.OpenShiftSDNConfig.VXLANPort = prev.DefaultNetwork.OpenShiftSDNConfig.VXLANPort
-	next.DefaultNetwork.OpenShiftSDNConfig.Mode = prev.DefaultNetwork.OpenShiftSDNConfig.Mode
-	next.DefaultNetwork.OpenShiftSDNConfig.MTU = prev.DefaultNetwork.OpenShiftSDNConfig.MTU
+	next = prev.DeepCopy()
 	// mtu migration
 
 	// valid mtu migration

@@ -173,7 +173,7 @@ func isOpenShiftSDNChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	nn := next.DefaultNetwork.OpenShiftSDNConfig
 	errs := []error{}
 
-	if reflect.DeepEqual(pn, nn) {
+	if reflect.DeepEqual(pn, nn) && reflect.DeepEqual(prev.Migration, next.Migration) {
 		return errs
 	}
 
@@ -201,7 +201,7 @@ func isOpenShiftSDNChangeSafe(prev, next *operv1.NetworkSpec) []error {
 		} else {
 			// Only check next.Migration.MTU.Network.From when it changes
 			checkPrevMTU := prev.Migration == nil || prev.Migration.MTU == nil || prev.Migration.MTU.Network == nil || !reflect.DeepEqual(prev.Migration.MTU.Network.From, next.Migration.MTU.Network.From)
-			if checkPrevMTU && *next.Migration.MTU.Network.From != *pn.MTU {
+			if checkPrevMTU && !reflect.DeepEqual(next.Migration.MTU.Network.From, pn.MTU) {
 				errs = append(errs, errors.Errorf("invalid Migration.MTU.Network.From(%d) not equal to the currently applied MTU(%d)", *next.Migration.MTU.Network.From, *pn.MTU))
 			}
 			if (*next.Migration.MTU.Network.To + sdnOverhead) > *next.Migration.MTU.Machine.To {
