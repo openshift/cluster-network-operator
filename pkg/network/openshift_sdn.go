@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -15,6 +16,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 
 	configv1 "github.com/openshift/api/config/v1"
 	netv1 "github.com/openshift/api/network/v1"
@@ -321,12 +324,24 @@ func clusterNetwork(conf *operv1.NetworkSpec) (string, error) {
 }
 
 func bootstrapSDN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
+	var platformType configv1.PlatformType
+	infraConfig := &configv1.Infrastructure{}
+	if err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
+		return nil, fmt.Errorf("failed to get infrastructure 'config': %v", err)
+	}
+
+	if infraConfig.Status.PlatformStatus != nil {
+		platformType = infraConfig.Status.PlatformStatus.Type
+	}
+	klog.V(2).Infof("Openshift-SDN: Bootstrap SDN infraConfig Platform: %q", platformType)
+
 	cloudRes, err := bootstrapCloud(conf, kubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to bootstrap cloud infrastructure, err: %v", err)
 	}
 	res := bootstrap.BootstrapResult{
-		Cloud: *cloudRes,
+		ExternalControlPlane: infraConfig.Status.ControlPlaneTopology == configv1.ExternalTopologyMode,
+		Cloud:                *cloudRes,
 	}
 	return &res, nil
 }
