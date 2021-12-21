@@ -47,12 +47,11 @@ type OVNBootstrapResult struct {
 type BootstrapResult struct {
 	Kuryr KuryrBootstrapResult
 	OVN   OVNBootstrapResult
-
-	ExternalControlPlane bool
-	Cloud                CloudBootstrapResult
+	Infra InfraBootstrapResult
 }
 
-type CloudBootstrapResult struct {
-	PlatformType   configv1.PlatformType
-	PlatformRegion string
+type InfraBootstrapResult struct {
+	PlatformType         configv1.PlatformType
+	PlatformRegion       string
+	ExternalControlPlane bool
 }
