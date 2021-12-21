@@ -24,13 +24,13 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	log.Printf("Starting render phase")
 	objs := []*uns.Unstructured{}
 
-	if bootstrapResult.Cloud.PlatformType == v1.AWSPlatformType ||
-		bootstrapResult.Cloud.PlatformType == v1.AzurePlatformType ||
-		bootstrapResult.Cloud.PlatformType == v1.GCPPlatformType {
+	if bootstrapResult.Infra.PlatformType == v1.AWSPlatformType ||
+		bootstrapResult.Infra.PlatformType == v1.AzurePlatformType ||
+		bootstrapResult.Infra.PlatformType == v1.GCPPlatformType {
 		// render cloud network config controller **before** the network plugin.
 		// the network plugin is dependent upon having the cloud network CRD
 		// defined as to initialize its watcher, otherwise it will error and crash
-		o, err := renderCloudNetworkConfigController(conf, bootstrapResult.Cloud, manifestDir)
+		o, err := renderCloudNetworkConfigController(conf, bootstrapResult.Infra, manifestDir)
 		if err != nil {
 			return nil, err
 		}
@@ -45,7 +45,7 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	objs = append(objs, o...)
 
 	// render MultusAdmissionController
-	o, err = renderMultusAdmissionController(conf, manifestDir, bootstrapResult.ExternalControlPlane)
+	o, err = renderMultusAdmissionController(conf, manifestDir, bootstrapResult.Infra.ExternalControlPlane)
 	if err != nil {
 		return nil, err
 	}
@@ -655,7 +655,7 @@ func renderNetworkPublic(manifestDir string) ([]*uns.Unstructured, error) {
 }
 
 // renderCloudNetworkConfigController renders the cloud network config controller
-func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrapResult bootstrap.CloudBootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrapResult bootstrap.InfraBootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["PlatformType"] = cloudBootstrapResult.PlatformType

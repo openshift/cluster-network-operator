@@ -47,7 +47,7 @@ func TestRenderOpenShiftSDN(t *testing.T) {
 	config := &crd.Spec
 
 	bootstrapResult := &bootstrap.BootstrapResult{
-		Cloud: bootstrap.CloudBootstrapResult{},
+		Infra: bootstrap.InfraBootstrapResult{},
 	}
 
 	errs := validateOpenShiftSDN(config)
@@ -196,7 +196,7 @@ func TestProxyArgs(t *testing.T) {
 	FillDefaults(config, nil)
 
 	bootstrapResult := &bootstrap.BootstrapResult{
-		Cloud: bootstrap.CloudBootstrapResult{},
+		Infra: bootstrap.InfraBootstrapResult{},
 	}
 
 	// iter through all objects, finding the kube-proxy config map
@@ -383,7 +383,7 @@ func TestOpenShiftSDNMultitenant(t *testing.T) {
 	config.DefaultNetwork.OpenShiftSDNConfig.Mode = "Multitenant"
 
 	bootstrapResult := &bootstrap.BootstrapResult{
-		Cloud: bootstrap.CloudBootstrapResult{},
+		Infra: bootstrap.InfraBootstrapResult{},
 	}
 
 	objs, err := renderOpenShiftSDN(config, bootstrapResult, manifestDir)
@@ -462,7 +462,7 @@ func TestOpenshiftSDNProxyConfig(t *testing.T) {
 	}
 
 	bootstrapResult := &bootstrap.BootstrapResult{
-		Cloud: bootstrap.CloudBootstrapResult{},
+		Infra: bootstrap.InfraBootstrapResult{},
 	}
 
 	// test default rendering
