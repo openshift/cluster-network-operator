@@ -55,8 +55,10 @@ spec:
           mountPath: "/etc/secret/cloudprovider"
           readOnly: true
         terminationMessagePolicy: FallbackToLogsOnError
+{{- if not .ExternalControlPlane }}
       nodeSelector:
         node-role.kubernetes.io/master: ""
+{{- end }}
       tolerations:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"
