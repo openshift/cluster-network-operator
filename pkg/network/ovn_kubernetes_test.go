@@ -1,6 +1,9 @@
 package network
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -10,11 +13,15 @@ import (
 
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	kapierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
@@ -1612,6 +1619,192 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 	}
 }
 
+func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
+	config := &operv1.NetworkSpec{
+		ServiceNetwork: []string{"172.30.0.0/16"},
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
+			{CIDR: "10.128.0.0/15", HostPrefix: 23},
+		},
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOVNKubernetes,
+			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
+				GenevePort:        ptrToUint32(8061),
+				PolicyAuditConfig: &operv1.PolicyAuditConfig{},
+			},
+		},
+		DisableMultiNetwork: boolPtr(true),
+	}
+	testCases := []struct {
+		Description string
+		FlowsConfig *bootstrap.FlowsConfig
+		Expected    []v1.EnvVar
+		NotExpected []string
+	}{
+		{
+			Description: "No detected OVN flows config",
+			NotExpected: []string{"IPFIX_COLLECTORS", "IPFIX_CACHE_MAX_FLOWS",
+				"IPFIX_CACHE_ACTIVE_TIMEOUT", "IPFIX_SAMPLING"},
+		},
+		{
+			Description: "Only target is specified",
+			FlowsConfig: &bootstrap.FlowsConfig{
+				Target: "1.2.3.4:567",
+			},
+			Expected: []v1.EnvVar{{Name: "IPFIX_COLLECTORS", Value: "1.2.3.4:567"}},
+			NotExpected: []string{"IPFIX_CACHE_MAX_FLOWS",
+				"IPFIX_CACHE_ACTIVE_TIMEOUT", "IPFIX_SAMPLING"},
+		},
+		{
+			Description: "IPFIX performance variables are specified",
+			FlowsConfig: &bootstrap.FlowsConfig{
+				Target:             "7.8.9.10:1112",
+				CacheMaxFlows:      uintPtr(123),
+				CacheActiveTimeout: uintPtr(456),
+				Sampling:           uintPtr(789),
+			},
+			Expected: []v1.EnvVar{
+				{Name: "IPFIX_COLLECTORS", Value: "7.8.9.10:1112"},
+				{Name: "IPFIX_CACHE_MAX_FLOWS", Value: "123"},
+				{Name: "IPFIX_CACHE_ACTIVE_TIMEOUT", Value: "456"},
+				{Name: "IPFIX_SAMPLING", Value: "789"},
+			},
+		},
+		{
+			Description: "Wrong configuration: target missing but performance variables present",
+			FlowsConfig: &bootstrap.FlowsConfig{
+				CacheMaxFlows:      uintPtr(123),
+				CacheActiveTimeout: uintPtr(456),
+				Sampling:           uintPtr(789),
+			},
+			NotExpected: []string{"IPFIX_COLLECTORS", "IPFIX_CACHE_MAX_FLOWS",
+				"IPFIX_CACHE_ACTIVE_TIMEOUT", "IPFIX_SAMPLING"},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.Description, func(t *testing.T) {
+			RegisterTestingT(t)
+			g := NewGomegaWithT(t)
+			bootstrapResult := &bootstrap.BootstrapResult{
+				OVN: bootstrap.OVNBootstrapResult{
+					MasterIPs: []string{"1.2.3.4"},
+					OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+						GatewayMode: "shared",
+					},
+					FlowsConfig: tc.FlowsConfig,
+				},
+			}
+			objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+			g.Expect(err).ToNot(HaveOccurred())
+			nodeDS := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+			ds := appsv1.DaemonSet{}
+			g.Expect(convert(nodeDS, &ds)).To(Succeed())
+			nodeCont, ok := findContainer(ds.Spec.Template.Spec.Containers, "ovnkube-node")
+			g.Expect(ok).To(BeTrue(), "expecting container named ovnkube-node in the DaemonSet")
+			g.Expect(nodeCont.Env).To(ContainElements(tc.Expected))
+			for _, ev := range nodeCont.Env {
+				Expect(tc.NotExpected).ToNot(ContainElement(ev.Name))
+			}
+		})
+	}
+}
+
+func TestBootStrapOvsConfigMap_SharedTarget(t *testing.T) {
+	fc := bootstrapFlowsConfig(&fakeClientReader{
+		configMap: &v1.ConfigMap{
+			Data: map[string]string{
+				"sharedTarget":       "1.2.3.4:3030",
+				"cacheActiveTimeout": "3200ms",
+				"cacheMaxFlows":      "33",
+				"sampling":           "55",
+			},
+		},
+	})
+
+	assert.Equal(t, "1.2.3.4:3030", fc.Target)
+	// verify that the 200ms get truncated
+	assert.EqualValues(t, 3, *fc.CacheActiveTimeout)
+	assert.EqualValues(t, 33, *fc.CacheMaxFlows)
+	assert.EqualValues(t, 55, *fc.Sampling)
+}
+
+func TestBootStrapOvsConfigMap_NodePort(t *testing.T) {
+	fc := bootstrapFlowsConfig(&fakeClientReader{
+		configMap: &v1.ConfigMap{
+			Data: map[string]string{
+				"nodePort":           "3131",
+				"cacheActiveTimeout": "invalid timeout",
+				"cacheMaxFlows":      "invalid int",
+			},
+		},
+	})
+
+	assert.Equal(t, ":3131", fc.Target)
+	// verify that invalid or unspecified fields are ignored
+	assert.Nil(t, fc.CacheActiveTimeout)
+	assert.Nil(t, fc.CacheMaxFlows)
+	assert.Nil(t, fc.Sampling)
+}
+
+func TestBootStrapOvsConfigMap_IncompleteMap(t *testing.T) {
+	fc := bootstrapFlowsConfig(&fakeClientReader{
+		configMap: &v1.ConfigMap{
+			Data: map[string]string{
+				"cacheActiveTimeout": "3200ms",
+				"cacheMaxFlows":      "33",
+				"sampling":           "55",
+			},
+		},
+	})
+
+	// without sharedTarget nor nodePort, flow collection can't be set
+	assert.Nil(t, fc)
+}
+
+func TestBootStrapOvsConfigMap_UnexistingMap(t *testing.T) {
+	fc := bootstrapFlowsConfig(&fakeClientReader{configMap: nil})
+
+	// without sharedTarget nor nodePort, flow collection can't be set
+	assert.Nil(t, fc)
+}
+
+type fakeClientReader struct {
+	configMap *v1.ConfigMap
+}
+
+func (f *fakeClientReader) Get(_ context.Context, _ client.ObjectKey, obj client.Object) error {
+	if cmPtr, ok := obj.(*v1.ConfigMap); !ok {
+		return fmt.Errorf("expecting *v1.ConfigMap, got %T", obj)
+	} else if f.configMap == nil {
+		return &kapierrors.StatusError{ErrStatus: metav1.Status{
+			Reason: metav1.StatusReasonNotFound,
+		}}
+	} else {
+		*cmPtr = *f.configMap
+	}
+	return nil
+}
+
+func (f *fakeClientReader) List(_ context.Context, _ client.ObjectList, _ ...client.ListOption) error {
+	return errors.New("unexpected invocation to List")
+}
+
+func findContainer(conts []v1.Container, name string) (v1.Container, bool) {
+	for _, cont := range conts {
+		if cont.Name == name {
+			return cont, true
+		}
+	}
+	return v1.Container{}, false
+}
+
+func convert(src *uns.Unstructured, dst metav1.Object) error {
+	j, err := src.MarshalJSON()
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(j, dst)
+}
+
 func findInObjs(group, kind, name, namespace string, objs []*uns.Unstructured) *uns.Unstructured {
 	for _, obj := range objs {
 		if (obj.GroupVersionKind().GroupKind() == schema.GroupKind{Group: group, Kind: kind} &&
@@ -1676,5 +1869,13 @@ func checkDaemonsetAnnotation(g *WithT, objs []*uns.Unstructured, key, value str
 }
 
 func ptrToUint32(x uint32) *uint32 {
+	return &x
+}
+
+func uintPtr(x uint) *uint {
+	return &x
+}
+
+func boolPtr(x bool) *bool {
 	return &x
 }

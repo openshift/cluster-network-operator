@@ -52,6 +52,11 @@ const OVN_NODE_SELECTOR_DPU = "network.operator.openshift.io/dpu: ''"
 
 var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
+const (
+	OVSFlowsConfigMapName   = "ovs-flows-config"
+	OVSFlowsConfigNamespace = names.APPLIED_NAMESPACE
+)
+
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
 // This creates
 // - the openshift-ovn-kubernetes namespace
@@ -131,6 +136,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["NetFlowCollectors"] = ""
 	data.Data["SFlowCollectors"] = ""
 	data.Data["IPFIXCollectors"] = ""
+	data.Data["IPFIXCacheMaxFlows"] = ""
+	data.Data["IPFIXCacheActiveTimeout"] = ""
+	data.Data["IPFIXSampling"] = ""
 	data.Data["OVNPolicyAuditRateLimit"] = c.PolicyAuditConfig.RateLimit
 	data.Data["OVNPolicyAuditMaxFileSize"] = c.PolicyAuditConfig.MaxFileSize
 	data.Data["OVNPolicyAuditDestination"] = c.PolicyAuditConfig.Destination
@@ -208,7 +216,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			data.Data["IPFIXCollectors"] = strings.TrimSuffix(collectors.String(), ",")
 		}
 	}
-
+	renderOVNFlowsConfig(bootstrapResult, &data)
 	if len(bootstrapResult.OVN.MasterIPs) == 1 {
 		data.Data["IsSNO"] = true
 	} else {
@@ -300,6 +308,34 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	return objs, nil
+}
+
+// renderOVNFlowsConfig renders the bootstrapped information from the ovs-flows-config ConfigMap
+func renderOVNFlowsConfig(bootstrapResult *bootstrap.BootstrapResult, data *render.RenderData) {
+	flows := bootstrapResult.OVN.FlowsConfig
+	if flows == nil {
+		return
+	}
+	if flows.Target == "" {
+		klog.Warningf("ovs-flows-config configmap 'target' field can't be empty. Ignoring configuration: %+v", flows)
+		return
+	}
+	// if IPFIX collectors are provided by means of both the operator configuration and the
+	// ovs-flows-config ConfigMap, we will merge both targets
+	if colls, ok := data.Data["IPFIXCollectors"].(string); !ok || colls == "" {
+		data.Data["IPFIXCollectors"] = flows.Target
+	} else {
+		data.Data["IPFIXCollectors"] = colls + "," + flows.Target
+	}
+	if flows.CacheMaxFlows != nil {
+		data.Data["IPFIXCacheMaxFlows"] = *flows.CacheMaxFlows
+	}
+	if flows.Sampling != nil {
+		data.Data["IPFIXSampling"] = *flows.Sampling
+	}
+	if flows.CacheActiveTimeout != nil {
+		data.Data["IPFIXCacheActiveTimeout"] = *flows.CacheActiveTimeout
+	}
 }
 
 // bootstrapOVNConfig returns the value of mode found in the openshift-ovn-kubernetes/dpu-mode-config configMap
@@ -671,9 +707,76 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 			ExistingNodeDaemonset:   nodeDS,
 			OVNKubernetesConfig:     ovnConfigResult,
 			PrePullerDaemonset:      prePullerDS,
+			FlowsConfig:             bootstrapFlowsConfig(kubeClient),
 		},
 	}
 	return &res, nil
+}
+
+// bootstrapFlowsConfig looks for the openshift-network-operator/ovs-flows-config configmap, and
+// returns it or returns nil if it does not exist (or can't be properly parsed).
+// Usually, the second argument will be net.LookupIP
+func bootstrapFlowsConfig(cl client.Reader) *bootstrap.FlowsConfig {
+	cm := corev1.ConfigMap{}
+	if err := cl.Get(context.TODO(), types.NamespacedName{
+		Name:      OVSFlowsConfigMapName,
+		Namespace: OVSFlowsConfigNamespace,
+	}, &cm); err != nil {
+		if !apierrors.IsNotFound(err) {
+			klog.Warningf("%s: error fetching configmap: %v", OVSFlowsConfigMapName, err)
+		}
+		// ovs-flows-config is not defined. Ignoring from bootstrap
+		return nil
+	}
+	fc := bootstrap.FlowsConfig{}
+	// fetching string fields and transforming them to OVS format
+	if st, ok := cm.Data["sharedTarget"]; ok {
+		fc.Target = st
+	} else if np, ok := cm.Data["nodePort"]; ok {
+		// empty host will be interpreted as Node IP by ovn-kubernetes
+		fc.Target = ":" + np
+	} else {
+		klog.Warningf("%s: wrong data section: either sharedTarget or nodePort sections are needed: %+v",
+			OVSFlowsConfigMapName, cm.Data)
+		return nil
+	}
+
+	if catStr, ok := cm.Data["cacheActiveTimeout"]; ok {
+		if catd, err := time.ParseDuration(catStr); err != nil {
+			klog.Warningf("%s: wrong cacheActiveTimeout value %s. Ignoring: %v",
+				OVSFlowsConfigMapName, catStr, err)
+		} else {
+			catf := catd.Seconds()
+			catu := uint(catf)
+			if catf != float64(catu) {
+				klog.Warningf("%s: cacheActiveTimeout %s will be truncated to %d seconds",
+					OVSFlowsConfigMapName, catStr, catu)
+			}
+			fc.CacheActiveTimeout = &catu
+		}
+	}
+
+	if cmfStr, ok := cm.Data["cacheMaxFlows"]; ok {
+		if cmf, err := strconv.ParseUint(cmfStr, 10, 32); err != nil {
+			klog.Warningf("%s: wrong cacheMaxFlows value %s. Ignoring: %v",
+				OVSFlowsConfigMapName, cmfStr, err)
+		} else {
+			cmfu := uint(cmf)
+			fc.CacheMaxFlows = &cmfu
+		}
+	}
+
+	if sStr, ok := cm.Data["sampling"]; ok {
+		if sampling, err := strconv.ParseUint(sStr, 10, 32); err != nil {
+			klog.Warningf("%s: wrong sampling value %s. Ignoring: %v",
+				OVSFlowsConfigMapName, sStr, err)
+		} else {
+			su := uint(sampling)
+			fc.Sampling = &su
+		}
+	}
+
+	return &fc
 }
 
 func currentInitiatorExists(ovnMasterIPs []string, configInitiator string) bool {
