@@ -17,6 +17,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/network"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -69,6 +71,14 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 	// Watch for changes to primary resource Network
 	err = c.Watch(&source.Kind{Type: &operv1.Network{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
+		return err
+	}
+
+	// watch for changes in the ovs-flows-config map
+	if err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}},
+		handler.EnqueueRequestsFromMapFunc(reconcileOvsFlowsConfig),
+		predicate.ResourceVersionChangedPredicate{},
+	); err != nil {
 		return err
 	}
 
@@ -348,4 +358,19 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// All was successful. Request that this be re-triggered after ResyncPeriod,
 	// so we can reconcile state again.
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
+}
+
+// reconcileOvsFlowsConfig filters non-ovs-flows-config events and forwards a request to the
+// openshift-network-operator/cluster operator
+func reconcileOvsFlowsConfig(object client.Object) []reconcile.Request {
+	n := object.GetName()
+	ns := object.GetNamespace()
+	if n != network.OVSFlowsConfigMapName || ns != network.OVSFlowsConfigNamespace {
+		return nil
+	}
+	log.Println(network.OVSFlowsConfigMapName + ": enqueuing operator reconcile request from configmap")
+	return []reconcile.Request{{NamespacedName: types.NamespacedName{
+		Name:      names.OPERATOR_CONFIG,
+		Namespace: names.APPLIED_NAMESPACE,
+	}}}
 }
