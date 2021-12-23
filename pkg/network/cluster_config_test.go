@@ -5,6 +5,9 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	. "github.com/onsi/gomega"
 )
@@ -28,13 +31,27 @@ var ClusterConfig = configv1.NetworkSpec{
 func TestValidateClusterConfig(t *testing.T) {
 	g := NewGomegaWithT(t)
 
+	// Bootstrap a client of type Baremetal
+	if err := configv1.AddToScheme(scheme.Scheme); err != nil {
+		t.Fatalf("failed to add configv1 to scheme: %v", err)
+	}
+	infrastructure := &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+		Status: configv1.InfrastructureStatus{
+			PlatformStatus: &configv1.PlatformStatus{
+				Type: configv1.BareMetalPlatformType,
+			},
+		},
+	}
+	client := fake.NewClientBuilder().WithObjects(infrastructure).Build()
+
 	cc := *ClusterConfig.DeepCopy()
-	err := ValidateClusterConfig(cc)
+	err := ValidateClusterConfig(cc, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	haveError := func(cfg configv1.NetworkSpec, substr string) {
 		t.Helper()
-		err = ValidateClusterConfig(cc)
+		err = ValidateClusterConfig(cc, client)
 		g.Expect(err).To(MatchError(ContainSubstring(substr)))
 	}
 
@@ -60,7 +77,7 @@ func TestValidateClusterConfig(t *testing.T) {
 
 	cc = *ClusterConfig.DeepCopy()
 	cc.ClusterNetwork[1].HostPrefix = 0
-	res := ValidateClusterConfig(cc)
+	res := ValidateClusterConfig(cc, client)
 	// Since the NetworkType is None, and the hostprefix is unset we don't validate it
 	g.Expect(res).Should(BeNil())
 
@@ -82,13 +99,27 @@ func TestValidateClusterConfig(t *testing.T) {
 func TestValidateClusterConfigDualStack(t *testing.T) {
 	g := NewGomegaWithT(t)
 
+	// Bootstrap a client of type Baremetal
+	if err := configv1.AddToScheme(scheme.Scheme); err != nil {
+		t.Fatalf("failed to add configv1 to scheme: %v", err)
+	}
+	infrastructure := &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+		Status: configv1.InfrastructureStatus{
+			PlatformStatus: &configv1.PlatformStatus{
+				Type: configv1.BareMetalPlatformType,
+			},
+		},
+	}
+	client := fake.NewClientBuilder().WithObjects(infrastructure).Build()
+
 	cc := *ClusterConfig.DeepCopy()
-	err := ValidateClusterConfig(cc)
+	err := ValidateClusterConfig(cc, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	haveError := func(cfg configv1.NetworkSpec, substr string) {
 		t.Helper()
-		err = ValidateClusterConfig(cc)
+		err = ValidateClusterConfig(cc, client)
 		g.Expect(err).To(MatchError(ContainSubstring(substr)))
 	}
 
@@ -128,8 +159,19 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 		CIDR:       "fd01::/48",
 		HostPrefix: 64,
 	})
-	err = ValidateClusterConfig(cc)
+	err = ValidateClusterConfig(cc, client)
 	g.Expect(err).NotTo(HaveOccurred())
+
+	// You can't use dual-stack if this is anything else but BareMetal or NonePlatformType
+	infrastructure.Status.PlatformStatus.Type = configv1.AzurePlatformType
+	client = fake.NewClientBuilder().WithObjects(infrastructure).Build()
+	cc = *ClusterConfig.DeepCopy()
+	cc.ServiceNetwork = append(cc.ServiceNetwork, "fd02::/112")
+	cc.ClusterNetwork = append(cc.ClusterNetwork, configv1.ClusterNetworkEntry{
+		CIDR:       "fd01::/48",
+		HostPrefix: 64,
+	})
+	haveError(cc, "DualStack deployments are allowed only for the BareMetal Platform type or the None Platform type")
 }
 
 func TestMergeClusterConfig(t *testing.T) {
