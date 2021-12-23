@@ -1,6 +1,7 @@
 package eventrecorder
 
 import (
+	"context"
 	"log"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -40,4 +41,8 @@ func (r *LoggingRecorder) ComponentName() string {
 
 func (r *LoggingRecorder) Shutdown() {
 	//not implemented
+}
+
+func (r *LoggingRecorder) WithContext(_ context.Context) events.Recorder {
+	return r
 }

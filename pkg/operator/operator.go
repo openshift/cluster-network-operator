@@ -8,7 +8,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller"
 	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
-
+	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -74,7 +74,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	// managementStateController syncs Operator.Spec.ManagementState down to
 	// an Operator.Status.Condition
-	managementStateController := management.NewOperatorManagementStateController("cluster-network-operator", o.client.OperatorHelperClient(), controllerConfig.EventRecorder)
+	managementStateController := managementstatecontroller.NewOperatorManagementStateController("cluster-network-operator", o.client.OperatorHelperClient(), controllerConfig.EventRecorder)
 	management.SetOperatorNotRemovable()
 
 	// TODO: Enable the library-go ClusterOperatorStatusController once
