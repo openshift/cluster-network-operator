@@ -291,9 +291,6 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
 	}
 
 	// Currently the only change we allow is switching to/from dual-stack.
-	//
-	// FIXME: the errors here currently do not actually mention dual-stack since it's
-	// not supported yet.
 
 	// validateIPPools() will have ensured that each config is independently either
 	// a valid single-stack config or a valid dual-stack config. Make sure we have
@@ -309,9 +306,9 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
 	default:
 		// They didn't change single-vs-dual
 		if reflect.DeepEqual(prev.ServiceNetwork, next.ServiceNetwork) {
-			return errors.Errorf("cannot change ClusterNetwork")
+			return errors.Errorf("unsupported change to ClusterNetwork")
 		} else {
-			return errors.Errorf("cannot change ServiceNetwork")
+			return errors.Errorf("unsupported change to ServiceNetwork")
 		}
 	}
 
@@ -321,7 +318,7 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
 	if singleStack.ServiceNetwork[0] != dualStack.ServiceNetwork[0] {
 		// User changed the primary service network, or tried to swap the order of
 		// the primary and secondary networks.
-		return errors.Errorf("cannot change ServiceNetwork")
+		return errors.Errorf("cannot change primary ServiceNetwork when migrating to/from dual-stack")
 	}
 
 	// Validate that the shared ClusterNetwork entries are unchanged, and that ALL of
@@ -333,11 +330,11 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
 		if i < len(singleStack.ClusterNetwork) {
 			if !reflect.DeepEqual(singleStack.ClusterNetwork[i], dualStack.ClusterNetwork[i]) {
 				// Changed or re-ordered an existing ClusterNetwork element
-				return errors.Errorf("cannot change ClusterNetwork")
+				return errors.Errorf("cannot change primary ClusterNetwork when migrating to/from dual-stack")
 			}
 		} else if utilnet.IsIPv6CIDRString(dualStack.ClusterNetwork[i].CIDR) == EntryZeroIsIPv6 {
 			// Added a new element of the existing IP family
-			return errors.Errorf("cannot change ClusterNetwork")
+			return errors.Errorf("cannot add additional ClusterNetwork values of original IP family when migrating to dual stack")
 		}
 	}
 
@@ -517,7 +514,7 @@ func isDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 
 func isMigrationChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	if prev.Migration != nil && next.Migration != nil && prev.Migration.NetworkType != next.Migration.NetworkType {
-		return []error{errors.Errorf("cannot change migration network type after migration is start")}
+		return []error{errors.Errorf("cannot change migration network type after migration has started")}
 	}
 	return nil
 }
