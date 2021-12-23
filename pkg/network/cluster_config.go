@@ -5,9 +5,11 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilnet "k8s.io/utils/net"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/pkg/errors"
 )
@@ -16,7 +18,7 @@ import (
 var pluginsUsingHostPrefix = sets.NewString(string(operv1.NetworkTypeOpenShiftSDN), string(operv1.NetworkTypeOVNKubernetes))
 
 // ValidateClusterConfig ensures the cluster config is valid.
-func ValidateClusterConfig(clusterConfig configv1.NetworkSpec) error {
+func ValidateClusterConfig(clusterConfig configv1.NetworkSpec, client client.Client) error {
 	// Check all networks for overlaps
 	pool := iputil.IPPool{}
 
@@ -89,6 +91,20 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec) error {
 
 	if clusterConfig.NetworkType == "" {
 		return errors.Errorf("spec.networkType is required")
+	}
+
+	// If for whatever reason it is not possible to get the platform type, fail
+	infraRes, err := platform.BootstrapInfra(client)
+	if err != nil {
+		return err
+	}
+
+	// Validate that this is either a BareMetal or None PlatformType. For all other
+	// PlatformTypes, migration to DualStack is prohibited
+	if ipv4Service && ipv6Service || ipv4Cluster && ipv6Cluster {
+		if !isSupportedDualStackPlatform(infraRes.PlatformType) {
+			return errors.Errorf("DualStack deployments are allowed only for the BareMetal Platform type or the None Platform type")
+		}
 	}
 
 	return nil
