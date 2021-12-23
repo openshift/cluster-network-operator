@@ -45,7 +45,7 @@ func (c *OperatorHelperClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
 	return &instance.ObjectMeta, nil
 }
 
-func (c *OperatorHelperClient) UpdateOperatorSpec(resourceVersion string, spec *operatorv1.OperatorSpec) (*operatorv1.OperatorSpec, string, error) {
+func (c *OperatorHelperClient) UpdateOperatorSpec(ctx context.Context, resourceVersion string, spec *operatorv1.OperatorSpec) (*operatorv1.OperatorSpec, string, error) {
 	original, err := c.informer.Lister().Get(names.OPERATOR_CONFIG)
 	if err != nil {
 		return nil, "", err
@@ -54,7 +54,7 @@ func (c *OperatorHelperClient) UpdateOperatorSpec(resourceVersion string, spec *
 	updated.ResourceVersion = resourceVersion
 	updated.Spec.OperatorSpec = *spec
 
-	ret, err := c.client.Update(context.TODO(), updated, metav1.UpdateOptions{})
+	ret, err := c.client.Update(ctx, updated, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, "", err
 	}
@@ -62,7 +62,7 @@ func (c *OperatorHelperClient) UpdateOperatorSpec(resourceVersion string, spec *
 	return &ret.Spec.OperatorSpec, ret.ResourceVersion, nil
 }
 
-func (c *OperatorHelperClient) UpdateOperatorStatus(resourceVersion string, status *operatorv1.OperatorStatus) (*operatorv1.OperatorStatus, error) {
+func (c *OperatorHelperClient) UpdateOperatorStatus(ctx context.Context, resourceVersion string, status *operatorv1.OperatorStatus) (*operatorv1.OperatorStatus, error) {
 	original, err := c.informer.Lister().Get(names.OPERATOR_CONFIG)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (c *OperatorHelperClient) UpdateOperatorStatus(resourceVersion string, stat
 	updated.ResourceVersion = resourceVersion
 	updated.Status.OperatorStatus = *status
 
-	ret, err := c.client.Update(context.TODO(), updated, metav1.UpdateOptions{})
+	ret, err := c.client.Update(ctx, updated, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
