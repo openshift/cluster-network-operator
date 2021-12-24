@@ -32,6 +32,10 @@ spec:
       containers:
       - image: {{ .ControllerImage }}
         name: controller
+        resources:
+          requests:
+            cpu: 20m
+            memory: 500Mi
 {{ if eq (getOr . "ControllerEnableProbes" true) true }}
         readinessProbe:
           failureThreshold: 10
