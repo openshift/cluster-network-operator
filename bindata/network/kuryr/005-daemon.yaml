@@ -76,6 +76,10 @@ spec:
               fieldPath: metadata.name
         securityContext:
           privileged: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 500Mi
         volumeMounts:
         - name: bin
           mountPath: /opt/cni/bin
