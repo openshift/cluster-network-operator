@@ -666,6 +666,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrap
 	data.Data["CloudNetworkConfigControllerImage"] = os.Getenv("CLOUD_NETWORK_CONFIG_CONTROLLER_IMAGE")
 	data.Data["KubernetesServiceHost"] = os.Getenv("KUBERNETES_SERVICE_HOST")
 	data.Data["KubernetesServicePort"] = os.Getenv("KUBERNETES_SERVICE_PORT")
+	data.Data["ExternalControlPlane"] = cloudBootstrapResult.ExternalControlPlane
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "cloud-network-config-controller"), &data)
 	if err != nil {
