@@ -54,9 +54,14 @@ spec:
         - name: cloud-provider-secret
           mountPath: "/etc/secret/cloudprovider"
           readOnly: true
+        - name: bound-sa-token
+          mountPath: /var/run/secrets/openshift/serviceaccount
+          readOnly: true
         terminationMessagePolicy: FallbackToLogsOnError
+{{- if not .ExternalControlPlane }}
       nodeSelector:
         node-role.kubernetes.io/master: ""
+{{- end }}
       tolerations:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"
@@ -68,3 +73,11 @@ spec:
       - name: cloud-provider-secret
         secret:
           secretName: cloud-credentials
+      # This service account token can be used to provide identity outside the cluster.
+      # For example, this token can be used with AssumeRoleWithWebIdentity to authenticate with AWS using IAM OIDC provider and STS.
+      - name: bound-sa-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+              audience: openshift
