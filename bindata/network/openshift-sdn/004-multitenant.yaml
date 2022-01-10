@@ -4,6 +4,7 @@
 # - openshift-ingress
 # - openshift-monitoring
 # - openshift-kube-apiserver
+# - openshift-kube-apiserver-operator
 # - openshift-operator-lifecycle-manager
 # - openshift-image-registry
 # - openshift-user-workload-monitoring
@@ -37,6 +38,14 @@ metadata:
   name: openshift-kube-apiserver
 netid: 0
 netname: openshift-kube-apiserver
+
+---
+apiVersion: network.openshift.io/v1
+kind: NetNamespace
+metadata:
+  name: openshift-kube-apiserver-operator
+netid: 0
+netname: openshift-kube-apiserver-operator
 
 ---
 apiVersion: network.openshift.io/v1
