@@ -10,7 +10,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	v1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -24,21 +23,17 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	log.Printf("Starting render phase")
 	objs := []*uns.Unstructured{}
 
-	if bootstrapResult.Infra.PlatformType == v1.AWSPlatformType ||
-		bootstrapResult.Infra.PlatformType == v1.AzurePlatformType ||
-		bootstrapResult.Infra.PlatformType == v1.GCPPlatformType {
-		// render cloud network config controller **before** the network plugin.
-		// the network plugin is dependent upon having the cloud network CRD
-		// defined as to initialize its watcher, otherwise it will error and crash
-		o, err := renderCloudNetworkConfigController(conf, bootstrapResult.Infra, manifestDir)
-		if err != nil {
-			return nil, err
-		}
-		objs = append(objs, o...)
+	// render cloud network config controller **before** the network plugin.
+	// the network plugin is dependent upon having the cloud network CRD
+	// defined as to initialize its watcher, otherwise it will error and crash
+	o, err := renderCloudNetworkConfigController(conf, bootstrapResult.Infra, manifestDir)
+	if err != nil {
+		return nil, err
 	}
+	objs = append(objs, o...)
 
 	// render Multus
-	o, err := renderMultus(conf, manifestDir)
+	o, err = renderMultus(conf, manifestDir)
 	if err != nil {
 		return nil, err
 	}
@@ -650,27 +645,6 @@ func renderNetworkPublic(manifestDir string) ([]*uns.Unstructured, error) {
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network", "public"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render network/public manifests")
-	}
-	return manifests, nil
-}
-
-// renderCloudNetworkConfigController renders the cloud network config controller
-func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrapResult bootstrap.InfraBootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
-	data := render.MakeRenderData()
-	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
-	data.Data["PlatformType"] = cloudBootstrapResult.PlatformType
-	data.Data["PlatformRegion"] = cloudBootstrapResult.PlatformRegion
-	data.Data["PlatformTypeAWS"] = v1.AWSPlatformType
-	data.Data["PlatformTypeAzure"] = v1.AzurePlatformType
-	data.Data["PlatformTypeGCP"] = v1.GCPPlatformType
-	data.Data["CloudNetworkConfigControllerImage"] = os.Getenv("CLOUD_NETWORK_CONFIG_CONTROLLER_IMAGE")
-	data.Data["KubernetesServiceHost"] = os.Getenv("KUBERNETES_SERVICE_HOST")
-	data.Data["KubernetesServicePort"] = os.Getenv("KUBERNETES_SERVICE_PORT")
-	data.Data["ExternalControlPlane"] = cloudBootstrapResult.ExternalControlPlane
-
-	manifests, err := render.RenderDir(filepath.Join(manifestDir, "cloud-network-config-controller"), &data)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to render cloud-network-config-controller manifests")
 	}
 	return manifests, nil
 }
