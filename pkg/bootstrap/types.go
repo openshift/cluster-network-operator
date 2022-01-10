@@ -53,7 +53,11 @@ type BootstrapResult struct {
 type InfraBootstrapResult struct {
 	PlatformType         configv1.PlatformType
 	PlatformRegion       string
+	PlatformStatus       *configv1.PlatformStatus
 	ExternalControlPlane bool
+
+	// KubeCloudConfig is the contents of the openshift-config-managed/kube-cloud-config ConfigMap
+	KubeCloudConfig map[string]string
 }
 
 type FlowsConfig struct {

@@ -32,7 +32,12 @@ spec:
         image: {{.CloudNetworkConfigControllerImage}}
         imagePullPolicy: IfNotPresent
         command: ["/usr/bin/cloud-network-config-controller"]
-        args: ["-platform-type", "{{.PlatformType}}", "-platform-region", "{{.PlatformRegion}}", "-secret-name", "cloud-credentials"]
+        args: [ "-platform-type", "{{.PlatformType}}",
+                "-platform-region={{.PlatformRegion}}",
+                "-platform-api-url={{.PlatformAPIURL}}",
+                "-platform-aws-ca-override={{.PlatformAWSCAPath}}",
+                "-platform-azure-environment={{.PlatformAzureEnvironment}}",
+                "-secret-name", "cloud-credentials"]
         env:
         - name: CONTROLLER_NAMESPACE
           valueFrom:
@@ -54,6 +59,12 @@ spec:
         - name: cloud-provider-secret
           mountPath: "/etc/secret/cloudprovider"
           readOnly: true
+        - name: kube-cloud-config
+          mountPath: "/kube-cloud-config"
+          readOnly: true
+        - name: trusted-ca
+          mountPath: /etc/pki/ca-trust/extracted/pem
+          readOnly: true
         - name: bound-sa-token
           mountPath: /var/run/secrets/openshift/serviceaccount
           readOnly: true
@@ -73,6 +84,15 @@ spec:
       - name: cloud-provider-secret
         secret:
           secretName: cloud-credentials
+      - name: kube-cloud-config
+        configMap:
+          name: kube-cloud-config
+      - name: trusted-ca
+        configMap:
+          name: trusted-ca
+          items:
+          - key: ca-bundle.crt
+            path: tls-ca-bundle.pem
       # This service account token can be used to provide identity outside the cluster.
       # For example, this token can be used with AssumeRoleWithWebIdentity to authenticate with AWS using IAM OIDC provider and STS.
       - name: bound-sa-token

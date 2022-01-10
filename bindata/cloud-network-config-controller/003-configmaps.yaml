@@ -1,0 +1,18 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  namespace: openshift-cloud-network-config-controller
+  name: kube-cloud-config
+# placeholder; will be replaced in render.go
+
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  namespace: openshift-cloud-network-config-controller
+  name: trusted-ca
+  annotations:
+    networkoperator.openshift.io/create-only: "true"
+  labels:
+    config.openshift.io/inject-trusted-cabundle: "true"
+# will have CA-bundle injected by the CNO
