@@ -395,10 +395,20 @@ func TestOpenShiftSDNMultitenant(t *testing.T) {
 		"openshift-ingress",
 		"openshift-monitoring",
 		"openshift-kube-apiserver",
+		"openshift-kube-apiserver-operator",
 		"openshift-apiserver",
 		"kube-system",
 		"openshift-operator-lifecycle-manager",
 		"openshift-image-registry",
+		"openshift-user-workload-monitoring",
+		"openshift-etcd",
+		"openshift-etcd-operator",
+		"openshift-service-catalog-apiserver",
+		"openshift-service-catalog-controller-manager",
+		"openshift-template-service-broker",
+		"openshift-ansible-service-broker",
+		"openshift-authentication",
+		"openshift-authentication-operator",
 	}
 
 	for _, ns := range netNS {
