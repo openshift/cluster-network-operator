@@ -8,6 +8,12 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+const (
+	MinMTUIPv4 uint32 = 576  // RFC 791
+	MinMTUIPv6 uint32 = 1280 // RFC 8200
+	MaxMTU     uint32 = 65536
+)
+
 // getDefaultMTU gets the mtu of the default route.
 func getDefaultMTU() (int, error) {
 	// Get the interface with the default route

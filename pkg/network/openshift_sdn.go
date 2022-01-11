@@ -137,7 +137,7 @@ func validateOpenShiftSDN(conf *operv1.NetworkSpec) []error {
 			out = append(out, errors.Errorf("invalid VXLANPort %d", *sc.VXLANPort))
 		}
 
-		if sc.MTU != nil && (*sc.MTU < 576 || *sc.MTU > 65536) {
+		if sc.MTU != nil && (*sc.MTU < MinMTUIPv4 || *sc.MTU > MaxMTU) {
 			out = append(out, errors.Errorf("invalid MTU %d", *sc.MTU))
 		}
 
@@ -203,6 +203,13 @@ func isOpenShiftSDNChangeSafe(prev, next *operv1.NetworkSpec) []error {
 			checkPrevMTU := prev.Migration == nil || prev.Migration.MTU == nil || prev.Migration.MTU.Network == nil || !reflect.DeepEqual(prev.Migration.MTU.Network.From, next.Migration.MTU.Network.From)
 			if checkPrevMTU && *next.Migration.MTU.Network.From != *pn.MTU {
 				errs = append(errs, errors.Errorf("invalid Migration.MTU.Network.From(%d) not equal to the currently applied MTU(%d)", *next.Migration.MTU.Network.From, *pn.MTU))
+			}
+
+			if *next.Migration.MTU.Network.To < MinMTUIPv4 || *next.Migration.MTU.Network.To > MaxMTU {
+				errs = append(errs, errors.Errorf("invalid Migration.MTU.Network.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Network.To, MinMTUIPv4, MaxMTU))
+			}
+			if *next.Migration.MTU.Machine.To < MinMTUIPv4 || *next.Migration.MTU.Machine.To > MaxMTU {
+				errs = append(errs, errors.Errorf("invalid Migration.MTU.Machine.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Machine.To, MinMTUIPv4, MaxMTU))
 			}
 			if (*next.Migration.MTU.Network.To + sdnOverhead) > *next.Migration.MTU.Machine.To {
 				errs = append(errs, errors.Errorf("invalid Migration.MTU.Machine.To(%d), has to be at least %d", *next.Migration.MTU.Machine.To, *next.Migration.MTU.Network.To+sdnOverhead))
