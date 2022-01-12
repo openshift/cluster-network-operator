@@ -33,6 +33,10 @@ const IgnoreObjectErrorAnnotation = "networkoperator.openshift.io/ignore-errors"
 // that they are not critical to the functioning of the pod network
 const NonCriticalAnnotation = "networkoperator.openshift.io/non-critical"
 
+// CreateOnlyAnnotation is an annotation on all objects that
+// tells the CNO reconciliaton engine to ignore this object if it already exists.
+const CreateOnlyAnnotation = "networkoperator.openshift.io/create-only"
+
 // NetworkMigrationAnnotation is an annotation on the networks.operator.openshift.io CR to indicate
 // that executing network migration (switching the default network type of the cluster) is allowed.
 const NetworkMigrationAnnotation = "networkoperator.openshift.io/network-migration"
