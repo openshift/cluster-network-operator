@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/openshift/cluster-network-operator/pkg/names"
+
 	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -51,6 +53,11 @@ func ApplyObject(ctx context.Context, client k8sclient.Client, obj *uns.Unstruct
 		if err != nil {
 			log.Printf("could not retrieve %s", objDesc)
 			return err
+		}
+
+		// object exists - for create-only objects, stop here
+		if anno := existing.GetAnnotations()[names.CreateOnlyAnnotation]; anno == "true" {
+			return nil
 		}
 
 		// Merge the desired object with what actually exists
