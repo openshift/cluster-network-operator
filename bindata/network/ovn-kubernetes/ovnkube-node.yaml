@@ -215,6 +215,8 @@ spec:
           echo "I$(date "+%m%d %H:%M:%S.%N") - disable conntrack on geneve port"
           iptables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
           iptables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
+          ip6tables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
+          ip6tables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
           retries=0
           while true; do
             # TODO: change to use '--request-timeout=30s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
