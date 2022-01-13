@@ -31,6 +31,14 @@ rules:
   - list
   - watch
   - update
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cloud-network-config-controller
+  namespace: openshift-cloud-network-config-controller
+rules:
 - apiGroups: 
   - ""
   resources:
@@ -39,6 +47,7 @@ rules:
   - get
   - create
   - update
+  - patch
 - apiGroups:
   - ""
   resources:
@@ -55,6 +64,20 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
+  name: cloud-network-config-controller
+subjects:
+- kind: ServiceAccount
+  name: cloud-network-config-controller
+  namespace: openshift-cloud-network-config-controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: openshift-cloud-network-config-controller
+  name: cloud-network-config-controller-rb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
   name: cloud-network-config-controller
 subjects:
 - kind: ServiceAccount
