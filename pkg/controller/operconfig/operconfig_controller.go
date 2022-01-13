@@ -291,6 +291,12 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		Resource: "CloudPrivateIPConfig",
 	})
 
+	// This Namespace is rendered by the CVO, but it's really our operand.
+	relatedObjects = append(relatedObjects, configv1.ObjectReference{
+		Resource: "namespaces",
+		Name:     "openshift-cloud-network-config-controller",
+	})
+
 	r.status.SetDaemonSets(daemonSets)
 	r.status.SetDeployments(deployments)
 	r.status.SetRelatedObjects(relatedObjects)
