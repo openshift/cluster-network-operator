@@ -94,7 +94,7 @@ func RemoveObjByGroupKindName(objs []*uns.Unstructured, group, kind, namespace, 
 	return out
 }
 
-// UpdateObjByGroupKindName calls f on the object that mathes the group, kind, namespace, and name. F is allowed
+// UpdateObjByGroupKindName calls f on the object that matches the group, kind, namespace, and name. F is allowed
 // to mutate the object.
 func UpdateObjByGroupKindName(objs []*uns.Unstructured, group, kind, namespace, name string, f func(*uns.Unstructured)) {
 	for i := range objs {
