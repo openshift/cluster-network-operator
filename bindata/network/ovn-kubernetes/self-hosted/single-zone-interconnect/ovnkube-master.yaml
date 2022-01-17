@@ -306,6 +306,22 @@ spec:
                   exit 0
                 fi
 
+                OVN_NB_CTL="ovn-nbctl"
+                echo "Setting the IC zone to global"
+                retries=0
+                current_probe_interval=0
+                while [[ "${retries}" -lt 10 ]]; do
+                  current_probe_interval=$(${OVN_NB_CTL} set NB_Global . name="global" options:name="global")
+                  if [[ $? == 0 ]]; then
+                    current_probe_interval=$(echo ${current_probe_interval} | tr -d '\"')
+                    break
+                  else
+                    sleep 2
+                    (( retries += 1 ))
+                  fi
+                done
+
+
                 # retry an operation a number of times, sleeping 2 seconds between each try
                 retry() {
                   local tries=${1}
@@ -848,6 +864,8 @@ spec:
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
           exec /usr/bin/ovnkube \
+            --enable-interconnect \
+            --zone global \
             --init-master "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --ovn-empty-lb-events \
