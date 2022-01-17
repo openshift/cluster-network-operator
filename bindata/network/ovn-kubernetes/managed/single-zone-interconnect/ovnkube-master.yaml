@@ -879,6 +879,8 @@ spec:
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
           exec /usr/bin/ovnkube \
+            --enable-interconnect \
+            --zone global \
             --init-master "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
