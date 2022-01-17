@@ -6,9 +6,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: ovn-raft-quorum-guard
-  namespace: {{.HostedClusterNamespace}}
-  annotations:
-    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
+  namespace: openshift-ovn-kubernetes
 spec:
   minAvailable: {{.OVN_MIN_AVAILABLE}}
   selector:
@@ -16,127 +14,49 @@ spec:
       app: ovnkube-master
 ---
 {{ end }}
-kind: StatefulSet
+kind: DaemonSet
 apiVersion: apps/v1
 metadata:
   name: ovnkube-master
-  namespace: {{.HostedClusterNamespace}}
+  namespace: openshift-ovn-kubernetes
   annotations:
-    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
     kubernetes.io/description: |
       This daemonset launches the ovn-kubernetes controller (master) networking components.
     release.openshift.io/version: "{{.ReleaseVersion}}"
-  labels:
-    # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
-    hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
 spec:
-  podManagementPolicy: Parallel
   selector:
     matchLabels:
       app: ovnkube-master
-  serviceName: ovnkube-master-internal
-  volumeClaimTemplates:
-  - apiVersion: v1
-    kind: PersistentVolumeClaim
-    metadata:
-      name: datadir
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 1Gi
-      volumeMode: Filesystem
-  replicas: {{.OvnkubeMasterReplicas}}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # by default, Deployments spin up the new pod before terminating the gold one
+      # but we don't want that - because ovsdb holds the lock.
+      maxSurge: 0
+      maxUnavailable: 1
   template:
     metadata:
       annotations:
-        hypershift.openshift.io/release-image: {{.ReleaseImage}}
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: "hosted-cluster-api-access"
       labels:
         app: ovnkube-master
         ovn-db-pod: "true"
         component: network
         type: infra
         openshift.io/component: network
-        hypershift.openshift.io/control-plane-component: ovnkube-master
         kubernetes.io/os: "linux"
     spec:
-      affinity:
-        nodeAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 50
-            preference:
-              matchExpressions:
-                - key: hypershift.openshift.io/control-plane
-                  operator: In
-                  values:
-                    - "true"
-          - weight: 100
-            preference:
-              matchExpressions:
-                - key: hypershift.openshift.io/cluster
-                  operator: In
-                  values:
-                    - {{.HostedClusterNamespace}}
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchLabels:
-                app: ovnkube-master
-            topologyKey: topology.kubernetes.io/zone
-        podAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchLabels:
-                    hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
-                topologyKey: kubernetes.io/hostname
-      priorityClassName: hypershift-api-critical
-      initContainers:
-      # Remove once https://github.com/kubernetes/kubernetes/issues/85966 is addressed
-      - name: init-ip
-        command:
-          - /bin/bash
-          - -c
-          - |
-            cat <<-EOF
-            Kubelet only sets a pod's Status.PodIP when all containers of the pod have started at least once (successfully or unsuccessfully)
-             or at least one of the initContainers finished.
-            Container start is blocked by postStart hooks. See https://github.com/kubernetes/kubernetes/issues/85966 for more details.
-            The NB and SB DB postStart hooks block until the DBs join the RAFT cluster or until a timeout is reached.
-            In a standalone cluster every pod is host networked and the DBs use host IP to communicate between the RAFT members.
-            In HyperShift OVN-Kubernetes master is run as a statefulset and the pods are not host networked, meaning we cannot rely on the podIP not changing.
-            To provide a stable network identity for each pod in the statefulset we use a headless service,
-             the downside of this approach is the DNS entry for the pod will only start to work after the pod has its Status.PodIP set.
-
-            Until https://github.com/kubernetes/kubernetes/issues/85966 is fixed use a no-op init container as a workaround.
-            This allows for pod-pod connectivity in postStart hooks the first time they run.
-            EOF
-        image: "{{.OvnImage}}"
+      serviceAccountName: ovn-kubernetes-controller
+      hostNetwork: true
+      dnsPolicy: Default
+      priorityClassName: "system-cluster-critical"
+      # volumes in all containers:
+      # (container) -> (host)
+      # /etc/openvswitch -> /var/lib/ovn/etc - ovsdb data
+      # /var/lib/openvswitch -> /var/lib/ovn/data - ovsdb pki state
+      # /run/openvswitch -> tmpfs - sockets
+      # /env -> configmap env-overrides - debug overrides
       containers:
-      # token-minter creates a token with the default service account path
-      # The token is read by ovn-k containers to authenticate against the hosted cluster api server
-      - name: token-minter
-        image: "{{.TokenMinterImage}}"
-        command: ["/usr/bin/control-plane-operator", "token-minter"]
-        args:
-        - --service-account-namespace=openshift-ovn-kubernetes
-        - --service-account-name=ovn-kubernetes-controller
-        - --token-audience={{.TokenAudience}}
-        - --token-file=/var/run/secrets/hosted_cluster/token
-        - --kubeconfig=/etc/kubernetes/kubeconfig
-        resources:
-          requests:
-            cpu: 10m
-            memory: 30Mi
-        volumeMounts:
-        - mountPath: /etc/kubernetes
-          name: admin-kubeconfig
-        - mountPath: /var/run/secrets/hosted_cluster
-          name: hosted-cluster-api-access
       # ovn-northd: convert network objects in nbdb to flows in sbdb
       - name: northd
         image: "{{.OvnImage}}"
@@ -182,14 +102,16 @@ spec:
                 - OVN_MANAGE_OVSDB=no /usr/share/ovn/scripts/ovn-ctl stop_northd
         env:
         - name: OVN_LOG_LEVEL
-          value: info
+          value: info 
         volumeMounts:
-        - mountPath: /var/run/ovn
-          name: datadir
-        - mountPath: /etc/ovn
-          name: datadir
-        - mountPath: /var/log/ovn
-          name: datadir
+        - mountPath: /etc/openvswitch/
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch/
+          name: var-lib-openvswitch
+        - mountPath: /run/openvswitch/
+          name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert # not needed, but useful when exec'ing in to pod.
@@ -199,10 +121,10 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 70Mi
+            memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
-      # nbdb: the northbound, or logical network object DB. In raft mode
+      # nbdb: the northbound, or logical network object DB. In raft mode 
       - name: nbdb
         image: "{{.OvnImage}}"
         command:
@@ -227,13 +149,12 @@ spec:
           trap quit TERM INT
 
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
-
           # initialize variables
-          pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
+          ovn_kubernetes_namespace=openshift-ovn-kubernetes
           ovndb_ctl_ssl_opts="-p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt"
           transport="ssl"
           ovn_raft_conn_ip_url_suffix=""
-          if [[ "${K8S_POD_IP}" == *":"* ]]; then
+          if [[ "${K8S_NODE_IP}" == *":"* ]]; then
             ovn_raft_conn_ip_url_suffix=":[::]"
           fi
           db="nb"
@@ -241,37 +162,40 @@ spec:
           ovn_db_file="/etc/ovn/ovn${db}_db.db"
           # checks if a db pod is part of a current cluster
           db_part_of_cluster() {
-            local pod_index=${1}
+            local pod=${1}
             local db=${2}
             local port=${3}
-            echo "Checking if ovnkube-master-${pod_index} is part of cluster"
-
-            init_ip="ovnkube-master-${pod_index}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
-
-
-
-
-            echo "ovnkube-master-${pod_index} ip: $init_ip"
+            echo "Checking if ${pod} is part of cluster"
+            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
+            init_ip=$(timeout 5 kubectl get pod -n ${ovn_kubernetes_namespace} ${pod} -o=jsonpath='{.status.podIP}')
+            if [[ $? != 0 ]]; then
+              echo "Unable to get ${pod} ip "
+              return 1
+            fi
+            echo "Found ${pod} ip: $init_ip"
             init_ip=$(bracketify $init_ip)
             target=$(ovn-${db}ctl --timeout=5 --db=${transport}:${init_ip}:${port} ${ovndb_ctl_ssl_opts} \
-                      --data=bare --no-headings --columns=target list connection || true)
+                      --data=bare --no-headings --columns=target list connection)
             if [[ "${target}" != "p${transport}:${port}${ovn_raft_conn_ip_url_suffix}" ]]; then
               echo "Unable to check correct target ${target} "
               return 1
             fi
-            echo "ovnkube-master-${pod_index} is part of cluster"
+            echo "${pod} is part of cluster"
             return 0
           }
           # end of db_part_of_cluster
-
+          
           # Checks if cluster has already been initialized.
           # If not it returns false and sets init_ip to CLUSTER_INITIATOR_IP
           cluster_exists() {
             local db=${1}
             local port=${2}
-            for ((i=0; i<{{.OvnkubeMasterReplicas}}; i++ )); do
-              if db_part_of_cluster $i $db $port; then
-                echo "ovnkube-master-${i} is part of current cluster with ip: ${init_ip}!"
+            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
+            db_pods=$(timeout 5 kubectl get pod -n ${ovn_kubernetes_namespace} -o=jsonpath='{.items[*].metadata.name}' | egrep -o 'ovnkube-master-\w+' | grep -v "metrics")
+
+            for db_pod in $db_pods; do
+              if db_part_of_cluster $db_pod $db $port; then
+                echo "${db_pod} is part of current cluster with ip: ${init_ip}!"
                 return 0
               fi
             done
@@ -285,14 +209,14 @@ spec:
           # The CNO determines which members make up the cluster, so if this container
           # is not supposed to be part of the cluster, wait forever doing nothing
           # (instad of exiting and causing CrashLoopBackoffs for no reason).
-          if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+          if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
             echo "$(date -Iseconds) - not selected as RAFT member; sleeping..."
             sleep 1500d
             exit 0
           fi
 
           OVN_ARGS="--db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
-            --db-nb-cluster-local-addr=${pod_dns_name} \
+            --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
             --db-nb-cluster-local-proto=ssl \
             --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
@@ -302,7 +226,7 @@ spec:
           CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
           echo "$(date -Iseconds) - starting nbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}, K8S_NODE_IP=${K8S_NODE_IP}"
           initialize="false"
-
+          
           if [[ ! -e ${ovn_db_file} ]]; then
             initialize="true"
           fi
@@ -333,7 +257,7 @@ spec:
               wait $!
             else
               # either we need to initialize a new cluster or wait for master to create it
-              if [[ "${pod_dns_name}" == "${CLUSTER_INITIATOR_IP}" ]]; then
+              if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                 # set DB election timer at DB creation time if OVN supports it
                 election_timer=
                 if test -n "$(/usr/share/ovn/scripts/ovn-ctl --help 2>&1 | grep "\--db-nb-election-timer")"; then
@@ -377,12 +301,26 @@ spec:
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
                 rm -f /var/run/ovn/ovnnb_db.pid
 
-                pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
-
                 # exit early if this DB is not supposed to be part of the cluster
-                if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+                if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
                   exit 0
                 fi
+
+                OVN_NB_CTL="ovn-nbctl"
+                echo "Setting the IC zone to global"
+                retries=0
+                current_probe_interval=0
+                while [[ "${retries}" -lt 10 ]]; do
+                  current_probe_interval=$(${OVN_NB_CTL} set NB_Global . name="global" options:name="global")
+                  if [[ $? == 0 ]]; then
+                    current_probe_interval=$(echo ${current_probe_interval} | tr -d '\"')
+                    break
+                  else
+                    sleep 2
+                    (( retries += 1 ))
+                  fi
+                done
+
 
                 # retry an operation a number of times, sleeping 2 seconds between each try
                 retry() {
@@ -404,7 +342,7 @@ spec:
                   return 0
                 }
 
-                if [[ "${pod_dns_name}" == "${CLUSTER_INITIATOR_IP}" ]]; then
+                if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - nbdb - postStart - waiting for master to be selected"
 
                   # set the connection and inactivity probe
@@ -473,7 +411,9 @@ spec:
                 echo "$(date -Iseconds) - nbdb stopped"
                 rm -f /var/run/ovn/ovnnb_db.pid
         readinessProbe:
+{{ if not .IsSNO }}
           initialDelaySeconds: 90
+{{ end }}
           timeoutSeconds: 5
           exec:
             command:
@@ -483,8 +423,7 @@ spec:
               set -xeo pipefail
 
               # exit early if this DB is not supposed to be part of the cluster
-              pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
-              if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+              if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
                 exit 0
               fi
 
@@ -497,28 +436,24 @@ spec:
               /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
         env:
         - name: OVN_LOG_LEVEL
-          value: info
+          value: info 
         - name: OVN_NORTHD_PROBE_INTERVAL
           value: "{{.OVN_NORTHD_PROBE_INTERVAL}}"
         - name: K8S_NODE_IP
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
-        - name: K8S_POD_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        - name: K8S_POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
         volumeMounts:
-        - mountPath: /etc/ovn
-          name: datadir
-        - mountPath: /var/run/ovn
-          name: datadir
-        - mountPath: /var/log/ovn
-          name: datadir
+        - mountPath: /etc/openvswitch/
+          name: etc-openvswitch
+        - mountPath: /etc/ovn/
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch/
+          name: var-lib-openvswitch
+        - mountPath: /run/openvswitch/
+          name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert
@@ -528,7 +463,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 30Mi
+            memory: 300Mi
         ports:
         - name: nb-db-port
           containerPort: {{.OVN_NB_PORT}}
@@ -536,6 +471,56 @@ spec:
           containerPort: {{.OVN_NB_RAFT_PORT}}
         terminationMessagePolicy: FallbackToLogsOnError
 
+      - name: kube-rbac-proxy
+        image: {{.KubeRBACProxyImage}}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          TLS_PK=/etc/pki/tls/metrics-cert/tls.key
+          TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
+          # As the secret mount is optional we must wait for the files to be present.
+          # The service is created in monitor.yaml and this is created in sdn.yaml.
+          TS=$(date +%s)
+          WARN_TS=$(( ${TS} + $(( 20 * 60)) ))
+          HAS_LOGGED_INFO=0
+          
+          log_missing_certs(){
+              CUR_TS=$(date +%s)
+              if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
+                echo $(date -Iseconds) WARN: ovn-master-metrics-cert not mounted after 20 minutes.
+              elif [[ "${HAS_LOGGED_INFO}" -eq 0 ]] ; then
+                echo $(date -Iseconds) INFO: ovn-master-metrics-cert not mounted. Waiting 20 minutes.
+                HAS_LOGGED_INFO=1
+              fi
+          }
+          while [[ ! -f "${TLS_PK}" ||  ! -f "${TLS_CERT}" ]] ; do
+            log_missing_certs
+            sleep 5
+          done
+          
+          echo $(date -Iseconds) INFO: ovn-master-metrics-certs mounted, starting kube-rbac-proxy
+          exec /usr/bin/kube-rbac-proxy \
+            --logtostderr \
+            --secure-listen-address=:9102 \
+            --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
+            --upstream=http://127.0.0.1:29102/ \
+            --tls-private-key-file=${TLS_PK} \
+            --tls-cert-file=${TLS_CERT}
+        ports:
+        - containerPort: 9102
+          name: https
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: ovn-master-metrics-cert
+          mountPath: /etc/pki/tls/metrics-cert
+          readOnly: True
       # sbdb: The southbound, or flow DB. In raft mode
       - name: sbdb
         image: "{{.OvnImage}}"
@@ -560,12 +545,14 @@ spec:
           # end of quit
           trap quit TERM INT
 
+          bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
+
           # initialize variables
-          pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
+          ovn_kubernetes_namespace=openshift-ovn-kubernetes
           ovndb_ctl_ssl_opts="-p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt"
           transport="ssl"
           ovn_raft_conn_ip_url_suffix=""
-          if [[ "${K8S_POD_IP}" == *":"* ]]; then
+          if [[ "${K8S_NODE_IP}" == *":"* ]]; then
             ovn_raft_conn_ip_url_suffix=":[::]"
           fi
           db="sb"
@@ -573,36 +560,45 @@ spec:
           ovn_db_file="/etc/ovn/ovn${db}_db.db"
           # checks if a db pod is part of a current cluster
           db_part_of_cluster() {
-            local pod_index=${1}
+            local pod=${1}
             local db=${2}
             local port=${3}
-            echo "Checking if ovnkube-master-${pod_index} is part of cluster"
-            init_ip="ovnkube-master-${pod_index}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
-            echo "ovnkube-master-${pod_index} ip: $init_ip"
+            echo "Checking if ${pod} is part of cluster"
+            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
+            init_ip=$(timeout 5 kubectl get pod -n ${ovn_kubernetes_namespace} ${pod} -o=jsonpath='{.status.podIP}')
+            if [[ $? != 0 ]]; then
+              echo "Unable to get ${pod} ip "
+              return 1
+            fi
+            echo "Found ${pod} ip: $init_ip"
+            init_ip=$(bracketify $init_ip)
             target=$(ovn-${db}ctl --timeout=5 --db=${transport}:${init_ip}:${port} ${ovndb_ctl_ssl_opts} \
-                      --data=bare --no-headings --columns=target list connection || true)
+                      --data=bare --no-headings --columns=target list connection)
             if [[ "${target}" != "p${transport}:${port}${ovn_raft_conn_ip_url_suffix}" ]]; then
               echo "Unable to check correct target ${target} "
               return 1
             fi
-            echo "ovnkube-master-${pod_index} is part of cluster"
+            echo "${pod} is part of cluster"
             return 0
           }
           # end of db_part_of_cluster
-
+          
           # Checks if cluster has already been initialized.
           # If not it returns false and sets init_ip to CLUSTER_INITIATOR_IP
           cluster_exists() {
             local db=${1}
             local port=${2}
-            for ((i=0; i<{{.OvnkubeMasterReplicas}}; i++ )); do
-              if db_part_of_cluster $i $db $port; then
-                echo "ovnkube-master-${i} is part of current cluster with ip: ${init_ip}!"
+            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
+            db_pods=$(timeout 5 kubectl get pod -n ${ovn_kubernetes_namespace} -o=jsonpath='{.items[*].metadata.name}' | egrep -o 'ovnkube-master-\w+' | grep -v "metrics")
+
+            for db_pod in $db_pods; do
+              if db_part_of_cluster $db_pod $db $port; then
+                echo "${db_pod} is part of current cluster with ip: ${init_ip}!"
                 return 0
               fi
             done
             # if we get here  there is no cluster, set init_ip and get out
-            init_ip=$CLUSTER_INITIATOR_IP
+            init_ip=$(bracketify $CLUSTER_INITIATOR_IP)
             return 1
           }
           # end of cluster_exists()
@@ -611,14 +607,14 @@ spec:
           # The CNO determines which members make up the cluster, so if this container
           # is not supposed to be part of the cluster, wait forever doing nothing
           # (instad of exiting and causing CrashLoopBackoffs for no reason).
-          if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+          if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
             echo "$(date -Iseconds) - not selected as RAFT member; sleeping..."
             sleep 1500d
             exit 0
           fi
 
           OVN_ARGS="--db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
-            --db-sb-cluster-local-addr="${pod_dns_name}" \
+            --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
             --db-sb-cluster-local-proto=ssl \
             --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
@@ -628,7 +624,7 @@ spec:
           CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
           echo "$(date -Iseconds) - starting sbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}"
           initialize="false"
-
+          
           if [[ ! -e ${ovn_db_file} ]]; then
             initialize="true"
           fi
@@ -659,7 +655,7 @@ spec:
               wait $!
             else
               # either we need to initialize a new cluster or wait for master to create it
-              if [[ "${pod_dns_name}" == "${CLUSTER_INITIATOR_IP}" ]]; then
+              if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                 # set DB election timer at DB creation time if OVN supports it
                 election_timer=
                 if test -n "$(/usr/share/ovn/scripts/ovn-ctl --help 2>&1 | grep "\--db-sb-election-timer")"; then
@@ -701,10 +697,8 @@ spec:
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
                 rm -f /var/run/ovn/ovnsb_db.pid
 
-                pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
-
                 # exit early if this DB is not supposed to be part of the cluster
-                if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+                if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
                   exit 0
                 fi
 
@@ -728,7 +722,7 @@ spec:
                   return 0
                 }
 
-                if [[ "${pod_dns_name}" == "${CLUSTER_INITIATOR_IP}" ]]; then
+                if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - sdb - postStart - waiting for master to be selected"
 
                   # set the connection and inactivity probe
@@ -769,7 +763,9 @@ spec:
                 echo "$(date -Iseconds) - sbdb stopped"
                 rm -f /var/run/ovn/ovnsb_db.pid
         readinessProbe:
+{{ if not .IsSNO }}
           initialDelaySeconds: 90
+{{ end }}
           timeoutSeconds: 5
           exec:
             command:
@@ -779,8 +775,7 @@ spec:
               set -xeo pipefail
 
               # exit early if this DB is not supposed to be part of the cluster
-              pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
-              if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+              if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
                 exit 0
               fi
 
@@ -793,26 +788,22 @@ spec:
               /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
         env:
         - name: OVN_LOG_LEVEL
-          value: info
+          value: info 
         - name: K8S_NODE_IP
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
-        - name: K8S_POD_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        - name: K8S_POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
         volumeMounts:
-        - mountPath: /etc/ovn
-          name: datadir
-        - mountPath: /var/run/ovn
-          name: datadir
-        - mountPath: /var/log/ovn
-          name: datadir
+        - mountPath: /etc/openvswitch/
+          name: etc-openvswitch
+        - mountPath: /etc/ovn/
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch/
+          name: var-lib-openvswitch
+        - mountPath: /run/openvswitch/
+          name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /env
           name: env-overrides
         - mountPath: /ovn-cert
@@ -827,7 +818,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 130Mi
+            memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
       # ovnkube master: convert kubernetes objects in to nbdb logical network components
@@ -844,10 +835,6 @@ spec:
             set +o allexport
           fi
 
-          # TLS for ovnkube-master metrics
-          TLS_PK=/etc/pki/tls/metrics-cert/tls.key
-          TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
-
           if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
             gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
           elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
@@ -856,16 +843,6 @@ spec:
             echo "Invalid OVN_GATEWAY_MODE: \"{{.OVN_GATEWAY_MODE}}\". Must be \"local\" or \"shared\"."
             exit 1
           fi
-
-          retries=0
-          while [ ! -f /var/run/secrets/hosted_cluster/token ]; do
-            (( retries += 1 ))
-            sleep 1
-            if [[ "${retries}" -gt 30 ]]; then
-              echo "$(date -Iseconds) - Hosted cluster token not found"
-                exit 1
-            fi
-          done
 
           multi_network_enabled_flag=
           if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" ]]; then
@@ -879,12 +856,13 @@ spec:
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
           exec /usr/bin/ovnkube \
+            --enable-interconnect \
+            --zone global \
             --init-master "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
-            --k8s-token-file=/var/run/secrets/hosted_cluster/token \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            --metrics-bind-address "0.0.0.0:9102" \
+            --metrics-bind-address "127.0.0.1:29102" \
             --metrics-enable-pprof \
             --metrics-enable-config-duration \
             ${gateway_mode_flags} \
@@ -900,16 +878,24 @@ spec:
             --nb-cert-common-name "{{.OVN_CERT_CN}}" \
             --enable-multicast \
             --disable-snat-multiple-gws \
-            --node-server-privkey ${TLS_PK} \
-            --node-server-cert ${TLS_CERT} \
             ${multi_network_enabled_flag} \
             ${multi_network_policy_enabled_flag} \
             --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
         volumeMounts:
-        - mountPath: /etc/ovn
-          name: datadir
-        - mountPath: /var/run/ovn
-          name: datadir
+        # for checking ovs-configuration service
+        - mountPath: /etc/systemd/system
+          name: systemd-units
+          readOnly: true
+        - mountPath: /etc/openvswitch/
+          name: etc-openvswitch
+        - mountPath: /etc/ovn/
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch/
+          name: var-lib-openvswitch
+        - mountPath: /run/openvswitch/
+          name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
         - mountPath: /env
@@ -918,17 +904,10 @@ spec:
           name: ovn-cert
         - mountPath: /ovn-ca
           name: ovn-ca
-        - mountPath: /hosted-ca
-          name: hosted-ca-cert
-        - mountPath: /var/run/secrets/hosted_cluster
-          name: hosted-cluster-api-access
-        - name: ovn-master-metrics-cert
-          mountPath: /etc/pki/tls/metrics-cert
-          readOnly: True
         resources:
           requests:
             cpu: 10m
-            memory: 200Mi
+            memory: 300Mi
         env:
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
@@ -936,10 +915,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: ALL_PROXY
-          value: socks5://127.0.0.1:8090
-        - name: NO_PROXY
-          value: kube-apiserver
         ports:
         - name: metrics-port
           containerPort: 29102
@@ -958,24 +933,13 @@ spec:
             set +o allexport
           fi
 
-          retries=0
-          while [ ! -f /var/run/secrets/hosted_cluster/token ]; do
-            (( retries += 1 ))
-            sleep 1
-            if [[ "${retries}" -gt 30 ]]; then
-              echo "$(date -Iseconds) - Hosted cluster token not found"
-                exit 1
-            fi
-          done
-
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovn-dbchecker - start ovn-dbchecker"
 
           # RAFT clusters need an odd number of members to achieve consensus.
           # The CNO determines which members make up the cluster, so if this container
           # is not supposed to be part of the cluster, wait forever doing nothing
           # (instad of exiting and causing CrashLoopBackoffs for no reason).
-          pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
-          if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+          if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
             echo "$(date -Iseconds) - not selected as RAFT member; sleeping..."
             sleep 1500d
             exit 0
@@ -983,7 +947,6 @@ spec:
 
           exec /usr/bin/ovndbchecker \
             --config-file=/run/ovnkube-config/ovnkube.conf \
-            --k8s-token-file=/var/run/secrets/hosted_cluster/token \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
             --sb-client-privkey /ovn-cert/tls.key \
@@ -998,10 +961,16 @@ spec:
             --nb-cert-common-name "{{.OVN_CERT_CN}}" \
             --nb-raft-election-timer "{{.OVN_NB_RAFT_ELECTION_TIMER}}"
         volumeMounts:
-        - mountPath: /etc/ovn
-          name: datadir
-        - mountPath: /var/run/ovn
-          name: datadir
+        - mountPath: /etc/openvswitch/
+          name: etc-openvswitch
+        - mountPath: /etc/ovn/
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch/
+          name: var-lib-openvswitch
+        - mountPath: /run/openvswitch/
+          name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
         - mountPath: /env
@@ -1010,63 +979,41 @@ spec:
           name: ovn-cert
         - mountPath: /ovn-ca
           name: ovn-ca
-        - mountPath: /hosted-ca
-          name: hosted-ca-cert
-        - mountPath: /var/run/secrets/hosted_cluster
-          name: hosted-cluster-api-access
         resources:
           requests:
             cpu: 10m
-            memory: 50Mi
+            memory: 300Mi
         env:
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
-        - name: K8S_POD_NAME
+        - name: K8S_NODE_IP
           valueFrom:
             fieldRef:
-              fieldPath: metadata.name
+              fieldPath: status.hostIP
         terminationMessagePolicy: FallbackToLogsOnError
-      - name: socks-proxy
-        image: "{{.Socks5ProxyImage}}"
-        command:
-        - /usr/bin/control-plane-operator
-        - konnectivity-socks5-proxy
-        args:
-        - "run"
-        volumeMounts:
-        - mountPath: /etc/kubernetes/
-          name: admin-kubeconfig
-        - mountPath: /etc/konnectivity/proxy-client
-          name: konnectivity-proxy-cert
-          readOnly: true
-        - mountPath: /etc/konnectivity/proxy-ca
-          name: konnectivity-proxy-ca
-          readOnly: true
-        resources:
-          requests:
-            cpu: 10m
-            memory: 10Mi
-        env:
-        - name: KUBECONFIG
-          value: "/etc/kubernetes/kubeconfig"
-        terminationMessagePolicy: FallbackToLogsOnError
-      {{ if .HCPNodeSelector }}
       nodeSelector:
-        {{ range $key, $value := .HCPNodeSelector }}
-        "{{$key}}": "{{$value}}"
-        {{ end }}
-      {{ end }}
+        node-role.kubernetes.io/master: ""
+        beta.kubernetes.io/os: "linux"
       volumes:
+      # for checking ovs-configuration service
+      - name: systemd-units
+        hostPath:
+          path: /etc/systemd/system
+      - name: etc-openvswitch
+        hostPath:
+          path: /var/lib/ovn/etc
+      - name: var-lib-openvswitch
+        hostPath:
+          path: /var/lib/ovn/data
+      - name: run-openvswitch
+        hostPath:
+          path: /var/run/openvswitch
+      - name: run-ovn
+        hostPath:
+          path: /var/run/ovn
       - name: ovnkube-config
         configMap:
           name: ovnkube-config
-      - name: konnectivity-proxy-ca
-        configMap:
-          name: konnectivity-ca-bundle
-      - name: konnectivity-proxy-cert
-        secret:
-          defaultMode: 0640
-          secretName: konnectivity-client
       - name: env-overrides
         configMap:
           name: env-overrides
@@ -1080,23 +1027,12 @@ spec:
       - name: ovn-master-metrics-cert
         secret:
           secretName: ovn-master-metrics-cert
-      - name: admin-kubeconfig
-        secret:
-          secretName: service-network-admin-kubeconfig
-      - name: hosted-cluster-api-access
-        emptyDir: {}
-      - name: hosted-ca-cert
-        secret:
-          secretName: root-ca
-          items:
-            - key: ca.crt
-              path: ca.crt
+          optional: true
       tolerations:
-        - key: "hypershift.openshift.io/control-plane"
-          operator: "Equal"
-          value: "true"
-          effect: "NoSchedule"
-        - key: "hypershift.openshift.io/cluster"
-          operator: "Equal"
-          value: {{.HostedClusterNamespace}}
-          effect: "NoSchedule"
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+      - key: "node.kubernetes.io/network-unavailable"
