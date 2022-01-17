@@ -27,6 +27,7 @@ import (
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	cnofake "github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 )
 
@@ -84,8 +85,9 @@ func TestRenderOVNKubernetes(t *testing.T) {
 			},
 		},
 	}
+	fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
 
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-master")))
@@ -140,7 +142,8 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 			},
 		},
 	}
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	script, err := findNBDBPostStart(objs)
@@ -161,7 +164,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 			},
 		},
 	}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	script, err = findNBDBPostStart(objs)
@@ -698,7 +701,8 @@ nodeport=true`,
 					DisableUDPAggregation: tc.disableGRO,
 				},
 			}
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+			fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 			g.Expect(err).NotTo(HaveOccurred())
 			confFile := extractOVNKubeConfig(g, objs)
 			g.Expect(confFile).To(Equal(strings.TrimSpace(tc.expected)))
@@ -1698,13 +1702,14 @@ metadata:
 				PrePullerUpdateStatus: prepullerStatus,
 			}
 
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+			fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 			_, preserveNode := renderedNode.GetAnnotations()[names.CreateOnlyAnnotation]
-			renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-master", "openshift-ovn-kubernetes", objs)
-			_, preserveMaster := renderedMaster.GetAnnotations()[names.CreateOnlyAnnotation]
+			renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-control-plane", "openshift-ovn-kubernetes", objs)
+			_, preserveMaster := renderedMaster.GetAnnotations()[names.CreateOnlyAnnotation] // TODO panic here
 			renderedPrePuller := findInObjs("apps", "DaemonSet", "ovnkube-upgrades-prepuller", "openshift-ovn-kubernetes", objs)
 
 			// if we expect a node update, the original node and the rendered one must be different
@@ -1719,7 +1724,7 @@ metadata:
 				checkDaemonSetImagePullPolicy(g, renderedPrePuller)
 			}
 
-			updateNode, updateMaster := shouldUpdateOVNKonUpgrade(bootstrapResult.OVN, tc.rv)
+			updateNode, updateMaster := shouldUpdateOVNKonUpgrade(bootstrapResult.OVN, masterStatus, tc.rv)
 			g.Expect(updateMaster).To(Equal(tc.expectMaster), "Check master")
 			if updateNode {
 				var updatePrePuller bool
@@ -1935,7 +1940,7 @@ func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
 				MasterUpdateStatus: masterStatus,
 				NodeUpdateStatus:   nodeStatus,
 			}
-			updateNode, updateMaster := shouldUpdateOVNKonIPFamilyChange(bootResult, tc.ipFamilyMode)
+			updateNode, updateMaster := shouldUpdateOVNKonIPFamilyChange(bootResult, masterStatus, tc.ipFamilyMode)
 			if updateNode != tc.expectNode {
 				t.Errorf("Expected node update: %v received %v", tc.expectNode, updateNode)
 			}
@@ -2010,12 +2015,13 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 
 	// the new rendered config should hold the node to do the dualstack conversion
 	// the upgrade code holds the masters to update the nodes first
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
-	renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-master", "openshift-ovn-kubernetes", objs)
+	renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-control-plane", "openshift-ovn-kubernetes", objs)
 
 	// the node has to be the same
 	if _, ok := renderedNode.GetAnnotations()[names.CreateOnlyAnnotation]; !ok {
@@ -2103,7 +2109,8 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 				},
 				FlowsConfig: tc.FlowsConfig,
 			}
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+			fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 			g.Expect(err).ToNot(HaveOccurred())
 			nodeDS := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 			ds := appsv1.DaemonSet{}

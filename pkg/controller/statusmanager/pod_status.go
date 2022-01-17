@@ -13,6 +13,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/util"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -102,7 +103,7 @@ func (status *StatusManager) SetFromPods() {
 			if !isNonCritical(ds) {
 				hung = append(hung, status.CheckCrashLoopBackOffPods(dsName, ds.Spec.Selector.MatchLabels, "DaemonSet")...)
 			}
-		} else if ds.Status.NumberAvailable == 0 { // NOTE: update this if we ever expect empty (unscheduled) daemonsets ~cdc
+		} else if ds.Status.NumberAvailable == 0 && ds.Status.DesiredNumberScheduled > 0 {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not yet scheduled on any nodes", dsName.String()))
 			dsProgressing = true
 		} else if ds.Generation > ds.Status.ObservedGeneration {
@@ -248,6 +249,16 @@ func (status *StatusManager) SetFromPods() {
 		}
 		if err := status.setAnnotation(context.TODO(), dep, names.RolloutHungAnnotation, depHung); err != nil {
 			log.Printf("Error setting Deployment %q annotation: %v", depName, err)
+		}
+	}
+
+	// hack for 2-phase upgrade from non-IC to IC ovnk:
+	// don't update the version field until phase 2 is over
+	if icConfigMap, err := util.GetInterConnectConfigMap(status.client.ClientFor("").Kubernetes()); err == nil {
+		// When an upgrade from <= 4.13 is ongoing, the IC configmap exists and exhibits ongoing-upgrade=true.
+		// When multizone control-plane and node have been rolled out (end of phase 2), the configmap is deleted.
+		if ongoingUpgrade, ok := icConfigMap.Data["ongoing-upgrade"]; ok && ongoingUpgrade == "true" {
+			reachedAvailableLevel = false
 		}
 	}
 
