@@ -1,0 +1,255 @@
+# The ovnkube control-plane components
+# Until 4.13 this was a stateful set named ovnkube-master, providing the centralized OVN control plane.
+# With OVN interconnect (4.14), we have a distributed OVN control plane (one per node); only cluster manager
+# runs on master nodes and doesn't need any persistent volumes, hence the resource type is now a Deployment.
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: ovnkube-control-plane
+  namespace: {{.HostedClusterNamespace}}
+  annotations:
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
+    kubernetes.io/description: |
+      This deployment launches the ovn-kubernetes control plane components.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+  labels:
+    # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
+    hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+spec:
+  selector:
+    matchLabels:
+      app: ovnkube-control-plane
+  replicas: {{.OvnkubeMasterReplicas}}
+  template:
+    metadata:
+      annotations:
+        hypershift.openshift.io/release-image: {{.ReleaseImage}}
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: ovnkube-control-plane
+        component: network
+        type: infra
+        openshift.io/component: network
+        hypershift.openshift.io/control-plane-component: ovnkube-control-plane
+        kubernetes.io/os: "linux"
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchExpressions:
+                - key: hypershift.openshift.io/control-plane
+                  operator: In
+                  values:
+                    - "true"
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: hypershift.openshift.io/cluster
+                  operator: In
+                  values:
+                    - {{.HostedClusterNamespace}}
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: ovnkube-control-plane
+            topologyKey: topology.kubernetes.io/zone
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+                topologyKey: kubernetes.io/hostname
+      priorityClassName: hypershift-api-critical
+      initContainers:
+      # Remove once https://github.com/kubernetes/kubernetes/issues/85966 is addressed
+      - name: init-ip
+        command:
+          - /bin/bash
+          - -c
+          - |
+            cat <<-EOF
+            Kubelet only sets a pod's Status.PodIP when all containers of the pod have started at least once (successfully or unsuccessfully)
+             or at least one of the initContainers finished.
+            Container start is blocked by postStart hooks. See https://github.com/kubernetes/kubernetes/issues/85966 for more details.
+            The NB and SB DB postStart hooks block until the DBs join the RAFT cluster or until a timeout is reached.
+            In a standalone cluster every pod is host networked and the DBs use host IP to communicate between the RAFT members.
+            In HyperShift OVN-Kubernetes control-plane is run as a deployment and the pods are not host networked, meaning we cannot rely on the podIP not changing.
+            To provide a stable network identity for each pod in the daemonset we use a headless service,
+             the downside of this approach is the DNS entry for the pod will only start to work after the pod has its Status.PodIP set.
+
+            Until https://github.com/kubernetes/kubernetes/issues/85966 is fixed use a no-op init container as a workaround.
+            This allows for pod-pod connectivity in postStart hooks the first time they run.
+            EOF
+        image: "{{.OvnImage}}"
+      containers:
+      # token-minter creates a token with the default service account path
+      # The token is read by ovn-k containers to authenticate against the hosted cluster api server
+      - name: token-minter
+        image: "{{.TokenMinterImage}}"
+        command: ["/usr/bin/control-plane-operator", "token-minter"]
+        args:
+        - --service-account-namespace=openshift-ovn-kubernetes
+        - --service-account-name=ovn-kubernetes-controller
+        - --token-audience={{.TokenAudience}}
+        - --token-file=/var/run/secrets/hosted_cluster/token
+        - --kubeconfig=/etc/kubernetes/kubeconfig
+        resources:
+          requests:
+            cpu: 10m
+            memory: 30Mi
+        volumeMounts:
+        - mountPath: /etc/kubernetes
+          name: admin-kubeconfig
+        - mountPath: /var/run/secrets/hosted_cluster
+          name: hosted-cluster-api-access
+      # ovnkube-control-plane: central component that allocates IPAM for each node in the cluster
+      - name: ovnkube-control-plane
+        image: "{{.OvnImage}}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+          if [[ -f "/env/_master" ]]; then
+            set -o allexport
+            source "/env/_master"
+            set +o allexport
+          fi
+
+          # TLS for ovnkube-control-plane metrics
+          TLS_PK=/etc/pki/tls/metrics-cert/tls.key
+          TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
+
+          retries=0
+          while [ ! -f /var/run/secrets/hosted_cluster/token ]; do
+            (( retries += 1 ))
+            sleep 1
+            if [[ "${retries}" -gt 30 ]]; then
+              echo "$(date -Iseconds) - Hosted cluster token not found"
+                exit 1
+            fi
+          done
+
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
+          exec /usr/bin/ovnkube \
+            --enable-interconnect \
+            --init-cluster-manager "${K8S_NODE}" \
+            --config-file=/run/ovnkube-config/ovnkube.conf \
+            --k8s-token-file=/var/run/secrets/hosted_cluster/token \
+            --loglevel "${OVN_KUBE_LOG_LEVEL}" \
+            --metrics-bind-address "127.0.0.1:29104" \
+            --metrics-enable-pprof \
+            --metrics-enable-config-duration \
+            --node-server-privkey ${TLS_PK} \
+            --node-server-cert ${TLS_CERT}
+        volumeMounts:
+        - mountPath: /run/ovnkube-config/
+          name: ovnkube-config
+        - mountPath: /env
+          name: env-overrides
+        - mountPath: /hosted-ca
+          name: hosted-ca-cert
+        - mountPath: /var/run/secrets/hosted_cluster
+          name: hosted-cluster-api-access
+        - name: ovn-master-metrics-cert
+          mountPath: /etc/pki/tls/metrics-cert
+          readOnly: True
+        resources:
+          requests:
+            cpu: 10m
+            memory: 200Mi
+        env:
+        - name: OVN_KUBE_LOG_LEVEL
+          value: "4"
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: ALL_PROXY
+          value: socks5://127.0.0.1:8090
+        - name: NO_PROXY
+          value: kube-apiserver
+        - name: POD_NAME  # standalone cluster manager will read POD_NAME and use it as its identity for leader election
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        ports:
+        - name: metrics-port
+          containerPort: 29104
+        terminationMessagePolicy: FallbackToLogsOnError
+
+      - name: socks-proxy
+        image: "{{.Socks5ProxyImage}}"
+        command:
+        - /usr/bin/control-plane-operator
+        - konnectivity-socks5-proxy
+        args:
+        - "run"
+        volumeMounts:
+        - mountPath: /etc/kubernetes/
+          name: admin-kubeconfig
+        - mountPath: /etc/konnectivity/proxy-client
+          name: konnectivity-proxy-cert
+          readOnly: true
+        - mountPath: /etc/konnectivity/proxy-ca
+          name: konnectivity-proxy-ca
+          readOnly: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        env:
+        - name: KUBECONFIG
+          value: "/etc/kubernetes/kubeconfig"
+        terminationMessagePolicy: FallbackToLogsOnError
+
+      {{ if .HCPNodeSelector }}
+      nodeSelector:
+        {{ range $key, $value := .HCPNodeSelector }}
+        "{{$key}}": "{{$value}}"
+        {{ end }}
+      {{ end }}
+      volumes:
+      - name: ovnkube-config
+        configMap:
+          name: ovnkube-config
+      - name: konnectivity-proxy-ca
+        configMap:
+          name: konnectivity-ca-bundle
+      - name: konnectivity-proxy-cert
+        secret:
+          defaultMode: 0640
+          secretName: konnectivity-client
+      - name: env-overrides
+        configMap:
+          name: env-overrides
+          optional: true
+      - name: ovn-control-plane-metrics-cert
+        secret:
+          secretName: ovn-control-plane-metrics-cert
+      - name: admin-kubeconfig
+        secret:
+          secretName: service-network-admin-kubeconfig
+      - name: hosted-cluster-api-access
+        emptyDir: {}
+      - name: hosted-ca-cert
+        secret:
+          secretName: root-ca
+          items:
+            - key: ca.crt
+              path: ca.crt
+      tolerations:
+        - key: "hypershift.openshift.io/control-plane"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+        - key: "hypershift.openshift.io/cluster"
+          operator: "Equal"
+          value: {{.HostedClusterNamespace}}
+          effect: "NoSchedule"
