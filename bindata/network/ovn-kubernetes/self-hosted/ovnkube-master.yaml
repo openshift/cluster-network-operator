@@ -46,6 +46,13 @@ spec:
         openshift.io/component: network
         kubernetes.io/os: "linux"
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: network.operator.openshift.io/ovnkube-ic
+                operator: DoesNotExist
       serviceAccountName: ovn-kubernetes-controller
       hostNetwork: true
       dnsPolicy: Default
