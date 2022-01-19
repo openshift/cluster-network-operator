@@ -80,6 +80,12 @@ rules:
   - delete
   - update
   - list
+- apiGroups: ["config.openshift.io"]
+  resources:
+  - infrastructures
+  verbs:
+  - get
+  - list
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

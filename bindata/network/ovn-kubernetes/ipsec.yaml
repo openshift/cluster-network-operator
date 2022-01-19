@@ -207,6 +207,14 @@ spec:
           # Start the pluto IKE daemon
           /usr/libexec/ipsec/pluto --leak-detective --config /etc/ipsec.conf --logfile /var/log/openvswitch/libreswan.log
 
+          # IBMCloud does not forward ESP (IP proto 50)
+          # Instead, force IBMCloud IPsec to always use NAT-T
+          platformType=$(kubectl get infrastructure cluster  -o jsonpath='{.spec.platformSpec.type}')
+          if [ "${platformType}" == "IBMCloud" ]; then
+              if ! grep -q encapsulation=yes /usr/share/openvswitch/scripts/ovs-monitor-ipsec ; then
+                  sed -i 's/    auto=route/    auto=route\n    encapsulation=yes/' /usr/share/openvswitch/scripts/ovs-monitor-ipsec
+              fi
+          fi
           # Environment variables are for workaround for https://mail.openvswitch.org/pipermail/ovs-dev/2020-October/375734.html
           # We now start ovs-monitor-ipsec which will monitor for changes in the ovs
           # tunnelling configuration (for example addition of a node) and configures
