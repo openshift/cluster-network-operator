@@ -88,6 +88,7 @@ rules:
   - list
   - watch
   - update
+  - patch
 - apiGroups: ["cloud.network.openshift.io"]
   resources:
   - cloudprivateipconfigs
