@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -320,6 +321,12 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		// Open question: should an error here indicate we will never retry?
 		if err := apply.ApplyObject(ctx, r.client, obj); err != nil {
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
+
+			// If error comes from nonexistent namespace print out a help message.
+			if obj.GroupVersionKind().Kind == "NetworkAttachmentDefinition" && strings.Contains(err.Error(), "namespaces") {
+				err = errors.Wrapf(err, "could not apply (%s) %s/%s; Namespace error for networkattachment definition, consider possible solutions: (1) Edit config files to include existing namespace (2) Create non-existent namespace (3) Delete erroneous network-attachment-definition", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
+			}
+
 			log.Println(err)
 
 			// Ignore errors if we've asked to do so.
