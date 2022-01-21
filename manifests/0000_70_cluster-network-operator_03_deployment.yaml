@@ -62,7 +62,7 @@ spec:
         - name: MULTUS_NETWORKPOLICY_IMAGE
           value: "quay.io/openshift/origin-multus-networkpolicy:latest"
         - name: OVN_IMAGE
-          value: "quay.io/openshift/origin-ovn-kubernetes:latest"
+          value: "quay.io/itssurya/dev-images:4420fe9f-18c9-4d90-81a9-6febed8b9078"
         - name: OVN_NB_RAFT_ELECTION_TIMER
           value: "10"
         - name: OVN_SB_RAFT_ELECTION_TIMER
