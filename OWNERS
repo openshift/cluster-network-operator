@@ -1,12 +1,9 @@
 reviewers:
   - abhat
   - alexanderConstantinescu
-  - aojea
-  - danielmellado
   - danwinship
   - dcbw
   - JacobTanenbaum
-  - rcarrillocruz
   - squeed
   - trozet
   - tssurya
@@ -16,7 +13,6 @@ approvers:
   - dcbw
   - fepan
   - knobunc
-  - rcarrillocruz
   - squeed
   - trozet
   - JacobTanenbaum
