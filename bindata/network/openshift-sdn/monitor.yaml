@@ -47,6 +47,54 @@ spec:
   sessionAffinity: None
   type: ClusterIP
 ---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: sdn-controller
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+  name: monitor-sdn-controller
+  namespace: openshift-sdn
+spec:
+  endpoints:
+    - interval: 30s
+      port: controller-metrics
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      scheme: https
+      tlsConfig:
+        caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+        serverName: sdn-controller.openshift-sdn.svc
+  jobLabel: app
+  namespaceSelector:
+    matchNames:
+      - openshift-sdn
+  selector:
+    matchLabels:
+      app: sdn-controller
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: sdn-controller-metrics-certs
+  labels:
+    app: sdn-controller
+  name: sdn-controller
+  namespace: openshift-sdn
+spec:
+  selector:
+    app: sdn-controller
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: controller-metrics
+      port: 9106
+      protocol: TCP
+      targetPort: 9106
+  sessionAffinity: None
+  type: ClusterIP
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
