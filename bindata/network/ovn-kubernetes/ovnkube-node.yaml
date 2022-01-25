@@ -376,6 +376,7 @@ spec:
             --metrics-bind-address "127.0.0.1:29103" \
             --ovn-metrics-bind-address "127.0.0.1:29105" \
             --metrics-enable-pprof \
+            --disable-snat-multiple-gws \
             ${export_network_flows_flags} \
             ${gw_interface_flag}
         env:
