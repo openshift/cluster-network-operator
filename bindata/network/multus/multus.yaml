@@ -489,9 +489,9 @@ spec:
   successfulJobsHistoryLimit: 0
   jobTemplate:
     spec:
+      backoffLimit: 0
       template:
         spec:
-          backoffLimit: 0
           priorityClassName: "system-cluster-critical"
           serviceAccountName: multus
           containers:
