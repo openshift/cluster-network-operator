@@ -540,6 +540,14 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	ovnConfig.GenevePort = ptrToUint32(70001)
 	errExpect("invalid GenevePort 70001")
 
+	// invalid ipv6 mtu
+	config.ServiceNetwork = []string{"fd02::/112"}
+	config.ClusterNetwork = []operv1.ClusterNetworkEntry{{
+		CIDR: "fd01::/48", HostPrefix: 64,
+	}}
+	ovnConfig.MTU = ptrToUint32(576)
+	errExpect("invalid MTU 576")
+
 	config.ClusterNetwork = nil
 	errExpect("ClusterNetwork cannot be empty")
 }
@@ -669,11 +677,44 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 
 	next.Migration.MTU.Network.From = prev.DefaultNetwork.OVNKubernetesConfig.MTU
 
-	// invalid Migration.MTU.Host.To, not big enough to accommodate next.Migration.MTU.Network.To with encap overhead
+	// invalid Migration.MTU.Network.To, lower than minimum MTU for IPv4
+	next.Migration.MTU.Network.To = ptrToUint32(100)
+	errs = isOVNKubernetesChangeSafe(prev, next)
+	g.Expect(errs).To(HaveLen(1))
+	g.Expect(errs[0]).To(MatchError(fmt.Sprintf("invalid Migration.MTU.Network.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Network.To, MinMTUIPv4, MaxMTU)))
+
+	// invalid Migration.MTU.Network.To, higher than maximum MTU for IPv4
+	next.Migration.MTU.Network.To = ptrToUint32(MaxMTU + 1)
+	errs = isOVNKubernetesChangeSafe(prev, next)
+	g.Expect(errs).To(HaveLen(2))
+	g.Expect(errs[0]).To(MatchError(fmt.Sprintf("invalid Migration.MTU.Network.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Network.To, MinMTUIPv4, MaxMTU)))
+
+	next.Migration.MTU.Network.To = ptrToUint32(1300)
+
+	// invalid Migration.MTU.Machine.To, not big enough to accommodate next.Migration.MTU.Network.To with encap overhead
 	next.Migration.MTU.Network.To = ptrToUint32(1500)
 	errs = isOVNKubernetesChangeSafe(prev, next)
 	g.Expect(errs).To(HaveLen(1))
 	g.Expect(errs[0]).To(MatchError(fmt.Sprintf("invalid Migration.MTU.Machine.To(%d), has to be at least %d", *next.Migration.MTU.Machine.To, *next.Migration.MTU.Network.To+getOVNEncapOverhead(next))))
+
+	// invalid Migration.MTU.Network.To, lower than minimum MTU for IPv6
+	next.Migration.MTU.Network.To = ptrToUint32(1200)
+	next.ClusterNetwork = []operv1.ClusterNetworkEntry{
+		{
+			CIDR:       "fd00:1:2:3::/64",
+			HostPrefix: 56,
+		},
+	}
+	errs = isOVNKubernetesChangeSafe(prev, next)
+	g.Expect(errs).To(HaveLen(1))
+	g.Expect(errs[0]).To(MatchError(fmt.Sprintf("invalid Migration.MTU.Network.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Network.To, MinMTUIPv6, MaxMTU)))
+
+	// invalid Migration.MTU.Machine.To, higher than max MTU
+	next.Migration.MTU.Network.To = ptrToUint32(MaxMTU)
+	next.Migration.MTU.Machine.To = ptrToUint32(*next.Migration.MTU.Network.To + getOVNEncapOverhead(next))
+	errs = isOVNKubernetesChangeSafe(prev, next)
+	g.Expect(errs).To(HaveLen(1))
+	g.Expect(errs[0]).To(MatchError(fmt.Sprintf("invalid Migration.MTU.Machine.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Machine.To, MinMTUIPv6, MaxMTU)))
 }
 
 // TestOVNKubernetesShouldUpdateMasterOnUpgrade checks to see that

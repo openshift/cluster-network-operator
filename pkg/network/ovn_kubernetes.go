@@ -408,7 +408,11 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 
 	oc := conf.DefaultNetwork.OVNKubernetesConfig
 	if oc != nil {
-		if oc.MTU != nil && (*oc.MTU < 576 || *oc.MTU > 65536) {
+		minMTU := MinMTUIPv4
+		if cnHasIPv6 {
+			minMTU = MinMTUIPv6
+		}
+		if oc.MTU != nil && (*oc.MTU < minMTU || *oc.MTU > MaxMTU) {
 			out = append(out, errors.Errorf("invalid MTU %d", *oc.MTU))
 		}
 		if oc.GenevePort != nil && (*oc.GenevePort < 1 || *oc.GenevePort > 65535) {
@@ -453,6 +457,20 @@ func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 			checkPrevMTU := prev.Migration == nil || prev.Migration.MTU == nil || prev.Migration.MTU.Network == nil || !reflect.DeepEqual(prev.Migration.MTU.Network.From, next.Migration.MTU.Network.From)
 			if checkPrevMTU && !reflect.DeepEqual(next.Migration.MTU.Network.From, pn.MTU) {
 				errs = append(errs, errors.Errorf("invalid Migration.MTU.Network.From(%d) not equal to the currently applied MTU(%d)", *next.Migration.MTU.Network.From, *pn.MTU))
+			}
+
+			minMTU := MinMTUIPv4
+			for _, cn := range next.ClusterNetwork {
+				if utilnet.IsIPv6CIDRString(cn.CIDR) {
+					minMTU = MinMTUIPv6
+					break
+				}
+			}
+			if *next.Migration.MTU.Network.To < minMTU || *next.Migration.MTU.Network.To > MaxMTU {
+				errs = append(errs, errors.Errorf("invalid Migration.MTU.Network.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Network.To, minMTU, MaxMTU))
+			}
+			if *next.Migration.MTU.Machine.To < minMTU || *next.Migration.MTU.Machine.To > MaxMTU {
+				errs = append(errs, errors.Errorf("invalid Migration.MTU.Machine.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Machine.To, minMTU, MaxMTU))
 			}
 			if (*next.Migration.MTU.Network.To + getOVNEncapOverhead(next)) > *next.Migration.MTU.Machine.To {
 				errs = append(errs, errors.Errorf("invalid Migration.MTU.Machine.To(%d), has to be at least %d", *next.Migration.MTU.Machine.To, *next.Migration.MTU.Network.To+getOVNEncapOverhead(next)))
