@@ -6,7 +6,9 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/management"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 type LogLevelController struct {
@@ -21,6 +23,8 @@ type LogLevelController struct {
 
 // NewClusterOperatorLoggingController sets a klog level for the operator based on the operator config.
 // If the loglevel is not set the default "Normal" level will be used.
+// This controller supports removable operands, as configured in pkg/operator/management and uses level "Normal"
+// if the operator CR is missing.
 func NewClusterOperatorLoggingController(operatorClient operatorv1helpers.OperatorClient, recorder events.Recorder) factory.Controller {
 	return NewClusterOperatorLoggingControllerWithLogLevel(operatorClient, operatorv1.Normal, recorder)
 }
@@ -40,6 +44,9 @@ func NewClusterOperatorLoggingControllerWithLogLevel(operatorClient operatorv1he
 // must be information that is logically "owned" by another component.
 func (c LogLevelController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	detailedSpec, _, _, err := c.operatorClient.GetOperatorState()
+	if errors.IsNotFound(err) && management.IsOperatorRemovable() {
+		return nil
+	}
 	if err != nil {
 		return err
 	}

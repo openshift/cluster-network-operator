@@ -60,8 +60,8 @@ func (c dynamicStaticPodOperatorClient) GetStaticPodOperatorState() (*operatorv1
 	return spec, status, instance.GetResourceVersion(), nil
 }
 
-func (c dynamicStaticPodOperatorClient) GetStaticPodOperatorStateWithQuorum() (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
-	instance, err := c.client.Get(context.TODO(), "cluster", metav1.GetOptions{})
+func (c dynamicStaticPodOperatorClient) GetStaticPodOperatorStateWithQuorum(ctx context.Context) (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
+	instance, err := c.client.Get(ctx, "cluster", metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -78,7 +78,7 @@ func (c dynamicStaticPodOperatorClient) GetStaticPodOperatorStateWithQuorum() (*
 	return spec, status, instance.GetResourceVersion(), nil
 }
 
-func (c dynamicStaticPodOperatorClient) UpdateStaticPodOperatorSpec(resourceVersion string, spec *operatorv1.StaticPodOperatorSpec) (*operatorv1.StaticPodOperatorSpec, string, error) {
+func (c dynamicStaticPodOperatorClient) UpdateStaticPodOperatorSpec(ctx context.Context, resourceVersion string, spec *operatorv1.StaticPodOperatorSpec) (*operatorv1.StaticPodOperatorSpec, string, error) {
 	uncastOriginal, err := c.informer.Lister().Get("cluster")
 	if err != nil {
 		return nil, "", err
@@ -91,7 +91,7 @@ func (c dynamicStaticPodOperatorClient) UpdateStaticPodOperatorSpec(resourceVers
 		return nil, "", err
 	}
 
-	ret, err := c.client.Update(context.TODO(), copy, metav1.UpdateOptions{})
+	ret, err := c.client.Update(ctx, copy, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, "", err
 	}
@@ -103,7 +103,7 @@ func (c dynamicStaticPodOperatorClient) UpdateStaticPodOperatorSpec(resourceVers
 	return retSpec, ret.GetResourceVersion(), nil
 }
 
-func (c dynamicStaticPodOperatorClient) UpdateStaticPodOperatorStatus(resourceVersion string, status *operatorv1.StaticPodOperatorStatus) (*operatorv1.StaticPodOperatorStatus, error) {
+func (c dynamicStaticPodOperatorClient) UpdateStaticPodOperatorStatus(ctx context.Context, resourceVersion string, status *operatorv1.StaticPodOperatorStatus) (*operatorv1.StaticPodOperatorStatus, error) {
 	uncastOriginal, err := c.informer.Lister().Get("cluster")
 	if err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (c dynamicStaticPodOperatorClient) UpdateStaticPodOperatorStatus(resourceVe
 		return nil, err
 	}
 
-	ret, err := c.client.UpdateStatus(context.TODO(), copy, metav1.UpdateOptions{})
+	ret, err := c.client.UpdateStatus(ctx, copy, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
