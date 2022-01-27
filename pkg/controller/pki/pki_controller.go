@@ -188,7 +188,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 
 	cont := certrotation.NewCertRotationController(
 		fmt.Sprintf("%s/%s", config.Namespace, config.Name), // name, not really used
-		certrotation.SigningRotation{
+		certrotation.RotatedSigningCASecret{
 			Namespace:     config.Namespace,
 			Name:          config.Name + "-ca",
 			Validity:      10 * OneYear,
@@ -198,7 +198,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			Client:        clientset.CoreV1(),
 			EventRecorder: &eventrecorder.LoggingRecorder{},
 		},
-		certrotation.CABundleRotation{
+		certrotation.CABundleConfigMap{
 			Namespace:     config.Namespace,
 			Name:          config.Name + "-ca",
 			Lister:        inf.Core().V1().ConfigMaps().Lister(),
@@ -206,7 +206,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			Client:        clientset.CoreV1(),
 			EventRecorder: &eventrecorder.LoggingRecorder{},
 		},
-		certrotation.TargetRotation{
+		certrotation.RotatedSelfSignedCertKeySecret{
 			Namespace: config.Namespace,
 			Name:      config.Name + "-cert",
 			Validity:  OneYear / 2,

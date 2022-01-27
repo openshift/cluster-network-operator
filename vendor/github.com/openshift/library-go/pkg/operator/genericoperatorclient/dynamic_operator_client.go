@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -39,7 +40,7 @@ func newClusterScopedOperatorClient(config *rest.Config, gvr schema.GroupVersion
 	}, informers, nil
 }
 
-func NewClusterScopedOperatorClient(config *rest.Config, gvr schema.GroupVersionResource) (v1helpers.OperatorClient, dynamicinformer.DynamicSharedInformerFactory, error) {
+func NewClusterScopedOperatorClient(config *rest.Config, gvr schema.GroupVersionResource) (v1helpers.OperatorClientWithFinalizers, dynamicinformer.DynamicSharedInformerFactory, error) {
 	d, informers, err := newClusterScopedOperatorClient(config, gvr)
 	if err != nil {
 		return nil, nil, err
@@ -49,7 +50,7 @@ func NewClusterScopedOperatorClient(config *rest.Config, gvr schema.GroupVersion
 
 }
 
-func NewClusterScopedOperatorClientWithConfigName(config *rest.Config, gvr schema.GroupVersionResource, configName string) (v1helpers.OperatorClient, dynamicinformer.DynamicSharedInformerFactory, error) {
+func NewClusterScopedOperatorClientWithConfigName(config *rest.Config, gvr schema.GroupVersionResource, configName string) (v1helpers.OperatorClientWithFinalizers, dynamicinformer.DynamicSharedInformerFactory, error) {
 	if len(configName) < 1 {
 		return nil, nil, fmt.Errorf("config name cannot be empty")
 	}
@@ -103,7 +104,7 @@ func (c dynamicOperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *op
 // UpdateOperatorSpec overwrites the operator object spec with the values given
 // in operatorv1.OperatorSpec while preserving pre-existing spec fields that have
 // no correspondence in operatorv1.OperatorSpec.
-func (c dynamicOperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operatorv1.OperatorSpec) (*operatorv1.OperatorSpec, string, error) {
+func (c dynamicOperatorClient) UpdateOperatorSpec(ctx context.Context, resourceVersion string, spec *operatorv1.OperatorSpec) (*operatorv1.OperatorSpec, string, error) {
 	uncastOriginal, err := c.informer.Lister().Get(c.configName)
 	if err != nil {
 		return nil, "", err
@@ -116,7 +117,7 @@ func (c dynamicOperatorClient) UpdateOperatorSpec(resourceVersion string, spec *
 		return nil, "", err
 	}
 
-	ret, err := c.client.Update(context.TODO(), copy, metav1.UpdateOptions{})
+	ret, err := c.client.Update(ctx, copy, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, "", err
 	}
@@ -131,7 +132,7 @@ func (c dynamicOperatorClient) UpdateOperatorSpec(resourceVersion string, spec *
 // UpdateOperatorStatus overwrites the operator object status with the values given
 // in operatorv1.OperatorStatus while preserving pre-existing status fields that have
 // no correspondence in operatorv1.OperatorStatus.
-func (c dynamicOperatorClient) UpdateOperatorStatus(resourceVersion string, status *operatorv1.OperatorStatus) (*operatorv1.OperatorStatus, error) {
+func (c dynamicOperatorClient) UpdateOperatorStatus(ctx context.Context, resourceVersion string, status *operatorv1.OperatorStatus) (*operatorv1.OperatorStatus, error) {
 	uncastOriginal, err := c.informer.Lister().Get(c.configName)
 	if err != nil {
 		return nil, err
@@ -144,7 +145,7 @@ func (c dynamicOperatorClient) UpdateOperatorStatus(resourceVersion string, stat
 		return nil, err
 	}
 
-	ret, err := c.client.UpdateStatus(context.TODO(), copy, metav1.UpdateOptions{})
+	ret, err := c.client.UpdateStatus(ctx, copy, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -154,6 +155,68 @@ func (c dynamicOperatorClient) UpdateOperatorStatus(resourceVersion string, stat
 	}
 
 	return retStatus, nil
+}
+
+func (c dynamicOperatorClient) EnsureFinalizer(ctx context.Context, finalizer string) error {
+	uncastInstance, err := c.informer.Lister().Get(c.configName)
+	if err != nil {
+		return err
+	}
+
+	instance := uncastInstance.(*unstructured.Unstructured)
+	finalizers := instance.GetFinalizers()
+	for _, f := range finalizers {
+		if f == finalizer {
+			return nil
+		}
+	}
+
+	// Change is needed
+	klog.V(4).Infof("Adding finalizer %q", finalizer)
+	newFinalizers := append(finalizers, finalizer)
+	err = c.saveFinalizers(ctx, instance, newFinalizers)
+	if err != nil {
+		return err
+	}
+	klog.V(2).Infof("Added finalizer %q", finalizer)
+	return err
+}
+
+func (c dynamicOperatorClient) RemoveFinalizer(ctx context.Context, finalizer string) error {
+	uncastInstance, err := c.informer.Lister().Get(c.configName)
+	if err != nil {
+		return err
+	}
+
+	instance := uncastInstance.(*unstructured.Unstructured)
+	finalizers := instance.GetFinalizers()
+	found := false
+	newFinalizers := make([]string, 0, len(finalizers))
+	for _, f := range finalizers {
+		if f == finalizer {
+			found = true
+			continue
+		}
+		newFinalizers = append(newFinalizers, f)
+	}
+	if !found {
+		return nil
+	}
+
+	klog.V(4).Infof("Removing finalizer %q: %v", finalizer, newFinalizers)
+	err = c.saveFinalizers(ctx, instance, newFinalizers)
+	if err != nil {
+		return err
+	}
+	klog.V(2).Infof("Removed finalizer %q", finalizer)
+	return nil
+}
+
+func (c dynamicOperatorClient) saveFinalizers(ctx context.Context, instance *unstructured.Unstructured, finalizers []string) error {
+	clone := instance.DeepCopy()
+	clone.SetFinalizers(finalizers)
+	_, err := c.client.Update(ctx, clone, metav1.UpdateOptions{})
+	return err
 }
 
 func getObjectMetaFromUnstructured(obj map[string]interface{}) (*metav1.ObjectMeta, error) {
