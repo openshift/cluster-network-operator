@@ -18,7 +18,7 @@ data:
     daemon_enabled = true
     docker_mode = true
     netns_proc_dir = /host_proc
-    vif_annotation_timeout = 500
+    vif_annotation_timeout = 200
 
     [ingress]
     #l7_router_uuid = <None>
