@@ -248,8 +248,15 @@ spec:
             else
               # either we need to initialize a new cluster or wait for master to create it
               if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
+                # set DB election timer at DB creation time if OVN supports it
+                election_timer=
+                if test -n "$(/usr/share/ovn/scripts/ovn-ctl --help 2>&1 | grep "\--db-nb-election-timer")"; then
+                  election_timer="--db-nb-election-timer=$(({{.OVN_NB_RAFT_ELECTION_TIMER}}*1000))"
+                fi
+
                 exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
+                ${election_timer} \
                 run_nb_ovsdb &
 
                 wait $!
@@ -587,8 +594,15 @@ spec:
             else
               # either we need to initialize a new cluster or wait for master to create it
               if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
+                # set DB election timer at DB creation time if OVN supports it
+                election_timer=
+                if test -n "$(/usr/share/ovn/scripts/ovn-ctl --help 2>&1 | grep "\--db-sb-election-timer")"; then
+                  election_timer="--db-sb-election-timer=$(({{.OVN_SB_RAFT_ELECTION_TIMER}}*1000))"
+                fi
+
                 exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
+                ${election_timer} \
                 run_sb_ovsdb &
 
                 wait $!
