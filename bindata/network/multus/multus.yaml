@@ -401,6 +401,7 @@ spec:
         spec:
           priorityClassName: "system-cluster-critical"
           serviceAccountName: multus
+          hostNetwork: true
           containers:
             - name: whereabouts
               image: {{.WhereaboutsImage}}
@@ -414,6 +415,11 @@ spec:
               volumeMounts:
                 - name: cni-net-dir
                   mountPath: /host/etc/cni/net.d
+              env:
+              - name: KUBERNETES_SERVICE_PORT
+                value: "{{.KUBERNETES_SERVICE_PORT}}"
+              - name: KUBERNETES_SERVICE_HOST
+                value: "{{.KUBERNETES_SERVICE_HOST}}"
           volumes:
             - name: cni-net-dir
               hostPath:
