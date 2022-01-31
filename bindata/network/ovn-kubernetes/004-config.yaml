@@ -34,6 +34,9 @@ data:
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
     nodeport=true
+
+    [hybridoverlay]
+    enabled=true
 {{- if .OVNHybridOverlayEnable }}
 
     [hybridoverlay]
