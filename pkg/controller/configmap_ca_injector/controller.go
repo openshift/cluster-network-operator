@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -14,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.Client) error {
-	reconciler := newReconciler(mgr, status)
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) error {
+	reconciler := newReconciler(mgr, status, c)
 	if reconciler == nil {
 		return fmt.Errorf("failed to create reconciler")
 	}
@@ -38,8 +38,8 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.
 	return add(mgr, reconciler)
 }
 
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) reconcile.Reconciler {
-	return &ReconcileConfigMapInjector{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status}
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) reconcile.Reconciler {
+	return &ReconcileConfigMapInjector{client: c, scheme: mgr.GetScheme(), status: status}
 }
 
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
@@ -77,7 +77,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 var _ reconcile.Reconciler = &ReconcileConfigMapInjector{}
 
 type ReconcileConfigMapInjector struct {
-	client crclient.Client
+	client *cnoclient.Client
 	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
 }
@@ -90,15 +90,10 @@ type ReconcileConfigMapInjector struct {
 func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log.Printf("Reconciling configmap from  %s/%s\n", request.Namespace, request.Name)
 
-	trustedCAbundleConfigMap := &corev1.ConfigMap{}
-	trustedCAbundleConfigMapName := types.NamespacedName{
-		Namespace: names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS,
-		Name:      names.TRUSTED_CA_BUNDLE_CONFIGMAP,
-	}
-	err := r.client.Get(ctx, trustedCAbundleConfigMapName, trustedCAbundleConfigMap)
+	trustedCAbundleConfigMap, err := r.client.Kubernetes().CoreV1().ConfigMaps(names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS).Get(ctx, names.TRUSTED_CA_BUNDLE_CONFIGMAP, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", trustedCAbundleConfigMapName.Namespace, trustedCAbundleConfigMapName.Name)
+			log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS, names.TRUSTED_CA_BUNDLE_CONFIGMAP)
 			return reconcile.Result{}, nil
 		}
 		log.Println(err)
@@ -120,7 +115,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 
 		configMapList := &corev1.ConfigMapList{}
 		matchingLabels := &crclient.MatchingLabels{names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL: "true"}
-		err = r.client.List(ctx, configMapList, matchingLabels)
+		err = r.client.CRClient().List(ctx, configMapList, matchingLabels)
 		if err != nil {
 			log.Println(err)
 			r.status.SetDegraded(statusmanager.InjectorConfig, "ListConfigMapError",
@@ -138,7 +133,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 			Namespace: request.Namespace,
 			Name:      request.Name,
 		}
-		err = r.client.Get(ctx, requestedCAbundleConfigMapName, requestedCAbundleConfigMap)
+		err = r.client.CRClient().Get(ctx, requestedCAbundleConfigMapName, requestedCAbundleConfigMap)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", request.Namespace, request.Name)
@@ -156,26 +151,24 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 
 	for _, configMap := range configMapsToChange {
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			retrievedConfigMap := &corev1.ConfigMap{}
-			err = r.client.Get(ctx, types.NamespacedName{Namespace: configMap.Namespace, Name: configMap.Name}, retrievedConfigMap)
-			if err != nil {
-				if errors.IsNotFound(err) {
-					return nil
-				}
-				log.Println(err)
-				return err
-			}
-			configMapToUpdate := retrievedConfigMap.DeepCopy()
-			if configMapToUpdate.Data == nil {
-				configMapToUpdate.Data = map[string]string{names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY: string(trustedCAbundleData)}
-			} else {
-				configMapToUpdate.Data[names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY] = string(trustedCAbundleData)
-			}
-			if equality.Semantic.DeepEqual(configMapToUpdate, retrievedConfigMap) {
+			if existing, ok := configMap.Data[names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY]; ok && existing == string(trustedCAbundleData) {
 				// Nothing to update the new and old configmap object would be the same.
 				return nil
 			}
-			err = r.client.Update(ctx, configMapToUpdate)
+
+			// create sparse object with only the keys we care about.
+			// so that server-side-apply will DTRT.
+			configMapToUpdate := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: configMap.Namespace,
+					Name:      configMap.Name,
+				},
+				Data: map[string]string{
+					names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY: string(trustedCAbundleData),
+				},
+			}
+
+			err = apply.ApplyObject(ctx, r.client, configMapToUpdate, "configmap_ca")
 			if err != nil {
 				log.Println(err)
 				return err
