@@ -30,7 +30,6 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: network-diagnostics
-  namespace: openshift-network-diagnostics
 subjects:
 - kind: ServiceAccount
   name: network-diagnostics
