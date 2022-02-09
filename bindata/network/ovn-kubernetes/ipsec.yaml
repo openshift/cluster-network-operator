@@ -149,7 +149,6 @@ spec:
             cpu: 10m
             memory: 100Mi
         terminationMessagePolicy: FallbackToLogsOnError
-        terminationGracePeriodSeconds: 10
       containers:
       # ovs-monitor-ipsec and libreswan daemons
       - name: ovn-ipsec
@@ -257,9 +256,9 @@ spec:
               ovs-appctl -t ovs-monitor-ipsec ipsec/status && ipsec status
           initialDelaySeconds: 60
           periodSeconds: 60
-        terminationGracePeriodSeconds: 10
       nodeSelector:
         beta.kubernetes.io/os: "linux"
+      terminationGracePeriodSeconds: 10
       volumes:
       - name: host-var-log-ovs
         hostPath:
