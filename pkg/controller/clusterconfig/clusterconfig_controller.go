@@ -6,6 +6,7 @@ import (
 	"log"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
@@ -13,6 +14,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/network"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -93,22 +95,21 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 		return reconcile.Result{}, err
 	}
 
-	operatorConfig, err := r.UpdateOperatorConfig(ctx, *clusterConfig)
-	if err != nil {
-		log.Printf("Failed to generate NetworkConfig CRD: %v", err)
-		r.status.SetDegraded(statusmanager.ClusterConfig, "UpdateOperatorConfig",
-			fmt.Sprintf("Internal error while converting cluster configuration: %v", err))
-		return reconcile.Result{}, err
+	// Generate a stub operator config and patch it in
+	// This will cause only the fields we change to be set.
+	operConfig := &operv1.Network{
+		TypeMeta:   metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"},
+		ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
 	}
+	network.MergeClusterConfig(&operConfig.Spec, clusterConfig.Spec)
 
-	if operatorConfig != nil {
-		if err := apply.ApplyObject(ctx, r.client, operatorConfig, "clusterconfig"); err != nil {
-			log.Printf("Could not apply operator config: %v", err)
-			r.status.SetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",
-				fmt.Sprintf("Error while trying to update operator configuration: %v", err))
-			return reconcile.Result{}, err
-		}
+	if err := apply.ApplyObject(ctx, r.client, operConfig, "clusterconfig"); err != nil {
+		r.status.SetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",
+			fmt.Sprintf("Error while trying to update operator configuration: %v", err))
+		log.Printf("Could not propagate configuration from network.config.openshift.io to network.operator.openshift.io: %v", err)
+		return reconcile.Result{}, fmt.Errorf("could not apply updated operator configuration: %w", err)
 	}
+	log.Println("Successfully updated Operator config from Cluster config")
 
 	r.status.SetNotDegraded(statusmanager.ClusterConfig)
 	return reconcile.Result{}, nil
