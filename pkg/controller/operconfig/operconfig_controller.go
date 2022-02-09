@@ -73,7 +73,7 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 	}
 
 	// Watch for changes to primary resource Network
-	err = c.Watch(&source.Kind{Type: &operv1.Network{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &operv1.Network{}}, &handler.EnqueueRequestForObject{}, predicate.GenerationChangedPredicate{})
 	if err != nil {
 		return err
 	}
