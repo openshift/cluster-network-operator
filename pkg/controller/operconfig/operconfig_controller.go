@@ -47,14 +47,14 @@ var ManifestPath = "./bindata"
 
 // Add creates a new OperConfig Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.ClusterClient) error {
 	return add(mgr, newReconciler(mgr, status, c))
 }
 
 const ControllerName = "operconfig"
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) *ReconcileOperConfig {
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.ClusterClient) *ReconcileOperConfig {
 	return &ReconcileOperConfig{
 		client:        c,
 		scheme:        mgr.GetScheme(),
@@ -107,7 +107,7 @@ var _ reconcile.Reconciler = &ReconcileOperConfig{}
 
 // ReconcileOperConfig reconciles a Network.operator.openshift.io object
 type ReconcileOperConfig struct {
-	client        *cnoclient.Client
+	client        *cnoclient.ClusterClient
 	scheme        *runtime.Scheme
 	status        *statusmanager.StatusManager
 	mapper        meta.RESTMapper

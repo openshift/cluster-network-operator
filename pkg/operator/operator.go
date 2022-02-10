@@ -28,7 +28,7 @@ type Operator struct {
 	// general controller configuration / context
 	ccfg *controllercmd.ControllerContext
 
-	client  *cnoclient.Client
+	client  *cnoclient.ClusterClient
 	manager ctmanager.Manager
 
 	StatusManager *statusmanager.StatusManager

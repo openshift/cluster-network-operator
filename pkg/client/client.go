@@ -32,11 +32,11 @@ import (
 
 const defaultResyncPeriod = 5 * time.Minute
 
-// Client is a bag of holding for object clients & informers.
+// ClusterClient is a bag of holding for object clients & informers.
 // It is generally responsible for managing informer lifecycle.
 //
 // int 5, wis 2, dex 10, cha 6
-type Client struct {
+type ClusterClient struct {
 	cfg *rest.Config
 
 	// Same configuration, but with protobuf enabled
@@ -57,7 +57,7 @@ type Client struct {
 	// against the apiserver.
 	dynclient dynamic.Interface
 
-	// crclient is the controller-runtime Client, for controllers that have
+	// crclient is the controller-runtime ClusterClient, for controllers that have
 	// not yet been migrated.
 	crclient crclient.Client
 
@@ -74,8 +74,8 @@ type Client struct {
 	donech  <-chan struct{}
 }
 
-func New(cfg, protocfg *rest.Config) (*Client, error) {
-	c := Client{
+func New(cfg, protocfg *rest.Config) (*ClusterClient, error) {
+	c := ClusterClient{
 		cfg:      cfg,
 		protocfg: protocfg,
 	}
@@ -125,35 +125,35 @@ func New(cfg, protocfg *rest.Config) (*Client, error) {
 	return &c, nil
 }
 
-func (c *Client) Kubernetes() kubernetes.Interface {
+func (c *ClusterClient) Kubernetes() kubernetes.Interface {
 	return c.kClient
 }
 
 // OpenshiftOperatorClient returns the clientset for operator.openshift.io
-func (c *Client) OpenshiftOperatorClient() *osoperclient.Clientset {
+func (c *ClusterClient) OpenshiftOperatorClient() *osoperclient.Clientset {
 	return c.osOperClient
 }
 
 // Dynamic returns an untyped, dynamic client.
-func (c *Client) Dynamic() dynamic.Interface {
+func (c *ClusterClient) Dynamic() dynamic.Interface {
 	return c.dynclient
 }
 
-func (c *Client) CRClient() crclient.Client {
+func (c *ClusterClient) CRClient() crclient.Client {
 	return c.crclient
 }
 
-func (c *Client) RESTMapper() meta.RESTMapper {
+func (c *ClusterClient) RESTMapper() meta.RESTMapper {
 	return c.restMapper
 }
 
-func (c *Client) Scheme() *runtime.Scheme {
+func (c *ClusterClient) Scheme() *runtime.Scheme {
 	return scheme.Scheme
 }
 
-func (c *Client) Start(ctx context.Context) error {
+func (c *ClusterClient) Start(ctx context.Context) error {
 	if c.started {
-		return fmt.Errorf("Trying to start Client twice")
+		return fmt.Errorf("Trying to start ClusterClient twice")
 	}
 	c.started = true
 	c.donech = ctx.Done()
@@ -197,7 +197,7 @@ func (c *Client) Start(ctx context.Context) error {
 // OperatorHelperClient returns an implementation of the
 // v1helpers.OperatorClient interface for use by the library-go
 // controllers.
-func (c *Client) OperatorHelperClient() operatorv1helpers.OperatorClient {
+func (c *ClusterClient) OperatorHelperClient() operatorv1helpers.OperatorClient {
 	if c.hc != nil {
 		return c.hc
 	}
@@ -210,7 +210,7 @@ func (c *Client) OperatorHelperClient() operatorv1helpers.OperatorClient {
 }
 
 // AddCustomInformer adds any informers not created by the factory to
-// the Client lifecycle management.
+// the ClusterClient lifecycle management.
 //
 // Example for a label-selected ConfigMap watch:
 //
@@ -225,7 +225,7 @@ func (c *Client) OperatorHelperClient() operatorv1helpers.OperatorClient {
 //				options.LabelSelector = "operator.example.dev/mylabel=myval"
 //			}))
 //
-func (c *Client) AddCustomInformer(inf cache.SharedInformer) {
+func (c *ClusterClient) AddCustomInformer(inf cache.SharedInformer) {
 	c.informers = append(c.informers, inf)
 	if c.started {
 		go inf.Run(c.donech)
