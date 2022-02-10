@@ -85,6 +85,11 @@ const TRUSTED_CA_BUNDLE_CONFIGMAP_NS = "openshift-config-managed"
 // determines whether or not to inject the combined ca certificate
 const TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL = "config.openshift.io/inject-trusted-cabundle"
 
+// INJECT_CA_BUNDLE_CONFIGMAP_ANNOTATION is the name of the annotation that
+// determines whether or not to inject a services CA bundle to the configmap
+// This annotation is owned by service CA operator
+const INJECT_CA_BUNDLE_CONFIGMAP_ANNOTATION = "service.beta.openshift.io/inject-cabundle"
+
 // SYSTEM_TRUST_BUNDLE is the full path to the file containing
 // the system trust bundle.
 const SYSTEM_TRUST_BUNDLE = "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"

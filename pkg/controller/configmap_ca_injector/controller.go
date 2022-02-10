@@ -163,6 +163,15 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 				log.Println(err)
 				return err
 			}
+			// An infinitely occurring reconcile loop may occur if the user incorrectly annotates a config map with
+			// service.beta.openshift.io/inject-cabundle=true (owned by service CA operator) and also with label
+			// config.openshift.io/inject-trusted-cabundle=true
+			if retrievedConfigMap.GetAnnotations()[names.INJECT_CA_BUNDLE_CONFIGMAP_ANNOTATION] == "true" {
+				err = fmt.Errorf("failed to reconcile config map %q from namespace %q due to conflicting annotation %q value set to 'true'",
+					retrievedConfigMap.GetName(), retrievedConfigMap.GetNamespace(), names.INJECT_CA_BUNDLE_CONFIGMAP_ANNOTATION)
+				log.Println(err)
+				return err
+			}
 			configMapToUpdate := retrievedConfigMap.DeepCopy()
 			if configMapToUpdate.Data == nil {
 				configMapToUpdate.Data = map[string]string{names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY: string(trustedCAbundleData)}
