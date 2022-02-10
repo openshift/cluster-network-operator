@@ -25,12 +25,12 @@ import (
 )
 
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.ClusterClient) error {
 	return add(mgr, newReconciler(mgr, status, c))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.ClusterClient) reconcile.Reconciler {
 	return &ReconcileClusterConfig{client: c, scheme: mgr.GetScheme(), status: status}
 }
 
@@ -55,7 +55,7 @@ var _ reconcile.Reconciler = &ReconcileClusterConfig{}
 
 // ReconcileClusterConfig reconciles a cluster Network object
 type ReconcileClusterConfig struct {
-	client *cnoclient.Client
+	client *cnoclient.ClusterClient
 	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
 }

@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.ClusterClient) error {
 	reconciler := newReconciler(mgr, status, c)
 	if reconciler == nil {
 		return fmt.Errorf("failed to create reconciler")
@@ -38,7 +38,7 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.
 	return add(mgr, reconciler)
 }
 
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.ClusterClient) reconcile.Reconciler {
 	return &ReconcileConfigMapInjector{client: c, scheme: mgr.GetScheme(), status: status}
 }
 
@@ -77,7 +77,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 var _ reconcile.Reconciler = &ReconcileConfigMapInjector{}
 
 type ReconcileConfigMapInjector struct {
-	client *cnoclient.Client
+	client *cnoclient.ClusterClient
 	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
 }

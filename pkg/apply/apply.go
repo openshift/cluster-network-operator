@@ -27,7 +27,7 @@ type Object interface {
 // This causes fields we own to be updated, and fields we don't own to be preserved.
 // For more information, see https://kubernetes.io/docs/reference/using-api/server-side-apply/
 // The subcontroller, if set, is used to assign field ownership.
-func ApplyObject(ctx context.Context, client *cnoclient.Client, obj Object, subcontroller string) error {
+func ApplyObject(ctx context.Context, client *cnoclient.ClusterClient, obj Object, subcontroller string) error {
 	name := obj.GetName()
 	namespace := obj.GetNamespace()
 
