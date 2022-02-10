@@ -36,14 +36,14 @@ type Operator struct {
 
 const LOCK_NAME = "cluster-network-operator"
 
-func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
+func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, extraClusters map[string]string) error {
 	o := &Operator{
 		ccfg: controllerConfig,
 	}
 
 	var err error
 	cfg := controllerConfig.KubeConfig
-	if o.client, err = cnoclient.New(cfg, controllerConfig.ProtoKubeConfig); err != nil {
+	if o.client, err = cnoclient.NewClusterClient(cfg, controllerConfig.ProtoKubeConfig); err != nil {
 		return err
 	}
 

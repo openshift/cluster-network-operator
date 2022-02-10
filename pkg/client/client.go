@@ -3,10 +3,8 @@ package client
 import (
 	"context"
 	"fmt"
-	"log"
-	"time"
-
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
+	clientConfig "github.com/openshift/library-go/pkg/config/client"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -16,6 +14,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"log"
+	"time"
 
 	osoperclient "github.com/openshift/client-go/operator/clientset/versioned"
 	osoperinformer "github.com/openshift/client-go/operator/informers/externalversions"
@@ -30,7 +30,10 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const defaultResyncPeriod = 5 * time.Minute
+const (
+	defaultResyncPeriod = 5 * time.Minute
+	DefaultClusterName  = "default"
+)
 
 // ClusterClient is a bag of holding for object clients & informers.
 // It is generally responsible for managing informer lifecycle.
@@ -74,7 +77,52 @@ type ClusterClient struct {
 	donech  <-chan struct{}
 }
 
-func New(cfg, protocfg *rest.Config) (*ClusterClient, error) {
+func NewClient(cfg, protocfg *rest.Config, extraClusters map[string]string) (*Client, error) {
+	cli := &Client{
+		clusterClients: make(map[string]*ClusterClient),
+	}
+
+	defaultClient, err := NewClusterClient(cfg, protocfg)
+	if err != nil {
+		return nil, err
+	}
+	cli.clusterClients[DefaultClusterName] = defaultClient
+
+	for name, kubeConfig := range extraClusters {
+		clientConfig, err := clientConfig.GetClientConfig(kubeConfig, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get config for cluster %s from %s: %w", name, kubeConfig, err)
+		}
+		protoConfig := rest.CopyConfig(clientConfig)
+		protoConfig.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+		protoConfig.ContentType = "application/vnd.kubernetes.protobuf"
+
+		clusterCli, err := NewClusterClient(clientConfig, protoConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed create new cluster client for cluster %s: %w", name, err)
+		}
+		cli.clusterClients[name] = clusterCli
+	}
+	return cli, nil
+}
+
+type Client struct {
+	clusterClients map[string]*ClusterClient
+}
+
+// ClientFor returns a ClusterClient reference based on the name provided, if name is empty returns the default ClusterClient
+func (c *Client) ClientFor(name string) *ClusterClient {
+	if len(name) == 0 {
+		return c.Default()
+	}
+	return c.clusterClients[name]
+}
+
+func (c *Client) Default() *ClusterClient {
+	return c.clusterClients[DefaultClusterName]
+}
+
+func NewClusterClient(cfg, protocfg *rest.Config) (*ClusterClient, error) {
 	c := ClusterClient{
 		cfg:      cfg,
 		protocfg: protocfg,
