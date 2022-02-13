@@ -34,7 +34,7 @@ func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig
 
 	// Validate cluster config
 	// If invalid just warn and proceed.
-	if err := network.ValidateClusterConfig(clusterConfig.Spec); err != nil {
+	if err := network.ValidateClusterConfig(clusterConfig.Spec, r.client); err != nil {
 		log.Printf("WARNING: ignoring Network.config.openshift.io/v1/cluster - failed validation: %v", err)
 		return nil
 	}
