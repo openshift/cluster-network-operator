@@ -188,7 +188,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if prev != nil {
 		// We may need to fill defaults here -- sort of as a poor-man's
 		// upconversion scheme -- if we add additional fields to the config.
-		err = network.IsChangeSafe(prev, &operConfig.Spec)
+		err = network.IsChangeSafe(prev, &operConfig.Spec, r.client)
 		if err != nil {
 			log.Printf("Not applying unsafe change: %v", err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",

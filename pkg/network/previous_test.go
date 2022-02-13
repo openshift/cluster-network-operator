@@ -4,8 +4,12 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 
 	. "github.com/onsi/gomega"
@@ -36,6 +40,18 @@ func TestPreviousVersionsSafe(t *testing.T) {
 		},
 	}
 
+	// Bootstrap a client with an infrastructure object
+	if err := configv1.AddToScheme(scheme.Scheme); err != nil {
+		t.Fatalf("failed to add configv1 to scheme: %v", err)
+	}
+	infrastructure := &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+		Status: configv1.InfrastructureStatus{
+			PlatformStatus: &configv1.PlatformStatus{},
+		},
+	}
+	client := fake.NewClientBuilder().WithObjects(infrastructure).Build()
+
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewGomegaWithT(t)
@@ -49,7 +65,7 @@ func TestPreviousVersionsSafe(t *testing.T) {
 			// This is the exact config transformation flow in the operator
 			g.Expect(Validate(input)).NotTo(HaveOccurred())
 			FillDefaults(input, applied)
-			g.Expect(IsChangeSafe(applied, input)).NotTo(HaveOccurred())
+			g.Expect(IsChangeSafe(applied, input, client)).NotTo(HaveOccurred())
 		})
 	}
 }
