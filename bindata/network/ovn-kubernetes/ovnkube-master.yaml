@@ -359,10 +359,13 @@ spec:
           preStop:
             exec:
               command:
-                - /usr/bin/ovn-appctl
-                - -t
-                - /var/run/ovn/ovnnb_db.ctl
-                - exit
+              - /bin/bash
+              - -c
+              - |
+                echo "$(date -Iseconds) - stopping nbdb"
+                /usr/share/ovn/scripts/ovn-ctl stop_nb_ovsdb
+                echo "$(date -Iseconds) - nbdb stopped"
+                rm -f /var/run/ovn/ovnnb_db.pid
         readinessProbe:
 {{ if not .IsSNO }}
           initialDelaySeconds: 90
@@ -667,10 +670,13 @@ spec:
           preStop:
             exec:
               command:
-                - /usr/bin/ovn-appctl
-                - -t
-                - /var/run/ovn/ovnsb_db.ctl
-                - exit
+              - /bin/bash
+              - -c
+              - |
+                echo "$(date -Iseconds) - stopping sbdb"
+                /usr/share/ovn/scripts/ovn-ctl stop_sb_ovsdb
+                echo "$(date -Iseconds) - sbdb stopped"
+                rm -f /var/run/ovn/ovnsb_db.pid
         readinessProbe:
 {{ if not .IsSNO }}
           initialDelaySeconds: 90
