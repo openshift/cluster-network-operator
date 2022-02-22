@@ -36,8 +36,8 @@ import (
 )
 
 // Attach control loop to the manager and watch for Egress Router objects
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, cli *cnoclient.ClusterClient) error {
-	r, err := newEgressRouterReconciler(mgr, status, cli)
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, cli *cnoclient.Client) error {
+	r, err := newEgressRouterReconciler(mgr, status, cli.Default())
 	if err != nil {
 		return err
 	}

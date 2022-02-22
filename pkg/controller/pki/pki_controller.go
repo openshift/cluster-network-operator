@@ -41,7 +41,7 @@ const (
 )
 
 // Add attaches our control loop to the manager and watches for PKI objects
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.ClusterClient) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.Client) error {
 	r, err := newPKIReconciler(mgr, status)
 	if err != nil {
 		return err

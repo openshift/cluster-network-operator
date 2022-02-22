@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.ClusterClient) error {
-	reconciler := newReconciler(mgr, status, c)
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) error {
+	reconciler := newReconciler(mgr, status, c.Default())
 	if reconciler == nil {
 		return fmt.Errorf("failed to create reconciler")
 	}

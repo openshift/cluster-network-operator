@@ -28,7 +28,7 @@ type Operator struct {
 	// general controller configuration / context
 	ccfg *controllercmd.ControllerContext
 
-	client  *cnoclient.ClusterClient
+	client  *cnoclient.Client
 	manager ctmanager.Manager
 
 	StatusManager *statusmanager.StatusManager
@@ -43,7 +43,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	var err error
 	cfg := controllerConfig.KubeConfig
-	if o.client, err = cnoclient.NewClusterClient(cfg, controllerConfig.ProtoKubeConfig); err != nil {
+	if o.client, err = cnoclient.NewClient(cfg, controllerConfig.ProtoKubeConfig, extraClusters); err != nil {
 		return err
 	}
 
@@ -51,7 +51,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	o.manager, err = manager.New(cfg, manager.Options{
 		Namespace: "",
 		MapperProvider: func(cfg *rest.Config) (meta.RESTMapper, error) {
-			return o.client.RESTMapper(), nil
+			return o.client.Default().RESTMapper(), nil
 		},
 		MetricsBindAddress: "0",
 	})
@@ -59,7 +59,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
-	o.StatusManager = statusmanager.New(o.manager.GetClient(), o.client.RESTMapper(), "network")
+	o.StatusManager = statusmanager.New(o.client.Default().CRClient(), o.client.Default().RESTMapper(), "network")
 
 	// Add controller-runtime controllers
 	klog.Info("Adding controller-runtime controllers")
@@ -70,18 +70,18 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// Initialize individual (non-controller-runtime) controllers
 
 	// logLevelController reacts to changes in the operator spec loglevel
-	logLevelController := loglevel.NewClusterOperatorLoggingController(o.client.OperatorHelperClient(), controllerConfig.EventRecorder)
+	logLevelController := loglevel.NewClusterOperatorLoggingController(o.client.Default().OperatorHelperClient(), controllerConfig.EventRecorder)
 
 	// managementStateController syncs Operator.Spec.ManagementState down to
 	// an Operator.Status.Condition
-	managementStateController := managementstatecontroller.NewOperatorManagementStateController("cluster-network-operator", o.client.OperatorHelperClient(), controllerConfig.EventRecorder)
+	managementStateController := managementstatecontroller.NewOperatorManagementStateController("cluster-network-operator", o.client.Default().OperatorHelperClient(), controllerConfig.EventRecorder)
 	management.SetOperatorNotRemovable()
 
 	// TODO: Enable the library-go ClusterOperatorStatusController once
 	// https://github.com/openshift/library-go/issues/936 is resolved.
 
 	// Start informers
-	if err := o.client.Start(ctx); err != nil {
+	if err := o.client.Default().Start(ctx); err != nil {
 		return fmt.Errorf("Failed to start client: %w", err)
 	}
 
