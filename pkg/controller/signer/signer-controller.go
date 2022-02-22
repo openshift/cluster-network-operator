@@ -29,7 +29,7 @@ import (
 const signerName = "network.openshift.io/signer"
 
 // Add controller and start it when the Manager is started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.ClusterClient) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.Client) error {
 	reconciler, err := newReconciler(mgr, status)
 	if err != nil {
 		return err

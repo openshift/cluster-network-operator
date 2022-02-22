@@ -34,7 +34,7 @@ var ManifestPath = "./bindata"
 
 // Add creates a new ingressConfig controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.ClusterClient) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.Client) error {
 
 	return add(mgr, newIngressConfigReconciler(mgr.GetClient()))
 }

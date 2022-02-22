@@ -27,7 +27,7 @@ import (
 )
 
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.ClusterClient) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.Client) error {
 	reconciler := newReconciler(mgr, status)
 	if reconciler == nil {
 		return fmt.Errorf("failed to create reconciler")

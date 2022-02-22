@@ -30,6 +30,9 @@ type Object interface {
 func ApplyObject(ctx context.Context, client *cnoclient.ClusterClient, obj Object, subcontroller string) error {
 	name := obj.GetName()
 	namespace := obj.GetNamespace()
+	if client == nil {
+		return fmt.Errorf("client not defined for %v", obj)
+	}
 
 	oks, _, _ := client.Scheme().ObjectKinds(obj)
 	if len(oks) == 0 {
