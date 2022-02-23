@@ -111,6 +111,9 @@ type ReconcileOperConfig struct {
 	status        *statusmanager.StatusManager
 	mapper        meta.RESTMapper
 	podReconciler *ReconcilePods
+
+	// If we can skip cleaning up the MTU prober job.
+	mtuProberCleanedUp bool
 }
 
 // Reconcile updates the state of the cluster to match that which is desired
@@ -175,13 +178,29 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		// FIXME: operator status?
 		return reconcile.Result{}, err
 	}
+
+	// If we need to, probe the host's MTU via a Job.
+	// It's okay if this is 0, since running clusters have no need of this
+	// and thus do not need to probe MTU
+	mtu := 0
+	if network.NeedMTUProbe(prev, &operConfig.Spec) {
+		mtu, err = r.probeMTU(ctx, operConfig)
+		if err != nil {
+			log.Printf("Failed to probe MTU: %v", err)
+			r.status.SetDegraded(statusmanager.OperatorConfig, "MTUProbeFailed",
+				fmt.Sprintf("Failed to probe MTU: %v", err))
+			return reconcile.Result{}, fmt.Errorf("could not probe MTU -- maybe no available nodes: %w", err)
+		}
+		log.Printf("Using detected MTU %d", mtu)
+	}
+
 	// up-convert Prev by filling defaults
 	if prev != nil {
-		network.FillDefaults(prev, prev)
+		network.FillDefaults(prev, prev, mtu)
 	}
 
 	// Fill all defaults explicitly
-	network.FillDefaults(&operConfig.Spec, prev)
+	network.FillDefaults(&operConfig.Spec, prev, mtu)
 
 	// Compare against previous applied configuration to see if this change
 	// is safe.

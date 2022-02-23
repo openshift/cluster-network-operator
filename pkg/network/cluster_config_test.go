@@ -225,7 +225,7 @@ func TestStatusFromConfig(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	crd := OpenShiftSDNConfig.DeepCopy()
-	FillDefaults(&crd.Spec, nil)
+	fillDefaults(&crd.Spec, nil)
 
 	var mtu uint32 = 1300
 	crd.Spec.DefaultNetwork.OpenShiftSDNConfig.MTU = &mtu
@@ -295,7 +295,7 @@ func TestStatusFromConfigUnknown(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	crd := OpenShiftSDNConfig.DeepCopy()
-	FillDefaults(&crd.Spec, nil)
+	fillDefaults(&crd.Spec, nil)
 
 	crd.Spec.DefaultNetwork.Type = "None"
 

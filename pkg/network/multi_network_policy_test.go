@@ -34,7 +34,7 @@ func TestRenderMultiNetworkPolicy(t *testing.T) {
 	config := &crd.Spec
 	disabled := false
 	config.UseMultiNetworkPolicy = &disabled
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	// disable MultiNetworkPolicy
 	objs, err := renderMultiNetworkpolicy(config, manifestDir)

@@ -60,11 +60,11 @@ func TestPreviousVersionsSafe(t *testing.T) {
 
 			applied, err := parseNetworkSpec(tc.appliedConfig)
 			g.Expect(err).NotTo(HaveOccurred())
-			FillDefaults(applied, applied)
+			fillDefaults(applied, applied)
 
 			// This is the exact config transformation flow in the operator
 			g.Expect(Validate(input)).NotTo(HaveOccurred())
-			FillDefaults(input, applied)
+			fillDefaults(input, applied)
 			g.Expect(IsChangeSafe(applied, input, client)).NotTo(HaveOccurred())
 		})
 	}

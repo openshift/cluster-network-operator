@@ -52,7 +52,7 @@ func TestRenderOpenShiftSDN(t *testing.T) {
 
 	errs := validateOpenShiftSDN(config)
 	g.Expect(errs).To(HaveLen(0))
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	objs, err := renderOpenShiftSDN(config, bootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -156,7 +156,7 @@ func TestValidateOpenShiftSDN(t *testing.T) {
 
 	err := validateOpenShiftSDN(config)
 	g.Expect(err).To(BeEmpty())
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	errExpect := func(substr string) {
 		t.Helper()
@@ -193,7 +193,7 @@ func TestProxyArgs(t *testing.T) {
 
 	crd := OpenShiftSDNConfig.DeepCopy()
 	config := &crd.Spec
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	bootstrapResult := &bootstrap.BootstrapResult{
 		Infra: bootstrap.InfraBootstrapResult{},
@@ -311,9 +311,9 @@ func TestOpenShiftSDNIsSafe(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	prev := OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(prev, nil)
+	fillDefaults(prev, nil)
 	next := OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 
 	errs := isOpenShiftSDNChangeSafe(prev, next)
 	g.Expect(errs).To(BeEmpty())
@@ -398,7 +398,7 @@ func TestOpenShiftSDNMultitenant(t *testing.T) {
 
 	crd := OpenShiftSDNConfig.DeepCopy()
 	config := &crd.Spec
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 	config.DefaultNetwork.OpenShiftSDNConfig.Mode = "Multitenant"
 
 	bootstrapResult := &bootstrap.BootstrapResult{
@@ -440,7 +440,7 @@ func TestClusterNetwork(t *testing.T) {
 
 	copy := OpenShiftSDNConfig.DeepCopy()
 	config := &copy.Spec
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 	// hard-code the mtu in case we run on other kinds of nodes
 	mtu := uint32(1450)
 	config.DefaultNetwork.OpenShiftSDNConfig.MTU = &mtu
@@ -471,7 +471,7 @@ func TestOpenshiftSDNProxyConfig(t *testing.T) {
 
 	crd := OpenShiftSDNConfig.DeepCopy()
 	config := &crd.Spec
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 	// hard-code the mtu in case we run on other kinds of nodes
 	mtu := uint32(1450)
 	config.DefaultNetwork.OpenShiftSDNConfig.MTU = &mtu

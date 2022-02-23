@@ -36,9 +36,9 @@ func TestIsChangeSafe(t *testing.T) {
 	// =================================
 
 	prev := OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(prev, nil)
+	fillDefaults(prev, nil)
 	next := OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 
 	// No error should occur when prev equals next.
 	err := IsChangeSafe(prev, next, client)
@@ -51,7 +51,7 @@ func TestIsChangeSafe(t *testing.T) {
 
 	// It is not supported to append another cluster network of the same type.
 	next = OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 	next.ClusterNetwork = append(next.ClusterNetwork, operv1.ClusterNetworkEntry{
 		CIDR:       "1.2.0.0/16",
 		HostPrefix: 24,
@@ -61,7 +61,7 @@ func TestIsChangeSafe(t *testing.T) {
 
 	// It is not supported to change the ServiceNetwork.
 	next = OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 	next.ServiceNetwork = []string{"1.2.3.0/24"}
 	err = IsChangeSafe(prev, next, client)
 	g.Expect(err).To(MatchError(ContainSubstring("unsupported change to ServiceNetwork")))
@@ -70,10 +70,10 @@ func TestIsChangeSafe(t *testing.T) {
 	// =================================
 
 	prev = OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(prev, nil)
+	fillDefaults(prev, nil)
 	prev.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
 	next = OVNKubernetesConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 
 	// You can change cluster network during migration.
 	next.ClusterNetwork = append(next.ClusterNetwork,
@@ -87,7 +87,7 @@ func TestIsChangeSafe(t *testing.T) {
 
 	// You can't change service network during migration.
 	next = OVNKubernetesConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 	next.ServiceNetwork = []string{"1.2.3.0/24"}
 	err = IsChangeSafe(prev, next, client)
 	g.Expect(err).To(MatchError(ContainSubstring("cannot change ServiceNetwork during migration")))
@@ -96,9 +96,9 @@ func TestIsChangeSafe(t *testing.T) {
 	// =================================
 
 	prev = OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(prev, nil)
+	fillDefaults(prev, nil)
 	next = OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(prev, nil)
+	fillDefaults(prev, nil)
 
 	// You can't change default network type when not doing migration.
 	next.DefaultNetwork.Type = "Kuryr"
@@ -107,7 +107,7 @@ func TestIsChangeSafe(t *testing.T) {
 
 	// You can't change default network type to non-target migration network type.
 	next = OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 	prev.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
 	next.DefaultNetwork.Type = "Kuryr"
 	err = IsChangeSafe(prev, next, client)
@@ -115,7 +115,7 @@ func TestIsChangeSafe(t *testing.T) {
 
 	// You can't change the migration network type when it is not null.
 	next = OpenShiftSDNConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 	next.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
 	prev.Migration = &operv1.NetworkMigration{NetworkType: "Kuryr"}
 	err = IsChangeSafe(prev, next, client)
@@ -125,9 +125,9 @@ func TestIsChangeSafe(t *testing.T) {
 	// =================================
 
 	prev = OVNKubernetesConfig.Spec.DeepCopy()
-	FillDefaults(prev, nil)
+	fillDefaults(prev, nil)
 	next = OVNKubernetesConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 
 	// You can change a single-stack config to dual-stack ...
 	next.ServiceNetwork = append(next.ServiceNetwork, "fd02::/112")
@@ -143,7 +143,7 @@ func TestIsChangeSafe(t *testing.T) {
 
 	// But you can't change the ServiceNetwork from single-stack IPv4 to dual-stack IPv6-primary ...
 	next = OVNKubernetesConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 	next.ServiceNetwork = append([]string{"fd02::/112"}, prev.ServiceNetwork...)
 	next.ClusterNetwork = append([]operv1.ClusterNetworkEntry{{
 		CIDR:       "fd01::/48",
@@ -157,7 +157,7 @@ func TestIsChangeSafe(t *testing.T) {
 
 	// You also cannot change the ClusterNetwork from single-stack IPv4 to dual-stack IPv6-primary ...
 	next = OVNKubernetesConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 	next.ServiceNetwork = append(next.ServiceNetwork, "fd02::/112")
 	next.ClusterNetwork = append([]operv1.ClusterNetworkEntry{{
 		CIDR:       "fd01::/48",
@@ -171,7 +171,7 @@ func TestIsChangeSafe(t *testing.T) {
 
 	// You can add multiple ClusterNetworks of the new IP family ...
 	next = OVNKubernetesConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 	next.ServiceNetwork = append(next.ServiceNetwork, "fd02::/112")
 	next.ClusterNetwork = append(next.ClusterNetwork,
 		operv1.ClusterNetworkEntry{
@@ -191,7 +191,7 @@ func TestIsChangeSafe(t *testing.T) {
 
 	// You can't add any new ClusterNetworks of the old IP family.
 	next = OVNKubernetesConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 	next.ServiceNetwork = append(next.ServiceNetwork, "fd02::/112")
 	next.ClusterNetwork = append(next.ClusterNetwork,
 		operv1.ClusterNetworkEntry{
@@ -211,7 +211,7 @@ func TestIsChangeSafe(t *testing.T) {
 	infrastructure.Status.PlatformStatus.Type = configv1.AzurePlatformType
 	client = fake.NewClientBuilder().WithObjects(infrastructure).Build()
 	next = OVNKubernetesConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 
 	next.ServiceNetwork = append(next.ServiceNetwork, "fd02::/112")
 	next.ClusterNetwork = append(next.ClusterNetwork, operv1.ClusterNetworkEntry{
@@ -263,9 +263,9 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 
 	prev := config.Spec.DeepCopy()
-	FillDefaults(prev, nil)
+	fillDefaults(prev, nil)
 	next := config.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 
 	err = IsChangeSafe(prev, next, client)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -287,4 +287,8 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("RoleBinding", "openshift-config-managed", "openshift-network-public-role-binding")))
 
 	// TODO(cdc) validate that kube-proxy is rendered
+}
+
+func fillDefaults(conf, previous *operv1.NetworkSpec) {
+	FillDefaults(conf, previous, 1400)
 }
