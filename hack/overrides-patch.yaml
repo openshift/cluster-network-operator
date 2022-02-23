@@ -6,6 +6,6 @@
   value:
     kind: Deployment
     name: network-operator
-    group: operator.openshift.io
+    group: apps
     namespace: openshift-network-operator
     unmanaged: true
