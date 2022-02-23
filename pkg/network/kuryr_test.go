@@ -50,7 +50,7 @@ func TestRenderKuryr(t *testing.T) {
 	errs := validateKuryr(config)
 	g.Expect(errs).To(HaveLen(0))
 
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	objs, err := renderKuryr(config, &FakeBootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())

@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"net"
 	"os"
@@ -510,17 +511,26 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 	}
 
 	sc := conf.DefaultNetwork.OVNKubernetesConfig
-	// MTU  is currently the only field we pull from previous.
-	// If MTU is not supplied, we infer it from the host on which CNO is running
-	// (which may not be a node in the cluster).
+	// MTU is currently the only field we pull from previous.
+	// If it's not supplied, we infer it by probing a node's interface via the mtu-prober job.
 	// However, this can never change, so we always prefer previous.
-
-	// TODO - Need to check as IPsec will additional headers
 	if sc.MTU == nil {
-		var mtu uint32 = uint32(hostMTU) - getOVNEncapOverhead(conf)
+		var mtu uint32
 		if previous != nil && previous.DefaultNetwork.OVNKubernetesConfig != nil &&
 			previous.DefaultNetwork.OVNKubernetesConfig.MTU != nil {
 			mtu = *previous.DefaultNetwork.OVNKubernetesConfig.MTU
+		} else {
+			// utter paranoia
+			// somehow we didn't probe the MTU in the controller, but we need it.
+			// This might be wrong in cases where the CNO is not local (e.g. Hypershift).
+			if hostMTU == 0 {
+				log.Printf("BUG: Probed MTU wasn't supplied, but was needed. Falling back to host MTU")
+				hostMTU, _ = GetDefaultMTU()
+				if hostMTU == 0 { // this is beyond unlikely.
+					panic("BUG: Probed MTU wasn't supplied, host MTU invalid")
+				}
+			}
+			mtu = uint32(hostMTU) - getOVNEncapOverhead(conf)
 		}
 		sc.MTU = &mtu
 	}
