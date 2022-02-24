@@ -397,6 +397,7 @@ spec:
   jobTemplate:
     spec:
       backoffLimit: 0
+      ttlSecondsAfterFinished: 900
       template:
         spec:
           priorityClassName: "system-cluster-critical"
