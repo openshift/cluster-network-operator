@@ -103,7 +103,7 @@ func (r *ReconcileOperConfig) deployMTUProber(ctx context.Context, owner metav1.
 		if err := controllerutil.SetControllerReference(owner, obj, r.scheme); err != nil {
 			return err // unlikely
 		}
-		if err := apply.ApplyObject(ctx, r.client.Default(), obj, ControllerName); err != nil {
+		if err := apply.ApplyObject(ctx, r.client, obj, ControllerName); err != nil {
 			klog.Infof("Could not apply mtu-prober object: %v", err)
 			return err
 		}

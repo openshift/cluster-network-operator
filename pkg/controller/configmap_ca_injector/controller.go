@@ -30,7 +30,7 @@ import (
 )
 
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) error {
-	reconciler := newReconciler(mgr, status, c.Default())
+	reconciler := newReconciler(mgr, status, c)
 	if reconciler == nil {
 		return fmt.Errorf("failed to create reconciler")
 	}
@@ -38,7 +38,7 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.
 	return add(mgr, reconciler)
 }
 
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.ClusterClient) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) reconcile.Reconciler {
 	return &ReconcileConfigMapInjector{client: c, scheme: mgr.GetScheme(), status: status}
 }
 
@@ -77,7 +77,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 var _ reconcile.Reconciler = &ReconcileConfigMapInjector{}
 
 type ReconcileConfigMapInjector struct {
-	client *cnoclient.ClusterClient
+	client *cnoclient.Client
 	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
 }
@@ -90,7 +90,7 @@ type ReconcileConfigMapInjector struct {
 func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log.Printf("Reconciling configmap from  %s/%s\n", request.Namespace, request.Name)
 
-	trustedCAbundleConfigMap, err := r.client.Kubernetes().CoreV1().ConfigMaps(names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS).Get(ctx, names.TRUSTED_CA_BUNDLE_CONFIGMAP, metav1.GetOptions{})
+	trustedCAbundleConfigMap, err := r.client.Default().Kubernetes().CoreV1().ConfigMaps(names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS).Get(ctx, names.TRUSTED_CA_BUNDLE_CONFIGMAP, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS, names.TRUSTED_CA_BUNDLE_CONFIGMAP)
@@ -115,7 +115,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 
 		configMapList := &corev1.ConfigMapList{}
 		matchingLabels := &crclient.MatchingLabels{names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL: "true"}
-		err = r.client.CRClient().List(ctx, configMapList, matchingLabels)
+		err = r.client.Default().CRClient().List(ctx, configMapList, matchingLabels)
 		if err != nil {
 			log.Println(err)
 			r.status.SetDegraded(statusmanager.InjectorConfig, "ListConfigMapError",
@@ -133,7 +133,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 			Namespace: request.Namespace,
 			Name:      request.Name,
 		}
-		err = r.client.CRClient().Get(ctx, requestedCAbundleConfigMapName, requestedCAbundleConfigMap)
+		err = r.client.Default().CRClient().Get(ctx, requestedCAbundleConfigMapName, requestedCAbundleConfigMap)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", request.Namespace, request.Name)
