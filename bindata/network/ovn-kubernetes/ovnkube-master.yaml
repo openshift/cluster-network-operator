@@ -751,19 +751,6 @@ spec:
             exit 1
           fi
 
-          # start nbctl daemon for caching
-          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start nbctl daemon for caching"
-          export OVN_NB_DAEMON=$(ovn-nbctl --pidfile=/var/run/ovn/ovn-nbctl.pid \
-            --detach \
-            -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
-            --db "{{.OVN_NB_DB_LIST}}" --log-file=/run/ovn/ovn-nbctl.log \
-            --monitor \
-            --unixctl=/var/run/ovn/ovn-nbctl.ctl \
-            -vreconnect:file:info)
-
-          # include nbctl daemon logging, allow for ovn-nbctl to create the log file
-          tail -F /run/ovn/ovn-nbctl.log &
-
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --init-master "${K8S_NODE}" \
@@ -782,15 +769,10 @@ spec:
             --nb-client-privkey /ovn-cert/tls.key \
             --nb-client-cert /ovn-cert/tls.crt \
             --nb-client-cacert /ovn-ca/ca-bundle.crt \
-            --nbctl-daemon-mode \
             --nb-cert-common-name "{{.OVN_CERT_CN}}" \
             --enable-multicast \
             --disable-snat-multiple-gws \
             --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
-        lifecycle:
-          preStop:
-            exec:
-              command: ["/bin/bash", "-c", "kill $(cat /var/run/ovn/ovn-nbctl.pid) && unset OVN_NB_DAEMON"]
         volumeMounts:
         # for checking ovs-configuration service
         - mountPath: /etc/systemd/system
