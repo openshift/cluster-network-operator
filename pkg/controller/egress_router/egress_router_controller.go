@@ -37,7 +37,7 @@ import (
 
 // Attach control loop to the manager and watch for Egress Router objects
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, cli *cnoclient.Client) error {
-	r, err := newEgressRouterReconciler(mgr, status, cli.Default())
+	r, err := newEgressRouterReconciler(mgr, status, cli)
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,7 @@ type egressrouter struct {
 
 type EgressRouterReconciler struct {
 	mgr    manager.Manager
-	client *cnoclient.ClusterClient
+	client *cnoclient.Client
 	status *statusmanager.StatusManager
 
 	egressrouters    map[types.NamespacedName]*egressrouter
@@ -75,7 +75,7 @@ type EgressRouterReconciler struct {
 
 var ResyncPeriod = 5 * time.Minute
 
-func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.ClusterClient) (reconcile.Reconciler, error) {
+func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) (reconcile.Reconciler, error) {
 
 	return &EgressRouterReconciler{
 		mgr:    mgr,

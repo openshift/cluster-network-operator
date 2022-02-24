@@ -59,7 +59,7 @@ func (r *ReconcileOperConfig) UpdateOperConfig(ctx context.Context, operConfig *
 	if err != nil {
 		return fmt.Errorf("failed to transmute operator config, err: %v", err)
 	}
-	if err = apply.ApplyObject(ctx, r.client.Default(), us, "operconfig"); err != nil {
+	if err = apply.ApplyObject(ctx, r.client, us, "operconfig"); err != nil {
 		return fmt.Errorf("could not apply (%s) %s/%s, err: %v", operConfig.GroupVersionKind(), operConfig.GetNamespace(), operConfig.GetName(), err)
 	}
 	return nil

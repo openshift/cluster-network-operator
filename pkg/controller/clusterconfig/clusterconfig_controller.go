@@ -26,11 +26,11 @@ import (
 
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) error {
-	return add(mgr, newReconciler(mgr, status, c.Default()))
+	return add(mgr, newReconciler(mgr, status, c))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.ClusterClient) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) reconcile.Reconciler {
 	return &ReconcileClusterConfig{client: c, scheme: mgr.GetScheme(), status: status}
 }
 
@@ -55,7 +55,7 @@ var _ reconcile.Reconciler = &ReconcileClusterConfig{}
 
 // ReconcileClusterConfig reconciles a cluster Network object
 type ReconcileClusterConfig struct {
-	client *cnoclient.ClusterClient
+	client *cnoclient.Client
 	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
 }
@@ -74,7 +74,7 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 
 	// Fetch the cluster config
 	clusterConfig := &configv1.Network{}
-	err := r.client.CRClient().Get(ctx, request.NamespacedName, clusterConfig)
+	err := r.client.Default().CRClient().Get(ctx, request.NamespacedName, clusterConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -89,7 +89,7 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	}
 
 	// Validate the cluster config
-	if err := network.ValidateClusterConfig(clusterConfig.Spec, r.client.CRClient()); err != nil {
+	if err := network.ValidateClusterConfig(clusterConfig.Spec, r.client.Default().CRClient()); err != nil {
 		log.Printf("Failed to validate Network.Spec: %v", err)
 		r.status.SetDegraded(statusmanager.ClusterConfig, "InvalidClusterConfig",
 			fmt.Sprintf("The cluster configuration is invalid (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))
