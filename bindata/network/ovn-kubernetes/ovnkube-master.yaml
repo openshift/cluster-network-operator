@@ -1,5 +1,6 @@
 # The ovnkube control-plane components
 
+{{ if not .IsSNO }}
 # The pod disruption budget ensures that we keep a raft quorum
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
@@ -11,9 +12,8 @@ spec:
   selector:
     matchLabels:
       app: ovnkube-master
-
 ---
-
+{{ end }}
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
