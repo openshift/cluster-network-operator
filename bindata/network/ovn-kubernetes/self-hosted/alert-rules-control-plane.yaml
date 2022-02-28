@@ -15,6 +15,7 @@ spec:
     - alert: NoRunningOvnMaster
       annotations:
         summary: There is no running ovn-kubernetes master.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoRunningOvnMaster.md
         description: |
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
           implemented while there are no OVN Kubernetes pods.
@@ -22,7 +23,7 @@ spec:
         absent(up{job="ovnkube-master", namespace="openshift-ovn-kubernetes"} == 1)
       for: 10m
       labels:
-        severity: warning
+        severity: critical
     - alert: NoOvnMasterLeader
       annotations:
         summary: There is no ovn-kubernetes master leader.
