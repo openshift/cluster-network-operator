@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onsi/gomega/types"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -54,13 +53,4 @@ func (k *KubeObjectMatcher) NegatedFailureMessage(actual interface{}) string {
 		k.kind, k.namespace, k.name,
 		obj.GetKind(), obj.GetNamespace(), obj.GetName())
 
-}
-
-// tweakMetaForCompare adjust the metadata so that if you compare an object
-// reconciled with itself, it will come out DeepEqual
-// This is just because we always set some metadata, so it diverges in a way
-// that is kubernetes equivalent but not go equal.
-func tweakMetaForCompare(obj *uns.Unstructured) {
-	obj.SetResourceVersion("")
-	obj.SetCreationTimestamp(metav1.Time{})
 }

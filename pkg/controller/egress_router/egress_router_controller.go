@@ -224,7 +224,7 @@ func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifes
 		klog.Infof("Assigning owner references")
 		obj.SetOwnerReferences(EgressRouterOwnerReferences)
 		klog.Infof("Applying manifest")
-		if err := apply.ApplyObject(ctx, r.client, obj); err != nil {
+		if err := apply.ApplyObject(ctx, r.client, obj, "egress_router"); err != nil {
 			klog.Infof("could not apply egress router object: %v", err)
 			return err
 		}

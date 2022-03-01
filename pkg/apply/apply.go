@@ -10,74 +10,85 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
+	utilpointer "k8s.io/utils/pointer"
 )
 
-// ApplyObject applies the desired object against the apiserver,
-// merging it with any existing objects if already present.
-func ApplyObject(ctx context.Context, client *cnoclient.Client, obj *uns.Unstructured) error {
+type Object interface {
+	metav1.Object
+	runtime.Object
+}
+
+// ApplyObject submits a server-side apply patch for the given object.
+// This causes fields we own to be updated, and fields we don't own to be preserved.
+// For more information, see https://kubernetes.io/docs/reference/using-api/server-side-apply/
+// The subcontroller, if set, is used to assign field ownership.
+func ApplyObject(ctx context.Context, client *cnoclient.Client, obj Object, subcontroller string) error {
 	name := obj.GetName()
 	namespace := obj.GetNamespace()
-	if name == "" {
-		return errors.Errorf("Object %s has no name", obj.GroupVersionKind().String())
+
+	oks, _, _ := client.Scheme().ObjectKinds(obj)
+	if len(oks) == 0 {
+		return errors.Errorf("Object %s/%s has no Kind registered in the Scheme", namespace, name)
 	}
-	gvk := obj.GroupVersionKind()
+	gvk := oks[0]
+	if name == "" {
+		return errors.Errorf("Object %s has no name", gvk)
+	}
+
+	// Dragons: If we're passed a non-Unstructured object (e.g. v1.ConfigMap), it won't have
+	// the GVK set necessarily. So, use the retrieved GVK from the schema and add it.
+	// This is a no-op for Unstructured objects.
+	obj.GetObjectKind().SetGroupVersionKind(gvk)
 	// used for logging and errors
 	objDesc := fmt.Sprintf("(%s) %s/%s", gvk.String(), namespace, name)
 	log.Printf("reconciling %s", objDesc)
 
-	if err := IsObjectSupported(obj); err != nil {
-		return errors.Wrapf(err, "object %s unsupported", objDesc)
-	}
+	// It isn't allowed to send ManagedFields in a Patch.
+	obj.SetManagedFields(nil)
 
-	// Get existing
-	existing := &uns.Unstructured{}
-	existing.SetGroupVersionKind(gvk)
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		err := client.CRClient().Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, existing)
-
-		if err != nil && apierrors.IsNotFound(err) {
-			log.Printf("does not exist, creating %s", objDesc)
-			err := client.CRClient().Create(ctx, obj)
-			if err != nil {
-				log.Printf("create of %s was unsucessful", objDesc)
-				return err
-			}
-			log.Printf("successfully created %s", objDesc)
-			return nil
-		}
-		if err != nil {
-			log.Printf("could not retrieve %s", objDesc)
-			return err
-		}
-
-		// object exists - for create-only objects, stop here
-		if anno := existing.GetAnnotations()[names.CreateOnlyAnnotation]; anno == "true" {
-			return nil
-		}
-
-		// Merge the desired object with what actually exists
-		if err := MergeObjectForUpdate(existing, obj); err != nil {
-			log.Printf("could not merge %s with existing", objDesc)
-			return err
-		}
-		if !equality.Semantic.DeepEqual(existing, obj) {
-			if err := client.CRClient().Update(ctx, obj); err != nil {
-				log.Printf("update of %s was unsuccessful", objDesc)
-				return err
-			} else {
-				log.Printf("update was successful")
-			}
-		}
-		return nil
-	})
-
+	// determine resource
+	rm, err := client.RESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
-		return errors.Wrapf(err, "ApplyObject of %s was unsuccessful", objDesc)
+		return fmt.Errorf("failed to retrieve resource from Object %s: %v", objDesc, err)
 	}
+
+	// If create-only is specified, check to see if exists
+	if _, ok := obj.GetAnnotations()[names.CreateOnlyAnnotation]; ok {
+		_, err := client.Dynamic().Resource(rm.Resource).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err == nil {
+			log.Printf("Object %s has create-only annotation and already exists, skipping apply.", objDesc)
+			return nil
+		}
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	fieldManager := "cluster-network-operator"
+	if subcontroller != "" {
+		fieldManager = fmt.Sprintf("%s/%s", fieldManager, subcontroller)
+	}
+
+	// Use server-side apply to merge the desired object with the object on disk
+	patchOptions := metav1.PatchOptions{
+		// It is considered best-practice for controllers to force
+		Force:        utilpointer.Bool(true),
+		FieldManager: fieldManager,
+	}
+	// Send the full object to be applied on the server side.
+	data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
+	if err != nil {
+		log.Printf("could not encode %s for apply", objDesc)
+		return fmt.Errorf("could not encode for patching: %w", err)
+	}
+	if _, err := client.Dynamic().Resource(rm.Resource).Namespace(namespace).Patch(ctx, name, types.ApplyPatchType, data, patchOptions); err != nil {
+		return fmt.Errorf("failed to apply / update %s: %w", objDesc, err)
+	}
+	log.Printf("Apply / Create of %s was successful", objDesc)
 	return nil
 }
