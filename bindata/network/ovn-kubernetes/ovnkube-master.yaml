@@ -356,6 +356,18 @@ spec:
                 {{ if .EnableIPsec }}
                 ${OVN_NB_CTL} set nb_global . ipsec=true
                 {{ end }}
+                OVNNBDB_CTL="/var/run/ovn/ovnnb_db.ctl"
+                if [[ -f $OVNNBDB_CTL ]]; then
+                  # Enable NBDB memory trimming on DB compaction, Every 10mins DBs are compacted
+                  # memory on the heap is freed, when enable memory trimmming freed memory will go back to OS.
+                  /usr/bin/ovn-appctl -t $OVNNBDB_CTL --timeout=5 ovsdb-server/memory-trim-on-compaction on
+                  if [[ $? -eq 0 ]]; then
+                    echo "Successfully enabled NBDB memory trimming on compaction"
+                  else
+                    echo "Couldn't enable NBDB memory trimming on compaction"
+                    exit 1
+                  fi
+                fi
           preStop:
             exec:
               command:
@@ -665,6 +677,18 @@ spec:
                   else
                       echo "Upgrading database $schema_name from schema version $db_version to $target_version"
                       ovsdb-client -t 30 convert "$DB_SERVER" "$DB_SCHEMA"
+                  fi
+                fi
+                OVNSBDB_CTL="/var/run/ovn/ovnsb_db.ctl"
+                if [[ -f $OVNSBDB_CTL ]]; then
+                  # Enable SBDB memory trimming on DB compaction, Every 10mins DBs are compacted
+                  # memory on the heap is freed, when enable memory trimmming freed memory will go back to OS.
+                  /usr/bin/ovn-appctl -t $OVNSBDB_CTL --timeout=5 ovsdb-server/memory-trim-on-compaction on
+                  if [[ $? -eq 0 ]]; then
+                    echo "Successfully enabled SBDB memory trimming on compaction"
+                  else
+                    echo "Couldn't enable SBDB memory trimming on compaction"
+                    exit 1
                   fi
                 fi
           preStop:
