@@ -7,13 +7,13 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -22,13 +22,13 @@ import (
 )
 
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
-	return add(mgr, newReconciler(mgr, status))
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) error {
+	return add(mgr, newReconciler(mgr, status, c))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) reconcile.Reconciler {
-	return &ReconcileClusterConfig{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status}
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) reconcile.Reconciler {
+	return &ReconcileClusterConfig{client: c, scheme: mgr.GetScheme(), status: status}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -52,9 +52,7 @@ var _ reconcile.Reconciler = &ReconcileClusterConfig{}
 
 // ReconcileClusterConfig reconciles a cluster Network object
 type ReconcileClusterConfig struct {
-	// This client, initialized using mgr.Client() above, is a split client
-	// that reads objects from the cache and writes to the apiserver
-	client client.Client
+	client *cnoclient.Client
 	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
 }
@@ -73,7 +71,7 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 
 	// Fetch the cluster config
 	clusterConfig := &configv1.Network{}
-	err := r.client.Get(ctx, request.NamespacedName, clusterConfig)
+	err := r.client.CRClient().Get(ctx, request.NamespacedName, clusterConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -88,7 +86,7 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	}
 
 	// Validate the cluster config
-	if err := network.ValidateClusterConfig(clusterConfig.Spec, r.client); err != nil {
+	if err := network.ValidateClusterConfig(clusterConfig.Spec, r.client.CRClient()); err != nil {
 		log.Printf("Failed to validate Network.Spec: %v", err)
 		r.status.SetDegraded(statusmanager.ClusterConfig, "InvalidClusterConfig",
 			fmt.Sprintf("The cluster configuration is invalid (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))

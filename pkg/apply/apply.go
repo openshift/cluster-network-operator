@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 
 	"github.com/pkg/errors"
@@ -14,12 +15,11 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ApplyObject applies the desired object against the apiserver,
 // merging it with any existing objects if already present.
-func ApplyObject(ctx context.Context, client k8sclient.Client, obj *uns.Unstructured) error {
+func ApplyObject(ctx context.Context, client *cnoclient.Client, obj *uns.Unstructured) error {
 	name := obj.GetName()
 	namespace := obj.GetNamespace()
 	if name == "" {
@@ -38,11 +38,11 @@ func ApplyObject(ctx context.Context, client k8sclient.Client, obj *uns.Unstruct
 	existing := &uns.Unstructured{}
 	existing.SetGroupVersionKind(gvk)
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		err := client.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, existing)
+		err := client.CRClient().Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, existing)
 
 		if err != nil && apierrors.IsNotFound(err) {
 			log.Printf("does not exist, creating %s", objDesc)
-			err := client.Create(ctx, obj)
+			err := client.CRClient().Create(ctx, obj)
 			if err != nil {
 				log.Printf("create of %s was unsucessful", objDesc)
 				return err
@@ -66,7 +66,7 @@ func ApplyObject(ctx context.Context, client k8sclient.Client, obj *uns.Unstruct
 			return err
 		}
 		if !equality.Semantic.DeepEqual(existing, obj) {
-			if err := client.Update(ctx, obj); err != nil {
+			if err := client.CRClient().Update(ctx, obj); err != nil {
 				log.Printf("update of %s was unsuccessful", objDesc)
 				return err
 			} else {

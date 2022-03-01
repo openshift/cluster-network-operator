@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type StatusLevel int
@@ -48,7 +48,7 @@ const (
 type StatusManager struct {
 	sync.Mutex
 
-	client client.Client
+	client crclient.Client
 	mapper meta.RESTMapper
 	name   string
 
@@ -60,7 +60,7 @@ type StatusManager struct {
 	relatedObjects []configv1.ObjectReference
 }
 
-func New(client client.Client, mapper meta.RESTMapper, name string) *StatusManager {
+func New(client crclient.Client, mapper meta.RESTMapper, name string) *StatusManager {
 	return &StatusManager{client: client, mapper: mapper, name: name}
 }
 
@@ -106,7 +106,7 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 			objToDelete.SetName(currentObj.Name)
 			objToDelete.SetNamespace(currentObj.Namespace)
 			objToDelete.SetGroupVersionKind(gvk)
-			err = status.client.Delete(context.TODO(), objToDelete, client.PropagationPolicy("Background"))
+			err = status.client.Delete(context.TODO(), objToDelete, crclient.PropagationPolicy("Background"))
 			if err != nil {
 				log.Printf("Error deleting related object: %v", err)
 				if !errors.IsNotFound(err) {

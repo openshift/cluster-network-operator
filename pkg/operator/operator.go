@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift/cluster-network-operator/pkg/client"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller"
 	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
@@ -28,7 +28,7 @@ type Operator struct {
 	// general controller configuration / context
 	ccfg *controllercmd.ControllerContext
 
-	client  *client.Client
+	client  *cnoclient.Client
 	manager ctmanager.Manager
 
 	StatusManager *statusmanager.StatusManager
@@ -43,7 +43,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	var err error
 	cfg := controllerConfig.KubeConfig
-	if o.client, err = client.New(cfg, controllerConfig.ProtoKubeConfig); err != nil {
+	if o.client, err = cnoclient.New(cfg, controllerConfig.ProtoKubeConfig); err != nil {
 		return err
 	}
 
@@ -63,7 +63,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	// Add controller-runtime controllers
 	klog.Info("Adding controller-runtime controllers")
-	if err := controller.AddToManager(o.manager, o.StatusManager); err != nil {
+	if err := controller.AddToManager(o.manager, o.StatusManager, o.client); err != nil {
 		return fmt.Errorf("Failed to add controllers to manager: %w", err)
 	}
 
