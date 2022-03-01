@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/library-go/pkg/crypto"
 	csrv1 "k8s.io/api/certificates/v1"
@@ -17,7 +18,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -28,7 +29,7 @@ import (
 const signerName = "network.openshift.io/signer"
 
 // Add controller and start it when the Manager is started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.Client) error {
 	reconciler, err := newReconciler(mgr, status)
 	if err != nil {
 		return err
@@ -80,7 +81,7 @@ var _ reconcile.Reconciler = &ReconcileCSR{}
 type ReconcileCSR struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
+	client crclient.Client
 	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
 

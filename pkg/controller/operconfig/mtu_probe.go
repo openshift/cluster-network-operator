@@ -79,7 +79,7 @@ func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network) 
 func (r *ReconcileOperConfig) readMTUConfigMap(ctx context.Context) (int, error) {
 	klog.V(4).Infof("Looking for ConfigMap %s/%s", cmNamespace, cmName)
 	cm := &corev1.ConfigMap{}
-	err := r.client.Get(ctx, types.NamespacedName{Namespace: cmNamespace, Name: cmName}, cm)
+	err := r.client.CRClient().Get(ctx, types.NamespacedName{Namespace: cmNamespace, Name: cmName}, cm)
 	if err != nil {
 		return 0, err
 	}
@@ -123,7 +123,7 @@ func (r *ReconcileOperConfig) deleteMTUProber(ctx context.Context) error {
 	klog.Info("Cleaning up mtu-prober job")
 	for i := len(objs) - 1; i >= 0; i-- {
 		obj := objs[i]
-		if err := r.client.Delete(ctx, obj, crclient.PropagationPolicy("Background")); err != nil && !apierrors.IsNotFound(err) {
+		if err := r.client.CRClient().Delete(ctx, obj, crclient.PropagationPolicy("Background")); err != nil && !apierrors.IsNotFound(err) {
 			klog.Infof("Could not delete mtu-prober object: %v", err)
 		} else {
 			klog.Infof("Deleted %s %s/%s", obj.GetKind(), obj.GetNamespace(), obj.GetName())

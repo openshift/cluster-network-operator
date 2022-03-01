@@ -13,12 +13,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // GetAppliedConfiguration retrieves the configuration we applied.
 // Returns nil with no error if no previous configuration was observed.
-func GetAppliedConfiguration(ctx context.Context, client k8sclient.Client, name string) (*operv1.NetworkSpec, error) {
+func GetAppliedConfiguration(ctx context.Context, client crclient.Client, name string) (*operv1.NetworkSpec, error) {
 	cm := &corev1.ConfigMap{}
 	err := client.Get(ctx, types.NamespacedName{Namespace: names.APPLIED_NAMESPACE, Name: names.APPLIED_PREFIX + name}, cm)
 	if err != nil && apierrors.IsNotFound(err) {

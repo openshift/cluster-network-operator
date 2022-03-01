@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
-	client "sigs.k8s.io/controller-runtime/pkg/client"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -317,7 +317,7 @@ func (status *StatusManager) setLastPodState(
 			newStatus.Annotations = map[string]string{}
 		}
 		newStatus.Annotations[lastSeenAnnotation] = string(lsbytes)
-		return status.client.Patch(context.TODO(), newStatus, client.MergeFrom(oldStatus))
+		return status.client.Patch(context.TODO(), newStatus, crclient.MergeFrom(oldStatus))
 	})
 }
 
@@ -328,7 +328,7 @@ func (status *StatusManager) setLastPodState(
 func (status *StatusManager) CheckCrashLoopBackOffPods(dName types.NamespacedName, selector map[string]string, kind string) []string {
 	hung := []string{}
 	pods := &v1.PodList{}
-	err := status.client.List(context.TODO(), pods, client.InNamespace(dName.Namespace), client.MatchingLabels(selector))
+	err := status.client.List(context.TODO(), pods, crclient.InNamespace(dName.Namespace), crclient.MatchingLabels(selector))
 	if err != nil {
 		log.Printf("Error getting pods from %s %q: %v", kind, dName.String(), err)
 	}
@@ -373,7 +373,7 @@ func (status *StatusManager) setDSAnnotation(obj *appsv1.DaemonSet, key string, 
 		delete(anno, key)
 	}
 	new.SetAnnotations(anno)
-	return status.client.Patch(context.TODO(), new, client.MergeFrom(obj))
+	return status.client.Patch(context.TODO(), new, crclient.MergeFrom(obj))
 }
 
 // setDepAnnotation sets an annotation on a Deployment. If value is nil,
@@ -399,5 +399,5 @@ func (status *StatusManager) setDepAnnotation(obj *appsv1.Deployment, key string
 		delete(anno, key)
 	}
 	new.SetAnnotations(anno)
-	return status.client.Patch(context.TODO(), new, client.MergeFrom(obj))
+	return status.client.Patch(context.TODO(), new, crclient.MergeFrom(obj))
 }

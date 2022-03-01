@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
@@ -17,7 +18,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -27,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.Client) error {
 	reconciler := newReconciler(mgr, status)
 	if reconciler == nil {
 		return fmt.Errorf("failed to create reconciler")
@@ -75,7 +77,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 var _ reconcile.Reconciler = &ReconcileConfigMapInjector{}
 
 type ReconcileConfigMapInjector struct {
-	client client.Client
+	client crclient.Client
 	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
 }
@@ -117,7 +119,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 	if request.Name == names.TRUSTED_CA_BUNDLE_CONFIGMAP && request.Namespace == names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS {
 
 		configMapList := &corev1.ConfigMapList{}
-		matchingLabels := &client.MatchingLabels{names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL: "true"}
+		matchingLabels := &crclient.MatchingLabels{names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL: "true"}
 		err = r.client.List(ctx, configMapList, matchingLabels)
 		if err != nil {
 			log.Println(err)

@@ -31,7 +31,7 @@ func (r *ReconcileClusterConfig) UpdateOperatorConfig(ctx context.Context, clust
 		ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
 	}
 
-	err := r.client.Get(ctx, types.NamespacedName{Name: names.OPERATOR_CONFIG}, operConfig)
+	err := r.client.CRClient().Get(ctx, types.NamespacedName{Name: names.OPERATOR_CONFIG}, operConfig)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, errors.Wrapf(err, "could not retrieve Network.operator.openshift.io/v1 %s", names.OPERATOR_CONFIG)
 	}

@@ -13,6 +13,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
@@ -25,7 +26,7 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -46,14 +47,14 @@ var ManifestPath = "./bindata"
 
 // Add creates a new OperConfig Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
-	return add(mgr, newReconciler(mgr, status))
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) error {
+	return add(mgr, newReconciler(mgr, status, c))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) *ReconcileOperConfig {
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) *ReconcileOperConfig {
 	return &ReconcileOperConfig{
-		client:        mgr.GetClient(),
+		client:        c,
 		scheme:        mgr.GetScheme(),
 		status:        status,
 		mapper:        mgr.GetRESTMapper(),
@@ -104,9 +105,7 @@ var _ reconcile.Reconciler = &ReconcileOperConfig{}
 
 // ReconcileOperConfig reconciles a Network.operator.openshift.io object
 type ReconcileOperConfig struct {
-	// This client, initialized using mgr.Client() above, is a split client
-	// that reads objects from the cache and writes to the apiserver
-	client        client.Client
+	client        *cnoclient.Client
 	scheme        *runtime.Scheme
 	status        *statusmanager.StatusManager
 	mapper        meta.RESTMapper
@@ -129,7 +128,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	// Fetch the Network.operator.openshift.io instance
 	operConfig := &operv1.Network{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}}
-	err := r.client.Get(ctx, request.NamespacedName, operConfig)
+	err := r.client.CRClient().Get(ctx, request.NamespacedName, operConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			r.status.SetDegraded(statusmanager.OperatorConfig, "NoOperatorConfig",
@@ -172,7 +171,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// Retrieve the previously applied operator configuration
-	prev, err := GetAppliedConfiguration(ctx, r.client, operConfig.ObjectMeta.Name)
+	prev, err := GetAppliedConfiguration(ctx, r.client.CRClient(), operConfig.ObjectMeta.Name)
 	if err != nil {
 		log.Printf("Failed to retrieve previously applied configuration: %v", err)
 		// FIXME: operator status?
@@ -207,7 +206,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if prev != nil {
 		// We may need to fill defaults here -- sort of as a poor-man's
 		// upconversion scheme -- if we add additional fields to the config.
-		err = network.IsChangeSafe(prev, &operConfig.Spec, r.client)
+		err = network.IsChangeSafe(prev, &operConfig.Spec, r.client.CRClient())
 		if err != nil {
 			log.Printf("Not applying unsafe change: %v", err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
@@ -219,7 +218,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	newOperConfig := operConfig.DeepCopy()
 
 	// Bootstrap any resources
-	bootstrapResult, err := network.Bootstrap(newOperConfig, r.client)
+	bootstrapResult, err := network.Bootstrap(newOperConfig, r.client.CRClient())
 	if err != nil {
 		log.Printf("Failed to reconcile platform networking resources: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "BootstrapError",
@@ -228,7 +227,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	if !reflect.DeepEqual(operConfig, newOperConfig) {
-		if err := r.UpdateOperConfig(newOperConfig); err != nil {
+		if err := r.UpdateOperConfig(ctx, newOperConfig); err != nil {
 			log.Printf("Failed to update the operator configuration: %v", err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "UpdateOperatorConfig",
 				fmt.Sprintf("Internal error while updating operator configuration: %v", err))
@@ -366,7 +365,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	r.status.SetFromPods()
 
 	// Update Network.config.openshift.io.Status
-	status, err := r.ClusterNetworkStatus(context.TODO(), operConfig)
+	status, err := r.ClusterNetworkStatus(ctx, operConfig)
 	if err != nil {
 		log.Printf("Could not generate network status: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "StatusError",
@@ -376,7 +375,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if status != nil {
 		// Don't set the owner reference in this case -- we're updating
 		// the status of our owner.
-		if err := apply.ApplyObject(context.TODO(), r.client, status); err != nil {
+		if err := apply.ApplyObject(ctx, r.client, status); err != nil {
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", status.GroupVersionKind(), status.GetNamespace(), status.GetName())
 			log.Println(err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "StatusError",
@@ -389,12 +388,13 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	// All was successful. Request that this be re-triggered after ResyncPeriod,
 	// so we can reconcile state again.
+	log.Printf("Operconfig Controller complete")
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
 }
 
 // reconcileOvsFlowsConfig filters non-ovs-flows-config events and forwards a request to the
 // openshift-network-operator/cluster operator
-func reconcileOvsFlowsConfig(object client.Object) []reconcile.Request {
+func reconcileOvsFlowsConfig(object crclient.Object) []reconcile.Request {
 	n := object.GetName()
 	ns := object.GetNamespace()
 	if n != network.OVSFlowsConfigMapName || ns != network.OVSFlowsConfigNamespace {

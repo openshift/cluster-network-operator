@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const OVN_NB_PORT = "9641"
@@ -342,7 +342,7 @@ func renderOVNFlowsConfig(bootstrapResult *bootstrap.BootstrapResult, data *rend
 
 // bootstrapOVNConfig returns the value of mode found in the openshift-ovn-kubernetes/dpu-mode-config configMap
 // if it exists, otherwise returns default configuration for OCP clusters using OVN-Kubernetes
-func bootstrapOVNConfig(conf *operv1.Network, kubeClient client.Client) (*bootstrap.OVNConfigBoostrapResult, error) {
+func bootstrapOVNConfig(conf *operv1.Network, kubeClient crclient.Client) (*bootstrap.OVNConfigBoostrapResult, error) {
 	ovnConfigResult := &bootstrap.OVNConfigBoostrapResult{
 		NodeMode: OVN_NODE_MODE_FULL,
 	}
@@ -571,7 +571,7 @@ type replicaCountDecoder struct {
 
 // bootstrapOVNGatewayConfig sets the Network.operator.openshift.io.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig value
 // based on the values from the "gateway-mode-config" map if any
-func bootstrapOVNGatewayConfig(conf *operv1.Network, kubeClient client.Client) {
+func bootstrapOVNGatewayConfig(conf *operv1.Network, kubeClient crclient.Client) {
 	// handle upgrade logic for gateway mode in OVN-K plugin (migration from hidden config map to using proper API)
 	// TODO: Remove this logic in future releases when we are sure everyone has migrated away from the config-map
 	cm := &corev1.ConfigMap{}
@@ -599,7 +599,7 @@ func bootstrapOVNGatewayConfig(conf *operv1.Network, kubeClient client.Client) {
 	klog.Infof("Gateway mode is %s", modeOverride)
 }
 
-func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
+func bootstrapOVN(conf *operv1.Network, kubeClient crclient.Client) (*bootstrap.BootstrapResult, error) {
 	clusterConfig := &corev1.ConfigMap{}
 	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
 	masterNodeList := &corev1.NodeList{}
@@ -623,7 +623,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 	var heartBeat int
 
 	err = wait.PollImmediate(OVN_MASTER_DISCOVERY_POLL*time.Second, time.Duration(OVN_MASTER_DISCOVERY_TIMEOUT)*time.Second, func() (bool, error) {
-		matchingLabels := &client.MatchingLabels{"node-role.kubernetes.io/master": ""}
+		matchingLabels := &crclient.MatchingLabels{"node-role.kubernetes.io/master": ""}
 		if err := kubeClient.List(context.TODO(), masterNodeList, matchingLabels); err != nil {
 			return false, err
 		}
@@ -760,7 +760,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 // bootstrapFlowsConfig looks for the openshift-network-operator/ovs-flows-config configmap, and
 // returns it or returns nil if it does not exist (or can't be properly parsed).
 // Usually, the second argument will be net.LookupIP
-func bootstrapFlowsConfig(cl client.Reader) *bootstrap.FlowsConfig {
+func bootstrapFlowsConfig(cl crclient.Reader) *bootstrap.FlowsConfig {
 	cm := corev1.ConfigMap{}
 	if err := cl.Get(context.TODO(), types.NamespacedName{
 		Name:      OVSFlowsConfigMapName,

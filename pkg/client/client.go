@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	kinformer "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -26,7 +27,6 @@ import (
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
 	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -52,9 +52,14 @@ type Client struct {
 
 	// restMapper is the mapper from GVK to GVR (among other fun tasks)
 	restMapper meta.RESTMapper
-	// dynamic is an untyped, uncached client for making direct requests
+
+	// dynclient is an untyped, uncached client for making direct requests
 	// against the apiserver.
-	dynamic crclient.Client
+	dynclient dynamic.Interface
+
+	// crclient is the controller-runtime Client, for controllers that have
+	// not yet been migrated.
+	crclient crclient.Client
 
 	// informers is any other Informer we create, e.g. ones with
 	// specific watches, that are't managed by the factories.
@@ -86,14 +91,21 @@ func New(cfg, protocfg *rest.Config) (*Client, error) {
 	}
 	c.osOperFactory = osoperinformer.NewSharedInformerFactory(c.osOperClient, defaultResyncPeriod)
 
-	// The dynamic client is untyped and exposes a simpler interface.
+	// Initialize the client-go dynamic client
+	c.dynclient, err = dynamic.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	// And the DynamicRESTMapper (which handles on-the-fly CRD creation)
 	if c.restMapper, err = k8s.NewDynamicRESTMapper(cfg); err != nil {
 		return nil, err
 	}
-	if c.dynamic, err = crclient.New(cfg, client.Options{Mapper: c.restMapper}); err != nil {
+	// And the controller-runtime client, which is similar to the client-go dynamic client.
+	if c.crclient, err = crclient.New(cfg, crclient.Options{Mapper: c.restMapper}); err != nil {
 		return nil, err
 	}
 
+	// Add types to the scheme.
 	if err := operv1.Install(c.Scheme()); err != nil {
 		log.Fatal(err)
 	}
@@ -122,10 +134,13 @@ func (c *Client) OpenshiftOperatorClient() *osoperclient.Clientset {
 	return c.osOperClient
 }
 
-// Dynamic returns an untyped, dynamic client. This is useful for
-// controller-tools-style controllers.
-func (c *Client) Dynamic() crclient.Client {
-	return c.dynamic
+// Dynamic returns an untyped, dynamic client.
+func (c *Client) Dynamic() dynamic.Interface {
+	return c.dynclient
+}
+
+func (c *Client) CRClient() crclient.Client {
+	return c.crclient
 }
 
 func (c *Client) RESTMapper() meta.RESTMapper {
