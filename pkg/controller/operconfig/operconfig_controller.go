@@ -51,6 +51,8 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.
 	return add(mgr, newReconciler(mgr, status, c))
 }
 
+const ControllerName = "operconfig"
+
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) *ReconcileOperConfig {
 	return &ReconcileOperConfig{
@@ -337,7 +339,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		}
 
 		// Open question: should an error here indicate we will never retry?
-		if err := apply.ApplyObject(ctx, r.client, obj); err != nil {
+		if err := apply.ApplyObject(ctx, r.client, obj, ControllerName); err != nil {
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
 
 			// If error comes from nonexistent namespace print out a help message.
@@ -375,7 +377,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if status != nil {
 		// Don't set the owner reference in this case -- we're updating
 		// the status of our owner.
-		if err := apply.ApplyObject(ctx, r.client, status); err != nil {
+		if err := apply.ApplyObject(ctx, r.client, status, ControllerName); err != nil {
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", status.GroupVersionKind(), status.GetNamespace(), status.GetName())
 			log.Println(err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "StatusError",

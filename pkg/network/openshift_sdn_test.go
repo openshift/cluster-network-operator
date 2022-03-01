@@ -7,7 +7,6 @@ import (
 	yaml "github.com/ghodss/yaml"
 
 	operv1 "github.com/openshift/api/operator/v1"
-	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -82,21 +81,6 @@ func TestRenderOpenShiftSDN(t *testing.T) {
 
 		_, ok := sel["node-role.kubernetes.io/master"]
 		g.Expect(ok).To(BeTrue())
-	}
-
-	// Make sure every obj is reasonable:
-	// - it is supported
-	// - it reconciles to itself (steady state)
-	for _, obj := range objs {
-		g.Expect(apply.IsObjectSupported(obj)).NotTo(HaveOccurred())
-		cur := obj.DeepCopy()
-		upd := obj.DeepCopy()
-
-		err = apply.MergeObjectForUpdate(cur, upd)
-		g.Expect(err).NotTo(HaveOccurred())
-
-		tweakMetaForCompare(cur)
-		g.Expect(cur).To(Equal(upd))
 	}
 }
 

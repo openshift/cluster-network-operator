@@ -102,7 +102,7 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	}
 
 	if operatorConfig != nil {
-		if err := apply.ApplyObject(ctx, r.client, operatorConfig); err != nil {
+		if err := apply.ApplyObject(ctx, r.client, operatorConfig, "clusterconfig"); err != nil {
 			log.Printf("Could not apply operator config: %v", err)
 			r.status.SetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",
 				fmt.Sprintf("Error while trying to update operator configuration: %v", err))
