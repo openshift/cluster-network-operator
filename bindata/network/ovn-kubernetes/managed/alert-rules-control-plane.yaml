@@ -25,6 +25,7 @@ spec:
       labels:
         severity: warning
     - alert: NoOvnMasterLeader
+      runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoOvnMasterLeader.md
       annotations:
         summary: There is no ovn-kubernetes master leader.
         description: |
@@ -35,7 +36,7 @@ spec:
         max(ovnkube_master_leader) == 0
       for: 10m
       labels:
-        severity: warning
+        severity: critical
     - alert: NorthboundStale
       annotations:
         summary: ovn-kubernetes has not written anything to the northbound database for too long.
