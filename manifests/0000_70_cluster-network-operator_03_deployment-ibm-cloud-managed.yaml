@@ -79,6 +79,8 @@ spec:
           value: quay.io/openshift/origin-cluster-network-operator:latest
         - name: NETWORK_CHECK_TARGET_IMAGE
           value: quay.io/openshift/origin-cluster-network-operator:latest
+        - name: NETWORK_OPERATOR_IMAGE
+          value: quay.io/openshift/origin-cluster-network-operator:latest
         - name: CLOUD_NETWORK_CONFIG_CONTROLLER_IMAGE
           value: quay.io/openshift/origin-cloud-network-config-controller:latest
         - name: POD_NAME

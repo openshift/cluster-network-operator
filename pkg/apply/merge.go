@@ -38,6 +38,10 @@ func MergeObjectForUpdate(current, updated *uns.Unstructured) error {
 		return err
 	}
 
+	if err := mergeJobForUpdate(current, updated); err != nil {
+		return err
+	}
+
 	// For all object types, merge metadata.
 	// Run this last, in case any of the more specific merge logic has
 	// changed "updated"
@@ -71,6 +75,39 @@ func mergeDeploymentForUpdate(current, updated *uns.Unstructured) error {
 		}
 
 		updated.SetAnnotations(updatedAnnotations)
+	}
+
+	return nil
+}
+
+// mergeJobForUpdate updates Job objects.
+// We need to copy-in the generated labels
+func mergeJobForUpdate(current, updated *uns.Unstructured) error {
+	gvk := updated.GroupVersionKind()
+	if gvk.Group == "batch" && gvk.Kind == "Job" {
+		// labels are immutable, and they need to be copied in.
+		lsel, found, err := uns.NestedMap(current.Object, "spec", "selector")
+		if err != nil {
+			return err
+		}
+		if found {
+			err = uns.SetNestedMap(updated.Object, lsel, "spec", "selector")
+			if err != nil {
+				return err
+			}
+		}
+
+		tsel, found, err := uns.NestedMap(current.Object, "spec", "template", "metadata", "labels")
+		if err != nil {
+			return err
+		}
+		if found {
+			err = uns.SetNestedMap(updated.Object, tsel, "spec", "template", "metadata", "labels")
+			if err != nil {
+				return err
+			}
+		}
+
 	}
 
 	return nil

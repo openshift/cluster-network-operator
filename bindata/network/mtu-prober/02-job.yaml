@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  namespace: openshift-network-operator
+  name: mtu-prober
+  annotations:
+    kubernetes.io/description: |
+      This job is run early in the network installation process. It determines the MTU
+      of the default route of a node on the cluster.
+spec:
+  selector: {} #need this to make the apiserver happy :/
+  template:
+    spec:
+      containers:
+      - name: prober
+        image: {{.CNOImage}}
+        command:
+        - /usr/bin/cluster-network-operator
+        - probe-mtu
+        - --namespace={{.DestNS}}
+        - --name={{.DestName}}
+        env:
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: "system-cluster-critical"
+      restartPolicy: OnFailure
+      serviceAccount: mtu-prober
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node.kubernetes.io/network-unavailable"
+        operator: "Exists"
+        effect: "NoSchedule"

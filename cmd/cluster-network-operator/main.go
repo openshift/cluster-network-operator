@@ -87,5 +87,7 @@ which is a kubeconfig from which to take just the URL to the apiserver`,
 
 	cmd.AddCommand(cmd2)
 
+	cmd.AddCommand(newMTUProberCommand())
+
 	return cmd
 }

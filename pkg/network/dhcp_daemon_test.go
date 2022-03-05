@@ -1,9 +1,10 @@
 package network
 
 import (
+	"testing"
+
 	. "github.com/onsi/gomega"
 	operv1 "github.com/openshift/api/operator/v1"
-	"testing"
 )
 
 var NoDHCPConfig = operv1.Network{
@@ -168,7 +169,7 @@ func TestRenderWithDHCP(t *testing.T) {
 
 	crd := DHCPConfig.DeepCopy()
 	config := &crd.Spec
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	objs, err := renderMultus(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -181,7 +182,7 @@ func TestRenderNoDHCP(t *testing.T) {
 
 	crd := NoDHCPConfig.DeepCopy()
 	config := &crd.Spec
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	objs, err := renderMultus(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -194,7 +195,7 @@ func TestRenderInvalidDHCP(t *testing.T) {
 
 	crd := InvalidDHCPConfig.DeepCopy()
 	config := &crd.Spec
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	objs, err := renderMultus(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -207,7 +208,7 @@ func TestRenderWithDHCPSimpleMacvlan(t *testing.T) {
 
 	crd := DHCPConfigSimpleMacvlan.DeepCopy()
 	config := &crd.Spec
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	objs, err := renderMultus(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -220,7 +221,7 @@ func TestRenderNoDHCPSimpleMacvlan(t *testing.T) {
 
 	crd := NoDHCPConfigSimpleMacvlan.DeepCopy()
 	config := &crd.Spec
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	objs, err := renderMultus(config, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
