@@ -1,6 +1,7 @@
 package network
 
 import (
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -257,15 +258,27 @@ func fillOpenShiftSDNDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 	}
 
 	// MTU is currently the only field we pull from previous.
-	// If it's not supplied, we infer it from  the node on which we're running.
+	// If it's not supplied, we infer it by probing a node's interface via the mtu-prober job.
 	// However, this can never change, so we always prefer previous.
 	if sc.MTU == nil {
-		var mtu uint32 = uint32(hostMTU) - 50 // 50 byte VXLAN header
+		var mtu uint32
 		if previous != nil &&
 			previous.DefaultNetwork.Type == operv1.NetworkTypeOpenShiftSDN &&
 			previous.DefaultNetwork.OpenShiftSDNConfig != nil &&
 			previous.DefaultNetwork.OpenShiftSDNConfig.MTU != nil {
 			mtu = *previous.DefaultNetwork.OpenShiftSDNConfig.MTU
+		} else {
+			// utter paranoia
+			// somehow we didn't probe the MTU in the controller, but we need it.
+			// This might be wrong in cases where the CNO is not local (e.g. Hypershift).
+			if hostMTU == 0 {
+				log.Printf("BUG: Probed MTU wasn't supplied, but was needed. Falling back to host MTU")
+				hostMTU, _ = GetDefaultMTU()
+				if hostMTU == 0 { // this is beyond unlikely.
+					panic("BUG: Probed MTU wasn't supplied, host MTU invalid")
+				}
+			}
+			mtu = uint32(hostMTU) - 50 // 50 byte VXLAN header
 		}
 		sc.MTU = &mtu
 	}

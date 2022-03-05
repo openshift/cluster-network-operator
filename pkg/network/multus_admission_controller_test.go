@@ -35,7 +35,7 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	config := &crd.Spec
 	disabled := true
 	config.DisableMultiNetwork = &disabled
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	// disable MultusAdmissionController
 	objs, err := renderMultusAdmissionController(config, manifestDir, false)

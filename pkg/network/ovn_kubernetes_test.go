@@ -63,7 +63,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 
 	errs := validateOVNKubernetes(config)
 	g.Expect(errs).To(HaveLen(0))
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	bootstrapResult := &bootstrap.BootstrapResult{
 		OVN: bootstrap.OVNBootstrapResult{
@@ -129,7 +129,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 
 	errs := validateOVNKubernetes(config)
 	g.Expect(errs).To(HaveLen(0))
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	bootstrapResult := &bootstrap.BootstrapResult{
 		OVN: bootstrap.OVNBootstrapResult{
@@ -370,7 +370,7 @@ election-retry-period=26`,
 
 			errs := validateOVNKubernetes(config)
 			g.Expect(errs).To(HaveLen(0))
-			FillDefaults(config, nil)
+			fillDefaults(config, nil)
 
 			bootstrapResult := &bootstrap.BootstrapResult{
 				OVN: bootstrap.OVNBootstrapResult{
@@ -523,7 +523,7 @@ func TestValidateOVNKubernetes(t *testing.T) {
 
 	err := validateOVNKubernetes(config)
 	g.Expect(err).To(BeEmpty())
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	errExpect := func(substr string) {
 		t.Helper()
@@ -560,7 +560,7 @@ func TestValidateOVNKubernetesDualStack(t *testing.T) {
 
 	err := validateOVNKubernetes(config)
 	g.Expect(err).To(BeEmpty())
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	errExpect := func(substr string) {
 		t.Helper()
@@ -598,9 +598,9 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	prev := OVNKubernetesConfig.Spec.DeepCopy()
-	FillDefaults(prev, nil)
+	fillDefaults(prev, nil)
 	next := OVNKubernetesConfig.Spec.DeepCopy()
-	FillDefaults(next, nil)
+	fillDefaults(next, nil)
 
 	errs := isOVNKubernetesChangeSafe(prev, next)
 	g.Expect(errs).To(BeEmpty())
@@ -1283,7 +1283,7 @@ metadata:
 
 			errs := validateOVNKubernetes(config)
 			g.Expect(errs).To(HaveLen(0))
-			FillDefaults(config, nil)
+			fillDefaults(config, nil)
 
 			node = &appsv1.DaemonSet{}
 			err := yaml.Unmarshal([]byte(tc.node), node)
@@ -1589,7 +1589,7 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 	if len(errs) > 0 {
 		t.Errorf("Unexpected error: %v", errs)
 	}
-	FillDefaults(config, nil)
+	fillDefaults(config, nil)
 
 	// at the same time we have an upgrade
 	os.Setenv("RELEASE_VERSION", "2.0.0")

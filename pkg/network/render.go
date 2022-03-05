@@ -205,18 +205,10 @@ func Validate(conf *operv1.NetworkSpec) error {
 //
 // Defaults are carried forward from previous if it is provided. This is so we
 // can change defaults as we move forward, but won't disrupt existing clusters.
-func FillDefaults(conf, previous *operv1.NetworkSpec) {
-	hostMTU, err := getDefaultMTU()
-	if hostMTU == 0 {
-		hostMTU = 1500
-	}
-	if previous == nil { // host mtu isn't used in subsequent runs, elide these logs
-		if err != nil {
-			log.Printf("Failed MTU probe, falling back to 1500: %v", err)
-		} else {
-			log.Printf("Detected uplink MTU %d", hostMTU)
-		}
-	}
+//
+// We may need to know the MTU of nodes in the cluster, so we can compute the correct
+// underlay MTU (for OVN-K and OSDN).
+func FillDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 	// DisableMultiNetwork defaults to false
 	if conf.DisableMultiNetwork == nil {
 		disable := false
@@ -284,6 +276,27 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec, client client.Client) error {
 		return errors.Errorf("invalid configuration: %v", errs)
 	}
 	return nil
+}
+
+// NeedMTUProbe returns true if we need to probe the cluster's MTU.
+// We need this if we don't have an MTU configured, either directly, or previously
+// to "carry forward". If not, we'll have to probe it.
+func NeedMTUProbe(prev, next *operv1.NetworkSpec) bool {
+	needsMTU := func(c *operv1.NetworkSpec) bool {
+		if c == nil {
+			return true
+		}
+		d := c.DefaultNetwork
+		switch d.Type {
+		case operv1.NetworkTypeOVNKubernetes:
+			return d.OVNKubernetesConfig == nil || d.OVNKubernetesConfig.MTU == nil || *d.OVNKubernetesConfig.MTU == 0
+		case operv1.NetworkTypeOpenShiftSDN:
+			return d.OpenShiftSDNConfig == nil || d.OpenShiftSDNConfig.MTU == nil || *d.OpenShiftSDNConfig.MTU == 0
+		}
+		// other network types don't need MTU
+		return false
+	}
+	return needsMTU(prev) && needsMTU(next)
 }
 
 func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.InfraBootstrapResult) error {
