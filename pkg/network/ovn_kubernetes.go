@@ -288,20 +288,22 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		updateNode, renderPrePull = shouldUpdateOVNKonPrepull(bootstrapResult.OVN.ExistingNodeDaemonset, bootstrapResult.OVN.PrePullerDaemonset, os.Getenv("RELEASE_VERSION"))
 	}
 
-	// If we need to delay master or node daemonset rollout, then we'll replace the new one with the existing one
+	// If we need to delay master or node daemonset rollout, then we'll tag that daemonset with "create-only"
 	if !updateMaster {
-		us, err := k8s.ToUnstructured(bootstrapResult.OVN.ExistingMasterDaemonset)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to transmute existing master daemonset")
-		}
-		objs = k8s.ReplaceObj(objs, us)
+		ds := bootstrapResult.OVN.ExistingMasterDaemonset
+		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", ds.Namespace, ds.Name, func(o *uns.Unstructured) {
+			anno := o.GetAnnotations()
+			anno[names.CreateOnlyAnnotation] = "true"
+			o.SetAnnotations(anno)
+		})
 	}
 	if !updateNode {
-		us, err := k8s.ToUnstructured(bootstrapResult.OVN.ExistingNodeDaemonset)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to transmute existing node daemonset")
-		}
-		objs = k8s.ReplaceObj(objs, us)
+		ds := bootstrapResult.OVN.ExistingNodeDaemonset
+		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", ds.Namespace, ds.Name, func(o *uns.Unstructured) {
+			anno := o.GetAnnotations()
+			anno[names.CreateOnlyAnnotation] = "true"
+			o.SetAnnotations(anno)
+		})
 	}
 
 	if !renderPrePull {
