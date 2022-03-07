@@ -1,0 +1,10 @@
+# Request that the cluster network operator PKI controller
+# creates a certificate and key for us.
+apiVersion: network.operator.openshift.io/v1
+kind: OperatorPKI
+metadata:
+  name: ovn
+  namespace: openshift-ovn-kubernetes
+spec:
+  targetCert:
+    commonName: {{.OVN_CERT_CN}}

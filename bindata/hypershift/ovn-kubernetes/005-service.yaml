@@ -1,0 +1,36 @@
+---
+# service to expose the ovn-master pod
+# at present ovn-master is limited to a single instance so
+# when the cluster has multiple masters we can get to the
+# ovn-master via this service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ovnkube-master
+  namespace: {{.HostedClusterNamespace}}
+  clusterName: {{.ManagementClusterName}}
+  labels:
+    app: ovnkube-master
+spec:
+  selector:
+    app: ovnkube-master
+  ports:
+  - name: north
+    port: {{.OVN_NB_PORT}}
+    protocol: TCP
+    targetPort: {{.OVN_NB_PORT}}
+  - name: south
+    port: {{.OVN_SB_PORT}}
+    protocol: TCP
+    targetPort: {{.OVN_SB_PORT}}
+  - name: north-raft
+    port: {{.OVN_NB_RAFT_PORT}}
+    protocol: TCP
+    targetPort: {{.OVN_NB_RAFT_PORT}}
+  - name: south-raft
+    port: {{.OVN_SB_RAFT_PORT}}
+    protocol: TCP
+    targetPort: {{.OVN_SB_RAFT_PORT}}
+  sessionAffinity: None
+  clusterIP: None
+  type: ClusterIP
