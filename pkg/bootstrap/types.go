@@ -35,7 +35,7 @@ type OVNConfigBoostrapResult struct {
 }
 
 type OVNBootstrapResult struct {
-	MasterIPs               []string
+	MasterAddresses         []string
 	ClusterInitiator        string
 	ExistingMasterDaemonset *appsv1.DaemonSet
 	ExistingNodeDaemonset   *appsv1.DaemonSet

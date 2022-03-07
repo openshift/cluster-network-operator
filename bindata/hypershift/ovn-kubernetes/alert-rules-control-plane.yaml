@@ -1,0 +1,79 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: k8s
+    role: alert-rules
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+  name: master-rules
+  namespace: openshift-ovn-kubernetes
+spec:
+  groups:
+  - name: cluster-network-operator-master.rules
+    rules:
+    - alert: NoRunningOvnMaster
+      annotations:
+        summary: There is no running ovn-kubernetes master.
+        description: |
+          Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
+          implemented while there are no OVN Kubernetes pods.
+      expr: |
+        absent(up{job="ovnkube-master", namespace="openshift-ovn-kubernetes"} == 1)
+      for: 10m
+      labels:
+        severity: warning
+    - alert: NoOvnMasterLeader
+      annotations:
+        summary: There is no ovn-kubernetes master leader.
+        description: |
+          Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
+          implemented while there is no OVN Kubernetes leader. Existing workloads should continue to have connectivity.
+          OVN-Kubernetes control plane is not functional.
+      expr: |
+        max(ovnkube_master_leader) == 0
+      for: 10m
+      labels:
+        severity: warning
+    - alert: NorthboundStale
+      annotations:
+        summary: ovn-kubernetes has not written anything to the northbound database for too long.
+        description: |
+          Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
+          implemented. Existing workloads should continue to have connectivity. OVN-Kubernetes control plane and/or
+          OVN northbound database may not be functional.
+      expr: |
+         time() - max(ovnkube_master_nb_e2e_timestamp) > 120
+      for: 10m
+      labels:
+        severity: warning
+    - alert: SouthboundStale
+      annotations:
+        summary: ovn-northd has not successfully synced any changes to the southbound DB for too long.
+        description: |
+          Networking control plane is degraded. Networking configuration updates may not be applied to the cluster or
+          taking a long time to apply. This usually means there is a large load on OVN component 'northd' or it is not
+          functioning.
+      expr: |
+        max(ovnkube_master_nb_e2e_timestamp) - max(ovnkube_master_sb_e2e_timestamp) > 120
+      for: 10m
+      labels:
+        severity: warning
+    - alert: V4SubnetAllocationThresholdExceeded
+      annotations:
+        summary: More than 80% of v4 subnets available to assign to the nodes are allocated. Current v4 subnet allocation percentage is {{"{{"}} $value {{"}}"}}.
+        description: More than 80% of IPv4 subnets are used. Insufficient IPv4 subnets could degrade provisioning of workloads.
+      expr: |
+        ovnkube_master_allocated_v4_host_subnets/ovnkube_master_num_v4_host_subnets * 100 > 80
+      for: 10m
+      labels:
+        severity: warning
+    - alert: V6SubnetAllocationThresholdExceeded
+      annotations:
+        summary: More than 80% of the v6 subnets available to assign to the nodes are allocated. Current v6 subnet allocation percentage is {{"{{"}} $value {{"}}"}}.
+        description: More than 80% of IPv6 subnets are used. Insufficient IPv6 subnets could degrade provisioning of workloads.
+      expr: |
+        ovnkube_master_allocated_v6_host_subnets/ovnkube_master_num_v6_host_subnets * 100 > 80
+      for: 10m
+      labels:
+        severity: warning
