@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
@@ -112,6 +113,58 @@ spec:
 
 	if !found {
 		t.Fatal("Replacement object didn't seem to be found")
+	}
+}
+
+func TestUpdate(t *testing.T) {
+
+	specs := []string{
+		`
+kind: DaemonSet
+apiVersion: apps/v1beta1
+metadata:
+  name: foo1
+  namespace: myns
+  annotations:
+    foo: bar
+spec:
+  a: b`,
+		`
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: foo1
+  namespace: myns
+  annotations:
+    foo: bar
+spec:
+  a: c`,
+	}
+
+	objs := []*uns.Unstructured{}
+	for _, spec := range specs {
+		objs = append(objs, parseManifest(t, spec))
+	}
+
+	UpdateObjByGroupKindName(objs, "apps", "DaemonSet", "myns", "foo1", func(o *uns.Unstructured) {
+		anno := o.GetAnnotations()
+		anno[names.CreateOnlyAnnotation] = "true"
+		o.SetAnnotations(anno)
+	})
+
+	found := false
+	for _, obj := range objs {
+		if found {
+			continue
+		}
+		_, ok := obj.GetAnnotations()[names.CreateOnlyAnnotation]
+		if ok && obj.GetKind() == "DaemonSet" {
+			found = true
+		}
+	}
+
+	if !found {
+		t.Fatal("did not find object with expected new annotation")
 	}
 }
 
