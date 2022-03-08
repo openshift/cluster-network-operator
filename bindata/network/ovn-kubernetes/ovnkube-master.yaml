@@ -27,7 +27,7 @@ spec:
   selector:
     matchLabels:
       app: ovnkube-master
-  strategy:
+  updateStrategy:
     type: RollingUpdate
     rollingUpdate:
       # by default, Deployments spin up the new pod before terminating the old one

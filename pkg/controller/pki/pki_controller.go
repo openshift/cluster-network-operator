@@ -16,6 +16,7 @@ import (
 	"time"
 
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/eventrecorder"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 
@@ -40,7 +41,7 @@ const (
 )
 
 // Add attaches our control loop to the manager and watches for PKI objects
-func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.Client) error {
 	r, err := newPKIReconciler(mgr, status)
 	if err != nil {
 		return err

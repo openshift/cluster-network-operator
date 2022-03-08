@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -21,13 +20,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	operv1 "github.com/openshift/api/operator/v1"
-	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 )
 
 var OVNKubernetesConfig = operv1.Network{
@@ -102,21 +99,6 @@ func TestRenderOVNKubernetes(t *testing.T) {
 
 		_, ok := sel["node-role.kubernetes.io/master"]
 		g.Expect(ok).To(BeTrue())
-	}
-
-	// Make sure every obj is reasonable:
-	// - it is supported
-	// - it reconciles to itself (steady state)
-	for _, obj := range objs {
-		g.Expect(apply.IsObjectSupported(obj)).NotTo(HaveOccurred())
-		cur := obj.DeepCopy()
-		upd := obj.DeepCopy()
-
-		err = apply.MergeObjectForUpdate(cur, upd)
-		g.Expect(err).NotTo(HaveOccurred())
-
-		tweakMetaForCompare(cur)
-		g.Expect(cur).To(Equal(upd))
 	}
 }
 
@@ -721,12 +703,12 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 func TestOVNKubernetestShouldUpdateMasterOnUpgrade(t *testing.T) {
 
 	for idx, tc := range []struct {
-		expectNode    bool
-		expectMaster  bool
-		expectPrePull bool
+		expectNode    bool // true if node changed
+		expectMaster  bool // true if master changed
+		expectPrePull bool // true if pre-puller rendered
 		node          string
 		master        string
-		prepull       string
+		prepull       string // a (maybe) existing pre-puller daemonset
 		rv            string // release version
 	}{
 
@@ -1297,29 +1279,12 @@ metadata:
 				t.Fatal(err)
 			}
 
-			usNode, err := k8s.ToUnstructured(node)
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
-			usMaster, err := k8s.ToUnstructured(master)
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
-
-			var usPrePuller *uns.Unstructured
 			if tc.prepull != "" {
 				prepuller = &appsv1.DaemonSet{}
 				err = yaml.Unmarshal([]byte(tc.prepull), prepuller)
 				if err != nil {
 					t.Fatal(err)
 				}
-				usPrePuller, err = k8s.ToUnstructured(prepuller)
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-			} else {
-				prepuller = nil
-				usPrePuller = nil
 			}
 
 			bootstrapResult := &bootstrap.BootstrapResult{
@@ -1338,15 +1303,17 @@ metadata:
 			g.Expect(err).NotTo(HaveOccurred())
 
 			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+			_, preserveNode := renderedNode.GetAnnotations()[names.CreateOnlyAnnotation]
 			renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-master", "openshift-ovn-kubernetes", objs)
-			renderedPrePuller := findInObjs("apps", "DaemonSet", "ovnkube-upgrades-prepuller", "openshift-ovn-kubernetes", objs)
+			_, preserveMaster := renderedMaster.GetAnnotations()[names.CreateOnlyAnnotation]
+			renderedPrePuller := findInObjs("apps", "DaemonSet", "ovnkube-upgrades-prepuller", "openshift-ovn-kubernetes", objs) != nil
 
 			// if we expect a node update, the original node and the rendered one must be different
-			g.Expect(tc.expectNode).To(Equal(!reflect.DeepEqual(renderedNode, usNode)), "Check node rendering")
+			g.Expect(tc.expectNode).To(Equal(!preserveNode), "Check node rendering")
 			// if we expect a master update, the original master and the rendered one must be different
-			g.Expect(tc.expectMaster).To(Equal(!reflect.DeepEqual(renderedMaster, usMaster)), "Check master rendering")
+			g.Expect(tc.expectMaster).To(Equal(!preserveMaster), "Check master rendering")
 			// if we expect a prepuller update, the original prepuller and the rendered one must be different
-			g.Expect(tc.expectPrePull).To(Equal(!reflect.DeepEqual(renderedPrePuller, usPrePuller)), "Check prepuller rendering")
+			g.Expect(tc.expectPrePull).To(Equal(renderedPrePuller), "Check prepuller rendering")
 
 			updateNode, updateMaster := shouldUpdateOVNKonUpgrade(node, master, tc.rv)
 			g.Expect(updateMaster).To(Equal(tc.expectMaster), "Check master")
@@ -1632,14 +1599,6 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 			},
 		},
 	}
-	usNode, err := k8s.ToUnstructured(bootstrapResult.OVN.ExistingNodeDaemonset)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	usMaster, err := k8s.ToUnstructured(bootstrapResult.OVN.ExistingMasterDaemonset)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
 
 	// the new rendered config should hold the node to do the dualstack conversion
 	// the upgrade code holds the masters to update the nodes first
@@ -1651,11 +1610,11 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 	renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-master", "openshift-ovn-kubernetes", objs)
 
 	// the node has to be the same
-	if !reflect.DeepEqual(usNode, renderedNode) {
-		t.Errorf("node daemonset are not equal, dual-stack should upgrade masters first %+v", renderedNode)
+	if _, ok := renderedNode.GetAnnotations()[names.CreateOnlyAnnotation]; !ok {
+		t.Errorf("node DaemonSet should have create-only annotation, does not")
 	}
 	// the master has to use the new annotations for dual-stack so it has to be mutated
-	if reflect.DeepEqual(usMaster, renderedMaster) {
+	if _, ok := renderedMaster.GetAnnotations()[names.CreateOnlyAnnotation]; ok {
 		t.Errorf("master daemonset are equal, dual-stack should modify masters")
 	}
 }
@@ -1812,7 +1771,7 @@ type fakeClientReader struct {
 	configMap *v1.ConfigMap
 }
 
-func (f *fakeClientReader) Get(_ context.Context, _ client.ObjectKey, obj client.Object) error {
+func (f *fakeClientReader) Get(_ context.Context, _ crclient.ObjectKey, obj crclient.Object) error {
 	if cmPtr, ok := obj.(*v1.ConfigMap); !ok {
 		return fmt.Errorf("expecting *v1.ConfigMap, got %T", obj)
 	} else if f.configMap == nil {
@@ -1825,7 +1784,7 @@ func (f *fakeClientReader) Get(_ context.Context, _ client.ObjectKey, obj client
 	return nil
 }
 
-func (f *fakeClientReader) List(_ context.Context, _ client.ObjectList, _ ...client.ListOption) error {
+func (f *fakeClientReader) List(_ context.Context, _ crclient.ObjectList, _ ...crclient.ListOption) error {
 	return errors.New("unexpected invocation to List")
 }
 

@@ -148,7 +148,6 @@ spec:
             memory: 65Mi
         securityContext:
           privileged: true
-        terminationGracePeriodSeconds: 10
         volumeMounts:
         - mountPath: /entrypoint
           name: cni-binary-copy
@@ -171,6 +170,7 @@ spec:
           value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: KUBERNETES_SERVICE_HOST
           value: "{{.KUBERNETES_SERVICE_HOST}}"
+      terminationGracePeriodSeconds: 10
       volumes:
         - name: system-cni-dir
           hostPath:
@@ -454,7 +454,7 @@ spec:
             memory: 10Mi
         securityContext:
           privileged: true
-        terminationGracePeriodSeconds: 10
+      terminationGracePeriodSeconds: 10
       volumes:
         - name: system-cni-dir
           hostPath:

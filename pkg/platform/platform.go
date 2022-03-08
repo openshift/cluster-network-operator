@@ -10,7 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	types "k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var cloudProviderConfig = types.NamespacedName{
@@ -18,7 +18,7 @@ var cloudProviderConfig = types.NamespacedName{
 	Name:      "kube-cloud-config",
 }
 
-func BootstrapInfra(kubeClient client.Client) (*bootstrap.InfraBootstrapResult, error) {
+func BootstrapInfra(kubeClient crclient.Client) (*bootstrap.InfraBootstrapResult, error) {
 	infraConfig := &configv1.Infrastructure{}
 	if err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
 		return nil, fmt.Errorf("failed to get infrastructure 'cluster': %v", err)

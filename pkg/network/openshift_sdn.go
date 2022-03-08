@@ -12,7 +12,7 @@ import (
 
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -340,7 +340,7 @@ func clusterNetwork(conf *operv1.NetworkSpec) (string, error) {
 	return string(cnBuf), nil
 }
 
-func bootstrapSDN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
+func bootstrapSDN(conf *operv1.Network, kubeClient crclient.Client) (*bootstrap.BootstrapResult, error) {
 	infraRes, err := platform.BootstrapInfra(kubeClient)
 	if err != nil {
 		return nil, err

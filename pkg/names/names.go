@@ -29,13 +29,13 @@ const APPLIED_NAMESPACE = "openshift-network-operator"
 // or update. Useful when we want to make a CR for which the CRD may not exist yet.
 const IgnoreObjectErrorAnnotation = "networkoperator.openshift.io/ignore-errors"
 
+// CreateOnlyAnnotation is an annotation on all objects that
+// tells the CNO reconciliation engine to ignore this object if it already exists.
+const CreateOnlyAnnotation = "networkoperator.openshift.io/create-only"
+
 // NonCriticalAnnotation is an annotation on Deployments/DaemonSets to indicate
 // that they are not critical to the functioning of the pod network
 const NonCriticalAnnotation = "networkoperator.openshift.io/non-critical"
-
-// CreateOnlyAnnotation is an annotation on all objects that
-// tells the CNO reconciliaton engine to ignore this object if it already exists.
-const CreateOnlyAnnotation = "networkoperator.openshift.io/create-only"
 
 // NetworkMigrationAnnotation is an annotation on the networks.operator.openshift.io CR to indicate
 // that executing network migration (switching the default network type of the cluster) is allowed.

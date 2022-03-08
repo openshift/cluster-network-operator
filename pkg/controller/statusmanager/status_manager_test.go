@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -34,19 +34,19 @@ func init() {
 	appsv1.AddToScheme(scheme.Scheme)
 }
 
-func getCO(client client.Client, name string) (*configv1.ClusterOperator, error) {
+func getCO(client crclient.Client, name string) (*configv1.ClusterOperator, error) {
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: name}, co)
 	return co, err
 }
 
-func getOC(client client.Client) (*operv1.Network, error) {
+func getOC(client crclient.Client) (*operv1.Network, error) {
 	oc := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: names.OPERATOR_CONFIG}, oc)
 	return oc, err
 }
 
-func getStatuses(client client.Client, name string) (*configv1.ClusterOperator, *operv1.Network, error) {
+func getStatuses(client crclient.Client, name string) (*configv1.ClusterOperator, *operv1.Network, error) {
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: name}, co)
 	if err != nil {
@@ -1355,7 +1355,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}
 }
 
-func getLastPodState(t *testing.T, client client.Client, name string) podState {
+func getLastPodState(t *testing.T, client crclient.Client, name string) podState {
 	t.Helper()
 	co, err := getCO(client, name)
 	if err != nil {
@@ -1372,7 +1372,7 @@ func getLastPodState(t *testing.T, client client.Client, name string) podState {
 }
 
 // sets *all* last-seen-times back an hour
-func setLastPodState(t *testing.T, client client.Client, name string, ps podState) {
+func setLastPodState(t *testing.T, client crclient.Client, name string, ps podState) {
 	t.Helper()
 	co, err := getCO(client, name)
 	if err != nil {

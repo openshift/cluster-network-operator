@@ -6,15 +6,16 @@ import (
 	"crypto/x509"
 	b64 "encoding/base64"
 	"fmt"
-	"golang.org/x/net/http/httpproxy"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 
+	"golang.org/x/net/http/httpproxy"
+
 	v1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/Masterminds/semver"
 	"github.com/gophercloud/gophercloud"
@@ -71,20 +72,20 @@ const (
 	kubeletMetricsPort       = 10250
 )
 
-func GetClusterID(kubeClient client.Client) (string, error) {
+func GetClusterID(kubeClient crclient.Client) (string, error) {
 	cluster := &confv1.Infrastructure{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "config.openshift.io/v1", Kind: "Infrastructure"},
 		ObjectMeta: metav1.ObjectMeta{Name: InfrastructureCRDName},
 	}
 
-	err := kubeClient.Get(context.TODO(), client.ObjectKey{Name: InfrastructureCRDName}, cluster)
+	err := kubeClient.Get(context.TODO(), crclient.ObjectKey{Name: InfrastructureCRDName}, cluster)
 	if err != nil {
 		return "", errors.Wrapf(err, "Failed to get Infrastracture CRD %s", InfrastructureCRDName)
 	}
 	return cluster.Status.InfrastructureName, nil
 }
 
-func GetCloudFromSecret(kubeClient client.Client) (clientconfig.Cloud, error) {
+func GetCloudFromSecret(kubeClient crclient.Client) (clientconfig.Cloud, error) {
 	emptyCloud := clientconfig.Cloud{}
 
 	secret := &v1.Secret{
@@ -92,7 +93,7 @@ func GetCloudFromSecret(kubeClient client.Client) (clientconfig.Cloud, error) {
 		ObjectMeta: metav1.ObjectMeta{Name: CloudsSecret},
 	}
 
-	err := kubeClient.Get(context.TODO(), client.ObjectKey{Namespace: names.APPLIED_NAMESPACE, Name: CloudsSecret}, secret)
+	err := kubeClient.Get(context.TODO(), crclient.ObjectKey{Namespace: names.APPLIED_NAMESPACE, Name: CloudsSecret}, secret)
 	if err != nil {
 		return emptyCloud, errors.Wrapf(err, "Failed to get %s Secret with OpenStack credentials", CloudsSecret)
 	}
@@ -115,12 +116,12 @@ func generateName(name, clusterID string) string {
 	return fmt.Sprintf("%s-%s", clusterID, name)
 }
 
-func ensureCA(kubeClient client.Client) ([]byte, []byte, error) {
+func ensureCA(kubeClient crclient.Client) ([]byte, []byte, error) {
 	secret := &v1.Secret{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
 		ObjectMeta: metav1.ObjectMeta{Name: names.KURYR_ADMISSION_CONTROLLER_SECRET},
 	}
-	err := kubeClient.Get(context.TODO(), client.ObjectKey{Namespace: KuryrNamespace, Name: names.KURYR_ADMISSION_CONTROLLER_SECRET}, secret)
+	err := kubeClient.Get(context.TODO(), crclient.ObjectKey{Namespace: KuryrNamespace, Name: names.KURYR_ADMISSION_CONTROLLER_SECRET}, secret)
 	if err != nil {
 		caBytes, keyBytes, err := cert.GenerateCA("Kuryr")
 		if err != nil {
@@ -141,12 +142,12 @@ func ensureCA(kubeClient client.Client) ([]byte, []byte, error) {
 	}
 }
 
-func ensureCertificate(kubeClient client.Client, caPEM []byte, privateKey []byte) ([]byte, []byte, error) {
+func ensureCertificate(kubeClient crclient.Client, caPEM []byte, privateKey []byte) ([]byte, []byte, error) {
 	secret := &v1.Secret{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
 		ObjectMeta: metav1.ObjectMeta{Name: names.KURYR_WEBHOOK_SECRET},
 	}
-	err := kubeClient.Get(context.TODO(), client.ObjectKey{Namespace: KuryrNamespace, Name: names.KURYR_WEBHOOK_SECRET}, secret)
+	err := kubeClient.Get(context.TODO(), crclient.ObjectKey{Namespace: KuryrNamespace, Name: names.KURYR_WEBHOOK_SECRET}, secret)
 	if err != nil {
 		caBytes, keyBytes, err := cert.GenerateCertificate("Kuryr", []string{"kuryr-dns-admission-controller.openshift-kuryr", "kuryr-dns-admission-controller.openshift-kuryr.svc"}, caPEM, privateKey)
 		if err != nil {
@@ -167,19 +168,19 @@ func ensureCertificate(kubeClient client.Client, caPEM []byte, privateKey []byte
 	}
 }
 
-func getConfigMap(kubeClient client.Client, namespace, name string) (*v1.ConfigMap, error) {
+func getConfigMap(kubeClient crclient.Client, namespace, name string) (*v1.ConfigMap, error) {
 	cm := &v1.ConfigMap{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 	}
-	err := kubeClient.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: name}, cm)
+	err := kubeClient.Get(context.TODO(), crclient.ObjectKey{Namespace: namespace, Name: name}, cm)
 	if err != nil {
 		return nil, err
 	}
 	return cm, nil
 }
 
-func getCloudProviderCACert(kubeClient client.Client) (string, error) {
+func getCloudProviderCACert(kubeClient crclient.Client) (string, error) {
 	cm, err := getConfigMap(kubeClient, OpenShiftConfigNamespace, UserCABundleConfigMap)
 	if err != nil {
 		return "", err
@@ -187,7 +188,7 @@ func getCloudProviderCACert(kubeClient client.Client) (string, error) {
 	return cm.Data["ca-bundle.pem"], nil
 }
 
-func getSavedAnnotation(kubeClient client.Client, annotation string) (string, error) {
+func getSavedAnnotation(kubeClient crclient.Client, annotation string) (string, error) {
 	cm, err := getConfigMap(kubeClient, KuryrNamespace, KuryrConfigMapName)
 	if err != nil {
 		return "", err
@@ -195,11 +196,11 @@ func getSavedAnnotation(kubeClient client.Client, annotation string) (string, er
 	return cm.Annotations[annotation], nil
 }
 
-func getMasterMachines(kubeClient client.Client) (*machineapi.MachineList, error) {
+func getMasterMachines(kubeClient crclient.Client) (*machineapi.MachineList, error) {
 	machineList := &machineapi.MachineList{}
-	listOptions := []client.ListOption{
-		client.InNamespace(machinesNamespace),
-		client.MatchingLabels{masterMachineLabel: "master"},
+	listOptions := []crclient.ListOption{
+		crclient.InNamespace(machinesNamespace),
+		crclient.MatchingLabels{masterMachineLabel: "master"},
 	}
 	err := kubeClient.List(context.TODO(), machineList, listOptions...)
 	if err != nil {
@@ -208,10 +209,10 @@ func getMasterMachines(kubeClient client.Client) (*machineapi.MachineList, error
 	return machineList, nil
 }
 
-func ensureSubnetGatewayGuardSvc(kubeClient client.Client, requestedIP string) (clusterIP net.IP, err error) {
+func ensureSubnetGatewayGuardSvc(kubeClient crclient.Client, requestedIP string) (clusterIP net.IP, err error) {
 	// Check if namespace exists.
 	ns := v1.Namespace{}
-	err = kubeClient.Get(context.TODO(), client.ObjectKey{Name: KuryrNamespace}, &ns)
+	err = kubeClient.Get(context.TODO(), crclient.ObjectKey{Name: KuryrNamespace}, &ns)
 	if err != nil && apierrors.IsNotFound(err) {
 		ns = v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
@@ -225,7 +226,7 @@ func ensureSubnetGatewayGuardSvc(kubeClient client.Client, requestedIP string) (
 	}
 
 	svc := v1.Service{}
-	err = kubeClient.Get(context.TODO(), client.ObjectKey{
+	err = kubeClient.Get(context.TODO(), crclient.ObjectKey{
 		Name:      "service-subnet-gateway-ip",
 		Namespace: KuryrNamespace,
 	}, &svc)
@@ -250,7 +251,7 @@ func ensureSubnetGatewayGuardSvc(kubeClient client.Client, requestedIP string) (
 	return clusterIP, err
 }
 
-func getWorkersSubnetFromMasters(client *gophercloud.ServiceClient, kubeClient client.Client, clusterID string) (subnets.Subnet, error) {
+func getWorkersSubnetFromMasters(client *gophercloud.ServiceClient, kubeClient crclient.Client, clusterID string) (subnets.Subnet, error) {
 	empty := subnets.Subnet{}
 	machines, err := getMasterMachines(kubeClient)
 	if err != nil {
@@ -296,7 +297,7 @@ func getWorkersSubnetFromMasters(client *gophercloud.ServiceClient, kubeClient c
 // between them and created subnets. Also SG rules are added to make sure pod
 // subnet can reach nodes and nodes can reach pods and services. The data is
 // returned to populate Kuryr's configuration.
-func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
+func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient crclient.Client) (*bootstrap.BootstrapResult, error) {
 	log.Print("Kuryr bootstrap started")
 	kc := conf.DefaultNetwork.KuryrConfig
 

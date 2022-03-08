@@ -6,13 +6,16 @@ import (
 	"time"
 
 	operv1 "github.com/openshift/api/operator/v1"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -31,12 +34,13 @@ var ManifestPath = "./bindata"
 
 // Add creates a new ingressConfig controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.Client) error {
+
 	return add(mgr, newIngressConfigReconciler(mgr.GetClient()))
 }
 
 // newIngressConfigReconciler returns a new reconcile.Reconciler
-func newIngressConfigReconciler(client client.Client) *ReconcileIngressConfigs {
+func newIngressConfigReconciler(client crclient.Client) *ReconcileIngressConfigs {
 	return &ReconcileIngressConfigs{client: client}
 }
 
@@ -59,7 +63,7 @@ var _ reconcile.Reconciler = &ReconcileIngressConfigs{}
 // ReconcileIngressConfigs watches for updates to ingress controller configuration
 // and sets the network policy related labels on the openshift-host-network namespace
 type ReconcileIngressConfigs struct {
-	client client.Client
+	client crclient.Client
 }
 
 // Reconcile sets the openshift-host-network namespaces' labels as per the
@@ -94,7 +98,7 @@ func (r *ReconcileIngressConfigs) Reconcile(ctx context.Context, request reconci
 	addLabel := ingressControllerConfig.Status.EndpointPublishingStrategy != nil &&
 		ingressControllerConfig.Status.EndpointPublishingStrategy.Type == operv1.HostNetworkStrategyType
 
-	err = r.updatePolicyGroupLabelOnNamespace(names.HostNetworkNamespace, addLabel)
+	err = r.updatePolicyGroupLabelOnNamespace(ctx, names.HostNetworkNamespace, addLabel)
 	if err != nil {
 		log.Printf("Error setting the host network label on namespace %s: %v", names.HostNetworkNamespace, err)
 		return reconcile.Result{}, err
@@ -103,10 +107,10 @@ func (r *ReconcileIngressConfigs) Reconcile(ctx context.Context, request reconci
 }
 
 // setLabelsOnNamespace sets the labels specified on the target namespace using the client API
-func (r *ReconcileIngressConfigs) updatePolicyGroupLabelOnNamespace(targetNamespace string, add bool) error {
+func (r *ReconcileIngressConfigs) updatePolicyGroupLabelOnNamespace(ctx context.Context, targetNamespace string, add bool) error {
 	var err error
 	namespace := &corev1.Namespace{TypeMeta: metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Namespace"}}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: targetNamespace}, namespace)
+	err = r.client.Get(ctx, types.NamespacedName{Name: targetNamespace}, namespace)
 	if err != nil {
 		// FIXME: abhat - this needs to be handled better. Currently we have no good way to tell
 		// the difference as to whether the error is a result of
@@ -135,5 +139,5 @@ func (r *ReconcileIngressConfigs) updatePolicyGroupLabelOnNamespace(targetNamesp
 
 	newNamespace.SetLabels(existingLabels)
 
-	return r.client.Patch(context.TODO(), newNamespace, client.MergeFrom(namespace))
+	return r.client.Patch(context.TODO(), newNamespace, crclient.MergeFrom(namespace))
 }
