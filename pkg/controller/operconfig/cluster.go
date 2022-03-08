@@ -24,7 +24,7 @@ import (
 func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig *operv1.Network) error {
 	// fetch the cluster config
 	clusterConfig := &configv1.Network{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: names.CLUSTER_CONFIG}, clusterConfig)
+	err := r.client.CRClient().Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, clusterConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -34,7 +34,7 @@ func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig
 
 	// Validate cluster config
 	// If invalid just warn and proceed.
-	if err := network.ValidateClusterConfig(clusterConfig.Spec, r.client); err != nil {
+	if err := network.ValidateClusterConfig(clusterConfig.Spec, r.client.CRClient()); err != nil {
 		log.Printf("WARNING: ignoring Network.config.openshift.io/v1/cluster - failed validation: %v", err)
 		return nil
 	}
@@ -50,16 +50,16 @@ func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig
 	// If there are changes to the "downstream" networkconfig, commit it back
 	// to the apiserver
 	log.Println("WARNING: Network.operator.openshift.io has fields being overwritten by Network.config.openshift.io configuration")
-	return r.UpdateOperConfig(operConfig)
+	return r.UpdateOperConfig(ctx, operConfig)
 }
 
-func (r *ReconcileOperConfig) UpdateOperConfig(operConfig *operv1.Network) error {
+func (r *ReconcileOperConfig) UpdateOperConfig(ctx context.Context, operConfig *operv1.Network) error {
 	operConfig.TypeMeta = metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}
 	us, err := k8sutil.ToUnstructured(operConfig)
 	if err != nil {
 		return fmt.Errorf("failed to transmute operator config, err: %v", err)
 	}
-	if err = apply.ApplyObject(context.TODO(), r.client, us); err != nil {
+	if err = apply.ApplyObject(ctx, r.client, us, "operconfig"); err != nil {
 		return fmt.Errorf("could not apply (%s) %s/%s, err: %v", operConfig.GroupVersionKind(), operConfig.GetNamespace(), operConfig.GetName(), err)
 	}
 	return nil
@@ -74,7 +74,7 @@ func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConf
 		ObjectMeta: metav1.ObjectMeta{Name: names.CLUSTER_CONFIG},
 	}
 
-	err := r.client.Get(ctx, types.NamespacedName{
+	err := r.client.CRClient().Get(ctx, types.NamespacedName{
 		Name: names.CLUSTER_CONFIG,
 	}, clusterConfig)
 	if err != nil && apierrors.IsNotFound(err) {

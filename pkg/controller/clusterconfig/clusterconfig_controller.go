@@ -6,29 +6,32 @@ import (
 	"log"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
-	return add(mgr, newReconciler(mgr, status))
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) error {
+	return add(mgr, newReconciler(mgr, status, c))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) reconcile.Reconciler {
-	return &ReconcileClusterConfig{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status}
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c *cnoclient.Client) reconcile.Reconciler {
+	return &ReconcileClusterConfig{client: c, scheme: mgr.GetScheme(), status: status}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -40,7 +43,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource config.openshift.io/v1/Network
-	err = c.Watch(&source.Kind{Type: &configv1.Network{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &configv1.Network{}}, &handler.EnqueueRequestForObject{}, predicate.GenerationChangedPredicate{})
 	if err != nil {
 		return err
 	}
@@ -52,9 +55,7 @@ var _ reconcile.Reconciler = &ReconcileClusterConfig{}
 
 // ReconcileClusterConfig reconciles a cluster Network object
 type ReconcileClusterConfig struct {
-	// This client, initialized using mgr.Client() above, is a split client
-	// that reads objects from the cache and writes to the apiserver
-	client client.Client
+	client *cnoclient.Client
 	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
 }
@@ -73,7 +74,7 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 
 	// Fetch the cluster config
 	clusterConfig := &configv1.Network{}
-	err := r.client.Get(ctx, request.NamespacedName, clusterConfig)
+	err := r.client.CRClient().Get(ctx, request.NamespacedName, clusterConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -88,29 +89,28 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	}
 
 	// Validate the cluster config
-	if err := network.ValidateClusterConfig(clusterConfig.Spec, r.client); err != nil {
+	if err := network.ValidateClusterConfig(clusterConfig.Spec, r.client.CRClient()); err != nil {
 		log.Printf("Failed to validate Network.Spec: %v", err)
 		r.status.SetDegraded(statusmanager.ClusterConfig, "InvalidClusterConfig",
 			fmt.Sprintf("The cluster configuration is invalid (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))
 		return reconcile.Result{}, err
 	}
 
-	operatorConfig, err := r.UpdateOperatorConfig(ctx, *clusterConfig)
-	if err != nil {
-		log.Printf("Failed to generate NetworkConfig CRD: %v", err)
-		r.status.SetDegraded(statusmanager.ClusterConfig, "UpdateOperatorConfig",
-			fmt.Sprintf("Internal error while converting cluster configuration: %v", err))
-		return reconcile.Result{}, err
+	// Generate a stub operator config and patch it in
+	// This will cause only the fields we change to be set.
+	operConfig := &operv1.Network{
+		TypeMeta:   metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"},
+		ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
 	}
+	network.MergeClusterConfig(&operConfig.Spec, clusterConfig.Spec)
 
-	if operatorConfig != nil {
-		if err := apply.ApplyObject(ctx, r.client, operatorConfig); err != nil {
-			log.Printf("Could not apply operator config: %v", err)
-			r.status.SetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",
-				fmt.Sprintf("Error while trying to update operator configuration: %v", err))
-			return reconcile.Result{}, err
-		}
+	if err := apply.ApplyObject(ctx, r.client, operConfig, "clusterconfig"); err != nil {
+		r.status.SetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",
+			fmt.Sprintf("Error while trying to update operator configuration: %v", err))
+		log.Printf("Could not propagate configuration from network.config.openshift.io to network.operator.openshift.io: %v", err)
+		return reconcile.Result{}, fmt.Errorf("could not apply updated operator configuration: %w", err)
 	}
+	log.Println("Successfully updated Operator config from Cluster config")
 
 	r.status.SetNotDegraded(statusmanager.ClusterConfig)
 	return reconcile.Result{}, nil

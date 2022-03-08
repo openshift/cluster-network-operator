@@ -13,10 +13,6 @@ spec:
   selector:
     matchLabels:
       app: sdn-controller
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
   template:
     metadata:
       annotations:

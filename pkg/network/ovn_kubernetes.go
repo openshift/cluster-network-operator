@@ -26,12 +26,13 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const OVN_NB_PORT = "9641"
@@ -287,20 +288,22 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		updateNode, renderPrePull = shouldUpdateOVNKonPrepull(bootstrapResult.OVN.ExistingNodeDaemonset, bootstrapResult.OVN.PrePullerDaemonset, os.Getenv("RELEASE_VERSION"))
 	}
 
-	// If we need to delay master or node daemonset rollout, then we'll replace the new one with the existing one
+	// If we need to delay master or node daemonset rollout, then we'll tag that daemonset with "create-only"
 	if !updateMaster {
-		us, err := k8s.ToUnstructured(bootstrapResult.OVN.ExistingMasterDaemonset)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to transmute existing master daemonset")
-		}
-		objs = k8s.ReplaceObj(objs, us)
+		ds := bootstrapResult.OVN.ExistingMasterDaemonset
+		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", ds.Namespace, ds.Name, func(o *uns.Unstructured) {
+			anno := o.GetAnnotations()
+			anno[names.CreateOnlyAnnotation] = "true"
+			o.SetAnnotations(anno)
+		})
 	}
 	if !updateNode {
-		us, err := k8s.ToUnstructured(bootstrapResult.OVN.ExistingNodeDaemonset)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to transmute existing node daemonset")
-		}
-		objs = k8s.ReplaceObj(objs, us)
+		ds := bootstrapResult.OVN.ExistingNodeDaemonset
+		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", ds.Namespace, ds.Name, func(o *uns.Unstructured) {
+			anno := o.GetAnnotations()
+			anno[names.CreateOnlyAnnotation] = "true"
+			o.SetAnnotations(anno)
+		})
 	}
 
 	if !renderPrePull {
@@ -341,7 +344,7 @@ func renderOVNFlowsConfig(bootstrapResult *bootstrap.BootstrapResult, data *rend
 
 // bootstrapOVNConfig returns the value of mode found in the openshift-ovn-kubernetes/dpu-mode-config configMap
 // if it exists, otherwise returns default configuration for OCP clusters using OVN-Kubernetes
-func bootstrapOVNConfig(conf *operv1.Network, kubeClient client.Client) (*bootstrap.OVNConfigBoostrapResult, error) {
+func bootstrapOVNConfig(conf *operv1.Network, kubeClient crclient.Client) (*bootstrap.OVNConfigBoostrapResult, error) {
 	ovnConfigResult := &bootstrap.OVNConfigBoostrapResult{
 		NodeMode: OVN_NODE_MODE_FULL,
 	}
@@ -570,7 +573,7 @@ type replicaCountDecoder struct {
 
 // bootstrapOVNGatewayConfig sets the Network.operator.openshift.io.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig value
 // based on the values from the "gateway-mode-config" map if any
-func bootstrapOVNGatewayConfig(conf *operv1.Network, kubeClient client.Client) {
+func bootstrapOVNGatewayConfig(conf *operv1.Network, kubeClient crclient.Client) {
 	// handle upgrade logic for gateway mode in OVN-K plugin (migration from hidden config map to using proper API)
 	// TODO: Remove this logic in future releases when we are sure everyone has migrated away from the config-map
 	cm := &corev1.ConfigMap{}
@@ -598,7 +601,7 @@ func bootstrapOVNGatewayConfig(conf *operv1.Network, kubeClient client.Client) {
 	klog.Infof("Gateway mode is %s", modeOverride)
 }
 
-func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.BootstrapResult, error) {
+func bootstrapOVN(conf *operv1.Network, kubeClient crclient.Client) (*bootstrap.BootstrapResult, error) {
 	clusterConfig := &corev1.ConfigMap{}
 	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
 	masterNodeList := &corev1.NodeList{}
@@ -622,7 +625,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 	var heartBeat int
 
 	err = wait.PollImmediate(OVN_MASTER_DISCOVERY_POLL*time.Second, time.Duration(OVN_MASTER_DISCOVERY_TIMEOUT)*time.Second, func() (bool, error) {
-		matchingLabels := &client.MatchingLabels{"node-role.kubernetes.io/master": ""}
+		matchingLabels := &crclient.MatchingLabels{"node-role.kubernetes.io/master": ""}
 		if err := kubeClient.List(context.TODO(), masterNodeList, matchingLabels); err != nil {
 			return false, err
 		}
@@ -691,7 +694,12 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 	}
 
 	// Retrieve existing daemonsets - used for deciding if upgrades should happen
-	masterDS := &appsv1.DaemonSet{}
+	masterDS := &appsv1.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
+	}
 	nsn := types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ovnkube-master"}
 	if err := kubeClient.Get(context.TODO(), nsn, masterDS); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -701,7 +709,12 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 		}
 	}
 
-	nodeDS := &appsv1.DaemonSet{}
+	nodeDS := &appsv1.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
+	}
 	nsn = types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ovnkube-node"}
 	if err := kubeClient.Get(context.TODO(), nsn, nodeDS); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -711,7 +724,12 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 		}
 	}
 
-	prePullerDS := &appsv1.DaemonSet{}
+	prePullerDS := &appsv1.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
+	}
 	nsn = types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ovnkube-upgrades-prepuller"}
 	if err := kubeClient.Get(context.TODO(), nsn, prePullerDS); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -744,7 +762,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient client.Client) (*bootstrap.Bo
 // bootstrapFlowsConfig looks for the openshift-network-operator/ovs-flows-config configmap, and
 // returns it or returns nil if it does not exist (or can't be properly parsed).
 // Usually, the second argument will be net.LookupIP
-func bootstrapFlowsConfig(cl client.Reader) *bootstrap.FlowsConfig {
+func bootstrapFlowsConfig(cl crclient.Reader) *bootstrap.FlowsConfig {
 	cm := corev1.ConfigMap{}
 	if err := cl.Get(context.TODO(), types.NamespacedName{
 		Name:      OVSFlowsConfigMapName,

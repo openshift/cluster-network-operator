@@ -6,6 +6,7 @@ import (
 	"log"
 
 	configv1 "github.com/openshift/api/config/v1"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 
@@ -14,7 +15,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -25,7 +27,7 @@ import (
 )
 
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ *cnoclient.Client) error {
 	reconciler := newReconciler(mgr, status)
 	if reconciler == nil {
 		return fmt.Errorf("failed to create reconciler")
@@ -80,7 +82,7 @@ func handleConfigMap(meta metav1.Object) bool {
 type ReconcileProxyConfig struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver.
-	client client.Client
+	client crclient.Client
 	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
 }
