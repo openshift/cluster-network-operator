@@ -3,10 +3,14 @@ package client
 import (
 	"context"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	clientConfig "github.com/openshift/library-go/pkg/config/client"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	kinformer "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -14,8 +18,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"log"
-	"time"
 
 	osoperclient "github.com/openshift/client-go/operator/clientset/versioned"
 	osoperinformer "github.com/openshift/client-go/operator/informers/externalversions"
@@ -122,6 +124,10 @@ func (c *Client) Default() *ClusterClient {
 	return c.clusterClients[DefaultClusterName]
 }
 
+func (c *Client) Clusters() map[string]*ClusterClient {
+	return c.clusterClients
+}
+
 func NewClusterClient(cfg, protocfg *rest.Config) (*ClusterClient, error) {
 	c := ClusterClient{
 		cfg:      cfg,
@@ -153,24 +159,28 @@ func NewClusterClient(cfg, protocfg *rest.Config) (*ClusterClient, error) {
 		return nil, err
 	}
 
-	// Add types to the scheme.
-	if err := operv1.Install(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := configv1.Install(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := netopv1.Install(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := machineapi.AddToScheme(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := op_netopv1.Install(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
+	registerTypes(c.Scheme())
 
 	return &c, nil
+}
+
+func registerTypes(s *runtime.Scheme) {
+	// Add types to the scheme.
+	if err := operv1.Install(s); err != nil {
+		log.Fatal(err)
+	}
+	if err := configv1.Install(s); err != nil {
+		log.Fatal(err)
+	}
+	if err := netopv1.Install(s); err != nil {
+		log.Fatal(err)
+	}
+	if err := machineapi.AddToScheme(s); err != nil {
+		log.Fatal(err)
+	}
+	if err := op_netopv1.Install(s); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (c *ClusterClient) Kubernetes() kubernetes.Interface {
@@ -197,6 +207,21 @@ func (c *ClusterClient) RESTMapper() meta.RESTMapper {
 
 func (c *ClusterClient) Scheme() *runtime.Scheme {
 	return scheme.Scheme
+}
+
+// URL returns the host and port of the apiserver endpoint for this client
+func (c *ClusterClient) HostPort() (string, string) {
+	url, _, err := rest.DefaultServerURL(c.cfg.Host, c.cfg.APIPath, schema.GroupVersion{}, true)
+	if err != nil { // can't happen, url was validated earlier when we created the client
+		panic(err)
+
+	}
+	host := url.Hostname()
+	port := url.Port()
+	if port == "" {
+		port = "443"
+	}
+	return host, port
 }
 
 func (c *ClusterClient) Start(ctx context.Context) error {
