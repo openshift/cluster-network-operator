@@ -1297,6 +1297,7 @@ metadata:
 					},
 					PrePullerDaemonset: prepuller,
 				},
+				Infra: fakeBootstrapInfra(),
 			}
 
 			objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)

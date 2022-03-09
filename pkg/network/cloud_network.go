@@ -31,8 +31,8 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrap
 	data.Data["PlatformTypeAzure"] = v1.AzurePlatformType
 	data.Data["PlatformTypeGCP"] = v1.GCPPlatformType
 	data.Data["CloudNetworkConfigControllerImage"] = os.Getenv("CLOUD_NETWORK_CONFIG_CONTROLLER_IMAGE")
-	data.Data["KubernetesServiceHost"] = os.Getenv("KUBERNETES_SERVICE_HOST")
-	data.Data["KubernetesServicePort"] = os.Getenv("KUBERNETES_SERVICE_PORT")
+	data.Data["KubernetesServiceHost"] = cloudBootstrapResult.APIServers["default"].Host
+	data.Data["KubernetesServicePort"] = cloudBootstrapResult.APIServers["default"].Port
 	data.Data["ExternalControlPlane"] = cloudBootstrapResult.ExternalControlPlane
 	data.Data["PlatformAzureEnvironment"] = ""
 	data.Data["PlatformAWSCAPath"] = ""

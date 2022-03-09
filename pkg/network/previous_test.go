@@ -7,10 +7,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 
 	. "github.com/onsi/gomega"
 )
@@ -50,7 +50,7 @@ func TestPreviousVersionsSafe(t *testing.T) {
 			PlatformStatus: &configv1.PlatformStatus{},
 		},
 	}
-	client := fake.NewClientBuilder().WithObjects(infrastructure).Build()
+	client := cnoclient.NewFakeClient(infrastructure)
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {

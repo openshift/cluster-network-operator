@@ -210,8 +210,8 @@ func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, bootstrapResult *bootst
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["KubeProxyImage"] = os.Getenv("KUBE_PROXY_IMAGE")
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
-	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
-	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
+	data.Data["KUBERNETES_SERVICE_HOST"] = bootstrapResult.Infra.APIServers["default"].Host
+	data.Data["KUBERNETES_SERVICE_PORT"] = bootstrapResult.Infra.APIServers["default"].Port
 	data.Data["KubeProxyConfig"] = kpc
 	data.Data["MetricsPort"] = metricsPort
 	data.Data["HealthzPort"] = healthzPort

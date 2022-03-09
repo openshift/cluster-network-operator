@@ -5,9 +5,9 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
-	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilnet "k8s.io/utils/net"
@@ -19,7 +19,7 @@ import (
 var pluginsUsingHostPrefix = sets.NewString(string(operv1.NetworkTypeOpenShiftSDN), string(operv1.NetworkTypeOVNKubernetes))
 
 // ValidateClusterConfig ensures the cluster config is valid.
-func ValidateClusterConfig(clusterConfig configv1.NetworkSpec, client crclient.Client) error {
+func ValidateClusterConfig(clusterConfig configv1.NetworkSpec, client *cnoclient.Client) error {
 	// Check all networks for overlaps
 	pool := iputil.IPPool{}
 

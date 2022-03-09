@@ -95,7 +95,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}()
 	go logLevelController.Run(ctx, 1)
 	go managementStateController.Run(ctx, 1)
-	if err := connectivitycheck.Start(ctx, o.ccfg.KubeConfig); err != nil {
+	host, port := o.client.Default().HostPort()
+	if err := connectivitycheck.Start(ctx, o.ccfg.KubeConfig, host, port); err != nil {
 		klog.Errorf("Failed to start connectivitycheck controller: %v", err)
 	}
 

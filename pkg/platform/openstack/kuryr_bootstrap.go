@@ -26,7 +26,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/platform/openstack/util/cert"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
@@ -297,7 +296,7 @@ func getWorkersSubnetFromMasters(client *gophercloud.ServiceClient, kubeClient c
 // between them and created subnets. Also SG rules are added to make sure pod
 // subnet can reach nodes and nodes can reach pods and services. The data is
 // returned to populate Kuryr's configuration.
-func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient crclient.Client) (*bootstrap.BootstrapResult, error) {
+func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient crclient.Client) (*bootstrap.KuryrBootstrapResult, error) {
 	log.Print("Kuryr bootstrap started")
 	kc := conf.DefaultNetwork.KuryrConfig
 
@@ -756,36 +755,28 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient crclient.Client) (*boot
 	}
 	octaviaVersion = maxOctaviaVersion.Original()
 
-	infraConfig, err := platform.BootstrapInfra(kubeClient)
-	if err != nil {
-		return nil, err
-	}
-
 	log.Print("Kuryr bootstrap finished")
 
-	res := bootstrap.BootstrapResult{
-		Infra: *infraConfig,
-		Kuryr: bootstrap.KuryrBootstrapResult{
-			ServiceSubnet:            svcSubnetId,
-			PodSubnetpool:            podSubnetpoolId,
-			WorkerNodesRouter:        routerId,
-			WorkerNodesSubnets:       []string{workerSubnet.ID},
-			PodsNetworkMTU:           mtu,
-			PodSecurityGroups:        []string{podSgId},
-			ExternalNetwork:          externalNetwork,
-			ClusterID:                clusterID,
-			OctaviaProvider:          octaviaProvider,
-			OctaviaMultipleListeners: octaviaMultipleListenersSupport,
-			OctaviaVersion:           octaviaVersion,
-			OpenStackCloud:           cloud,
-			WebhookCA:                b64.StdEncoding.EncodeToString(ca),
-			WebhookCAKey:             b64.StdEncoding.EncodeToString(key),
-			WebhookKey:               b64.StdEncoding.EncodeToString(webhookKey),
-			WebhookCert:              b64.StdEncoding.EncodeToString(webhookCert),
-			UserCACert:               userCACert,
-			HttpProxy:                httpProxy,
-			HttpsProxy:               httpsProxy,
-			NoProxy:                  noProxy,
-		}}
-	return &res, nil
+	return &bootstrap.KuryrBootstrapResult{
+		ServiceSubnet:            svcSubnetId,
+		PodSubnetpool:            podSubnetpoolId,
+		WorkerNodesRouter:        routerId,
+		WorkerNodesSubnets:       []string{workerSubnet.ID},
+		PodsNetworkMTU:           mtu,
+		PodSecurityGroups:        []string{podSgId},
+		ExternalNetwork:          externalNetwork,
+		ClusterID:                clusterID,
+		OctaviaProvider:          octaviaProvider,
+		OctaviaMultipleListeners: octaviaMultipleListenersSupport,
+		OctaviaVersion:           octaviaVersion,
+		OpenStackCloud:           cloud,
+		WebhookCA:                b64.StdEncoding.EncodeToString(ca),
+		WebhookCAKey:             b64.StdEncoding.EncodeToString(key),
+		WebhookKey:               b64.StdEncoding.EncodeToString(webhookKey),
+		WebhookCert:              b64.StdEncoding.EncodeToString(webhookCert),
+		UserCACert:               userCACert,
+		HttpProxy:                httpProxy,
+		HttpsProxy:               httpsProxy,
+		NoProxy:                  noProxy,
+	}, nil
 }

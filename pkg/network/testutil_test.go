@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onsi/gomega/types"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -52,5 +53,17 @@ func (k *KubeObjectMatcher) NegatedFailureMessage(actual interface{}) string {
 	return fmt.Sprintf("Expected Kind, Namespace, Name not to match (%v, %v, %v) but got (%v, %v, %v)",
 		k.kind, k.namespace, k.name,
 		obj.GetKind(), obj.GetNamespace(), obj.GetName())
+
+}
+
+func fakeBootstrapInfra() bootstrap.InfraBootstrapResult {
+	return bootstrap.InfraBootstrapResult{
+		APIServers: map[string]bootstrap.APIServer{
+			"default": {
+				Host: "testing.test",
+				Port: "8443",
+			},
+		},
+	}
 
 }

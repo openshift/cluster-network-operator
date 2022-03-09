@@ -36,14 +36,14 @@ func TestRenderNetworkMetricsDaemon(t *testing.T) {
 	fillDefaults(config, nil)
 
 	// disable MultusAdmissionController
-	objs, err := renderMultus(config, manifestDir)
+	objs, err := renderMultus(config, fakeBootstrapInfra(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "network-metrics-daemon")))
 
 	// enable MultusAdmissionController
 	enabled := false
 	config.DisableMultiNetwork = &enabled
-	objs, err = renderMultus(config, manifestDir)
+	objs, err = renderMultus(config, fakeBootstrapInfra(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "network-metrics-daemon")))
 

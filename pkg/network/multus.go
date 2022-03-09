@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/pkg/errors"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -17,7 +18,7 @@ const (
 )
 
 // renderMultus generates the manifests of Multus
-func renderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func renderMultus(conf *operv1.NetworkSpec, bootstrapResult bootstrap.InfraBootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	if *conf.DisableMultiNetwork {
 		return nil, nil
 	}
@@ -32,7 +33,7 @@ func renderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 	out = append(out, objs...)
 
 	usedhcp := useDHCP(conf)
-	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), usedhcp)
+	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), usedhcp, bootstrapResult)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +49,7 @@ func renderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 }
 
 // renderMultusConfig returns the manifests of Multus
-func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool) ([]*uns.Unstructured, error) {
+func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, bootstrapResult bootstrap.InfraBootstrapResult) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 
 	// render the manifests on disk
@@ -60,8 +61,8 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool) ([
 	data.Data["WhereaboutsImage"] = os.Getenv("WHEREABOUTS_CNI_IMAGE")
 	data.Data["EgressRouterImage"] = os.Getenv("EGRESS_ROUTER_CNI_IMAGE")
 	data.Data["RouteOverrideImage"] = os.Getenv("ROUTE_OVERRRIDE_CNI_IMAGE")
-	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
-	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
+	data.Data["KUBERNETES_SERVICE_HOST"] = bootstrapResult.APIServers["default"].Host
+	data.Data["KUBERNETES_SERVICE_PORT"] = bootstrapResult.APIServers["default"].Port
 	data.Data["RenderDHCP"] = useDHCP
 	data.Data["MultusCNIConfDir"] = MultusCNIConfDir
 	data.Data["SystemCNIConfDir"] = SystemCNIConfDir

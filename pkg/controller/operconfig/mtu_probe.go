@@ -93,7 +93,7 @@ func (r *ReconcileOperConfig) readMTUConfigMap(ctx context.Context) (int, error)
 }
 
 func (r *ReconcileOperConfig) deployMTUProber(ctx context.Context, owner metav1.Object) error {
-	objs, err := renderMTUProber()
+	objs, err := renderMTUProber(r.client.Default().HostPort())
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (r *ReconcileOperConfig) deleteMTUProber(ctx context.Context) error {
 	if r.mtuProberCleanedUp {
 		return nil
 	}
-	objs, err := renderMTUProber()
+	objs, err := renderMTUProber(r.client.Default().HostPort())
 	if err != nil {
 		return err
 	}
@@ -133,11 +133,11 @@ func (r *ReconcileOperConfig) deleteMTUProber(ctx context.Context) error {
 	return nil
 }
 
-func renderMTUProber() ([]*uns.Unstructured, error) {
+func renderMTUProber(host, port string) ([]*uns.Unstructured, error) {
 	data := render.MakeRenderData()
 	data.Data["CNOImage"] = os.Getenv("NETWORK_CHECK_TARGET_IMAGE")
-	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
-	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
+	data.Data["KUBERNETES_SERVICE_HOST"] = host
+	data.Data["KUBERNETES_SERVICE_PORT"] = port
 	data.Data["DestNS"] = cmNamespace
 	data.Data["DestName"] = cmName
 

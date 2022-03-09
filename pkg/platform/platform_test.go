@@ -1,12 +1,14 @@
 package platform
 
 import (
+	"fmt"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 )
 
 func TestTopologyModeDetection(t *testing.T) {
@@ -45,15 +47,24 @@ func TestTopologyModeDetection(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			client := fake.NewClientBuilder().WithObjects(tc.infrastructure).Build()
+			client := cnoclient.NewFakeClient(tc.infrastructure)
 
 			bootstrapResult, err := BootstrapInfra(client)
 			if err != nil {
 				t.Fatalf("BootstrapInfra failed: %v", err)
 			}
+			fmt.Printf("%+v\n", bootstrapResult)
 
 			if bootstrapResult.ExternalControlPlane != tc.expectExternalControlplane {
 				t.Errorf("expected externalControlPlane to be %t, was %t", tc.expectExternalControlplane, bootstrapResult.ExternalControlPlane)
+			}
+
+			if bootstrapResult.APIServers["default"].Host != "testing" {
+				t.Errorf("unexpected apiserver host")
+			}
+
+			if bootstrapResult.APIServers["default"].Port != "8443" {
+				t.Errorf("unexpected apiserver port")
 			}
 		})
 	}

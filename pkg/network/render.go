@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
@@ -36,7 +36,7 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	objs = append(objs, o...)
 
 	// render Multus
-	o, err = renderMultus(conf, manifestDir)
+	o, err = renderMultus(conf, bootstrapResult.Infra, manifestDir)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func FillDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 // IsChangeSafe checks to see if the change between prev and next are allowed
 // FillDefaults and Validate should have been called, but beware that prev may
 // be from an older version.
-func IsChangeSafe(prev, next *operv1.NetworkSpec, client crclient.Client) error {
+func IsChangeSafe(prev, next *operv1.NetworkSpec, client *cnoclient.Client) error {
 	if prev == nil {
 		return nil
 	}

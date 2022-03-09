@@ -11,8 +11,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
-	"github.com/openshift/cluster-network-operator/pkg/platform"
-	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -40,8 +38,8 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 	data.Data["SDNImage"] = os.Getenv("SDN_IMAGE")
 	data.Data["CNIPluginsImage"] = os.Getenv("CNI_PLUGINS_IMAGE")
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
-	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
-	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
+	data.Data["KUBERNETES_SERVICE_HOST"] = bootstrapResult.Infra.APIServers["default"].Host
+	data.Data["KUBERNETES_SERVICE_PORT"] = bootstrapResult.Infra.APIServers["default"].Port
 	data.Data["Mode"] = c.Mode
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
@@ -338,15 +336,4 @@ func clusterNetwork(conf *operv1.NetworkSpec) (string, error) {
 	}
 
 	return string(cnBuf), nil
-}
-
-func bootstrapSDN(conf *operv1.Network, kubeClient crclient.Client) (*bootstrap.BootstrapResult, error) {
-	infraRes, err := platform.BootstrapInfra(kubeClient)
-	if err != nil {
-		return nil, err
-	}
-	res := bootstrap.BootstrapResult{
-		Infra: *infraRes,
-	}
-	return &res, nil
 }

@@ -56,8 +56,15 @@ type InfraBootstrapResult struct {
 	PlatformStatus       *configv1.PlatformStatus
 	ExternalControlPlane bool
 
+	APIServers map[string]APIServer
+
 	// KubeCloudConfig is the contents of the openshift-config-managed/kube-cloud-config ConfigMap
 	KubeCloudConfig map[string]string
+}
+
+type APIServer struct {
+	Host string
+	Port string
 }
 
 type FlowsConfig struct {

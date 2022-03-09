@@ -6,10 +6,10 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 )
 
 func TestIsChangeSafe(t *testing.T) {
@@ -30,7 +30,7 @@ func TestIsChangeSafe(t *testing.T) {
 			},
 		},
 	}
-	client := fake.NewClientBuilder().WithObjects(infrastructure).Build()
+	client := cnoclient.NewFakeClient(infrastructure)
 
 	// OpenShiftSDN validation
 	// =================================
@@ -209,7 +209,7 @@ func TestIsChangeSafe(t *testing.T) {
 	// You can't migrate from single-stack to dual-stack if this is anything else but
 	// BareMetal or NonePlatformType
 	infrastructure.Status.PlatformStatus.Type = configv1.AzurePlatformType
-	client = fake.NewClientBuilder().WithObjects(infrastructure).Build()
+	client = cnoclient.NewFakeClient(infrastructure)
 	next = OVNKubernetesConfig.Spec.DeepCopy()
 	fillDefaults(next, nil)
 
@@ -257,7 +257,7 @@ func TestRenderUnknownNetwork(t *testing.T) {
 			PlatformStatus: &configv1.PlatformStatus{},
 		},
 	}
-	client := fake.NewClientBuilder().WithObjects(infrastructure).Build()
+	client := cnoclient.NewFakeClient(infrastructure)
 
 	err := Validate(&config.Spec)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -270,7 +270,7 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	err = IsChangeSafe(prev, next, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	bootstrapResult, err := Bootstrap(&config, nil)
+	bootstrapResult, err := Bootstrap(&config, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	objs, err := Render(prev, bootstrapResult, manifestDir)

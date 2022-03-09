@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +49,7 @@ func NewNetworkConnectivityCheckController(
 	configInformers configinformers.SharedInformerFactory,
 	apiextensionsInformers apiextensionsinformers.SharedInformerFactory,
 	recorder events.Recorder,
+	apiHost, apiPort string, // the host and port of the apiserver
 ) NetworkConnectivityCheckController {
 	c := networkConnectivityCheckController{
 		ConnectivityCheckController: connectivitycheckcontroller.NewConnectivityCheckController(
@@ -85,6 +85,8 @@ func NewNetworkConnectivityCheckController(
 		openshiftAPIServerEndpointsLister: kubeInformersForNamespaces.InformersFor("openshift-apiserver").Core().V1().Endpoints().Lister(),
 		openshiftAPIServerServiceLister:   kubeInformersForNamespaces.InformersFor("openshift-apiserver").Core().V1().Services().Lister(),
 		infrastructureLister:              configInformers.Config().V1().Infrastructures().Lister(),
+		apiServerHost:                     apiHost,
+		apiServerPort:                     apiPort,
 	}
 	return c.WithPodNetworkConnectivityCheckFn(generator.generate)
 }
@@ -104,6 +106,8 @@ type connectivityCheckTemplateProvider struct {
 	openshiftAPIServerEndpointsLister corev1listers.EndpointsLister
 	openshiftAPIServerServiceLister   corev1listers.ServiceLister
 	infrastructureLister              configv1listers.InfrastructureLister
+	apiServerHost                     string
+	apiServerPort                     string
 }
 
 func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncContext factory.SyncContext) ([]*v1alpha1.PodNetworkConnectivityCheck, error) {
@@ -149,8 +153,8 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 
 func (c *connectivityCheckTemplateProvider) getTemplatesForKubernetesDefaultServiceCheck(recorder events.Recorder) []*v1alpha1.PodNetworkConnectivityCheck {
 	var templates []*v1alpha1.PodNetworkConnectivityCheck
-	host := os.Getenv("KUBERNETES_SERVICE_HOST")
-	port := os.Getenv("KUBERNETES_SERVICE_PORT")
+	host := c.apiServerHost
+	port := c.apiServerPort
 	if len(host) == 0 || len(port) == 0 {
 		recorder.Warningf("EndpointDetectionFailure", "unable to determine kubernetes service endpoint: in-cluster configuration not found")
 		return templates
@@ -353,7 +357,7 @@ func withTarget(label, target string) func(check *v1alpha1.PodNetworkConnectivit
 	return WithTarget(label + "-" + target)
 }
 
-func Start(ctx context.Context, kubeConfig *rest.Config) error {
+func Start(ctx context.Context, kubeConfig *rest.Config, host, port string) error {
 	protoKubeConfig := rest.CopyConfig(kubeConfig)
 	protoKubeConfig.ContentType = "application/vnd.kubernetes.protobuf,application/json"
 	eventRecorder := &eventrecorder.LoggingRecorder{}
@@ -393,6 +397,7 @@ func Start(ctx context.Context, kubeConfig *rest.Config) error {
 		configInformers,
 		apiextensionsInformers,
 		eventRecorder,
+		host, port,
 	)
 
 	go connectivityCheckController.Run(ctx, 1)
