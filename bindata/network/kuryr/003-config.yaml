@@ -9,7 +9,7 @@ metadata:
 data:
   kuryr.conf: |+
     [DEFAULT]
-    debug = {{ .DebugEnabled }}
+    debug = true
 
     [binding]
     default_driver = kuryr.lib.binding.drivers.vlan
