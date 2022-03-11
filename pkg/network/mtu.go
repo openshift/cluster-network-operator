@@ -4,6 +4,7 @@
 package network
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
 )
@@ -31,6 +32,24 @@ func GetDefaultMTU() (int, error) {
 	for _, route := range routes {
 		// Skip non-default routes
 		if route.Dst != nil {
+			continue
+		}
+		if route.LinkIndex == 0 {
+			if len(route.MultiPath) == 0 {
+				return 0, fmt.Errorf("[%s] route has an unset link index and is not a multipath route", route)
+			}
+			// If the default route is multi path check all it's links
+			for _, p := range route.MultiPath {
+				link, err := netlink.LinkByIndex(p.LinkIndex)
+				if err != nil {
+					return 0, errors.Wrapf(err, "could not retrieve link id %d", p.LinkIndex)
+				}
+
+				newmtu := link.Attrs().MTU
+				if newmtu > 0 && newmtu < mtu {
+					mtu = newmtu
+				}
+			}
 			continue
 		}
 		link, err := netlink.LinkByIndex(route.LinkIndex)
