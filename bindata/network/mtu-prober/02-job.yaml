@@ -8,7 +8,6 @@ metadata:
       This job is run early in the network installation process. It determines the MTU
       of the default route of a node on the cluster.
 spec:
-  selector: {} #need this to make the apiserver happy :/
   template:
     spec:
       containers:
