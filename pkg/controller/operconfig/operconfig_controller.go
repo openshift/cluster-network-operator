@@ -17,6 +17,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -180,12 +181,19 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	// Gather the Infra status, we'll need it a few places
+	infraStatus, err := platform.InfraStatus(r.client)
+	if err != nil {
+		log.Printf("Failed to retrieve infrastructure status: %v", err)
+		return reconcile.Result{}, err
+	}
+
 	// If we need to, probe the host's MTU via a Job.
 	// It's okay if this is 0, since running clusters have no need of this
 	// and thus do not need to probe MTU
 	mtu := 0
 	if network.NeedMTUProbe(prev, &operConfig.Spec) {
-		mtu, err = r.probeMTU(ctx, operConfig)
+		mtu, err = r.probeMTU(ctx, operConfig, infraStatus)
 		if err != nil {
 			log.Printf("Failed to probe MTU: %v", err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "MTUProbeFailed",
@@ -208,7 +216,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if prev != nil {
 		// We may need to fill defaults here -- sort of as a poor-man's
 		// upconversion scheme -- if we add additional fields to the config.
-		err = network.IsChangeSafe(prev, &operConfig.Spec, r.client.Default().CRClient())
+		err = network.IsChangeSafe(prev, &operConfig.Spec, infraStatus)
 		if err != nil {
 			log.Printf("Not applying unsafe change: %v", err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
@@ -220,7 +228,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	newOperConfig := operConfig.DeepCopy()
 
 	// Bootstrap any resources
-	bootstrapResult, err := network.Bootstrap(newOperConfig, r.client.Default().CRClient())
+	bootstrapResult, err := network.Bootstrap(newOperConfig, r.client)
 	if err != nil {
 		log.Printf("Failed to reconcile platform networking resources: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "BootstrapError",

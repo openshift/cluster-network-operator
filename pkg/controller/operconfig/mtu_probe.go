@@ -10,6 +10,7 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 
 	"github.com/openshift/cluster-network-operator/pkg/apply"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,17 +35,17 @@ const (
 // then cleans up after itsef.
 // If, for whatever reason, it takes longer for the MTU to be detected,
 // it will adopt an existing job.
-func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network) (int, error) {
+func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, infra *bootstrap.InfraStatus) (int, error) {
 	mtu, err := r.readMTUConfigMap(ctx)
 	if err == nil {
-		_ = r.deleteMTUProber(ctx)
+		_ = r.deleteMTUProber(ctx, infra)
 		return mtu, nil
 	} else if !apierrors.IsNotFound(err) {
 		return 0, err
 	}
 
 	// cm doesn't exist, create Job
-	err = r.deployMTUProber(ctx, oc)
+	err = r.deployMTUProber(ctx, oc, infra)
 	if err != nil {
 		return 0, fmt.Errorf("failed to deploy mtu prober: %w", err)
 	}
@@ -67,7 +68,7 @@ func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network) 
 	})
 
 	if err == nil {
-		if err := r.deleteMTUProber(ctx); err != nil {
+		if err := r.deleteMTUProber(ctx, infra); err != nil {
 			klog.Errorf("failed to clean up mtu prober: %v", err)
 		}
 		return mtu, nil
@@ -92,8 +93,8 @@ func (r *ReconcileOperConfig) readMTUConfigMap(ctx context.Context) (int, error)
 	return mtu, nil
 }
 
-func (r *ReconcileOperConfig) deployMTUProber(ctx context.Context, owner metav1.Object) error {
-	objs, err := renderMTUProber()
+func (r *ReconcileOperConfig) deployMTUProber(ctx context.Context, owner metav1.Object, infra *bootstrap.InfraStatus) error {
+	objs, err := renderMTUProber(infra)
 	if err != nil {
 		return err
 	}
@@ -111,11 +112,11 @@ func (r *ReconcileOperConfig) deployMTUProber(ctx context.Context, owner metav1.
 	return nil
 }
 
-func (r *ReconcileOperConfig) deleteMTUProber(ctx context.Context) error {
+func (r *ReconcileOperConfig) deleteMTUProber(ctx context.Context, infra *bootstrap.InfraStatus) error {
 	if r.mtuProberCleanedUp {
 		return nil
 	}
-	objs, err := renderMTUProber()
+	objs, err := renderMTUProber(infra)
 	if err != nil {
 		return err
 	}
@@ -133,11 +134,11 @@ func (r *ReconcileOperConfig) deleteMTUProber(ctx context.Context) error {
 	return nil
 }
 
-func renderMTUProber() ([]*uns.Unstructured, error) {
+func renderMTUProber(infra *bootstrap.InfraStatus) ([]*uns.Unstructured, error) {
 	data := render.MakeRenderData()
 	data.Data["CNOImage"] = os.Getenv("NETWORK_CHECK_TARGET_IMAGE")
-	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
-	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
+	data.Data["KUBERNETES_SERVICE_HOST"] = infra.APIServers[bootstrap.APIServerDefault].Host
+	data.Data["KUBERNETES_SERVICE_PORT"] = infra.APIServers[bootstrap.APIServerDefault].Port
 	data.Data["DestNS"] = cmNamespace
 	data.Data["DestName"] = cmName
 

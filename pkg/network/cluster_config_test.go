@@ -7,7 +7,8 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/openshift/cluster-network-operator/pkg/client/fake"
 
 	. "github.com/onsi/gomega"
 )
@@ -43,7 +44,7 @@ func TestValidateClusterConfig(t *testing.T) {
 			},
 		},
 	}
-	client := fake.NewClientBuilder().WithObjects(infrastructure).Build()
+	client := fake.NewFakeClient(infrastructure)
 
 	cc := *ClusterConfig.DeepCopy()
 	err := ValidateClusterConfig(cc, client)
@@ -111,7 +112,7 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 			},
 		},
 	}
-	client := fake.NewClientBuilder().WithObjects(infrastructure).Build()
+	client := fake.NewFakeClient(infrastructure)
 
 	cc := *ClusterConfig.DeepCopy()
 	err := ValidateClusterConfig(cc, client)
@@ -164,7 +165,7 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 
 	// You can't use dual-stack if this is anything else but BareMetal or NonePlatformType
 	infrastructure.Status.PlatformStatus.Type = configv1.AzurePlatformType
-	client = fake.NewClientBuilder().WithObjects(infrastructure).Build()
+	client = fake.NewFakeClient(infrastructure)
 	cc = *ClusterConfig.DeepCopy()
 	cc.ServiceNetwork = append(cc.ServiceNetwork, "fd02::/112")
 	cc.ClusterNetwork = append(cc.ClusterNetwork, configv1.ClusterNetworkEntry{

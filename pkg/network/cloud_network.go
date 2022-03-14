@@ -18,7 +18,7 @@ import (
 )
 
 // renderCloudNetworkConfigController renders the cloud network config controller
-func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrapResult bootstrap.InfraBootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrapResult bootstrap.InfraStatus, manifestDir string) ([]*uns.Unstructured, error) {
 	pt := cloudBootstrapResult.PlatformType
 	if !(pt == v1.AWSPlatformType || pt == v1.AzurePlatformType || pt == v1.GCPPlatformType) {
 		return nil, nil
@@ -31,8 +31,8 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrap
 	data.Data["PlatformTypeAzure"] = v1.AzurePlatformType
 	data.Data["PlatformTypeGCP"] = v1.GCPPlatformType
 	data.Data["CloudNetworkConfigControllerImage"] = os.Getenv("CLOUD_NETWORK_CONFIG_CONTROLLER_IMAGE")
-	data.Data["KubernetesServiceHost"] = os.Getenv("KUBERNETES_SERVICE_HOST")
-	data.Data["KubernetesServicePort"] = os.Getenv("KUBERNETES_SERVICE_PORT")
+	data.Data["KubernetesServiceHost"] = cloudBootstrapResult.APIServers[bootstrap.APIServerDefault].Host
+	data.Data["KubernetesServicePort"] = cloudBootstrapResult.APIServers[bootstrap.APIServerDefault].Port
 	data.Data["ExternalControlPlane"] = cloudBootstrapResult.ExternalControlPlane
 	data.Data["PlatformAzureEnvironment"] = ""
 	data.Data["PlatformAWSCAPath"] = ""

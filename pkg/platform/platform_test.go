@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/cluster-network-operator/pkg/client/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestTopologyModeDetection(t *testing.T) {
@@ -45,9 +45,9 @@ func TestTopologyModeDetection(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			client := fake.NewClientBuilder().WithObjects(tc.infrastructure).Build()
+			client := fake.NewFakeClient(tc.infrastructure)
 
-			bootstrapResult, err := BootstrapInfra(client)
+			bootstrapResult, err := InfraStatus(client)
 			if err != nil {
 				t.Fatalf("BootstrapInfra failed: %v", err)
 			}

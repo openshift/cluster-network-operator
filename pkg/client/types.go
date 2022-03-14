@@ -16,6 +16,9 @@ import (
 
 // Client holds all apiserver connections.
 type Client interface {
+	// Clients returns all known cluster clietns.
+	Clients() map[string]ClusterClient
+
 	// ClientFor returns the ClusterClient for a given named cluster.
 	ClientFor(name string) ClusterClient
 
@@ -48,4 +51,7 @@ type ClusterClient interface {
 
 	// OpenshiftOperatorClient returns the clientset for operator.openshift.io
 	OperatorHelperClient() operatorv1helpers.OperatorClient
+
+	// HostPort returns the host and port, as a string, of this connection
+	HostPort() (string, string)
 }

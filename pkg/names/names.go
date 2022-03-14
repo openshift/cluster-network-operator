@@ -144,3 +144,8 @@ const IPFamilySingleStack = "single-stack"
 
 // dual stack IP family mode
 const IPFamilyDualStack = "dual-stack"
+
+// EnvApiOverrideHost is an environment variable that, if set, allows overriding the host / port
+// of the apiserver, but only for rendered manifests. CNO itself will not use it
+const EnvApiOverrideHost = "APISERVER_OVERRIDE_HOST"
+const EnvApiOverridePort = "APISERVER_OVERRIDE_PORT"
