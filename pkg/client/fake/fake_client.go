@@ -32,16 +32,24 @@ type FakeClusterClient struct {
 	crclient crclient.Client
 }
 
-func (fcc *FakeClient) ClientFor(name string) cnoclient.ClusterClient {
-	return fcc.clusterClients[name]
+func (fc *FakeClient) ClientFor(name string) cnoclient.ClusterClient {
+	return fc.clusterClients[name]
 }
 
-func (fcc *FakeClient) Default() cnoclient.ClusterClient {
-	return fcc.ClientFor(cnoclient.DefaultClusterName)
+func (fc *FakeClient) Default() cnoclient.ClusterClient {
+	return fc.ClientFor(cnoclient.DefaultClusterName)
 }
 
-func (fcc *FakeClient) Start(context.Context) error {
+func (fc *FakeClient) Start(context.Context) error {
 	return nil
+}
+
+func (fc *FakeClient) Clients() map[string]cnoclient.ClusterClient {
+	out := make(map[string]cnoclient.ClusterClient)
+	for k, v := range fc.clusterClients {
+		out[k] = v
+	}
+	return out
 }
 
 // NewFakeClient creates a fake client with a backing store that contains the given objexts.
@@ -98,4 +106,8 @@ func (fc *FakeClusterClient) Scheme() *runtime.Scheme {
 }
 func (fc *FakeClusterClient) OperatorHelperClient() operatorv1helpers.OperatorClient {
 	panic("not implemented!")
+}
+
+func (fc *FakeClusterClient) HostPort() (string, string) {
+	return "testing", "9999"
 }

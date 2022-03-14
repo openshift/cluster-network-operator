@@ -10,6 +10,7 @@ import (
 	clientConfig "github.com/openshift/library-go/pkg/config/client"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	kinformer "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -137,6 +138,14 @@ func (c *OperatorClient) Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (c *OperatorClient) Clients() map[string]ClusterClient {
+	out := make(map[string]ClusterClient, len(c.clusterClients))
+	for k, v := range c.clusterClients {
+		out[k] = v
+	}
+	return out
 }
 
 func NewClusterClient(cfg, protocfg *rest.Config) (*OperatorClusterClient, error) {
@@ -299,4 +308,19 @@ func RegisterTypes(s *runtime.Scheme) {
 	if err := op_netopv1.Install(s); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// URL returns the host and port of the apiserver endpoint for this client
+func (c *OperatorClusterClient) HostPort() (string, string) {
+	url, _, err := rest.DefaultServerURL(c.cfg.Host, c.cfg.APIPath, schema.GroupVersion{}, true)
+	if err != nil { // can't happen, url was validated earlier when we created the client
+		panic(err)
+
+	}
+	host := url.Hostname()
+	port := url.Port()
+	if port == "" {
+		port = "443"
+	}
+	return host, port
 }
