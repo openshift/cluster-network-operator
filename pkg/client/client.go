@@ -170,22 +170,7 @@ func NewClusterClient(cfg, protocfg *rest.Config) (*OperatorClusterClient, error
 		return nil, err
 	}
 
-	// Add types to the scheme.
-	if err := operv1.Install(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := configv1.Install(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := netopv1.Install(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := machineapi.AddToScheme(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := op_netopv1.Install(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
+	RegisterTypes(c.Scheme())
 
 	return &c, nil
 }
@@ -294,5 +279,24 @@ func (c *OperatorClusterClient) AddCustomInformer(inf cache.SharedInformer) {
 	c.informers = append(c.informers, inf)
 	if c.started {
 		go inf.Run(c.donech)
+	}
+}
+
+func RegisterTypes(s *runtime.Scheme) {
+	// Add types to the scheme.
+	if err := operv1.Install(s); err != nil {
+		log.Fatal(err)
+	}
+	if err := configv1.Install(s); err != nil {
+		log.Fatal(err)
+	}
+	if err := netopv1.Install(s); err != nil {
+		log.Fatal(err)
+	}
+	if err := machineapi.AddToScheme(s); err != nil {
+		log.Fatal(err)
+	}
+	if err := op_netopv1.Install(s); err != nil {
+		log.Fatal(err)
 	}
 }
