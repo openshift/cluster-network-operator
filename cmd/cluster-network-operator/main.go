@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -78,13 +79,15 @@ which is a kubeconfig from which to take just the URL to the apiserver`,
 			os.Exit(1)
 		},
 	}
-
-	cmdcfg := controllercmd.NewControllerCommandConfig("network-operator", version.Get(), operator.RunOperator)
+	var extraClusters *map[string]string
+	cmdcfg := controllercmd.NewControllerCommandConfig("network-operator", version.Get(), func(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
+		return operator.RunOperator(ctx, controllerConfig, *extraClusters)
+	})
 
 	cmd2 := cmdcfg.NewCommand()
 	cmd2.Use = "start"
 	cmd2.Short = "Start the cluster network operator"
-
+	extraClusters = cmd2.Flags().StringToString("extra-clusters", nil, "extra clusters, pairs of cluster name and kubeconfig path")
 	cmd.AddCommand(cmd2)
 
 	cmd.AddCommand(newMTUProberCommand())

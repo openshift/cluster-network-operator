@@ -130,7 +130,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	// Fetch the Network.operator.openshift.io instance
 	operConfig := &operv1.Network{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}}
-	err := r.client.CRClient().Get(ctx, request.NamespacedName, operConfig)
+	err := r.client.Default().CRClient().Get(ctx, request.NamespacedName, operConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			r.status.SetDegraded(statusmanager.OperatorConfig, "NoOperatorConfig",
@@ -173,7 +173,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// Retrieve the previously applied operator configuration
-	prev, err := GetAppliedConfiguration(ctx, r.client.CRClient(), operConfig.ObjectMeta.Name)
+	prev, err := GetAppliedConfiguration(ctx, r.client.Default().CRClient(), operConfig.ObjectMeta.Name)
 	if err != nil {
 		log.Printf("Failed to retrieve previously applied configuration: %v", err)
 		// FIXME: operator status?
@@ -208,7 +208,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if prev != nil {
 		// We may need to fill defaults here -- sort of as a poor-man's
 		// upconversion scheme -- if we add additional fields to the config.
-		err = network.IsChangeSafe(prev, &operConfig.Spec, r.client.CRClient())
+		err = network.IsChangeSafe(prev, &operConfig.Spec, r.client.Default().CRClient())
 		if err != nil {
 			log.Printf("Not applying unsafe change: %v", err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
@@ -220,7 +220,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	newOperConfig := operConfig.DeepCopy()
 
 	// Bootstrap any resources
-	bootstrapResult, err := network.Bootstrap(newOperConfig, r.client.CRClient())
+	bootstrapResult, err := network.Bootstrap(newOperConfig, r.client.Default().CRClient())
 	if err != nil {
 		log.Printf("Failed to reconcile platform networking resources: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "BootstrapError",
@@ -329,13 +329,16 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	// Apply the objects to the cluster
 	for _, obj := range objs {
-		// Mark the object to be GC'd if the owner is deleted.
-		if err := controllerutil.SetControllerReference(operConfig, obj, r.scheme); err != nil {
-			err = errors.Wrapf(err, "could not set reference for (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
-			log.Println(err)
-			r.status.SetDegraded(statusmanager.OperatorConfig, "InternalError",
-				fmt.Sprintf("Internal error while updating operator configuration: %v", err))
-			return reconcile.Result{}, err
+		// TODO: OwnerRef for non default clusters. For HyperShift this should probably be HostedControlPlane CR
+		if obj.GetClusterName() == "" {
+			// Mark the object to be GC'd if the owner is deleted.
+			if err := controllerutil.SetControllerReference(operConfig, obj, r.scheme); err != nil {
+				err = errors.Wrapf(err, "could not set reference for (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
+				log.Println(err)
+				r.status.SetDegraded(statusmanager.OperatorConfig, "InternalError",
+					fmt.Sprintf("Internal error while updating operator configuration: %v", err))
+				return reconcile.Result{}, err
+			}
 		}
 
 		// Open question: should an error here indicate we will never retry?

@@ -80,7 +80,7 @@ func handleConfigMap(meta metav1.Object) bool {
 
 // ReconcileProxyConfig reconciles a Proxy object
 type ReconcileProxyConfig struct {
-	// This client, initialized using mgr.Client() above, is a split client
+	// This client, initialized using mgr.GetClient() above, is a split client
 	// that reads objects from the cache and writes to the apiserver.
 	client crclient.Client
 	scheme *runtime.Scheme
