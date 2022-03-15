@@ -1,6 +1,7 @@
 package render
 
 import (
+	"strconv"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -94,5 +95,22 @@ func TestRenderDir(t *testing.T) {
 
 	o, err := RenderDir("testdata", &d)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(o).To(HaveLen(6))
+	g.Expect(o).To(HaveLen(9)) // it will descend dirs
+}
+
+func TestRenderMultiDir(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	d := MakeRenderData()
+	d.Funcs["fname"] = func(s string) string { return s }
+	d.Data["Namespace"] = "myns"
+
+	o, err := RenderDirs([]string{"testdata/a", "testdata/b"}, &d)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(o).To(HaveLen(3)) // it will descend dirs
+
+	// Ensure objects are ordered correctly
+	for i, obj := range o {
+		g.Expect(obj.GetName()).To(Equal(strconv.Itoa(i + 1)))
+	}
 }
