@@ -79,7 +79,7 @@ var _ reconcile.Reconciler = &ReconcileCSR{}
 // This allows clients to get a signed certificate while maintaining
 // private key confidentiality.
 type ReconcileCSR struct {
-	// This client, initialized using mgr.Client() above, is a split client
+	// This client, initialized using mgr.GetClient() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
 	client crclient.Client
 	scheme *runtime.Scheme
