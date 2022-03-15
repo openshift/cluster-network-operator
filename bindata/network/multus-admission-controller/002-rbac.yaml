@@ -4,22 +4,12 @@ kind: ClusterRole
 metadata:
   name: multus-admission-controller-webhook
 rules:
-- apiGroups:
-  - admissionregistration.k8s.io
-  resources:
-  - validatingwebhookconfigurations
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - namespaces
-  verbs:
-  - get
-  - patch
-  - update
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: ["k8s.cni.cncf.io"]
+  resources: ["network-attachment-definitions"]
+  verbs: ["get", "watch", "list"]
 - apiGroups: ['authentication.k8s.io']
   resources: ['tokenreviews']
   verbs: ['create']
