@@ -23,14 +23,6 @@ spec:
     port: {{.OVN_SB_PORT}}
     protocol: TCP
     targetPort: {{.OVN_SB_PORT}}
-  - name: north-raft
-    port: {{.OVN_NB_RAFT_PORT}}
-    protocol: TCP
-    targetPort: {{.OVN_NB_RAFT_PORT}}
-  - name: south-raft
-    port: {{.OVN_SB_RAFT_PORT}}
-    protocol: TCP
-    targetPort: {{.OVN_SB_RAFT_PORT}}
   sessionAffinity: None
   clusterIP: None
   type: ClusterIP

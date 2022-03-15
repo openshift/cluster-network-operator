@@ -9,7 +9,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: ovn-kubernetes-controller
+  name: openshift-ovn-kubernetes-controller
 rules:
 - apiGroups: [""]
   resources:
@@ -121,11 +121,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: ovn-kubernetes-controller
+  name: openshift-ovn-kubernetes-controller
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: ovn-kubernetes-controller
+  name: openshift-ovn-kubernetes-controller
 subjects:
 - kind: ServiceAccount
   name: ovn-kubernetes-controller
@@ -135,7 +135,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: ovn-kubernetes-sbdb
+  name: openshift-ovn-kubernetes-sbdb
   namespace: openshift-ovn-kubernetes
 rules:
 - apiGroups: [""]
@@ -150,22 +150,13 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: ovn-kubernetes-sbdb
+  name: openshift-ovn-kubernetes-sbdb
   namespace: openshift-ovn-kubernetes
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: ovn-kubernetes-sbdb
+  name: openshift-ovn-kubernetes-sbdb
 subjects:
 - kind: ServiceAccount
   name: ovn-kubernetes-controller
   namespace: openshift-ovn-kubernetes
-
----
-# extra cluster
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: ovn-kubernetes-controller-management
-  namespace: {{.HostedClusterNamespace}}
-  clusterName: {{.ManagementClusterName}}

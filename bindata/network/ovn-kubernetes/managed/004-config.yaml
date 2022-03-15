@@ -60,7 +60,6 @@ data:
 {{- end  }}
 
 
-{{- if .EnableHypershift }}
 ---
 # The ovnconfig config file. Used by master processes in hypershift hostedcluster.
 kind: ConfigMap
@@ -121,5 +120,4 @@ data:
     election-lease-duration=137
     election-renew-deadline=107
     election-retry-period=26
-{{- end  }}
 {{- end  }}
