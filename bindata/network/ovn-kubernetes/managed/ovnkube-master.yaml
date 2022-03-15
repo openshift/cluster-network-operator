@@ -1,4 +1,20 @@
+# The ovnkube control-plane components
+
+{{ if not .IsSNO }}
+# The pod disruption budget ensures that we keep a raft quorum
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: ovn-raft-quorum-guard
+  namespace: {{.HostedClusterNamespace}}
+  clusterName: {{.ManagementClusterName}}
+spec:
+  minAvailable: {{.OVN_MIN_AVAILABLE}}
+  selector:
+    matchLabels:
+      app: ovnkube-master
 ---
+{{ end }}
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
@@ -46,7 +62,6 @@ spec:
               matchLabels:
                 app: ovnkube-master
             topologyKey: topology.kubernetes.io/zone
-      serviceAccountName: ovn-kubernetes-controller-management
       priorityClassName: "system-cluster-critical"
       containers:
       # ovn-northd: convert network objects in nbdb to flows in sbdb
