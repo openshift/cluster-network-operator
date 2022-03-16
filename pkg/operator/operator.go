@@ -53,7 +53,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
-	o.StatusManager = statusmanager.New(o.client.Default().CRClient(), o.client.Default().RESTMapper(), "network")
+	o.StatusManager = statusmanager.New(o.client, "network")
 
 	// Add controller-runtime controllers
 	klog.Info("Adding controller-runtime controllers")
