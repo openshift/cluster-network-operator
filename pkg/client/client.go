@@ -3,10 +3,14 @@ package client
 import (
 	"context"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	clientConfig "github.com/openshift/library-go/pkg/config/client"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	kinformer "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -14,8 +18,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"log"
-	"time"
 
 	osoperclient "github.com/openshift/client-go/operator/clientset/versioned"
 	osoperinformer "github.com/openshift/client-go/operator/informers/externalversions"
@@ -35,11 +37,11 @@ const (
 	DefaultClusterName  = "default"
 )
 
-// ClusterClient is a bag of holding for object clients & informers.
+// OperatorClusterClient is a bag of holding for object clients & informers.
 // It is generally responsible for managing informer lifecycle.
 //
 // int 5, wis 2, dex 10, cha 6
-type ClusterClient struct {
+type OperatorClusterClient struct {
 	cfg *rest.Config
 
 	// Same configuration, but with protobuf enabled
@@ -77,9 +79,12 @@ type ClusterClient struct {
 	donech  <-chan struct{}
 }
 
-func NewClient(cfg, protocfg *rest.Config, extraClusters map[string]string) (*Client, error) {
-	cli := &Client{
-		clusterClients: make(map[string]*ClusterClient),
+// enforce that OperatorClusterClient implements the ClusterClient interface
+var _ ClusterClient = &OperatorClusterClient{}
+
+func NewClient(cfg, protocfg *rest.Config, extraClusters map[string]string) (*OperatorClient, error) {
+	cli := &OperatorClient{
+		clusterClients: make(map[string]*OperatorClusterClient),
 	}
 
 	defaultClient, err := NewClusterClient(cfg, protocfg)
@@ -106,24 +111,45 @@ func NewClient(cfg, protocfg *rest.Config, extraClusters map[string]string) (*Cl
 	return cli, nil
 }
 
-type Client struct {
-	clusterClients map[string]*ClusterClient
+type OperatorClient struct {
+	clusterClients map[string]*OperatorClusterClient
 }
 
+// ensure OperatorClient implements Client
+var _ Client = &OperatorClient{}
+
 // ClientFor returns a ClusterClient reference based on the name provided, if name is empty returns the default ClusterClient
-func (c *Client) ClientFor(name string) *ClusterClient {
+func (c *OperatorClient) ClientFor(name string) ClusterClient {
 	if len(name) == 0 {
 		return c.Default()
 	}
 	return c.clusterClients[name]
 }
 
-func (c *Client) Default() *ClusterClient {
+func (c *OperatorClient) Default() ClusterClient {
 	return c.clusterClients[DefaultClusterName]
 }
 
-func NewClusterClient(cfg, protocfg *rest.Config) (*ClusterClient, error) {
-	c := ClusterClient{
+func (c *OperatorClient) Start(ctx context.Context) error {
+	for _, cc := range c.clusterClients {
+		if err := cc.Start(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *OperatorClient) Clients() map[string]ClusterClient {
+	out := make(map[string]ClusterClient, len(c.clusterClients))
+	for k, v := range c.clusterClients {
+		out[k] = v
+	}
+	return out
+}
+
+func NewClusterClient(cfg, protocfg *rest.Config) (*OperatorClusterClient, error) {
+	c := OperatorClusterClient{
 		cfg:      cfg,
 		protocfg: protocfg,
 	}
@@ -153,53 +179,38 @@ func NewClusterClient(cfg, protocfg *rest.Config) (*ClusterClient, error) {
 		return nil, err
 	}
 
-	// Add types to the scheme.
-	if err := operv1.Install(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := configv1.Install(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := netopv1.Install(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := machineapi.AddToScheme(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
-	if err := op_netopv1.Install(c.Scheme()); err != nil {
-		log.Fatal(err)
-	}
+	RegisterTypes(c.Scheme())
 
 	return &c, nil
 }
 
-func (c *ClusterClient) Kubernetes() kubernetes.Interface {
+func (c *OperatorClusterClient) Kubernetes() kubernetes.Interface {
 	return c.kClient
 }
 
 // OpenshiftOperatorClient returns the clientset for operator.openshift.io
-func (c *ClusterClient) OpenshiftOperatorClient() *osoperclient.Clientset {
+func (c *OperatorClusterClient) OpenshiftOperatorClient() *osoperclient.Clientset {
 	return c.osOperClient
 }
 
 // Dynamic returns an untyped, dynamic client.
-func (c *ClusterClient) Dynamic() dynamic.Interface {
+func (c *OperatorClusterClient) Dynamic() dynamic.Interface {
 	return c.dynclient
 }
 
-func (c *ClusterClient) CRClient() crclient.Client {
+func (c *OperatorClusterClient) CRClient() crclient.Client {
 	return c.crclient
 }
 
-func (c *ClusterClient) RESTMapper() meta.RESTMapper {
+func (c *OperatorClusterClient) RESTMapper() meta.RESTMapper {
 	return c.restMapper
 }
 
-func (c *ClusterClient) Scheme() *runtime.Scheme {
+func (c *OperatorClusterClient) Scheme() *runtime.Scheme {
 	return scheme.Scheme
 }
 
-func (c *ClusterClient) Start(ctx context.Context) error {
+func (c *OperatorClusterClient) Start(ctx context.Context) error {
 	if c.started {
 		return fmt.Errorf("Trying to start ClusterClient twice")
 	}
@@ -245,7 +256,7 @@ func (c *ClusterClient) Start(ctx context.Context) error {
 // OperatorHelperClient returns an implementation of the
 // v1helpers.OperatorClient interface for use by the library-go
 // controllers.
-func (c *ClusterClient) OperatorHelperClient() operatorv1helpers.OperatorClient {
+func (c *OperatorClusterClient) OperatorHelperClient() operatorv1helpers.OperatorClient {
 	if c.hc != nil {
 		return c.hc
 	}
@@ -273,9 +284,43 @@ func (c *ClusterClient) OperatorHelperClient() operatorv1helpers.OperatorClient 
 //				options.LabelSelector = "operator.example.dev/mylabel=myval"
 //			}))
 //
-func (c *ClusterClient) AddCustomInformer(inf cache.SharedInformer) {
+func (c *OperatorClusterClient) AddCustomInformer(inf cache.SharedInformer) {
 	c.informers = append(c.informers, inf)
 	if c.started {
 		go inf.Run(c.donech)
 	}
+}
+
+func RegisterTypes(s *runtime.Scheme) {
+	// Add types to the scheme.
+	if err := operv1.Install(s); err != nil {
+		log.Fatal(err)
+	}
+	if err := configv1.Install(s); err != nil {
+		log.Fatal(err)
+	}
+	if err := netopv1.Install(s); err != nil {
+		log.Fatal(err)
+	}
+	if err := machineapi.AddToScheme(s); err != nil {
+		log.Fatal(err)
+	}
+	if err := op_netopv1.Install(s); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// URL returns the host and port of the apiserver endpoint for this client
+func (c *OperatorClusterClient) HostPort() (string, string) {
+	url, _, err := rest.DefaultServerURL(c.cfg.Host, c.cfg.APIPath, schema.GroupVersion{}, true)
+	if err != nil { // can't happen, url was validated earlier when we created the client
+		panic(err)
+
+	}
+	host := url.Hostname()
+	port := url.Port()
+	if port == "" {
+		port = "443"
+	}
+	return host, port
 }

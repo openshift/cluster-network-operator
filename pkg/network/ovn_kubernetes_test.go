@@ -62,12 +62,11 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	g.Expect(errs).To(HaveLen(0))
 	fillDefaults(config, nil)
 
-	bootstrapResult := &bootstrap.BootstrapResult{
-		OVN: bootstrap.OVNBootstrapResult{
-			MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
-			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				NodeMode: "full",
-			},
+	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+		MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			NodeMode: "full",
 		},
 	}
 
@@ -113,12 +112,11 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	g.Expect(errs).To(HaveLen(0))
 	fillDefaults(config, nil)
 
-	bootstrapResult := &bootstrap.BootstrapResult{
-		OVN: bootstrap.OVNBootstrapResult{
-			MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
-			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				NodeMode: "full",
-			},
+	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+		MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			NodeMode: "full",
 		},
 	}
 	objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
@@ -129,12 +127,11 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 
 	g.Expect(script).To(ContainSubstring("pssl:9641"))
 
-	bootstrapResult = &bootstrap.BootstrapResult{
-		OVN: bootstrap.OVNBootstrapResult{
-			MasterIPs: []string{"fd01::1", "fd01::2", "fd01::3"},
-			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				NodeMode: "full",
-			},
+	bootstrapResult = fakeBootstrapResult()
+	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+		MasterIPs: []string{"fd01::1", "fd01::2", "fd01::3"},
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			NodeMode: "full",
 		},
 	}
 	objs, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
@@ -168,9 +165,9 @@ lflow-cache-limit-kb=1048576
 [kubernetes]
 service-cidrs="172.30.0.0/16"
 ovn-config-namespace="openshift-ovn-kubernetes"
-apiserver="https://1.1.1.1:1111"
+apiserver="https://testing.test:8443"
 host-network-namespace="openshift-host-network"
-platform-type=""
+platform-type="GCP"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -194,10 +191,10 @@ lflow-cache-limit-kb=1048576
 [kubernetes]
 service-cidrs="172.30.0.0/16"
 ovn-config-namespace="openshift-ovn-kubernetes"
-apiserver="https://1.1.1.1:1111"
+apiserver="https://testing.test:8443"
 host-network-namespace="openshift-host-network"
 no-hostsubnet-nodes="kubernetes.io/os=windows"
-platform-type=""
+platform-type="GCP"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -233,10 +230,10 @@ lflow-cache-limit-kb=1048576
 [kubernetes]
 service-cidrs="172.30.0.0/16"
 ovn-config-namespace="openshift-ovn-kubernetes"
-apiserver="https://1.1.1.1:1111"
+apiserver="https://testing.test:8443"
 host-network-namespace="openshift-host-network"
 no-hostsubnet-nodes="kubernetes.io/os=windows"
-platform-type=""
+platform-type="GCP"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -275,10 +272,10 @@ lflow-cache-limit-kb=1048576
 [kubernetes]
 service-cidrs="172.30.0.0/16"
 ovn-config-namespace="openshift-ovn-kubernetes"
-apiserver="https://1.1.1.1:1111"
+apiserver="https://testing.test:8443"
 host-network-namespace="openshift-host-network"
 no-hostsubnet-nodes="kubernetes.io/os=windows"
-platform-type=""
+platform-type="GCP"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -307,9 +304,9 @@ lflow-cache-limit-kb=1048576
 [kubernetes]
 service-cidrs="172.30.0.0/16"
 ovn-config-namespace="openshift-ovn-kubernetes"
-apiserver="https://1.1.1.1:1111"
+apiserver="https://testing.test:8443"
 host-network-namespace="openshift-host-network"
-platform-type=""
+platform-type="GCP"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -331,9 +328,6 @@ election-retry-period=26`,
 	}
 	g := NewGomegaWithT(t)
 
-	os.Setenv("KUBERNETES_SERVICE_HOST", "1.1.1.1")
-	os.Setenv("KUBERNETES_SERVICE_PORT", "1111")
-
 	for i, tc := range testcases {
 		t.Run(fmt.Sprintf("%d:%s", i, tc.desc), func(t *testing.T) {
 			OVNKubeConfig := OVNKubernetesConfig.DeepCopy()
@@ -354,12 +348,11 @@ election-retry-period=26`,
 			g.Expect(errs).To(HaveLen(0))
 			fillDefaults(config, nil)
 
-			bootstrapResult := &bootstrap.BootstrapResult{
-				OVN: bootstrap.OVNBootstrapResult{
-					MasterIPs: tc.masterIPs,
-					OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-						NodeMode: "full",
-					},
+			bootstrapResult := fakeBootstrapResult()
+			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+				MasterIPs: tc.masterIPs,
+				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+					NodeMode: "full",
 				},
 			}
 			objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
@@ -1287,16 +1280,15 @@ metadata:
 				}
 			}
 
-			bootstrapResult := &bootstrap.BootstrapResult{
-				OVN: bootstrap.OVNBootstrapResult{
-					MasterIPs:               []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
-					ExistingMasterDaemonset: master,
-					ExistingNodeDaemonset:   node,
-					OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-						NodeMode: "full",
-					},
-					PrePullerDaemonset: prepuller,
+			bootstrapResult := fakeBootstrapResult()
+			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+				MasterIPs:               []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+				ExistingMasterDaemonset: master,
+				ExistingNodeDaemonset:   node,
+				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+					NodeMode: "full",
 				},
+				PrePullerDaemonset: prepuller,
 			}
 
 			objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
@@ -1563,40 +1555,39 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 
 	// bootstrap also represents current status
 	// the current cluster is single-stack and has version 1.9.9
-	bootstrapResult := &bootstrap.BootstrapResult{
-		OVN: bootstrap.OVNBootstrapResult{
-			MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
-			ExistingMasterDaemonset: &appsv1.DaemonSet{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: "apps/v1",
-					Kind:       "DaemonSet",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "ovnkube-master",
-					Namespace: "openshift-ovn-kubernetes",
-					Annotations: map[string]string{
-						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
-						"release.openshift.io/version":      "1.9.9",
-					},
+	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+		MasterIPs: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+		ExistingMasterDaemonset: &appsv1.DaemonSet{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "apps/v1",
+				Kind:       "DaemonSet",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ovnkube-master",
+				Namespace: "openshift-ovn-kubernetes",
+				Annotations: map[string]string{
+					names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
+					"release.openshift.io/version":      "1.9.9",
 				},
 			},
-			ExistingNodeDaemonset: &appsv1.DaemonSet{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: "apps/v1",
-					Kind:       "DaemonSet",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "ovnkube-node",
-					Namespace: "openshift-ovn-kubernetes",
-					Annotations: map[string]string{
-						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
-						"release.openshift.io/version":      "1.9.9",
-					},
+		},
+		ExistingNodeDaemonset: &appsv1.DaemonSet{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "apps/v1",
+				Kind:       "DaemonSet",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ovnkube-node",
+				Namespace: "openshift-ovn-kubernetes",
+				Annotations: map[string]string{
+					names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
+					"release.openshift.io/version":      "1.9.9",
 				},
 			},
-			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				NodeMode: "full",
-			},
+		},
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			NodeMode: "full",
 		},
 	}
 
@@ -1684,14 +1675,13 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 		t.Run(tc.Description, func(t *testing.T) {
 			RegisterTestingT(t)
 			g := NewGomegaWithT(t)
-			bootstrapResult := &bootstrap.BootstrapResult{
-				OVN: bootstrap.OVNBootstrapResult{
-					MasterIPs: []string{"1.2.3.4"},
-					OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-						GatewayMode: "shared",
-					},
-					FlowsConfig: tc.FlowsConfig,
+			bootstrapResult := fakeBootstrapResult()
+			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+				MasterIPs: []string{"1.2.3.4"},
+				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+					GatewayMode: "shared",
 				},
+				FlowsConfig: tc.FlowsConfig,
 			}
 			objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
 			g.Expect(err).ToNot(HaveOccurred())

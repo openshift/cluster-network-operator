@@ -47,10 +47,10 @@ type OVNBootstrapResult struct {
 type BootstrapResult struct {
 	Kuryr KuryrBootstrapResult
 	OVN   OVNBootstrapResult
-	Infra InfraBootstrapResult
+	Infra InfraStatus
 }
 
-type InfraBootstrapResult struct {
+type InfraStatus struct {
 	PlatformType         configv1.PlatformType
 	PlatformRegion       string
 	PlatformStatus       *configv1.PlatformStatus
@@ -58,7 +58,28 @@ type InfraBootstrapResult struct {
 
 	// KubeCloudConfig is the contents of the openshift-config-managed/kube-cloud-config ConfigMap
 	KubeCloudConfig map[string]string
+
+	// URLs to the apiservers. This is because we can't use the default in-cluster one (they assume a running service network)
+	APIServers map[string]APIServer
 }
+
+// APIServer is the hostname & port of a given APIServer. (This is the
+// load-balancer or other "real" address, not the ServiceIP).
+type APIServer struct {
+	Host string
+	Port string
+}
+
+// APIServerDefault is the key in to APIServers for the cluster's APIserver
+// This **always** declares how manifests inside the cluster should reference it
+// In other words, for Hypershift clusters, it is the url to the gateway / route / proxy
+// for standard clusters, it is the internal ALB. It is never a service IP
+const APIServerDefault = "default"
+
+// APIServerDefaultLocal is the key in to APIServer that is local to the CNO.
+// This describes how to talk to the apiserver in the same way the CNO does it. For hypershift,
+// this might be a ServiceIP that is only valid inside the management cluster.
+const APIServerDefaultLocal = "default-local"
 
 type FlowsConfig struct {
 	// Target IP:port of the flow collector
