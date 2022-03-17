@@ -3,10 +3,11 @@ package apply
 import (
 	"context"
 	"fmt"
-	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
-	"github.com/openshift/cluster-network-operator/pkg/names"
 	"log"
 	"strings"
+
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 
 	"github.com/pkg/errors"
 
@@ -27,7 +28,7 @@ type Object interface {
 // This causes fields we own to be updated, and fields we don't own to be preserved.
 // For more information, see https://kubernetes.io/docs/reference/using-api/server-side-apply/
 // The subcontroller, if set, is used to assign field ownership.
-func ApplyObject(ctx context.Context, client *cnoclient.Client, obj Object, subcontroller string) error {
+func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subcontroller string) error {
 	name := obj.GetName()
 	namespace := obj.GetNamespace()
 	clusterClient := client.ClientFor(obj.GetClusterName())
@@ -115,7 +116,7 @@ func ApplyObject(ctx context.Context, client *cnoclient.Client, obj Object, subc
 //  ManagedFields
 //  Finalizers
 // Annotations are merged, when there is a conflict obj's annotation is used.
-func getCopySource(ctx context.Context, obj Object, client *cnoclient.Client) (Object, error) {
+func getCopySource(ctx context.Context, obj Object, client cnoclient.Client) (Object, error) {
 	anno, exists := obj.GetAnnotations()[names.CopyFromAnnotation]
 	if !exists {
 		return nil, fmt.Errorf("%s annotation not specified", names.CopyFromAnnotation)

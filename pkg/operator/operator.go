@@ -28,7 +28,7 @@ type Operator struct {
 	// general controller configuration / context
 	ccfg *controllercmd.ControllerContext
 
-	client  *cnoclient.Client
+	client  cnoclient.Client
 	manager ctmanager.Manager
 
 	StatusManager *statusmanager.StatusManager
@@ -81,7 +81,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// https://github.com/openshift/library-go/issues/936 is resolved.
 
 	// Start informers
-	if err := o.client.Default().Start(ctx); err != nil {
+	if err := o.client.Start(ctx); err != nil {
 		return fmt.Errorf("Failed to start client: %w", err)
 	}
 

@@ -26,7 +26,7 @@ var KuryrConfig = operv1.Network{
 	},
 }
 
-var FakeBootstrapResult = bootstrap.BootstrapResult{
+var fakeKuryrBootstrapResult = bootstrap.BootstrapResult{
 	Kuryr: bootstrap.KuryrBootstrapResult{
 		PodSubnetpool:     "pod-subnetpool-id",
 		ServiceSubnet:     "svc-subnet-id",
@@ -35,6 +35,14 @@ var FakeBootstrapResult = bootstrap.BootstrapResult{
 			AuthType: "password",
 			AuthInfo: &clientconfig.AuthInfo{
 				AuthURL: "https://foo.bar:8080",
+			},
+		},
+	},
+	Infra: bootstrap.InfraStatus{
+		APIServers: map[string]bootstrap.APIServer{
+			bootstrap.APIServerDefault: {
+				Host: "testing.test",
+				Port: "8443",
 			},
 		},
 	},
@@ -52,7 +60,7 @@ func TestRenderKuryr(t *testing.T) {
 
 	fillDefaults(config, nil)
 
-	objs, err := renderKuryr(config, &FakeBootstrapResult, manifestDir)
+	objs, err := renderKuryr(config, &fakeKuryrBootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-kuryr", "kuryr-cni")))
 

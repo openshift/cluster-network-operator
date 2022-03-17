@@ -19,7 +19,6 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	"github.com/pkg/errors"
@@ -78,14 +77,17 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	objs := []*uns.Unstructured{}
 
+	h := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault].Host
+	p := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault].Port
+
 	// render the manifests on disk
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["OvnImage"] = os.Getenv("OVN_IMAGE")
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
-	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
-	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
-	data.Data["K8S_APISERVER"] = fmt.Sprintf("https://%s:%s", os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT"))
+	data.Data["KUBERNETES_SERVICE_HOST"] = h
+	data.Data["KUBERNETES_SERVICE_PORT"] = p
+	data.Data["K8S_APISERVER"] = fmt.Sprintf("https://%s:%s", h, p)
 	data.Data["MTU"] = c.MTU
 	data.Data["RoutableMTU"] = nil
 
@@ -601,7 +603,7 @@ func bootstrapOVNGatewayConfig(conf *operv1.Network, kubeClient crclient.Client)
 	klog.Infof("Gateway mode is %s", modeOverride)
 }
 
-func bootstrapOVN(conf *operv1.Network, kubeClient crclient.Client) (*bootstrap.BootstrapResult, error) {
+func bootstrapOVN(conf *operv1.Network, kubeClient crclient.Client) (*bootstrap.OVNBootstrapResult, error) {
 	clusterConfig := &corev1.ConfigMap{}
 	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
 	masterNodeList := &corev1.NodeList{}
@@ -739,22 +741,14 @@ func bootstrapOVN(conf *operv1.Network, kubeClient crclient.Client) (*bootstrap.
 		}
 	}
 
-	infraRes, err := platform.BootstrapInfra(kubeClient)
-	if err != nil {
-		return nil, err
-	}
-
-	res := bootstrap.BootstrapResult{
-		Infra: *infraRes,
-		OVN: bootstrap.OVNBootstrapResult{
-			MasterIPs:               ovnMasterIPs,
-			ClusterInitiator:        clusterInitiator,
-			ExistingMasterDaemonset: masterDS,
-			ExistingNodeDaemonset:   nodeDS,
-			OVNKubernetesConfig:     ovnConfigResult,
-			PrePullerDaemonset:      prePullerDS,
-			FlowsConfig:             bootstrapFlowsConfig(kubeClient),
-		},
+	res := bootstrap.OVNBootstrapResult{
+		MasterIPs:               ovnMasterIPs,
+		ClusterInitiator:        clusterInitiator,
+		ExistingMasterDaemonset: masterDS,
+		ExistingNodeDaemonset:   nodeDS,
+		OVNKubernetesConfig:     ovnConfigResult,
+		PrePullerDaemonset:      prePullerDS,
+		FlowsConfig:             bootstrapFlowsConfig(kubeClient),
 	}
 	return &res, nil
 }
