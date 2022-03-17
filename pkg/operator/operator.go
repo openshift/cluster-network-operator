@@ -25,9 +25,6 @@ import (
 // It also starts the controller-tools manager, which then manages all controllers
 // that use the controller-tools scaffolding.
 type Operator struct {
-	// general controller configuration / context
-	ccfg *controllercmd.ControllerContext
-
 	client  cnoclient.Client
 	manager ctmanager.Manager
 
@@ -36,19 +33,16 @@ type Operator struct {
 
 const LOCK_NAME = "cluster-network-operator"
 
-func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, extraClusters map[string]string) error {
-	o := &Operator{
-		ccfg: controllerConfig,
-	}
+func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, inClusterClientName string, extraClusters map[string]string) error {
+	o := &Operator{}
 
 	var err error
-	cfg := controllerConfig.KubeConfig
-	if o.client, err = cnoclient.NewClient(cfg, controllerConfig.ProtoKubeConfig, extraClusters); err != nil {
+	if o.client, err = cnoclient.NewClient(controllerConfig.KubeConfig, controllerConfig.ProtoKubeConfig, inClusterClientName, extraClusters); err != nil {
 		return err
 	}
 
 	// initialize the controller-runtime environment
-	o.manager, err = manager.New(cfg, manager.Options{
+	o.manager, err = manager.New(o.client.Default().Config(), manager.Options{
 		Namespace: "",
 		MapperProvider: func(cfg *rest.Config) (meta.RESTMapper, error) {
 			return o.client.Default().RESTMapper(), nil
@@ -95,7 +89,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}()
 	go logLevelController.Run(ctx, 1)
 	go managementStateController.Run(ctx, 1)
-	if err := connectivitycheck.Start(ctx, o.ccfg.KubeConfig); err != nil {
+	if err := connectivitycheck.Start(ctx, o.client.Default().Config()); err != nil {
 		klog.Errorf("Failed to start connectivitycheck controller: %v", err)
 	}
 

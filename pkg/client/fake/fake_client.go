@@ -2,13 +2,13 @@ package fake
 
 import (
 	"context"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 
@@ -87,6 +87,10 @@ func (fc *FakeClusterClient) Kubernetes() kubernetes.Interface {
 
 func (fc *FakeClusterClient) OpenshiftOperatorClient() *osoperclient.Clientset {
 	panic("not implemented!")
+}
+
+func (fc *FakeClusterClient) Config() *rest.Config {
+	return nil
 }
 
 func (fc *FakeClusterClient) Dynamic() dynamic.Interface {
