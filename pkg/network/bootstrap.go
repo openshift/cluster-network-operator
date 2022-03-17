@@ -27,7 +27,7 @@ func Bootstrap(conf *operv1.Network, client cnoclient.Client) (*bootstrap.Bootst
 		}
 		out.Kuryr = *k
 	case operv1.NetworkTypeOVNKubernetes:
-		o, err := bootstrapOVN(conf, client.Default().CRClient())
+		o, err := bootstrapOVN(conf, client)
 		if err != nil {
 			return nil, err
 		}

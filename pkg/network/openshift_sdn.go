@@ -28,7 +28,8 @@ import (
 // - the sdn daemonset
 // - the openvswitch daemonset
 // and some other small things.
-func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, bool, error) {
+	var progressing bool
 	c := conf.DefaultNetwork.OpenShiftSDNConfig
 
 	objs := []*uns.Unstructured{}
@@ -72,7 +73,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 
 	clusterNetwork, err := clusterNetwork(conf)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build ClusterNetwork")
+		return nil, progressing, errors.Wrap(err, "failed to build ClusterNetwork")
 	}
 	data.Data["ClusterNetwork"] = clusterNetwork
 
@@ -99,18 +100,18 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 
 	kpc, err := kubeProxyConfiguration(kpcDefaults, conf, kpcOverrides)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build kube-proxy config")
+		return nil, progressing, errors.Wrap(err, "failed to build kube-proxy config")
 	}
 	data.Data["KubeProxyConfig"] = kpc
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/openshift-sdn"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render manifests")
+		return nil, progressing, errors.Wrap(err, "failed to render manifests")
 	}
 
 	objs = append(objs, manifests...)
 
-	return objs, nil
+	return objs, progressing, nil
 }
 
 // validateOpenShiftSDN checks that the openshift-sdn specific configuration
