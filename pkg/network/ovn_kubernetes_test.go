@@ -67,10 +67,13 @@ func TestRenderOVNKubernetes(t *testing.T) {
 		MasterAddresses: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 			NodeMode: "full",
+			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+				Enabled: false,
+			},
 		},
 	}
 
-	objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-master")))
@@ -117,9 +120,12 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 		MasterAddresses: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 			NodeMode: "full",
+			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+				Enabled: false,
+			},
 		},
 	}
-	objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	script, err := findNBDBPostStart(objs)
@@ -132,9 +138,12 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 		MasterAddresses: []string{"fd01::1", "fd01::2", "fd01::3"},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 			NodeMode: "full",
+			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+				Enabled: false,
+			},
 		},
 	}
-	objs, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	script, err = findNBDBPostStart(objs)
@@ -353,9 +362,12 @@ election-retry-period=26`,
 				MasterAddresses: tc.masterIPs,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 					NodeMode: "full",
+					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+						Enabled: false,
+					},
 				},
 			}
-			objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
 			g.Expect(err).NotTo(HaveOccurred())
 			confFile := extractOVNKubeConfig(g, objs)
 			g.Expect(confFile).To(Equal(strings.TrimSpace(tc.expected)))
@@ -1287,11 +1299,14 @@ metadata:
 				ExistingNodeDaemonset:   node,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 					NodeMode: "full",
+					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+						Enabled: false,
+					},
 				},
 				PrePullerDaemonset: prepuller,
 			}
 
-			objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
@@ -1588,12 +1603,15 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 			NodeMode: "full",
+			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+				Enabled: false,
+			},
 		},
 	}
 
 	// the new rendered config should hold the node to do the dualstack conversion
 	// the upgrade code holds the masters to update the nodes first
-	objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1680,10 +1698,13 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 				MasterAddresses: []string{"1.2.3.4"},
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 					GatewayMode: "shared",
+					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+						Enabled: false,
+					},
 				},
 				FlowsConfig: tc.FlowsConfig,
 			}
-			objs, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
 			g.Expect(err).ToNot(HaveOccurred())
 			nodeDS := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 			ds := appsv1.DaemonSet{}
