@@ -80,18 +80,22 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	c := conf.DefaultNetwork.OVNKubernetesConfig
 
 	objs := []*uns.Unstructured{}
-
-	h := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault].Host
-	p := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault].Port
+	apiServer := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault]
+	localAPIServer := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal]
 
 	// render the manifests on disk
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["OvnImage"] = os.Getenv("OVN_IMAGE")
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
-	data.Data["KUBERNETES_SERVICE_HOST"] = h
-	data.Data["KUBERNETES_SERVICE_PORT"] = p
-	data.Data["K8S_APISERVER"] = fmt.Sprintf("https://%s:%s", h, p)
+	data.Data["KUBERNETES_SERVICE_HOST"] = apiServer.Host
+	data.Data["KUBERNETES_SERVICE_PORT"] = apiServer.Port
+	data.Data["K8S_APISERVER"] = fmt.Sprintf("https://%s:%s", apiServer.Host, apiServer.Port)
+	data.Data["K8S_LOCAL_APISERVER"] = fmt.Sprintf("https://%s:%s", localAPIServer.Host, localAPIServer.Port)
+
+	data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
+	// TOKEN_AUDIENCE is used by token-minter to identify the audience for the service account token which is verified by the apiserver
+	data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
 	data.Data["MTU"] = c.MTU
 	data.Data["RoutableMTU"] = nil
 
