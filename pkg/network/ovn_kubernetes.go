@@ -630,11 +630,11 @@ func bootstrapOVNGatewayConfig(conf *operv1.Network, kubeClient crclient.Client)
 func getMasterAddresses(kubeClient crclient.Client, controlPlaneReplicaCount int, hypershift bool) ([]string, error) {
 	var heartBeat int
 	masterNodeList := &corev1.NodeList{}
-	ovnMasterAddresses := make([]string, controlPlaneReplicaCount)
+	ovnMasterAddresses := make([]string, 0, controlPlaneReplicaCount)
 
 	if hypershift {
 		for i := 0; i < controlPlaneReplicaCount; i++ {
-			ovnMasterAddresses[i] = fmt.Sprintf("ovnkube-master-%d.ovnkube-master.%s.svc.cluster.local", i, os.Getenv("HOSTED_CLUSTER_NAMESPACE"))
+			ovnMasterAddresses = append(ovnMasterAddresses, fmt.Sprintf("ovnkube-master-%d.ovnkube-master.%s.svc.cluster.local", i, os.Getenv("HOSTED_CLUSTER_NAMESPACE")))
 		}
 	} else {
 		err := wait.PollImmediate(OVN_MASTER_DISCOVERY_POLL*time.Second, time.Duration(OVN_MASTER_DISCOVERY_TIMEOUT)*time.Second, func() (bool, error) {
@@ -669,7 +669,7 @@ func getMasterAddresses(kubeClient crclient.Client, controlPlaneReplicaCount int
 			return nil, fmt.Errorf("Unable to bootstrap OVN, err: %v", err)
 		}
 
-		for i, masterNode := range masterNodeList.Items {
+		for _, masterNode := range masterNodeList.Items {
 			var ip string
 			for _, address := range masterNode.Status.Addresses {
 				if address.Type == corev1.NodeInternalIP {
@@ -680,7 +680,7 @@ func getMasterAddresses(kubeClient crclient.Client, controlPlaneReplicaCount int
 			if ip == "" {
 				return nil, fmt.Errorf("No InternalIP found on master node '%s'", masterNode.Name)
 			}
-			ovnMasterAddresses[i] = ip
+			ovnMasterAddresses = append(ovnMasterAddresses, ip)
 		}
 	}
 	return ovnMasterAddresses, nil
