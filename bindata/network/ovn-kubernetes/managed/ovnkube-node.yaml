@@ -1,0 +1,604 @@
+---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  {{ if eq .OVN_NODE_MODE "dpu-host" }}
+  name: ovnkube-node-dpu-host
+  {{ else }}
+  name: ovnkube-node
+  {{ end }}
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    kubernetes.io/description: |
+      This daemonset launches the ovn-kubernetes per node networking components.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+    matchLabels:
+      {{ if eq .OVN_NODE_MODE "dpu-host" }}
+      app: ovnkube-node-dpu-host
+      {{ else }}
+      app: ovnkube-node
+      {{ end }}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        {{ if eq .OVN_NODE_MODE "dpu-host" }}
+        app: ovnkube-node-dpu-host
+        {{ else }}
+        app: ovnkube-node
+        {{ end }}
+        component: network
+        type: infra
+        openshift.io/component: network
+        kubernetes.io/os: "linux"
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: network.operator.openshift.io/dpu-host
+                {{ if eq .OVN_NODE_MODE "dpu-host" }}
+                operator: Exists
+                {{ else }}
+                operator: DoesNotExist
+                {{ end }}
+              - key: network.operator.openshift.io/dpu
+                operator: DoesNotExist
+      serviceAccountName: ovn-kubernetes-node
+      hostNetwork: true
+      hostPID: true
+      priorityClassName: "system-node-critical"
+      # volumes in all containers:
+      # (container) -> (host)
+      # /etc/openvswitch -> /etc/openvswitch - ovsdb system id
+      # /var/lib/openvswitch -> /var/lib/openvswitch/data - ovsdb data
+      # /run/openvswitch -> tmpfs - ovsdb sockets
+      # /env -> configmap env-overrides - debug overrides
+      containers:
+      {{ if eq .OVN_NODE_MODE "full" }}
+      # ovn-controller: programs the vswitch with flows from the sbdb
+      - name: ovn-controller
+        image: "{{.OvnImage}}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          if [[ -f "/env/${K8S_NODE}" ]]; then
+            set -o allexport
+            source "/env/${K8S_NODE}"
+            set +o allexport
+          fi
+
+          echo "$(date -Iseconds) - starting ovn-controller"
+          exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
+            --no-chdir --pidfile=/var/run/ovn/ovn-controller.pid \
+            --syslog-method="{{.OVNPolicyAuditDestination}}" \
+            --log-file=/var/log/ovn/acl-audit-log.log \
+            -vFACILITY:"{{.OVNPolicyAuditSyslogFacility}}" \
+            -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
+            -vconsole:"${OVN_LOG_LEVEL}" -vconsole:"acl_log:off" \
+            -vPATTERN:console:"{{.OVN_LOG_PATTERN_CONSOLE}}" \
+            -vsyslog:"acl_log:info" \
+            -vfile:"acl_log:info"
+        securityContext:
+          privileged: true
+        env:
+        - name: OVN_LOG_LEVEL
+          value: info
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - mountPath: /run/openvswitch
+          name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
+        - mountPath: /etc/openvswitch
+          name: etc-openvswitch
+        - mountPath: /etc/ovn/
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch
+          name: var-lib-openvswitch
+        - mountPath: /env
+          name: env-overrides
+        - mountPath: /ovn-cert
+          name: ovn-cert
+        - mountPath: /ovn-ca
+          name: ovn-ca
+        - mountPath: /var/log/ovn
+          name: node-log
+        - mountPath: /dev/log
+          name: log-socket
+        terminationMessagePolicy: FallbackToLogsOnError
+        resources:
+          requests:
+            cpu: 10m
+            memory: 300Mi
+      - name: ovn-acl-logging
+        image: "{{.OvnImage}}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+
+          # Rotate audit log files when then get to max size (in bytes)
+          MAXFILESIZE=$(( "{{.OVNPolicyAuditMaxFileSize}}"*1000000 ))
+          LOGFILE=/var/log/ovn/acl-audit-log.log
+          CONTROLLERPID=$(cat /run/ovn/ovn-controller.pid)
+
+          # Redirect err to null so no messages are shown upon rotation
+          tail -F ${LOGFILE} 2> /dev/null &
+
+          while true
+          do
+            # Make sure ovn-controller's logfile exists, and get current size in bytes
+            if [ -f "$LOGFILE" ]; then
+              file_size=`du -b ${LOGFILE} | tr -s '\t' ' ' | cut -d' ' -f1`
+            else
+              ovs-appctl -t /var/run/ovn/ovn-controller.${CONTROLLERPID}.ctl vlog/reopen
+              file_size=`du -b ${LOGFILE} | tr -s '\t' ' ' | cut -d' ' -f1`
+            fi
+
+            if [ $file_size -gt $MAXFILESIZE ];then
+              echo "Rotating OVN ACL Log File"
+              timestamp=`date '+%Y-%m-%dT%H-%M-%S'`
+              mv ${LOGFILE} /var/log/ovn/acl-audit-log.$timestamp.log
+              ovs-appctl -t /run/ovn/ovn-controller.${CONTROLLERPID}.ctl vlog/reopen
+              CONTROLLERPID=$(cat /run/ovn/ovn-controller.pid)
+            fi
+
+            # sleep for 30 seconds to avoid wasting CPU
+            sleep 30
+          done
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /var/log/ovn
+          name: node-log
+        - mountPath: /run/ovn/
+          name: run-ovn
+      {{ end }}
+      - name: kube-rbac-proxy
+        image: {{.KubeRBACProxyImage}}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          TLS_PK=/etc/pki/tls/metrics-cert/tls.key
+          TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
+          # As the secret mount is optional we must wait for the files to be present.
+          # The service is created in monitor.yaml and this is created in sdn.yaml.
+          # If it isn't created there is probably an issue so we want to crashloop.
+          retries=0
+          TS=$(date +%s)
+          WARN_TS=$(( ${TS} + $(( 20 * 60)) ))
+          HAS_LOGGED_INFO=0
+
+          log_missing_certs(){
+              CUR_TS=$(date +%s)
+              if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
+                echo $(date -Iseconds) WARN: ovn-node-metrics-cert not mounted after 20 minutes.
+              elif [[ "${HAS_LOGGED_INFO}" -eq 0 ]] ; then
+                echo $(date -Iseconds) INFO: ovn-node-metrics-cert not mounted. Waiting one hour.
+                HAS_LOGGED_INFO=1
+              fi
+          }
+          while [[ ! -f "${TLS_PK}" ||  ! -f "${TLS_CERT}" ]] ; do
+            log_missing_certs
+            sleep 5
+          done
+
+          echo $(date -Iseconds) INFO: ovn-node-metrics-certs mounted, starting kube-rbac-proxy
+          exec /usr/bin/kube-rbac-proxy \
+            --logtostderr \
+            --secure-listen-address=:9103 \
+            --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
+            --upstream=http://127.0.0.1:29103/ \
+            --tls-private-key-file=${TLS_PK} \
+            --tls-cert-file=${TLS_CERT}
+        ports:
+        - containerPort: 9103
+          name: https
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: ovn-node-metrics-cert
+          mountPath: /etc/pki/tls/metrics-cert
+          readOnly: True
+      - name: kube-rbac-proxy-ovn-metrics
+        image: {{.KubeRBACProxyImage}}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          TLS_PK=/etc/pki/tls/metrics-cert/tls.key
+          TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
+          # As the secret mount is optional we must wait for the files to be present.
+          # The service is created in monitor.yaml and this is created in sdn.yaml.
+          # If it isn't created there is probably an issue so we want to crashloop.
+          retries=0
+          TS=$(date +%s)
+          WARN_TS=$(( ${TS} + $(( 20 * 60)) ))
+          HAS_LOGGED_INFO=0
+
+          log_missing_certs(){
+              CUR_TS=$(date +%s)
+              if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
+                echo $(date -Iseconds) WARN: ovn-node-metrics-cert not mounted after 20 minutes.
+              elif [[ "${HAS_LOGGED_INFO}" -eq 0 ]] ; then
+                echo $(date -Iseconds) INFO: ovn-node-metrics-cert not mounted. Waiting one hour.
+                HAS_LOGGED_INFO=1
+              fi
+          }
+          while [[ ! -f "${TLS_PK}" ||  ! -f "${TLS_CERT}" ]] ; do
+            log_missing_certs
+            sleep 5
+          done
+
+          echo $(date -Iseconds) INFO: ovn-node-metrics-certs mounted, starting kube-rbac-proxy
+          exec /usr/bin/kube-rbac-proxy \
+            --logtostderr \
+            --secure-listen-address=:9105 \
+            --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
+            --upstream=http://127.0.0.1:29105/ \
+            --tls-private-key-file=${TLS_PK} \
+            --tls-cert-file=${TLS_CERT}
+        ports:
+        - containerPort: 9105
+          name: https
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: ovn-node-metrics-cert
+          mountPath: /etc/pki/tls/metrics-cert
+          readOnly: True
+      # ovnkube-node: does node-level bookkeeping and configuration
+      - name: ovnkube-node
+        image: "{{.OvnImage}}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+          if [[ -f "/env/${K8S_NODE}" ]]; then
+            set -o allexport
+            source "/env/${K8S_NODE}"
+            set +o allexport
+          fi
+          echo "I$(date "+%m%d %H:%M:%S.%N") - waiting for db_ip addresses"
+          cp -f /usr/libexec/cni/ovn-k8s-cni-overlay /cni-bin-dir/
+          ovn_config_namespace=openshift-ovn-kubernetes
+          echo "I$(date "+%m%d %H:%M:%S.%N") - disable conntrack on geneve port"
+          iptables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
+          iptables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
+          ip6tables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
+          ip6tables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
+          retries=0
+
+          echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node db_ip ${db_ip}"
+
+          if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
+            gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
+          elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
+            gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
+          else
+            echo "Invalid OVN_GATEWAY_MODE: \"{{.OVN_GATEWAY_MODE}}\". Must be \"local\" or \"shared\"."
+            exit 1
+          fi
+
+          export_network_flows_flags=
+          if [[ -n "${NETFLOW_COLLECTORS}" ]] ; then
+            export_network_flows_flags="--netflow-targets ${NETFLOW_COLLECTORS}"
+          fi
+          if [[ -n "${SFLOW_COLLECTORS}" ]] ; then
+            export_network_flows_flags="$export_network_flows_flags --sflow-targets ${SFLOW_COLLECTORS}"
+          fi
+          if [[ -n "${IPFIX_COLLECTORS}" ]] ; then
+            export_network_flows_flags="$export_network_flows_flags --ipfix-targets ${IPFIX_COLLECTORS}"
+          fi
+          if [[ -n "${IPFIX_CACHE_MAX_FLOWS}" ]] ; then
+            export_network_flows_flags="$export_network_flows_flags --ipfix-cache-max-flows ${IPFIX_CACHE_MAX_FLOWS}"
+          fi
+          if [[ -n "${IPFIX_CACHE_ACTIVE_TIMEOUT}" ]] ; then
+            export_network_flows_flags="$export_network_flows_flags --ipfix-cache-active-timeout ${IPFIX_CACHE_ACTIVE_TIMEOUT}"
+          fi
+          if [[ -n "${IPFIX_SAMPLING}" ]] ; then
+            export_network_flows_flags="$export_network_flows_flags --ipfix-sampling ${IPFIX_SAMPLING}"
+          fi
+          gw_interface_flag=
+          # if br-ex1 is configured on the node, we want to use it for external gateway traffic
+          if [ -d /sys/class/net/br-ex1 ]; then
+            gw_interface_flag="--exgw-interface=br-ex1"
+          fi
+
+          node_mgmt_port_netdev_flags=
+          if [[ -n "${OVNKUBE_NODE_MGMT_PORT_NETDEV}" ]] ; then
+            node_mgmt_port_netdev_flags="--ovnkube-node-mgmt-port-netdev ${OVNKUBE_NODE_MGMT_PORT_NETDEV}"
+          fi
+
+          exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
+            --nb-address "{{.OVN_NB_DB_ROUTE}}" \
+            --sb-address "{{.OVN_SB_DB_ROUTE}}" \
+            --nb-client-privkey /ovn-cert/tls.key \
+            --nb-client-cert /ovn-cert/tls.crt \
+            --nb-client-cacert /ovn-ca/ca-bundle.crt \
+            --nb-cert-common-name "{{.OVN_CERT_CN}}" \
+            --sb-client-privkey /ovn-cert/tls.key \
+            --sb-client-cert /ovn-cert/tls.crt \
+            --sb-client-cacert /ovn-ca/ca-bundle.crt \
+            --sb-cert-common-name "{{.OVN_CERT_CN}}" \
+            --config-file=/run/ovnkube-config/ovnkube.conf \
+            --loglevel "${OVN_KUBE_LOG_LEVEL}" \
+            --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
+            ${gateway_mode_flags} \
+            {{- if eq .OVN_NODE_MODE "dpu-host" }}
+            --ovnkube-node-mode dpu-host \
+            ${node_mgmt_port_netdev_flags} \
+            {{- end }}
+            --metrics-bind-address "127.0.0.1:29103" \
+            --ovn-metrics-bind-address "127.0.0.1:29105" \
+            --metrics-enable-pprof \
+            --disable-snat-multiple-gws \
+            ${export_network_flows_flags} \
+            ${gw_interface_flag}
+        env:
+        # for kubectl
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
+        - name: OVN_CONTROLLER_INACTIVITY_PROBE
+          value: "{{.OVN_CONTROLLER_INACTIVITY_PROBE}}"
+        - name: OVN_KUBE_LOG_LEVEL
+          value: "4"
+        {{ if .NetFlowCollectors }}
+        - name: NETFLOW_COLLECTORS
+          value: "{{.NetFlowCollectors}}"
+        {{ end }}
+        {{ if .SFlowCollectors }}
+        - name: SFLOW_COLLECTORS
+          value: "{{.SFlowCollectors}}"
+        {{ end }}
+        {{ if .IPFIXCollectors }}
+        - name: IPFIX_COLLECTORS
+          value: "{{.IPFIXCollectors}}"
+        {{ end }}
+        {{ if .IPFIXCacheMaxFlows }}
+        - name: IPFIX_CACHE_MAX_FLOWS
+          value: "{{.IPFIXCacheMaxFlows}}"
+        {{ end }}
+        {{ if .IPFIXCacheActiveTimeout }}
+        - name: IPFIX_CACHE_ACTIVE_TIMEOUT
+          value: "{{.IPFIXCacheActiveTimeout}}"
+        {{ end }}
+        {{ if .IPFIXSampling }}
+        - name: IPFIX_SAMPLING
+          value: "{{.IPFIXSampling}}"
+        {{ end }}
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        ports:
+        - name: metrics-port
+          containerPort: 29103
+        securityContext:
+          privileged: true
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        # for checking ovs-configuration service
+        - mountPath: /etc/systemd/system
+          name: systemd-units
+          readOnly: true
+        # for the iptables wrapper
+        - mountPath: /host
+          name: host-slash
+          readOnly: true
+          mountPropagation: HostToContainer
+        # for the CNI server socket
+        - mountPath: /run/ovn-kubernetes/
+          name: host-run-ovn-kubernetes
+        # accessing bind-mounted net namespaces
+        - mountPath: /run/netns
+          name: host-run-netns
+          readOnly: true
+          mountPropagation: HostToContainer
+        # for installing the CNI plugin binary
+        - mountPath: /cni-bin-dir
+          name: host-cni-bin
+        # for installing the CNI configuration file
+        - mountPath: /etc/cni/net.d
+          name: host-cni-netd
+        # Where we store IP allocations
+        - mountPath: /var/lib/cni/networks/ovn-k8s-cni-overlay
+          name: host-var-lib-cni-networks-ovn-kubernetes
+        - mountPath: /run/openvswitch
+          name: run-openvswitch
+        - mountPath: /run/ovn/
+          name: run-ovn
+        - mountPath: /etc/openvswitch
+          name: etc-openvswitch
+        - mountPath: /etc/ovn/
+          name: etc-openvswitch
+        - mountPath: /var/lib/openvswitch
+          name: var-lib-openvswitch
+        - mountPath: /run/ovnkube-config/
+          name: ovnkube-config
+        - mountPath: /env
+          name: env-overrides
+        - mountPath: /ovn-cert
+          name: ovn-cert
+        - mountPath: /ovn-ca
+          name: ovn-ca
+        resources:
+          requests:
+            cpu: 10m
+            memory: 300Mi
+        lifecycle:
+          preStop:
+            exec:
+              command: ["rm","-f","/etc/cni/net.d/10-ovn-kubernetes.conf"]
+        readinessProbe:
+          exec:
+            command: ["test", "-f", "/etc/cni/net.d/10-ovn-kubernetes.conf"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      {{- if .OVNPlatformAzure}}
+      - name: drop-icmp
+        image: "{{.OvnImage}}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+
+          touch /var/run/ovn/add_iptables.sh
+          chmod 0755 /var/run/ovn/add_iptables.sh
+          cat <<'EOF' > /var/run/ovn/add_iptables.sh
+          #!/bin/sh
+          if [ -z "$3" ]
+          then
+               echo "Called with host address missing, ignore"
+               exit 0
+          fi
+          echo "Adding ICMP drop rule for '$3' "
+          if iptables -C CHECK_ICMP_SOURCE -p icmp -s $3 -j ICMP_ACTION
+          then
+               echo "iptables already set for $3"
+          else
+               iptables -A CHECK_ICMP_SOURCE -p icmp -s $3 -j ICMP_ACTION
+          fi
+          EOF
+
+          echo "I$(date "+%m%d %H:%M:%S.%N") - drop-icmp - start drop-icmp ${K8S_NODE}"
+          iptables -X CHECK_ICMP_SOURCE || true
+          iptables -N CHECK_ICMP_SOURCE || true
+          iptables -F CHECK_ICMP_SOURCE
+          iptables -D INPUT -p icmp --icmp-type fragmentation-needed -j CHECK_ICMP_SOURCE || true
+          iptables -I INPUT -p icmp --icmp-type fragmentation-needed -j CHECK_ICMP_SOURCE
+          iptables -N ICMP_ACTION || true
+          iptables -F ICMP_ACTION
+          iptables -A ICMP_ACTION -j LOG
+          iptables -A ICMP_ACTION -j DROP
+          #
+          ip addr show
+          ip route show
+          iptables -nvL
+          iptables -nvL -t nat
+          oc observe pods -n openshift-ovn-kubernetes -l app=ovnkube-node -a '{ .status.hostIP }' -- /var/run/ovn/add_iptables.sh
+          #systemd-run -qPG -- oc observe pods -n openshift-ovn-kubernetes -l app=ovnkube-node -a '{ .status.hostIP }' -- /var/run/ovn/add_iptables.sh
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/bash", "-c", "echo drop-icmp done"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+        # for the iptables wrapper
+        - mountPath: /host
+          name: host-slash
+          readOnly: true
+          mountPropagation: HostToContainer
+        - mountPath: /run/ovn/
+          name: run-ovn
+        resources:
+          requests:
+            cpu: 5m
+            memory: 20Mi
+        env:
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+      {{- end}}
+      nodeSelector:
+        beta.kubernetes.io/os: "linux"
+      volumes:
+      # for checking ovs-configuration service
+      - name: systemd-units
+        hostPath:
+          path: /etc/systemd/system
+      # used for iptables wrapper scripts
+      - name: host-slash
+        hostPath:
+          path: /
+      - name: host-run-netns
+        hostPath:
+          path: /run/netns
+      - name: var-lib-openvswitch
+        hostPath:
+          path: /var/lib/openvswitch/data
+      - name: etc-openvswitch
+        hostPath:
+          path: /etc/openvswitch
+      - name: run-openvswitch
+        hostPath:
+          path: /var/run/openvswitch
+      - name: run-ovn
+        hostPath:
+          path: /var/run/ovn
+      {{ if eq .OVN_NODE_MODE "full" }}
+      # Used for placement of ACL audit logs
+      - name: node-log
+        hostPath:
+          path: /var/log/ovn
+      - name: log-socket
+        hostPath:
+          path: /dev/log
+      {{ end }}
+      # For CNI server
+      - name: host-run-ovn-kubernetes
+        hostPath:
+          path: /run/ovn-kubernetes
+      - name: host-cni-bin
+        hostPath:
+          path: "{{.CNIBinDir}}"
+      - name: host-cni-netd
+        hostPath:
+          path: "{{.CNIConfDir}}"
+      - name: host-var-lib-cni-networks-ovn-kubernetes
+        hostPath:
+          path: /var/lib/cni/networks/ovn-k8s-cni-overlay
+      - name: ovnkube-config
+        configMap:
+          name: ovnkube-config
+      - name: env-overrides
+        configMap:
+          name: env-overrides
+          optional: true
+      - name: ovn-ca
+        configMap:
+          name: ovn-ca
+      - name: ovn-cert
+        secret:
+          secretName: ovn-cert
+      - name: ovn-node-metrics-cert
+        secret:
+          secretName: ovn-node-metrics-cert
+          optional: true
+      tolerations:
+      - operator: "Exists"
