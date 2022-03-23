@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"log"
 	"math/rand"
 	"net/url"
@@ -80,14 +81,16 @@ which is a kubeconfig from which to take just the URL to the apiserver`,
 		},
 	}
 	var extraClusters *map[string]string
+	var inClusterClientName *string
 	cmdcfg := controllercmd.NewControllerCommandConfig("network-operator", version.Get(), func(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
-		return operator.RunOperator(ctx, controllerConfig, *extraClusters)
+		return operator.RunOperator(ctx, controllerConfig, *inClusterClientName, *extraClusters)
 	})
 
 	cmd2 := cmdcfg.NewCommand()
 	cmd2.Use = "start"
 	cmd2.Short = "Start the cluster network operator"
 	extraClusters = cmd2.Flags().StringToString("extra-clusters", nil, "extra clusters, pairs of cluster name and kubeconfig path")
+	inClusterClientName = cmd2.Flags().String("in-cluster-client-name", cnoclient.DefaultClusterName, "client name for in-cluster config(service account or kubeconfig)")
 	cmd.AddCommand(cmd2)
 
 	cmd.AddCommand(newMTUProberCommand())

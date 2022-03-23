@@ -82,16 +82,16 @@ type OperatorClusterClient struct {
 // enforce that OperatorClusterClient implements the ClusterClient interface
 var _ ClusterClient = &OperatorClusterClient{}
 
-func NewClient(cfg, protocfg *rest.Config, extraClusters map[string]string) (*OperatorClient, error) {
+func NewClient(cfg, protocfg *rest.Config, inClusterClientName string, extraClusters map[string]string) (*OperatorClient, error) {
 	cli := &OperatorClient{
 		clusterClients: make(map[string]*OperatorClusterClient),
 	}
 
-	defaultClient, err := NewClusterClient(cfg, protocfg)
+	inClusterClient, err := NewClusterClient(cfg, protocfg)
 	if err != nil {
 		return nil, err
 	}
-	cli.clusterClients[DefaultClusterName] = defaultClient
+	cli.clusterClients[inClusterClientName] = inClusterClient
 
 	for name, kubeConfig := range extraClusters {
 		clientConfig, err := clientConfig.GetClientConfig(kubeConfig, nil)
@@ -208,6 +208,10 @@ func (c *OperatorClusterClient) RESTMapper() meta.RESTMapper {
 
 func (c *OperatorClusterClient) Scheme() *runtime.Scheme {
 	return scheme.Scheme
+}
+
+func (c *OperatorClusterClient) Config() *rest.Config {
+	return c.cfg
 }
 
 func (c *OperatorClusterClient) Start(ctx context.Context) error {
