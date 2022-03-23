@@ -35,8 +35,8 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 
 	confv1 "github.com/openshift/api/config/v1"
+	machineapi "github.com/openshift/api/machine/v1beta1"
 	operv1 "github.com/openshift/api/operator/v1"
-	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	capo "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis/openstackproviderconfig/v1alpha1"
 
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"

@@ -8,32 +8,31 @@ require (
 	github.com/containernetworking/cni v0.8.0
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
-	github.com/gophercloud/gophercloud v0.14.0
-	github.com/gophercloud/utils v0.0.0-20201221031838-d93cf4b3fa50
+	github.com/gophercloud/gophercloud v0.19.0
+	github.com/gophercloud/utils v0.0.0-20210720165645-8a3ad2ad9e70
 	github.com/onsi/gomega v1.17.0
-	github.com/openshift/api v0.0.0-20211209135129-c58d9f695577
+	github.com/openshift/api v0.0.0-20220322000322-9c4998a4d646
 	github.com/openshift/build-machinery-go v0.0.0-20211213093930-7e33a7eb4ce3
 	github.com/openshift/client-go v0.0.0-20211209144617-7385dd6338e3
 	github.com/openshift/library-go v0.0.0-20211220195323-eca2c467c492
-	github.com/openshift/machine-api-operator v0.2.1-0.20201203125141-79567cb3368e
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
 	github.com/vishvananda/netlink v1.1.0
-	golang.org/x/net v0.0.0-20210825183410-e898025ed96a
+	golang.org/x/net v0.0.0-20211209124913-491a49abca63
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.23.0
+	k8s.io/api v0.23.1
 	k8s.io/apiextensions-apiserver v0.23.0
-	k8s.io/apimachinery v0.23.0
+	k8s.io/apimachinery v0.23.1
 	k8s.io/client-go v0.23.0
 	k8s.io/code-generator v0.23.0
 	k8s.io/component-base v0.23.0
 	k8s.io/klog/v2 v2.30.0
 	k8s.io/kube-proxy v0.22.1
-	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
-	sigs.k8s.io/cluster-api-provider-openstack v0.3.3
+	k8s.io/utils v0.0.0-20211208161948-7d6a63dca704
+	sigs.k8s.io/cluster-api-provider-openstack v0.0.0-a384cbe0dfa0c2543f6d35f024431a12494e670a
 	sigs.k8s.io/controller-runtime v0.11.0
 )
 
@@ -54,14 +53,14 @@ require (
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
-	github.com/go-logr/logr v1.2.0 // indirect
+	github.com/go-logr/logr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/go-cmp v0.5.5 // indirect
+	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
@@ -80,7 +79,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20201201000827-1117a4fc438c // indirect
 	github.com/pkg/profile v1.3.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
@@ -129,9 +127,7 @@ require (
 	k8s.io/kube-aggregator v0.23.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.25 // indirect
-	sigs.k8s.io/cluster-api-provider-aws v0.0.0-00010101000000-000000000000 // indirect
-	sigs.k8s.io/cluster-api-provider-azure v0.0.0-00010101000000-000000000000 // indirect
-	sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6 // indirect
+	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
 	sigs.k8s.io/kube-storage-version-migrator v0.0.4 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.0 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
@@ -140,5 +136,5 @@ require (
 replace (
 	sigs.k8s.io/cluster-api-provider-aws => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20201125052318-b85a18cbf338
 	sigs.k8s.io/cluster-api-provider-azure => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20201130182513-88b90230f2a4
-	sigs.k8s.io/cluster-api-provider-openstack => github.com/openshift/cluster-api-provider-openstack v0.0.0-20210107201226-5f60693f7a71
+	sigs.k8s.io/cluster-api-provider-openstack => github.com/openshift/cluster-api-provider-openstack v0.0.0-20220209101310-a384cbe0dfa0
 )
