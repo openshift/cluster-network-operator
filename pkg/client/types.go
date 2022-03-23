@@ -3,13 +3,13 @@ package client
 import (
 	"context"
 
+	osoperclient "github.com/openshift/client-go/operator/clientset/versioned"
+	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-
-	osoperclient "github.com/openshift/client-go/operator/clientset/versioned"
-	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	"k8s.io/client-go/rest"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -37,6 +37,9 @@ type ClusterClient interface {
 
 	// OpenshiftOperatorClient returns the clientset for operator.openshift.io
 	OpenshiftOperatorClient() *osoperclient.Clientset
+
+	// Config returns the clients rest config
+	Config() *rest.Config
 
 	// Dynamic returns an untyped, dynamic client.
 	Dynamic() dynamic.Interface
