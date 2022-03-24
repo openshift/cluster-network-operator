@@ -506,6 +506,7 @@ spec:
               command:
               - /ip-reconciler
               - -log-level=verbose
+              - -timeout=32
               volumeMounts:
                 - name: cni-net-dir
                   mountPath: /host/etc/cni/net.d
