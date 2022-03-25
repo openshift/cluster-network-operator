@@ -31,14 +31,6 @@ rules:
   verbs:
   - list
   - watch
-- apiGroups: [""]
-  resources:
-  - nodes
-  verbs:
-  - get
-  - list
-  - watch
-  - patch
 - apiGroups: ["networking.k8s.io"]
   resources:
   - networkpolicies
