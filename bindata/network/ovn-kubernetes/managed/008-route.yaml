@@ -1,5 +1,6 @@
----
-# ovnkube-sbdb route exposed in extra cluster
+{{ if eq .OVNDbServiceType "ClusterIP" }}
+# There are two service types supported for ovn sb db in hypershift: ClusterIP and NodePort
+# When ClusterIP is used we expose the service through the following route
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
@@ -15,3 +16,7 @@ spec:
   to:
     kind: Service
     name: ovnkube-master-external
+  {{ if .OVNSbDbRouteHost }}
+  host: {{.OVNSbDbRouteHost}}
+  {{ end }}
+{{ end }}
