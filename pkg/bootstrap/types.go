@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	configv1 "github.com/openshift/api/config/v1"
+	hyperv1 "github.com/openshift/hypershift/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 )
 
@@ -30,10 +31,11 @@ type KuryrBootstrapResult struct {
 }
 
 type OVNHyperShiftBootstrapResult struct {
-	Enabled   bool
-	ClusterID string
-	Namespace string
-	Route     string
+	Enabled                   bool
+	ClusterID                 string
+	Namespace                 string
+	ServicePublishingStrategy *hyperv1.ServicePublishingStrategy
+	OVNSbDbEndpoint           string
 }
 
 type OVNConfigBoostrapResult struct {
