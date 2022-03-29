@@ -246,19 +246,12 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// Generate the objects
-	objs, progressing, err := network.Render(&operConfig.Spec, bootstrapResult, ManifestPath)
+	objs, _, err := network.Render(&operConfig.Spec, bootstrapResult, ManifestPath)
 	if err != nil {
 		log.Printf("Failed to render: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "RenderError",
 			fmt.Sprintf("Internal error while rendering operator configuration: %v", err))
 		return reconcile.Result{}, err
-	}
-
-	if progressing {
-		r.status.SetProgressing(statusmanager.OperatorConfig, "RenderProgressing",
-			"Waiting to render manifests")
-	} else {
-		r.status.UnsetProgressing(statusmanager.OperatorConfig)
 	}
 
 	// The first object we create should be the record of our applied configuration. The last object we create is config.openshift.io/v1/Network.Status
@@ -404,9 +397,6 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	if !bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled || bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Route != "" {
-		r.status.UnsetProgressing(statusmanager.OperatorConfig)
-	}
 	r.status.SetNotDegraded(statusmanager.OperatorConfig)
 
 	// All was successful. Request that this be re-triggered after ResyncPeriod,
