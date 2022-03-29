@@ -131,7 +131,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 			return err
 		}
 
-		oldStatus := oc.Status.DeepCopy()
+		oldStatus := oc.DeepCopy()
 
 		oc.Status.Version = os.Getenv("RELEASE_VERSION")
 
@@ -183,7 +183,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 
 		operStatus = &oc.Status
 
-		if equality.Semantic.DeepEqual(&oc.Status, oldStatus) {
+		if equality.Semantic.DeepEqual(&oc.Status, oldStatus.Status) {
 			return nil
 		}
 
@@ -192,7 +192,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 			buf = []byte(fmt.Sprintf("(failed to convert to YAML: %s)", err))
 		}
 
-		if err := status.client.Update(context.TODO(), oc); err != nil {
+		if err := status.client.Patch(context.TODO(), oc, crclient.MergeFrom(oldStatus)); err != nil {
 			return err
 		}
 		log.Printf("Set operator conditions:\n%s", buf)
