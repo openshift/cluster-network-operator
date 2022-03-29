@@ -56,6 +56,42 @@ spec:
       hostNetwork: true
       hostPID: true
       priorityClassName: "system-node-critical"
+      initContainers:
+      # ovnkube-node-init: wait for sbdb ready
+      {{ if eq .OVN_NODE_MODE "full" }}
+      - name: ovnkube-node-init
+        image: "{{.OvnImage}}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+          if [[ -f "/env/${K8S_NODE}" ]]; then
+            set -o allexport
+            source "/env/${K8S_NODE}"
+            set +o allexport
+          fi
+          echo "$(date -Iseconds) - checking sbdb"
+          ovndb_ctl_ssl_opts="-p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt"
+          sbdb_ip="{{.OVN_SB_DB_ROUTE}}"
+          retries=0
+          while ! ovn-sbctl --no-leader-only --timeout=5 --db=${sbdb_ip} ${ovndb_ctl_ssl_opts} get-connection; do
+            (( retries += 1 ))
+            if [[ "${retries}" -gt 40 ]]; then
+              echo "$(date -Iseconds) - ERROR RESTARTING - sbdb - too many failed ovn-sbctl attempts, giving up"
+              exit 1
+            fi
+            sleep 2
+          done
+        volumeMounts:
+        - mountPath: /env
+          name: env-overrides
+        - mountPath: /ovn-cert
+          name: ovn-cert
+        - mountPath: /ovn-ca
+          name: ovn-ca
+      {{ end }}
+
       # volumes in all containers:
       # (container) -> (host)
       # /etc/openvswitch -> /etc/openvswitch - ovsdb system id
