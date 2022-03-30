@@ -84,7 +84,7 @@ spec:
       annotations:
         summary: Kuryr CNI pod {{"{{"}} $labels.pod {{"}}"}} is taking too long, on average, to perform CNI {{"{{"}} $labels.command {{"}}"}} requests.
       expr: |
-        histogram_quantile(0.95, rate(kuryr_cni_request_duration_seconds_bucket[10m])) > 30
+        histogram_quantile(0.95, rate(kuryr_cni_request_duration_seconds_bucket[10m])) > 60
       labels:
         severity: warning
     - alert: KuryrLoadBalancerWithError
