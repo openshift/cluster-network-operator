@@ -255,10 +255,10 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	if progressing {
-		r.status.SetProgressing(statusmanager.OperatorConfig, "RenderProgressing",
+		r.status.SetProgressing(statusmanager.OperatorRender, "RenderProgressing",
 			"Waiting to render manifests")
 	} else {
-		r.status.UnsetProgressing(statusmanager.OperatorConfig)
+		r.status.UnsetProgressing(statusmanager.OperatorRender)
 	}
 
 	// The first object we create should be the record of our applied configuration. The last object we create is config.openshift.io/v1/Network.Status
