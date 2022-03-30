@@ -24,10 +24,10 @@ import (
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	configv1 "github.com/openshift/api/config/v1"
+	machineapi "github.com/openshift/api/machine/v1beta1"
 	op_netopv1 "github.com/openshift/api/networkoperator/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
-	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
