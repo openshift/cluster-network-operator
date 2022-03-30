@@ -34,6 +34,7 @@ type StatusLevel int
 const (
 	ClusterConfig StatusLevel = iota
 	OperatorConfig
+	OperatorRender
 	ProxyConfig
 	InjectorConfig
 	PodDeployment
