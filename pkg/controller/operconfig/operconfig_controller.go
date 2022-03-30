@@ -404,9 +404,6 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	if !bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled || bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Route != "" {
-		r.status.UnsetProgressing(statusmanager.OperatorConfig)
-	}
 	r.status.SetNotDegraded(statusmanager.OperatorConfig)
 
 	// All was successful. Request that this be re-triggered after ResyncPeriod,
