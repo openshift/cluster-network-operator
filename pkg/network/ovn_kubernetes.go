@@ -144,10 +144,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["HostedClusterNamespace"] = os.Getenv("HOSTED_CLUSTER_NAMESPACE")
 	data.Data["OvnkubeMasterReplicas"] = len(bootstrapResult.OVN.MasterAddresses)
 
-	// Sbdb route in the format of "ssl://ovnkube-sbdb-<hostedcluster namespace>.apps.<hostedcluster domain name>:443"
-	// TODO: get this from the route Status
-	data.Data["OVN_NB_DB_ROUTE"] = fmt.Sprintf("ssl://ovnkube-sbdb-%s.apps.%s:%s", os.Getenv("HOSTED_CLUSTER_NAMESPACE"), os.Getenv("MANAGEMENT_CLUSTER_DOMAIN"), OVN_SB_ROUTE_PORT)
-	data.Data["OVN_SB_DB_ROUTE"] = fmt.Sprintf("ssl://ovnkube-sbdb-%s.apps.%s:%s", os.Getenv("HOSTED_CLUSTER_NAMESPACE"), os.Getenv("MANAGEMENT_CLUSTER_DOMAIN"), OVN_SB_ROUTE_PORT)
+	// Sbdb route in the format of "ssl:dbAddress:dbPort"
+	data.Data["OVN_NB_DB_ROUTE"] = fmt.Sprintf("ssl:ovnkube-sbdb-%s.apps.%s:%s", os.Getenv("HOSTED_CLUSTER_NAMESPACE"), os.Getenv("MANAGEMENT_CLUSTER_DOMAIN"), OVN_SB_ROUTE_PORT)
+	data.Data["OVN_SB_DB_ROUTE"] = fmt.Sprintf("ssl:ovnkube-sbdb-%s.apps.%s:%s", os.Getenv("HOSTED_CLUSTER_NAMESPACE"), os.Getenv("MANAGEMENT_CLUSTER_DOMAIN"), OVN_SB_ROUTE_PORT)
 
 	data.Data["OVN_NB_INACTIVITY_PROBE"] = nb_inactivity_probe
 	data.Data["OVN_NB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterAddresses, OVN_NB_PORT)
