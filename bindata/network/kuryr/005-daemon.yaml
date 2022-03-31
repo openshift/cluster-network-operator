@@ -24,7 +24,7 @@ spec:
         configuration-hash: {{ .ConfigMapHash }}
     spec:
       hostNetwork: true
-      serviceAccountName: kuryr
+      serviceAccountName: kuryr-daemon
       priorityClassName: system-node-critical
       initContainers:
         - name: block-mcs
