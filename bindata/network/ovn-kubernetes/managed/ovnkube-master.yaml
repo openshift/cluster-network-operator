@@ -26,6 +26,7 @@ metadata:
       This daemonset launches the ovn-kubernetes controller (master) networking components.
     release.openshift.io/version: "{{.ReleaseVersion}}"
 spec:
+  podManagementPolicy: Parallel
   selector:
     matchLabels:
       app: ovnkube-master
@@ -126,7 +127,7 @@ spec:
                 - stop_northd
         env:
         - name: OVN_LOG_LEVEL
-          value: dbg
+          value: info
         volumeMounts:
         - mountPath: /var/run/ovn
           name: datadir
@@ -404,7 +405,7 @@ spec:
 
         env:
         - name: OVN_LOG_LEVEL
-          value: dbg
+          value: info
         - name: OVN_NORTHD_PROBE_INTERVAL
           value: "{{.OVN_NORTHD_PROBE_INTERVAL}}"
         - name: K8S_NODE_IP
@@ -706,7 +707,7 @@ spec:
               fi
         env:
         - name: OVN_LOG_LEVEL
-          value: dbg
+          value: info
         - name: K8S_NODE_IP
           valueFrom:
             fieldRef:
