@@ -13,7 +13,6 @@ import (
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
-	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
@@ -69,9 +68,6 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["PoolMinPorts"] = c.PoolMinPorts
 	data.Data["PoolBatchPorts"] = c.PoolBatchPorts
 
-	// deploy or not kuryr-admission-controller depending on double listeners support
-	data.Data["AdmissionController"] = !b.OctaviaMultipleListeners
-
 	// Octavia config data
 	data.Data["OctaviaProvider"] = b.OctaviaProvider
 	if b.OctaviaProvider == OVNProvider {
@@ -110,14 +106,6 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 		return nil, errors.Wrap(err, "failed to calculate checksum of Kuryr configuration")
 	}
 	data.Data["ConfigMapHash"] = hash
-
-	// DNS mutating webhook
-	data.Data["AdmissionControllerSecret"] = names.KURYR_ADMISSION_CONTROLLER_SECRET
-	data.Data["WebhookSecret"] = names.KURYR_WEBHOOK_SECRET
-	data.Data["WebhookCA"] = b.WebhookCA
-	data.Data["WebhookCAKey"] = b.WebhookCAKey
-	data.Data["WebhookCert"] = b.WebhookCert
-	data.Data["WebhookKey"] = b.WebhookKey
 
 	// Pods Network MTU
 	mtu := b.PodsNetworkMTU

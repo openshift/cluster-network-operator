@@ -7,26 +7,21 @@ import (
 )
 
 type KuryrBootstrapResult struct {
-	ServiceSubnet            string
-	PodSubnetpool            string
-	WorkerNodesRouter        string
-	WorkerNodesSubnets       []string
-	PodsNetworkMTU           uint32
-	PodSecurityGroups        []string
-	ExternalNetwork          string
-	ClusterID                string
-	OctaviaProvider          string
-	OctaviaMultipleListeners bool
-	OctaviaVersion           string
-	OpenStackCloud           clientconfig.Cloud
-	WebhookCA                string
-	WebhookCAKey             string
-	WebhookCert              string
-	WebhookKey               string
-	UserCACert               string
-	HttpsProxy               string
-	HttpProxy                string
-	NoProxy                  string
+	ServiceSubnet      string
+	PodSubnetpool      string
+	WorkerNodesRouter  string
+	WorkerNodesSubnets []string
+	PodsNetworkMTU     uint32
+	PodSecurityGroups  []string
+	ExternalNetwork    string
+	ClusterID          string
+	OctaviaProvider    string
+	OctaviaVersion     string
+	OpenStackCloud     clientconfig.Cloud
+	UserCACert         string
+	HttpsProxy         string
+	HttpProxy          string
+	NoProxy            string
 }
 
 type OVNConfigBoostrapResult struct {
