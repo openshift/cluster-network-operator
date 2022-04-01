@@ -24,6 +24,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
+	hyperv1 "github.com/openshift/hypershift/api/v1alpha1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -146,6 +147,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["ManagementClusterName"] = client.ManagementClusterName
 	data.Data["HostedClusterNamespace"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Namespace
 	data.Data["OvnkubeMasterReplicas"] = len(bootstrapResult.OVN.MasterAddresses)
+	data.Data["ClusterID"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ClusterID
+	data.Data["ClusterIDLabel"] = ClusterIDLabel
 	// Sbdb route in the format of "ssl:dbAddress:dbPort"
 	data.Data["OVN_NB_DB_ROUTE"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Route, OVN_SB_ROUTE_PORT)
 	data.Data["OVN_SB_DB_ROUTE"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Route, OVN_SB_ROUTE_PORT)
@@ -400,6 +403,19 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 	if !hc.Enabled {
 		return ovnHypershiftResult, nil
 	}
+
+	hcp := &hyperv1.HostedControlPlane{ObjectMeta: metav1.ObjectMeta{Name: hc.Name}}
+	err := kubeClient.ClientFor(cnoclient.ManagementClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, hcp)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			klog.Infof("Did not find hosted control plane")
+		} else {
+			return nil, fmt.Errorf("Could not get hosted control plane: %v", err)
+		}
+	}
+
+	ovnHypershiftResult.ClusterID = hcp.Spec.ClusterID
+
 	route := &routev1.Route{}
 	gvr := schema.GroupVersionResource{
 		Group:    "route.openshift.io",
