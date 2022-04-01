@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	b64 "encoding/base64"
 	"fmt"
 	"log"
 	"net"
@@ -17,7 +16,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/Masterminds/semver"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
@@ -26,7 +24,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/platform/openstack/util/cert"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 
@@ -49,16 +46,12 @@ const (
 	OpenShiftConfigNamespace = "openshift-config"
 	UserCABundleConfigMap    = "cloud-provider-config"
 	// NOTE(dulek): This one is hardcoded in openshift/installer.
-	InfrastructureCRDName = "cluster"
-	masterMachineLabel    = "machine.openshift.io/cluster-api-machine-role"
-	machinesNamespace     = "openshift-machine-api"
-	// NOTE(ltomasbo): Amphora driver supports came on 2.11, but ovn-octavia only supports it after 2.13
-	MinOctaviaVersionWithMultipleListeners = "v2.13"
-	MinOctaviaVersionWithProviders         = "v2.6"
-	KuryrNamespace                         = "openshift-kuryr"
-	KuryrConfigMapName                     = "kuryr-config"
-	DNSNamespace                           = "openshift-dns"
-	DNSServiceName                         = "dns-default"
+	InfrastructureCRDName          = "cluster"
+	masterMachineLabel             = "machine.openshift.io/cluster-api-machine-role"
+	machinesNamespace              = "openshift-machine-api"
+	MinOctaviaVersionWithProviders = "v2.6"
+	KuryrNamespace                 = "openshift-kuryr"
+	KuryrConfigMapName             = "kuryr-config"
 	// NOTE(ltomasbo): Only OVN octavia driver supported on kuryr
 	OVNProvider              = "ovn"
 	etcdClientPort           = 2379
@@ -113,58 +106,6 @@ func GetCloudFromSecret(kubeClient crclient.Client) (clientconfig.Cloud, error) 
 
 func generateName(name, clusterID string) string {
 	return fmt.Sprintf("%s-%s", clusterID, name)
-}
-
-func ensureCA(kubeClient crclient.Client) ([]byte, []byte, error) {
-	secret := &v1.Secret{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
-		ObjectMeta: metav1.ObjectMeta{Name: names.KURYR_ADMISSION_CONTROLLER_SECRET},
-	}
-	err := kubeClient.Get(context.TODO(), crclient.ObjectKey{Namespace: KuryrNamespace, Name: names.KURYR_ADMISSION_CONTROLLER_SECRET}, secret)
-	if err != nil {
-		caBytes, keyBytes, err := cert.GenerateCA("Kuryr")
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "Failed to generate CA.")
-		}
-		return caBytes, keyBytes, nil
-	} else {
-		crtContent, crtok := secret.Data["ca.crt"]
-		keyContent, keyok := secret.Data["ca.key"]
-		if !crtok || !keyok {
-			caBytes, keyBytes, err := cert.GenerateCA("Kuryr")
-			if err != nil {
-				return nil, nil, errors.Wrapf(err, "Failed to generate CA.")
-			}
-			return caBytes, keyBytes, nil
-		}
-		return crtContent, keyContent, nil
-	}
-}
-
-func ensureCertificate(kubeClient crclient.Client, caPEM []byte, privateKey []byte) ([]byte, []byte, error) {
-	secret := &v1.Secret{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
-		ObjectMeta: metav1.ObjectMeta{Name: names.KURYR_WEBHOOK_SECRET},
-	}
-	err := kubeClient.Get(context.TODO(), crclient.ObjectKey{Namespace: KuryrNamespace, Name: names.KURYR_WEBHOOK_SECRET}, secret)
-	if err != nil {
-		caBytes, keyBytes, err := cert.GenerateCertificate("Kuryr", []string{"kuryr-dns-admission-controller.openshift-kuryr", "kuryr-dns-admission-controller.openshift-kuryr.svc"}, caPEM, privateKey)
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "Failed to generate CA.")
-		}
-		return caBytes, keyBytes, nil
-	} else {
-		crtContent, crtok := secret.Data["tls.crt"]
-		keyContent, keyok := secret.Data["tls.key"]
-		if !crtok || !keyok {
-			caBytes, keyBytes, err := cert.GenerateCertificate("Kuryr", []string{"kuryr-dns-admission-controller.openshift-kuryr", "kuryr-dns-admission-controller.openshift-kuryr.svc"}, caPEM, privateKey)
-			if err != nil {
-				return nil, nil, errors.Wrapf(err, "Failed to generate CA.")
-			}
-			return caBytes, keyBytes, nil
-		}
-		return crtContent, keyContent, nil
-	}
 }
 
 func getConfigMap(kubeClient crclient.Client, namespace, name string) (*v1.ConfigMap, error) {
@@ -423,12 +364,6 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient crclient.Client) (*boot
 	octaviaProviderSupport, err := IsOctaviaVersionSupported(lbClient, MinOctaviaVersionWithProviders)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to determine if Octavia supports providers")
-	}
-
-	log.Print("Checking Double Listeners Octavia support")
-	octaviaMultipleListenersSupport, err := IsOctaviaVersionSupported(lbClient, MinOctaviaVersionWithMultipleListeners)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to determine if Octavia supports double listeners")
 	}
 
 	// Logic here is as follows:
@@ -712,72 +647,29 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient crclient.Client) (*boot
 	}
 	log.Print("All old SG rules removed")
 
-	log.Print("Ensuring certificates")
-	ca, key, err := ensureCA(kubeClient)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to ensure CA")
-	}
-	webhookCert, webhookKey, err := ensureCertificate(kubeClient, ca, key)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to ensure Certificate")
-	}
-
-	octaviaVersion, err := getSavedAnnotation(kubeClient, names.KuryrOctaviaVersionAnnotation)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, errors.Wrap(err, "failed to get kuryr-config ConfigMap")
-	}
-
-	maxOctaviaVersion, err := getMaxOctaviaAPIVersion(lbClient)
+	octaviaVersion, err := getMaxOctaviaAPIVersion(lbClient)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get max octavia api version")
 	}
 
-	// In case the Kuryr config-map is annotated with an Octavia version different
-	// than the current Octavia version, and older than the version that multiple
-	// listeners becomes available and the Octavia provider is amphora, an Octavia
-	// upgrade happened and UDP listeners are now allowed to be created.
-	// By recreating the OpenShift DNS service a new load balancer amphora is in
-	// place with all required listeners.
-	log.Print("Checking Octavia upgrade happened")
-	if octaviaVersion != "" && octaviaProvider == "default" {
-		savedOctaviaVersion := semver.MustParse(octaviaVersion)
-		multipleListenersVersion := semver.MustParse(MinOctaviaVersionWithMultipleListeners)
-		if !savedOctaviaVersion.Equal(maxOctaviaVersion) && savedOctaviaVersion.LessThan(multipleListenersVersion) && octaviaMultipleListenersSupport {
-			dnsService := &v1.Service{
-				TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
-				ObjectMeta: metav1.ObjectMeta{Name: DNSServiceName, Namespace: DNSNamespace},
-			}
-			err := kubeClient.Delete(context.TODO(), dnsService)
-			if err != nil {
-				return nil, errors.Wrapf(err, "Failed to delete %s Service", DNSServiceName)
-			}
-		}
-	}
-	octaviaVersion = maxOctaviaVersion.Original()
-
 	log.Print("Kuryr bootstrap finished")
 
 	res := &bootstrap.KuryrBootstrapResult{
-		ServiceSubnet:            svcSubnetId,
-		PodSubnetpool:            podSubnetpoolId,
-		WorkerNodesRouter:        routerId,
-		WorkerNodesSubnets:       []string{workerSubnet.ID},
-		PodsNetworkMTU:           mtu,
-		PodSecurityGroups:        []string{podSgId},
-		ExternalNetwork:          externalNetwork,
-		ClusterID:                clusterID,
-		OctaviaProvider:          octaviaProvider,
-		OctaviaMultipleListeners: octaviaMultipleListenersSupport,
-		OctaviaVersion:           octaviaVersion,
-		OpenStackCloud:           cloud,
-		WebhookCA:                b64.StdEncoding.EncodeToString(ca),
-		WebhookCAKey:             b64.StdEncoding.EncodeToString(key),
-		WebhookKey:               b64.StdEncoding.EncodeToString(webhookKey),
-		WebhookCert:              b64.StdEncoding.EncodeToString(webhookCert),
-		UserCACert:               userCACert,
-		HttpProxy:                httpProxy,
-		HttpsProxy:               httpsProxy,
-		NoProxy:                  noProxy,
+		ServiceSubnet:      svcSubnetId,
+		PodSubnetpool:      podSubnetpoolId,
+		WorkerNodesRouter:  routerId,
+		WorkerNodesSubnets: []string{workerSubnet.ID},
+		PodsNetworkMTU:     mtu,
+		PodSecurityGroups:  []string{podSgId},
+		ExternalNetwork:    externalNetwork,
+		ClusterID:          clusterID,
+		OctaviaProvider:    octaviaProvider,
+		OctaviaVersion:     octaviaVersion.Original(),
+		OpenStackCloud:     cloud,
+		UserCACert:         userCACert,
+		HttpProxy:          httpProxy,
+		HttpsProxy:         httpsProxy,
+		NoProxy:            noProxy,
 	}
 	return res, nil
 }
