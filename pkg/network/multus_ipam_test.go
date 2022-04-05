@@ -7,7 +7,7 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 )
 
-var NoDHCPConfig = operv1.Network{
+var NoIPAMConfig = operv1.Network{
 	Spec: operv1.NetworkSpec{
 		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
 			{Type: operv1.NetworkTypeRaw, Name: "net-attach-1", RawCNIConfig: "{}"},
@@ -54,7 +54,32 @@ var DHCPConfig = operv1.Network{
 	},
 }
 
-var InvalidDHCPConfig = operv1.Network{
+var WhereaboutsConfig = operv1.Network{
+	Spec: operv1.NetworkSpec{
+		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
+			{
+				Type:         operv1.NetworkTypeRaw,
+				Name:         "net-attach-whereabouts",
+				RawCNIConfig: "{\"cniVersion\":\"0.3.0\",\"type\":\"macvlan\",\"master\":\"eth0\",\"mode\":\"bridge\",\"ipam\":{\"type\":\"whereabouts\",\"range\": \"192.168.2.225/28\"}}",
+			},
+		},
+		ServiceNetwork: []string{"172.30.0.0/16"},
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+		},
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOpenShiftSDN,
+			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
+				Mode: operv1.SDNModeNetworkPolicy,
+			},
+		},
+	},
+}
+
+var InvalidIPAMConfig = operv1.Network{
 	Spec: operv1.NetworkSpec{
 		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
 			{
@@ -176,30 +201,45 @@ func TestRenderWithDHCP(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "dhcp-daemon")))
 }
 
-// TestRenderNoDHCP tests a rendering WITHOUT the DHCP daemonset.
-func TestRenderNoDHCP(t *testing.T) {
+// TestRenderWithWhereabouts tests a rendering with the ip reconciler
+func TestRenderWithWhereabouts(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	crd := NoDHCPConfig.DeepCopy()
+	crd := WhereaboutsConfig.DeepCopy()
 	config := &crd.Spec
 	fillDefaults(config, nil)
 
 	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "dhcp-daemon")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("CronJob", "openshift-multus", "ip-reconciler")))
 }
 
-// TestRenderInvalidDHCP tests a rendering with the DHCP daemonset.
-func TestRenderInvalidDHCP(t *testing.T) {
+// TestRenderNoIPAM tests a rendering WITHOUT an IPAM configured.
+func TestRenderNoIPAM(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	crd := InvalidDHCPConfig.DeepCopy()
+	crd := NoIPAMConfig.DeepCopy()
 	config := &crd.Spec
 	fillDefaults(config, nil)
 
 	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "dhcp-daemon")))
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("CronJob", "openshift-multus", "ip-reconciler")))
+}
+
+// TestRenderInvalidIPAMConfig tests a rendering without auxiliary IPAM, due to an invalid IPAM configuration.
+func TestRenderInvalidIPAMConfig(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := InvalidIPAMConfig.DeepCopy()
+	config := &crd.Spec
+	fillDefaults(config, nil)
+
+	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "dhcp-daemon")))
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("CronJob", "openshift-multus", "ip-reconciler")))
 }
 
 // TestRenderWithDHCPSimpleMacvlan tests a rendering with the DHCP daemonset SimpleMacvlan.
