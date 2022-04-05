@@ -289,7 +289,6 @@ spec:
             source "/env/${K8S_NODE}"
             set +o allexport
           fi
-          echo "I$(date "+%m%d %H:%M:%S.%N") - waiting for db_ip addresses"
           cp -f /usr/libexec/cni/ovn-k8s-cni-overlay /cni-bin-dir/
           ovn_config_namespace=openshift-ovn-kubernetes
           echo "I$(date "+%m%d %H:%M:%S.%N") - disable conntrack on geneve port"
@@ -297,23 +296,7 @@ spec:
           iptables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
           ip6tables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
           ip6tables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
-          retries=0
-          while true; do
-            # TODO: change to use '--request-timeout=30s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
-            db_ip=$(timeout 30 kubectl get ep -n ${ovn_config_namespace} ovnkube-db -o jsonpath='{.subsets[0].addresses[0].ip}')
-            if [[ -n "${db_ip}" ]]; then
-              break
-            fi
-            (( retries += 1 ))
-            if [[ "${retries}" -gt 40 ]]; then
-              echo "E$(date "+%m%d %H:%M:%S.%N") - db endpoint never came up"
-              exit 1
-            fi
-            echo "I$(date "+%m%d %H:%M:%S.%N") - waiting for db endpoint"
-            sleep 5
-          done
-
-          echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node db_ip ${db_ip}"
+          echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node"
 
           if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
             gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
