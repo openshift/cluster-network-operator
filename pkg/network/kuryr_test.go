@@ -60,7 +60,7 @@ func TestRenderKuryr(t *testing.T) {
 
 	fillDefaults(config, nil)
 
-	objs, err := renderKuryr(config, &fakeKuryrBootstrapResult, manifestDir)
+	objs, _, err := renderKuryr(config, &fakeKuryrBootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-kuryr", "kuryr-cni")))
 

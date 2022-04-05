@@ -265,7 +265,7 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	bootstrapResult, err := Bootstrap(&config, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	objs, err := Render(prev, bootstrapResult, manifestDir)
+	objs, _, err := Render(prev, bootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Validate that openshift-sdn isn't rendered

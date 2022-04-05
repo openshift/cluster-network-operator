@@ -33,6 +33,10 @@ const IgnoreObjectErrorAnnotation = "networkoperator.openshift.io/ignore-errors"
 // tells the CNO reconciliation engine to ignore this object if it already exists.
 const CreateOnlyAnnotation = "networkoperator.openshift.io/create-only"
 
+// CreateWaitAnnotation is an annotation on all objects that
+// tells the CNO reconciliation engine to ignore creating this object until conditions are met.
+const CreateWaitAnnotation = "networkoperator.openshift.io/create-wait"
+
 // NonCriticalAnnotation is an annotation on Deployments/DaemonSets to indicate
 // that they are not critical to the functioning of the pod network
 const NonCriticalAnnotation = "networkoperator.openshift.io/non-critical"

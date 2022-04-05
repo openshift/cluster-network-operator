@@ -31,7 +31,8 @@ const (
 // - configmap with kuryr.conf
 // - the kuryr-controller deployment
 // - the kuryr-daemon daemonset
-func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, bool, error) {
+	var progressing bool
 	c := conf.DefaultNetwork.KuryrConfig
 	b := bootstrapResult.Kuryr
 
@@ -107,7 +108,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	// configuration was changed.
 	hash, err := k8sutil.CalculateHash(data.Data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to calculate checksum of Kuryr configuration")
+		return nil, progressing, errors.Wrap(err, "failed to calculate checksum of Kuryr configuration")
 	}
 	data.Data["ConfigMapHash"] = hash
 
@@ -125,7 +126,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 		if mtu >= *c.MTU {
 			mtu = *c.MTU
 		} else {
-			return nil, errors.Errorf("Configured MTU (%d) is incompatible with OpenShift nodes network MTU (%d).", *c.MTU, mtu)
+			return nil, progressing, errors.Errorf("Configured MTU (%d) is incompatible with OpenShift nodes network MTU (%d).", *c.MTU, mtu)
 		}
 	}
 	c.MTU = &mtu
@@ -133,11 +134,11 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/kuryr"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render manifests")
+		return nil, progressing, errors.Wrap(err, "failed to render manifests")
 	}
 
 	objs = append(objs, manifests...)
-	return objs, nil
+	return objs, progressing, nil
 }
 
 // validateKuryr checks that the Kuryr specific configuration is basically sane.

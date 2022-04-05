@@ -70,6 +70,12 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 		return fmt.Errorf("failed to retrieve resource from Object %s: %v", objDesc, err)
 	}
 
+	// If create-wait is specified, ignore creating the object
+	if _, ok := obj.GetAnnotations()[names.CreateWaitAnnotation]; ok {
+		log.Printf("Object %s has create-wait annotation, skipping apply.", objDesc)
+		return nil
+	}
+
 	// If create-only is specified, check to see if exists
 	if _, ok := obj.GetAnnotations()[names.CreateOnlyAnnotation]; ok {
 		_, err := clusterClient.Dynamic().Resource(rm.Resource).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
