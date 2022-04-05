@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: cni-binary-copy-script
+  name: cni-copy-resources
   namespace: openshift-multus
   annotations:
     kubernetes.io/description: |
@@ -84,6 +84,16 @@ data:
       echo "Failed to copy files in ${sourcedir} to $DESTINATION_DIRECTORY"
       exit 1
     fi
+  allowlist.conf: |-
+    ^net.ipv4.conf.IFNAME.accept_redirects$
+    ^net.ipv4.conf.IFNAME.accept_source_route$
+    ^net.ipv4.conf.IFNAME.disable_policy$
+    ^net.ipv4.conf.IFNAME.secure_redirects$
+    ^net.ipv4.conf.IFNAME.send_redirects$
+    ^net.ipv6.conf.IFNAME.accept_redirects$
+    ^net.ipv6.conf.IFNAME.accept_source_route$
+    ^net.ipv6.neigh.IFNAME.base_reachable_time_ms$
+    ^net.ipv6.neigh.IFNAME.retrans_time_ms$
 ---
 kind: DaemonSet
 apiVersion: apps/v1
@@ -187,7 +197,7 @@ spec:
             type: File
         - name: cni-binary-copy
           configMap:
-            name: cni-binary-copy-script
+            name: cni-copy-resources
             defaultMode: 0744
 ---
 kind: DaemonSet
@@ -245,7 +255,7 @@ spec:
           value: "/usr/src/egress-router-cni/bin/"
       - name: cni-plugins
         image: {{.CNIPluginsImage}}
-        command: ["/entrypoint/cnibincopy.sh"]
+        command: ["/bin/bash", "-c", "/entrypoint/cnibincopy.sh && cp /entrypoint/allowlist.conf /host/etc/cni/tuning/"]
         volumeMounts:
         - mountPath: /entrypoint
           name: cni-binary-copy
@@ -254,6 +264,9 @@ spec:
         - mountPath: /host/etc/os-release
           name: os-release
           readOnly: true
+        - mountPath: /host/etc/cni/tuning/
+          name: tuning-conf-dir
+          readOnly: false
         env:
         - name: RHEL7_SOURCE_DIRECTORY
           value: "/usr/src/plugins/rhel7/bin/"
@@ -471,8 +484,12 @@ spec:
             type: File
         - name: cni-binary-copy
           configMap:
-            name: cni-binary-copy-script
+            name: cni-copy-resources
             defaultMode: 0744
+        - hostPath:
+            path: /etc/cni/tuning/
+            type: DirectoryOrCreate
+          name: tuning-conf-dir
 ---
 apiVersion: batch/v1
 kind: CronJob
