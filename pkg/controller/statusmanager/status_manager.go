@@ -34,6 +34,7 @@ type StatusLevel int
 const (
 	ClusterConfig StatusLevel = iota
 	OperatorConfig
+	OperatorRender
 	ProxyConfig
 	InjectorConfig
 	PodDeployment
@@ -269,7 +270,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 // syncDegraded syncs the current Degraded status
 func (status *StatusManager) syncDegraded() {
 	for _, c := range status.failing {
-		if c != nil {
+		if c != nil && c.Type == operv1.OperatorStatusTypeDegraded {
 			status.set(false, *c)
 			return
 		}
@@ -310,6 +311,52 @@ func (status *StatusManager) SetNotDegraded(statusLevel StatusLevel) {
 	status.Lock()
 	defer status.Unlock()
 	status.setNotDegraded(statusLevel)
+}
+
+// syncProgressing syncs the current Progressing status
+func (status *StatusManager) syncProgressing() {
+	for _, c := range status.failing {
+		if c != nil && c.Type == operv1.OperatorStatusTypeProgressing {
+			status.set(false, *c)
+			return
+		}
+	}
+	status.set(
+		false,
+		operv1.OperatorCondition{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionFalse,
+		},
+	)
+}
+
+func (status *StatusManager) setProgressing(statusLevel StatusLevel, reason, message string) {
+	status.failing[statusLevel] = &operv1.OperatorCondition{
+		Type:    operv1.OperatorStatusTypeProgressing,
+		Status:  operv1.ConditionTrue,
+		Reason:  reason,
+		Message: message,
+	}
+	status.syncProgressing()
+}
+
+func (status *StatusManager) unsetProgressing(statusLevel StatusLevel) {
+	if status.failing[statusLevel] != nil {
+		status.failing[statusLevel] = nil
+	}
+	status.syncProgressing()
+}
+
+func (status *StatusManager) SetProgressing(statusLevel StatusLevel, reason, message string) {
+	status.Lock()
+	defer status.Unlock()
+	status.setProgressing(statusLevel, reason, message)
+}
+
+func (status *StatusManager) UnsetProgressing(statusLevel StatusLevel) {
+	status.Lock()
+	defer status.Unlock()
+	status.unsetProgressing(statusLevel)
 }
 
 func (status *StatusManager) SetDaemonSets(daemonSets []types.NamespacedName) {

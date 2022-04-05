@@ -53,7 +53,7 @@ func TestRenderOpenShiftSDN(t *testing.T) {
 	g.Expect(errs).To(HaveLen(0))
 	fillDefaults(config, nil)
 
-	objs, err := renderOpenShiftSDN(config, bootstrapResult, manifestDir)
+	objs, _, err := renderOpenShiftSDN(config, bootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// It's important that the namespace is first
@@ -204,7 +204,7 @@ func TestProxyArgs(t *testing.T) {
 	}
 
 	// test default rendering
-	objs, err := renderOpenShiftSDN(config, bootstrapResult, manifestDir)
+	objs, _, err := renderOpenShiftSDN(config, bootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg := getProxyConfigFile(objs)
 
@@ -219,7 +219,7 @@ func TestProxyArgs(t *testing.T) {
 		BindAddress:        "1.2.3.4",
 		ProxyArguments:     map[string]operv1.ProxyArgumentList{},
 	}
-	objs, err = renderOpenShiftSDN(config, bootstrapResult, manifestDir)
+	objs, _, err = renderOpenShiftSDN(config, bootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg = getProxyConfigFile(objs)
 	val, _, _ = uns.NestedString(cfg.Object, "iptables", "syncPeriod")
@@ -232,7 +232,7 @@ func TestProxyArgs(t *testing.T) {
 		"cluster-cidr":       {"1.2.3.4/5"},
 		"config-sync-period": {"1s", "2s"},
 	}
-	objs, err = renderOpenShiftSDN(config, bootstrapResult, manifestDir)
+	objs, _, err = renderOpenShiftSDN(config, bootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg = getProxyConfigFile(objs)
 
@@ -246,7 +246,7 @@ func TestProxyArgs(t *testing.T) {
 	config.KubeProxyConfig.ProxyArguments = map[string]operv1.ProxyArgumentList{
 		"proxy-mode": {"iptables"},
 	}
-	objs, err = renderOpenShiftSDN(config, bootstrapResult, manifestDir)
+	objs, _, err = renderOpenShiftSDN(config, bootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg = getProxyConfigFile(objs)
 
@@ -256,7 +256,7 @@ func TestProxyArgs(t *testing.T) {
 	// Disabling unidling doesn't add the fixup
 	f := false
 	config.DefaultNetwork.OpenShiftSDNConfig.EnableUnidling = &f
-	objs, err = renderOpenShiftSDN(config, bootstrapResult, manifestDir)
+	objs, _, err = renderOpenShiftSDN(config, bootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg = getProxyConfigFile(objs)
 
@@ -283,7 +283,7 @@ func TestProxyArgs(t *testing.T) {
 	errs = validateKubeProxy(config)
 	g.Expect(errs).To(HaveLen(1))
 
-	objs, err = renderOpenShiftSDN(config, bootstrapResult, manifestDir)
+	objs, _, err = renderOpenShiftSDN(config, bootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	cfg = getProxyConfigFile(objs)
 
@@ -389,7 +389,7 @@ func TestOpenShiftSDNMultitenant(t *testing.T) {
 		Infra: bootstrap.InfraStatus{},
 	}
 
-	objs, err := renderOpenShiftSDN(config, bootstrapResult, manifestDir)
+	objs, _, err := renderOpenShiftSDN(config, bootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// the full list of namespaces with a netns
@@ -479,7 +479,7 @@ func TestOpenshiftSDNProxyConfig(t *testing.T) {
 	}
 
 	// test default rendering
-	objs, err := renderOpenShiftSDN(config, bootstrapResult, manifestDir)
+	objs, _, err := renderOpenShiftSDN(config, bootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(getProxyConfig(objs)).To(MatchYAML(`
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
@@ -533,7 +533,7 @@ winkernel:
 	// Disable unidling
 	f := false
 	config.DefaultNetwork.OpenShiftSDNConfig.EnableUnidling = &f
-	objs, err = renderOpenShiftSDN(config, bootstrapResult, manifestDir)
+	objs, _, err = renderOpenShiftSDN(config, bootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(getProxyConfig(objs)).To(MatchYAML(`
 apiVersion: kubeproxy.config.k8s.io/v1alpha1

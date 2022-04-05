@@ -20,8 +20,9 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
-func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, bool, error) {
 	log.Printf("Starting render phase")
+	var progressing bool
 	objs := []*uns.Unstructured{}
 
 	// render cloud network config controller **before** the network plugin.
@@ -29,35 +30,35 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	// defined as to initialize its watcher, otherwise it will error and crash
 	o, err := renderCloudNetworkConfigController(conf, bootstrapResult.Infra, manifestDir)
 	if err != nil {
-		return nil, err
+		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
 	// render Multus
 	o, err = renderMultus(conf, bootstrapResult, manifestDir)
 	if err != nil {
-		return nil, err
+		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
 	// render MultusAdmissionController
 	o, err = renderMultusAdmissionController(conf, manifestDir, bootstrapResult.Infra.ExternalControlPlane)
 	if err != nil {
-		return nil, err
+		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
 	// render MultiNetworkPolicy
 	o, err = renderMultiNetworkpolicy(conf, manifestDir)
 	if err != nil {
-		return nil, err
+		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
 	// render default network
-	o, err = renderDefaultNetwork(conf, bootstrapResult, manifestDir)
+	o, progressing, err = renderDefaultNetwork(conf, bootstrapResult, manifestDir)
 	if err != nil {
-		return nil, err
+		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
@@ -71,32 +72,32 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	// dependency.
 	o, err = renderStandaloneKubeProxy(conf, bootstrapResult, manifestDir)
 	if err != nil {
-		return nil, err
+		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
 	// render additional networks
 	o, err = renderAdditionalNetworks(conf, manifestDir)
 	if err != nil {
-		return nil, err
+		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
 	// render network diagnostics
 	o, err = renderNetworkDiagnostics(conf, manifestDir)
 	if err != nil {
-		return nil, err
+		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
 	o, err = renderNetworkPublic(manifestDir)
 	if err != nil {
-		return nil, err
+		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
 	log.Printf("Render phase done, rendered %d objects", len(objs))
-	return objs, nil
+	return objs, progressing, nil
 }
 
 // deprecatedCanonicalizeIPAMConfig converts configuration to a canonical form
@@ -476,10 +477,10 @@ func validateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 
 // renderDefaultNetwork generates the manifests corresponding to the requested
 // default network
-func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, bool, error) {
 	dn := conf.DefaultNetwork
 	if errs := validateDefaultNetwork(conf); len(errs) > 0 {
-		return nil, errors.Errorf("invalid Default Network configuration: %v", errs)
+		return nil, false, errors.Errorf("invalid Default Network configuration: %v", errs)
 	}
 
 	switch dn.Type {
@@ -491,7 +492,7 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 		return renderKuryr(conf, bootstrapResult, manifestDir)
 	default:
 		log.Printf("NOTICE: Unknown network type %s, ignoring", dn.Type)
-		return nil, nil
+		return nil, false, nil
 	}
 }
 
