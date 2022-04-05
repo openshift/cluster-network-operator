@@ -7,16 +7,20 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 )
 
-// useDHCPRaw determines if the the DHCP CNI plugin running as a daemon should be rendered.
-func useDHCPRaw(addnet *operv1.AdditionalNetworkDefinition) bool {
+const ipamTypeDHCP = "dhcp"
+const ipamTypeWhereabouts = "whereabouts"
+
+// detectIPAMTypeRaw determines if a target type of IPAM is being used
+// this facilitates using auxillary features associated with that IPAM (such as DHCP CNI daemon, or ip-reconciler for Whereabouts)
+func detectIPAMTypeRaw(targetType string, addNet *operv1.AdditionalNetworkDefinition) bool {
 	// Parse the RawCNIConfig
 	var rawConfig map[string]interface{}
 	var err error
 
-	confBytes := []byte(addnet.RawCNIConfig)
+	confBytes := []byte(addNet.RawCNIConfig)
 	err = json.Unmarshal(confBytes, &rawConfig)
 	if err != nil {
-		log.Printf("WARNING: Not rendering DHCP daemonset, failed to Unmarshal RawCNIConfig: %v", confBytes)
+		log.Printf("WARNING: Cannot detect multus network IPAM type, failed to Unmarshal RawCNIConfig: %v", confBytes)
 		return false
 	}
 
@@ -36,7 +40,7 @@ func useDHCPRaw(addnet *operv1.AdditionalNetworkDefinition) bool {
 					return false
 				}
 
-				if typeval == "dhcp" {
+				if typeval == targetType {
 					return true
 				}
 			}
@@ -59,13 +63,14 @@ func useDHCPSimpleMacvlan(conf *operv1.SimpleMacvlanConfig) bool {
 	return false
 }
 
-// useDHCP determines if the the DHCP CNI plugin running as a daemon should be rendered in case of Raw.
-func useDHCP(conf *operv1.NetworkSpec) bool {
+// detectAuxiliaryIPAM detects if an auxiliary ipam is used.
+func detectAuxiliaryIPAM(conf *operv1.NetworkSpec) (bool, bool) {
 	renderdhcp := false
+	renderwhereabouts := false
 
 	// This isn't useful without Multinetwork.
 	if *conf.DisableMultiNetwork {
-		return renderdhcp
+		return renderdhcp, renderwhereabouts
 	}
 
 	// Look and see if we have an AdditionalNetworks
@@ -73,16 +78,18 @@ func useDHCP(conf *operv1.NetworkSpec) bool {
 		for _, addnet := range conf.AdditionalNetworks {
 			switch addnet.Type {
 			case operv1.NetworkTypeRaw:
-				renderdhcp = renderdhcp || useDHCPRaw(&addnet)
+				renderdhcp = renderdhcp || detectIPAMTypeRaw(ipamTypeDHCP, &addnet)
+				renderwhereabouts = renderwhereabouts || detectIPAMTypeRaw(ipamTypeWhereabouts, &addnet)
 			case operv1.NetworkTypeSimpleMacvlan:
+				// SimpleMacvlan only supports static and DHCP. So we don't detect whereabouts.
 				renderdhcp = renderdhcp || useDHCPSimpleMacvlan(addnet.SimpleMacvlanConfig)
 			}
 
-			if renderdhcp {
+			if renderdhcp && renderwhereabouts {
 				break
 			}
 		}
 	}
 
-	return renderdhcp
+	return renderdhcp, renderwhereabouts
 }
