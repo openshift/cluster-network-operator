@@ -473,6 +473,7 @@ spec:
           configMap:
             name: cni-binary-copy-script
             defaultMode: 0744
+{{if .RenderIpReconciler}}
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -519,3 +520,4 @@ spec:
               hostPath:
                 path: {{ .SystemCNIConfDir }}
           restartPolicy: Never
+{{- end}}

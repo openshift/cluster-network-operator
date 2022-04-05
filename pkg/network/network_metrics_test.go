@@ -5,7 +5,6 @@ import (
 
 	. "github.com/onsi/gomega"
 	operv1 "github.com/openshift/api/operator/v1"
-	"github.com/openshift/cluster-network-operator/pkg/apply"
 )
 
 var NetworkMetricsDaemonConfig = operv1.Network{
@@ -50,7 +49,7 @@ func TestRenderNetworkMetricsDaemon(t *testing.T) {
 
 	// Check rendered object
 
-	g.Expect(len(objs)).To(Equal(24), "Expected 24 multus related objects")
+	g.Expect(len(objs)).To(Equal(23), "Expected 23 multus related objects")
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "network-metrics-daemon")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Service", "openshift-multus", "network-metrics-service")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "metrics-daemon-role")))
@@ -58,20 +57,4 @@ func TestRenderNetworkMetricsDaemon(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceMonitor", "openshift-multus", "monitor-network")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Role", "openshift-multus", "prometheus-k8s")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("RoleBinding", "openshift-multus", "prometheus-k8s")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("CronJob", "openshift-multus", "ip-reconciler")))
-
-	// Make sure every obj is reasonable:
-	// - it is supported
-	// - it reconciles to itself (steady state)
-	for _, obj := range objs {
-		g.Expect(apply.IsObjectSupported(obj)).NotTo(HaveOccurred())
-		cur := obj.DeepCopy()
-		upd := obj.DeepCopy()
-
-		err = apply.MergeObjectForUpdate(cur, upd)
-		g.Expect(err).NotTo(HaveOccurred())
-
-		tweakMetaForCompare(cur)
-		g.Expect(cur).To(Equal(upd))
-	}
 }
