@@ -2,8 +2,10 @@ package fake
 
 import (
 	"context"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
@@ -33,6 +35,9 @@ type FakeClusterClient struct {
 }
 
 func (fc *FakeClient) ClientFor(name string) cnoclient.ClusterClient {
+	if len(name) == 0 {
+		return fc.Default()
+	}
 	return fc.clusterClients[name]
 }
 
@@ -81,6 +86,42 @@ func NewFakeClient(objs ...crclient.Object) cnoclient.Client {
 	}
 }
 
+type fakeRESTMapper struct {
+	kindForInput schema.GroupVersionResource
+}
+
+func (f *fakeRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
+	f.kindForInput = resource
+	return schema.GroupVersionKind{
+		Group:   "test",
+		Version: "test",
+		Kind:    "test"}, nil
+}
+
+func (f *fakeRESTMapper) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error) {
+	return schema.GroupVersionResource{}, nil
+}
+
+func (f *fakeRESTMapper) ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
+	return "", nil
+}
+
 func (fc *FakeClusterClient) Kubernetes() kubernetes.Interface {
 	panic("not implemented!")
 }
@@ -102,7 +143,7 @@ func (fc *FakeClusterClient) CRClient() crclient.Client {
 }
 
 func (fc *FakeClusterClient) RESTMapper() meta.RESTMapper {
-	panic("not implemented!")
+	return &fakeRESTMapper{}
 }
 
 func (fc *FakeClusterClient) Scheme() *runtime.Scheme {

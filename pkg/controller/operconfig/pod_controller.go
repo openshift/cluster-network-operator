@@ -6,7 +6,6 @@ import (
 
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -21,15 +20,15 @@ var _ reconcile.Reconciler = &ReconcilePods{}
 type ReconcilePods struct {
 	status *statusmanager.StatusManager
 
-	resources []types.NamespacedName
+	resources []statusmanager.ClusteredName
 }
 
-func (r *ReconcilePods) SetResources(resources []types.NamespacedName) {
+func (r *ReconcilePods) SetResources(resources []statusmanager.ClusteredName) {
 	r.resources = resources
 }
 
 // Reconcile updates the ClusterOperator.Status to match the current state of the
-// watched Deployments/DaemonSets
+// watched Deployments/DaemonSets/StatefulSets
 func (r *ReconcilePods) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	found := false
 	for _, name := range r.resources {
