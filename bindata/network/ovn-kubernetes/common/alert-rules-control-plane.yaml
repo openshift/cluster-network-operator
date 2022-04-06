@@ -36,6 +36,7 @@ spec:
       labels:
         severity: warning
     - alert: NorthboundStale
+      runbook_url: https://github.com/openshift/runbooks/alerts/cluster-network-operator/NorthboundStaleAlert.md
       annotations:
         summary: ovn-kubernetes has not written anything to the northbound database for too long.
         description: |
@@ -48,6 +49,7 @@ spec:
       labels:
         severity: warning
     - alert: SouthboundStale
+      runbook_url:  https://github.com/openshift/runbooks/alerts/cluster-network-operator/SouthboundStaleAlert.md
       annotations:
         summary: ovn-northd has not successfully synced any changes to the southbound DB for too long.
         description: |
