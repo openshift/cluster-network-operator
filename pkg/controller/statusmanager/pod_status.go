@@ -271,38 +271,25 @@ func (status *StatusManager) SetFromPods() {
 		log.Printf("Failed to set pod state (continuing): %+v\n", err)
 	}
 
-	conditions := make([]operv1.OperatorCondition, 0, 2)
 	if len(progressing) > 0 {
-		conditions = append(conditions,
-			operv1.OperatorCondition{
-				Type:    operv1.OperatorStatusTypeProgressing,
-				Status:  operv1.ConditionTrue,
-				Reason:  "Deploying",
-				Message: strings.Join(progressing, "\n"),
-			},
-		)
+		status.setProgressing(PodDeployment, "Deploying", strings.Join(progressing, "\n"))
 	} else {
-		conditions = append(conditions,
-			operv1.OperatorCondition{
-				Type:   operv1.OperatorStatusTypeProgressing,
-				Status: operv1.ConditionFalse,
-			},
-		)
+		status.unsetProgressing(PodDeployment)
 	}
+
+	condition := operv1.OperatorCondition{}
 	if reachedAvailableLevel {
-		conditions = append(conditions,
-			operv1.OperatorCondition{
-				Type:   operv1.OperatorStatusTypeAvailable,
-				Status: operv1.ConditionTrue,
-			},
-		)
+		condition = operv1.OperatorCondition{
+			Type:   operv1.OperatorStatusTypeAvailable,
+			Status: operv1.ConditionTrue,
+		}
 	}
 
 	if reachedAvailableLevel && len(progressing) == 0 {
 		status.installComplete = true
 	}
 
-	status.set(reachedAvailableLevel, conditions...)
+	status.set(reachedAvailableLevel, condition)
 	if len(hung) > 0 {
 		status.setDegraded(RolloutHung, "RolloutHung", strings.Join(hung, "\n"))
 	} else {
