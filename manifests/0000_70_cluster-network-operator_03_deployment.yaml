@@ -21,6 +21,11 @@ spec:
     spec:
       containers:
       - name: network-operator
+        ports:
+          - containerPort: 9104
+            hostPort: 9104
+            name: cno
+            protocol: TCP
         image: quay.io/openshift/origin-cluster-network-operator:latest
         command:
         - /bin/bash
