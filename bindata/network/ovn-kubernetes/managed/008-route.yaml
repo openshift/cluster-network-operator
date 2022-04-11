@@ -14,4 +14,4 @@ spec:
     termination: passthrough
   to:
     kind: Service
-    name: ovnkube-master
+    name: ovnkube-master-external
