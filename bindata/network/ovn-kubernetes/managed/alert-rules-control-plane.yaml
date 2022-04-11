@@ -41,7 +41,7 @@ spec:
         severity: critical
     - alert: NorthboundStale
       annotations:
-        summary: ovn-kubernetes has not written anything to the northbound database for too long.
+        summary: ovn-kubernetes has not written anything to the northbound database within 120 seconds for too long.
         runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NorthboundStaleAlert.md
         description: |
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
@@ -54,7 +54,7 @@ spec:
         severity: warning
     - alert: SouthboundStale
       annotations:
-        summary: ovn-northd has not successfully synced any changes to the southbound DB for too long.
+        summary: ovn-northd has not successfully synced any changes to the southbound DB within 120 seconds for too long.
         runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/SouthboundStaleAlert.md
         description: |
           Networking control plane is degraded. Networking configuration updates may not be applied to the cluster or

@@ -41,7 +41,7 @@ spec:
         severity: critical
     - alert: NorthboundStale
       annotations:
-        summary: ovn-kubernetes has not written anything to the northbound database for too long.
+        summary: ovn-kubernetes has not written anything to the northbound database within 120 seconds for too long.
         description: |
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
           implemented. Existing workloads should continue to have connectivity. OVN-Kubernetes control plane and/or
@@ -53,7 +53,7 @@ spec:
         severity: warning
     - alert: SouthboundStale
       annotations:
-        summary: ovn-northd has not successfully synced any changes to the southbound DB for too long.
+        summary: ovn-northd has not successfully synced any changes to the southbound DB within 120 seconds for too long.
         description: |
           Networking control plane is degraded. Networking configuration updates may not be applied to the cluster or
           taking a long time to apply. This usually means there is a large load on OVN component 'northd' or it is not
