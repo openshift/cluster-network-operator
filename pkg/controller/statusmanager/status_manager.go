@@ -114,7 +114,7 @@ func (status *StatusManager) getClusterOperAnnotation(obj *configv1.ClusterOpera
 	objs := []network.RelatedObject{}
 
 	value, set := anno[names.RelatedClusterObjectsAnnotation]
-	if !set {
+	if !set || value == "" {
 		return objs, nil
 	}
 	items := strings.Split(value, ",")
