@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"strings"
 	"time"
 
@@ -103,6 +104,23 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
+	}
+
+	if hyperShiftConfig := network.NewHyperShiftConfig(); hyperShiftConfig.Enabled {
+		// In HyperShift, only StatefulSets are deployed in the management cluster.
+		// To add more resources the CNOs ClusterRole has to be updated in HyperShift
+		mgmtCluster, err := cluster.New(r.client.ClientFor(cnoclient.ManagementClusterName).Config(), func(opts *cluster.Options) { opts.Namespace = hyperShiftConfig.Namespace })
+		if err != nil {
+			return err
+		}
+		err = c.Watch(source.NewKindWithCache(&appsv1.StatefulSet{}, mgmtCluster.GetCache()), &handler.EnqueueRequestForObject{})
+		if err != nil {
+			return err
+		}
+		err = mgr.Add(mgmtCluster)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
