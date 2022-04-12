@@ -442,57 +442,6 @@ spec:
           containerPort: {{.OVN_NB_RAFT_PORT}}
         terminationMessagePolicy: FallbackToLogsOnError
 
-      - name: kube-rbac-proxy
-        image: {{.KubeRBACProxyImage}}
-        command:
-        - /bin/bash
-        - -c
-        - |
-          #!/bin/bash
-          set -euo pipefail
-          TLS_PK=/etc/pki/tls/metrics-cert/tls.key
-          TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
-          # As the secret mount is optional we must wait for the files to be present.
-          # The service is created in monitor.yaml and this is created in sdn.yaml.
-          TS=$(date +%s)
-          WARN_TS=$(( ${TS} + $(( 20 * 60)) ))
-          HAS_LOGGED_INFO=0
-
-          log_missing_certs(){
-              CUR_TS=$(date +%s)
-              if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
-                echo $(date -Iseconds) WARN: ovn-master-metrics-cert not mounted after 20 minutes.
-              elif [[ "${HAS_LOGGED_INFO}" -eq 0 ]] ; then
-                echo $(date -Iseconds) INFO: ovn-master-metrics-cert not mounted. Waiting 20 minutes.
-                HAS_LOGGED_INFO=1
-              fi
-          }
-          while [[ ! -f "${TLS_PK}" ||  ! -f "${TLS_CERT}" ]] ; do
-            log_missing_certs
-            sleep 5
-          done
-
-          echo $(date -Iseconds) INFO: ovn-master-metrics-certs mounted, starting kube-rbac-proxy
-          exec /usr/bin/kube-rbac-proxy \
-            --logtostderr \
-            --secure-listen-address=:9102 \
-            --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
-            --upstream=http://127.0.0.1:29102/ \
-            --tls-private-key-file=${TLS_PK} \
-            --tls-cert-file=${TLS_CERT}
-        ports:
-        - containerPort: 9102
-          name: https
-        resources:
-          requests:
-            cpu: 10m
-            memory: 20Mi
-        terminationMessagePolicy: FallbackToLogsOnError
-        volumeMounts:
-        - name: ovn-master-metrics-cert
-          mountPath: /etc/pki/tls/metrics-cert
-          readOnly: True
-
       # sbdb: The southbound, or flow DB. In raft mode
       - name: sbdb
         image: "{{.OvnImage}}"
@@ -756,6 +705,10 @@ spec:
             set +o allexport
           fi
 
+          # TLS for ovnkube-master metrics
+          TLS_PK=/etc/pki/tls/metrics-cert/tls.key
+          TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
+
           if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
             gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
           elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
@@ -773,7 +726,7 @@ spec:
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            --metrics-bind-address "127.0.0.1:29102" \
+            --metrics-bind-address "0.0.0.0:9102" \
             --metrics-enable-pprof \
             ${gateway_mode_flags} \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
@@ -788,6 +741,8 @@ spec:
             --nb-cert-common-name "{{.OVN_CERT_CN}}" \
             --enable-multicast \
             --disable-snat-multiple-gws \
+            --metrics-node-server-privkey ${TLS_PK} \
+            --metrics-node-server-cert ${TLS_CERT} \
             --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
         volumeMounts:
         - mountPath: /etc/ovn
@@ -806,6 +761,9 @@ spec:
           name: hosted-ca-cert
         - mountPath: /var/run/secrets/hosted_cluster
           name: hosted-cluster-api-access
+        - name: ovn-master-metrics-cert
+          mountPath: /etc/pki/tls/metrics-cert
+          readOnly: True
         resources:
           requests:
             cpu: 10m
@@ -898,7 +856,6 @@ spec:
       - name: ovn-master-metrics-cert
         secret:
           secretName: ovn-master-metrics-cert
-          optional: true
       - name: admin-kubeconfig
         secret:
           secretName: service-network-admin-kubeconfig

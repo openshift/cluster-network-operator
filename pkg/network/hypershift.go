@@ -14,6 +14,10 @@ var (
 )
 
 const (
+	// ClusterIDLabel (_id) is the common label used to identify clusters in telemeter.
+	// For hypershift, it will identify metrics produced by the both the control plane
+	// components and guest cluster monitoring stack.
+	ClusterIDLabel = "_id"
 	// NetworkOperatorStatusTypeProgressing indicates Progressing condition in hostedControlPlane status
 	NetworkOperatorStatusTypeProgressing = "network.operator.openshift.io/Progressing"
 	// NetworkOperatorStatusTypeDegraded indicates Degraded condition in hostedControlPlane status

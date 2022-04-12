@@ -31,6 +31,7 @@ type KuryrBootstrapResult struct {
 
 type OVNHyperShiftBootstrapResult struct {
 	Enabled   bool
+	ClusterID string
 	Namespace string
 	Route     string
 }
