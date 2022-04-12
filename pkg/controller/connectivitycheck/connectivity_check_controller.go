@@ -3,6 +3,7 @@ package connectivitycheck
 import (
 	"context"
 	"fmt"
+	"github.com/openshift/cluster-network-operator/pkg/network"
 	"net"
 	"net/url"
 	"strconv"
@@ -109,16 +110,19 @@ type connectivityCheckTemplateProvider struct {
 
 func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncContext factory.SyncContext) ([]*v1alpha1.PodNetworkConnectivityCheck, error) {
 	var templates []*v1alpha1.PodNetworkConnectivityCheck
-	// kas service IP
-	templates = append(templates, c.getTemplatesForKubernetesServiceMonitorService(syncContext.Recorder())...)
 	// kas default service IP
 	templates = append(templates, c.getTemplatesForKubernetesDefaultServiceCheck(syncContext.Recorder())...)
-	// each kas endpoint IP
-	templates = append(templates, c.getTemplatesForKubernetesServiceEndpointsChecks(syncContext.Recorder())...)
-	// oas service IP
-	templates = append(templates, c.getTemplatesForOpenShiftAPIServerServiceCheck(syncContext.Recorder())...)
-	// each oas endpoint IP
-	templates = append(templates, c.getTemplatesForOpenShiftAPIServerServiceEndpointsChecks(syncContext.Recorder())...)
+	if hcpCfg := network.NewHyperShiftConfig(); !hcpCfg.Enabled {
+		// In hypershift, the following services/endpoints are not present in the hosted cluster
+		// kas service IP
+		templates = append(templates, c.getTemplatesForKubernetesServiceMonitorService(syncContext.Recorder())...)
+		// each kas endpoint IP
+		templates = append(templates, c.getTemplatesForKubernetesServiceEndpointsChecks(syncContext.Recorder())...)
+		// oas service IP
+		templates = append(templates, c.getTemplatesForOpenShiftAPIServerServiceCheck(syncContext.Recorder())...)
+		// each oas endpoint IP
+		templates = append(templates, c.getTemplatesForOpenShiftAPIServerServiceEndpointsChecks(syncContext.Recorder())...)
+	}
 	// each api load balancer hostname
 	templates = append(templates, c.getTemplatesForAPILoadBalancerChecks(syncContext.Recorder())...)
 	// generic pod service IP
