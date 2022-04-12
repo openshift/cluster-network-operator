@@ -3,55 +3,6 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: ovnkube-master
-  annotations:
-    networkoperator.openshift.io/ignore-errors: ""
-  name: monitor-ovn-master-metrics
-  namespace: openshift-ovn-kubernetes
-spec:
-  endpoints:
-  - interval: 30s
-    port: metrics
-    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-    scheme: https
-    tlsConfig:
-      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
-      serverName: ovn-kubernetes-master.openshift-ovn-kubernetes.svc
-  jobLabel: app
-  namespaceSelector:
-    matchNames:
-    - openshift-ovn-kubernetes
-  selector:
-    matchLabels:
-      app: ovnkube-master
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: ovnkube-master
-  name: ovn-kubernetes-master
-  namespace: openshift-ovn-kubernetes
-  annotations:
-    service.beta.openshift.io/serving-cert-secret-name: ovn-master-metrics-cert
-spec:
-  selector:
-    app: ovnkube-master
-  clusterIP: None
-  publishNotReadyAddresses: true
-  ports:
-  - name: metrics
-    port: 9102
-    protocol: TCP
-    targetPort: 9102
-  sessionAffinity: None
-  type: ClusterIP
----
-
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  labels:
     app: ovnkube-node
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
