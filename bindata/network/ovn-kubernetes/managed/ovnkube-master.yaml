@@ -30,7 +30,7 @@ spec:
   selector:
     matchLabels:
       app: ovnkube-master
-  serviceName: ovnkube-master
+  serviceName: ovnkube-master-internal
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim
@@ -189,7 +189,7 @@ spec:
             local port=${3}
             echo "Checking if ovnkube-master-${pod_index} is part of cluster"
 
-            init_ip="ovnkube-master-${pod_index}.ovnkube-master.{{.HostedClusterNamespace}}.svc.cluster.local"
+            init_ip="ovnkube-master-${pod_index}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
 
 
 
@@ -225,7 +225,7 @@ spec:
           # end of cluster_exists()
 
           OVN_ARGS="--db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
-            --db-nb-cluster-local-addr=$(bracketify ${K8S_POD_NAME}.ovnkube-master.{{.HostedClusterNamespace}}.svc.cluster.local) \
+            --db-nb-cluster-local-addr=$(bracketify ${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local) \
             --no-monitor \
             --db-nb-cluster-local-proto=ssl \
             --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
@@ -268,7 +268,7 @@ spec:
               wait $!
             else
               # either we need to initialize a new cluster or wait for master to create it
-              if [[ "${K8S_POD_NAME}.ovnkube-master.{{.HostedClusterNamespace}}.svc.cluster.local" == "${CLUSTER_INITIATOR_IP}" ]]; then
+              if [[ "${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local" == "${CLUSTER_INITIATOR_IP}" ]]; then
                 # set DB election timer at DB creation time if OVN supports it
                 election_timer=
                 if test -n "$(/usr/share/ovn/scripts/ovn-ctl --help 2>&1 | grep "\--db-nb-election-timer")"; then
@@ -312,7 +312,7 @@ spec:
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
 
                 rm -f /var/run/ovn/ovnnb_db.pid
-                if [[ "${K8S_POD_NAME}.ovnkube-master.{{.HostedClusterNamespace}}.svc.cluster.local" == "${CLUSTER_INITIATOR_IP}" ]]; then
+                if [[ "${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - nbdb - postStart - waiting for master to be selected"
 
                   # set the connection and inactivity probe
@@ -483,7 +483,7 @@ spec:
             local db=${2}
             local port=${3}
             echo "Checking if ovnkube-master-${pod_index} is part of cluster"
-            init_ip="ovnkube-master-${pod_index}.ovnkube-master.{{.HostedClusterNamespace}}.svc.cluster.local"
+            init_ip="ovnkube-master-${pod_index}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
             echo "ovnkube-master-${pod_index} ip: $init_ip"
             target=$(ovn-${db}ctl --timeout=5 --db=${transport}:${init_ip}:${port} ${ovndb_ctl_ssl_opts} \
                       --data=bare --no-headings --columns=target list connection)
@@ -514,7 +514,7 @@ spec:
           # end of cluster_exists()
 
           OVN_ARGS="--db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
-            --db-sb-cluster-local-addr="${K8S_POD_NAME}.ovnkube-master.{{.HostedClusterNamespace}}.svc.cluster.local" \
+            --db-sb-cluster-local-addr="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local" \
             --no-monitor \
             --db-sb-cluster-local-proto=ssl \
             --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
@@ -557,7 +557,7 @@ spec:
               wait $!
             else
               # either we need to initialize a new cluster or wait for master to create it
-              if [[ "${K8S_POD_NAME}.ovnkube-master.{{.HostedClusterNamespace}}.svc.cluster.local" == "${CLUSTER_INITIATOR_IP}" ]]; then
+              if [[ "${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local" == "${CLUSTER_INITIATOR_IP}" ]]; then
                 # set DB election timer at DB creation time if OVN supports it
                 election_timer=
                 if test -n "$(/usr/share/ovn/scripts/ovn-ctl --help 2>&1 | grep "\--db-sb-election-timer")"; then
@@ -598,7 +598,7 @@ spec:
                 set -x
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
                 rm -f /var/run/ovn/ovnsb_db.pid
-                if [[ "${K8S_POD_NAME}.ovnkube-master.{{.HostedClusterNamespace}}.svc.cluster.local" == "${CLUSTER_INITIATOR_IP}" ]]; then
+                if [[ "${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - sdb - postStart - waiting for master to be selected"
 
                   # set the connection and inactivity probe
