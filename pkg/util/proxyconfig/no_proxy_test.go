@@ -1,6 +1,7 @@
 package proxyconfig
 
 import (
+	"strconv"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -100,6 +101,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 		infra   *configv1.Infrastructure
 		network *configv1.Network
 		cluster *corev1.ConfigMap
+		getEnv  func(string) string
 	}
 	tests := []struct {
 		name    string
@@ -238,10 +240,26 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{name: "valid proxy config with multiple user noProxy and env var to proxy internal apiserver address",
+			args: args{
+				proxy:   proxyConfigWithNoProxy("172.30.0.1,.foo.test.com,199.161.0.0/16"),
+				infra:   infraConfig(configv1.AWSPlatformType, "test.cluster.com", "us-west-2"),
+				network: netConfig("10.128.0.0/14", []string{"172.30.0.0/16"}),
+				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
+				getEnv:  func(v string) string { return strconv.FormatBool(v == "PROXY_INTERNAL_APISERVER_ADDRESS") },
+			},
+			want: ".cluster.local,.foo.test.com,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
+				"169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,localhost",
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := MergeUserSystemNoProxy(tt.args.proxy, tt.args.infra, tt.args.network, tt.args.cluster)
+			getenv := tt.args.getEnv
+			if getenv == nil {
+				getenv = func(string) string { return "" }
+			}
+			got, err := mergeUserSystemNoProxy(tt.args.proxy, tt.args.infra, tt.args.network, tt.args.cluster, getenv)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MergeUserSystemNoProxy() error = %v, wantErr %v", err, tt.wantErr)
 				return

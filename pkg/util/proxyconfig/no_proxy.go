@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -20,6 +21,10 @@ import (
 // provided, a comma-separated string of cluster-wide noProxy settings
 // are returned.
 func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructure, network *configv1.Network, cluster *corev1.ConfigMap) (string, error) {
+	return mergeUserSystemNoProxy(proxy, infra, network, cluster, os.Getenv)
+}
+
+func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructure, network *configv1.Network, cluster *corev1.ConfigMap, getEnv func(string) string) (string, error) {
 	// TODO: This will be flexible when master machine management is more dynamic.
 	type machineNetworkEntry struct {
 		// CIDR is the IP block address pool for machines within the cluster.
@@ -64,14 +69,20 @@ func MergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		set.Insert(mc.CIDR)
 	}
 
-	if len(infra.Status.APIServerInternalURL) > 0 {
-		internalAPIServer, err := url.Parse(infra.Status.APIServerInternalURL)
-		if err != nil {
-			return "", fmt.Errorf("failed to parse internal api server internal url")
+	// Hypershift does in many but not all cases not actually have an internal apiserver address and just
+	// puts the external one in this field (because components expect it to be non-empty). We can not
+	// derive from the cluster if we need to proxy the internal apiserver address or not, so we have this
+	// knob that allows Hypershift to tell us.
+	if getEnv("PROXY_INTERNAL_APISERVER_ADDRESS") != "true" {
+		if len(infra.Status.APIServerInternalURL) > 0 {
+			internalAPIServer, err := url.Parse(infra.Status.APIServerInternalURL)
+			if err != nil {
+				return "", fmt.Errorf("failed to parse internal api server internal url")
+			}
+			set.Insert(internalAPIServer.Hostname())
+		} else {
+			return "", fmt.Errorf("internal api server url missing from infrastructure config '%s'", infra.Name)
 		}
-		set.Insert(internalAPIServer.Hostname())
-	} else {
-		return "", fmt.Errorf("internal api server url missing from infrastructure config '%s'", infra.Name)
 	}
 
 	if len(network.Status.ServiceNetwork) > 0 {
