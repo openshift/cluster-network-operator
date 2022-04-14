@@ -13,22 +13,8 @@ spec:
   endpoints:
   - interval: 30s
     port: metrics
-    scheme: https
-    bearerTokenSecret:
-      key: ""
-    tlsConfig:
-      ca:
-        configMap:
-          key: service-ca.crt
-          name: openshift-service-ca.crt
-      cert:
-        secret:
-          key: tls.crt
-          name: ovn-master-metrics-cert
-      keySecret:
-        key: tls.key
-        name: ovn-master-metrics-cert
-      serverName: ovnkube-master-internal.{{.HostedClusterNamespace}}.svc
+    scheme: http
+    path: /metrics
     metricRelabelings:
     - action: replace
       replacement: {{.ClusterID}}
