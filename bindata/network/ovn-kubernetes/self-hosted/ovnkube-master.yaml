@@ -141,6 +141,7 @@ spec:
             /usr/share/ovn/scripts/ovn-ctl stop_nb_ovsdb
             echo "$(date -Iseconds) - nbdb stopped"
             rm -f /var/run/ovn/ovnnb_db.pid
+            rm -f /var/run/ovn/ovnnbdb-mem-trim-enabled
             exit 0
           }
           # end of quit
@@ -382,7 +383,15 @@ spec:
                 echo "NB DB Raft leader is unknown to the cluster node."
                 exit 1
               else
-                /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
+                # enable memory triming once
+                if [ ! -f /var/run/ovn/ovnnbdb-mem-trim-enabled ]; then
+                  /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on
+                  if [[ $? -eq 0 ]]; then
+                    touch /var/run/ovn/ovnnbdb-mem-trim-enabled
+                  else
+                    echo "NB DB failed to enable memory trim on compaction"
+                  fi
+                fi
               fi
 
         env:
@@ -491,6 +500,7 @@ spec:
             /usr/share/ovn/scripts/ovn-ctl stop_sb_ovsdb
             echo "$(date -Iseconds) - sbdb stopped"
             rm -f /var/run/ovn/ovnsb_db.pid
+            rm -f /var/run/ovn/ovnsbdb-mem-trim-enabled
             exit 0
           }
           # end of quit
@@ -695,7 +705,15 @@ spec:
                 echo "SB DB Raft leader is unknown to the cluster node."
                 exit 1
               else
-                /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
+                # enable memory triming once
+                if [ ! -f /var/run/ovn/ovnsbdb-mem-trim-enabled ]; then
+                  /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on
+                  if [[ $? -eq 0 ]]; then
+                    touch /var/run/ovn/ovnsbdb-mem-trim-enabled
+                  else
+                    echo "SB DB failed to enable memory trim on compaction"
+                  fi
+                fi
               fi
         env:
         - name: OVN_LOG_LEVEL
