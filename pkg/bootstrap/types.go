@@ -45,6 +45,7 @@ type OVNBootstrapResult struct {
 	ClusterInitiator        string
 	ExistingMasterDaemonset *appsv1.DaemonSet
 	ExistingNodeDaemonset   *appsv1.DaemonSet
+	ExistingIPsecDaemonset  *appsv1.DaemonSet
 	OVNKubernetesConfig     *OVNConfigBoostrapResult
 	PrePullerDaemonset      *appsv1.DaemonSet
 	FlowsConfig             *FlowsConfig
