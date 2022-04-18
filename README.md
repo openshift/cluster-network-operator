@@ -195,7 +195,7 @@ data:
 ```
 
 ### Configuring OVNKubernetes
-OVNKubernetes supports the following configuration options, all of which are optional and once set at cluster creation, they can't be changed except for `gatewayConfig` which can be changed at runtime:
+OVNKubernetes supports the following configuration options, all of which are optional and once set at cluster creation, they can't be changed except for `gatewayConfig` and `IPsec` which can be changed at runtime:
 * `MTU`: The MTU to use for the geneve overlay. The default is the MTU of the node that the cluster-network-operator is first run on, minus 100 bytes for geneve overhead. If the nodes in your cluster don't all have the same MTU then you may need to set this explicitly.
 * `genevePort`: The UDP port to use for the Geneve overlay. The default is 6081.
 * `hybridOverlayConfig`: hybrid linux/windows cluster (see below).
@@ -261,7 +261,7 @@ The hybridClusterNetwork `cidr` and hostPrefix are used when adding windows node
 
 There can be at most one hybridClusterNetwork "CIDR". A future version may supports multiple `cidr`.
 
-#### Configuring IPsec with OVNKubernetes
+#### Configuring IPsec with OVNKubernetes at cluster creation
 OVNKubernetes supports IPsec encryption of all pod traffic using the OVN IPsec functionality. Add the following to the `spec:` section of the operator config:
 
 ```yaml
@@ -270,6 +270,62 @@ spec:
     type: OVNKubernetes
     ovnKubernetesConfig:
       ipsecConfig: {}
+```
+
+#### Configuring IPsec with OVNKubernetes at runtime
+OVN Kubernetes supports IPsec encryption dynamic enablement/disablement at runtime.
+The IPsec protocol adds an ESP header to tenant traffic which stores security data that is needed by each IPsec
+endpoint to encrypt/decrypt the tenant traffic.
+
+In order for IPsec to function properly the cluster MTU size must be decreased by 46 bytes to fit the additional ESP header added to each packet.
+This adjustment is not currently automatic and must be performed by the cluster administrator before enabling IPsec at runtime.
+
+Example of enabling the IPsec at runtime:
+
+1. Decrease the Cluster MTU size by 46 bytes (for ESP header):
+    1. Add the following to the `spec:` section of the operator config:
+```yaml
+spec:
+migration:
+  mtu:
+    machine:
+      from: 1500
+      to: 1500
+    network:
+      from: 1400
+      to: 1352
+```
+2. wait until Machine-Config-Operator updates the machines, it will reboot each node one by one:
+
+```
+$ oc get mcp
+```
+3. finalize the MTU migration process by adding the following to the `spec:` section of the operator config:
+
+```yaml
+spec:
+  migration: null
+  defaultNetwork:
+    ovnKubernetesConfig:
+      ...
+      mtu: 1352
+```
+For more information about [MTU change at runtime](https://docs.openshift.com/container-platform/4.10/networking/changing-cluster-network-mtu.html)
+
+2. Enable IPsec:
+Add the following to the `spec:` section of the operator config:
+
+```yaml
+spec:
+  defaultNetwork:
+    type: OVNKubernetes
+    ovnKubernetesConfig:
+      ipsecConfig: {}
+```
+
+Example of disabling IPsec at runtime:
+```
+$ oc patch networks.operator.openshift.io cluster --type=json -p='[{"op":"remove", "path":"/spec/defaultNetwork/ovnKubernetesConfig/ipsecConfig"}]'
 ```
 
 #### Configuring Network Policy audit logging with OVNKubernetes 

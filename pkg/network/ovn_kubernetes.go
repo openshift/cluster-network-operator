@@ -221,10 +221,29 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVNHybridOverlayVXLANPort"] = ""
 	}
 
+	// If IPsec is enabled for the first time, we start the daemonset. If it is
+	// disabled after that, we do not stop the daemonset but only stop IPsec.
+	//
+	// TODO: We need to do this as, by default, we maintain IPsec state on the
+	// node in order to maintain encrypted connectivity in the case of upgrades.
+	// If we only unrender the IPsec daemonset, we will be unable to cleanup
+	// the IPsec state on the node and the traffic will continue to be
+	// encrypted.
 	if c.IPsecConfig != nil {
-		data.Data["EnableIPsec"] = true
+		// IPsec is enabled
+		data.Data["OVNIPsecDaemonsetEnable"] = true
+		data.Data["OVNIPsecEnable"] = true
 	} else {
-		data.Data["EnableIPsec"] = false
+		if bootstrapResult.OVN.ExistingIPsecDaemonset != nil {
+			// IPsec has previously started and
+			// now it has been requested to be disabled
+			data.Data["OVNIPsecDaemonsetEnable"] = true
+			data.Data["OVNIPsecEnable"] = false
+		} else {
+			// IPsec has never started
+			data.Data["OVNIPsecDaemonsetEnable"] = false
+			data.Data["OVNIPsecEnable"] = false
+		}
 	}
 
 	if c.GatewayConfig != nil && c.GatewayConfig.RoutingViaHost {
@@ -669,10 +688,7 @@ func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 			errs = append(errs, errors.Errorf("cannot edit a running hybrid overlay network"))
 		}
 	}
-	if pn.IPsecConfig == nil && nn.IPsecConfig != nil {
-		errs = append(errs, errors.Errorf("cannot enable IPsec after install time"))
-	}
-	if pn.IPsecConfig != nil {
+	if pn.IPsecConfig != nil && nn.IPsecConfig != nil {
 		if !reflect.DeepEqual(pn.IPsecConfig, nn.IPsecConfig) {
 			errs = append(errs, errors.Errorf("cannot edit IPsec configuration at runtime"))
 		}
@@ -933,11 +949,27 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client) (*bootstrap
 		}
 	}
 
+	ipsecDS := &appsv1.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
+	}
+	nsn = types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ovn-ipsec"}
+	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecDS); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to retrieve existing ipsec DaemonSet: %w", err)
+		} else {
+			ipsecDS = nil
+		}
+	}
+
 	res := bootstrap.OVNBootstrapResult{
 		MasterAddresses:         ovnMasterAddresses,
 		ClusterInitiator:        clusterInitiator,
 		ExistingMasterDaemonset: masterDS,
 		ExistingNodeDaemonset:   nodeDS,
+		ExistingIPsecDaemonset:  ipsecDS,
 		OVNKubernetesConfig:     ovnConfigResult,
 		PrePullerDaemonset:      prePullerDS,
 		FlowsConfig:             bootstrapFlowsConfig(kubeClient.ClientFor("").CRClient()),
