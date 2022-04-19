@@ -73,7 +73,7 @@ spec:
           fi
           echo "$(date -Iseconds) - checking sbdb"
           ovndb_ctl_ssl_opts="-p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt"
-          sbdb_ip="{{.OVN_SB_DB_ROUTE}}"
+          sbdb_ip="{{.OVN_SB_DB_ENDPOINT}}"
           retries=0
           while ! ovn-sbctl --no-leader-only --timeout=5 --db=${sbdb_ip} ${ovndb_ctl_ssl_opts} get-connection; do
             (( retries += 1 ))
@@ -377,8 +377,8 @@ spec:
           fi
 
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
-            --nb-address "{{.OVN_NB_DB_ROUTE}}" \
-            --sb-address "{{.OVN_SB_DB_ROUTE}}" \
+            --nb-address "{{.OVN_NB_DB_ENDPOINT}}" \
+            --sb-address "{{.OVN_SB_DB_ENDPOINT}}" \
             --nb-client-privkey /ovn-cert/tls.key \
             --nb-client-cert /ovn-cert/tls.crt \
             --nb-client-cacert /ovn-ca/ca-bundle.crt \
