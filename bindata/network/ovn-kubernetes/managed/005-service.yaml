@@ -23,9 +23,12 @@ spec:
     port: {{.OVN_SB_PORT}}
     protocol: TCP
     targetPort: {{.OVN_SB_PORT}}
+{{ if .OVN_SB_NODE_PORT }}
+    nodePort: {{.OVN_SB_NODE_PORT}}
+{{ end }}
   sessionAffinity: None
   clusterIP: None
-  type: ClusterIP
+  type: {{.OVNDbServiceType}}
 
 ---
 apiVersion: v1
