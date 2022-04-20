@@ -323,7 +323,7 @@ spec:
                 #configure northd_probe_interval
                 OVN_NB_CTL="ovn-nbctl -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
                 --db "{{.OVN_NB_DB_LIST}}""
-                northd_probe_interval=${OVN_NORTHD_PROBE_INTERVAL:-5000}
+                northd_probe_interval=${OVN_NORTHD_PROBE_INTERVAL:-10000}
                 echo "Setting northd probe interval to ${northd_probe_interval} ms"
                 retries=0
                 current_probe_interval=0
