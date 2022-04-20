@@ -67,6 +67,9 @@ type InfraStatus struct {
 
 	// URLs to the apiservers. This is because we can't use the default in-cluster one (they assume a running service network)
 	APIServers map[string]APIServer
+
+	// Proxy settings to use for all communication to the KAS
+	Proxy configv1.ProxyStatus
 }
 
 // APIServer is the hostname & port of a given APIServer. (This is the

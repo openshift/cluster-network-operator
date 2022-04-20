@@ -13,6 +13,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 
+	configv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,7 +95,11 @@ func (r *ReconcileOperConfig) readMTUConfigMap(ctx context.Context) (int, error)
 }
 
 func (r *ReconcileOperConfig) deployMTUProber(ctx context.Context, owner metav1.Object, infra *bootstrap.InfraStatus) error {
-	objs, err := renderMTUProber(infra)
+	var proxy configv1.Proxy
+	if err := r.client.Default().CRClient().Get(ctx, crclient.ObjectKey{Name: "cluster"}, &proxy); err != nil {
+		return fmt.Errorf("failed to get proxy: %w", err)
+	}
+	objs, err := renderMTUProber(infra, proxy.Status)
 	if err != nil {
 		return err
 	}
@@ -116,7 +121,12 @@ func (r *ReconcileOperConfig) deleteMTUProber(ctx context.Context, infra *bootst
 	if r.mtuProberCleanedUp {
 		return nil
 	}
-	objs, err := renderMTUProber(infra)
+
+	var proxy configv1.Proxy
+	if err := r.client.Default().CRClient().Get(ctx, crclient.ObjectKey{Name: "cluster"}, &proxy); err != nil {
+		return fmt.Errorf("failed to get proxy: %w", err)
+	}
+	objs, err := renderMTUProber(infra, proxy.Status)
 	if err != nil {
 		return err
 	}
@@ -134,13 +144,16 @@ func (r *ReconcileOperConfig) deleteMTUProber(ctx context.Context, infra *bootst
 	return nil
 }
 
-func renderMTUProber(infra *bootstrap.InfraStatus) ([]*uns.Unstructured, error) {
+func renderMTUProber(infra *bootstrap.InfraStatus, proxyStatus configv1.ProxyStatus) ([]*uns.Unstructured, error) {
 	data := render.MakeRenderData()
 	data.Data["CNOImage"] = os.Getenv("NETWORK_CHECK_TARGET_IMAGE")
 	data.Data["KUBERNETES_SERVICE_HOST"] = infra.APIServers[bootstrap.APIServerDefault].Host
 	data.Data["KUBERNETES_SERVICE_PORT"] = infra.APIServers[bootstrap.APIServerDefault].Port
 	data.Data["DestNS"] = cmNamespace
 	data.Data["DestName"] = cmName
+	data.Data["HTTP_PROXY"] = proxyStatus.HTTPProxy
+	data.Data["HTTPS_PROXY"] = proxyStatus.HTTPSProxy
+	data.Data["NO_PROXY"] = proxyStatus.NoProxy
 
 	objs, err := render.RenderDir("bindata/network/mtu-prober", &data)
 	if err != nil {
