@@ -36,6 +36,7 @@ type OVNHyperShiftBootstrapResult struct {
 	Namespace                 string
 	ServicePublishingStrategy *hyperv1.ServicePublishingStrategy
 	OVNSbDbEndpoint           string
+	ControlPlaneReplicas      int
 }
 
 type OVNConfigBoostrapResult struct {
