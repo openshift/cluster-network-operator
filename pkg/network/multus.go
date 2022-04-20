@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -35,7 +36,7 @@ func renderMultus(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bootstrap
 	usedhcp, usewhereabouts := detectAuxiliaryIPAM(conf)
 	h := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault].Host
 	p := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault].Port
-	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), usedhcp, usewhereabouts, h, p)
+	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), usedhcp, usewhereabouts, h, p, bootstrapResult.Infra.Proxy)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +52,7 @@ func renderMultus(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bootstrap
 }
 
 // renderMultusConfig returns the manifests of Multus
-func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, useWhereabouts bool, apihost, apiport string) ([]*uns.Unstructured, error) {
+func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, useWhereabouts bool, apihost, apiport string, proxy configv1.ProxyStatus) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 
 	// render the manifests on disk
@@ -71,6 +72,9 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 	data.Data["SystemCNIConfDir"] = SystemCNIConfDir
 	data.Data["DefaultNetworkType"] = defaultNetworkType
 	data.Data["CNIBinDir"] = CNIBinDir
+	data.Data["HTTP_PROXY"] = proxy.HTTPProxy
+	data.Data["HTTPS_PROXY"] = proxy.HTTPSProxy
+	data.Data["NO_PROXY"] = proxy.NoProxy
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus"), &data)
 	if err != nil {
