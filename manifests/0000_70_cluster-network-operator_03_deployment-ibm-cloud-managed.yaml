@@ -89,6 +89,11 @@ spec:
               fieldPath: metadata.name
         image: quay.io/openshift/origin-cluster-network-operator:latest
         name: network-operator
+        ports:
+        - containerPort: 9104
+          hostPort: 9104
+          name: cno
+          protocol: TCP
         resources:
           requests:
             cpu: 10m
