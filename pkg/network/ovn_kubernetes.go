@@ -428,6 +428,12 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 	}
 
 	ovnHypershiftResult.ClusterID = hcp.Spec.ClusterID
+	switch hcp.Spec.ControllerAvailabilityPolicy {
+	case hyperv1.HighlyAvailable:
+		ovnHypershiftResult.ControlPlaneReplicas = 3
+	default:
+		ovnHypershiftResult.ControlPlaneReplicas = 1
+	}
 	for _, svc := range hcp.Spec.Services {
 		// TODO: instead of the hardcoded string use ServiceType hyperv1.OVNSbDb once the API is updated
 		if svc.Service == "OVNSbDb" {
@@ -847,7 +853,12 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client) (*bootstrap
 		return nil, fmt.Errorf("Unable to bootstrap OVN config, err: %v", err)
 	}
 
-	controlPlaneReplicaCount, _ := strconv.Atoi(rcD.ControlPlane.Replicas)
+	var controlPlaneReplicaCount int
+	if hc.Enabled {
+		controlPlaneReplicaCount = ovnConfigResult.HyperShiftConfig.ControlPlaneReplicas
+	} else {
+		controlPlaneReplicaCount, _ = strconv.Atoi(rcD.ControlPlane.Replicas)
+	}
 
 	ovnMasterAddresses, err := getMasterAddresses(kubeClient.ClientFor("").CRClient(), controlPlaneReplicaCount, hc.Enabled)
 	if err != nil {
