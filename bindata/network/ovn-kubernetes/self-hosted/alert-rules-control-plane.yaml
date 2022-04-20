@@ -60,6 +60,7 @@ spec:
       labels:
         severity: warning
     - alert: V4SubnetAllocationThresholdExceeded
+      runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/V4SubnetAllocationThresholdExceeded.md
       annotations:
         summary: More than 80% of v4 subnets available to assign to the nodes are allocated. Current v4 subnet allocation percentage is {{"{{"}} $value {{"}}"}}.
         description: More than 80% of IPv4 subnets are used. Insufficient IPv4 subnets could degrade provisioning of workloads.
