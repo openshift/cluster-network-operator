@@ -1170,7 +1170,7 @@ status:
   numberMisscheduled: 0
   numberReady: 5
   observedGeneration: 2
-  updatedNumberScheduled: 
+  updatedNumberScheduled:
 `,
 			node: `
 apiVersion: apps/v1

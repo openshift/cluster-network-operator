@@ -46,6 +46,18 @@ spec:
           value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: KUBERNETES_SERVICE_HOST
           value: "{{.KUBERNETES_SERVICE_HOST}}"
+{{ if .HTTP_PROXY }}
+        - name: "HTTP_PROXY"
+          value: "{{ .HTTP_PROXY}}"
+{{ end }}
+{{ if .HTTPS_PROXY }}
+        - name: "HTTPS_PROXY"
+          value: "{{ .HTTPS_PROXY}}"
+{{ end }}
+{{ if .NO_PROXY }}
+        - name: "NO_PROXY"
+          value: "{{ .NO_PROXY}}"
+{{ end }}
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /env

@@ -97,6 +97,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["KUBERNETES_SERVICE_PORT"] = apiServer.Port
 	data.Data["K8S_APISERVER"] = fmt.Sprintf("https://%s:%s", apiServer.Host, apiServer.Port)
 	data.Data["K8S_LOCAL_APISERVER"] = fmt.Sprintf("https://%s:%s", localAPIServer.Host, localAPIServer.Port)
+	data.Data["HTTP_PROXY"] = bootstrapResult.Infra.Proxy.HTTPProxy
+	data.Data["HTTPS_PROXY"] = bootstrapResult.Infra.Proxy.HTTPSProxy
+	data.Data["NO_PROXY"] = bootstrapResult.Infra.Proxy.NoProxy
 
 	data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
 	// TOKEN_AUDIENCE is used by token-minter to identify the audience for the service account token which is verified by the apiserver
