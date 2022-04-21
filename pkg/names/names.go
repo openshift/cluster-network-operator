@@ -118,12 +118,6 @@ func TrustedCABundleConfigMap() types.NamespacedName {
 	}
 }
 
-// KURYR_ADMISSION_CONTROLLER_SECRET is the name of the Secret that stores the admission controller CA and Key
-const KURYR_ADMISSION_CONTROLLER_SECRET = "kuryr-dns-admission-controller-secret"
-
-// KURYR_WEB_HOOK_SECRET is the name of the secret used in the kuryr-dns-admission-controller DaemonSet
-const KURYR_WEBHOOK_SECRET = "kuryr-webhook-secret"
-
 // constants for namespace and custom resource names
 // namespace in which ingress controller objects are created
 const IngressControllerNamespace = "openshift-ingress-operator"
