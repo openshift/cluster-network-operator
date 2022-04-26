@@ -197,7 +197,7 @@ spec:
             echo "ovnkube-master-${pod_index} ip: $init_ip"
             init_ip=$(bracketify $init_ip)
             target=$(ovn-${db}ctl --timeout=5 --db=${transport}:${init_ip}:${port} ${ovndb_ctl_ssl_opts} \
-                      --data=bare --no-headings --columns=target list connection)
+                      --data=bare --no-headings --columns=target list connection || true)
             if [[ "${target}" != "p${transport}:${port}${ovn_raft_conn_ip_url_suffix}" ]]; then
               echo "Unable to check correct target ${target} "
               return 1
@@ -486,7 +486,7 @@ spec:
             init_ip="ovnkube-master-${pod_index}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
             echo "ovnkube-master-${pod_index} ip: $init_ip"
             target=$(ovn-${db}ctl --timeout=5 --db=${transport}:${init_ip}:${port} ${ovndb_ctl_ssl_opts} \
-                      --data=bare --no-headings --columns=target list connection)
+                      --data=bare --no-headings --columns=target list connection || true)
             if [[ "${target}" != "p${transport}:${port}${ovn_raft_conn_ip_url_suffix}" ]]; then
               echo "Unable to check correct target ${target} "
               return 1
