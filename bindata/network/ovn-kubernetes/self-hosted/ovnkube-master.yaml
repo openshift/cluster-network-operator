@@ -48,6 +48,7 @@ spec:
     spec:
       serviceAccountName: ovn-kubernetes-controller
       hostNetwork: true
+      dnsPolicy: Default
       priorityClassName: "system-cluster-critical"
       # volumes in all containers:
       # (container) -> (host)

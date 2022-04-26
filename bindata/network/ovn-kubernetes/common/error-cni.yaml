@@ -97,6 +97,7 @@ spec:
         kubernetes.io/os: "linux"
     spec:
       hostNetwork: true
+      dnsPolicy: Default
       nodeSelector:
         kubernetes.io/os: linux
         network.operator.openshift.io/dpu: ''
