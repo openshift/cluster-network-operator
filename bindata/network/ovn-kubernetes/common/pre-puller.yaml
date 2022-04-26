@@ -22,6 +22,7 @@ spec:
     spec:
       serviceAccountName: ovn-kubernetes-node
       hostNetwork: true
+      dnsPolicy: Default
       priorityClassName: "system-node-critical"
       containers:
         # ovnkube-upgrades-prepuller: no-op container that simply pulls the new image during upgrades
