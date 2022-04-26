@@ -25,9 +25,9 @@ spec:
       labels:
         severity: warning
     - alert: NoOvnMasterLeader
-      runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoOvnMasterLeader.md
       annotations:
         summary: There is no ovn-kubernetes master leader.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoOvnMasterLeader.md
         description: |
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
           implemented while there is no OVN Kubernetes leader. Existing workloads should continue to have connectivity.
