@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"strings"
 	"time"
 
@@ -29,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -151,6 +151,8 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, nil
 	}
 
+	resyncResult := reconcile.Result{RequeueAfter: ResyncPeriod}
+
 	// Fetch the Network.operator.openshift.io instance
 	operConfig := &operv1.Network{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}}
 	err := r.client.Default().CRClient().Get(ctx, request.NamespacedName, operConfig)
@@ -167,7 +169,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		// Error reading the object - requeue the request.
 		log.Printf("Unable to retrieve Network.operator.openshift.io object: %v", err)
 		// FIXME: operator status?
-		return reconcile.Result{}, err
+		return resyncResult, nil
 	}
 
 	if operConfig.Spec.ManagementState == operv1.Unmanaged {
@@ -181,7 +183,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		log.Printf("Failed to merge the cluster configuration: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "MergeClusterConfig",
 			fmt.Sprintf("Internal error while merging cluster configuration and operator configuration: %v", err))
-		return reconcile.Result{}, err
+		return resyncResult, nil
 	}
 
 	// Convert certain fields to canonicalized form for backward compatibility
@@ -192,7 +194,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		log.Printf("Failed to validate Network.operator.openshift.io.Spec: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
 			fmt.Sprintf("The operator configuration is invalid (%v). Use 'oc edit network.operator.openshift.io cluster' to fix.", err))
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	}
 
 	// Retrieve the previously applied operator configuration
@@ -200,14 +202,14 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if err != nil {
 		log.Printf("Failed to retrieve previously applied configuration: %v", err)
 		// FIXME: operator status?
-		return reconcile.Result{}, err
+		return resyncResult, nil
 	}
 
 	// Gather the Infra status, we'll need it a few places
 	infraStatus, err := platform.InfraStatus(r.client)
 	if err != nil {
 		log.Printf("Failed to retrieve infrastructure status: %v", err)
-		return reconcile.Result{}, err
+		return resyncResult, nil
 	}
 
 	// If we need to, probe the host's MTU via a Job.
@@ -220,7 +222,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			log.Printf("Failed to probe MTU: %v", err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "MTUProbeFailed",
 				fmt.Sprintf("Failed to probe MTU: %v", err))
-			return reconcile.Result{}, fmt.Errorf("could not probe MTU -- maybe no available nodes: %w", err)
+			return resyncResult, nil
 		}
 		log.Printf("Using detected MTU %d", mtu)
 	}
@@ -243,7 +245,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			log.Printf("Not applying unsafe change: %v", err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
 				fmt.Sprintf("Not applying unsafe configuration change: %v. Use 'oc edit network.operator.openshift.io cluster' to undo the change.", err))
-			return reconcile.Result{}, err
+			return reconcile.Result{}, nil
 		}
 	}
 
@@ -255,7 +257,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		log.Printf("Failed to reconcile platform networking resources: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "BootstrapError",
 			fmt.Sprintf("Internal error while reconciling platform networking resources: %v", err))
-		return reconcile.Result{}, err
+		return resyncResult, nil
 	}
 
 	if !reflect.DeepEqual(operConfig, newOperConfig) {
@@ -263,7 +265,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			log.Printf("Failed to update the operator configuration: %v", err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "UpdateOperatorConfig",
 				fmt.Sprintf("Internal error while updating operator configuration: %v", err))
-			return reconcile.Result{}, err
+			return resyncResult, nil
 		}
 	}
 
@@ -273,7 +275,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		log.Printf("Failed to render: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "RenderError",
 			fmt.Sprintf("Internal error while rendering operator configuration: %v", err))
-		return reconcile.Result{}, err
+		return resyncResult, nil
 	}
 
 	if progressing {
@@ -289,7 +291,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		log.Printf("Failed to render applied: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "RenderError",
 			fmt.Sprintf("Internal error while recording new operator configuration: %v", err))
-		return reconcile.Result{}, err
+		return resyncResult, nil
 	}
 	objs = append([]*uns.Unstructured{app}, objs...)
 
@@ -394,7 +396,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 				log.Println(err)
 				r.status.SetDegraded(statusmanager.OperatorConfig, "InternalError",
 					fmt.Sprintf("Internal error while updating operator configuration: %v", err))
-				return reconcile.Result{}, err
+				return resyncResult, nil
 			}
 		}
 
@@ -419,7 +421,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			}
 			r.status.SetDegraded(statusmanager.OperatorConfig, "ApplyOperatorConfig",
 				fmt.Sprintf("Error while updating operator configuration: %v", err))
-			return reconcile.Result{}, err
+			return resyncResult, nil
 		}
 	}
 
@@ -432,7 +434,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		log.Printf("Could not generate network status: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "StatusError",
 			fmt.Sprintf("Could not update cluster configuration status: %v", err))
-		return reconcile.Result{}, err
+		return resyncResult, nil
 	}
 	if status != nil {
 		// Don't set the owner reference in this case -- we're updating
@@ -442,7 +444,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			log.Println(err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "StatusError",
 				fmt.Sprintf("Could not update cluster configuration status: %v", err))
-			return reconcile.Result{}, err
+			return resyncResult, nil
 		}
 	}
 
@@ -451,7 +453,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// All was successful. Request that this be re-triggered after ResyncPeriod,
 	// so we can reconcile state again.
 	log.Printf("Operconfig Controller complete")
-	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
+	return resyncResult, nil
 }
 
 // reconcileOvsFlowsConfig filters non-ovs-flows-config events and forwards a request to the
