@@ -289,14 +289,14 @@ func NeedMTUProbe(prev, next *operv1.NetworkSpec) bool {
 		// other network types don't need MTU
 		return false
 	}
-	return needsMTU(prev) && needsMTU(next)
+	return needsMTU(next) && needsMTU(prev)
 }
 
 func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.InfraStatus) error {
 	// Forbid changing service network during a migration
 	if prev.Migration != nil {
 		if !reflect.DeepEqual(prev.ServiceNetwork, next.ServiceNetwork) {
-			return errors.Errorf("cannot change ServiceNetwork during migration")
+			return errors.Errorf("?cannot change ServiceNetwork during migration")
 		}
 		return nil
 	}
