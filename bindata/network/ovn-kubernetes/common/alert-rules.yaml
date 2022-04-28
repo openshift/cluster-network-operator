@@ -13,9 +13,9 @@ spec:
   - name: cluster-network-operator-ovn.rules
     rules:
     - alert: NodeWithoutOVNKubeNodePodRunning
-      runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NodeWithoutOVNKubeNodePodRunning.md
       annotations:
         summary: All Linux nodes should be running an ovnkube-node pod, {{"{{"}} $labels.node {{"}}"}} is not.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NodeWithoutOVNKubeNodePodRunning.md
         description: |
           Networking is degraded on nodes that do not have a functioning ovnkube-node pod. Existing workloads on the
           node may continue to have connectivity but any additional workloads will not be provisioned on the node. Any

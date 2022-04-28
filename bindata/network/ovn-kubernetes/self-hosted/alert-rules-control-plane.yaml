@@ -25,9 +25,9 @@ spec:
       labels:
         severity: critical
     - alert: NoOvnMasterLeader
-      runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoOvnMasterLeader.md
       annotations:
         summary: There is no ovn-kubernetes master leader.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoOvnMasterLeader.md
         description: |
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
           implemented while there is no OVN Kubernetes leader. Existing workloads should continue to have connectivity.
@@ -62,9 +62,9 @@ spec:
       labels:
         severity: warning
     - alert: V4SubnetAllocationThresholdExceeded
-      runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/V4SubnetAllocationThresholdExceeded.md
       annotations:
         summary: More than 80% of v4 subnets available to assign to the nodes are allocated. Current v4 subnet allocation percentage is {{"{{"}} $value {{"}}"}}.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/V4SubnetAllocationThresholdExceeded.md
         description: More than 80% of IPv4 subnets are used. Insufficient IPv4 subnets could degrade provisioning of workloads.
       expr: |
         ovnkube_master_allocated_v4_host_subnets/ovnkube_master_num_v4_host_subnets * 100 > 80
