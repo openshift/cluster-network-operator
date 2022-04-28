@@ -25,10 +25,19 @@ spec:
         type: infra
         openshift.io/component: network
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: cloud-network-config-controller
       priorityClassName: system-cluster-critical
       containers:
       - name: controller
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         image: {{.CloudNetworkConfigControllerImage}}
         imagePullPolicy: IfNotPresent
         command: ["/usr/bin/cloud-network-config-controller"]
