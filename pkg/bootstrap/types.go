@@ -30,7 +30,8 @@ type OVNHyperShiftBootstrapResult struct {
 	ClusterID                 string
 	Namespace                 string
 	ServicePublishingStrategy *hyperv1.ServicePublishingStrategy
-	OVNSbDbEndpoint           string
+	OVNSbDbRouteHost          string
+	OVNSbDbRouteNodePort      int32
 	ControlPlaneReplicas      int
 }
 
