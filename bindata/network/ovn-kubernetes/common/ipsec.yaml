@@ -1,4 +1,4 @@
-{{if .EnableIPsec}}
+{{if .OVNIPsecDaemonsetEnable}}
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
