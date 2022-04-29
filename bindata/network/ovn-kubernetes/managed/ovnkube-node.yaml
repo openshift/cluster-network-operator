@@ -57,6 +57,16 @@ spec:
       dnsPolicy: Default
       hostPID: true
       priorityClassName: "system-node-critical"
+      # When proxy is enabled in hypershift, ovn sbdb requests are redirected
+      # to 127.0.0.1 with hostAlias settings. Ovnkube-node-proxy container
+      # listens on 127.0.0.1 and connects to destination ovn sbdb route or
+      # node port service through http proxy server.
+      {{if .ENABLE_OVN_NODE_PROXY}}
+      hostAliases:
+      - hostnames:
+        - {{.OVN_SB_DB_ROUTE_HOST}}
+        ip: 127.0.0.1
+      {{end}}
       initContainers:
       # ovnkube-node-init: wait for sbdb ready
       {{ if eq .OVN_NODE_MODE "full" }}
@@ -73,6 +83,14 @@ spec:
             set +o allexport
           fi
           echo "$(date -Iseconds) - checking sbdb"
+
+          {{if .ENABLE_OVN_NODE_PROXY}}
+          # Don't use /etc/hosts to resolve OVN_SB_DB_ROUTE_HOST which points to 127.0.0.1 (see spec.hostAliases)
+          echo "hosts: dns files" >> /etc/nsswitch.conf
+          exec socat TCP-LISTEN:{{.OVN_SB_DB_ROUTE_LOCAL_PORT}},reuseaddr,fork PROXY:{{.HTTP_PROXY_IP}}:{{.OVN_SB_DB_ROUTE_HOST}}:{{.OVN_SB_DB_ROUTE_PORT}},proxyport={{.HTTP_PROXY_PORT}} &
+          proxypid=$!
+         {{end}}
+
           ovndb_ctl_ssl_opts="-p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt"
           sbdb_ip="{{.OVN_SB_DB_ENDPOINT}}"
           retries=0
@@ -84,6 +102,10 @@ spec:
             fi
             sleep 2
           done
+
+          {{if .ENABLE_OVN_NODE_PROXY}}
+          kill $proxypid
+          {{end}}
         volumeMounts:
         - mountPath: /env
           name: env-overrides
@@ -101,6 +123,38 @@ spec:
       # /env -> configmap env-overrides - debug overrides
       containers:
       {{ if eq .OVN_NODE_MODE "full" }}
+      {{if .ENABLE_OVN_NODE_PROXY}}
+      # ovnkube-node-proxy redirects ovn sbdb traffic to http proxy
+      - name: ovnkube-node-proxy
+        image: "{{.OvnImage}}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+          if [[ -f "/env/${K8S_NODE}" ]]; then
+            set -o allexport
+            source "/env/${K8S_NODE}"
+            set +o allexport
+          fi
+          echo "$(date -Iseconds) - starting ovnkube-node-proxy"
+          # Don't use /etc/hosts to resolve OVN_SB_DB_ROUTE_HOST which points to 127.0.0.1 (see spec.hostAliases)
+          echo "hosts: dns files" >> /etc/nsswitch.conf
+          exec socat TCP-LISTEN:{{.OVN_SB_DB_ROUTE_LOCAL_PORT}},reuseaddr,fork PROXY:{{.HTTP_PROXY_IP}}:{{.OVN_SB_DB_ROUTE_HOST}}:{{.OVN_SB_DB_ROUTE_PORT}},proxyport={{.HTTP_PROXY_PORT}}
+        env:
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - mountPath: /env
+          name: env-overrides
+        terminationMessagePolicy: FallbackToLogsOnError
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+      {{end}}
       # ovn-controller: programs the vswitch with flows from the sbdb
       - name: ovn-controller
         image: "{{.OvnImage}}"

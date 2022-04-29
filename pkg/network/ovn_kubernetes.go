@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -61,9 +62,10 @@ var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
 const (
 	// TODO: get this from the route Status
-	OVN_SB_ROUTE_PORT       = "443"
-	OVSFlowsConfigMapName   = "ovs-flows-config"
-	OVSFlowsConfigNamespace = names.APPLIED_NAMESPACE
+	OVN_SB_DB_ROUTE_PORT       = "443"
+	OVN_SB_DB_ROUTE_LOCAL_PORT = "9645"
+	OVSFlowsConfigMapName      = "ovs-flows-config"
+	OVSFlowsConfigNamespace    = names.APPLIED_NAMESPACE
 )
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
@@ -166,8 +168,39 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			data.Data["OVN_SB_NODE_PORT"] = pubStrategy.NodePort.Port
 		}
 	}
-	data.Data["OVN_NB_DB_ENDPOINT"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbEndpoint
-	data.Data["OVN_SB_DB_ENDPOINT"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbEndpoint
+	data.Data["OVN_NB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
+	data.Data["OVN_SB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
+
+	// Hypershift proxy
+	if bootstrapResult.Infra.Proxy.HTTPProxy == "" {
+		data.Data["ENABLE_OVN_NODE_PROXY"] = false
+	} else {
+		data.Data["ENABLE_OVN_NODE_PROXY"] = true
+		u, err := url.Parse(bootstrapResult.Infra.Proxy.HTTPProxy)
+		if err != nil {
+			return nil, progressing, errors.Wrap(err, "failed to parse http proxy")
+		}
+		host, port, err := net.SplitHostPort(u.Host)
+		if err != nil {
+			return nil, progressing, errors.Wrap(err, "failed to split http proxy host")
+		}
+		data.Data["HTTP_PROXY_IP"] = host
+		data.Data["HTTP_PROXY_PORT"] = port
+		data.Data["OVN_SB_DB_ROUTE_LOCAL_PORT"] = OVN_SB_DB_ROUTE_LOCAL_PORT
+		data.Data["OVN_NB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s",
+			bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_LOCAL_PORT)
+		data.Data["OVN_SB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s",
+			bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_LOCAL_PORT)
+		data.Data["OVN_SB_DB_ROUTE_HOST"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost
+
+		var routePort string
+		if pubStrategy != nil && pubStrategy.Type == hyperv1.NodePort {
+			routePort = strconv.Itoa(int(bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort))
+		} else {
+			routePort = OVN_SB_DB_ROUTE_PORT
+		}
+		data.Data["OVN_SB_DB_ROUTE_PORT"] = routePort
+	}
 
 	data.Data["OVN_NB_INACTIVITY_PROBE"] = nb_inactivity_probe
 	data.Data["OVN_NB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterAddresses, OVN_NB_PORT)
@@ -386,7 +419,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", "openshift-ovn-kubernetes", "ovnkube-upgrades-prepuller")
 	}
 
-	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled && bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbEndpoint == "" {
+	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled && bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost == "" {
 		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node", func(o *uns.Unstructured) {
 			anno := o.GetAnnotations()
 			if anno == nil {
@@ -494,11 +527,11 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 					return ovnHypershiftResult, nil
 				}
 				if len(route.Status.Ingress) >= 1 && route.Status.Ingress[0].Host != "" {
-					ovnHypershiftResult.OVNSbDbEndpoint = fmt.Sprintf("ssl:%s:%s", route.Status.Ingress[0].Host, OVN_SB_ROUTE_PORT)
+					ovnHypershiftResult.OVNSbDbRouteHost = route.Status.Ingress[0].Host
 				} else if route.Spec.Host != "" {
-					ovnHypershiftResult.OVNSbDbEndpoint = fmt.Sprintf("ssl:%s:%s", route.Spec.Host, OVN_SB_ROUTE_PORT)
+					ovnHypershiftResult.OVNSbDbRouteHost = route.Spec.Host
 				}
-				klog.Infof("Overriding OVN configuration route to %s", ovnHypershiftResult.OVNSbDbEndpoint)
+				klog.Infof("Overriding OVN configuration route to %s", ovnHypershiftResult.OVNSbDbRouteHost)
 			}
 		}
 	case hyperv1.NodePort:
@@ -520,7 +553,8 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 				}
 			}
 			if sbDbPort > 0 {
-				ovnHypershiftResult.OVNSbDbEndpoint = fmt.Sprintf("ssl:%s:%d", ovnHypershiftResult.ServicePublishingStrategy.NodePort.Address, sbDbPort)
+				ovnHypershiftResult.OVNSbDbRouteHost = ovnHypershiftResult.ServicePublishingStrategy.NodePort.Address
+				ovnHypershiftResult.OVNSbDbRouteNodePort = sbDbPort
 			} else {
 				klog.Infof("Node port not defined for ovnkube-master service")
 			}
