@@ -54,6 +54,7 @@ spec:
                 operator: DoesNotExist
       serviceAccountName: ovn-kubernetes-node
       hostNetwork: true
+      dnsPolicy: Default
       hostPID: true
       priorityClassName: "system-node-critical"
       initContainers:
