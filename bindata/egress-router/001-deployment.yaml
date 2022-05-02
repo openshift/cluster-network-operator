@@ -19,7 +19,13 @@ spec:
         app: egress-router-cni
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        k8s.v1.cni.cncf.io/networks: egress-router-cni-nad
+        k8s.v1.cni.cncf.io/networks: |
+          [
+            {
+              "name":"egress-router-cni-nad",
+              "default-route": ["{{.Gateway}}"]
+            }
+          ]
     spec:
       containers:
         - name: egress-router-cni-pod
