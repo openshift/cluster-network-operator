@@ -13,22 +13,21 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	v1coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/tools/cache"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client) error {
-	reconciler := newReconciler(mgr, status)
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) error {
+	reconciler := newReconciler(mgr, status, c)
 	if reconciler == nil {
 		return fmt.Errorf("failed to create reconciler")
 	}
@@ -37,30 +36,37 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.C
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) reconcile.Reconciler {
-	return &ReconcileProxyConfig{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status}
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) *ReconcileProxyConfig {
+	// Watch just the namespace that contains trusted-ca-bundle
+	cmInformer := v1coreinformers.NewConfigMapInformer(
+		c.Default().Kubernetes(),
+		names.ADDL_TRUST_BUNDLE_CONFIGMAP_NS,
+		0, // don't resync
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	r := &ReconcileProxyConfig{
+		client:     c.Default().CRClient(),
+		status:     status,
+		cmInformer: cmInformer,
+	}
+
+	c.Default().AddCustomInformer(cmInformer) // Tell the ClusterClient about this informer
+
+	return r
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r *ReconcileProxyConfig) error {
 	// Create a new controller
 	c, err := controller.New("proxyconfig-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
 
-	// We only care about a configmap source with a specific name/namespace,
-	// so filter events before they are provided to the controller event handlers.
-	pred := predicate.Funcs{
-		UpdateFunc:  func(e event.UpdateEvent) bool { return handleConfigMap(e.ObjectNew) },
-		DeleteFunc:  func(e event.DeleteEvent) bool { return handleConfigMap(e.Object) },
-		CreateFunc:  func(e event.CreateEvent) bool { return handleConfigMap(e.Object) },
-		GenericFunc: func(e event.GenericEvent) bool { return handleConfigMap(e.Object) },
-	}
-
-	// Watch for changes to the additional trust bundle configmap.
-	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForObject{}, pred)
-	if err != nil {
+	// watch for changes to configmaps in openshift-config
+	if err := c.Watch(&source.Informer{Informer: r.cmInformer},
+		&handler.EnqueueRequestForObject{},
+	); err != nil {
 		return err
 	}
 
@@ -73,18 +79,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-// handleConfigMap returns true if meta namespace is "openshift-config".
-func handleConfigMap(meta metav1.Object) bool {
-	return meta.GetNamespace() == names.ADDL_TRUST_BUNDLE_CONFIGMAP_NS
-}
-
 // ReconcileProxyConfig reconciles a Proxy object
 type ReconcileProxyConfig struct {
 	// This client, initialized using mgr.GetClient() above, is a split client
 	// that reads objects from the cache and writes to the apiserver.
 	client crclient.Client
-	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
+
+	cmInformer cache.SharedIndexInformer
 }
 
 // Reconcile expects request to refer to a cluster-scoped proxy object
