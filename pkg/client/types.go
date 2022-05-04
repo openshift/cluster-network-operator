@@ -10,6 +10,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -57,4 +58,6 @@ type ClusterClient interface {
 
 	// HostPort returns the host and port, as a string, of this connection
 	HostPort() (string, string)
+
+	AddCustomInformer(inf cache.SharedInformer)
 }
