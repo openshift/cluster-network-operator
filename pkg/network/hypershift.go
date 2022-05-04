@@ -18,10 +18,8 @@ const (
 	// For hypershift, it will identify metrics produced by the both the control plane
 	// components and guest cluster monitoring stack.
 	ClusterIDLabel = "_id"
-	// NetworkOperatorStatusTypeProgressing indicates Progressing condition in hostedControlPlane status
-	NetworkOperatorStatusTypeProgressing = "network.operator.openshift.io/Progressing"
-	// NetworkOperatorStatusTypeDegraded indicates Degraded condition in hostedControlPlane status
-	NetworkOperatorStatusTypeDegraded = "network.operator.openshift.io/Degraded"
+	// HyperShiftConditionTypePrefix is a cluster network operator condition type prefix in hostedControlPlane status
+	HyperShiftConditionTypePrefix = "network.operator.openshift.io/"
 )
 
 type RelatedObject struct {

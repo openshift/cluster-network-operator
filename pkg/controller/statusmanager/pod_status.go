@@ -277,19 +277,16 @@ func (status *StatusManager) SetFromPods() {
 		status.unsetProgressing(PodDeployment)
 	}
 
-	condition := operv1.OperatorCondition{}
 	if reachedAvailableLevel {
-		condition = operv1.OperatorCondition{
+		status.set(reachedAvailableLevel, operv1.OperatorCondition{
 			Type:   operv1.OperatorStatusTypeAvailable,
-			Status: operv1.ConditionTrue,
-		}
+			Status: operv1.ConditionTrue})
 	}
 
 	if reachedAvailableLevel && len(progressing) == 0 {
 		status.installComplete = true
 	}
 
-	status.set(reachedAvailableLevel, condition)
 	if len(hung) > 0 {
 		status.setDegraded(RolloutHung, "RolloutHung", strings.Join(hung, "\n"))
 	} else {

@@ -267,24 +267,14 @@ func (status *StatusManager) writeHypershiftStatus(operStatus *operv1.NetworkSta
 				if cond.Reason != "" {
 					reason = cond.Reason
 				}
-				if cond.Type == operv1.OperatorStatusTypeProgressing {
-					newCondition := metav1.Condition{
-						Type:    network.NetworkOperatorStatusTypeProgressing,
-						Status:  metav1.ConditionStatus(cond.Status),
-						Reason:  reason,
-						Message: cond.Message,
-					}
-					meta.SetStatusCondition(&hcp.Status.Conditions, newCondition)
+
+				newCondition := metav1.Condition{
+					Type:    network.HyperShiftConditionTypePrefix + cond.Type,
+					Status:  metav1.ConditionStatus(cond.Status),
+					Reason:  reason,
+					Message: cond.Message,
 				}
-				if cond.Type == operv1.OperatorStatusTypeDegraded {
-					newCondition := metav1.Condition{
-						Type:    network.NetworkOperatorStatusTypeDegraded,
-						Status:  metav1.ConditionStatus(cond.Status),
-						Reason:  reason,
-						Message: cond.Message,
-					}
-					meta.SetStatusCondition(&hcp.Status.Conditions, newCondition)
-				}
+				meta.SetStatusCondition(&hcp.Status.Conditions, newCondition)
 			}
 		}
 
