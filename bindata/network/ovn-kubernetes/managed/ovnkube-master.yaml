@@ -54,6 +54,7 @@ spec:
         component: network
         type: infra
         openshift.io/component: network
+        hypershift.openshift.io/control-plane-component: onvkube-master
         kubernetes.io/os: "linux"
     spec:
       affinity:
