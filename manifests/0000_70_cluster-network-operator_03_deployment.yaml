@@ -90,7 +90,7 @@ spec:
         - name: OVN_NORTHD_PROBE_INTERVAL
           value: "5000"
         - name: OVN_CONTROLLER_INACTIVITY_PROBE
-          value: "180000"
+          value: "30000"
         - name: OVN_NB_INACTIVITY_PROBE
           value: "60000"
         - name: EGRESS_ROUTER_CNI_IMAGE
