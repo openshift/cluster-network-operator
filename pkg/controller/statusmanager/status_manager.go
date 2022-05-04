@@ -3,6 +3,7 @@ package statusmanager
 import (
 	"context"
 	"fmt"
+	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"log"
 	"os"
 	"reflect"
@@ -104,7 +105,7 @@ func (status *StatusManager) setClusterOperAnnotation(obj *configv1.ClusterOpera
 	}
 	anno[names.RelatedClusterObjectsAnnotation] = strings.Join(value, ",")
 	new.SetAnnotations(anno)
-	return status.client.ClientFor(obj.GetClusterName()).CRClient().Patch(context.TODO(), new, crclient.MergeFrom(obj))
+	return status.client.ClientFor(apply.GetClusterName(obj)).CRClient().Patch(context.TODO(), new, crclient.MergeFrom(obj))
 }
 
 // getClusterOperAnnotation gets an annotation from the clusterOperator network object
@@ -222,7 +223,6 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 			objToDelete := &uns.Unstructured{}
 			objToDelete.SetName(currentObj.Name)
 			objToDelete.SetNamespace(currentObj.Namespace)
-			objToDelete.SetClusterName(currentObj.ClusterName)
 			objToDelete.SetGroupVersionKind(gvk)
 			err = status.client.ClientFor(currentObj.ClusterName).CRClient().Delete(context.TODO(), objToDelete, crclient.PropagationPolicy("Background"))
 			if err != nil {

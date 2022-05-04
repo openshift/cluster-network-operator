@@ -7,7 +7,8 @@ kind: PodDisruptionBudget
 metadata:
   name: ovn-raft-quorum-guard
   namespace: {{.HostedClusterNamespace}}
-  clusterName: {{.ManagementClusterName}}
+  annotations:
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
 spec:
   minAvailable: {{.OVN_MIN_AVAILABLE}}
   selector:
@@ -20,8 +21,8 @@ apiVersion: apps/v1
 metadata:
   name: ovnkube-master
   namespace: {{.HostedClusterNamespace}}
-  clusterName: {{.ManagementClusterName}}
   annotations:
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
     kubernetes.io/description: |
       This daemonset launches the ovn-kubernetes controller (master) networking components.
     release.openshift.io/version: "{{.ReleaseVersion}}"

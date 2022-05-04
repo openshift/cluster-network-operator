@@ -301,18 +301,18 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	relatedClusterObjects := []network.RelatedObject{}
 	for _, obj := range objs {
 		if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "DaemonSet" {
-			daemonSets = append(daemonSets, statusmanager.ClusteredName{ClusterName: obj.GetClusterName(), Namespace: obj.GetNamespace(), Name: obj.GetName()})
+			daemonSets = append(daemonSets, statusmanager.ClusteredName{ClusterName: apply.GetClusterName(obj), Namespace: obj.GetNamespace(), Name: obj.GetName()})
 		} else if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "Deployment" {
-			deployments = append(deployments, statusmanager.ClusteredName{ClusterName: obj.GetClusterName(), Namespace: obj.GetNamespace(), Name: obj.GetName()})
+			deployments = append(deployments, statusmanager.ClusteredName{ClusterName: apply.GetClusterName(obj), Namespace: obj.GetNamespace(), Name: obj.GetName()})
 		} else if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "StatefulSet" {
-			statefulSets = append(statefulSets, statusmanager.ClusteredName{ClusterName: obj.GetClusterName(), Namespace: obj.GetNamespace(), Name: obj.GetName()})
+			statefulSets = append(statefulSets, statusmanager.ClusteredName{ClusterName: apply.GetClusterName(obj), Namespace: obj.GetNamespace(), Name: obj.GetName()})
 		}
 		restMapping, err := r.mapper.RESTMapping(obj.GroupVersionKind().GroupKind())
 		if err != nil {
 			log.Printf("Failed to get REST mapping for storing related object: %v", err)
 			continue
 		}
-		if obj.GetClusterName() != "" {
+		if apply.GetClusterName(obj) != "" {
 			relatedClusterObjects = append(relatedClusterObjects, network.RelatedObject{
 				ObjectReference: configv1.ObjectReference{
 					Group:     obj.GetObjectKind().GroupVersionKind().Group,
@@ -320,7 +320,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 					Name:      obj.GetName(),
 					Namespace: obj.GetNamespace(),
 				},
-				ClusterName: obj.GetClusterName(),
+				ClusterName: apply.GetClusterName(obj),
 			})
 			// Don't add management cluster objects in relatedObjects
 			continue
@@ -387,7 +387,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// Apply the objects to the cluster
 	for _, obj := range objs {
 		// TODO: OwnerRef for non default clusters. For HyperShift this should probably be HostedControlPlane CR
-		if obj.GetClusterName() == "" {
+		if apply.GetClusterName(obj) == "" {
 			// Mark the object to be GC'd if the owner is deleted.
 			if err := controllerutil.SetControllerReference(operConfig, obj, r.scheme); err != nil {
 				err = errors.Wrapf(err, "could not set reference for (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
