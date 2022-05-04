@@ -68,6 +68,9 @@ const KuryrOctaviaVersionAnnotation = "networkoperator.openshift.io/kuryr-octavi
 // value format: cluster/namespace/name
 const CopyFromAnnotation = "network.operator.openshift.io/copy-from"
 
+// ClusterNameAnnotation is an annotation that specifies the cluster an object belongs to
+const ClusterNameAnnotation = "network.operator.openshift.io/cluster-name"
+
 // RelatedClusterObjectsAnnotation is an annotation that allows deleting resources for specified clusters
 // value format: cluster/group/resource/namespace/name
 const RelatedClusterObjectsAnnotation = "network.operator.openshift.io/relatedClusterObjects"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"log"
 	"os"
 	"reflect"
@@ -442,7 +443,7 @@ func (status *StatusManager) setDSAnnotation(obj *appsv1.DaemonSet, key string, 
 		delete(anno, key)
 	}
 	new.SetAnnotations(anno)
-	return status.client.ClientFor(obj.GetClusterName()).CRClient().Patch(context.TODO(), new, crclient.MergeFrom(obj))
+	return status.client.ClientFor(apply.GetClusterName(obj)).CRClient().Patch(context.TODO(), new, crclient.MergeFrom(obj))
 }
 
 // setSSAnnotation sets an annotation on a statefulset; or unsets it if value is nil
@@ -467,7 +468,7 @@ func (status *StatusManager) setSSAnnotation(obj *appsv1.StatefulSet, key string
 		delete(anno, key)
 	}
 	new.SetAnnotations(anno)
-	return status.client.ClientFor(obj.GetClusterName()).CRClient().Patch(context.TODO(), new, crclient.MergeFrom(obj))
+	return status.client.ClientFor(apply.GetClusterName(obj)).CRClient().Patch(context.TODO(), new, crclient.MergeFrom(obj))
 }
 
 // setDepAnnotation sets an annotation on a Deployment. If value is nil,
@@ -493,5 +494,5 @@ func (status *StatusManager) setDepAnnotation(obj *appsv1.Deployment, key string
 		delete(anno, key)
 	}
 	new.SetAnnotations(anno)
-	return status.client.ClientFor(obj.GetClusterName()).CRClient().Patch(context.TODO(), new, crclient.MergeFrom(obj))
+	return status.client.ClientFor(apply.GetClusterName(obj)).CRClient().Patch(context.TODO(), new, crclient.MergeFrom(obj))
 }
