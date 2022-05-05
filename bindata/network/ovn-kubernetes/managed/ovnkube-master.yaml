@@ -64,7 +64,7 @@ spec:
               matchLabels:
                 app: ovnkube-master
             topologyKey: topology.kubernetes.io/zone
-      priorityClassName: "system-cluster-critical"
+      priorityClassName: hypershift-api-critical
       containers:
       # token-minter creates a token with the default service account path
       # The token is read by ovn-k containers to authenticate against the hosted cluster api server
@@ -77,6 +77,10 @@ spec:
         - --token-audience={{.TokenAudience}}
         - --token-file=/var/run/secrets/hosted_cluster/token
         - --kubeconfig=/etc/kubernetes/kubeconfig
+        resources:
+          requests:
+            cpu: 10m
+            memory: 10Mi
         volumeMounts:
         - mountPath: /etc/kubernetes
           name: admin-kubeconfig
