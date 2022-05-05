@@ -6,9 +6,9 @@ metadata:
     app: ovnkube-master
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
   name: monitor-ovn-master-metrics
   namespace: {{.HostedClusterNamespace}}
-  clusterName: {{.ManagementClusterName}}
 spec:
   endpoints:
   - interval: 30s

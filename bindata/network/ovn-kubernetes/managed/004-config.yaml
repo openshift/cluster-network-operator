@@ -67,7 +67,8 @@ apiVersion: v1
 metadata:
   name: ovnkube-config
   namespace: {{.HostedClusterNamespace}}
-  clusterName: {{.ManagementClusterName}}
+  annotations:
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
 data:
   ovnkube.conf:   |-
     [default]

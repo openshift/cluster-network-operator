@@ -24,6 +24,12 @@ type Object interface {
 	runtime.Object
 }
 
+// GetClusterName returns the names.ClusterNameAnnotation annotation for the specified object.
+// If the annotation does not exist it will return an empty string.
+func GetClusterName(obj Object) string {
+	return obj.GetAnnotations()[names.ClusterNameAnnotation]
+}
+
 // ApplyObject submits a server-side apply patch for the given object.
 // This causes fields we own to be updated, and fields we don't own to be preserved.
 // For more information, see https://kubernetes.io/docs/reference/using-api/server-side-apply/
@@ -31,9 +37,9 @@ type Object interface {
 func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subcontroller string) error {
 	name := obj.GetName()
 	namespace := obj.GetNamespace()
-	clusterClient := client.ClientFor(obj.GetClusterName())
+	clusterClient := client.ClientFor(GetClusterName(obj))
 	if clusterClient == nil {
-		return fmt.Errorf("object %s/%s specifies unknown cluster %s", namespace, name, obj.GetClusterName())
+		return fmt.Errorf("object %s/%s specifies unknown cluster %s", namespace, name, GetClusterName(obj))
 	}
 
 	oks, _, _ := clusterClient.Scheme().ObjectKinds(obj)
@@ -157,7 +163,6 @@ func getCopySource(ctx context.Context, obj Object, client cnoclient.Client) (Ob
 
 	ret.SetNamespace(obj.GetNamespace())
 	ret.SetName(obj.GetName())
-	ret.SetClusterName(obj.GetClusterName())
 	ret.SetLabels(obj.GetLabels())
 	ret.SetOwnerReferences(obj.GetOwnerReferences())
 	ret.SetManagedFields(obj.GetManagedFields())
