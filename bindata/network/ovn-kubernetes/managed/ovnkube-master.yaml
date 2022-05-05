@@ -742,8 +742,8 @@ spec:
             --nb-cert-common-name "{{.OVN_CERT_CN}}" \
             --enable-multicast \
             --disable-snat-multiple-gws \
-            --metrics-node-server-privkey ${TLS_PK} \
-            --metrics-node-server-cert ${TLS_CERT} \
+            --node-server-privkey ${TLS_PK} \
+            --node-server-cert ${TLS_CERT} \
             --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
         volumeMounts:
         - mountPath: /etc/ovn
