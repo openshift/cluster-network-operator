@@ -121,9 +121,9 @@ spec:
           preStop:
             exec:
               command:
-                - OVN_MANAGE_OVSDB=no
-                - /usr/share/ovn/scripts/ovn-ctl
-                - stop_northd
+                - /bin/bash
+                - -c
+                - OVN_MANAGE_OVSDB=no /usr/share/ovn/scripts/ovn-ctl stop_northd
         env:
         - name: OVN_LOG_LEVEL
           value: info
