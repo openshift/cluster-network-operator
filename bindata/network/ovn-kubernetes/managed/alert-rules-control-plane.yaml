@@ -6,9 +6,9 @@ metadata:
     role: alert-rules
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
   name: master-rules
   namespace: {{.HostedClusterNamespace}}
-  clusterName: {{.ManagementClusterName}}
 spec:
   groups:
   - name: cluster-network-operator-master.rules

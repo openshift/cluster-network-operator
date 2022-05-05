@@ -8,7 +8,8 @@ kind: Service
 metadata:
   name: ovnkube-master-external
   namespace: {{.HostedClusterNamespace}}
-  clusterName: {{.ManagementClusterName}}
+  annotations:
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
   labels:
     app: ovnkube-master
 spec:
@@ -36,8 +37,8 @@ kind: Service
 metadata:
   name: ovnkube-master-internal
   namespace: {{.HostedClusterNamespace}}
-  clusterName: {{.ManagementClusterName}}
   annotations:
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
     service.beta.openshift.io/serving-cert-secret-name: ovn-master-metrics-cert
   labels:
     app: ovnkube-master

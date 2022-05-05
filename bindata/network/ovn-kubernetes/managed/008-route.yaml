@@ -6,7 +6,8 @@ kind: Route
 metadata:
   name: ovnkube-sbdb
   namespace: {{.HostedClusterNamespace}}
-  clusterName: {{.ManagementClusterName}}
+  annotations:
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
 spec:
   port:
     targetPort: {{.OVN_SB_PORT}}
