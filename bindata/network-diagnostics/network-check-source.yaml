@@ -24,10 +24,19 @@ spec:
         app: network-check-source
         kubernetes.io/os: "linux"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       priorityClassName: openshift-user-critical
       serviceAccountName: network-diagnostics
       containers:
       - name: check-endpoints
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         image: "{{.NetworkCheckSourceImage}}"
         imagePullPolicy: IfNotPresent
         terminationMessagePolicy: FallbackToLogsOnError

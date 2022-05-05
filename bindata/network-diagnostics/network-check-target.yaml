@@ -25,11 +25,20 @@ spec:
         app: network-check-target
         kubernetes.io/os: "linux"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       priorityClassName: openshift-user-critical
       containers:
       - image: "{{.NetworkCheckTargetImage}}"
         imagePullPolicy: IfNotPresent
         name: network-check-target-container
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         command:
           - cluster-network-check-target
         ports:
