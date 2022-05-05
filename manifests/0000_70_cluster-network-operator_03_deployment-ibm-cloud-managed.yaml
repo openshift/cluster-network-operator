@@ -46,7 +46,7 @@ spec:
           else
             URL_ONLY_KUBECONFIG=/etc/kubernetes/kubeconfig
           fi
-          exec /usr/bin/cluster-network-operator start --listen=0.0.0.0:9104
+          exec /usr/bin/cluster-network-operator start
         env:
         - name: RELEASE_VERSION
           value: 0.0.1-snapshot
@@ -104,11 +104,6 @@ spec:
               fieldPath: metadata.name
         image: quay.io/openshift/origin-cluster-network-operator:latest
         name: network-operator
-        ports:
-        - containerPort: 9104
-          hostPort: 9104
-          name: cno
-          protocol: TCP
         resources:
           requests:
             cpu: 10m

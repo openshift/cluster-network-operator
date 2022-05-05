@@ -4,12 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"log"
 	"math/rand"
 	"net/url"
 	"os"
 	"time"
+
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 
 	"github.com/openshift/cluster-network-operator/pkg/operator"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -85,6 +86,7 @@ which is a kubeconfig from which to take just the URL to the apiserver`,
 	cmdcfg := controllercmd.NewControllerCommandConfig("network-operator", version.Get(), func(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
 		return operator.RunOperator(ctx, controllerConfig, *inClusterClientName, *extraClusters)
 	})
+	cmdcfg.DisableServing = true
 
 	cmd2 := cmdcfg.NewCommand()
 	cmd2.Use = "start"

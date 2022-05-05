@@ -36,11 +36,6 @@ spec:
             weight: 100
       containers:
       - name: network-operator
-        ports:
-          - containerPort: 9104
-            hostPort: 9104
-            name: cno
-            protocol: TCP
         image: quay.io/openshift/origin-cluster-network-operator:latest
         command:
         - /bin/bash
@@ -53,7 +48,7 @@ spec:
           else
             URL_ONLY_KUBECONFIG=/etc/kubernetes/kubeconfig
           fi
-          exec /usr/bin/cluster-network-operator start --listen=0.0.0.0:9104
+          exec /usr/bin/cluster-network-operator start
         resources:
           requests:
             cpu: 10m
