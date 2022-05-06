@@ -69,9 +69,12 @@ func TestRenderKuryr(t *testing.T) {
 	// the ClusterNetwork.
 	g.Expect(objs[0]).To(HaveKubernetesID("Namespace", "", "openshift-kuryr"))
 
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "kuryr")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-kuryr", "kuryr")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "kuryr")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "kuryr-controller")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "kuryr-daemon")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-kuryr", "kuryr-controller")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-kuryr", "kuryr-daemon")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "kuryr-controller")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "kuryr-daemon")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-kuryr", "kuryr-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-kuryr", "kuryr-cni")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ConfigMap", "openshift-kuryr", "kuryr-config")))

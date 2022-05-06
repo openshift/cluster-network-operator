@@ -2,30 +2,27 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: kuryr
+  name: kuryr-controller
 rules:
 - apiGroups: [""]
   resources:
-  - namespaces
   - nodes
+  verbs:
+  - get
+  - list
+- apiGroups: [""]
+  resources:
   - endpoints
   - services
   - services/status
   - pods
+  - namespaces
   verbs:
   - get
   - watch
   - list
   - update
   - patch
-  - delete
-- apiGroups: ["extensions"]
-  resources:
-  - networkpolicies
-  verbs:
-  - get
-  - list
-  - watch
 - apiGroups: ["networking.k8s.io"]
   resources:
   - networkpolicies
@@ -35,21 +32,12 @@ rules:
   - watch
   - update
   - patch
-- apiGroups: ["k8s.cni.cncf.io"]
-  resources:
-  - network-attachment-definitions
-  verbs:
-  - get
 - apiGroups: ["openstack.org"]
   resources:
   - kuryrnetworks
   - kuryrnetworkpolicies
   - kuryrports
   - kuryrloadbalancers
-  verbs: ["*"]
-- apiGroups: ["route.openshift.io"]
-  resources:
-  - routes
   verbs: ["*"]
 - apiGroups: ["security.openshift.io"]
   resources:
@@ -69,22 +57,70 @@ rules:
   verbs:
   - create
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kuryr-daemon
+rules:
+- apiGroups: [""]
+  resources:
+  - pods
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups: ["openstack.org"]
+  resources:
+  - kuryrports
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups: ["security.openshift.io"]
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+- apiGroups: ["", "events.k8s.io"]
+  resources:
+  - events
+  verbs:
+  - create
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: kuryr
+  name: kuryr-controller
   namespace: openshift-kuryr
-
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kuryr-daemon
+  namespace: openshift-kuryr
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: kuryr
+  name: kuryr-controller
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: kuryr
+  name: kuryr-controller
 subjects:
 - kind: ServiceAccount
-  name: kuryr
+  name: kuryr-controller
+  namespace: openshift-kuryr
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kuryr-daemon
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kuryr-daemon
+subjects:
+- kind: ServiceAccount
+  name: kuryr-daemon
   namespace: openshift-kuryr
