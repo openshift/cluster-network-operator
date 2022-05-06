@@ -51,6 +51,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["NoProxy"] = b.NoProxy
 
 	// general kuryr options
+	data.Data["ClusterID"] = b.ClusterID
 	data.Data["ResourceTags"] = "openshiftClusterID=" + b.ClusterID
 	data.Data["PodSecurityGroups"] = strings.Join(b.PodSecurityGroups, ",")
 	data.Data["WorkerNodesRouter"] = b.WorkerNodesRouter

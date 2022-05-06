@@ -34,6 +34,7 @@ data:
     pod_vif_driver = nested-vlan
     vif_pool_driver = nested
     multi_vif_drivers = noop
+    cluster_id = {{ .ClusterID }}
 
     enabled_handlers = vif,kuryrport,service,endpoints,kuryrloadbalancer,policy,pod_label,namespace,openshift_machine,kuryrnetworkpolicy,kuryrnetwork{{ if .EnablePortPoolsPrepopulation }},kuryrnetwork_population{{ end }}
     pod_security_groups_driver = policy
