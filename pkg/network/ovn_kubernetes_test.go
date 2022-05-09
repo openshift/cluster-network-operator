@@ -181,6 +181,7 @@ platform-type="GCP"
 [ovnkubernetesfeature]
 enable-egress-ip=true
 enable-egress-firewall=true
+enable-egress-qos=true
 
 [gateway]
 mode=shared
@@ -208,6 +209,7 @@ platform-type="GCP"
 [ovnkubernetesfeature]
 enable-egress-ip=true
 enable-egress-firewall=true
+enable-egress-qos=true
 
 [gateway]
 mode=local
@@ -247,6 +249,7 @@ platform-type="GCP"
 [ovnkubernetesfeature]
 enable-egress-ip=true
 enable-egress-firewall=true
+enable-egress-qos=true
 
 [gateway]
 mode=local
@@ -289,6 +292,7 @@ platform-type="GCP"
 [ovnkubernetesfeature]
 enable-egress-ip=true
 enable-egress-firewall=true
+enable-egress-qos=true
 
 [gateway]
 mode=shared
@@ -320,6 +324,7 @@ platform-type="GCP"
 [ovnkubernetesfeature]
 enable-egress-ip=true
 enable-egress-firewall=true
+enable-egress-qos=true
 
 [gateway]
 mode=shared
