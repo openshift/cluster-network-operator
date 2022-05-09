@@ -31,8 +31,9 @@ func renderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 	}
 	out = append(out, objs...)
 
-	usedhcp := useDHCP(conf)
-	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), usedhcp)
+	usedhcp, usewhereabouts := detectAuxiliaryIPAM(conf)
+	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), usedhcp, usewhereabouts)
+
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +49,7 @@ func renderMultus(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstruct
 }
 
 // renderMultusConfig returns the manifests of Multus
-func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool) ([]*uns.Unstructured, error) {
+func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, useWhereabouts bool) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 
 	// render the manifests on disk
@@ -63,6 +64,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool) ([
 	data.Data["KUBERNETES_SERVICE_HOST"] = os.Getenv("KUBERNETES_SERVICE_HOST")
 	data.Data["KUBERNETES_SERVICE_PORT"] = os.Getenv("KUBERNETES_SERVICE_PORT")
 	data.Data["RenderDHCP"] = useDHCP
+	data.Data["RenderIpReconciler"] = useWhereabouts
 	data.Data["MultusCNIConfDir"] = MultusCNIConfDir
 	data.Data["SystemCNIConfDir"] = SystemCNIConfDir
 	data.Data["DefaultNetworkType"] = defaultNetworkType
