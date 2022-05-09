@@ -101,6 +101,12 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 				log.Printf("Object Kind is network.operator.openshift.io, skip")
 				continue
 			}
+			// @npinaeva objects without a name shouldn't be listed as relatedObjects in the first place,
+			// and we should never try to delete them
+			if currentObj.Name == "" {
+				log.Printf("Object without a name GVK %+v, skip", gvk)
+				continue
+			}
 			log.Printf("Detected related object with GVK %+v, namespace %v and name %v not rendered by manifests, deleting...", gvk, currentObj.Namespace, currentObj.Name)
 			objToDelete := &uns.Unstructured{}
 			objToDelete.SetName(currentObj.Name)
