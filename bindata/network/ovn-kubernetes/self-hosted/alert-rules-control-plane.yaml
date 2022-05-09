@@ -12,6 +12,8 @@ spec:
   groups:
   - name: cluster-network-operator-master.rules
     rules:
+    - record: cluster:ovnkube_master_egress_routing_via_host:max
+      expr: max(ovnkube_master_egress_routing_via_host)
     - alert: NoRunningOvnMaster
       annotations:
         summary: There is no running ovn-kubernetes master.
