@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"strings"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
 
 	"github.com/pkg/errors"
 
