@@ -36,7 +36,9 @@ const (
 // noProxy fields of proxyConfig are valid.
 func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySpec) error {
 	if !isSpecHTTPProxySet(proxyConfig) && !isSpecHTTPSProxySet(proxyConfig) {
-		return fmt.Errorf("httpProxy or httpsProxy must be set when using proxy")
+		if proxyConfig.NoProxy != noProxyWildcard {
+			return fmt.Errorf("httpProxy or httpsProxy must be set when using proxy")
+		}
 	}
 
 	if isSpecHTTPProxySet(proxyConfig) {
