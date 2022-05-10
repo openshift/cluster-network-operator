@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	v1coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -62,7 +61,6 @@ const ControllerName = "operconfig"
 func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) *ReconcileOperConfig {
 	return &ReconcileOperConfig{
 		client:        c,
-		scheme:        mgr.GetScheme(),
 		status:        status,
 		mapper:        mgr.GetRESTMapper(),
 		podReconciler: newPodReconciler(status),
@@ -182,7 +180,6 @@ var _ reconcile.Reconciler = &ReconcileOperConfig{}
 // ReconcileOperConfig reconciles a Network.operator.openshift.io object
 type ReconcileOperConfig struct {
 	client        cnoclient.Client
-	scheme        *runtime.Scheme
 	status        *statusmanager.StatusManager
 	mapper        meta.RESTMapper
 	podReconciler *ReconcilePods
@@ -440,7 +437,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		// TODO: OwnerRef for non default clusters. For HyperShift this should probably be HostedControlPlane CR
 		if apply.GetClusterName(obj) == "" {
 			// Mark the object to be GC'd if the owner is deleted.
-			if err := controllerutil.SetControllerReference(operConfig, obj, r.scheme); err != nil {
+			if err := controllerutil.SetControllerReference(operConfig, obj, r.client.ClientFor(apply.GetClusterName(obj)).Scheme()); err != nil {
 				err = errors.Wrapf(err, "could not set reference for (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
 				log.Println(err)
 				r.status.SetDegraded(statusmanager.OperatorConfig, "InternalError",
