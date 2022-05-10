@@ -117,19 +117,12 @@ func New(client cnoclient.Client, name string) *StatusManager {
 
 // setClusterOperAnnotation sets an annotation on the clusterOperator network object
 func (status *StatusManager) setClusterOperAnnotation(obj *configv1.ClusterOperator) error {
-	new := obj.DeepCopy()
-	anno := new.GetAnnotations()
 	value := []string{}
-
-	if anno == nil {
-		anno = map[string]string{}
-	}
 	for _, obj := range status.hyperShiftConfig.RelatedObjects {
 		value = append(value, fmt.Sprintf("%s/%s/%s/%s/%s", obj.ClusterName, obj.Group, obj.Resource, obj.Namespace, obj.Name))
 	}
-	anno[names.RelatedClusterObjectsAnnotation] = strings.Join(value, ",")
-	new.SetAnnotations(anno)
-	return status.client.ClientFor(apply.GetClusterName(obj)).CRClient().Patch(context.TODO(), new, crclient.MergeFrom(obj))
+	anno := strings.Join(value, ",")
+	return status.setAnnotation(context.TODO(), obj, names.RelatedClusterObjectsAnnotation, &anno)
 }
 
 // getClusterOperAnnotation gets an annotation from the clusterOperator network object
