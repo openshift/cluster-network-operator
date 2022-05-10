@@ -101,7 +101,7 @@ func (r *ReconcileOperConfig) deployMTUProber(ctx context.Context, owner metav1.
 
 	klog.Info("No probed MTU detected, deploying mtu-prober job")
 	for _, obj := range objs {
-		if err := controllerutil.SetControllerReference(owner, obj, r.scheme); err != nil {
+		if err := controllerutil.SetControllerReference(owner, obj, r.client.ClientFor(apply.GetClusterName(obj)).Scheme()); err != nil {
 			return err // unlikely
 		}
 		if err := apply.ApplyObject(ctx, r.client, obj, ControllerName); err != nil {
