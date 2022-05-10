@@ -36,6 +36,9 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrap
 	data.Data["ExternalControlPlane"] = cloudBootstrapResult.ExternalControlPlane
 	data.Data["PlatformAzureEnvironment"] = ""
 	data.Data["PlatformAWSCAPath"] = ""
+	data.Data["HTTP_PROXY"] = cloudBootstrapResult.Proxy.HTTPProxy
+	data.Data["HTTPS_PROXY"] = cloudBootstrapResult.Proxy.HTTPSProxy
+	data.Data["NO_PROXY"] = cloudBootstrapResult.Proxy.NoProxy
 
 	// AWS and azure allow for funky endpoint overriding.
 	// in different ways, of course.

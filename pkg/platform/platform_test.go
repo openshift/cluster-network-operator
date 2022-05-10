@@ -45,7 +45,7 @@ func TestTopologyModeDetection(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			client := fake.NewFakeClient(tc.infrastructure)
+			client := fake.NewFakeClient(tc.infrastructure, &configv1.Proxy{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}})
 
 			bootstrapResult, err := InfraStatus(client)
 			if err != nil {

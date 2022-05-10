@@ -33,6 +33,16 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		APIServers:           map[string]bootstrap.APIServer{},
 	}
 
+	// If we use hypershift, the components need proxy settings. In selfhosted, they
+	// are always local to the API so there it is never needed.
+	if res.ExternalControlPlane {
+		proxy := &configv1.Proxy{}
+		if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "cluster"}, proxy); err != nil {
+			return nil, fmt.Errorf("failed to get proxy 'cluster': %w", err)
+		}
+		res.Proxy = proxy.Status
+	}
+
 	// Extract apiserver URLs from the kubeconfig(s) passed to the CNO
 	for name, c := range client.Clients() {
 		h, p := c.HostPort()
