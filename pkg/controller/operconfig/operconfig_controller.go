@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/cluster"
-
 	"github.com/pkg/errors"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -29,9 +27,13 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	v1coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -75,34 +77,82 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 		return err
 	}
 
-	// Watch for changes to primary resource Network
-	err = c.Watch(&source.Kind{Type: &operv1.Network{}}, &handler.EnqueueRequestForObject{}, predicate.GenerationChangedPredicate{})
+	// Watch for changes to primary resource Network (as long as the spec changes)
+	err = c.Watch(&source.Kind{Type: &operv1.Network{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+		UpdateFunc: func(evt event.UpdateEvent) bool {
+			old, ok := evt.ObjectOld.(*operv1.Network)
+			if !ok {
+				return true
+			}
+			new, ok := evt.ObjectNew.(*operv1.Network)
+			if !ok {
+				return true
+			}
+			if reflect.DeepEqual(old.Spec, new.Spec) {
+				log.Printf("Skipping reconcile of Network.operator.openshift.io: spec unchanged")
+				return false
+			}
+			return true
+		},
+	})
 	if err != nil {
 		return err
 	}
 
-	// watch for changes in the ovs-flows-config map
-	if err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}},
-		handler.EnqueueRequestsFromMapFunc(reconcileOvsFlowsConfig),
+	// watch for changes in all configmaps in our namespace
+	// Currently, this would catch the mtu-prober reporting or the ovs flows config map.
+	// Need to do this with a custom namespaced informer.
+	cmInformer := v1coreinformers.NewConfigMapInformer(
+		r.client.Default().Kubernetes(),
+		names.APPLIED_NAMESPACE,
+		0, // don't resync
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	r.client.Default().AddCustomInformer(cmInformer) // Tell the ClusterClient about this informer
+
+	if err := c.Watch(&source.Informer{Informer: cmInformer},
+		handler.EnqueueRequestsFromMapFunc(reconcileOperConfig),
 		predicate.ResourceVersionChangedPredicate{},
+		predicate.NewPredicateFuncs(func(object crclient.Object) bool {
+			// Ignore ConfigMaps we manage as part of this loop
+			return !(object.GetName() == "network-operator-lock" ||
+				object.GetName() == "applied-cluster")
+		}),
+	); err != nil {
+		return err
+	}
+
+	// Watch when nodes are created too
+	newNodePredicate := predicate.Funcs{
+		CreateFunc: func(_ event.CreateEvent) bool {
+			return true
+		},
+		UpdateFunc: func(_ event.UpdateEvent) bool {
+			return false
+		},
+	}
+	if err := c.Watch(
+		&source.Kind{Type: &corev1.Node{}},
+		handler.EnqueueRequestsFromMapFunc(reconcileOperConfig),
+		newNodePredicate,
 	); err != nil {
 		return err
 	}
 
 	// Likewise for the Pod reconciler
-	c, err = controller.New("pod-controller", mgr, controller.Options{Reconciler: r.podReconciler})
+	podController, err := controller.New("pod-controller", mgr, controller.Options{Reconciler: r.podReconciler})
 	if err != nil {
 		return err
 	}
-	err = c.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, &handler.EnqueueRequestForObject{})
+	err = podController.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForObject{})
+	err = podController.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
-	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForObject{})
+	err = podController.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -114,7 +164,7 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 		if err != nil {
 			return err
 		}
-		err = c.Watch(source.NewKindWithCache(&appsv1.StatefulSet{}, mgmtCluster.GetCache()), &handler.EnqueueRequestForObject{})
+		err = podController.Watch(source.NewKindWithCache(&appsv1.StatefulSet{}, mgmtCluster.GetCache()), &handler.EnqueueRequestForObject{})
 		if err != nil {
 			return err
 		}
@@ -455,15 +505,8 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
 }
 
-// reconcileOvsFlowsConfig filters non-ovs-flows-config events and forwards a request to the
-// openshift-network-operator/cluster operator
-func reconcileOvsFlowsConfig(object crclient.Object) []reconcile.Request {
-	n := object.GetName()
-	ns := object.GetNamespace()
-	if n != network.OVSFlowsConfigMapName || ns != network.OVSFlowsConfigNamespace {
-		return nil
-	}
-	log.Println(network.OVSFlowsConfigMapName + ": enqueuing operator reconcile request from configmap")
+func reconcileOperConfig(obj crclient.Object) []reconcile.Request {
+	log.Printf("%s %s/%s changed, triggering operconf reconciliation", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
 	return []reconcile.Request{{NamespacedName: types.NamespacedName{
 		Name:      names.OPERATOR_CONFIG,
 		Namespace: names.APPLIED_NAMESPACE,

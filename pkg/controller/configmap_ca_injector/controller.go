@@ -12,22 +12,26 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	v1coreinformers "k8s.io/client-go/informers/core/v1"
+	v1corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
+
+var labelSelector = labels.Set{names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL: "true"}
 
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) error {
 	reconciler := newReconciler(mgr, status, c)
@@ -38,36 +42,54 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.C
 	return add(mgr, reconciler)
 }
 
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) reconcile.Reconciler {
-	return &ReconcileConfigMapInjector{client: c, scheme: mgr.GetScheme(), status: status}
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) *ReconcileConfigMapInjector {
+	li := v1coreinformers.NewFilteredConfigMapInformer(
+		c.Default().Kubernetes(),
+		metav1.NamespaceAll,
+		0, // no resync
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		func(options *metav1.ListOptions) {
+			options.LabelSelector = labelSelector.String()
+		})
+	ni := v1coreinformers.NewConfigMapInformer(
+		c.Default().Kubernetes(),
+		names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS,
+		0, // no resync
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	r := &ReconcileConfigMapInjector{
+		client:        c,
+		scheme:        mgr.GetScheme(),
+		status:        status,
+		labelInformer: li,
+		labelLister:   v1corelisters.NewConfigMapLister(li.GetIndexer()),
+		nsInformer:    ni,
+		nsLister:      v1corelisters.NewConfigMapLister(ni.GetIndexer()),
+	}
+
+	c.Default().AddCustomInformer(r.labelInformer)
+	c.Default().AddCustomInformer(r.nsInformer)
+	return r
 }
 
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r *ReconcileConfigMapInjector) error {
 	// Create a new controller.
 	c, err := controller.New("configmap-trust-bundle-injector-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
 
-	// The events fire for changes/creation of the trusted-ca-bundle and any configmaps with the
-	// label "config.openshift.io/inject-trusted-cabundle".
-	pred := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			return shouldUpdateConfigMaps(e.ObjectNew)
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return false
-		},
-		CreateFunc: func(e event.CreateEvent) bool {
-			return shouldUpdateConfigMaps(e.Object)
-		},
-		GenericFunc: func(e event.GenericEvent) bool {
-			return shouldUpdateConfigMaps(e.Object)
-		},
+	// Wire up the informers to the queue
+	if err := c.Watch(&source.Informer{Informer: r.labelInformer},
+		&handler.EnqueueRequestForObject{},
+		predicate.ResourceVersionChangedPredicate{},
+	); err != nil {
+		return err
 	}
-
-	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForObject{}, pred)
-	if err != nil {
+	if err := c.Watch(&source.Informer{Informer: r.nsInformer},
+		&handler.EnqueueRequestForObject{},
+		predicate.NewPredicateFuncs(isCABundle),
+	); err != nil {
 		return err
 	}
 
@@ -80,6 +102,11 @@ type ReconcileConfigMapInjector struct {
 	client cnoclient.Client
 	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
+
+	labelInformer cache.SharedIndexInformer
+	labelLister   v1corelisters.ConfigMapLister
+	nsInformer    cache.SharedIndexInformer
+	nsLister      v1corelisters.ConfigMapLister
 }
 
 // Reconcile expects requests to refers to configmaps of two different types.
@@ -90,7 +117,7 @@ type ReconcileConfigMapInjector struct {
 func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log.Printf("Reconciling configmap from  %s/%s\n", request.Namespace, request.Name)
 
-	trustedCAbundleConfigMap, err := r.client.Default().Kubernetes().CoreV1().ConfigMaps(names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS).Get(ctx, names.TRUSTED_CA_BUNDLE_CONFIGMAP, metav1.GetOptions{})
+	trustedCAbundleConfigMap, err := r.nsLister.ConfigMaps(names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS).Get(names.TRUSTED_CA_BUNDLE_CONFIGMAP)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS, names.TRUSTED_CA_BUNDLE_CONFIGMAP)
@@ -108,43 +135,37 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 		return reconcile.Result{}, err
 	}
 	// Build a list of configMaps.
-	configMapsToChange := []corev1.ConfigMap{}
+	configMapsToChange := []*corev1.ConfigMap{}
 
 	// The trusted-ca-bundle changed.
 	if request.Name == names.TRUSTED_CA_BUNDLE_CONFIGMAP && request.Namespace == names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS {
-
-		configMapList := &corev1.ConfigMapList{}
-		matchingLabels := &crclient.MatchingLabels{names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL: "true"}
-		err = r.client.Default().CRClient().List(ctx, configMapList, matchingLabels)
-		if err != nil {
+		cms, err := r.labelLister.List(labelSelector.AsSelector())
+		if err != nil { // unlikely -- informer list
 			log.Println(err)
 			r.status.SetDegraded(statusmanager.InjectorConfig, "ListConfigMapError",
 				fmt.Sprintf("Error getting the list of affected configmaps: %v", err))
 			return reconcile.Result{}, err
+
 		}
-		configMapsToChange = configMapList.Items
+		configMapsToChange = cms
 		log.Printf("%s changed, updating %d configMaps", names.TRUSTED_CA_BUNDLE_CONFIGMAP, len(configMapsToChange))
 	} else {
 		// Changing a single labeled configmap.
 
 		// Get the requested object.
-		requestedCAbundleConfigMap := &corev1.ConfigMap{}
-		requestedCAbundleConfigMapName := types.NamespacedName{
-			Namespace: request.Namespace,
-			Name:      request.Name,
-		}
-		err = r.client.Default().CRClient().Get(ctx, requestedCAbundleConfigMapName, requestedCAbundleConfigMap)
+		cm, err := r.labelLister.ConfigMaps(request.Namespace).Get(request.Name)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", request.Namespace, request.Name)
 				return reconcile.Result{}, nil
 			}
+			// Unlikely -- this is an informer
 			r.status.SetDegraded(statusmanager.InjectorConfig, "ClusterConfigError",
 				fmt.Sprintf("failed to get configmap '%s/%s': %v", request.Namespace, request.Name, err))
 			log.Println(err)
 			return reconcile.Result{}, err
 		}
-		configMapsToChange = append(configMapsToChange, *requestedCAbundleConfigMap)
+		configMapsToChange = append(configMapsToChange, cm)
 	}
 
 	errs := []error{}
@@ -153,6 +174,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			if existing, ok := configMap.Data[names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY]; ok && existing == string(trustedCAbundleData) {
 				// Nothing to update the new and old configmap object would be the same.
+				log.Printf("ConfigMap %s/%s %s unchanged, skipping", configMap.Namespace, configMap.Name, names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY)
 				return nil
 			}
 
@@ -193,7 +215,6 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 	return reconcile.Result{}, nil
 }
 
-func shouldUpdateConfigMaps(meta metav1.Object) bool {
-	return meta.GetLabels()[names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL] == "true" ||
-		(meta.GetName() == names.TRUSTED_CA_BUNDLE_CONFIGMAP && meta.GetNamespace() == names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS)
+func isCABundle(meta crclient.Object) bool {
+	return (meta.GetName() == names.TRUSTED_CA_BUNDLE_CONFIGMAP && meta.GetNamespace() == names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS)
 }
