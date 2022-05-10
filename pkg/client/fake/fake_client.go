@@ -11,6 +11,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 
@@ -155,4 +157,8 @@ func (fc *FakeClusterClient) OperatorHelperClient() operatorv1helpers.OperatorCl
 
 func (fc *FakeClusterClient) HostPort() (string, string) {
 	return "testing", "9999"
+}
+
+func (fc *FakeClusterClient) AddCustomInformer(inf cache.SharedInformer) {
+	klog.Warningf("the fake Kubernetes client doesn't support informers!")
 }
