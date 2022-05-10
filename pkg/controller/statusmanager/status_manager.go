@@ -3,7 +3,6 @@ package statusmanager
 import (
 	"context"
 	"fmt"
-	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"log"
 	"os"
 	"reflect"
@@ -14,6 +13,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
@@ -29,6 +29,7 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -61,26 +62,42 @@ type ClusteredName struct {
 	Name        string
 }
 
+func NewClusteredName(obj crclient.Object) ClusteredName {
+	return ClusteredName{
+		Namespace:   obj.GetNamespace(),
+		Name:        obj.GetName(),
+		ClusterName: apply.GetClusterName(obj),
+	}
+}
+
 func (c ClusteredName) String() string {
 	return c.ClusterName + string(ClusteredNameSeparator) + c.Namespace + string(ClusteredNameSeparator) + c.Name
 }
+
+const generateStatusSelector = names.GenerateStatusLabel // Just a single label is an EXISTS selector. Easy.
 
 // StatusManager coordinates changes to ClusterOperator.Status
 type StatusManager struct {
 	sync.Mutex
 
-	client cnoclient.Client
-	name   string
+	client           cnoclient.Client
+	name             string
+	hyperShiftConfig *network.HyperShiftConfig
 
 	failing         [maxStatusLevel]*operv1.OperatorCondition
 	installComplete bool
 
-	daemonSets     []ClusteredName
-	deployments    []ClusteredName
-	statefulSets   []ClusteredName
-	relatedObjects []configv1.ObjectReference
+	// All our informers and listers
+	dsInformers map[string]cache.SharedIndexInformer
+	dsListers   map[string]DaemonSetLister
 
-	hyperShiftConfig *network.HyperShiftConfig
+	depInformers map[string]cache.SharedIndexInformer
+	depListers   map[string]DeploymentLister
+
+	ssInformers map[string]cache.SharedIndexInformer
+	ssListers   map[string]StatefulSetLister
+
+	relatedObjects []configv1.ObjectReference
 }
 
 func New(client cnoclient.Client, name string) *StatusManager {
@@ -88,6 +105,13 @@ func New(client cnoclient.Client, name string) *StatusManager {
 		client:           client,
 		name:             name,
 		hyperShiftConfig: network.NewHyperShiftConfig(),
+
+		dsInformers:  map[string]cache.SharedIndexInformer{},
+		dsListers:    map[string]DaemonSetLister{},
+		depInformers: map[string]cache.SharedIndexInformer{},
+		depListers:   map[string]DeploymentLister{},
+		ssInformers:  map[string]cache.SharedIndexInformer{},
+		ssListers:    map[string]StatefulSetLister{},
 	}
 }
 
@@ -545,24 +569,6 @@ func (status *StatusManager) UnsetProgressing(statusLevel StatusLevel) {
 	status.Lock()
 	defer status.Unlock()
 	status.unsetProgressing(statusLevel)
-}
-
-func (status *StatusManager) SetDaemonSets(daemonSets []ClusteredName) {
-	status.Lock()
-	defer status.Unlock()
-	status.daemonSets = daemonSets
-}
-
-func (status *StatusManager) SetDeployments(deployments []ClusteredName) {
-	status.Lock()
-	defer status.Unlock()
-	status.deployments = deployments
-}
-
-func (status *StatusManager) SetStatefulSets(statefulSets []ClusteredName) {
-	status.Lock()
-	defer status.Unlock()
-	status.statefulSets = statefulSets
 }
 
 func (status *StatusManager) SetRelatedObjects(relatedObjects []configv1.ObjectReference) {

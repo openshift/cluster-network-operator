@@ -19,7 +19,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/network"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -29,7 +28,6 @@ import (
 	v1coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -60,10 +58,9 @@ const ControllerName = "operconfig"
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) *ReconcileOperConfig {
 	return &ReconcileOperConfig{
-		client:        c,
-		status:        status,
-		mapper:        mgr.GetRESTMapper(),
-		podReconciler: newPodReconciler(status),
+		client: c,
+		status: status,
+		mapper: mgr.GetRESTMapper(),
 	}
 }
 
@@ -137,41 +134,6 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 		return err
 	}
 
-	// Likewise for the Pod reconciler
-	podController, err := controller.New("pod-controller", mgr, controller.Options{Reconciler: r.podReconciler})
-	if err != nil {
-		return err
-	}
-	err = podController.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-	err = podController.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-	err = podController.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	if hyperShiftConfig := network.NewHyperShiftConfig(); hyperShiftConfig.Enabled {
-		// In HyperShift, only StatefulSets are deployed in the management cluster.
-		// To add more resources the CNOs ClusterRole has to be updated in HyperShift
-		mgmtCluster, err := cluster.New(r.client.ClientFor(cnoclient.ManagementClusterName).Config(), func(opts *cluster.Options) { opts.Namespace = hyperShiftConfig.Namespace })
-		if err != nil {
-			return err
-		}
-		err = podController.Watch(source.NewKindWithCache(&appsv1.StatefulSet{}, mgmtCluster.GetCache()), &handler.EnqueueRequestForObject{})
-		if err != nil {
-			return err
-		}
-		err = mgr.Add(mgmtCluster)
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -179,10 +141,9 @@ var _ reconcile.Reconciler = &ReconcileOperConfig{}
 
 // ReconcileOperConfig reconciles a Network.operator.openshift.io object
 type ReconcileOperConfig struct {
-	client        cnoclient.Client
-	status        *statusmanager.StatusManager
-	mapper        meta.RESTMapper
-	podReconciler *ReconcilePods
+	client cnoclient.Client
+	status *statusmanager.StatusManager
+	mapper meta.RESTMapper
 
 	// If we can skip cleaning up the MTU prober job.
 	mtuProberCleanedUp bool
@@ -341,19 +302,17 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 	objs = append([]*uns.Unstructured{app}, objs...)
 
-	// Set up the Pod reconciler before we start creating DaemonSets/Deployments/StatefulSets
-	daemonSets := []statusmanager.ClusteredName{}
-	deployments := []statusmanager.ClusteredName{}
-	statefulSets := []statusmanager.ClusteredName{}
 	relatedObjects := []configv1.ObjectReference{}
 	relatedClusterObjects := []network.RelatedObject{}
 	for _, obj := range objs {
-		if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "DaemonSet" {
-			daemonSets = append(daemonSets, statusmanager.ClusteredName{ClusterName: apply.GetClusterName(obj), Namespace: obj.GetNamespace(), Name: obj.GetName()})
-		} else if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "Deployment" {
-			deployments = append(deployments, statusmanager.ClusteredName{ClusterName: apply.GetClusterName(obj), Namespace: obj.GetNamespace(), Name: obj.GetName()})
-		} else if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "StatefulSet" {
-			statefulSets = append(statefulSets, statusmanager.ClusteredName{ClusterName: apply.GetClusterName(obj), Namespace: obj.GetNamespace(), Name: obj.GetName()})
+		// Label all DaemonSets, Deployments, and StatefulSets with the label that generates Status.
+		if obj.GetAPIVersion() == "apps/v1" && (obj.GetKind() == "DaemonSet" || obj.GetKind() == "Deployment" || obj.GetKind() == "StatefulSet") {
+			l := obj.GetLabels()
+			if l == nil {
+				l = map[string]string{}
+			}
+			l[names.GenerateStatusLabel] = ""
+			obj.SetLabels(l)
 		}
 		restMapping, err := r.mapper.RESTMapping(obj.GroupVersionKind().GroupKind())
 		if err != nil {
@@ -420,17 +379,8 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		Name:     "openshift-cloud-network-config-controller",
 	})
 
-	r.status.SetDaemonSets(daemonSets)
-	r.status.SetDeployments(deployments)
-	r.status.SetStatefulSets(statefulSets)
 	r.status.SetRelatedObjects(relatedObjects)
 	r.status.SetRelatedClusterObjects(relatedClusterObjects)
-
-	allResources := []statusmanager.ClusteredName{}
-	allResources = append(allResources, daemonSets...)
-	allResources = append(allResources, deployments...)
-	allResources = append(allResources, statefulSets...)
-	r.podReconciler.SetResources(allResources)
 
 	// Apply the objects to the cluster
 	for _, obj := range objs {
@@ -470,9 +420,6 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{}, err
 		}
 	}
-
-	// Run a pod status check just to clear any initial inconsitencies at startup of the CNO
-	r.status.SetFromPods()
 
 	// Update Network.config.openshift.io.Status
 	status, err := r.ClusterNetworkStatus(ctx, operConfig)

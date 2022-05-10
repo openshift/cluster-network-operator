@@ -41,6 +41,12 @@ const CreateWaitAnnotation = "networkoperator.openshift.io/create-wait"
 // that they are not critical to the functioning of the pod network
 const NonCriticalAnnotation = "networkoperator.openshift.io/non-critical"
 
+// GenerateStatusLabel can be set by the various Controllers to tell the
+// StatusController that this object is relevant, and should be included
+// when generating status from deployed pods.
+// Currently, this is looked for on Deployments, DaemonSets, and StatefulSets
+const GenerateStatusLabel = "networkoperator.openshift.io/generates-operator-status"
+
 // NetworkMigrationAnnotation is an annotation on the networks.operator.openshift.io CR to indicate
 // that executing network migration (switching the default network type of the cluster) is allowed.
 const NetworkMigrationAnnotation = "networkoperator.openshift.io/network-migration"

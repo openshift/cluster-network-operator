@@ -11,19 +11,21 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/openshift/cluster-network-operator/pkg/client/fake"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //nolint:errcheck
@@ -55,6 +57,21 @@ func getStatuses(client cnoclient.Client, name string) (*configv1.ClusterOperato
 	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Name: names.OPERATOR_CONFIG}, oc)
 	return co, oc, err
 }
+
+func set(t *testing.T, client cnoclient.Client, obj crclient.Object) {
+	t.Helper()
+	err := client.ClientFor("").CRClient().Update(context.TODO(), obj)
+	if apierrors.IsNotFound(err) {
+		err = client.ClientFor("").CRClient().Create(context.TODO(), obj)
+
+	}
+	if err != nil {
+		t.Fatalf("Failed to set: %v", err)
+	}
+}
+
+// sl: labels that all status-havers have
+var sl map[string]string = map[string]string{names.GenerateStatusLabel: ""}
 
 // Tests that the parts of newConditions that are set match what's in oldConditions (but
 // doesn't look at anything else in oldConditions)
@@ -106,9 +123,7 @@ func TestStatusManager_set(t *testing.T) {
 
 	// make the network.operator object
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	if err := client.ClientFor("").CRClient().Create(context.TODO(), no); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	set(t, client, no)
 
 	condUpdate := operv1.OperatorCondition{
 		Type:   operv1.OperatorStatusTypeUpgradeable,
@@ -203,10 +218,7 @@ func TestStatusManager_set(t *testing.T) {
 	}
 	obj.SetGroupVersionKind(gvk)
 	obj.SetName("current")
-	err = status.client.ClientFor("").CRClient().Create(context.TODO(), obj)
-	if err != nil {
-		t.Fatalf("error creating not rendered object: %v", err)
-	}
+	set(t, client, obj)
 
 	co.Status.RelatedObjects = []configv1.ObjectReference{
 		{
@@ -238,9 +250,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 		t.Fatalf("unexpected error (expected Not Found): %v", err)
 	}
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	if err := client.ClientFor("").CRClient().Create(context.TODO(), no); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	set(t, client, no)
 
 	condUpdate := operv1.OperatorCondition{
 		Type:   operv1.OperatorStatusTypeUpgradeable,
@@ -326,15 +336,9 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing")
+	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	if err := client.ClientFor("").CRClient().Create(context.TODO(), no); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	status.SetDaemonSets([]ClusteredName{
-		{Namespace: "one", Name: "alpha"},
-		{Namespace: "two", Name: "beta"},
-	})
+	set(t, client, no)
 
 	status.SetFromPods()
 	co, oc, err := getStatuses(client, "testing")
@@ -356,29 +360,23 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 
 	// Create minimal DaemonSets
 	dsA := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Generation: 1, ClusterName: ""},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Generation: 1, ClusterName: "", Labels: sl},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "alpha"},
 			},
 		},
 	}
-	err = client.ClientFor("").CRClient().Create(context.TODO(), dsA)
-	if err != nil {
-		t.Fatalf("error creating DaemonSet: %v", err)
-	}
+	set(t, client, dsA)
 	dsB := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "beta", Generation: 1, ClusterName: ""},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "beta", Generation: 1, ClusterName: "", Labels: sl},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "beta"},
 			},
 		},
 	}
-	err = client.ClientFor("").CRClient().Create(context.TODO(), dsB)
-	if err != nil {
-		t.Fatalf("error creating DaemonSet: %v", err)
-	}
+	set(t, client, dsB)
 	status.SetFromPods()
 
 	// Since the DaemonSet.Status reports no pods Available, the status should be Progressing
@@ -423,15 +421,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("Progressing condition unexpectedly missing")
 	}
 
-	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, dsA)
-	if err != nil {
-		t.Fatalf("error getting DaemonSet: %v", err)
-	}
-	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: "two", Name: "beta"}, dsB)
-	if err != nil {
-		t.Fatalf("error getting DaemonSet: %v", err)
-	}
-
 	// Update to report expected deployment size
 	dsANodes := int32(1)
 	dsBNodes := int32(3)
@@ -442,14 +431,8 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 
 	// Now start "deploying"
 	for dsA.Status.NumberUnavailable > 0 || dsB.Status.NumberUnavailable > 0 {
-		err = client.ClientFor("").CRClient().Update(context.TODO(), dsA)
-		if err != nil {
-			t.Fatalf("error updating DaemonSet: %v", err)
-		}
-		err = client.ClientFor("").CRClient().Update(context.TODO(), dsB)
-		if err != nil {
-			t.Fatalf("error updating DaemonSet: %v", err)
-		}
+		set(t, client, dsA)
+		set(t, client, dsB)
 		status.SetFromPods()
 
 		co, oc, err = getStatuses(client, "testing")
@@ -486,15 +469,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			t.Fatalf("Progressing condition unexpectedly missing")
 		}
 
-		err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, dsA)
-		if err != nil {
-			t.Fatalf("error getting DaemonSet: %v", err)
-		}
-		err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: "two", Name: "beta"}, dsB)
-		if err != nil {
-			t.Fatalf("error getting DaemonSet: %v", err)
-		}
-
 		if dsA.Status.NumberUnavailable > 0 {
 			dsA.Status.NumberUnavailable--
 			dsA.Status.NumberAvailable++
@@ -510,14 +484,8 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("assertion failed: %#v, %#v", dsA, dsB)
 	}
 
-	err = client.ClientFor("").CRClient().Update(context.TODO(), dsA)
-	if err != nil {
-		t.Fatalf("error updating DaemonSet: %v", err)
-	}
-	err = client.ClientFor("").CRClient().Update(context.TODO(), dsB)
-	if err != nil {
-		t.Fatalf("error updating DaemonSet: %v", err)
-	}
+	set(t, client, dsA)
+	set(t, client, dsB)
 	time.Sleep(1 * time.Second) // minimum transition time fidelity
 	status.SetFromPods()
 
@@ -562,10 +530,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	// Now, bump the generation of one of the daemonsets, and verify
 	// that we enter Progressing state but otherwise stay Available
 	dsA.Generation = 2
-	err = client.ClientFor("").CRClient().Update(context.TODO(), dsA)
-	if err != nil {
-		t.Fatalf("error updating DaemonSet: %v", err)
-	}
+	set(t, client, dsA)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -606,10 +571,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		NumberReady:            1,
 		ObservedGeneration:     2,
 	}
-	err = client.ClientFor("").CRClient().Update(context.TODO(), dsA)
-	if err != nil {
-		t.Fatalf("error updating DaemonSet: %v", err)
-	}
+	set(t, client, dsA)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -649,10 +611,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		NumberUnavailable:      1,
 		ObservedGeneration:     2,
 	}
-	err = client.ClientFor("").CRClient().Update(context.TODO(), dsA)
-	if err != nil {
-		t.Fatalf("error updating DaemonSet: %v", err)
-	}
+	set(t, client, dsA)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -693,10 +652,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		ObservedGeneration:     2,
 		UpdatedNumberScheduled: 1,
 	}
-	err = client.ClientFor("").CRClient().Update(context.TODO(), dsA)
-	if err != nil {
-		t.Fatalf("error updating DaemonSet: %v", err)
-	}
+	set(t, client, dsA)
 
 	t0 := time.Now()
 	time.Sleep(time.Second / 10)
@@ -796,10 +752,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting DaemonSet: %v", err)
 	}
-	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: "two", Name: "beta"}, dsB)
-	if err != nil {
-		t.Fatalf("error getting DaemonSet: %v", err)
-	}
 
 	if _, set := dsA.Annotations[names.RolloutHungAnnotation]; !set {
 		t.Fatalf("Expected rollout-hung annotation, but was missing")
@@ -815,10 +767,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		ObservedGeneration:     2,
 		UpdatedNumberScheduled: 1,
 	}
-	err = client.ClientFor("").CRClient().Update(context.TODO(), dsA)
-	if err != nil {
-		t.Fatalf("error updating DaemonSet: %v", err)
-	}
+	set(t, client, dsA)
 	status.SetFromPods()
 
 	// see that the pod state is sensible
@@ -850,7 +799,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
-	dsA = &appsv1.DaemonSet{} // some weird bug in the fake client that doesn't handle deleting annotations
 	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, dsA)
 	if err != nil {
 		t.Fatalf("error getting DaemonSet: %v", err)
@@ -861,10 +809,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 
 	// Test non-critical DaemonSets
-	status.SetDaemonSets([]ClusteredName{
-		{Namespace: "one", Name: "non-critical"},
-	})
-
 	dsNC := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:  "one",
@@ -873,16 +817,14 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Annotations: map[string]string{
 				names.NonCriticalAnnotation: "",
 			},
+			Labels: sl,
 		},
 		Status: appsv1.DaemonSetStatus{
 			ObservedGeneration: 1,
 			NumberUnavailable:  1,
 		},
 	}
-	err = client.ClientFor("").CRClient().Create(context.TODO(), dsNC)
-	if err != nil {
-		t.Fatalf("error creating DaemonSet: %v", err)
-	}
+	set(t, client, dsNC)
 	status.SetFromPods()
 
 	// We should now be Progressing, but not un-Available
@@ -955,18 +897,11 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 
 	// Now update
-	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: nsn.Namespace, Name: nsn.Name}, dsNC)
-	if err != nil {
-		t.Fatalf("Error getting ds: %v", err)
-	}
 	dsNC.Status.NumberAvailable = 1
 	dsNC.Status.NumberUnavailable = 0
 	dsNC.Status.DesiredNumberScheduled = 1
 	dsNC.Status.UpdatedNumberScheduled = 1
-	err = client.ClientFor("").CRClient().Update(context.TODO(), dsNC)
-	if err != nil {
-		t.Fatalf("error updating DaemonSet: %v", err)
-	}
+	set(t, client, dsNC)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -1001,14 +936,9 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 func TestStatusManagerSetFromDeployments(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing")
+	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	if err := client.ClientFor("").CRClient().Create(context.TODO(), no); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	status.SetDeployments([]ClusteredName{
-		{Namespace: "one", Name: "alpha"},
-	})
+	set(t, client, no)
 
 	status.SetFromPods()
 
@@ -1030,46 +960,11 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}
 
 	// Create a Deployment that isn't the one we're looking for
-	depB := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "beta", ClusterName: ""},
-		Status: appsv1.DeploymentStatus{
-			UnavailableReplicas: 1,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": "gamma"},
-			},
-		},
-	}
-	err = client.ClientFor("").CRClient().Create(context.TODO(), depB)
-	if err != nil {
-		t.Fatalf("error creating Deployment: %v", err)
-	}
-	status.SetFromPods()
-
-	co, oc, err = getStatuses(client, "testing")
-	if err != nil {
-		t.Fatalf("error getting ClusterOperator: %v", err)
-	}
-	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
-		{
-			Type:   operv1.OperatorStatusTypeProgressing,
-			Status: operv1.ConditionTrue,
-			Reason: "Deploying",
-		},
-	}) {
-		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
-	}
-	if len(co.Status.Versions) > 0 {
-		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
-	}
 
 	// Create minimal Deployment
-	depA := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", ClusterName: ""}}
-	err = client.ClientFor("").CRClient().Create(context.TODO(), depA)
-	if err != nil {
-		t.Fatalf("error creating Deployment: %v", err)
-	}
+	depA := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", ClusterName: "", Labels: sl}}
+	set(t, client, depA)
+
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -1103,21 +998,9 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}
 
 	// Update to report expected deployment size
-	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, depA)
-	if err != nil {
-		t.Fatalf("error getting Deployment: %v", err)
-	}
-	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "beta"}, depB)
-	if err != nil {
-		t.Fatalf("error getting Deployment: %v", err)
-	}
-
 	depA.Status.UnavailableReplicas = 0
 	depA.Status.AvailableReplicas = 1
-	err = client.ClientFor("").CRClient().Update(context.TODO(), depA)
-	if err != nil {
-		t.Fatalf("error updating Deployment: %v", err)
-	}
+	set(t, client, depA)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -1148,26 +1031,27 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
-	// Add more expected pods
-	status.SetDeployments([]ClusteredName{
-		{Namespace: "one", Name: "alpha"},
-		{Namespace: "one", Name: "beta"},
-	})
-	status.SetDaemonSets([]ClusteredName{
-		{Namespace: "one", Name: "gamma"},
-	})
+	depB := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "beta", ClusterName: "", Labels: sl},
+		Status: appsv1.DeploymentStatus{
+			UnavailableReplicas: 1,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "gamma"},
+			},
+		},
+	}
+	set(t, client, depB)
 
 	ds := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "gamma", ClusterName: ""},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "gamma", ClusterName: "", Labels: sl},
 		Status: appsv1.DaemonSetStatus{
 			NumberUnavailable: 0,
 			NumberAvailable:   1,
 		},
 	}
-	err = client.ClientFor("").CRClient().Create(context.TODO(), ds)
-	if err != nil {
-		t.Fatalf("error creating DaemonSet: %v", err)
-	}
+	set(t, client, ds)
 
 	t0 := time.Now()
 	time.Sleep(time.Second / 10)
@@ -1267,22 +1151,14 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
-	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, depA)
-	if err != nil {
-		t.Fatalf("error getting Deployment: %v", err)
-	}
-	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "beta"}, depB)
+	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: depB.Namespace, Name: depB.Name}, depB)
 	if err != nil {
 		t.Fatalf("error getting Deployment: %v", err)
 	}
 
 	depB.Status.UnavailableReplicas = 0
 	depB.Status.AvailableReplicas = 1
-	err = client.ClientFor("").CRClient().Update(context.TODO(), depB)
-	if err != nil {
-		t.Fatalf("error updating Deployment: %v", err)
-	}
-
+	set(t, client, depB)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -1352,20 +1228,15 @@ func setLastPodState(t *testing.T, client cnoclient.Client, name string, ps podS
 func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing")
+	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	if err := client.ClientFor("").CRClient().Create(context.TODO(), no); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	status.SetDaemonSets([]ClusteredName{
-		{Namespace: "one", Name: "alpha"},
-		{Namespace: "two", Name: "beta"},
-	})
+	set(t, client, no)
 
 	dsA := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "one",
 			Name:      "alpha",
+			Labels:    sl,
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
@@ -1373,15 +1244,13 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 			},
 		},
 	}
-	err := client.ClientFor("").CRClient().Create(context.TODO(), dsA)
-	if err != nil {
-		t.Fatalf("error creating DaemonSet: %v", err)
-	}
+	set(t, client, dsA)
 
 	dsB := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "two",
 			Name:      "beta",
+			Labels:    sl,
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
@@ -1389,10 +1258,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 			},
 		},
 	}
-	err = client.ClientFor("").CRClient().Create(context.TODO(), dsB)
-	if err != nil {
-		t.Fatalf("error creating DaemonSet: %v", err)
-	}
+	set(t, client, dsB)
 
 	podA := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1411,10 +1277,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 			}},
 		},
 	}
-	err = client.ClientFor("").CRClient().Create(context.TODO(), podA)
-	if err != nil {
-		t.Fatalf("error creating Pod: %v", err)
-	}
+	set(t, client, podA)
 
 	podB := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1431,10 +1294,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 			}},
 		},
 	}
-	err = client.ClientFor("").CRClient().Create(context.TODO(), podB)
-	if err != nil {
-		t.Fatalf("error creating Pod: %v", err)
-	}
+	set(t, client, podB)
 
 	expected := []string{"DaemonSet \"/one/alpha\" rollout is not making progress - pod alpha-x0x0 is in CrashLoopBackOff State"}
 	hung := status.CheckCrashLoopBackOffPods(ClusteredName{Namespace: "one", Name: "alpha"}, map[string]string{"app": "alpha"}, "DaemonSet")
@@ -1448,11 +1308,13 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 		t.Fatalf("unexpected value in hung %v", hung)
 	}
 
-	// Test non-critical DaemonSets - the operator should not be marked as degraded.
-	status.SetDaemonSets([]ClusteredName{
-		{Namespace: "four", Name: "non-critical"},
-	})
+	// forget about dsA and dsB
+	dsA.Labels = nil
+	dsB.Labels = nil
+	set(t, client, dsA)
+	set(t, client, dsB)
 
+	// Test non-critical DaemonSets - the operator should not be marked as degraded.
 	dsNC := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "four",
@@ -1460,6 +1322,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 			Annotations: map[string]string{
 				names.NonCriticalAnnotation: "",
 			},
+			Labels: sl,
 		},
 		Status: appsv1.DaemonSetStatus{
 			NumberUnavailable: 1,
@@ -1470,10 +1333,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 			},
 		},
 	}
-	err = client.ClientFor("").CRClient().Create(context.TODO(), dsNC)
-	if err != nil {
-		t.Fatalf("error creating DaemonSet: %v", err)
-	}
+	set(t, client, dsNC)
 
 	podnC := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1492,10 +1352,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 			},
 			}},
 	}
-	err = client.ClientFor("").CRClient().Create(context.TODO(), podnC)
-	if err != nil {
-		t.Fatalf("error creating Pod: %v", err)
-	}
+	set(t, client, podnC)
 
 	status.SetFromPods()
 
@@ -1524,14 +1381,15 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
 	}
 
-	status.SetDeployments([]ClusteredName{
-		{Namespace: "three", Name: "gamma"},
-	})
+	dsNC.Labels = nil
+	set(t, client, dsNC)
 
+	// Check that crashlooping deployments also are detected
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "three",
 			Name:      "gamma",
+			Labels:    sl,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
@@ -1542,10 +1400,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 			UnavailableReplicas: 1,
 		},
 	}
-	err = client.ClientFor("").CRClient().Create(context.TODO(), dep)
-	if err != nil {
-		t.Fatalf("error creating Deployment: %v", err)
-	}
+	set(t, client, dep)
 
 	podC := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1564,10 +1419,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 			},
 			}},
 	}
-	err = client.ClientFor("").CRClient().Create(context.TODO(), podC)
-	if err != nil {
-		t.Fatalf("error creating Pod: %v", err)
-	}
+	set(t, client, podC)
 
 	status.SetFromPods()
 	oc, err = getOC(client)
