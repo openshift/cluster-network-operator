@@ -16,11 +16,9 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -351,21 +349,9 @@ func (status *StatusManager) setLastPodState(
 	if err != nil {
 		return err
 	}
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		oldStatus := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
-		err := status.client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Name: status.name}, oldStatus)
-		isNotFound := errors.IsNotFound(err)
-		if err != nil && !isNotFound {
-			return err
-		}
-
-		newStatus := oldStatus.DeepCopy()
-		if newStatus.Annotations == nil {
-			newStatus.Annotations = map[string]string{}
-		}
-		newStatus.Annotations[lastSeenAnnotation] = string(lsbytes)
-		return status.client.ClientFor("").CRClient().Patch(context.TODO(), newStatus, crclient.MergeFrom(oldStatus))
-	})
+	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
+	anno := string(lsbytes)
+	return status.setAnnotation(context.TODO(), co, lastSeenAnnotation, &anno)
 }
 
 // CheckCrashLoopBackOffPods checks for pods (matching the label selector) with
