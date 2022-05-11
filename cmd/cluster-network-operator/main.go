@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/pflag"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 
 	_ "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/version"
@@ -26,6 +27,10 @@ import (
 )
 
 const ENV_URL_KUBECONFIG = "URL_ONLY_KUBECONFIG"
+
+func init() {
+	klog.InitFlags(flag.CommandLine)
+}
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
