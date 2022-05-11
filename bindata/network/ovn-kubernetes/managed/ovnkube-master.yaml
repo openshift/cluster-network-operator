@@ -2,7 +2,7 @@
 
 {{ if not .IsSNO }}
 # The pod disruption budget ensures that we keep a raft quorum
-apiVersion: policy/v1beta1
+apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: ovn-raft-quorum-guard
