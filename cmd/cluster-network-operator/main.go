@@ -4,26 +4,24 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"log"
 	"math/rand"
 	"net/url"
 	"os"
 	"time"
 
-	"github.com/openshift/cluster-network-operator/pkg/operator"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
 
-	_ "github.com/openshift/cluster-network-operator/pkg/client"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/operator"
 	"github.com/openshift/cluster-network-operator/pkg/version"
 
+	"k8s.io/client-go/tools/clientcmd"
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog/v2"
 )
 
 const ENV_URL_KUBECONFIG = "URL_ONLY_KUBECONFIG"
