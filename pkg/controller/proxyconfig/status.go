@@ -28,9 +28,18 @@ func (r *ReconcileProxyConfig) syncProxyStatus(proxy *configv1.Proxy, infra *con
 		}
 	}
 
-	updated.Status.HTTPProxy = proxy.Spec.HTTPProxy
-	updated.Status.HTTPSProxy = proxy.Spec.HTTPSProxy
-	updated.Status.NoProxy = noProxy
+	updated.Status.ConfigType = proxy.Spec.ConfigType
+	if proxy.Spec.ConfigType == configv1.ExplicitProxy {
+		updated.Status.HTTPProxy = proxy.Spec.HTTPProxy
+		updated.Status.HTTPSProxy = proxy.Spec.HTTPSProxy
+		updated.Status.NoProxy = noProxy
+	}
+
+	if proxy.Spec.ConfigType == configv1.TransparentProxy {
+		updated.Status.HTTPProxy = ""
+		updated.Status.HTTPSProxy = ""
+		updated.Status.NoProxy = ""
+	}
 
 	if !proxyStatusesEqual(proxy.Status, updated.Status) {
 		if err := r.client.Status().Update(context.TODO(), updated); err != nil {
