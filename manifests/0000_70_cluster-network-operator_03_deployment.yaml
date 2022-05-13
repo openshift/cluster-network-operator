@@ -118,6 +118,8 @@ spec:
         - mountPath: /etc/kubernetes
           name: host-etc-kube
           readOnly: true
+        - mountPath: /var/run/secrets/serving-cert
+          name: metrics-tls
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -127,6 +129,10 @@ spec:
           hostPath:
             path: /etc/kubernetes
             type: Directory
+        - name: metrics-tls
+          secret:
+            secretName: metrics-tls
+            optional: true
       restartPolicy: Always
       securityContext:
         runAsNonRoot: true

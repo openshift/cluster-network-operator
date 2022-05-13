@@ -118,6 +118,8 @@ spec:
         - mountPath: /etc/kubernetes
           name: host-etc-kube
           readOnly: true
+        - mountPath: /var/run/secrets/serving-cert
+          name: metrics-tls
       hostNetwork: true
       priorityClassName: system-cluster-critical
       restartPolicy: Always
@@ -139,3 +141,7 @@ spec:
           path: /etc/kubernetes
           type: Directory
         name: host-etc-kube
+      - name: metrics-tls
+        secret:
+          optional: true
+          secretName: metrics-tls
