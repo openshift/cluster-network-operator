@@ -16,5 +16,8 @@ func AddToManager(m manager.Manager, sm *statusmanager.StatusManager, c cnoclien
 			return err
 		}
 	}
+	if err := sm.AddPodWatcher(m); err != nil {
+		return err
+	}
 	return nil
 }
