@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"log"
 	"os"
 	"reflect"
@@ -17,10 +16,9 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -73,24 +71,22 @@ func (status *StatusManager) SetFromPods() {
 	status.Lock()
 	defer status.Unlock()
 
+	daemonSets, deployments, statefulSets := status.listAllStatusObjects()
+
 	targetLevel := os.Getenv("RELEASE_VERSION")
-	reachedAvailableLevel := (len(status.daemonSets) + len(status.deployments) + len(status.statefulSets)) > 0
+	reachedAvailableLevel := (len(daemonSets) + len(deployments) + len(statefulSets)) > 0
 
 	progressing := []string{}
 	hung := []string{}
 
 	daemonsetStates, deploymentStates, statefulsetStates := status.getLastPodState()
 
-	for _, dsName := range status.daemonSets {
-		ds := &appsv1.DaemonSet{}
-		if err := status.client.ClientFor(dsName.ClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: dsName.Namespace, Name: dsName.Name}, ds); err != nil {
-			log.Printf("Error getting DaemonSet %q: %v", dsName.String(), err)
-			progressing = append(progressing, fmt.Sprintf("Waiting for DaemonSet %q to be created", dsName.String()))
-			reachedAvailableLevel = false
-			// Assume the OperConfig Controller is in the process of reconciling
-			// things; it will set a Degraded status if it fails.
-			continue
-		}
+	if (len(daemonSets) + len(deployments) + len(statefulSets)) == 0 {
+		progressing = append(progressing, "Deploying")
+	}
+
+	for _, ds := range daemonSets {
+		dsName := NewClusteredName(ds)
 
 		dsProgressing := false
 
@@ -140,21 +136,13 @@ func (status *StatusManager) SetFromPods() {
 		} else {
 			delete(daemonsetStates, dsName)
 		}
-		if err := status.setDSAnnotation(ds, names.RolloutHungAnnotation, dsHung); err != nil {
+		if err := status.setAnnotation(context.TODO(), ds, names.RolloutHungAnnotation, dsHung); err != nil {
 			log.Printf("Error setting DaemonSet %q annotation: %v", dsName, err)
 		}
 	}
 
-	for _, ssName := range status.statefulSets {
-		ss := &appsv1.StatefulSet{}
-		if err := status.client.ClientFor(ssName.ClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: ssName.Namespace, Name: ssName.Name}, ss); err != nil {
-			log.Printf("Error getting StatefulSet %q: %v", ssName.String(), err)
-			progressing = append(progressing, fmt.Sprintf("Waiting for StatefulSet %q to be created", ssName.String()))
-			reachedAvailableLevel = false
-			// Assume the OperConfig Controller is in the process of reconciling
-			// things; it will set a Degraded status if it fails.
-			continue
-		}
+	for _, ss := range statefulSets {
+		ssName := NewClusteredName(ss)
 
 		ssProgressing := false
 
@@ -201,22 +189,13 @@ func (status *StatusManager) SetFromPods() {
 		} else {
 			delete(statefulsetStates, ssName)
 		}
-		if err := status.setSSAnnotation(ss, names.RolloutHungAnnotation, ssHung); err != nil {
+		if err := status.setAnnotation(context.TODO(), ss, names.RolloutHungAnnotation, ssHung); err != nil {
 			log.Printf("Error setting StatefulSet %q annotation: %v", ssName, err)
 		}
 	}
 
-	for _, depName := range status.deployments {
-		dep := &appsv1.Deployment{}
-		if err := status.client.ClientFor(depName.ClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: depName.Namespace, Name: depName.Name}, dep); err != nil {
-			log.Printf("Error getting Deployment %q: %v", depName.String(), err)
-			progressing = append(progressing, fmt.Sprintf("Waiting for Deployment %q to be created", depName.String()))
-			reachedAvailableLevel = false
-			// Assume the OperConfig Controller is in the process of reconciling
-			// things; it will set a Degraded status if it fails.
-			continue
-		}
-
+	for _, dep := range deployments {
+		depName := NewClusteredName(dep)
 		depProgressing := false
 
 		if isNonCritical(dep) && dep.Status.UnavailableReplicas > 0 && !status.installComplete {
@@ -262,7 +241,7 @@ func (status *StatusManager) SetFromPods() {
 		} else {
 			delete(deploymentStates, depName)
 		}
-		if err := status.setDepAnnotation(dep, names.RolloutHungAnnotation, depHung); err != nil {
+		if err := status.setAnnotation(context.TODO(), dep, names.RolloutHungAnnotation, depHung); err != nil {
 			log.Printf("Error setting Deployment %q annotation: %v", depName, err)
 		}
 	}
@@ -370,22 +349,9 @@ func (status *StatusManager) setLastPodState(
 	if err != nil {
 		return err
 	}
-
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		oldStatus := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
-		err := status.client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Name: status.name}, oldStatus)
-		isNotFound := errors.IsNotFound(err)
-		if err != nil && !isNotFound {
-			return err
-		}
-
-		newStatus := oldStatus.DeepCopy()
-		if newStatus.Annotations == nil {
-			newStatus.Annotations = map[string]string{}
-		}
-		newStatus.Annotations[lastSeenAnnotation] = string(lsbytes)
-		return status.client.ClientFor("").CRClient().Patch(context.TODO(), newStatus, crclient.MergeFrom(oldStatus))
-	})
+	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
+	anno := string(lsbytes)
+	return status.setAnnotation(context.TODO(), co, lastSeenAnnotation, &anno)
 }
 
 // CheckCrashLoopBackOffPods checks for pods (matching the label selector) with
@@ -418,78 +384,23 @@ func isNonCritical(obj metav1.Object) bool {
 	return exists
 }
 
-// setDSAnnotation sets an annotation on a daemonset; or unsets it if value is nil
-func (status *StatusManager) setDSAnnotation(obj *appsv1.DaemonSet, key string, value *string) error {
-	new := obj.DeepCopy()
-	anno := new.GetAnnotations()
-
-	existing, set := anno[key]
-	if value != nil && set && existing == *value {
-		return nil
+func (status *StatusManager) listAllStatusObjects() (dss []*appsv1.DaemonSet, deps []*appsv1.Deployment, sss []*appsv1.StatefulSet) {
+	selector, err := labels.Parse(generateStatusSelector)
+	if err != nil {
+		panic(err) // selector is guaranteed valid, unreachable
 	}
-	if !set && value == nil {
-		return nil
+	// these lists can't fail, they're backed by informers
+	for _, lister := range status.dsListers {
+		l, _ := lister.List(selector)
+		dss = append(dss, l...)
 	}
-
-	if value != nil {
-		if anno == nil {
-			anno = map[string]string{}
-		}
-		anno[key] = *value
-	} else {
-		delete(anno, key)
+	for _, lister := range status.depListers {
+		l, _ := lister.List(selector)
+		deps = append(deps, l...)
 	}
-	new.SetAnnotations(anno)
-	return status.client.ClientFor(apply.GetClusterName(obj)).CRClient().Patch(context.TODO(), new, crclient.MergeFrom(obj))
-}
-
-// setSSAnnotation sets an annotation on a statefulset; or unsets it if value is nil
-func (status *StatusManager) setSSAnnotation(obj *appsv1.StatefulSet, key string, value *string) error {
-	new := obj.DeepCopy()
-	anno := new.GetAnnotations()
-
-	existing, set := anno[key]
-	if value != nil && set && existing == *value {
-		return nil
+	for _, lister := range status.ssListers {
+		l, _ := lister.List(selector)
+		sss = append(sss, l...)
 	}
-	if !set && value == nil {
-		return nil
-	}
-
-	if value != nil {
-		if anno == nil {
-			anno = map[string]string{}
-		}
-		anno[key] = *value
-	} else {
-		delete(anno, key)
-	}
-	new.SetAnnotations(anno)
-	return status.client.ClientFor(apply.GetClusterName(obj)).CRClient().Patch(context.TODO(), new, crclient.MergeFrom(obj))
-}
-
-// setDepAnnotation sets an annotation on a Deployment. If value is nil,
-// it unsets the annotation
-func (status *StatusManager) setDepAnnotation(obj *appsv1.Deployment, key string, value *string) error {
-	new := obj.DeepCopy()
-	anno := new.GetAnnotations()
-
-	existing, set := anno[key]
-	if value != nil && set && existing == *value {
-		return nil
-	}
-	if !set && value == nil {
-		return nil
-	}
-
-	if value != nil {
-		if anno == nil {
-			anno = map[string]string{}
-		}
-		anno[key] = *value
-	} else {
-		delete(anno, key)
-	}
-	new.SetAnnotations(anno)
-	return status.client.ClientFor(apply.GetClusterName(obj)).CRClient().Patch(context.TODO(), new, crclient.MergeFrom(obj))
+	return
 }
