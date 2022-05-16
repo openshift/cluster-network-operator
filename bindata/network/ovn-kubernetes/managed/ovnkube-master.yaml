@@ -724,11 +724,20 @@ spec:
             exit 1
           fi
 
+          retries=0
+          while [ ! -f /var/run/secrets/hosted_cluster/token ]; do
+            (( retries += 1 ))
+            sleep 1
+            if [[ "${retries}" -gt 30 ]]; then
+              echo "$(date -Iseconds) - Hosted cluster token not found"
+                exit 1
+            fi
+          done
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --init-master "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
-            --k8s-token="$(</var/run/secrets/hosted_cluster/token)" \
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
@@ -799,10 +808,19 @@ spec:
             set +o allexport
           fi
 
+          retries=0
+          while [ ! -f /var/run/secrets/hosted_cluster/token ]; do
+            (( retries += 1 ))
+            sleep 1
+            if [[ "${retries}" -gt 30 ]]; then
+              echo "$(date -Iseconds) - Hosted cluster token not found"
+                exit 1
+            fi
+          done
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovn-dbchecker - start ovn-dbchecker"
           exec /usr/bin/ovndbchecker \
             --config-file=/run/ovnkube-config/ovnkube.conf \
-            --k8s-token="$(</var/run/secrets/hosted_cluster/token)" \
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
