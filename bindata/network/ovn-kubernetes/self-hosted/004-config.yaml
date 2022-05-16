@@ -30,6 +30,7 @@ data:
     [ovnkubernetesfeature]
     enable-egress-ip=true
     enable-egress-firewall=true
+    enable-egress-qos=true
 
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
