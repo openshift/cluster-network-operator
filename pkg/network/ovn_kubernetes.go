@@ -270,7 +270,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVNIPsecDaemonsetEnable"] = true
 		data.Data["OVNIPsecEnable"] = true
 	} else {
-		if bootstrapResult.OVN.ExistingIPsecDaemonset != nil {
+		if bootstrapResult.OVN.IPsecUpdateStatus != nil {
 			// IPsec has previously started and
 			// now it has been requested to be disabled
 			data.Data["OVNIPsecDaemonsetEnable"] = true
@@ -372,28 +372,30 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		ipFamilyMode = names.IPFamilyDualStack
 	}
 	// check if the IP family mode has changed and control the conversion process.
-	updateNode, updateMaster := shouldUpdateOVNKonIPFamilyChange(bootstrapResult.OVN.ExistingNodeDaemonset, bootstrapResult.OVN.ExistingMasterDaemonset, ipFamilyMode)
+	updateNode, updateMaster := shouldUpdateOVNKonIPFamilyChange(bootstrapResult.OVN, ipFamilyMode)
 	// annotate the daemonset and the daemonset template with the current IP family mode,
 	// this triggers a daemonset restart if there are changes.
-	err = setOVNDaemonsetAnnotation(objs, names.NetworkIPFamilyModeAnnotation, ipFamilyMode)
+	err = setOVNObjectAnnotation(objs, names.NetworkIPFamilyModeAnnotation, ipFamilyMode)
 	if err != nil {
-		return nil, progressing, errors.Wrapf(err, "failed to set IP family %s annotation on daemonsets", ipFamilyMode)
+		return nil, progressing, errors.Wrapf(err, "failed to set IP family %s annotation on daemonsets or statefulsets", ipFamilyMode)
 	}
 
 	// don't process upgrades if we are handling a dual-stack conversion.
 	if updateMaster && updateNode {
-		updateNode, updateMaster = shouldUpdateOVNKonUpgrade(bootstrapResult.OVN.ExistingNodeDaemonset, bootstrapResult.OVN.ExistingMasterDaemonset, os.Getenv("RELEASE_VERSION"))
+		updateNode, updateMaster = shouldUpdateOVNKonUpgrade(bootstrapResult.OVN, os.Getenv("RELEASE_VERSION"))
 	}
 
 	renderPrePull := false
 	if updateNode {
-		updateNode, renderPrePull = shouldUpdateOVNKonPrepull(bootstrapResult.OVN.ExistingNodeDaemonset, bootstrapResult.OVN.PrePullerDaemonset, os.Getenv("RELEASE_VERSION"))
+		updateNode, renderPrePull = shouldUpdateOVNKonPrepull(bootstrapResult.OVN, os.Getenv("RELEASE_VERSION"))
 	}
 
 	// If we need to delay master or node daemonset rollout, then we'll tag that daemonset with "create-only"
 	if !updateMaster {
-		ds := bootstrapResult.OVN.ExistingMasterDaemonset
-		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", ds.Namespace, ds.Name, func(o *uns.Unstructured) {
+		kind := bootstrapResult.OVN.MasterUpdateStatus.Kind
+		namespace := bootstrapResult.OVN.MasterUpdateStatus.Namespace
+		name := bootstrapResult.OVN.MasterUpdateStatus.Name
+		k8s.UpdateObjByGroupKindName(objs, "apps", kind, namespace, name, func(o *uns.Unstructured) {
 			anno := o.GetAnnotations()
 			if anno == nil {
 				anno = map[string]string{}
@@ -403,8 +405,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		})
 	}
 	if !updateNode {
-		ds := bootstrapResult.OVN.ExistingNodeDaemonset
-		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", ds.Namespace, ds.Name, func(o *uns.Unstructured) {
+		kind := bootstrapResult.OVN.NodeUpdateStatus.Kind
+		namespace := bootstrapResult.OVN.NodeUpdateStatus.Namespace
+		name := bootstrapResult.OVN.NodeUpdateStatus.Name
+		k8s.UpdateObjByGroupKindName(objs, "apps", kind, namespace, name, func(o *uns.Unstructured) {
 			anno := o.GetAnnotations()
 			if anno == nil {
 				anno = map[string]string{}
@@ -940,19 +944,56 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client) (*bootstrap
 		conf.SetAnnotations(currentAnnotation)
 	}
 
-	// Retrieve existing daemonsets - used for deciding if upgrades should happen
-	masterDS := &appsv1.DaemonSet{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "DaemonSet",
-			APIVersion: appsv1.SchemeGroupVersion.String(),
-		},
-	}
-	nsn := types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ovnkube-master"}
-	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, masterDS); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("Failed to retrieve existing master DaemonSet: %w", err)
+	// Retrieve existing daemonsets or statefulsets status - used for deciding if upgrades should happen
+	var nsn types.NamespacedName
+	masterStatus := &bootstrap.OVNUpdateStatus{}
+	nodeStatus := &bootstrap.OVNUpdateStatus{}
+	ipsecStatus := &bootstrap.OVNUpdateStatus{}
+	prepullerStatus := &bootstrap.OVNUpdateStatus{}
+
+	if hc.Enabled {
+		masterSS := &appsv1.StatefulSet{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "StatefulSet",
+				APIVersion: appsv1.SchemeGroupVersion.String(),
+			},
+		}
+		nsn = types.NamespacedName{Namespace: hc.Namespace, Name: "ovnkube-master"}
+		if err := kubeClient.ClientFor(cnoclient.ManagementClusterName).CRClient().Get(context.TODO(), nsn, masterSS); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("Failed to retrieve existing master DaemonSet: %w", err)
+			} else {
+				masterStatus = nil
+			}
 		} else {
-			masterDS = nil
+			masterStatus.Kind = "StatefulSet"
+			masterStatus.Namespace = masterSS.Namespace
+			masterStatus.Name = masterSS.Name
+			masterStatus.IPFamilyMode = masterSS.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+			masterStatus.Version = masterSS.GetAnnotations()["release.openshift.io/version"]
+			masterStatus.Progressing = statefulSetProgressing(masterSS)
+		}
+	} else {
+		masterDS := &appsv1.DaemonSet{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "DaemonSet",
+				APIVersion: appsv1.SchemeGroupVersion.String(),
+			},
+		}
+		nsn = types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ovnkube-master"}
+		if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, masterDS); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("Failed to retrieve existing master DaemonSet: %w", err)
+			} else {
+				masterStatus = nil
+			}
+		} else {
+			masterStatus.Kind = "DaemonSet"
+			masterStatus.Namespace = masterDS.Namespace
+			masterStatus.Name = masterDS.Name
+			masterStatus.IPFamilyMode = masterDS.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+			masterStatus.Version = masterDS.GetAnnotations()["release.openshift.io/version"]
+			masterStatus.Progressing = daemonSetProgressing(masterDS, false)
 		}
 	}
 
@@ -967,8 +1008,15 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client) (*bootstrap
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Failed to retrieve existing node DaemonSet: %w", err)
 		} else {
-			nodeDS = nil
+			nodeStatus = nil
 		}
+	} else {
+		nodeStatus.Kind = "DaemonSet"
+		nodeStatus.Namespace = nodeDS.Namespace
+		nodeStatus.Name = nodeDS.Name
+		nodeStatus.IPFamilyMode = nodeDS.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+		nodeStatus.Version = nodeDS.GetAnnotations()["release.openshift.io/version"]
+		nodeStatus.Progressing = daemonSetProgressing(nodeDS, true)
 	}
 
 	prePullerDS := &appsv1.DaemonSet{
@@ -982,8 +1030,14 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client) (*bootstrap
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Failed to retrieve existing prepuller DaemonSet: %w", err)
 		} else {
-			prePullerDS = nil
+			prepullerStatus = nil
 		}
+	} else {
+		prepullerStatus.Namespace = prePullerDS.Namespace
+		prepullerStatus.Name = prePullerDS.Name
+		prepullerStatus.IPFamilyMode = prePullerDS.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+		prepullerStatus.Version = prePullerDS.GetAnnotations()["release.openshift.io/version"]
+		prepullerStatus.Progressing = daemonSetProgressing(prePullerDS, true)
 	}
 
 	ipsecDS := &appsv1.DaemonSet{
@@ -997,19 +1051,24 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client) (*bootstrap
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Failed to retrieve existing ipsec DaemonSet: %w", err)
 		} else {
-			ipsecDS = nil
+			ipsecStatus = nil
 		}
+	} else {
+		ipsecStatus.Namespace = ipsecDS.Namespace
+		ipsecStatus.Name = ipsecDS.Name
+		ipsecStatus.IPFamilyMode = ipsecDS.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+		ipsecStatus.Version = ipsecDS.GetAnnotations()["release.openshift.io/version"]
 	}
 
 	res := bootstrap.OVNBootstrapResult{
-		MasterAddresses:         ovnMasterAddresses,
-		ClusterInitiator:        clusterInitiator,
-		ExistingMasterDaemonset: masterDS,
-		ExistingNodeDaemonset:   nodeDS,
-		ExistingIPsecDaemonset:  ipsecDS,
-		OVNKubernetesConfig:     ovnConfigResult,
-		PrePullerDaemonset:      prePullerDS,
-		FlowsConfig:             bootstrapFlowsConfig(kubeClient.ClientFor("").CRClient()),
+		MasterAddresses:       ovnMasterAddresses,
+		ClusterInitiator:      clusterInitiator,
+		MasterUpdateStatus:    masterStatus,
+		NodeUpdateStatus:      nodeStatus,
+		IPsecUpdateStatus:     ipsecStatus,
+		PrePullerUpdateStatus: prepullerStatus,
+		OVNKubernetesConfig:   ovnConfigResult,
+		FlowsConfig:           bootstrapFlowsConfig(kubeClient.ClientFor("").CRClient()),
 	}
 	return &res, nil
 }
@@ -1111,14 +1170,15 @@ func listenDualStack(masterIP string) string {
 // the master and node daemonsets on IP family configuration changes.
 // We rollout changes on masters first when there is a configuration change.
 // Configuration changes take precedence over upgrades.
-func shouldUpdateOVNKonIPFamilyChange(existingNode, existingMaster *appsv1.DaemonSet, ipFamilyMode string) (updateNode, updateMaster bool) {
+func shouldUpdateOVNKonIPFamilyChange(ovn bootstrap.OVNBootstrapResult, ipFamilyMode string) (updateNode, updateMaster bool) {
 	// Fresh cluster - full steam ahead!
-	if existingNode == nil || existingMaster == nil {
+	if ovn.NodeUpdateStatus == nil || ovn.MasterUpdateStatus == nil {
 		return true, true
 	}
-	// check current daemonsets IP family mode
-	nodeIPFamilyMode := existingNode.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
-	masterIPFamilyMode := existingMaster.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+	// check current IP family mode
+
+	nodeIPFamilyMode := ovn.NodeUpdateStatus.IPFamilyMode
+	masterIPFamilyMode := ovn.MasterUpdateStatus.IPFamilyMode
 	// if there are no annotations this is a fresh cluster
 	if nodeIPFamilyMode == "" || masterIPFamilyMode == "" {
 		return true, true
@@ -1133,10 +1193,11 @@ func shouldUpdateOVNKonIPFamilyChange(existingNode, existingMaster *appsv1.Daemo
 		return false, true
 	}
 	// Don't rollout the changes on nodes until the master daemonset rollout has finished
-	if daemonSetProgressing(existingMaster, false) {
+	if ovn.MasterUpdateStatus.Progressing {
 		klog.V(2).Infof("Waiting for OVN-Kubernetes master daemonset IP family mode rollout before updating node")
 		return false, true
 	}
+
 	klog.V(2).Infof("OVN-Kubernetes master daemonset rollout complete, updating IP family mode on node daemonset")
 	return true, true
 }
@@ -1146,36 +1207,36 @@ func shouldUpdateOVNKonIPFamilyChange(existingNode, existingMaster *appsv1.Daemo
 // If the existing node daemonset has a different version then what we would like to apply, we first
 // roll out a no-op daemonset. Then, when that has rolled out to 100% of the cluster or has stopped
 // progressing, proceed with the node upgrade.
-func shouldUpdateOVNKonPrepull(existingNode, prePuller *appsv1.DaemonSet, releaseVersion string) (updateNode, renderPrepull bool) {
+func shouldUpdateOVNKonPrepull(ovn bootstrap.OVNBootstrapResult, releaseVersion string) (updateNode, renderPrepull bool) {
 	// Fresh cluster - full steam ahead! No need to wait for pre-puller.
-	if existingNode == nil {
+	if ovn.NodeUpdateStatus == nil {
 		klog.V(3).Infof("Fresh cluster, no need for prepuller")
 		return true, false
 	}
 
 	// if node is already upgraded, then no need to pre-pull
 	// Return true so that we reconcile any changes that somehow could have happened.
-	existingNodeVersion := existingNode.GetAnnotations()["release.openshift.io/version"]
+	existingNodeVersion := ovn.NodeUpdateStatus.Version
 	if existingNodeVersion == releaseVersion {
 		klog.V(3).Infof("OVN-Kubernetes node is already in the expected release.")
 		return true, false
 	}
 
 	// at this point, we've determined we need an upgrade
-	if prePuller == nil {
+	if ovn.PrePullerUpdateStatus == nil {
 		klog.Infof("Rolling out the no-op prepuller daemonset...")
 		return false, true
 	}
 
 	// If pre-puller just pulled a new upgrade image and then we
 	// downgrade immediately, we might wanna make prepuller pull the downgrade image.
-	existingPrePullerVersion := prePuller.GetAnnotations()["release.openshift.io/version"]
+	existingPrePullerVersion := ovn.PrePullerUpdateStatus.Version
 	if existingPrePullerVersion != releaseVersion {
 		klog.Infof("Rendering prepuller daemonset to update its image...")
 		return false, true
 	}
 
-	if daemonSetProgressing(prePuller, true) {
+	if ovn.PrePullerUpdateStatus.Progressing {
 		klog.Infof("Waiting for ovnkube-upgrades-prepuller daemonset to finish pulling the image before updating node")
 		return false, true
 	}
@@ -1187,14 +1248,14 @@ func shouldUpdateOVNKonPrepull(existingNode, prePuller *appsv1.DaemonSet, releas
 // shouldUpdateOVNKonUpgrade determines if we should roll out changes to
 // the master and node daemonsets on upgrades. We roll out nodes first,
 // then masters. Downgrades, we do the opposite.
-func shouldUpdateOVNKonUpgrade(existingNode, existingMaster *appsv1.DaemonSet, releaseVersion string) (updateNode, updateMaster bool) {
+func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion string) (updateNode, updateMaster bool) {
 	// Fresh cluster - full steam ahead!
-	if existingNode == nil || existingMaster == nil {
+	if ovn.NodeUpdateStatus == nil || ovn.MasterUpdateStatus == nil {
 		return true, true
 	}
 
-	nodeVersion := existingNode.GetAnnotations()["release.openshift.io/version"]
-	masterVersion := existingMaster.GetAnnotations()["release.openshift.io/version"]
+	nodeVersion := ovn.NodeUpdateStatus.Version
+	masterVersion := ovn.MasterUpdateStatus.Version
 
 	// shortcut - we're all rolled out.
 	// Return true so that we reconcile any changes that somehow could have happened.
@@ -1236,7 +1297,7 @@ func shouldUpdateOVNKonUpgrade(existingNode, existingMaster *appsv1.DaemonSet, r
 	// master older, node updated
 	// update master if node is rolled out
 	if masterDelta == versionUpgrade && nodeDelta == versionSame {
-		if daemonSetProgressing(existingNode, true) {
+		if ovn.NodeUpdateStatus.Progressing {
 			klog.V(2).Infof("Waiting for OVN-Kubernetes node update to roll out before updating master")
 			return true, false
 		}
@@ -1254,7 +1315,7 @@ func shouldUpdateOVNKonUpgrade(existingNode, existingMaster *appsv1.DaemonSet, r
 	// master same, node needs downgrade
 	// wait for master rollout
 	if masterDelta == versionSame && nodeDelta == versionDowngrade {
-		if daemonSetProgressing(existingMaster, false) {
+		if ovn.MasterUpdateStatus.Progressing {
 			klog.V(2).Infof("Waiting for OVN-Kubernetes master downgrade to roll out before downgrading node")
 			return false, true
 		}
@@ -1310,11 +1371,38 @@ func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 	return true
 }
 
-// setOVNDaemonsetAnnotation annotates the OVNkube master and node daemonset
+// statefulSetProgressing returns true if a statefulset is rolling out a change.
+// If allowHung is true, then treat a statefulset hung at 90% as "done" for our purposes.
+func statefulSetProgressing(ss *appsv1.StatefulSet) bool {
+	status := ss.Status
+
+	// Copy-pasted from status_manager: Determine if a DaemonSet is progressing
+	progressing := (status.ReadyReplicas < status.Replicas ||
+		status.AvailableReplicas == 0 ||
+		ss.Generation > status.ObservedGeneration)
+
+	s := "progressing"
+	if !progressing {
+		s = "complete"
+	}
+	klog.V(2).Infof("statefulset %s/%s rollout %s; %d/%d scheduled; %d available; generation %d -> %d",
+		ss.Namespace, ss.Name, s, status.ReadyReplicas, status.Replicas,
+		status.AvailableReplicas, ss.Generation, status.ObservedGeneration)
+
+	if !progressing {
+		klog.V(2).Infof("statefulset %s/%s rollout complete", ss.Namespace, ss.Name)
+		return false
+	}
+
+	return true
+}
+
+// setOVNObjectAnnotation annotates the OVNkube master and node daemonset
 // it also annotated the template with the provided key and value to force the rollout
-func setOVNDaemonsetAnnotation(objs []*uns.Unstructured, key, value string) error {
+func setOVNObjectAnnotation(objs []*uns.Unstructured, key, value string) error {
 	for _, obj := range objs {
-		if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "DaemonSet" &&
+		if obj.GetAPIVersion() == "apps/v1" &&
+			(obj.GetKind() == "DaemonSet" || obj.GetKind() == "StatefulSet") &&
 			(obj.GetName() == "ovnkube-master" || obj.GetName() == "ovnkube-node") {
 			// set daemonset annotation
 			anno := obj.GetAnnotations()
