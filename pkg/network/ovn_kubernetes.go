@@ -157,6 +157,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNDbServiceType"] = corev1.ServiceTypeClusterIP
 	data.Data["OVNSbDbRouteHost"] = nil
 	data.Data["OVN_SB_NODE_PORT"] = nil
+	data.Data["OVN_NB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
+	data.Data["OVN_SB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
 	pubStrategy := bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ServicePublishingStrategy
 	if pubStrategy != nil && pubStrategy.Type == hyperv1.Route {
 		if pubStrategy.Route != nil && pubStrategy.Route.Hostname != "" {
@@ -164,12 +166,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		}
 	} else if pubStrategy != nil && pubStrategy.Type == hyperv1.NodePort {
 		data.Data["OVNDbServiceType"] = corev1.ServiceTypeNodePort
-		if pubStrategy.NodePort != nil && pubStrategy.NodePort.Port > 0 {
-			data.Data["OVN_SB_NODE_PORT"] = pubStrategy.NodePort.Port
-		}
+		data.Data["OVN_SB_NODE_PORT"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort
+		data.Data["OVN_NB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%d", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort)
+		data.Data["OVN_SB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%d", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort)
 	}
-	data.Data["OVN_NB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
-	data.Data["OVN_SB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
 
 	// Hypershift proxy
 	if bootstrapResult.Infra.Proxy.HTTPProxy == "" {
@@ -537,7 +537,8 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 	case hyperv1.NodePort:
 		{
 			svc := &corev1.Service{}
-			err = kubeClient.Default().CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: "ovnkube-master-external"}, svc)
+			clusterClient := kubeClient.ClientFor(client.ManagementClusterName)
+			err = clusterClient.CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: "ovnkube-master-external"}, svc)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					klog.Infof("Did not find ovnkube-master service")
