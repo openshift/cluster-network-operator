@@ -1269,6 +1269,9 @@ metadata:
 			var node *appsv1.DaemonSet
 			var master *appsv1.DaemonSet
 			var prepuller *appsv1.DaemonSet
+			nodeStatus := &bootstrap.OVNUpdateStatus{}
+			masterStatus := &bootstrap.OVNUpdateStatus{}
+			prepullerStatus := &bootstrap.OVNUpdateStatus{}
 			crd := OVNKubernetesConfig.DeepCopy()
 			config := &crd.Spec
 			os.Setenv("RELEASE_VERSION", tc.rv)
@@ -1282,12 +1285,24 @@ metadata:
 			if err != nil {
 				t.Fatal(err)
 			}
+			nodeStatus.Kind = node.Kind
+			nodeStatus.Namespace = node.Namespace
+			nodeStatus.Name = node.Name
+			nodeStatus.IPFamilyMode = node.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+			nodeStatus.Version = node.GetAnnotations()["release.openshift.io/version"]
+			nodeStatus.Progressing = daemonSetProgressing(node, true)
 
 			master = &appsv1.DaemonSet{}
 			err = yaml.Unmarshal([]byte(tc.master), master)
 			if err != nil {
 				t.Fatal(err)
 			}
+			masterStatus.Kind = master.Kind
+			masterStatus.Namespace = master.Namespace
+			masterStatus.Name = master.Name
+			masterStatus.IPFamilyMode = master.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+			masterStatus.Version = master.GetAnnotations()["release.openshift.io/version"]
+			masterStatus.Progressing = daemonSetProgressing(master, false)
 
 			if tc.prepull != "" {
 				prepuller = &appsv1.DaemonSet{}
@@ -1295,20 +1310,28 @@ metadata:
 				if err != nil {
 					t.Fatal(err)
 				}
+				prepullerStatus.Kind = prepuller.Kind
+				prepullerStatus.Namespace = prepuller.Namespace
+				prepullerStatus.Name = prepuller.Name
+				prepullerStatus.IPFamilyMode = prepuller.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+				prepullerStatus.Version = prepuller.GetAnnotations()["release.openshift.io/version"]
+				prepullerStatus.Progressing = daemonSetProgressing(prepuller, false)
+			} else {
+				prepullerStatus = nil
 			}
 
 			bootstrapResult := fakeBootstrapResult()
 			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
-				MasterAddresses:         []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
-				ExistingMasterDaemonset: master,
-				ExistingNodeDaemonset:   node,
+				MasterAddresses:    []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+				MasterUpdateStatus: masterStatus,
+				NodeUpdateStatus:   nodeStatus,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 					NodeMode: "full",
 					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 						Enabled: false,
 					},
 				},
-				PrePullerDaemonset: prepuller,
+				PrePullerUpdateStatus: prepullerStatus,
 			}
 
 			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
@@ -1327,11 +1350,11 @@ metadata:
 			// if we expect a prepuller update, the original prepuller and the rendered one must be different
 			g.Expect(tc.expectPrePull).To(Equal(renderedPrePuller), "Check prepuller rendering")
 
-			updateNode, updateMaster := shouldUpdateOVNKonUpgrade(node, master, tc.rv)
+			updateNode, updateMaster := shouldUpdateOVNKonUpgrade(bootstrapResult.OVN, tc.rv)
 			g.Expect(updateMaster).To(Equal(tc.expectMaster), "Check master")
 			if updateNode {
 				var updatePrePuller bool
-				updateNode, updatePrePuller = shouldUpdateOVNKonPrepull(node, prepuller, tc.rv)
+				updateNode, updatePrePuller = shouldUpdateOVNKonPrepull(bootstrapResult.OVN, tc.rv)
 				g.Expect(updatePrePuller).To(Equal(tc.expectPrePull), "Check prepuller")
 			}
 			g.Expect(updateNode).To(Equal(tc.expectNode), "Check node")
@@ -1530,7 +1553,20 @@ func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
 	} {
 
 		t.Run(tc.name, func(t *testing.T) {
-			updateNode, updateMaster := shouldUpdateOVNKonIPFamilyChange(tc.node, tc.master, tc.ipFamilyMode)
+			masterStatus := &bootstrap.OVNUpdateStatus{}
+			nodeStatus := &bootstrap.OVNUpdateStatus{}
+			if tc.master != nil {
+				masterStatus.IPFamilyMode = tc.master.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+				masterStatus.Progressing = daemonSetProgressing(tc.master, false)
+			}
+			if tc.node != nil {
+				nodeStatus.IPFamilyMode = tc.node.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+			}
+			bootResult := bootstrap.OVNBootstrapResult{
+				MasterUpdateStatus: masterStatus,
+				NodeUpdateStatus:   nodeStatus,
+			}
+			updateNode, updateMaster := shouldUpdateOVNKonIPFamilyChange(bootResult, tc.ipFamilyMode)
 			if updateNode != tc.expectNode {
 				t.Errorf("Expected node update: %v received %v", tc.expectNode, updateNode)
 			}
@@ -1578,33 +1614,19 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 	bootstrapResult := fakeBootstrapResult()
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		MasterAddresses: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
-		ExistingMasterDaemonset: &appsv1.DaemonSet{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "apps/v1",
-				Kind:       "DaemonSet",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ovnkube-master",
-				Namespace: "openshift-ovn-kubernetes",
-				Annotations: map[string]string{
-					names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
-					"release.openshift.io/version":      "1.9.9",
-				},
-			},
+		MasterUpdateStatus: &bootstrap.OVNUpdateStatus{
+			Kind:         "DaemonSet",
+			Namespace:    "openshift-ovn-kubernetes",
+			Name:         "ovnkube-master",
+			Version:      "1.9.9",
+			IPFamilyMode: names.IPFamilySingleStack,
 		},
-		ExistingNodeDaemonset: &appsv1.DaemonSet{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "apps/v1",
-				Kind:       "DaemonSet",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ovnkube-node",
-				Namespace: "openshift-ovn-kubernetes",
-				Annotations: map[string]string{
-					names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
-					"release.openshift.io/version":      "1.9.9",
-				},
-			},
+		NodeUpdateStatus: &bootstrap.OVNUpdateStatus{
+			Kind:         "DaemonSet",
+			Namespace:    "openshift-ovn-kubernetes",
+			Name:         "ovnkube-node",
+			Version:      "1.9.9",
+			IPFamilyMode: names.IPFamilySingleStack,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 			NodeMode: "full",
