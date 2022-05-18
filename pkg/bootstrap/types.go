@@ -4,7 +4,6 @@ import (
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	configv1 "github.com/openshift/api/config/v1"
 	hyperv1 "github.com/openshift/hypershift/api/v1alpha1"
-	appsv1 "k8s.io/api/apps/v1"
 )
 
 type KuryrBootstrapResult struct {
@@ -41,15 +40,30 @@ type OVNConfigBoostrapResult struct {
 	HyperShiftConfig *OVNHyperShiftBootstrapResult
 }
 
+// OVNUpdateStatus contains the status of existing daemonset
+// or statefulset that are maily used by upgrade process
+type OVNUpdateStatus struct {
+	Kind         string
+	Namespace    string
+	Name         string
+	Version      string
+	IPFamilyMode string
+	Progressing  bool
+}
+
 type OVNBootstrapResult struct {
-	MasterAddresses         []string
-	ClusterInitiator        string
-	ExistingMasterDaemonset *appsv1.DaemonSet
-	ExistingNodeDaemonset   *appsv1.DaemonSet
-	ExistingIPsecDaemonset  *appsv1.DaemonSet
-	OVNKubernetesConfig     *OVNConfigBoostrapResult
-	PrePullerDaemonset      *appsv1.DaemonSet
-	FlowsConfig             *FlowsConfig
+	MasterAddresses  []string
+	ClusterInitiator string
+	// MasterUpdateStatus is the status of ovnkube-master daemonset or statefulset (when hypershift is enabled)
+	MasterUpdateStatus *OVNUpdateStatus
+	// NodeUpdateStatus is the status of ovnkube-node daemonset
+	NodeUpdateStatus *OVNUpdateStatus
+	// IPsecUpdateStatus is the status of ovn-ipsec daemonset
+	IPsecUpdateStatus *OVNUpdateStatus
+	// PrePullerUpdateStatus is the status of ovnkube-upgrades-prepuller daemonset
+	PrePullerUpdateStatus *OVNUpdateStatus
+	OVNKubernetesConfig   *OVNConfigBoostrapResult
+	FlowsConfig           *FlowsConfig
 }
 
 type BootstrapResult struct {
