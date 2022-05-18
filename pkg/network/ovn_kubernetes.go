@@ -319,12 +319,15 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["IsSNO"] = false
 	}
 
+	var manifestSubDir string
 	manifestDirs := make([]string, 0, 2)
 	manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "network/ovn-kubernetes/common"))
 	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled {
-		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "network/ovn-kubernetes/managed"))
+		manifestSubDir = "network/ovn-kubernetes/managed"
+		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, manifestSubDir))
 	} else {
-		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "network/ovn-kubernetes/self-hosted"))
+		manifestSubDir = "network/ovn-kubernetes/self-hosted"
+		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, manifestSubDir))
 	}
 
 	manifests, err := render.RenderDirs(manifestDirs, &data)
@@ -336,7 +339,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	nodeMode := bootstrapResult.OVN.OVNKubernetesConfig.NodeMode
 	if nodeMode == OVN_NODE_MODE_DPU_HOST {
 		data.Data["OVN_NODE_MODE"] = nodeMode
-		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/ovnkube-node.yaml"), &data)
+		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, manifestSubDir+"/ovnkube-node.yaml"), &data)
 		if err != nil {
 			return nil, progressing, errors.Wrap(err, "failed to render manifests")
 		}
@@ -345,7 +348,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		// "OVN_NODE_MODE" not set when render.RenderDir() called above,
 		// so render just the error-cni.yaml with "OVN_NODE_MODE" set.
 		data.Data["OVN_NODE_MODE"] = nodeMode
-		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/error-cni.yaml"), &data)
+		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/common/error-cni.yaml"), &data)
 		if err != nil {
 			return nil, progressing, errors.Wrap(err, "failed to render manifests")
 		}
