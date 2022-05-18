@@ -761,7 +761,7 @@ kind: DaemonSet
 			expectMaster: true,
 			// Note: For reducing testing complexity, prepuller is set to false
 			// because it hits the condition where the node's version (null) is same
-			// as release version (null). In reality if node's version is differnt
+			// as release version (null). In reality if node's version is different
 			// from expected, prePull will be true.
 			expectPrePull: false,
 			master: `
@@ -1607,7 +1607,7 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 	fillDefaults(config, nil)
 
 	// at the same time we have an upgrade
-	os.Setenv("RELEASE_VERSION", "2.0.0")
+	t.Setenv("RELEASE_VERSION", "2.0.0")
 
 	// bootstrap also represents current status
 	// the current cluster is single-stack and has version 1.9.9
@@ -1860,7 +1860,7 @@ func extractOVNKubeConfig(g *WithT, objs []*uns.Unstructured) string {
 			val, ok, err := uns.NestedString(obj.Object, "data", "ovnkube.conf")
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(ok).To(BeTrue())
-			return string(val)
+			return val
 		}
 	}
 	return ""

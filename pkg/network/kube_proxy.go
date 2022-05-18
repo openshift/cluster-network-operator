@@ -221,7 +221,7 @@ func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, bootstrapResult *bootst
 	// in bootstrapResult. Once out of DevPreview, CNO API will be expanded to
 	// include Node Mode and it will be stored in conf (operv1.NetworkSpec) and
 	// this code will not need to access bootstrapResult.OVN.OVNKubernetesConfig.
-	if bootstrapResult != nil && bootstrapResult.OVN.OVNKubernetesConfig != nil {
+	if bootstrapResult.OVN.OVNKubernetesConfig != nil {
 		if bootstrapResult.OVN.OVNKubernetesConfig.NodeMode == OVN_NODE_MODE_DPU {
 			data.Data["KUBE_PROXY_NODE_SELECTOR"] = OVN_NODE_SELECTOR_DPU
 		}
