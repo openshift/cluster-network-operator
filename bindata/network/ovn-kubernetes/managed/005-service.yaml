@@ -27,8 +27,10 @@ spec:
 {{ if .OVN_SB_NODE_PORT }}
     nodePort: {{.OVN_SB_NODE_PORT}}
 {{ end }}
-  sessionAffinity: None
+{{ if ne .OVNDbServiceType "NodePort" }}
   clusterIP: None
+{{ end }}
+  sessionAffinity: None
   type: {{.OVNDbServiceType}}
 
 ---
