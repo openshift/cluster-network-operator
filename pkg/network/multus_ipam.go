@@ -11,7 +11,7 @@ const ipamTypeDHCP = "dhcp"
 const ipamTypeWhereabouts = "whereabouts"
 
 // detectIPAMTypeRaw determines if a target type of IPAM is being used
-// this facilitates using auxillary features associated with that IPAM (such as DHCP CNI daemon, or ip-reconciler for Whereabouts)
+// this facilitates using auxiliary features associated with that IPAM (such as DHCP CNI daemon, or ip-reconciler for Whereabouts)
 func detectIPAMTypeRaw(targetType string, addNet *operv1.AdditionalNetworkDefinition) bool {
 	// Parse the RawCNIConfig
 	var rawConfig map[string]interface{}

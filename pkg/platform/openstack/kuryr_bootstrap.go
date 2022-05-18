@@ -72,7 +72,7 @@ func GetClusterID(kubeClient crclient.Client) (string, error) {
 
 	err := kubeClient.Get(context.TODO(), crclient.ObjectKey{Name: InfrastructureCRDName}, cluster)
 	if err != nil {
-		return "", errors.Wrapf(err, "Failed to get Infrastracture CRD %s", InfrastructureCRDName)
+		return "", errors.Wrapf(err, "Failed to get Infrastructure CRD %s", InfrastructureCRDName)
 	}
 	return cluster.Status.InfrastructureName, nil
 }
@@ -618,7 +618,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient crclient.Client) (*boot
 				rule.protocol, rule.cidr, rule.sgId, rule.minPort, rule.maxPort)
 		}
 	}
-	log.Print("All requried traffic allowed")
+	log.Print("All required traffic allowed")
 
 	// It may happen that we tightened some SG rules in an upgrade, we need to make sure to remove the ones that are
 	// not expected anymore.
