@@ -13,6 +13,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 
+	configv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +29,7 @@ import (
 const (
 	cmNamespace = "openshift-network-operator"
 	cmName      = "mtu"
+	awsMTU      = 9001
 )
 
 // probeMTU executes the MTU prober job, if the result configmap
@@ -36,6 +38,10 @@ const (
 // If, for whatever reason, it takes longer for the MTU to be detected,
 // it will adopt an existing job.
 func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, infra *bootstrap.InfraStatus) (int, error) {
+	if infra.ExternalControlPlane && infra.PlatformType == configv1.AWSPlatformType {
+		klog.Infof("AWS cluster, omitting MTU probing and using default of %d", awsMTU)
+		return awsMTU, nil
+	}
 	mtu, err := r.readMTUConfigMap(ctx)
 	if err == nil {
 		_ = r.deleteMTUProber(ctx, infra)
