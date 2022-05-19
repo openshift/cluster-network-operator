@@ -30,6 +30,7 @@ const (
 	cmNamespace = "openshift-network-operator"
 	cmName      = "mtu"
 	awsMTU      = 9001
+	azureMTU    = 1500
 )
 
 // probeMTU executes the MTU prober job, if the result configmap
@@ -38,9 +39,15 @@ const (
 // If, for whatever reason, it takes longer for the MTU to be detected,
 // it will adopt an existing job.
 func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, infra *bootstrap.InfraStatus) (int, error) {
-	if infra.ExternalControlPlane && infra.PlatformType == configv1.AWSPlatformType {
-		klog.Infof("AWS cluster, omitting MTU probing and using default of %d", awsMTU)
-		return awsMTU, nil
+	if infra.ExternalControlPlane {
+		if infra.PlatformType == configv1.AWSPlatformType {
+			klog.Infof("AWS cluster, omitting MTU probing and using default of %d", awsMTU)
+			return awsMTU, nil
+		}
+		if infra.PlatformType == configv1.AzurePlatformType {
+			klog.Infof("AWS cluster, omitting MTU probing and using default of %d", azureMTU)
+			return azureMTU, nil
+		}
 	}
 	mtu, err := r.readMTUConfigMap(ctx)
 	if err == nil {
