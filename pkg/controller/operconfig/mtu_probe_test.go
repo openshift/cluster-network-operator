@@ -36,9 +36,22 @@ func TestProbeMTU(t *testing.T) {
 			}},
 			expectedMTU: 5000,
 		},
-
 		{
-			name:  "Not aws on Hypershift, value from configmap is used",
+			name:        "Azure on hypershift, hardcoded value is used",
+			infra:       &bootstrap.InfraStatus{PlatformType: configv1.AzurePlatformType, ExternalControlPlane: true},
+			expectedMTU: 1500,
+		},
+		{
+			name:  "Azure selfhosted, value from configmap is used",
+			infra: &bootstrap.InfraStatus{PlatformType: configv1.AzurePlatformType},
+			objects: []crclient.Object{&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Namespace: cmNamespace, Name: cmName},
+				Data:       map[string]string{"mtu": "5000"},
+			}},
+			expectedMTU: 5000,
+		},
+		{
+			name:  "Unknown platform on Hypershift, value from configmap is used",
 			infra: &bootstrap.InfraStatus{ExternalControlPlane: true},
 			objects: []crclient.Object{&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Namespace: cmNamespace, Name: cmName},
@@ -47,7 +60,7 @@ func TestProbeMTU(t *testing.T) {
 			expectedMTU: 5000,
 		},
 		{
-			name:  "Not aws, value from configmap is used",
+			name:  "Unknown platform, value from configmap is used",
 			infra: &bootstrap.InfraStatus{},
 			objects: []crclient.Object{&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Namespace: cmNamespace, Name: cmName},
