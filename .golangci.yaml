@@ -1,0 +1,25 @@
+run:
+  skip-dirs:
+    - vendor
+  modules-download-mode: vendor
+
+linters:
+  disable-all: true #so that lint version bumps don't change results
+  enable:
+    - deadcode
+    - errcheck
+    - exportloopref
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - nolintlint
+    - nosprintfhostport
+    - staticcheck
+    - structcheck
+    - tenv
+    - typecheck
+    - unconvert
+    - unused
+    - varcheck
+    - wastedassign
