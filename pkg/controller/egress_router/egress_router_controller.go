@@ -200,7 +200,7 @@ func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifes
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["EgressRouterNamespace"] = namespace
-	if isItValidCidr(string(router.Spec.Addresses[0].IP)) {
+	if isItValidCidr(router.Spec.Addresses[0].IP) {
 		data.Data["Addresses"] = router.Spec.Addresses[0].IP
 	}
 	if isItValidIPAddress(router.Spec.Addresses[0].Gateway) {
