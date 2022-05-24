@@ -97,8 +97,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 	data.Data["KUBERNETES_SERVICE_HOST"] = apiServer.Host
 	data.Data["KUBERNETES_SERVICE_PORT"] = apiServer.Port
-	data.Data["K8S_APISERVER"] = fmt.Sprintf("https://%s:%s", apiServer.Host, apiServer.Port)
-	data.Data["K8S_LOCAL_APISERVER"] = fmt.Sprintf("https://%s:%s", localAPIServer.Host, localAPIServer.Port)
+	data.Data["K8S_APISERVER"] = "https://" + net.JoinHostPort(apiServer.Host, apiServer.Port)
+	data.Data["K8S_LOCAL_APISERVER"] = "https://" + net.JoinHostPort(localAPIServer.Host, localAPIServer.Port)
 	data.Data["HTTP_PROXY"] = bootstrapResult.Infra.Proxy.HTTPProxy
 	data.Data["HTTPS_PROXY"] = bootstrapResult.Infra.Proxy.HTTPSProxy
 	data.Data["NO_PROXY"] = bootstrapResult.Infra.Proxy.NoProxy
@@ -499,7 +499,8 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 	for _, svc := range hcp.Spec.Services {
 		// TODO: instead of the hardcoded string use ServiceType hyperv1.OVNSbDb once the API is updated
 		if svc.Service == "OVNSbDb" {
-			ovnHypershiftResult.ServicePublishingStrategy = &svc.ServicePublishingStrategy
+			s := svc.ServicePublishingStrategy
+			ovnHypershiftResult.ServicePublishingStrategy = &s
 		}
 	}
 	if ovnHypershiftResult.ServicePublishingStrategy == nil {

@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -e
-make golangci-lint
+if [ -t 0 ]; then echo 'Please run "make check" instead'; echo; fi
 make verify
