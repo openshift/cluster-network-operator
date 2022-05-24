@@ -743,6 +743,7 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --metrics-bind-address "0.0.0.0:9102" \
             --metrics-enable-pprof \
+            --metrics-enable-config-duration \
             ${gateway_mode_flags} \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
             --sb-client-privkey /ovn-cert/tls.key \
