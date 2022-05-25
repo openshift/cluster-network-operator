@@ -2,6 +2,7 @@ package connectivitycheckcontroller
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -10,7 +11,6 @@ import (
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	configv1listers "github.com/openshift/client-go/config/listers/config/v1"
 	operatorcontrolplaneclient "github.com/openshift/client-go/operatorcontrolplane/clientset/versioned"
-	"github.com/openshift/library-go/pkg/operator/connectivitycheckcontroller/bindata"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
@@ -199,6 +199,9 @@ func (c *connectivityCheckController) Sync(ctx context.Context, syncContext fact
 	return nil
 }
 
+//go:embed manifests
+var assets embed.FS
+
 func ensureConnectivityCheckCRDExists(ctx context.Context, syncContext factory.SyncContext, client *apiextensionsclient.Clientset) error {
 	_, err := client.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, podnetworkconnectivitychecksCRDName, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
@@ -211,8 +214,8 @@ func ensureConnectivityCheckCRDExists(ctx context.Context, syncContext factory.S
 			resourceapply.NewClientHolder().WithAPIExtensionsClient(client),
 			syncContext.Recorder(),
 			nil,
-			func(name string) ([]byte, error) { return bindata.Asset(name) },
-			"pkg/operator/connectivitycheckcontroller/manifests/controlplane.operator.openshift.io_podnetworkconnectivitychecks.yaml",
+			assets.ReadFile,
+			"manifests/controlplane.operator.openshift.io_podnetworkconnectivitychecks.yaml",
 		)
 		if applyResults[0].Error != nil {
 			return applyResults[0].Error
