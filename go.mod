@@ -17,7 +17,7 @@ require (
 	github.com/openshift/hypershift v0.0.0-20220323152148-c356b8b72d66
 	github.com/openshift/library-go v0.0.0-20211220195323-eca2c467c492
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.11.1
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
