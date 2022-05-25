@@ -101,6 +101,9 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: 10m0s
   tcpEstablishedTimeout: null
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
 detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
@@ -129,7 +132,9 @@ showHiddenMetricsForVersion: ""
 udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
 `))
 }
@@ -168,6 +173,9 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: 10m0s
   tcpEstablishedTimeout: null
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
 detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
@@ -196,7 +204,9 @@ showHiddenMetricsForVersion: ""
 udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
 `))
 }
@@ -403,6 +413,9 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
 detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: 0.0.0.0:10255
@@ -431,7 +444,9 @@ showHiddenMetricsForVersion: ""
 udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
 `))
 		}

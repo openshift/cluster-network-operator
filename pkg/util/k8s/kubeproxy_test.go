@@ -42,6 +42,9 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
 detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
@@ -70,7 +73,9 @@ showHiddenMetricsForVersion: ""
 udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
 `,
 		},
@@ -100,6 +105,9 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
 detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
@@ -128,7 +136,9 @@ showHiddenMetricsForVersion: ""
 udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
 `,
 		},
@@ -154,6 +164,9 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
 detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
@@ -182,7 +195,9 @@ showHiddenMetricsForVersion: ""
 udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
 `,
 		},
@@ -208,6 +223,9 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
 detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
@@ -236,7 +254,9 @@ showHiddenMetricsForVersion: ""
 udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
 `,
 		},
@@ -265,6 +285,9 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
 detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
@@ -295,7 +318,9 @@ showHiddenMetricsForVersion: ""
 udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
 `,
 		},

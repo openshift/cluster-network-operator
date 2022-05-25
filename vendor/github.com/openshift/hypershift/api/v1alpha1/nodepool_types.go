@@ -2,15 +2,19 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	capikubevirt "sigs.k8s.io/cluster-api-provider-kubevirt/api/v1alpha1"
 )
 
 const (
+	NodePoolValidHostedClusterConditionType      = "ValidHostedCluster"
 	NodePoolValidReleaseImageConditionType       = "ValidReleaseImage"
 	NodePoolValidAMIConditionType                = "ValidAMI"
+	NodePoolValidPowerVSImageConditionType       = "ValidPowerVSImage"
+	NodePoolValidKubeVirtImageConditionType      = "ValidKubeVirtImage"
 	NodePoolValidMachineConfigConditionType      = "ValidMachineConfig"
+	NodePoolValidKubevirtConfigConditionType     = "ValidKubevirtConfig"
 	NodePoolUpdateManagementEnabledConditionType = "UpdateManagementEnabled"
 	NodePoolAutoscalingEnabledConditionType      = "AutoscalingEnabled"
 	NodePoolReadyConditionType                   = "Ready"
@@ -19,6 +23,7 @@ const (
 	NodePoolUpdatingConfigConditionType          = "UpdatingConfig"
 	NodePoolAsExpectedConditionReason            = "AsExpected"
 	NodePoolValidationFailedConditionReason      = "ValidationFailed"
+	NodePoolInplaceUpgradeFailedConditionReason  = "InplaceUpgradeFailed"
 )
 
 // The following are reasons for the IgnitionEndpointAvailable condition.
@@ -48,10 +53,10 @@ func init() {
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 // +kubebuilder:object:root=true
-// +kubebuilder:subresource:scale:specpath=.spec.nodeCount,statuspath=.status.nodeCount
+// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.clusterName",description="Cluster"
-// +kubebuilder:printcolumn:name="Desired Nodes",type="integer",JSONPath=".spec.nodeCount",description="Desired Nodes"
-// +kubebuilder:printcolumn:name="Current Nodes",type="integer",JSONPath=".status.nodeCount",description="Available Nodes"
+// +kubebuilder:printcolumn:name="Desired Nodes",type="integer",JSONPath=".spec.replicas",description="Desired Nodes"
+// +kubebuilder:printcolumn:name="Current Nodes",type="integer",JSONPath=".status.replicas",description="Available Nodes"
 // +kubebuilder:printcolumn:name="Autoscaling",type="string",JSONPath=".status.conditions[?(@.type==\"AutoscalingEnabled\")].status",description="Autoscaling Enabled"
 // +kubebuilder:printcolumn:name="Autorepair",type="string",JSONPath=".status.conditions[?(@.type==\"AutorepairEnabled\")].status",description="Node Autorepair Enabled"
 // +kubebuilder:printcolumn:name="Version",type="string",JSONPath=".status.version",description="Current version"
@@ -89,11 +94,17 @@ type NodePoolSpec struct {
 	// +immutable
 	Platform NodePoolPlatform `json:"platform"`
 
-	// NodeCount is the desired number of nodes the pool should maintain. If
+	// Deprecated: Use Replicas instead. NodeCount will be dropped in the next
+	// api release.
+	//
+	// +optional
+	NodeCount *int32 `json:"nodeCount,omitempty"`
+
+	// Replicas is the desired number of nodes the pool should maintain. If
 	// unset, the default value is 0.
 	//
 	// +optional
-	NodeCount *int32 `json:"nodeCount"`
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Management specifies behavior for managing nodes in the pool, such as
 	// upgrade strategies and auto-repair behaviors.
@@ -112,12 +123,6 @@ type NodePoolSpec struct {
 	//
 	// Each ConfigMap must have a single key named "config" whose value is the
 	// JSON or YAML of a serialized MachineConfig.
-	//
-	// TODO (alberto): this ConfigMaps are meant to contain MachineConfig,
-	// KubeletConfig and ContainerRuntimeConfig but MCO only supports
-	// MachineConfig in bootstrap mode atm. See:
-	// https://github.com/openshift/machine-config-operator/blob/9c6c2bfd7ed498bfbc296d530d1839bd6a177b0b/pkg/controller/bootstrap/bootstrap.go#L104-L119
-	//
 	// +kubebuilder:validation:Optional
 	Config []corev1.LocalObjectReference `json:"config,omitempty"`
 
@@ -133,10 +138,10 @@ type NodePoolSpec struct {
 
 // NodePoolStatus is the latest observed status of a NodePool.
 type NodePoolStatus struct {
-	// NodeCount is the latest observed number of nodes in the pool.
+	// Replicas is the latest observed number of nodes in the pool.
 	//
 	// +optional
-	NodeCount int32 `json:"nodeCount"`
+	Replicas int32 `json:"replicas"`
 
 	// Version is the semantic version of the latest applied release specified by
 	// the NodePool.
@@ -316,13 +321,191 @@ type NodePoolPlatform struct {
 	Agent *AgentNodePoolPlatform `json:"agent,omitempty"`
 
 	Azure *AzureNodePoolPlatform `json:"azure,omitempty"`
+
+	// PowerVS specifies the configuration used when using IBMCloud PowerVS platform.
+	//
+	// +optional
+	PowerVS *PowerVSNodePoolPlatform `json:"powervs,omitempty"`
+}
+
+// PowerVSNodePoolPlatform specifies the configuration of a NodePool when operating
+// on IBMCloud PowerVS platform.
+type PowerVSNodePoolPlatform struct {
+	// SystemType is the System type used to host the instance.
+	// systemType determines the number of cores and memory that is available.
+	// Few of the supported SystemTypes are s922,e880,e980.
+	// e880 systemType available only in Dallas Datacenters.
+	// e980 systemType available in Datacenters except Dallas and Washington.
+	// When omitted, this means that the user has no opinion and the platform is left to choose a
+	// reasonable default. The current default is s922 which is generally available.
+	//
+	// +optional
+	// +kubebuilder:default=s922
+	SystemType string `json:"systemType,omitempty"`
+
+	// ProcessorType is the VM instance processor type.
+	// It must be set to one of the following values: Dedicated, Capped or Shared.
+	//
+	// Dedicated: resources are allocated for a specific client, The hypervisor makes a 1:1 binding of a partition’s processor to a physical processor core.
+	// Shared: Shared among other clients.
+	// Capped: Shared, but resources do not expand beyond those that are requested, the amount of CPU time is Capped to the value specified for the entitlement.
+	//
+	// if the processorType is selected as Dedicated, then Processors value cannot be fractional.
+	// When omitted, this means that the user has no opinion and the platform is left to choose a
+	// reasonable default. The current default is Shared.
+	//
+	// +kubebuilder:default=shared
+	// +kubebuilder:validation:Enum=dedicated;shared;capped
+	// +optional
+	ProcessorType string `json:"processorType,omitempty"`
+
+	// Processors is the number of virtual processors in a virtual machine.
+	// when the processorType is selected as Dedicated the processors value cannot be fractional.
+	// maximum value for the Processors depends on the selected SystemType.
+	// when SystemType is set to e880 or e980 maximum Processors value is 143.
+	// when SystemType is set to s922 maximum Processors value is 15.
+	// minimum value for Processors depends on the selected ProcessorType.
+	// when ProcessorType is set as Shared or Capped, The minimum processors is 0.5.
+	// when ProcessorType is set as Dedicated, The minimum processors is 1.
+	// When omitted, this means that the user has no opinion and the platform is left to choose a
+	// reasonable default. The default is set based on the selected ProcessorType.
+	// when ProcessorType selected as Dedicated, the default is set to 1.
+	// when ProcessorType selected as Shared or Capped, the default is set to 0.5.
+	//
+	// +optional
+	// +kubebuilder:default="0.5"
+	Processors intstr.IntOrString `json:"processors,omitempty"`
+
+	// MemoryGiB is the size of a virtual machine's memory, in GiB.
+	// maximum value for the MemoryGiB depends on the selected SystemType.
+	// when SystemType is set to e880 maximum MemoryGiB value is 7463 GiB.
+	// when SystemType is set to e980 maximum MemoryGiB value is 15307 GiB.
+	// when SystemType is set to s922 maximum MemoryGiB value is 942 GiB.
+	// The minimum memory is 32 GiB.
+	//
+	// When omitted, this means the user has no opinion and the platform is left to choose a reasonable
+	// default. The current default is 32.
+	//
+	// +optional
+	// +kubebuilder:default=32
+	MemoryGiB int32 `json:"memoryGiB,omitempty"`
+
+	// Image used for deploying the nodes. If unspecified, the default
+	// is chosen based on the NodePool release payload image.
+	//
+	// +optional
+	Image *PowerVSResourceReference `json:"image,omitempty"`
+
+	// StorageType for the image and nodes, this will be ignored if Image is specified.
+	// The storage tiers in PowerVS are based on I/O operations per second (IOPS).
+	// It means that the performance of your storage volumes is limited to the maximum number of IOPS based on volume size and storage tier.
+	// Although, the exact numbers might change over time, the Tier 3 storage is currently set to 3 IOPS/GB, and the Tier 1 storage is currently set to 10 IOPS/GB.
+	//
+	// The default is tier1
+	//
+	// +kubebuilder:default=tier1
+	// +kubebuilder:validation:Enum=tier1;tier3
+	// +optional
+	StorageType string `json:"storageType,omitempty"`
+
+	// ImageDeletePolicy is policy for the image deletion.
+	//
+	// delete: delete the image from the infrastructure.
+	// retain: delete the image from the openshift but retain in the infrastructure.
+	//
+	// The default is delete
+	//
+	// +kubebuilder:default=delete
+	// +kubebuilder:validation:Enum=delete;retain
+	// +optional
+	ImageDeletePolicy string `json:"imageDeletePolicy,omitempty"`
+}
+
+// KubevirtCompute contains values associated with the virtual compute hardware requested for the VM.
+type KubevirtCompute struct {
+	// Memory represents how much guest memory the VM should have
+	//
+	// +optional
+	// +kubebuilder:default="4Gi"
+	Memory *resource.Quantity `json:"memory"`
+
+	// Cores represents how many cores the guest VM should have
+	//
+	// +optional
+	// +kubebuilder:default=2
+	Cores *uint32 `json:"cores"`
+}
+
+// KubevirtPersistentVolume containes the values involved with provisioning persistent storage for a KubeVirt VM.
+type KubevirtPersistentVolume struct {
+	// Size is the size of the persistent storage volume
+	//
+	// +optional
+	// +kubebuilder:default="16Gi"
+	Size *resource.Quantity `json:"size"`
+	// StorageClass is the storageClass used for the underlying PVC that hosts the volume
+	//
+	// +optional
+	StorageClass *string `json:"storageClass,omitempty"`
+}
+
+// KubevirtRootVolume represents the volume that the rhcos disk will be stored and run from.
+type KubevirtRootVolume struct {
+	// Image represents what rhcos image to use for the node pool
+	//
+	// +optional
+	Image *KubevirtDiskImage `json:"diskImage,omitempty"`
+
+	// KubevirtVolume represents of type of storage to run the image on
+	KubevirtVolume `json:",inline"`
+}
+
+// KubevirtVolumeType is a specific supported KubeVirt volumes
+//
+// +kubebuilder:validation:Enum=Persistent
+type KubevirtVolumeType string
+
+const (
+	// KubevirtVolumeTypePersistent represents persistent volume for kubevirt VMs
+	KubevirtVolumeTypePersistent KubevirtVolumeType = "Persistent"
+)
+
+// KubevirtVolume represents what kind of storage to use for a KubeVirt VM volume
+type KubevirtVolume struct {
+	// Type represents the type of storage to associate with the kubevirt VMs.
+	//
+	// +optional
+	// +unionDiscriminator
+	// +kubebuilder:default=Persistent
+	Type KubevirtVolumeType `json:"type"`
+
+	// Persistent volume type means the VM's storage is backed by a PVC
+	// VMs that use persistent volumes can survive disruption events like restart and eviction
+	// This is the default type used when no storage type is defined.
+	//
+	// +optional
+	Persistent *KubevirtPersistentVolume `json:"persistent,omitempty"`
+}
+
+// KubevirtDiskImage contains values representing where the rhcos image is located
+type KubevirtDiskImage struct {
+	// ContainerDiskImage is a string representing the container image that holds the root disk
+	//
+	// +optional
+	ContainerDiskImage *string `json:"containerDiskImage,omitempty"`
 }
 
 // KubevirtNodePoolPlatform specifies the configuration of a NodePool when operating
 // on KubeVirt platform.
 type KubevirtNodePoolPlatform struct {
-	// NodeTemplate Spec contains the VirtualMachineInstance specification.
-	NodeTemplate *capikubevirt.VirtualMachineTemplateSpec `json:"nodeTemplate,omitempty"`
+	// RootVolume represents values associated with the VM volume that will host rhcos
+	RootVolume *KubevirtRootVolume `json:"rootVolume"`
+
+	// Compute contains values representing the virtual hardware requested for the VM
+	//
+	// +optional
+	// +kubebuilder:default={memory: "4Gi", cores: 2}
+	Compute *KubevirtCompute `json:"compute"`
 }
 
 // AWSNodePoolPlatform specifies the configuration of a NodePool when operating
