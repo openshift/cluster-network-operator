@@ -161,7 +161,8 @@ spec:
 {{- end}}
             --cleanup-config-on-exit=true
             --namespace-isolation=true
-            --multus-log-level=verbose
+            --multus-log-level=debug
+            --multus-log-file=/var/run/multus/cni/net.d/multus.log
             --cni-version=0.3.1
             --additional-bin-dir=/opt/multus/bin
             --skip-multus-binary-copy=true
