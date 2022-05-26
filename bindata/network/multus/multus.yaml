@@ -212,12 +212,15 @@ spec:
         - name: system-cni-dir
           hostPath:
             path: {{ .SystemCNIConfDir }}
+            type: Directory
         - name: multus-cni-dir
           hostPath:
             path: {{ .MultusCNIConfDir }}
+            type: Directory
         - name: cnibin
           hostPath:
             path: {{ .CNIBinDir }}
+            type: Directory
         - name: os-release
           hostPath:
             path: /etc/os-release
