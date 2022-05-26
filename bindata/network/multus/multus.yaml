@@ -13,18 +13,23 @@ data:
     #!/bin/bash
     set -e
 
+    function log()
+    {
+        echo "$(date --iso-8601=seconds) [cnibincopy] ${1}"
+    }
+
     DESTINATION_DIRECTORY=/host/opt/cni/bin/
 
     # Perform validation of usage
     if [ -z "$RHEL7_SOURCE_DIRECTORY" ] ||
        [ -z "$RHEL8_SOURCE_DIRECTORY" ] ||
        [ -z "$DEFAULT_SOURCE_DIRECTORY" ]; then
-      echo "FATAL ERROR: You must set env variables: RHEL7_SOURCE_DIRECTORY, RHEL8_SOURCE_DIRECTORY, DEFAULT_SOURCE_DIRECTORY"
+      log "FATAL ERROR: You must set env variables: RHEL7_SOURCE_DIRECTORY, RHEL8_SOURCE_DIRECTORY, DEFAULT_SOURCE_DIRECTORY"
       exit 1
     fi
 
     if [ ! -d "$DESTINATION_DIRECTORY" ]; then
-      echo "FATAL ERROR: Destination directory ($DESTINATION_DIRECTORY) does not exist"
+      log "FATAL ERROR: Destination directory ($DESTINATION_DIRECTORY) does not exist"
       exit 1
     fi
 
@@ -41,11 +46,11 @@ data:
         if [ "${VARIANT_ID}" == "coreos" ]; then
           rhelmajor=8
         else
-          echo "FATAL ERROR: Unsupported Fedora variant=${VARIANT_ID}"
+          log "FATAL ERROR: Unsupported Fedora variant=${VARIANT_ID}"
           exit 1
         fi
       ;;
-      *) echo "FATAL ERROR: Unsupported OS ID=${ID}"; exit 1
+      *) log "FATAL ERROR: Unsupported OS ID=${ID}"; exit 1
       ;;
     esac
 
@@ -66,24 +71,38 @@ data:
         fi
       ;;
       *)
-        echo "ERROR: RHEL Major Version Unsupported, rhelmajor=${rhelmajor}"
+        log "ERROR: RHEL Major Version Unsupported, rhelmajor=${rhelmajor}"
       ;;
     esac
 
     # When it doesn't exist, fall back to the original directory.
     if [ "$founddir" == false ]; then
-      echo "Source directory unavailable for OS version: ${rhelmajor}"
+      log "Source directory unavailable for OS version: ${rhelmajor}"
       sourcedir=$DEFAULT_SOURCE_DIRECTORY
     fi
 
-    cp -rf ${sourcedir}* $DESTINATION_DIRECTORY
-
+    # Use a subdirectory called "upgrade" so we can atomically move fully copied files.
+    UPGRADE_DIRECTORY=${DESTINATION_DIRECTORY}upgrade_$(uuidgen)
+    rm -Rf $UPGRADE_DIRECTORY
+    mkdir -p $UPGRADE_DIRECTORY
+    cp -rf ${sourcedir}* $UPGRADE_DIRECTORY
     if [ $? -eq 0 ]; then
-      echo "Successfully copied files in ${sourcedir} to $DESTINATION_DIRECTORY"
+      log "Successfully copied files in ${sourcedir} to $UPGRADE_DIRECTORY"
     else
-      echo "Failed to copy files in ${sourcedir} to $DESTINATION_DIRECTORY"
+      log "Failed to copy files in ${sourcedir} to $UPGRADE_DIRECTORY"
+      rm -Rf $UPGRADE_DIRECTORY
       exit 1
     fi
+    mv -f $UPGRADE_DIRECTORY/* ${DESTINATION_DIRECTORY}/
+    if [ $? -eq 0 ]; then
+      log "Successfully moved files in $UPGRADE_DIRECTORY to ${DESTINATION_DIRECTORY}"
+    else
+      log "Failed to move files in $UPGRADE_DIRECTORY to ${DESTINATION_DIRECTORY}"
+      rm -Rf $UPGRADE_DIRECTORY
+      exit 1
+    fi
+    rm -Rf $UPGRADE_DIRECTORY
+
   #
   # Safe sysctls
   # -------------
