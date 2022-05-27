@@ -19,14 +19,6 @@ rules:
   - get
   - list
   - watch
-- apiGroups: [certificates.k8s.io]
-  resources: ['certificatesigningrequests']
-  verbs:
-    - create
-    - get
-    - delete
-    - update
-    - list
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -116,6 +108,14 @@ rules:
 - apiGroups: ['authorization.k8s.io']
   resources: ['subjectaccessreviews']
   verbs: ['create']
+- apiGroups: [certificates.k8s.io]
+  resources: ['certificatesigningrequests']
+  verbs:
+    - create
+    - get
+    - delete
+    - update
+    - list
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
