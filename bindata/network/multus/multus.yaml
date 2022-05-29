@@ -76,7 +76,12 @@ data:
       sourcedir=$DEFAULT_SOURCE_DIRECTORY
     fi
 
-    cp -rf ${sourcedir}* $DESTINATION_DIRECTORY
+    # Use a subdirectory called "upgrade" so we can atomically move fully copied files.
+    rm -Rf $DESTINATION_DIRECTORY/upgrade
+    mkdir -p $DESTINATION_DIRECTORY/upgrade
+    cp -rf ${sourcedir}* $DESTINATION_DIRECTORY/upgrade
+    mv $DESTINATION_DIRECTORY/upgrade/* $DESTINATION_DIRECTORY/
+    rm -Rf $DESTINATION_DIRECTORY/upgrade
 
     if [ $? -eq 0 ]; then
       echo "Successfully copied files in ${sourcedir} to $DESTINATION_DIRECTORY"
