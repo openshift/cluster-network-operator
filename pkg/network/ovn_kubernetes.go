@@ -269,16 +269,19 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		// IPsec is enabled
 		data.Data["OVNIPsecDaemonsetEnable"] = true
 		data.Data["OVNIPsecEnable"] = true
+		data.Data["OVNIPsecForceEncapsulation"] = c.IPsecConfig.ForceEncapsulation
 	} else {
 		if bootstrapResult.OVN.IPsecUpdateStatus != nil {
 			// IPsec has previously started and
 			// now it has been requested to be disabled
 			data.Data["OVNIPsecDaemonsetEnable"] = true
 			data.Data["OVNIPsecEnable"] = false
+			data.Data["OVNIPsecForceEncapsulation"] = false
 		} else {
 			// IPsec has never started
 			data.Data["OVNIPsecDaemonsetEnable"] = false
 			data.Data["OVNIPsecEnable"] = false
+			data.Data["OVNIPsecForceEncapsulation"] = false
 		}
 	}
 

@@ -356,8 +356,14 @@ spec:
 
                 {{ if .OVNIPsecEnable }}
                 ${OVN_NB_CTL} set nb_global . ipsec=true
+                    {{ if .OVNIPsecForceEncapsulation }}
+                ${OVN_NB_CTL} set nb_global . options:ipsec_encapsulation=true
+                    {{ else }}
+                ${OVN_NB_CTL} set nb_global . options:ipsec_encapsulation=false
+                    {{ end }}
                 {{ else }}
                 ${OVN_NB_CTL} set nb_global . ipsec=false
+                ${OVN_NB_CTL} set nb_global . set nb_global . options:ipsec_encapsulation=false
                 {{ end }}
           preStop:
             exec:

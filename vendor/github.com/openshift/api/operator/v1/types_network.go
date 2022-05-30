@@ -423,6 +423,7 @@ type HybridOverlayConfig struct {
 }
 
 type IPsecConfig struct {
+	ForceEncapsulation bool `json:forceEncapsulation,omitempty`
 }
 
 // GatewayConfig holds node gateway-related parsed config file parameters and command-line overrides
