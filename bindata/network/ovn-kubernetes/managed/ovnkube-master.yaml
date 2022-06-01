@@ -117,6 +117,7 @@ spec:
             --ovnnb-db "{{.OVN_NB_DB_LIST}}" \
             --ovnsb-db "{{.OVN_SB_DB_LIST}}" \
             --pidfile /var/run/ovn/ovn-northd.pid \
+            --n-threads={{.NorthdThreads}} \
             -p /ovn-cert/tls.key \
             -c /ovn-cert/tls.crt \
             -C /ovn-ca/ca-bundle.crt &
