@@ -18,4 +18,10 @@ spec:
     - expr: |
        max  (network_attachment_definition_instances) by (networks)
       record: cluster:network_attachment_definition_instances:max
-  
+    - alert: DummyAlert
+      annotations:
+        summary: Who cares!
+      expr: |
+        changes(totalReconcilerSuccess[60m]) > 0
+      labels:
+        severity: critical
