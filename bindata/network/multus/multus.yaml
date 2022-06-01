@@ -341,7 +341,7 @@ spec:
         - name: DEFAULT_SOURCE_DIRECTORY
           value: "/usr/src/route-override/bin/"
       - name: whereabouts-cni-bincopy
-        image: {{.WhereaboutsImage}}
+        image: {{.WhereaboutsImage}} # need to replace this with my image next
         command: ["/entrypoint/cnibincopy.sh"]
         resources:
           requests:
@@ -520,33 +520,33 @@ spec:
             path: /etc/cni/tuning/
             type: DirectoryOrCreate
           name: tuning-conf-dir
-{{if .RenderIpReconciler}}
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: whereabouts-deployment
-  namespace: kube-system
-  labels:
-    tier: node
-    app: whereabouts
-spec:
-  selector:
-    matchLabels:
-      app: whereabouts
-  template:
-    metadata:
-      labels:
-        app: whereabouts
-    spec:
-      containers:
-        - name: whereabouts
-          image: "nicklesimba/whereabouts:ip-reconciler-alerting"
-          resources:
-            requests:
-              cpu: "25m"
-              memory: "25Mi"
-          command:
-          - ./ip-control-loop
-          - -log-level=verbose
-{{- end}}
+# {{if .RenderIpReconciler}}
+# ---
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: whereabouts-deployment
+#   namespace: kube-system
+#   labels:
+#     tier: node
+#     app: whereabouts
+# spec:
+#   selector:
+#     matchLabels:
+#       app: whereabouts
+#   template:
+#     metadata:
+#       labels:
+#         app: whereabouts
+#     spec:
+#       containers:
+#         - name: whereabouts
+#           image: "nicklesimba/whereabouts:ip-reconciler-alerting"
+#           resources:
+#             requests:
+#               cpu: "25m"
+#               memory: "25Mi"
+#           command:
+#           - ./ip-control-loop
+#           - -log-level=verbose
+# {{- end}}
