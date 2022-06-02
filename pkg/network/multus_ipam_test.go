@@ -211,7 +211,7 @@ func TestRenderWithWhereabouts(t *testing.T) {
 
 	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("CronJob", "openshift-multus", "ip-reconciler")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "whereabouts-deployment")))
 }
 
 // TestRenderNoIPAM tests a rendering WITHOUT an IPAM configured.

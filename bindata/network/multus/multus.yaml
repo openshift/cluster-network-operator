@@ -572,7 +572,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: whereabouts-deployment
-  namespace: kube-system 
+  namespace: openshift-multus
   labels:
     tier: node
     app: whereabouts

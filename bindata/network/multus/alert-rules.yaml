@@ -14,7 +14,7 @@ spec:
     rules:
     - alert: IPReconcilerHasNotSucceeded
       annotations:
-        summary: Whereabouts noticed ip-reconciler cronjob hasn't succeeded in the past hour. Sending an alert for prometheus to read.
+        summary: Whereabouts noticed ip-reconciler hasn't succeeded in the past hour. Sending an alert for prometheus to read.
       expr: |
         changes(totalReconcilerSuccess[60m]) == 0
       labels:
