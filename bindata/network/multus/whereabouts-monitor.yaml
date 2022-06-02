@@ -3,10 +3,10 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    name: monitor-multus
+    name: monitor-whereabouts
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
-  name: monitor-multus
+  name: monitor-whereabouts
   namespace: openshift-multus
 spec:
   endpoints:
@@ -16,7 +16,7 @@ spec:
     scheme: 'https'
     tlsConfig:
       caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
-      serverName: multus.openshift-multus.svc
+      serverName: whereabouts.openshift-multus.svc
     scrapeTimeout: 30s
   jobLabel: app
   namespaceSelector:
@@ -24,22 +24,22 @@ spec:
     - openshift-multus
   selector:
     matchLabels:
-      app: multus
+      app: whereabouts
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: multus
+  name: whereabouts
   namespace: openshift-multus
   labels:
-    app: multus
+    app: whereabouts
 spec:
   ports:
   - name: metrics
     port: 1984
     targetPort: https
   selector:
-    app: multus
+    app: whereabouts
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

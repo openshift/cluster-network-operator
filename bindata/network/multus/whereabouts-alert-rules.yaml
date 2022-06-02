@@ -6,7 +6,7 @@ metadata:
     role: alert-rules
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
-  name: whereabouts-rules
+  name: whereabouts-alert-rules
   namespace: openshift-multus
 spec:
   groups:
@@ -14,14 +14,14 @@ spec:
     rules:
     - alert: IPReconcilerHasNotSucceeded
       annotations:
-        summary: Whereabouts noticed ip-reconciler hasn't succeeded in the past hour. Sending an alert for prometheus to read.
+        summary: Whereabouts noticed ip-reconciler hasn't succeeded in the past hour.
       expr: |
         changes(totalReconcilerSuccess[60m]) == 0
       labels:
         severity: critical
     - alert: IPReconcilerHasSucceeded
       annotations:
-        summary: Debug - Whereabouts noticed ip-reconciler has passed at least once. 
+        summary: Debug - Whereabouts noticed ip-reconciler has passed at least once in the past hour. 
       expr: |
         changes(totalReconcilerSuccess[60m]) > 0
       labels:

@@ -341,7 +341,7 @@ spec:
         - name: DEFAULT_SOURCE_DIRECTORY
           value: "/usr/src/route-override/bin/"
       - name: whereabouts-cni-bincopy
-        image: "nicklesimba/whereabouts:ip-reconciler-alerting"
+        image: {{.WhereaboutsImage}}
         command: ["/entrypoint/cnibincopy.sh"]
         resources:
           requests:
@@ -520,7 +520,7 @@ spec:
             path: /etc/cni/tuning/
             type: DirectoryOrCreate
           name: tuning-conf-dir
-{{if .RenderIpReconciler}}
+# {{if .RenderIpReconciler}}
 # ---
 # apiVersion: batch/v1
 # kind: CronJob
@@ -595,4 +595,4 @@ spec:
           command:
           - ./ip-control-loop
           - -log-level=verbose
-{{- end}}
+# {{- end}}
