@@ -520,6 +520,35 @@ spec:
             path: /etc/cni/tuning/
             type: DirectoryOrCreate
           name: tuning-conf-dir
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whereabouts-deployment
+  namespace: openshift-multus
+  labels:
+    tier: node
+    app: whereabouts
+spec:
+  selector:
+    matchLabels:
+      app: whereabouts
+  template:
+    metadata:
+      labels:
+        app: whereabouts
+    spec:
+      containers:
+        - name: whereabouts
+          image: "nicklesimba/whereabouts:ip-reconciler-alerting"
+          resources:
+            requests:
+              cpu: "25m"
+              memory: "25Mi"
+          command:
+          - ./ip-control-loop
+          - -log-level=verbose
+      serviceAccountName: multus
 # {{if .RenderIpReconciler}}
 # ---
 # apiVersion: batch/v1
@@ -567,32 +596,4 @@ spec:
 #               hostPath:
 #                 path: {{ .SystemCNIConfDir }}
 #           restartPolicy: Never
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: whereabouts-deployment
-  namespace: openshift-multus
-  labels:
-    tier: node
-    app: whereabouts
-spec:
-  selector:
-    matchLabels:
-      app: whereabouts
-  template:
-    metadata:
-      labels:
-        app: whereabouts
-    spec:
-      containers:
-        - name: whereabouts
-          image: "nicklesimba/whereabouts:ip-reconciler-alerting"
-          resources:
-            requests:
-              cpu: "25m"
-              memory: "25Mi"
-          command:
-          - ./ip-control-loop
-          - -log-level=verbose
 # {{- end}}

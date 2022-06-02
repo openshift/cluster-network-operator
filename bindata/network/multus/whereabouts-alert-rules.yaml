@@ -16,13 +16,13 @@ spec:
       annotations:
         summary: Whereabouts noticed ip-reconciler hasn't succeeded in the past hour.
       expr: |
-        changes(totalReconcilerSuccess[60m]) == 0
+        changes(reconciler_success_total[60m]) == 0
       labels:
         severity: critical
     - alert: IPReconcilerHasSucceeded
       annotations:
         summary: Debug - Whereabouts noticed ip-reconciler has passed at least once in the past hour. 
       expr: |
-        changes(totalReconcilerSuccess[60m]) > 0
+        changes(reconciler_success_total[60m]) > 0
       labels:
         severity: critical
