@@ -315,8 +315,14 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	renderOVNFlowsConfig(bootstrapResult, &data)
 	if len(bootstrapResult.OVN.MasterAddresses) == 1 {
 		data.Data["IsSNO"] = true
+		data.Data["NorthdThreads"] = 1
 	} else {
 		data.Data["IsSNO"] = false
+		// OVN 22.06 and later support multiple northd threads.
+		// Less resource constrained clusters can use multiple threads
+		// in northd to improve network operation latency at the cost
+		// of a bit of CPU.
+		data.Data["NorthdThreads"] = 4
 	}
 
 	var manifestSubDir string
