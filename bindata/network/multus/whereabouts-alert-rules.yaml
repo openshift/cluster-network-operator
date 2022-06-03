@@ -21,8 +21,8 @@ spec:
         severity: critical
     - alert: IPReconcilerHasSucceeded
       annotations:
-        summary: Debug - Whereabouts noticed ip-reconciler has passed at least once in the past hour. 
+        summary: Debug alert - Whereabouts noticed ip-reconciler has passed at least once in the past hour. 
       expr: |
         changes(reconciler_success_total[60m]) > 0
       labels:
-        severity: critical
+        severity: warning
