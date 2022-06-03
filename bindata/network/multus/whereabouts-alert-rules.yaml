@@ -16,7 +16,7 @@ spec:
       annotations:
         summary: Whereabouts noticed ip-reconciler hasn't succeeded in the past hour.
       expr: |
-        changes(reconciler_success_total[60m]) == 0
+        changes(reconciler_success_total[10m]) == 0
       labels:
         severity: critical
     - alert: IPReconcilerHasSucceeded
@@ -26,3 +26,5 @@ spec:
         changes(reconciler_success_total[60m]) > 0
       labels:
         severity: warning
+
+# changes(reconciler_success_total[10m]) == 0 <== should be changed back to 60m
