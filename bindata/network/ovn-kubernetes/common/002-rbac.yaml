@@ -52,6 +52,7 @@ rules:
 - apiGroups: [""]
   resources:
   - namespaces
+  - nodes
   - endpoints
   - services
   verbs:
@@ -77,15 +78,6 @@ rules:
   - events
   verbs:
   - create
-  - patch
-  - update
-- apiGroups: [""]
-  resources:
-  - nodes
-  verbs:
-  - get
-  - list
-  - watch
   - patch
   - update
 - apiGroups: ["k8s.ovn.org"]
