@@ -359,7 +359,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 
 	// Create minimal DaemonSets
 	dsA := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Generation: 1, ClusterName: "", Labels: sl},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Generation: 1, Labels: sl},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "alpha"},
@@ -368,7 +368,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 	set(t, client, dsA)
 	dsB := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "beta", Generation: 1, ClusterName: "", Labels: sl},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "beta", Generation: 1, Labels: sl},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "beta"},
@@ -961,7 +961,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	// Create a Deployment that isn't the one we're looking for
 
 	// Create minimal Deployment
-	depA := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", ClusterName: "", Labels: sl}}
+	depA := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Labels: sl}}
 	set(t, client, depA)
 
 	status.SetFromPods()
@@ -1031,7 +1031,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}
 
 	depB := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "beta", ClusterName: "", Labels: sl},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "beta", Labels: sl},
 		Status: appsv1.DeploymentStatus{
 			UnavailableReplicas: 1,
 		},
@@ -1044,7 +1044,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	set(t, client, depB)
 
 	ds := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "gamma", ClusterName: "", Labels: sl},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "gamma", Labels: sl},
 		Status: appsv1.DaemonSetStatus{
 			NumberUnavailable: 0,
 			NumberAvailable:   1,
