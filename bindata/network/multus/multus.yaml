@@ -524,7 +524,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: whereabouts-deployment
+  name: whereabouts-controlloop-deployment
   namespace: openshift-multus
   labels:
     tier: node
@@ -548,6 +548,9 @@ spec:
           command:
           - ./ip-control-loop
           - -log-level=verbose
+          ports:
+          - containerPort: 1984
+            protocol: TCP
       serviceAccountName: multus
 # {{if .RenderIpReconciler}}
 # ---
