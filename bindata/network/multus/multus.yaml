@@ -520,6 +520,7 @@ spec:
             path: /etc/cni/tuning/
             type: DirectoryOrCreate
           name: tuning-conf-dir
+{{if .RenderIpReconciler}}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -552,51 +553,4 @@ spec:
           - containerPort: 1984
             protocol: TCP
       serviceAccountName: multus
-# {{if .RenderIpReconciler}}
-# ---
-# apiVersion: batch/v1
-# kind: CronJob
-# metadata:
-#   name: ip-reconciler
-#   namespace: openshift-multus
-#   labels:
-#     tier: node
-#     app: whereabouts
-# spec:
-#   # reconcile loop every 15 minutes, starting at the top of the hour
-#   schedule: "*/15 * * * *"
-#   concurrencyPolicy: Replace
-#   successfulJobsHistoryLimit: 0
-#   jobTemplate:
-#     spec:
-#       backoffLimit: 0
-#       ttlSecondsAfterFinished: 900
-#       template:
-#         spec:
-#           priorityClassName: "system-cluster-critical"
-#           serviceAccountName: multus
-#           hostNetwork: true
-#           containers:
-#             - name: whereabouts
-#               image: {{.WhereaboutsImage}}
-#               resources:
-#                 requests:
-#                   cpu: "25m"
-#                   memory: "25Mi"
-#               command:
-#               - /ip-reconciler
-#               - -log-level=verbose
-#               volumeMounts:
-#                 - name: cni-net-dir
-#                   mountPath: /host/etc/cni/net.d
-#               env:
-#               - name: KUBERNETES_SERVICE_PORT
-#                 value: "{{.KUBERNETES_SERVICE_PORT}}"
-#               - name: KUBERNETES_SERVICE_HOST
-#                 value: "{{.KUBERNETES_SERVICE_HOST}}"
-#           volumes:
-#             - name: cni-net-dir
-#               hostPath:
-#                 path: {{ .SystemCNIConfDir }}
-#           restartPolicy: Never
-# {{- end}}
+{{- end}}
