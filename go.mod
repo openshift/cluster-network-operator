@@ -38,7 +38,6 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.93.3 // indirect
 	github.com/BurntSushi/toml v0.4.1 // indirect
 	github.com/Masterminds/goutils v1.1.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
