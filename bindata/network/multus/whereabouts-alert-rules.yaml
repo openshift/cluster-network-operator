@@ -16,7 +16,7 @@ spec:
       annotations:
         summary: Whereabouts noticed ip-reconciler hasn't succeeded in the past hour.
       expr: |
-        changes(reconciler_success_total[5s]) == 0
+        changes(reconciler_success_total[10m]) == 0
       labels:
         severity: critical
     - alert: IPReconcilerHasSucceeded
