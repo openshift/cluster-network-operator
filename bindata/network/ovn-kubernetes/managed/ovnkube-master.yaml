@@ -81,7 +81,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 10Mi
+            memory: 30Mi
         volumeMounts:
         - mountPath: /etc/kubernetes
           name: admin-kubeconfig
@@ -149,7 +149,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 300Mi
+            memory: 70Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
       # nbdb: the northbound, or logical network object DB. In raft mode
@@ -441,7 +441,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 300Mi
+            memory: 30Mi
         ports:
         - name: nb-db-port
           containerPort: {{.OVN_NB_PORT}}
@@ -695,7 +695,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 300Mi
+            memory: 130Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
       # ovnkube master: convert kubernetes objects in to nbdb logical network components
@@ -784,7 +784,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 300Mi
+            memory: 200Mi
         env:
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
@@ -857,7 +857,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 300Mi
+            memory: 50Mi
         env:
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
