@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
@@ -11,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	kinformer "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -38,6 +38,15 @@ const (
 	DefaultClusterName    = "default"
 	ManagementClusterName = "management"
 )
+
+func init() {
+	utilruntime.Must(operv1.Install(scheme.Scheme))
+	utilruntime.Must(hyperv1.AddToScheme(scheme.Scheme))
+	utilruntime.Must(configv1.Install(scheme.Scheme))
+	utilruntime.Must(netopv1.Install(scheme.Scheme))
+	utilruntime.Must(machineapi.AddToScheme(scheme.Scheme))
+	utilruntime.Must(op_netopv1.Install(scheme.Scheme))
+}
 
 // OperatorClusterClient is a bag of holding for object clients & informers.
 // It is generally responsible for managing informer lifecycle.
@@ -181,8 +190,6 @@ func NewClusterClient(cfg, protocfg *rest.Config) (*OperatorClusterClient, error
 		return nil, err
 	}
 
-	RegisterTypes(c.Scheme())
-
 	return &c, nil
 }
 
@@ -294,28 +301,6 @@ func (c *OperatorClusterClient) AddCustomInformer(inf cache.SharedInformer) {
 	c.informers = append(c.informers, inf)
 	if c.started {
 		go inf.Run(c.donech)
-	}
-}
-
-func RegisterTypes(s *runtime.Scheme) {
-	// Add types to the scheme.
-	if err := operv1.Install(s); err != nil {
-		log.Fatal(err)
-	}
-	if err := hyperv1.AddToScheme(s); err != nil {
-		log.Fatal(err)
-	}
-	if err := configv1.Install(s); err != nil {
-		log.Fatal(err)
-	}
-	if err := netopv1.Install(s); err != nil {
-		log.Fatal(err)
-	}
-	if err := machineapi.AddToScheme(s); err != nil {
-		log.Fatal(err)
-	}
-	if err := op_netopv1.Install(s); err != nil {
-		log.Fatal(err)
 	}
 }
 
