@@ -54,6 +54,7 @@ spec:
     - alert: SouthboundStale
       annotations:
         summary: ovn-northd has not successfully synced any changes to the southbound DB for too long.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/SouthboundStaleAlert.md
         description: |
           Networking control plane is degraded. Networking configuration updates may not be applied to the cluster or
           taking a long time to apply. This usually means there is a large load on OVN component 'northd' or it is not
