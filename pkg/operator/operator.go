@@ -31,8 +31,6 @@ type Operator struct {
 	StatusManager *statusmanager.StatusManager
 }
 
-const LOCK_NAME = "cluster-network-operator"
-
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, inClusterClientName string, extraClusters map[string]string) error {
 	o := &Operator{}
 
