@@ -316,6 +316,23 @@ spec:
               - -c
               - |
                 set -x
+
+                # With some plugins like openshift-sdn, NetworkPolicy depends on each pod's Status.PodIP being added to the policy rules.
+                # Kubelet only sets a pod's Status.PodIP when all containers of the pod have started at least once (successfully or unsuccessfully).
+                # Container start is blocked by postStart hooks. See https://github.com/kubernetes/kubernetes/issues/85966 for more details.
+                # The NB and SB DB postStart hooks block until the DBs join the RAFT cluster (which requires network connectivity) or until a timeout is reached.
+                # Thus the first time the DB containers start their pod's Status.PodIP is not yet set, so NetworkPolicy blocks connectivity, the DB can't join the RAFT cluster, and the postStart hook fails after a long timeout.  
+                # To work around this long timeout, exit early if the container has no connectivity, presumably because this is the first time the container has started and Status.PodIP is not yet set.
+                # This lets kubelet proceed with setting Status.PodIP, after which it will eventually restart the failed containers, which will now have network connectivity and succeed.
+                gwIP=$(ip route show default | cut -d ' ' -f3)
+                if [[ -z "${gwIP}" ]]; then
+                  gwIP=$(ip -6 route show default | cut -d ' ' -f3)
+                fi
+
+                if ! ping -c1 -W1 "${gwIP}" > /dev/null; then
+                  echo "${gwIP} is not reachable, exiting"
+                  exit 1
+                fi
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
 
                 rm -f /var/run/ovn/ovnnb_db.pid
@@ -603,6 +620,23 @@ spec:
               - -c
               - |
                 set -x
+
+                # With some plugins like openshift-sdn, NetworkPolicy depends on each pod's Status.PodIP being added to the policy rules.
+                # Kubelet only sets a pod's Status.PodIP when all containers of the pod have started at least once (successfully or unsuccessfully).
+                # Container start is blocked by postStart hooks. See https://github.com/kubernetes/kubernetes/issues/85966 for more details.
+                # The NB and SB DB postStart hooks block until the DBs join the RAFT cluster (which requires network connectivity) or until a timeout is reached.
+                # Thus the first time the DB containers start their pod's Status.PodIP is not yet set, so NetworkPolicy blocks connectivity, the DB can't join the RAFT cluster, and the postStart hook fails after a long timeout.  
+                # To work around this long timeout, exit early if the container has no connectivity, presumably because this is the first time the container has started and Status.PodIP is not yet set.
+                # This lets kubelet proceed with setting Status.PodIP, after which it will eventually restart the failed containers, which will now have network connectivity and succeed.
+                gwIP=$(ip route show default | cut -d ' ' -f3)
+                if [[ -z "${gwIP}" ]]; then
+                  gwIP=$(ip -6 route show default | cut -d ' ' -f3)
+                fi
+
+                if ! ping -c1 -W1 "${gwIP}" > /dev/null; then
+                  echo "${gwIP} is not reachable, exiting"
+                  exit 1
+                fi
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
                 rm -f /var/run/ovn/ovnsb_db.pid
                 if [[ "${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local" == "${CLUSTER_INITIATOR_IP}" ]]; then
