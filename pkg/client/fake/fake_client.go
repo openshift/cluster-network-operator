@@ -73,11 +73,9 @@ func NewFakeClient(objs ...crclient.Object) cnoclient.Client {
 	for _, o := range objs {
 		oo = append(oo, o)
 	}
-	scheme := scheme.Scheme
-	cnoclient.RegisterTypes(scheme)
 	fc := FakeClusterClient{
 		// kClient:   faketyped.NewSimpleClientset(oo...), // TODO: fix this, it doesn't work for non-kubernetes objects
-		dynclient: fakedynamic.NewSimpleDynamicClient(scheme, oo...),
+		dynclient: fakedynamic.NewSimpleDynamicClient(scheme.Scheme, oo...),
 		crclient:  crfake.NewClientBuilder().WithObjects(objs...).Build(),
 	}
 
