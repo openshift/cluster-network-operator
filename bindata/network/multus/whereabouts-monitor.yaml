@@ -10,7 +10,7 @@ metadata:
   namespace: openshift-multus
 spec:
   endpoints:
-  - interval: 30s
+  - interval: 5s
     port: metrics
     bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
     scheme: 'http'

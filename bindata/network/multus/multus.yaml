@@ -520,7 +520,6 @@ spec:
             path: /etc/cni/tuning/
             type: DirectoryOrCreate
           name: tuning-conf-dir
-{{if .RenderIpReconciler}}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -541,7 +540,7 @@ spec:
     spec:
       containers:
         - name: whereabouts
-          image: "nicklesimba/whereabouts:ip-reconciler-alerting"
+          image: "nicklesimba/whereabouts:ip-reconciler-alerting-7"
           resources:
             requests:
               cpu: "25m"
@@ -553,4 +552,5 @@ spec:
           - containerPort: 1984
             protocol: TCP
       serviceAccountName: multus
-{{- end}}
+# {{if .RenderIpReconciler}}
+# {{- end}}

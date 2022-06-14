@@ -1,30 +1,32 @@
-apiVersion: monitoring.coreos.com/v1
-kind: PrometheusRule
-metadata:
-  labels:
-    prometheus: k8s
-    role: alert-rules
-  annotations:
-    networkoperator.openshift.io/ignore-errors: ""
-  name: whereabouts-alert-rules
-  namespace: openshift-multus
-spec:
-  groups:
-  - name: cluster-network-operator-whereabouts.rules
-    rules:
-    - alert: IPReconcilerHasNotSucceeded
-      annotations:
-        summary: Whereabouts noticed ip-reconciler hasn't succeeded in the past hour.
-      expr: |
-        changes(reconciler_success_total[10m]) == 0
-      labels:
-        severity: critical
-    - alert: IPReconcilerHasSucceeded
-      annotations:
-        summary: Debug alert - Whereabouts noticed ip-reconciler has passed at least once in the past hour. 
-      expr: |
-        changes(reconciler_success_total[60m]) > 0
-      labels:
-        severity: warning
+# apiVersion: monitoring.coreos.com/v1
+# kind: PrometheusRule
+# metadata:
+#   labels:
+#     prometheus: k8s
+#     role: alert-rules
+#   annotations:
+#     networkoperator.openshift.io/ignore-errors: ""
+#   name: whereabouts-alert-rules
+#   namespace: openshift-multus
+# spec:
+#   groups:
+#   - name: cluster-network-operator-whereabouts.rules
+#     rules:
+#     - alert: IPReconcilerHasNotSucceeded
+#       annotations:
+#         summary: Whereabouts noticed ip-reconciler hasn't succeeded in the past 60 seconds.
+#       expr: |
+#         changes(reconciler_success_total[60s]) == 0 and reconciler_attempted > 0
+#       labels:
+#         severity: critical
+#     - alert: IPReconcilerHasSucceeded
+#       annotations:
+#         summary: Debug alert - Whereabouts noticed ip-reconciler has passed at least once in the past 60 seconds. 
+#       expr: |
+#         changes(reconciler_success_total[60s]) > 0 and reconciler_attempted > 0
+#       labels:
+#         severity: warning
+# {{if .RenderIpReconciler}}
+# {{- end}}
 
-# changes(reconciler_success_total[10m]) == 0 <== should be changed back to 60m
+# changes(reconciler_success_total[3s]) == 0 <== should be changed back to 60m

@@ -49,7 +49,7 @@ func TestRenderMultus(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus")))
 
 	// It's important that the namespace is first
-	g.Expect(len(objs)).To(Equal(29), "Expected 29 multus related objects")
+	g.Expect(len(objs)).To(Equal(29), "Expected 29 multus related objects") // change back to 28 after reintroducing conditional RenderIpReconciler
 	g.Expect(objs[0]).To(HaveKubernetesID("CustomResourceDefinition", "", "network-attachment-definitions.k8s.cni.cncf.io"))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Namespace", "", "openshift-multus")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "multus")))
