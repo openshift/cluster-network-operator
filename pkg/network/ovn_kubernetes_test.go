@@ -161,6 +161,7 @@ func TestRenderedOVNKubernetesConfig(t *testing.T) {
 		egressIPConfig      *operv1.EgressIPConfig
 		masterIPs           []string
 		v4InternalSubnet    string
+		disableGRO          bool
 	}
 	testcases := []testcase{
 		{
@@ -172,6 +173,7 @@ cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -200,6 +202,7 @@ cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -230,6 +233,7 @@ cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -272,6 +276,7 @@ cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -317,6 +322,7 @@ cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -362,6 +368,7 @@ cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -406,6 +413,7 @@ cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -440,6 +448,7 @@ cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -466,6 +475,36 @@ election-retry-period=26`,
 			gatewayConfig: &operv1.GatewayConfig{
 				RoutingViaHost: false,
 			},
+		},
+		{
+			desc: "disable UDP aggregation",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=1048576
+enable-udp-aggregation=false
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://testing.test:8443"
+host-network-namespace="openshift-host-network"
+platform-type="GCP"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+egressip-node-healthcheck-port=9107
+
+[gateway]
+mode=shared
+nodeport=true`,
+			masterIPs:  []string{"1.2.3.4", "2.3.4.5"},
+			disableGRO: true,
 		},
 	}
 	g := NewGomegaWithT(t)
@@ -504,6 +543,7 @@ election-retry-period=26`,
 					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 						Enabled: false,
 					},
+					DisableUDPAggregation: tc.disableGRO,
 				},
 			}
 			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
@@ -1966,6 +2006,49 @@ func TestBootStrapOvsConfigMap_UnexistingMap(t *testing.T) {
 
 	// without sharedTarget nor nodePort, flow collection can't be set
 	assert.Nil(t, fc)
+}
+
+func Test_getDisableUDPAggregation(t *testing.T) {
+	var disable bool
+
+	disable = getDisableUDPAggregation(&fakeClientReader{configMap: nil})
+	assert.Equal(t, false, disable, "with no configmap")
+
+	disable = getDisableUDPAggregation(&fakeClientReader{
+		configMap: &v1.ConfigMap{
+			Data: map[string]string{
+				"friday": "2",
+			},
+		},
+	})
+	assert.Equal(t, false, disable, "with bad configmap")
+
+	disable = getDisableUDPAggregation(&fakeClientReader{
+		configMap: &v1.ConfigMap{
+			Data: map[string]string{
+				"disable-udp-aggregation": "false",
+			},
+		},
+	})
+	assert.Equal(t, false, disable, "with configmap that sets 'disable-udp-aggregation' to 'false'")
+
+	disable = getDisableUDPAggregation(&fakeClientReader{
+		configMap: &v1.ConfigMap{
+			Data: map[string]string{
+				"disable-udp-aggregation": "bad",
+			},
+		},
+	})
+	assert.Equal(t, false, disable, "with configmap that sets 'disable-udp-aggregation' to 'bad'")
+
+	disable = getDisableUDPAggregation(&fakeClientReader{
+		configMap: &v1.ConfigMap{
+			Data: map[string]string{
+				"disable-udp-aggregation": "true",
+			},
+		},
+	})
+	assert.Equal(t, true, disable, "with configmap that sets 'disable-udp-aggregation' to 'true'")
 }
 
 type fakeClientReader struct {
