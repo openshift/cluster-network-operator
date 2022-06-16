@@ -170,6 +170,7 @@ cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -197,6 +198,7 @@ cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -237,6 +239,7 @@ cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -280,6 +283,7 @@ cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -313,6 +317,7 @@ cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
 encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
