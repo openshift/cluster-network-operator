@@ -71,7 +71,7 @@ All SLOs have to present a unified API: they watch configuration in the `config.
 ### Install & Upgrade Orderings
 
 The CVO has a notion of 
-[run levels](https://github.com/openshift/cluster-version-operator/blob/master/docs/dev/operators.md#how-do-i-get-added-as-a-special-run-level),
+[run levels](https://github.com/openshift/enhancements/blob/master/dev-guide/cluster-version-operator/dev/operators.md#how-do-i-get-added-as-a-special-run-level),
 which dictate the order in which components are **upgraded**. Presently, the CNO 
 (and thus its operands) are runlevel 07, which is comparatively early. At 
 install-time, however, all components are installed at once.
