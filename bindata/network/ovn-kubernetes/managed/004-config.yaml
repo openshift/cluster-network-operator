@@ -97,6 +97,12 @@ data:
     enable-egress-ip=true
     enable-egress-firewall=true
     enable-egress-qos=true
+    {{- /*
+    In hypershift ovnkube-master pods run in the management cluster and they don't have direct connectivity to ovnkube-node pods(hosted cluster).
+    EgressIP reachability check tries to open a connection to egress nodes management IP which doesn't currently work in a hypershift deployment.
+    As a workaround disable EgressIP reachability check, this means EgressIP will take longer to reassign if there is a node that becomes unreachable.
+    */}}
+    egressip-reachability-total-timeout=0
 
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
