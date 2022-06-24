@@ -16,6 +16,7 @@ data:
     encap-port="{{.GenevePort}}"
     enable-lflow-cache=true
     lflow-cache-limit-kb=1048576
+    enable-udp-aggregation=true
 
     [kubernetes]
     service-cidrs="{{.OVN_service_cidr}}"
