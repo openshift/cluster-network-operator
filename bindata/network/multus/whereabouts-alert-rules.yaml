@@ -1,3 +1,4 @@
+{{if .RenderIpReconciler}}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -26,7 +27,6 @@ spec:
         changes(reconciler_success_total[60s]) > 0 and reconciler_attempted > 0
       labels:
         severity: warning
-# {{if .RenderIpReconciler}}
-# {{- end}}
+{{- end}}
 
 # changes(reconciler_success_total[3s]) == 0 <== should be changed back to 60m

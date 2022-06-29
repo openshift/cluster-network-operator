@@ -444,6 +444,8 @@ spec:
             }
             EOF
 
+            chmod 644 $WHEREABOUTS_GLOBALCONFIG
+
             else
               warn "Doesn't look like we're running in a kubernetes environment (no serviceaccount token)"
             fi
@@ -521,6 +523,7 @@ spec:
             type: DirectoryOrCreate
           name: tuning-conf-dir
 ---
+{{if .RenderIpReconciler}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -540,7 +543,7 @@ spec:
     spec:
       containers:
         - name: whereabouts
-          image: "nicklesimba/whereabouts:ip-reconciler-alerting-7"
+          image: "nicklesimba/whereabouts:ip-reconciler-alerting-8"
           resources:
             requests:
               cpu: "25m"
@@ -551,6 +554,12 @@ spec:
           ports:
           - containerPort: 1984
             protocol: TCP
+          volumeMounts:
+          - name: system-cni-dir
+            mountPath: /host/etc/cni/net.d/whereabouts.d/
       serviceAccountName: multus
-# {{if .RenderIpReconciler}}
-# {{- end}}
+      volumes:
+        - name: system-cni-dir
+          hostPath:
+            path: {{ .SystemCNIConfDir }}/whereabouts.d
+{{- end}}

@@ -226,9 +226,8 @@ func TestRenderNoIPAM(t *testing.T) {
 	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "dhcp-daemon")))
-	// g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "whereabouts-controlloop-deployment")))
-	// g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("PrometheusRule", "openshift-multus", "whereabouts-alert-rules")))
-	// uncomment the above two lines after reintroducing conditional RenderIpReconciler
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "whereabouts-controlloop-deployment")))
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("PrometheusRule", "openshift-multus", "whereabouts-alert-rules")))
 }
 
 // TestRenderInvalidIPAMConfig tests a rendering without auxiliary IPAM, due to an invalid IPAM configuration.
@@ -242,9 +241,8 @@ func TestRenderInvalidIPAMConfig(t *testing.T) {
 	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "dhcp-daemon")))
-	// g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "whereabouts-controlloop-deployment")))
-	// g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("PrometheusRule", "openshift-multus", "whereabouts-alert-rules")))
-	// uncomment the above two lines after reintroducing conditional RenderIpReconciler
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "whereabouts-controlloop-deployment")))
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("PrometheusRule", "openshift-multus", "whereabouts-alert-rules")))
 }
 
 // TestRenderWithDHCPSimpleMacvlan tests a rendering with the DHCP daemonset SimpleMacvlan.
