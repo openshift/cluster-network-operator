@@ -475,6 +475,43 @@ func renderOVNFlowsConfig(bootstrapResult *bootstrap.BootstrapResult, data *rend
 	}
 }
 
+// getHCPData is a helper to fetch data from the HCP Hypershift unstructured resource.
+// This is useful until hypershift API becomes beta to avoid possible changes in the API to break typed unmarshalling here.
+func getHCPData(hcp *uns.Unstructured) (string, hyperv1.AvailabilityPolicy, []hyperv1.ServicePublishingStrategyMapping, error) {
+	clusterID, _, err := uns.NestedString(hcp.Object, "spec", "clusterID")
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to find clusterID: %w", err)
+	}
+
+	controllerAvailabilityPolicyString, _, err := uns.NestedString(hcp.Object, "spec", "controllerAvailabilityPolicy")
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to find controllerAvailabilityPolicy: %w", err)
+	}
+	controllerAvailabilityPolicy := hyperv1.AvailabilityPolicy(controllerAvailabilityPolicyString)
+
+	servicesSlice, _, err := uns.NestedSlice(hcp.Object, "spec", "services")
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to find services: %w", err)
+	}
+
+	var services []hyperv1.ServicePublishingStrategyMapping
+	for _, serviceInterface := range servicesSlice {
+		serviceUnstructured, ok := serviceInterface.(map[string]interface{})
+		if !ok {
+			return "", "", nil, fmt.Errorf("failed to convert service into unstructured: %w", err)
+		}
+
+		servicePublishingStrategyMapping := &hyperv1.ServicePublishingStrategyMapping{}
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(serviceUnstructured, servicePublishingStrategyMapping)
+		if err != nil {
+			return "", "", nil, fmt.Errorf("failed to convert unstructured into servicePublishingStrategyMapping %w", err)
+		}
+
+		services = append(services, *servicePublishingStrategyMapping)
+	}
+	return clusterID, controllerAvailabilityPolicy, services, nil
+}
+
 func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Client) (*bootstrap.OVNHyperShiftBootstrapResult, error) {
 	ovnHypershiftResult := &bootstrap.OVNHyperShiftBootstrapResult{
 		Enabled:   hc.Enabled,
@@ -485,24 +522,35 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 		return ovnHypershiftResult, nil
 	}
 
-	hcp := &hyperv1.HostedControlPlane{ObjectMeta: metav1.ObjectMeta{Name: hc.Name}}
+	// Fetch HCP as unstructured to reduce friction while API is alpha.
+	hcp := &uns.Unstructured{}
+	hcp.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "hypershift.openshift.io",
+		Kind:    "HostedControlPlane",
+		Version: "v1alpha1",
+	})
 	err := kubeClient.ClientFor(cnoclient.ManagementClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, hcp)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			klog.Infof("Did not find hosted control plane")
 		} else {
-			return nil, fmt.Errorf("Could not get hosted control plane: %v", err)
+			return nil, fmt.Errorf("could not get hosted control plane: %v", err)
 		}
 	}
 
-	ovnHypershiftResult.ClusterID = hcp.Spec.ClusterID
-	switch hcp.Spec.ControllerAvailabilityPolicy {
+	clusterID, controllerAvailabilityPolicy, services, err := getHCPData(hcp)
+	if err != nil {
+		return nil, fmt.Errorf(" %w", err)
+	}
+
+	ovnHypershiftResult.ClusterID = clusterID
+	switch controllerAvailabilityPolicy {
 	case hyperv1.HighlyAvailable:
 		ovnHypershiftResult.ControlPlaneReplicas = 3
 	default:
 		ovnHypershiftResult.ControlPlaneReplicas = 1
 	}
-	for _, svc := range hcp.Spec.Services {
+	for _, svc := range services {
 		// TODO: instead of the hardcoded string use ServiceType hyperv1.OVNSbDb once the API is updated
 		if svc.Service == "OVNSbDb" {
 			s := svc.ServicePublishingStrategy

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
+	hyperv1 "github.com/openshift/hypershift/api/v1alpha1"
 	"os"
 	"strconv"
 	"strings"
@@ -1921,4 +1923,63 @@ func uintPtr(x uint) *uint {
 
 func boolPtr(x bool) *bool {
 	return &x
+}
+
+func TestGetHCPData(t *testing.T) {
+	wantClusterID := "test"
+	wantAvailabilityPolicy := hyperv1.AvailabilityPolicy("test")
+	wantServices := []hyperv1.ServicePublishingStrategyMapping{
+		{
+			Service: "test",
+			ServicePublishingStrategy: hyperv1.ServicePublishingStrategy{
+				Type: "test",
+				NodePort: &hyperv1.NodePortPublishingStrategy{
+					Address: "test",
+					Port:    0,
+				},
+				LoadBalancer: nil,
+				Route:        nil,
+			},
+		},
+		{
+			Service: "test",
+			ServicePublishingStrategy: hyperv1.ServicePublishingStrategy{
+				Type: "test",
+				NodePort: &hyperv1.NodePortPublishingStrategy{
+					Address: "test",
+					Port:    0,
+				},
+				LoadBalancer: &hyperv1.LoadBalancerPublishingStrategy{
+					Hostname: "test",
+				},
+				Route: nil,
+			},
+		},
+	}
+	hcp := &hyperv1.HostedControlPlane{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1alpha1",
+			Kind:       "HostedControlPlane",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "test",
+		},
+		Spec: hyperv1.HostedControlPlaneSpec{
+			ReleaseImage:                 "",
+			ClusterID:                    wantClusterID,
+			ControllerAvailabilityPolicy: wantAvailabilityPolicy,
+			Services:                     wantServices,
+		},
+	}
+	g := NewGomegaWithT(t)
+
+	obj, err := k8sutil.ToUnstructured(hcp)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	clusterID, availabilityPolicy, services, err := getHCPData(obj)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(clusterID).To(BeEquivalentTo(wantClusterID))
+	g.Expect(availabilityPolicy).To(BeEquivalentTo(wantAvailabilityPolicy))
+	g.Expect(services).To(BeEquivalentTo(wantServices))
 }
