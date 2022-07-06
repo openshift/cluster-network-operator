@@ -66,6 +66,27 @@ spec:
                 app: ovnkube-master
             topologyKey: topology.kubernetes.io/zone
       priorityClassName: hypershift-api-critical
+      initContainers:
+      # Remove once https://github.com/kubernetes/kubernetes/issues/85966 is addressed
+      - name: init-ip
+        command:
+          - /bin/bash
+          - -c
+          - |
+            cat <<-EOF
+            Kubelet only sets a pod's Status.PodIP when all containers of the pod have started at least once (successfully or unsuccessfully)
+             or at least one of the initContainers finished.
+            Container start is blocked by postStart hooks. See https://github.com/kubernetes/kubernetes/issues/85966 for more details.
+            The NB and SB DB postStart hooks block until the DBs join the RAFT cluster or until a timeout is reached.
+            In a standalone cluster every pod is host networked and the DBs use host IP to communicate between the RAFT members.
+            In HyperShift OVN-Kubernetes master is run as a statefulset and the pods are not host networked, meaning we cannot rely on the podIP not changing.
+            To provide a stable network identity for each pod in the statefulset we use a headless service,
+             the downside of this approach is the DNS entry for the pod will only start to work after the pod has its Status.PodIP set.
+
+            Until https://github.com/kubernetes/kubernetes/issues/85966 is fixed use a no-op init container as a workaround.
+            This allows for pod-pod connectivity in postStart hooks the first time they run.
+            EOF
+        image: "{{.OvnImage}}"
       containers:
       # token-minter creates a token with the default service account path
       # The token is read by ovn-k containers to authenticate against the hosted cluster api server
