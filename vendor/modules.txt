@@ -208,7 +208,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20220525145417-ee5b62754c68
+# github.com/openshift/api v0.0.0-20220525145417-ee5b62754c68 => github.com/kyrtapz/api v0.0.0-20220706115439-0618a03a8b91
 ## explicit; go 1.16
 github.com/openshift/api
 github.com/openshift/api/apiserver
@@ -1415,6 +1415,7 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
+# github.com/openshift/api => github.com/kyrtapz/api v0.0.0-20220706115439-0618a03a8b91
 # github.com/openshift/hypershift/api => github.com/openshift/hypershift v0.0.0-20220323152148-c356b8b72d66
 # kubevirt.io/containerized-data-importer-api => github.com/kubevirt/containerized-data-importer-api v1.41.1-0.20211201033752-05520fb9f18d
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.24

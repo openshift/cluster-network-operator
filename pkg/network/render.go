@@ -220,6 +220,12 @@ func FillDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 		conf.UseMultiNetworkPolicy = &disable
 	}
 
+	// DisableNetworkDiagnostics defaults to false
+	if conf.DisableNetworkDiagnostics == nil {
+		disable := false
+		conf.DisableNetworkDiagnostics = &disable
+	}
+
 	if len(conf.LogLevel) == 0 {
 		conf.LogLevel = "Normal"
 	}
@@ -641,7 +647,7 @@ func renderMultiNetworkpolicy(conf *operv1.NetworkSpec, manifestDir string) ([]*
 
 // renderNetworkDiagnostics renders the connectivity checks
 func renderNetworkDiagnostics(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
-	if conf.DisableNetworkDiagnostics {
+	if *conf.DisableNetworkDiagnostics {
 		return nil, nil
 	}
 
