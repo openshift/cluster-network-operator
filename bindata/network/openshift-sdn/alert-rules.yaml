@@ -40,7 +40,7 @@ spec:
         summary: OpenShift SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} is taking too long to update proxy rules for services.
         description: Configuration of proxy rules for Kubernetes services in the node is taking too long and stale endpoints may exist.
       expr: |
-        histogram_quantile(.95, kubeproxy_sync_proxy_rules_duration_seconds_bucket)
+        histogram_quantile(.95, sum(rate(kubeproxy_sync_proxy_rules_duration_seconds_bucket[5m])) by (le, namespace, pod))
         * on(namespace, pod) group_right topk by (namespace, pod) (1, kube_pod_info{namespace="openshift-sdn",  pod=~"sdn-[^-]*"}) > 15
       labels:
         severity: warning
