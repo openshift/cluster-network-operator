@@ -543,7 +543,7 @@ spec:
     spec:
       containers:
         - name: whereabouts
-          image: "nicklesimba/whereabouts:ip-reconciler-alerting-8"
+          image: "nicklesimba/whereabouts:prometheus-metrics"
           resources:
             requests:
               cpu: "25m"
