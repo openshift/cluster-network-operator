@@ -288,6 +288,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVN_GATEWAY_MODE"] = OVN_SHARED_GW_MODE
 	}
 
+	data.Data["ReachabilityTotalTimeoutSeconds"] = c.EgressIPConfig.ReachabilityTotalTimeoutSeconds
+
 	exportNetworkFlows := conf.ExportNetworkFlows
 	if exportNetworkFlows != nil {
 		if exportNetworkFlows.NetFlow != nil {
