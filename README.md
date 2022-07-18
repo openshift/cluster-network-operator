@@ -203,6 +203,8 @@ OVNKubernetes supports the following configuration options, all of which are opt
 * `policyAuditConfig`: holds the configuration for network policy audit events.
 * `gatewayConfig`: holds the configuration for node gateway options.
   * `routingViaHost`: If set to true, pod egress traffic will touch host networking stack before being sent out.
+* `egressIPConfig`: holds the configuration for EgressIP options.
+  * `reachabilityTotalTimeoutSeconds`: Set EgressIP node reachability total timeout in seconds, 0 means disable reachability check and the default is 1 second.
 
 These configuration flags are only in the Operator configuration object.
 
@@ -216,6 +218,8 @@ spec:
       genevePort: 6081
       gatewayConfig:
         routingViaHost: false
+      egressIPConfig:
+        reachabilityTotalTimeoutSeconds: 5
 ```
 
 Additionally, you can configure per-node verbosity for ovn-kubernetes. This is useful
