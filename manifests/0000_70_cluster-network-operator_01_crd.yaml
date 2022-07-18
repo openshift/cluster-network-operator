@@ -150,7 +150,7 @@ spec:
                         minimum: 0
                         type: integer
                       enablePortPoolsPrepopulation:
-                        description: enablePortPoolsPrepopulation when true will make Kuryr prepopulate each newly created port pool with a minimum number of ports. Kuryr uses Neutron port pooling to fight the fact that it takes a significant amount of time to create one. Instead of creating it when pod is being deployed, Kuryr keeps a number of ports ready to be attached to pods. By default port prepopulation is disabled.
+                        description: enablePortPoolsPrepopulation when true will make Kuryr prepopulate each newly created port pool with a minimum number of ports. Kuryr uses Neutron port pooling to fight the fact that it takes a significant amount of time to create one. It creates a number of ports when the first pod that is configured to use the dedicated network for pods is created in a namespace, and keeps them ready to be attached to pods. Port prepopulation is disabled by default.
                         type: boolean
                       mtu:
                         description: mtu is the MTU that Kuryr should use when creating pod networks in Neutron. The value has to be lower or equal to the MTU of the nodes network and Neutron has to allow creation of tenant networks with such MTU. If unset Pod networks will be created with the same MTU as the nodes network has.
@@ -199,6 +199,16 @@ spec:
                   ovnKubernetesConfig:
                     description: ovnKubernetesConfig configures the ovn-kubernetes plugin.
                     properties:
+                      egressIPConfig:
+                        description: egressIPConfig holds the configuration for EgressIP options.
+                        properties:
+                          reachabilityTotalTimeoutSeconds:
+                            description: reachabilityTotalTimeout configures the EgressIP node reachability check total timeout in seconds. If the EgressIP node cannot be reached within this timeout, the node is declared down. Setting a large value may cause the EgressIP feature to react slowly to node changes. In particular, it may react slowly for EgressIP nodes that really have a genuine problem and are unreachable. When omitted, this means the user has no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is 1 second. A value of 0 disables the EgressIP node's reachability check.
+                            format: int32
+                            maximum: 60
+                            minimum: 0
+                            type: integer
+                        type: object
                       gatewayConfig:
                         description: gatewayConfig holds the configuration for node gateway options.
                         properties:
@@ -242,7 +252,6 @@ spec:
                         minimum: 0
                         type: integer
                       policyAuditConfig:
-                        default: {}
                         description: policyAuditConfig is the configuration for network policy audit events. If unset, reported defaults are used.
                         properties:
                           destination:
@@ -266,6 +275,12 @@ spec:
                             description: syslogFacility the RFC5424 facility for generated messages, e.g. "kern". Default is "local0"
                             type: string
                         type: object
+                      v4InternalSubnet:
+                        description: v4InternalSubnet is a v4 subnet used internally by ovn-kubernetes in case the default one is being already used by something else. It must not overlap with any other subnet being used by OpenShift or by the node network. The size of the subnet must be larger than the number of nodes. The value cannot be changed after installation. Default is 100.64.0.0/16
+                        type: string
+                      v6InternalSubnet:
+                        description: v6InternalSubnet is a v6 subnet used internally by ovn-kubernetes in case the default one is being already used by something else. It must not overlap with any other subnet being used by OpenShift or by the node network. The size of the subnet must be larger than the number of nodes. The value cannot be changed after installation. Default is fd98::/48
+                        type: string
                     type: object
                   type:
                     description: type is the type of network All NetworkTypes are supported except for NetworkTypeRaw
