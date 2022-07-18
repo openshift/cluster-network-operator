@@ -32,6 +32,9 @@ data:
     enable-egress-ip=true
     enable-egress-firewall=true
     enable-egress-qos=true
+    {{- if .ReachabilityTotalTimeoutSeconds }}
+    egressip-reachability-total-timeout={{.ReachabilityTotalTimeoutSeconds}}
+    {{- end }}
 
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}

@@ -158,6 +158,7 @@ func TestRenderedOVNKubernetesConfig(t *testing.T) {
 		expected            string
 		hybridOverlayConfig *operv1.HybridOverlayConfig
 		gatewayConfig       *operv1.GatewayConfig
+		egressIPConfig      *operv1.EgressIPConfig
 		masterIPs           []string
 	}
 	testcases := []testcase{
@@ -227,6 +228,97 @@ cluster-subnets="10.132.0.0/14"`,
 			},
 			gatewayConfig: &operv1.GatewayConfig{
 				RoutingViaHost: true,
+			},
+
+			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
+		},
+		{
+			desc: "EgressIPConfig",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://testing.test:8443"
+host-network-namespace="openshift-host-network"
+no-hostsubnet-nodes="kubernetes.io/os=windows"
+platform-type="GCP"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+egressip-reachability-total-timeout=3
+
+[gateway]
+mode=local
+nodeport=true
+
+[hybridoverlay]
+enabled=true
+cluster-subnets="10.132.0.0/14"`,
+			hybridOverlayConfig: &operv1.HybridOverlayConfig{
+				HybridClusterNetwork: []operv1.ClusterNetworkEntry{
+					{CIDR: "10.132.0.0/14", HostPrefix: 23},
+				},
+			},
+			gatewayConfig: &operv1.GatewayConfig{
+				RoutingViaHost: true,
+			},
+			egressIPConfig: &operv1.EgressIPConfig{
+				ReachabilityTotalTimeoutSeconds: ptrToUint32(3),
+			},
+			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
+		},
+		{
+			desc: "EgressIPConfig with disable reachability check",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://testing.test:8443"
+host-network-namespace="openshift-host-network"
+no-hostsubnet-nodes="kubernetes.io/os=windows"
+platform-type="GCP"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+egressip-reachability-total-timeout=0
+
+[gateway]
+mode=local
+nodeport=true
+
+[hybridoverlay]
+enabled=true
+cluster-subnets="10.132.0.0/14"`,
+			hybridOverlayConfig: &operv1.HybridOverlayConfig{
+				HybridClusterNetwork: []operv1.ClusterNetworkEntry{
+					{CIDR: "10.132.0.0/14", HostPrefix: 23},
+				},
+			},
+			gatewayConfig: &operv1.GatewayConfig{
+				RoutingViaHost: true,
+			},
+			egressIPConfig: &operv1.EgressIPConfig{
+				ReachabilityTotalTimeoutSeconds: ptrToUint32(0),
 			},
 			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
 		},
@@ -356,7 +448,9 @@ election-retry-period=26`,
 			if tc.hybridOverlayConfig != nil {
 				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig = tc.gatewayConfig
 			}
-
+			if tc.egressIPConfig != nil {
+				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.EgressIPConfig = *tc.egressIPConfig
+			}
 			//set a few inputs so that the tests are not machine dependant
 			OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.MTU = ptrToUint32(1500)
 
