@@ -5,15 +5,23 @@ metadata:
   name: {{.MultusValidatingWebhookName}}
   labels:
     app: multus-admission-controller
+{{- if not .HyperShiftEnabled}}
+# Webhook cannot use the injected CA bundle in hypershift since the endpoint runs in the management cluster
   annotations:
     service.beta.openshift.io/inject-cabundle: "true"
+{{- end }}
 webhooks:
   - name: multus-validating-config.k8s.io
     clientConfig:
+{{- if .HyperShiftEnabled}}
+      url: "https://multus-admission-controller.{{.AdmissionControllerNamespace}}.svc/validate"
+      caBundle: {{.ManagementServiceCABundle}}
+{{ else }}
       service:
         name: multus-admission-controller
-        namespace: openshift-multus
+        namespace: {{.AdmissionControllerNamespace}}
         path: "/validate"
+{{- end }}
     rules:
       - operations: [ "CREATE", "UPDATE" ]
         apiGroups: ["k8s.cni.cncf.io"]

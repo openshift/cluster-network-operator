@@ -1,10 +1,10 @@
 package network
 
 import (
-	"github.com/openshift/cluster-network-operator/pkg/client"
-	"github.com/openshift/cluster-network-operator/pkg/names"
 	"os"
 	"path/filepath"
+
+	"github.com/openshift/cluster-network-operator/pkg/names"
 
 	"github.com/pkg/errors"
 
@@ -86,12 +86,12 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		data.Data["CLIImage"] = os.Getenv("CLI_IMAGE")
 		data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
 		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
-		data.Data["ManagementClusterName"] = client.ManagementClusterName
+		data.Data["ManagementClusterName"] = names.ManagementClusterName
 		data.Data["HostedClusterNamespace"] = hcpCfg.Namespace
 		caOverride.ObjectMeta = metav1.ObjectMeta{
 			Namespace:   hcpCfg.Namespace,
 			Name:        "cloud-network-config-controller-kube-cloud-config",
-			Annotations: map[string]string{names.ClusterNameAnnotation: client.ManagementClusterName},
+			Annotations: map[string]string{names.ClusterNameAnnotation: names.ManagementClusterName},
 		}
 		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "cloud-network-config-controller/managed"))
 	} else {

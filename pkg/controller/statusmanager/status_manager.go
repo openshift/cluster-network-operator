@@ -266,7 +266,7 @@ func (status *StatusManager) writeHypershiftStatus(operStatus *operv1.NetworkSta
 	}
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		hcp := &hyperv1.HostedControlPlane{ObjectMeta: metav1.ObjectMeta{Name: status.hyperShiftConfig.Name}}
-		err := status.client.ClientFor(cnoclient.ManagementClusterName).CRClient().Get(
+		err := status.client.ClientFor(names.ManagementClusterName).CRClient().Get(
 			context.TODO(), types.NamespacedName{Namespace: status.hyperShiftConfig.Namespace, Name: status.hyperShiftConfig.Name}, hcp)
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -310,7 +310,7 @@ func (status *StatusManager) writeHypershiftStatus(operStatus *operv1.NetworkSta
 			buf = []byte(fmt.Sprintf("(failed to convert to YAML: %s)", err))
 		}
 
-		if err := status.client.ClientFor(cnoclient.ManagementClusterName).CRClient().Status().Update(context.TODO(), hcp); err != nil {
+		if err := status.client.ClientFor(names.ManagementClusterName).CRClient().Status().Update(context.TODO(), hcp); err != nil {
 			return err
 		}
 		log.Printf("Set HostedControlPlane conditions:\n%s", buf)

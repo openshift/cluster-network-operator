@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	clientConfig "github.com/openshift/library-go/pkg/config/client"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -34,9 +35,7 @@ import (
 )
 
 const (
-	defaultResyncPeriod   = 5 * time.Minute
-	DefaultClusterName    = "default"
-	ManagementClusterName = "management"
+	defaultResyncPeriod = 5 * time.Minute
 )
 
 func init() {
@@ -138,7 +137,7 @@ func (c *OperatorClient) ClientFor(name string) ClusterClient {
 }
 
 func (c *OperatorClient) Default() ClusterClient {
-	return c.clusterClients[DefaultClusterName]
+	return c.clusterClients[names.DefaultClusterName]
 }
 
 func (c *OperatorClient) Start(ctx context.Context) error {
