@@ -2,9 +2,16 @@ package network
 
 import (
 	"context"
+	"encoding/base64"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -12,7 +19,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 )
 
@@ -21,11 +27,11 @@ import (
 var ignoredNamespaces string
 
 // getOpenshiftNamespaces collect openshift related namespaces, as comma separate list
-func getOpenshiftNamespaces(client kubernetes.Interface) (string, error) {
+func getOpenshiftNamespaces(client cnoclient.Client) (string, error) {
 	namespaces := []string{}
 
 	// get openshift specific namespaces to add them into ignoreNamespace
-	nsList, err := client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{
+	nsList, err := client.Default().Kubernetes().CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: "openshift.io/cluster-monitoring==true",
 	})
 	if err != nil {
@@ -39,10 +45,11 @@ func getOpenshiftNamespaces(client kubernetes.Interface) (string, error) {
 }
 
 // renderMultusAdmissonControllerConfig returns the manifests of Multus Admisson Controller
-func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPlane bool, replicas int, client kubernetes.Interface) ([]*uns.Unstructured, error) {
+func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 	var err error
 
+	replicas := getMultusAdmissionControllerReplicas(bootstrapResult)
 	if ignoredNamespaces == "" {
 		ignoredNamespaces, err = getOpenshiftNamespaces(client)
 		if err != nil {
@@ -59,6 +66,33 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 	data.Data["ExternalControlPlane"] = externalControlPlane
 	data.Data["Replicas"] = replicas
+	// Hypershift
+	hsc := NewHyperShiftConfig()
+	data.Data["HyperShiftEnabled"] = hsc.Enabled
+	data.Data["ManagementClusterName"] = names.ManagementClusterName
+	data.Data["AdmissionControllerNamespace"] = "openshift-multus"
+	if hsc.Enabled {
+		data.Data["AdmissionControllerNamespace"] = hsc.Namespace
+		data.Data["KubernetesServiceHost"] = bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal].Host
+		data.Data["KubernetesServicePort"] = bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal].Port
+		data.Data["CLIImage"] = os.Getenv("CLI_IMAGE")
+		data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
+		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
+
+		// Get serving CA from the management cluster since the service resides there
+		serviceCA := &corev1.ConfigMap{}
+		err := client.ClientFor(names.ManagementClusterName).CRClient().Get(
+			context.TODO(), types.NamespacedName{Namespace: hsc.Namespace, Name: "openshift-service-ca.crt"}, serviceCA)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get managments clusters service CA: %v", err)
+		}
+		ca, exists := serviceCA.Data["service-ca.crt"]
+		if !exists {
+			return nil, fmt.Errorf("(%s) %s/%s missing 'service-ca.crt' key", serviceCA.GroupVersionKind(), serviceCA.Namespace, serviceCA.Name)
+		}
+
+		data.Data["ManagementServiceCABundle"] = base64.URLEncoding.EncodeToString([]byte(ca))
+	}
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus-admission-controller"), &data)
 	if err != nil {

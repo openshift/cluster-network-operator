@@ -160,3 +160,9 @@ const IPFamilyDualStack = "dual-stack"
 // of the apiserver, but only for rendered manifests. CNO itself will not use it
 const EnvApiOverrideHost = "APISERVER_OVERRIDE_HOST"
 const EnvApiOverridePort = "APISERVER_OVERRIDE_PORT"
+
+// ManagementClusterName provides the name of the management cluster, for use with Hypershift.
+const ManagementClusterName = "management"
+
+// DefaultClusterName provides the name of the default cluster, for use with Hypershift (or non-Hypershift)
+const DefaultClusterName = "default"
