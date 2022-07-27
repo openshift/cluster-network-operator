@@ -26,7 +26,7 @@ spec:
         openshift.io/component: network
         configuration-hash: {{ .ConfigMapHash }}
     spec:
-      serviceAccountName: kuryr
+      serviceAccountName: kuryr-controller
       hostNetwork: true
       priorityClassName: system-cluster-critical
       containers:

@@ -27,7 +27,7 @@ spec:
         type: infra
         openshift.io/component: network
     spec:
-      serviceAccountName: kuryr
+      serviceAccountName: kuryr-controller
       containers:
       - name: kuryr-dns-admission-controller
         image: {{ .ControllerImage }}
