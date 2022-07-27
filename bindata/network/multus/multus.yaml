@@ -444,6 +444,7 @@ spec:
             }
             EOF
 
+            chmod 755 $CNI_CONF_DIR/whereabouts.d
             chmod 755 $WHEREABOUTS_GLOBALCONFIG
 
             else
