@@ -444,7 +444,7 @@ spec:
             }
             EOF
 
-            chmod 644 $WHEREABOUTS_GLOBALCONFIG
+            chmod 755 $WHEREABOUTS_GLOBALCONFIG
 
             else
               warn "Doesn't look like we're running in a kubernetes environment (no serviceaccount token)"
