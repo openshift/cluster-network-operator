@@ -440,7 +440,8 @@ spec:
               "kubernetes": {
                 "kubeconfig": "/etc/kubernetes/cni/net.d/whereabouts.d/whereabouts.kubeconfig"
               },
-              "log_level": "debug"
+              "log_level": "debug",
+              "reconciler_cron_expression": "30 4 * * *"
             }
             EOF
 
