@@ -433,7 +433,7 @@ spec:
             current-context: whereabouts-context
             EOF
 
-            # Kubeconfig file for Multus CNI plugin.
+            # Kubeconfig file for Whereabouts CNI plugin.
             cat > $WHEREABOUTS_GLOBALCONFIG <<EOF
             {
               "datastore": "kubernetes",
@@ -445,8 +445,7 @@ spec:
             }
             EOF
 
-            chmod 755 $CNI_CONF_DIR/whereabouts.d
-            chmod 755 $WHEREABOUTS_GLOBALCONFIG
+            chmod 644 $WHEREABOUTS_GLOBALCONFIG
 
             else
               warn "Doesn't look like we're running in a kubernetes environment (no serviceaccount token)"
