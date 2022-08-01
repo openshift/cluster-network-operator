@@ -76,8 +76,8 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		res.PlatformRegion = infraConfig.Status.PlatformStatus.GCP.Region
 	}
 
-	// AWS specifies a CA bundle via a config map; retrieve it.
-	if res.PlatformType == configv1.AWSPlatformType {
+	// AWS and OpenStack specify a CA bundle via a config map; retrieve it.
+	if res.PlatformType == configv1.AWSPlatformType || res.PlatformType == configv1.OpenStackPlatformType {
 		cm := &corev1.ConfigMap{}
 		if err := client.Default().CRClient().Get(context.TODO(), cloudProviderConfig, cm); err != nil {
 			if !apierrors.IsNotFound(err) {
