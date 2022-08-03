@@ -34,6 +34,9 @@ data:
     {{- if .ReachabilityTotalTimeoutSeconds }}
     egressip-reachability-total-timeout={{.ReachabilityTotalTimeoutSeconds}}
     {{- end }}
+{{- if .ReachabilityNodePort }}
+    egressip-node-healthcheck-port={{.ReachabilityNodePort}}
+{{- end }}
 
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
