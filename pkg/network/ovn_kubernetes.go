@@ -58,6 +58,9 @@ const OVN_NODE_MODE_DPU_HOST = "dpu-host"
 const OVN_NODE_MODE_DPU = "dpu"
 const OVN_NODE_SELECTOR_DPU = "network.operator.openshift.io/dpu: ''"
 
+// gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
+const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
+
 var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
 const (
@@ -291,6 +294,13 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	data.Data["ReachabilityTotalTimeoutSeconds"] = c.EgressIPConfig.ReachabilityTotalTimeoutSeconds
+
+	reachability_node_port := os.Getenv("OVN_EGRESSIP_HEALTHCHECK_PORT")
+	if len(reachability_node_port) == 0 {
+		reachability_node_port = OVN_EGRESSIP_HEALTHCHECK_PORT
+		klog.Infof("OVN_EGRESSIP_HEALTHCHECK_PORT env var is not defined. Using: %s", reachability_node_port)
+	}
+	data.Data["ReachabilityNodePort"] = reachability_node_port
 
 	exportNetworkFlows := conf.ExportNetworkFlows
 	if exportNetworkFlows != nil {
