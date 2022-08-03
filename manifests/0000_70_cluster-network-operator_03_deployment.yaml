@@ -113,6 +113,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: OVN_EGRESSIP_HEALTHCHECK_PORT
+          value: "9107"
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /etc/kubernetes
