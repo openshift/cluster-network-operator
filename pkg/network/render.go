@@ -62,6 +62,16 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	}
 	objs = append(objs, o...)
 
+	if conf.Migration != nil && conf.Migration.NetworkType != "" {
+		// During SDN Migration, CNO needs to convert the custom resources of
+		// egressIP, egressFirewall, etc. Therefore we need to render the CRDs for
+		// both OpenShiftSDN and OVNKubernetes.
+		o, err = renderCRDForMigration(conf, manifestDir)
+		if err != nil {
+			return nil, progressing, err
+		}
+		objs = append(objs, o...)
+	}
 	// render kube-proxy
 	// DPU_DEV_PREVIEW
 	// There is currently a restriction that renderStandaloneKubeProxy() is
@@ -493,6 +503,28 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 	default:
 		log.Printf("NOTICE: Unknown network type %s, ignoring", dn.Type)
 		return nil, false, nil
+	}
+}
+
+// renderCRDForMigration generates OpenShiftSDN CRDs when default network is OVNKubernetes,
+// and generates OVNKubernetes CRDs when default network is OpenShiftSDN.
+func renderCRDForMigration(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+	switch conf.DefaultNetwork.Type {
+	case operv1.NetworkTypeOpenShiftSDN:
+		manifests, err := render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/common/001-crd.yaml"), &render.RenderData{})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to render OVNKubernetes CRDs")
+		}
+		return manifests, err
+	case operv1.NetworkTypeOVNKubernetes:
+		manifests, err := render.RenderTemplate(filepath.Join(manifestDir, "network/openshift-sdn/001-crd.yaml"), &render.RenderData{})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to render OpenShiftSDN CRDs")
+		}
+		return manifests, err
+	default:
+		log.Printf("NOTICE: Unsupported network type %s, ignoring", conf.DefaultNetwork.Type)
+		return nil, nil
 	}
 }
 
