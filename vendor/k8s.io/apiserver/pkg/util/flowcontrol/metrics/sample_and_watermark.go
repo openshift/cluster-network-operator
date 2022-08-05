@@ -88,8 +88,8 @@ func NewSampleAndWaterMarkHistogramsGenerator(clock clock.PassiveClock, samplePe
 			clock:        clock,
 			t0:           clock.Now(),
 			samplePeriod: samplePeriod,
-			samples:      compbasemetrics.NewHistogramVec(sampleOpts, labelNames),
-			waterMarks:   compbasemetrics.NewHistogramVec(waterMarkOpts, append([]string{labelNameMark}, labelNames...)),
+			// samples:      compbasemetrics.NewHistogramVec(sampleOpts, labelNames),
+			// waterMarks:   compbasemetrics.NewHistogramVec(waterMarkOpts, append([]string{labelNameMark}, labelNames...)),
 		}}
 }
 

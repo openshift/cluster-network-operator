@@ -100,9 +100,9 @@ func New(
 		FlowcontrolClient:      flowcontrolClient,
 		ServerConcurrencyLimit: serverConcurrencyLimit,
 		RequestWaitLimit:       requestWaitLimit,
-		ReqsObsPairGenerator:   metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		ExecSeatsObsGenerator:  metrics.PriorityLevelExecutionSeatsObserverGenerator,
-		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
+		// ReqsObsPairGenerator:   metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		// ExecSeatsObsGenerator:  metrics.PriorityLevelExecutionSeatsObserverGenerator,
+		QueueSetFactory: fqs.NewQueueSetFactory(clk),
 	})
 }
 

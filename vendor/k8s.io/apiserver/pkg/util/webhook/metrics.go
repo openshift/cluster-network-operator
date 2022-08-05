@@ -18,7 +18,6 @@ package webhook
 
 import (
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 var x509MissingSANCounter = metrics.NewCounter(
@@ -47,6 +46,5 @@ var x509InsecureSHA1Counter = metrics.NewCounter(
 )
 
 func init() {
-	legacyregistry.MustRegister(x509MissingSANCounter)
-	legacyregistry.MustRegister(x509InsecureSHA1Counter)
+	// legacyregistry.MustRegister(x509MissingSANCounter)
 }

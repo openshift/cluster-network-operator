@@ -44,7 +44,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/traces"
 	"k8s.io/klog/v2"
 )
@@ -68,7 +67,7 @@ func init() {
 	// using the global prometheus registry and using our own wrapped global registry,
 	// we need to explicitly register these metrics to our global registry here.
 	// For reference: https://github.com/kubernetes/kubernetes/pull/81387
-	legacyregistry.RawMustRegister(grpcprom.DefaultClientMetrics)
+	// legacyregistry.RawMustRegister(grpcprom.DefaultClientMetrics)
 	dbMetricsMonitors = make(map[string]struct{})
 }
 
