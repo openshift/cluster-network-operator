@@ -17,6 +17,8 @@ spec:
     tlsConfig:
       caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
       serverName: sdn.openshift-sdn.svc
+      certFile: /etc/prometheus/secrets/metrics-client-certs/tls.crt
+      keyFile: /etc/prometheus/secrets/metrics-client-certs/tls.key
   jobLabel: app
   namespaceSelector:
     matchNames:
@@ -65,6 +67,8 @@ spec:
       tlsConfig:
         caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
         serverName: sdn-controller.openshift-sdn.svc
+        certFile: /etc/prometheus/secrets/metrics-client-certs/tls.crt
+        keyFile: /etc/prometheus/secrets/metrics-client-certs/tls.key
   jobLabel: app
   namespaceSelector:
     matchNames:
