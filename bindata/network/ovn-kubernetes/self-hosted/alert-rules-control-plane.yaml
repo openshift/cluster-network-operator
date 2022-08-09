@@ -42,6 +42,7 @@ spec:
     - alert: NorthboundStale
       annotations:
         summary: ovn-kubernetes has not written anything to the northbound database for too long.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NorthboundStaleAlert.md
         description: |
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
           implemented. Existing workloads should continue to have connectivity. OVN-Kubernetes control plane and/or
