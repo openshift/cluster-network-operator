@@ -12,7 +12,7 @@ metadata:
     release.openshift.io/version: "{{.ReleaseVersion}}"
     networkoperator.openshift.io/non-critical: ""
 spec:
-  replicas: 2
+  replicas: {{.Replicas}}
   selector:
     matchLabels:
       app: multus-admission-controller

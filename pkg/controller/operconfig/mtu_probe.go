@@ -39,7 +39,7 @@ const (
 // If, for whatever reason, it takes longer for the MTU to be detected,
 // it will adopt an existing job.
 func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, infra *bootstrap.InfraStatus) (int, error) {
-	if infra.ExternalControlPlane {
+	if infra.ControlPlaneTopology == configv1.ExternalTopologyMode {
 		if infra.PlatformType == configv1.AWSPlatformType {
 			klog.Infof("AWS cluster, omitting MTU probing and using default of %d", awsMTU)
 			return awsMTU, nil

@@ -73,10 +73,11 @@ type BootstrapResult struct {
 }
 
 type InfraStatus struct {
-	PlatformType         configv1.PlatformType
-	PlatformRegion       string
-	PlatformStatus       *configv1.PlatformStatus
-	ExternalControlPlane bool
+	PlatformType           configv1.PlatformType
+	PlatformRegion         string
+	PlatformStatus         *configv1.PlatformStatus
+	ControlPlaneTopology   configv1.TopologyMode
+	InfrastructureTopology configv1.TopologyMode
 
 	// KubeCloudConfig is the contents of the openshift-config-managed/kube-cloud-config ConfigMap
 	KubeCloudConfig map[string]string

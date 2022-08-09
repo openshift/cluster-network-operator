@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onsi/gomega/types"
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -59,9 +60,10 @@ func (k *KubeObjectMatcher) NegatedFailureMessage(actual interface{}) string {
 func fakeBootstrapResult() *bootstrap.BootstrapResult {
 	return &bootstrap.BootstrapResult{
 		Infra: bootstrap.InfraStatus{
-			PlatformType:         "GCP",
-			PlatformRegion:       "moon-2",
-			ExternalControlPlane: false,
+			PlatformType:           "GCP",
+			PlatformRegion:         "moon-2",
+			ControlPlaneTopology:   configv1.HighlyAvailableTopologyMode,
+			InfrastructureTopology: configv1.HighlyAvailableTopologyMode,
 			APIServers: map[string]bootstrap.APIServer{
 				bootstrap.APIServerDefault: {
 					Host: "testing.test",
