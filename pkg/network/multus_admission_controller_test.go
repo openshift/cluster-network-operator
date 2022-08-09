@@ -36,15 +36,17 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	config.DisableMultiNetwork = &disabled
 	fillDefaults(config, nil)
 
+	bootstrap := fakeBootstrapResult()
+
 	// disable MultusAdmissionController
-	objs, err := renderMultusAdmissionController(config, manifestDir, false)
+	objs, err := renderMultusAdmissionController(config, manifestDir, false, bootstrap)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 
 	// enable MultusAdmissionController
 	enabled := false
 	config.DisableMultiNetwork = &enabled
-	objs, err = renderMultusAdmissionController(config, manifestDir, false)
+	objs, err = renderMultusAdmissionController(config, manifestDir, false, bootstrap)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 
