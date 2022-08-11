@@ -28,7 +28,7 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	// render cloud network config controller **before** the network plugin.
 	// the network plugin is dependent upon having the cloud network CRD
 	// defined as to initialize its watcher, otherwise it will error and crash
-	o, err := renderCloudNetworkConfigController(conf, bootstrapResult.Infra, manifestDir)
+	o, err := renderCloudNetworkConfigController(conf, bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
