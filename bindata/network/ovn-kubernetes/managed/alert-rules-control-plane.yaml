@@ -140,3 +140,45 @@ spec:
       for: 25m
       labels:
         severity: warning
+    - alert: OVNKubernetesNorthboundDatabaseLeaderError
+      annotations:
+        summary: OVN northbound database(s) have no RAFT leader
+        description: OVN northbound database(s) have no RAFT leader. Networking control plane is degraded.
+      expr: |
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        count(max_over_time(ovn_db_cluster_server_role{db_name="OVN_Northbound", server_role="leader"}[5m])) by (namespace) == 0
+      labels:
+        severity: critical
+    - alert: OVNKubernetesSouthboundDatabaseLeaderError
+      annotations:
+        summary: OVN southbound database(s) have no RAFT leader
+        description: OVN southbound database(s) have no leader. Networking control plane is degraded.
+      expr: |
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        count(max_over_time(ovn_db_cluster_server_role{db_name="OVN_Southbound", server_role="leader"}[5m])) by (namespace) == 0
+      labels:
+        severity: critical
+    - alert: OVNKubernetesNorthboundDatabaseMultipleLeadersError
+      annotations:
+        summary: OVN northbound database(s) have multiple RAFT leaders
+        description: OVN northbound database(s) have multiple RAFT leaders which may indicate degraded OVN database high availability.
+      expr: |
+        # Without min_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        count(min_over_time(ovn_db_cluster_server_role{db_name="OVN_Northbound", server_role="leader"}[1m])) by (leader, namespace) > 1
+      for: 5m
+      labels:
+        severity: warning
+    - alert: OVNKubernetesSouthboundDatabaseMultipleLeadersError
+      annotations:
+        summary: OVN southbound database(s) have multiple RAFT leaders
+        description: OVN southbound database(s) have multiple RAFT leaders which may indicate degraded OVN database high availability.
+      expr: |
+        # Without min_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        count(min_over_time(ovn_db_cluster_server_role{db_name="OVN_Southbound", server_role="leader"}[1m])) by (leader, namespace) > 1
+      for: 5m
+      labels:
+        severity: warning
