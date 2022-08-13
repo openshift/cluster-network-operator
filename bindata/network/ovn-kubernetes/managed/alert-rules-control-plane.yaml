@@ -182,3 +182,31 @@ spec:
       for: 5m
       labels:
         severity: warning
+    - alert: OVNKubernetesNorthboundDatabaseClusterMemberError
+      annotations:
+        summary: OVN northbound database server(s) has not been a member of the databases high availability for a period of time.
+        description: OVN northbound database server(s) has not been a RAFT cluster member for a period of time which may indicate
+          degraded OVN database high availability cluster.
+      expr: |
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        count(max_over_time(ovn_db_cluster_server_status{db_name="OVN_Northbound", server_status="cluster member"}[5m])) 
+        != sum(max_over_time(kube_node_role{role="master"}[5m]))
+      for: 5m
+      labels:
+        namespace: {{.HostedClusterNamespace}}
+        severity: warning
+    - alert: OVNKubernetesSouthboundDatabaseClusterMemberError
+      annotations:
+        summary: OVN southbound database server(s) has not been a member of the databases high availability for a period of time.
+        description: OVN southbound database server(s) has not been a RAFT cluster member for a period of time which may indicate
+          degraded OVN database high availability.
+      expr: |
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        count(max_over_time(ovn_db_cluster_server_status{db_name="OVN_Southbound", server_status="cluster member"}[5m])) 
+        != sum(max_over_time(kube_node_role{role="master"}[5m]))
+      for: 5m
+      labels:
+        namespace: {{.HostedClusterNamespace}}
+        severity: warning
