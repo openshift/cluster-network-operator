@@ -321,3 +321,16 @@ spec:
       labels:
         namespace: openshift-ovn-kubernetes
         severity: warning
+    # OVN northd functional alerts
+    - alert: OVNKubernetesNorthdInactive
+      annotations:
+        summary: Exactly one OVN northd instance must have an active status.
+        description: Exactly one OVN northd must have an active status within the high availability set.
+          Networking control plane is degraded.
+      expr: |
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        count(ovn_northd_status == 1) by (namespace) != 1
+      for: 5m
+      labels:
+        severity: critical
