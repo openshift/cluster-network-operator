@@ -210,3 +210,115 @@ spec:
       labels:
         namespace: {{.HostedClusterNamespace}}
         severity: warning
+    - alert: OVNKubernetesNorthboundDatabaseInboundConnectionError
+      annotations:
+        summary: OVN northbound database server(s) is experiencing inbound RAFT connectivity errors.
+        description: OVN northbound database server(s) is experiencing inbound RAFT connectivity errors which may indicate degraded OVN
+          database high availability.
+      expr: |
+        # Without min_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        # ..error_total is set to zero when error resolves itself
+        min_over_time(ovn_db_cluster_inbound_connections_error_total{db_name="OVN_Northbound"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+    - alert: OVNKubernetesSouthboundDatabaseInboundConnectionError
+      annotations:
+        summary: OVN southbound database server(s) is experiencing inbound RAFT connectivity errors.
+        description: OVN southbound database server(s) is experiencing inbound RAFT connectivity errors which may indicate degraded OVN
+          database high availability.
+      expr: |
+        # Without min_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        # ..error_total is set to zero when error resolves itself
+        min_over_time(ovn_db_cluster_inbound_connections_error_total{db_name="OVN_Southbound"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+    - alert: OVNKubernetesNorthboundDatabaseOutboundConnectionError
+      annotations:
+        summary: OVN northbound database server(s) is experiencing outbound RAFT connectivity errors.
+        description: OVN northbound database server(s) outbound RAFT connectivity errors may indicate degraded OVN
+          database high availability.
+      expr: |
+        # Without min_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        # ..error_total is set to zero when error resolves itself
+        min_over_time(ovn_db_cluster_outbound_connections_error_total{db_name="OVN_Northbound"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+    - alert: OVNKubernetesSouthboundDatabaseOutboundConnectionError
+      annotations:
+        summary: OVN southbound database server(s) is experiencing outbound RAFT connectivity errors.
+        description: OVN southbound database server(s) outbound RAFT connectivity errors which may indicate degraded OVN
+          database high availability.
+      expr: |
+        # Without min_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        # ..error_total is set to zero when error resolves itself
+        min_over_time(ovn_db_cluster_outbound_connections_error_total{db_name="OVN_Southbound"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+    - alert: OVNKubernetesNorthboundDatabaseInboundConnectionMissing
+      annotations:
+        summary: OVN northbound database server(s) do not have expected number of inbound RAFT connections.
+        description: OVN northbound database server(s) do not have expected number of inbound connections for a RAFT cluster
+          which may indicate degraded OVN database high availability.
+      expr: |
+        # Expected sum of inbound connections is number of control plane nodes * number of control plane nodes minus one
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        sum(max_over_time(ovn_db_cluster_inbound_connections_total{db_name="OVN_Northbound"}[5m]))
+        != count(max_over_time(kube_node_role{role="master"}[5m])) * (count(max_over_time(kube_node_role{role="master"}[5m]))-1)
+      for: 5m
+      labels:
+        namespace: {{.HostedClusterNamespace}}
+        severity: warning
+    - alert: OVNKubernetesSouthboundDatabaseInboundConnectionMissing
+      annotations:
+        summary: OVN southbound database server(s) do not have expected number of inbound RAFT connections.
+        description: OVN southbound database server(s) do not have expected number of inbound connections for a RAFT cluster
+          which may indicate degraded OVN database high availability.
+      expr: |
+        # Expected sum of inbound connections is number of control plane nodes * number of control plane nodes minus one
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        sum(max_over_time(ovn_db_cluster_inbound_connections_total{db_name="OVN_Southbound"}[5m]))
+        != count(max_over_time(kube_node_role{role="master"}[5m])) * (count(max_over_time(kube_node_role{role="master"}[5m]))-1)
+      for: 5m
+      labels:
+        namespace: {{.HostedClusterNamespace}}
+        severity: warning
+    - alert: OVNKubernetesNorthboundDatabaseOutboundConnectionMissing
+      annotations:
+        summary: OVN northbound database server(s) do not have expected number of outbound RAFT connections.
+        description: OVN northbound database server(s) do not have expected number of outbound connections for a RAFT cluster
+          which may indicate degraded OVN database high availability.
+      expr: |
+        # Expected sum of outbound connections is number of control plane nodes * number of control plane nodes minus one
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        sum(max_over_time(ovn_db_cluster_outbound_connections_total{db_name="OVN_Northbound"}[5m]))
+        != count(max_over_time(kube_node_role{role="master"}[5m])) * (count(max_over_time(kube_node_role{role="master"}[5m]))-1)
+      for: 5m
+      labels:
+        namespace: {{.HostedClusterNamespace}}
+        severity: warning
+    - alert: OVNKubernetesSouthboundDatabaseOutboundConnectionMissing
+      annotations:
+        summary: OVN southbound database server(s) do not have expected number of outbound RAFT connections.
+        description: OVN southbound database server(s) do not have expected number of outbound connections for a RAFT cluster
+          which may indicate degraded OVN database high availability.
+      expr: |
+        # Expected sum of outbound connections is number of control plane nodes * number of control plane nodes minus one
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        sum(max_over_time(ovn_db_cluster_outbound_connections_total{db_name="OVN_Southbound"}[5m]))
+        != count(max_over_time(kube_node_role{role="master"}[5m])) * (count(max_over_time(kube_node_role{role="master"}[5m]))-1)
+      for: 5m
+      labels:
+        namespace: {{.HostedClusterNamespace}}
+        severity: warning
