@@ -42,7 +42,8 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	objs = append(objs, o...)
 
 	// render MultusAdmissionController
-	o, err = renderMultusAdmissionController(conf, manifestDir, bootstrapResult.Infra.ExternalControlPlane)
+	o, err = renderMultusAdmissionController(conf, manifestDir,
+		bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode, bootstrapResult)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -600,8 +601,21 @@ func renderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 	return out, nil
 }
 
+func getMultusAdmissionControllerReplicas(bootstrapResult *bootstrap.BootstrapResult) int {
+	replicas := 2
+	if bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode {
+		if bootstrapResult.Infra.InfrastructureTopology == configv1.SingleReplicaTopologyMode {
+			replicas = 1
+		}
+	} else if bootstrapResult.Infra.ControlPlaneTopology == configv1.SingleReplicaTopologyMode {
+		replicas = 1
+	}
+
+	return replicas
+}
+
 // renderMultusAdmissionController generates the manifests of Multus Admission Controller
-func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string, externalControlPlane bool) ([]*uns.Unstructured, error) {
+func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult) ([]*uns.Unstructured, error) {
 	if *conf.DisableMultiNetwork {
 		return nil, nil
 	}
@@ -609,7 +623,8 @@ func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir strin
 	var err error
 	out := []*uns.Unstructured{}
 
-	objs, err := renderMultusAdmissonControllerConfig(manifestDir, externalControlPlane)
+	objs, err := renderMultusAdmissonControllerConfig(manifestDir, externalControlPlane,
+		getMultusAdmissionControllerReplicas(bootstrapResult))
 	if err != nil {
 		return nil, err
 	}

@@ -53,7 +53,7 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 	} else {
 		data.Data["SDNPlatformAzure"] = false
 	}
-	data.Data["ExternalControlPlane"] = bootstrapResult.Infra.ExternalControlPlane
+	data.Data["ExternalControlPlane"] = bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode
 	data.Data["RoutableMTU"] = nil
 	data.Data["MTU"] = nil
 

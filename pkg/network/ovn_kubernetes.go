@@ -80,7 +80,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	// TODO: Fix operator behavior when running in a cluster with an externalized control plane.
 	// For now, return an error since we don't have any master nodes to run the ovn-master daemonset.
-	if bootstrapResult.Infra.ExternalControlPlane && !bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled {
+	externalControlPlane := bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode
+	if externalControlPlane && !bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled {
 		return nil, progressing, fmt.Errorf("Unable to render OVN in a cluster with an external control plane")
 	}
 

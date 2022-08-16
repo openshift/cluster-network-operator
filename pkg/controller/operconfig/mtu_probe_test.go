@@ -24,7 +24,7 @@ func TestProbeMTU(t *testing.T) {
 	}{
 		{
 			name:        "AWS on Hypershift, hardcoded value is used",
-			infra:       &bootstrap.InfraStatus{PlatformType: configv1.AWSPlatformType, ExternalControlPlane: true},
+			infra:       &bootstrap.InfraStatus{PlatformType: configv1.AWSPlatformType, ControlPlaneTopology: configv1.ExternalTopologyMode},
 			expectedMTU: 9001,
 		},
 		{
@@ -38,7 +38,7 @@ func TestProbeMTU(t *testing.T) {
 		},
 		{
 			name:        "Azure on hypershift, hardcoded value is used",
-			infra:       &bootstrap.InfraStatus{PlatformType: configv1.AzurePlatformType, ExternalControlPlane: true},
+			infra:       &bootstrap.InfraStatus{PlatformType: configv1.AzurePlatformType, ControlPlaneTopology: configv1.ExternalTopologyMode},
 			expectedMTU: 1500,
 		},
 		{
@@ -52,7 +52,7 @@ func TestProbeMTU(t *testing.T) {
 		},
 		{
 			name:  "Unknown platform on Hypershift, value from configmap is used",
-			infra: &bootstrap.InfraStatus{ExternalControlPlane: true},
+			infra: &bootstrap.InfraStatus{ControlPlaneTopology: configv1.ExternalTopologyMode},
 			objects: []crclient.Object{&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Namespace: cmNamespace, Name: cmName},
 				Data:       map[string]string{"mtu": "5000"},
