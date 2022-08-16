@@ -27,15 +27,16 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	}
 
 	res := &bootstrap.InfraStatus{
-		PlatformType:         infraConfig.Status.PlatformStatus.Type,
-		PlatformStatus:       infraConfig.Status.PlatformStatus,
-		ExternalControlPlane: infraConfig.Status.ControlPlaneTopology == configv1.ExternalTopologyMode,
-		APIServers:           map[string]bootstrap.APIServer{},
+		PlatformType:           infraConfig.Status.PlatformStatus.Type,
+		PlatformStatus:         infraConfig.Status.PlatformStatus,
+		ControlPlaneTopology:   infraConfig.Status.ControlPlaneTopology,
+		InfrastructureTopology: infraConfig.Status.InfrastructureTopology,
+		APIServers:             map[string]bootstrap.APIServer{},
 	}
 
 	// If we use hypershift, the components need proxy settings. In selfhosted, they
 	// are always local to the API so there it is never needed.
-	if res.ExternalControlPlane {
+	if res.ControlPlaneTopology == configv1.ExternalTopologyMode {
 		proxy := &configv1.Proxy{}
 		if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "cluster"}, proxy); err != nil {
 			return nil, fmt.Errorf("failed to get proxy 'cluster': %w", err)
