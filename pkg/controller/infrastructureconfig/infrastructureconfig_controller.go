@@ -7,13 +7,14 @@ import (
 	"reflect"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -92,7 +93,7 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 	updatedInfraConfig := r.apiAndIngressVIPsSyncer.VipsSynchronize(infraConfig)
 
 	if !reflect.DeepEqual(updatedInfraConfig.Status, infraConfig.Status) {
-		if err = r.client.Default().CRClient().Status().Update(ctx, updatedInfraConfig, &client.UpdateOptions{}); err != nil {
+		if err = r.updateInfrastructureConfigStatus(ctx, updatedInfraConfig); err != nil {
 			err = fmt.Errorf("Error while updating infrastructures.%s/cluster status: %w", configv1.GroupName, err)
 			log.Println(err)
 
@@ -105,4 +106,15 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 
 	r.status.SetNotDegraded(statusmanager.InfrastructureConfig)
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileInfrastructureConfig) updateInfrastructureConfigStatus(ctx context.Context, infraConfig *configv1.Infrastructure) error {
+	infraConfigToApply := &configv1.Infrastructure{
+		ObjectMeta: v1.ObjectMeta{
+			Name: infraConfig.Name,
+		},
+		Status: infraConfig.Status,
+	}
+
+	return apply.ApplyObject(ctx, r.client, infraConfigToApply, ControllerName, "status")
 }
