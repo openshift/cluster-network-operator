@@ -23,6 +23,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	hyperv1 "github.com/openshift/hypershift/api/v1alpha1"
 	"github.com/pkg/errors"
@@ -108,6 +109,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
 	data.Data["MTU"] = c.MTU
 	data.Data["RoutableMTU"] = nil
+	data.Data["V4JoinSubnet"] = c.V4InternalSubnet
+	data.Data["V6JoinSubnet"] = c.V6InternalSubnet
 
 	if conf.Migration != nil && conf.Migration.MTU != nil {
 		if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
@@ -674,6 +677,66 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 		}
 		if oc.GenevePort != nil && (*oc.GenevePort < 1 || *oc.GenevePort > 65535) {
 			out = append(out, errors.Errorf("invalid GenevePort %d", *oc.GenevePort))
+		}
+		var v4Net, v6Net *net.IPNet
+		var err error
+		if oc.V4InternalSubnet != "" {
+			if !cnHasIPv4 {
+				out = append(out, errors.Errorf("v4InternalSubnet and ClusterNetwork must have matching IP families"))
+			}
+			_, v4Net, err = net.ParseCIDR(oc.V4InternalSubnet)
+			if err != nil {
+				out = append(out, errors.Errorf("v4InternalSubnet is invalid: %s", err))
+			}
+			if !isInternalSubnetLargeEnough(conf, true) {
+				out = append(out, errors.Errorf("v4InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork"))
+			}
+		}
+		if oc.V6InternalSubnet != "" {
+			if !cnHasIPv6 {
+				out = append(out, errors.Errorf("v6InternalSubnet and ClusterNetwork must have matching IP families"))
+			}
+			_, v6Net, err = net.ParseCIDR(oc.V6InternalSubnet)
+			if err != nil {
+				out = append(out, errors.Errorf("v6InternalSubnet is invalid: %s", err))
+			}
+			if !isInternalSubnetLargeEnough(conf, false) {
+				out = append(out, errors.Errorf("v6InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork"))
+			}
+		}
+		for _, cn := range conf.ClusterNetwork {
+			if utilnet.IsIPv6CIDRString(cn.CIDR) {
+				if oc.V6InternalSubnet != "" {
+					_, v6ClusterNet, _ := net.ParseCIDR(cn.CIDR)
+					if iputil.NetsOverlap(*v6Net, *v6ClusterNet) {
+						out = append(out, errors.Errorf("v6InternalSubnet overlaps with ClusterNetwork %s", cn.CIDR))
+					}
+				}
+			} else {
+				if oc.V4InternalSubnet != "" {
+					_, v4ClusterNet, _ := net.ParseCIDR(cn.CIDR)
+					if iputil.NetsOverlap(*v4Net, *v4ClusterNet) {
+						out = append(out, errors.Errorf("v4InternalSubnet overlaps with ClusterNetwork %s", cn.CIDR))
+					}
+				}
+			}
+		}
+		for _, sn := range conf.ServiceNetwork {
+			if utilnet.IsIPv6CIDRString(sn) {
+				if oc.V6InternalSubnet != "" {
+					_, v6ServiceNet, _ := net.ParseCIDR(sn)
+					if iputil.NetsOverlap(*v6Net, *v6ServiceNet) {
+						out = append(out, errors.Errorf("v6InternalSubnet overlaps with ServiceNetwork %s", sn))
+					}
+				}
+			} else {
+				if oc.V4InternalSubnet != "" {
+					_, v4ServiceNet, _ := net.ParseCIDR(sn)
+					if iputil.NetsOverlap(*v4Net, *v4ServiceNet) {
+						out = append(out, errors.Errorf("v4InternalSubnet overlaps with ServiceNetwork %s", sn))
+					}
+				}
+			}
 		}
 	}
 
@@ -1443,4 +1506,25 @@ func setOVNObjectAnnotation(objs []*uns.Unstructured, key, value string) error {
 		}
 	}
 	return nil
+}
+
+func isInternalSubnetLargeEnough(conf *operv1.NetworkSpec, v4 bool) bool {
+	var maxNodesNum int
+	subnet := conf.DefaultNetwork.OVNKubernetesConfig.V4InternalSubnet
+	addrLen := 32
+	if !v4 {
+		subnet = conf.DefaultNetwork.OVNKubernetesConfig.V6InternalSubnet
+		addrLen = 128
+	}
+	for _, n := range conf.ClusterNetwork {
+		if (utilnet.IsIPv6CIDRString(n.CIDR) && v4) || (!utilnet.IsIPv6CIDRString(n.CIDR) && !v4) {
+			continue
+		}
+		mask, _ := strconv.Atoi(strings.Split(n.CIDR, "/")[1])
+		nodesNum := 1 << (int(n.HostPrefix) - mask)
+		maxNodesNum += nodesNum
+	}
+	// We need to ensure each node can be assigned an IP address from the internal subnet
+	intSubnetMask, _ := strconv.Atoi(strings.Split(subnet, "/")[1])
+	return maxNodesNum < (1<<(addrLen-intSubnetMask) - 2)
 }

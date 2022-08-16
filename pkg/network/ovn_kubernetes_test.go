@@ -160,6 +160,7 @@ func TestRenderedOVNKubernetesConfig(t *testing.T) {
 		gatewayConfig       *operv1.GatewayConfig
 		egressIPConfig      *operv1.EgressIPConfig
 		masterIPs           []string
+		v4InternalSubnet    string
 	}
 	testcases := []testcase{
 		{
@@ -188,6 +189,35 @@ enable-egress-qos=true
 mode=shared
 nodeport=true`,
 			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
+		},
+		{
+			desc: "custom join subnet",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=1048576
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://testing.test:8443"
+host-network-namespace="openshift-host-network"
+platform-type="GCP"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+
+[gateway]
+mode=shared
+nodeport=true
+v4-join-subnet="100.99.0.0/16"`,
+			v4InternalSubnet: "100.99.0.0/16",
+			masterIPs:        []string{"1.2.3.4", "2.3.4.5"},
 		},
 		{
 			desc: "HybridOverlay",
@@ -447,6 +477,10 @@ election-retry-period=26`,
 			//set a few inputs so that the tests are not machine dependant
 			OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.MTU = ptrToUint32(1500)
 
+			if tc.v4InternalSubnet != "" {
+				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.V4InternalSubnet = tc.v4InternalSubnet
+			}
+
 			crd := OVNKubeConfig.DeepCopy()
 			config := &crd.Spec
 
@@ -616,6 +650,15 @@ func TestValidateOVNKubernetes(t *testing.T) {
 				ContainSubstring(substr))))
 	}
 
+	ovnConfig.V4InternalSubnet = "100.64.0.0/22"
+	errExpect("v4InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.V6InternalSubnet = "fd01::/48"
+	errExpect("v6InternalSubnet and ClusterNetwork must have matching IP families")
+	ovnConfig.V4InternalSubnet = "10.128.0.0/16"
+	errExpect("v4InternalSubnet overlaps with ClusterNetwork 10.128.0.0/15")
+	ovnConfig.V4InternalSubnet = "172.30.0.0/18"
+	errExpect("v4InternalSubnet overlaps with ServiceNetwork 172.30.0.0/16")
+
 	// set mtu to insanity
 	ovnConfig.MTU = ptrToUint32(70000)
 	errExpect("invalid MTU 70000")
@@ -629,6 +672,13 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	config.ClusterNetwork = []operv1.ClusterNetworkEntry{{
 		CIDR: "fd01::/48", HostPrefix: 64,
 	}}
+	errExpect("v4InternalSubnet and ClusterNetwork must have matching IP families")
+	ovnConfig.V6InternalSubnet = "fd01::/64"
+	errExpect("v6InternalSubnet overlaps with ClusterNetwork fd01::/48")
+	ovnConfig.V6InternalSubnet = "fd03::/112"
+	errExpect("v6InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.V6InternalSubnet = "fd02::/64"
+	errExpect("v6InternalSubnet overlaps with ServiceNetwork fd02::/112")
 	ovnConfig.MTU = ptrToUint32(576)
 	errExpect("invalid MTU 576")
 
