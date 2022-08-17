@@ -2,6 +2,7 @@ package fake
 
 import (
 	"context"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,7 +67,7 @@ func (fc *FakeClient) Clients() map[string]cnoclient.ClusterClient {
 func isOpenShiftObject(obj crclient.Object) bool {
 	kKind, _, _ := scheme.Scheme.ObjectKinds(obj)
 	for _, v := range kKind {
-		if v.Group == "config.openshift.io" {
+		if strings.HasSuffix(v.Group, "openshift.io") {
 			return true
 		}
 	}
