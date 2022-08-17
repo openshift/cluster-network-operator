@@ -13,14 +13,16 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/kubernetes"
 	utilnet "k8s.io/utils/net"
 )
 
-func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, bool, error) {
+func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client cnoclient.Client) ([]*uns.Unstructured, bool, error) {
 	log.Printf("Starting render phase")
 	var progressing bool
 	objs := []*uns.Unstructured{}
@@ -43,7 +45,7 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 
 	// render MultusAdmissionController
 	o, err = renderMultusAdmissionController(conf, manifestDir,
-		bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode, bootstrapResult)
+		bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode, bootstrapResult, client.Default().Kubernetes())
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -615,7 +617,7 @@ func getMultusAdmissionControllerReplicas(bootstrapResult *bootstrap.BootstrapRe
 }
 
 // renderMultusAdmissionController generates the manifests of Multus Admission Controller
-func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult) ([]*uns.Unstructured, error) {
+func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client kubernetes.Interface) ([]*uns.Unstructured, error) {
 	if *conf.DisableMultiNetwork {
 		return nil, nil
 	}
@@ -624,7 +626,7 @@ func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir strin
 	out := []*uns.Unstructured{}
 
 	objs, err := renderMultusAdmissonControllerConfig(manifestDir, externalControlPlane,
-		getMultusAdmissionControllerReplicas(bootstrapResult))
+		getMultusAdmissionControllerReplicas(bootstrapResult), client)
 	if err != nil {
 		return nil, err
 	}
