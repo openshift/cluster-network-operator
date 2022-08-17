@@ -11,6 +11,7 @@ import (
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -44,7 +45,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["UserCACertificate"] = b.UserCACert
 
 	// ExternalControlPlane
-	data.Data["ExternalControlPlane"] = bootstrapResult.Infra.ExternalControlPlane
+	data.Data["ExternalControlPlane"] = bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode
 
 	data.Data["HttpsProxy"] = b.HttpsProxy
 	data.Data["HttpProxy"] = b.HttpProxy

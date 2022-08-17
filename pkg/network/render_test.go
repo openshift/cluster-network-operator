@@ -4,12 +4,12 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+	configv1 "github.com/openshift/api/config/v1"
+	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-
-	configv1 "github.com/openshift/api/config/v1"
-	operv1 "github.com/openshift/api/operator/v1"
 )
 
 func TestIsChangeSafe(t *testing.T) {
@@ -283,4 +283,95 @@ func TestRenderUnknownNetwork(t *testing.T) {
 
 func fillDefaults(conf, previous *operv1.NetworkSpec) {
 	FillDefaults(conf, previous, 1400)
+}
+
+func Test_getMultusAdmissionControllerReplicas(t *testing.T) {
+	type args struct {
+		bootstrapResult *bootstrap.BootstrapResult
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{
+			name: "External control plane, highly available infra",
+			args: args{
+				bootstrapResult: &bootstrap.BootstrapResult{
+					Infra: bootstrap.InfraStatus{
+						ControlPlaneTopology:   configv1.ExternalTopologyMode,
+						InfrastructureTopology: configv1.HighlyAvailableTopologyMode,
+					},
+				},
+			},
+			want: 2,
+		},
+		{
+			name: "External control plane, single-replica infra",
+			args: args{
+				bootstrapResult: &bootstrap.BootstrapResult{
+					Infra: bootstrap.InfraStatus{
+						ControlPlaneTopology:   configv1.ExternalTopologyMode,
+						InfrastructureTopology: configv1.SingleReplicaTopologyMode,
+					},
+				},
+			},
+			want: 1,
+		},
+		{
+			name: "Highly available control-plane, highly available infra",
+			args: args{
+				bootstrapResult: &bootstrap.BootstrapResult{
+					Infra: bootstrap.InfraStatus{
+						ControlPlaneTopology:   configv1.HighlyAvailableTopologyMode,
+						InfrastructureTopology: configv1.HighlyAvailableTopologyMode,
+					},
+				},
+			},
+			want: 2,
+		},
+		{
+			name: "Highly available control-plane, single-replica infra",
+			args: args{
+				bootstrapResult: &bootstrap.BootstrapResult{
+					Infra: bootstrap.InfraStatus{
+						ControlPlaneTopology:   configv1.HighlyAvailableTopologyMode,
+						InfrastructureTopology: configv1.SingleReplicaTopologyMode,
+					},
+				},
+			},
+			want: 2,
+		},
+		{
+			name: "Single-replicas control-plane, single-replica infra",
+			args: args{
+				bootstrapResult: &bootstrap.BootstrapResult{
+					Infra: bootstrap.InfraStatus{
+						ControlPlaneTopology:   configv1.SingleReplicaTopologyMode,
+						InfrastructureTopology: configv1.SingleReplicaTopologyMode,
+					},
+				},
+			},
+			want: 1,
+		},
+		{
+			name: "Single-replicas control-plane, highly-available infra",
+			args: args{
+				bootstrapResult: &bootstrap.BootstrapResult{
+					Infra: bootstrap.InfraStatus{
+						ControlPlaneTopology:   configv1.SingleReplicaTopologyMode,
+						InfrastructureTopology: configv1.HighlyAvailableTopologyMode,
+					},
+				},
+			},
+			want: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getMultusAdmissionControllerReplicas(tt.args.bootstrapResult); got != tt.want {
+				t.Errorf("getMultusAdmissionControllerReplicas() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
