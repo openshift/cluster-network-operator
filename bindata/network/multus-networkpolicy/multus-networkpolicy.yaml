@@ -34,6 +34,7 @@ spec:
         - "--host-prefix=/host"
         - "--container-runtime-endpoint=/run/crio/crio.sock"
         - "--pod-iptables=/var/lib/multi-networkpolicy/iptables"
+        - "--network-plugins=macvlan,sriov"
         resources:
           requests:
             cpu: "100m"

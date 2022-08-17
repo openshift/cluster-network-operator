@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	configv1 "github.com/openshift/api/config/v1"
 	v1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
@@ -20,7 +21,13 @@ import (
 // renderCloudNetworkConfigController renders the cloud network config controller
 func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrapResult bootstrap.InfraStatus, manifestDir string) ([]*uns.Unstructured, error) {
 	pt := cloudBootstrapResult.PlatformType
-	if !(pt == v1.AWSPlatformType || pt == v1.AzurePlatformType || pt == v1.GCPPlatformType) {
+
+	// Do not render the CNCC for platforms that the CNCC does not support.
+	if !(pt == v1.AWSPlatformType || pt == v1.AzurePlatformType || pt == v1.GCPPlatformType || pt == v1.OpenStackPlatformType) {
+		return nil, nil
+	}
+	// Do not render the CNCC for network plugins that do not support the CNCC.
+	if conf.DefaultNetwork.Type != operv1.NetworkTypeOpenShiftSDN && conf.DefaultNetwork.Type != operv1.NetworkTypeOVNKubernetes {
 		return nil, nil
 	}
 	data := render.MakeRenderData()
@@ -33,7 +40,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrap
 	data.Data["CloudNetworkConfigControllerImage"] = os.Getenv("CLOUD_NETWORK_CONFIG_CONTROLLER_IMAGE")
 	data.Data["KubernetesServiceHost"] = cloudBootstrapResult.APIServers[bootstrap.APIServerDefault].Host
 	data.Data["KubernetesServicePort"] = cloudBootstrapResult.APIServers[bootstrap.APIServerDefault].Port
-	data.Data["ExternalControlPlane"] = cloudBootstrapResult.ExternalControlPlane
+	data.Data["ExternalControlPlane"] = cloudBootstrapResult.ControlPlaneTopology == configv1.ExternalTopologyMode
 	data.Data["PlatformAzureEnvironment"] = ""
 	data.Data["PlatformAWSCAPath"] = ""
 	data.Data["HTTP_PROXY"] = cloudBootstrapResult.Proxy.HTTPProxy
@@ -66,7 +73,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrap
 		return nil, errors.Wrap(err, "failed to render cloud-network-config-controller manifests")
 	}
 
-	// Generate the silly AWS CA override
+	// Needed for AWS and OpenStack CA override
 	cm := &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",

@@ -39,7 +39,7 @@ func getOpenshiftNamespaces(client kubernetes.Interface) (string, error) {
 }
 
 // renderMultusAdmissonControllerConfig returns the manifests of Multus Admisson Controller
-func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPlane bool, client kubernetes.Interface) ([]*uns.Unstructured, error) {
+func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPlane bool, replicas int, client kubernetes.Interface) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 	var err error
 
@@ -58,6 +58,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	data.Data["MultusValidatingWebhookName"] = names.MULTUS_VALIDATING_WEBHOOK
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 	data.Data["ExternalControlPlane"] = externalControlPlane
+	data.Data["Replicas"] = replicas
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus-admission-controller"), &data)
 	if err != nil {
