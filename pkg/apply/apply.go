@@ -94,6 +94,17 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 		}
 	}
 
+	merge := getMergeForUpdate(obj)
+	if merge != nil {
+		// this object requires some of the existing data merged into the
+		// updated object, this is on exceptional cases where the server-side
+		// apply is not doing what we want
+		obj, err = merge(ctx, clusterClient)
+		if err != nil {
+			return fmt.Errorf("failed to merge object %s: %w", objDesc, err)
+		}
+	}
+
 	fieldManager := "cluster-network-operator"
 	if subcontroller != "" {
 		fieldManager = fmt.Sprintf("%s/%s", fieldManager, subcontroller)
