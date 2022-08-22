@@ -31,6 +31,7 @@ type OVNHyperShiftBootstrapResult struct {
 	ServicePublishingStrategy *hyperv1.ServicePublishingStrategy
 	OVNSbDbRouteHost          string
 	OVNSbDbRouteNodePort      int32
+	OVNSbDbRouteLabels        map[string]string
 	ControlPlaneReplicas      int
 }
 
