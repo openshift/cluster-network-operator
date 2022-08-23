@@ -1,6 +1,8 @@
 package network
 
 import (
+	"github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"os"
 	"path/filepath"
 
@@ -19,7 +21,8 @@ import (
 )
 
 // renderCloudNetworkConfigController renders the cloud network config controller
-func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrapResult bootstrap.InfraStatus, manifestDir string) ([]*uns.Unstructured, error) {
+func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+	cloudBootstrapResult := bootstrapResult.Infra
 	pt := cloudBootstrapResult.PlatformType
 
 	// Do not render the CNCC for platforms that the CNCC does not support.
@@ -38,18 +41,27 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrap
 	data.Data["PlatformTypeAzure"] = v1.AzurePlatformType
 	data.Data["PlatformTypeGCP"] = v1.GCPPlatformType
 	data.Data["CloudNetworkConfigControllerImage"] = os.Getenv("CLOUD_NETWORK_CONFIG_CONTROLLER_IMAGE")
-	data.Data["KubernetesServiceHost"] = cloudBootstrapResult.APIServers[bootstrap.APIServerDefault].Host
-	data.Data["KubernetesServicePort"] = cloudBootstrapResult.APIServers[bootstrap.APIServerDefault].Port
+	data.Data["KubernetesServiceHost"] = cloudBootstrapResult.APIServers[bootstrap.APIServerDefaultLocal].Host
+	data.Data["KubernetesServicePort"] = cloudBootstrapResult.APIServers[bootstrap.APIServerDefaultLocal].Port
 	data.Data["ExternalControlPlane"] = cloudBootstrapResult.ControlPlaneTopology == configv1.ExternalTopologyMode
 	data.Data["PlatformAzureEnvironment"] = ""
 	data.Data["PlatformAWSCAPath"] = ""
-	data.Data["HTTP_PROXY"] = cloudBootstrapResult.Proxy.HTTPProxy
-	data.Data["HTTPS_PROXY"] = cloudBootstrapResult.Proxy.HTTPSProxy
-	data.Data["NO_PROXY"] = cloudBootstrapResult.Proxy.NoProxy
 
 	// AWS and azure allow for funky endpoint overriding.
 	// in different ways, of course.
 	apiurl := ""
+	// Needed for AWS and OpenStack CA override
+	caOverride := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "openshift-cloud-network-config-controller",
+			Name:      "kube-cloud-config",
+		},
+		Data: cloudBootstrapResult.KubeCloudConfig,
+	}
 	if cloudBootstrapResult.PlatformType == v1.AWSPlatformType {
 		for _, ep := range cloudBootstrapResult.PlatformStatus.AWS.ServiceEndpoints {
 			if ep.Name == "ec2" {
@@ -68,24 +80,33 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, cloudBootstrap
 
 	data.Data["PlatformAPIURL"] = apiurl
 
-	manifests, err := render.RenderDir(filepath.Join(manifestDir, "cloud-network-config-controller"), &data)
+	manifestDirs := make([]string, 0, 2)
+	manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "cloud-network-config-controller/common"))
+	if hcpCfg := NewHyperShiftConfig(); hcpCfg.Enabled {
+		data.Data["CLIImage"] = os.Getenv("CLI_IMAGE")
+		data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
+		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
+		data.Data["ManagementClusterName"] = client.ManagementClusterName
+		data.Data["HostedClusterNamespace"] = hcpCfg.Namespace
+		caOverride.ObjectMeta = metav1.ObjectMeta{
+			Namespace:   hcpCfg.Namespace,
+			Name:        "cloud-network-config-controller-kube-cloud-config",
+			Annotations: map[string]string{names.ClusterNameAnnotation: client.ManagementClusterName},
+		}
+		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "cloud-network-config-controller/managed"))
+	} else {
+		data.Data["HTTP_PROXY"] = cloudBootstrapResult.Proxy.HTTPProxy
+		data.Data["HTTPS_PROXY"] = cloudBootstrapResult.Proxy.HTTPSProxy
+		data.Data["NO_PROXY"] = cloudBootstrapResult.Proxy.NoProxy
+		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "cloud-network-config-controller/self-hosted"))
+	}
+
+	manifests, err := render.RenderDirs(manifestDirs, &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render cloud-network-config-controller manifests")
 	}
 
-	// Needed for AWS and OpenStack CA override
-	cm := &corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "openshift-cloud-network-config-controller",
-			Name:      "kube-cloud-config",
-		},
-		Data: cloudBootstrapResult.KubeCloudConfig,
-	}
-	obj, err := k8sutil.ToUnstructured(cm)
+	obj, err := k8sutil.ToUnstructured(caOverride)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to transmute")
 	}
