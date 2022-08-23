@@ -1,0 +1,179 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-network-config-controller
+  namespace: {{.HostedClusterNamespace}}
+  annotations:
+    kubernetes.io/description: |
+      This deployment launches the cloud network config controller which manages cloud-level network configurations
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+    networkoperator.openshift.io/non-critical: ""
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
+spec:
+  selector:
+    matchLabels:
+      app: cloud-network-config-controller
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      name: cloud-network-config-controller
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: cloud-network-config-controller
+        component: network
+        type: infra
+        openshift.io/component: network
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      - name: hosted-cluster-kubecfg-setup
+        image: "{{.CLIImage}}"
+        command:
+          - /bin/bash
+          - -c
+          - |
+            kc=/var/run/secrets/hosted_cluster/kubeconfig
+            kubectl --kubeconfig $kc config set clusters.default.server "https://[${KUBERNETES_SERVICE_HOST}]:${KUBERNETES_SERVICE_PORT}"
+            kubectl --kubeconfig $kc config set clusters.default.certificate-authority /hosted-ca/ca.crt
+            kubectl --kubeconfig $kc config set users.admin.tokenFile /var/run/secrets/hosted_cluster/token
+            kubectl --kubeconfig $kc config set contexts.default.cluster default
+            kubectl --kubeconfig $kc config set contexts.default.user admin
+            kubectl --kubeconfig $kc config set contexts.default.namespace openshift-cloud-network-config-controller
+            kubectl --kubeconfig $kc config use-context default
+        volumeMounts:
+          - mountPath: /var/run/secrets/hosted_cluster
+            name: hosted-cluster-api-access
+        env:
+          - name: KUBERNETES_SERVICE_PORT
+            value: "{{.KubernetesServicePort}}"
+          - name: KUBERNETES_SERVICE_HOST
+            value: "{{.KubernetesServiceHost}}"
+      containers:
+      # hosted-cluster-token creates a token with a custom path(/var/run/secrets/hosted_cluster/token)
+      # The token path is included in the kubeconfig used by cncc containers to talk to the hosted clusters API server
+      - name: hosted-cluster-token
+        image: "{{.TokenMinterImage}}"
+        command: ["/usr/bin/control-plane-operator", "token-minter"]
+        args:
+          - --service-account-namespace=openshift-cloud-network-config-controller
+          - --service-account-name=cloud-network-config-controller
+          - --token-audience={{.TokenAudience}}
+          - --token-file=/var/run/secrets/hosted_cluster/token
+          - --kubeconfig=/etc/kubernetes/kubeconfig
+        resources:
+          requests:
+            cpu: 10m
+            memory: 30Mi
+        volumeMounts:
+          - mountPath: /etc/kubernetes
+            name: admin-kubeconfig
+          - mountPath: /var/run/secrets/hosted_cluster
+            name: hosted-cluster-api-access
+        # cloud-token creates a token with the default service account path
+        # The token is read by cncc containers to authenticate against the cloud services
+      - name: cloud-token
+        image: "{{.TokenMinterImage}}"
+        command: ["/usr/bin/control-plane-operator", "token-minter"]
+        args:
+          - --service-account-namespace=openshift-cloud-network-config-controller
+          - --service-account-name=cloud-network-config-controller
+          - --token-file=/var/run/secrets/openshift/serviceaccount/token
+          - --kubeconfig=/etc/kubernetes/kubeconfig
+        resources:
+          requests:
+            cpu: 10m
+            memory: 30Mi
+        volumeMounts:
+          - mountPath: /etc/kubernetes
+            name: admin-kubeconfig
+          - mountPath: /var/run/secrets/openshift/serviceaccount
+            name: cloud-token
+      - name: controller
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        image: {{.CloudNetworkConfigControllerImage}}
+        imagePullPolicy: IfNotPresent
+        command:
+          - /bin/bash
+          - -c
+          - |
+            retries=0
+            while [ ! -f /var/run/secrets/hosted_cluster/token ]; do
+              (( retries += 1 ))
+              sleep 1
+              if [[ "${retries}" -gt 30 ]]; then
+                echo "$(date -Iseconds) - Hosted cluster token not found"
+                  exit 1
+              fi
+            done
+
+            exec /usr/bin/cloud-network-config-controller \
+              -platform-type {{.PlatformType}} \
+              -platform-region={{.PlatformRegion}} \
+              -platform-api-url={{.PlatformAPIURL}} \
+              -platform-aws-ca-override={{.PlatformAWSCAPath}} \
+              -platform-azure-environment={{.PlatformAzureEnvironment}} \
+              -secret-name cloud-network-config-controller-creds \
+              -kubeconfig /var/run/secrets/hosted_cluster/kubeconfig
+        env:
+        - name: CONTROLLER_NAMESPACE
+          value: "openshift-cloud-network-config-controller"
+        - name: CONTROLLER_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KubernetesServicePort}}"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KubernetesServiceHost}}"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        volumeMounts:
+        - mountPath: /hosted-ca
+          name: hosted-ca-cert
+        - mountPath: /var/run/secrets/hosted_cluster
+          name: hosted-cluster-api-access
+        - name: cloud-provider-secret
+          mountPath: /etc/secret/cloudprovider
+          readOnly: true
+        - name: kube-cloud-config
+          mountPath: /kube-cloud-config
+          readOnly: true
+        - name: cloud-token
+          mountPath: /var/run/secrets/openshift/serviceaccount
+          readOnly: true
+        terminationMessagePolicy: FallbackToLogsOnError
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+      volumes:
+      - name: hosted-cluster-api-access
+        emptyDir: {}
+      - name: cloud-token
+        emptyDir: {}
+      - name: hosted-ca-cert
+        secret:
+          secretName: root-ca
+          items:
+            - key: ca.crt
+              path: ca.crt
+      - name: admin-kubeconfig
+        secret:
+          secretName: service-network-admin-kubeconfig
+      - name: cloud-provider-secret
+        secret:
+          secretName: cloud-network-config-controller-creds
+      - name: kube-cloud-config
+        configMap:
+          name: cloud-network-config-controller-kube-cloud-config

@@ -1,0 +1,8 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  namespace: {{.HostedClusterNamespace}}
+  name: cloud-network-config-controller-kube-cloud-config
+  annotations:
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
+# placeholder; will be replaced in render.go
