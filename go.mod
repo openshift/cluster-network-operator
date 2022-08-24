@@ -11,7 +11,7 @@ require (
 	github.com/gophercloud/gophercloud v0.19.0
 	github.com/gophercloud/utils v0.0.0-20210720165645-8a3ad2ad9e70
 	github.com/onsi/gomega v1.18.1
-	github.com/openshift/api v0.0.0-20220715133027-dab5b363ebd1
+	github.com/openshift/api v0.0.0-20220823152035-864c47647c02
 	github.com/openshift/build-machinery-go v0.0.0-20211213093930-7e33a7eb4ce3
 	github.com/openshift/client-go v0.0.0-20220525160904-9e1acff93e4a
 	github.com/openshift/library-go v0.0.0-20220525173854-9b950a41acdc
