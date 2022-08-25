@@ -17,6 +17,7 @@ import (
 	"k8s.io/klog/v2"
 
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 
 	osoperclient "github.com/openshift/client-go/operator/clientset/versioned"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -49,7 +50,7 @@ func (fc *FakeClient) ClientFor(name string) cnoclient.ClusterClient {
 }
 
 func (fc *FakeClient) Default() cnoclient.ClusterClient {
-	return fc.ClientFor(cnoclient.DefaultClusterName)
+	return fc.ClientFor(names.DefaultClusterName)
 }
 
 func (fc *FakeClient) Start(context.Context) error {
@@ -100,7 +101,7 @@ func NewFakeClient(objs ...crclient.Object) cnoclient.Client {
 
 	return &FakeClient{
 		clusterClients: map[string]*FakeClusterClient{
-			cnoclient.DefaultClusterName: &fc,
+			names.DefaultClusterName: &fc,
 		},
 	}
 }

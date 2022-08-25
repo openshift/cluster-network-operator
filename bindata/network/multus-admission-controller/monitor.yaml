@@ -6,30 +6,53 @@ metadata:
     name: monitor-multus-admission-controller
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
+{{- if .HyperShiftEnabled}}
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
+{{- end }}
   name: monitor-multus-admission-controller
-  namespace: openshift-multus
+  namespace: {{.AdmissionControllerNamespace}}
 spec:
   endpoints:
   - interval: 30s
     port: metrics
-    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
     scheme: 'https'
+{{- if .HyperShiftEnabled}}
+    bearerTokenSecret:
+      key: ""
+    tlsConfig:
+      ca:
+        configMap:
+          key: service-ca.crt
+          name: openshift-service-ca.crt
+      cert:
+        secret:
+          key: tls.crt
+          name: multus-admission-controller-secret
+      keySecret:
+        key: tls.key
+        name: multus-admission-controller-secret
+      serverName: multus-admission-controller.{{.AdmissionControllerNamespace}}.svc
+{{ else }}
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
     tlsConfig:
       caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
-      serverName: multus-admission-controller.openshift-multus.svc
+      serverName: multus-admission-controller.{{.AdmissionControllerNamespace}}.svc
+{{- end }}
+
   jobLabel: app
   namespaceSelector:
     matchNames:
-    - openshift-multus
+    - {{.AdmissionControllerNamespace}}
   selector:
     matchLabels:
-       app: multus-admission-controller
+      app: multus-admission-controller
+{{- if not .HyperShiftEnabled}}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: prometheus-k8s
-  namespace: openshift-multus
+  namespace: {{.AdmissionControllerNamespace}}
 rules:
 - apiGroups:
   - ""
@@ -46,7 +69,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: prometheus-k8s
-  namespace: openshift-multus
+  namespace: {{.AdmissionControllerNamespace}}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -55,3 +78,4 @@ subjects:
 - kind: ServiceAccount
   name: prometheus-k8s
   namespace: openshift-monitoring
+{{- end }}

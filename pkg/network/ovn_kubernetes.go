@@ -20,7 +20,6 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
-	"github.com/openshift/cluster-network-operator/pkg/client"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -150,7 +149,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	// Hypershift
-	data.Data["ManagementClusterName"] = client.ManagementClusterName
+	data.Data["ManagementClusterName"] = names.ManagementClusterName
 	data.Data["HostedClusterNamespace"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Namespace
 	data.Data["OvnkubeMasterReplicas"] = len(bootstrapResult.OVN.MasterAddresses)
 	data.Data["ClusterID"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ClusterID
@@ -489,7 +488,7 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 	}
 
 	hcp := &hyperv1.HostedControlPlane{ObjectMeta: metav1.ObjectMeta{Name: hc.Name}}
-	err := kubeClient.ClientFor(cnoclient.ManagementClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, hcp)
+	err := kubeClient.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, hcp)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			klog.Infof("Did not find hosted control plane")
@@ -527,7 +526,7 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 				Version:  "v1",
 				Resource: "routes",
 			}
-			clusterClient := kubeClient.ClientFor(client.ManagementClusterName)
+			clusterClient := kubeClient.ClientFor(names.ManagementClusterName)
 			routeObj, err := clusterClient.Dynamic().Resource(gvr).Namespace(hc.Namespace).Get(context.TODO(), "ovnkube-sbdb", metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
@@ -554,7 +553,7 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 	case hyperv1.NodePort:
 		{
 			svc := &corev1.Service{}
-			clusterClient := kubeClient.ClientFor(client.ManagementClusterName)
+			clusterClient := kubeClient.ClientFor(names.ManagementClusterName)
 			err = clusterClient.CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: "ovnkube-master-external"}, svc)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
@@ -973,7 +972,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client) (*bootstrap
 			},
 		}
 		nsn = types.NamespacedName{Namespace: hc.Namespace, Name: "ovnkube-master"}
-		if err := kubeClient.ClientFor(cnoclient.ManagementClusterName).CRClient().Get(context.TODO(), nsn, masterSS); err != nil {
+		if err := kubeClient.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(), nsn, masterSS); err != nil {
 			if !apierrors.IsNotFound(err) {
 				return nil, fmt.Errorf("Failed to retrieve existing master DaemonSet: %w", err)
 			} else {
