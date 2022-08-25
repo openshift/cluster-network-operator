@@ -3,7 +3,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: multus-admission-controller
-  namespace: openshift-multus
+  namespace: {{.AdmissionControllerNamespace}}
   labels:
     app: multus-admission-controller
   annotations:
@@ -11,24 +11,74 @@ metadata:
       This deployment launches the Multus admisson controller component.
     release.openshift.io/version: "{{.ReleaseVersion}}"
     networkoperator.openshift.io/non-critical: ""
+{{- if .HyperShiftEnabled}}
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
+{{- end }}
 spec:
   replicas: {{.Replicas}}
   selector:
     matchLabels:
       app: multus-admission-controller
-      namespace: openshift-multus
+      namespace: {{.AdmissionControllerNamespace}}
   template:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: multus-admission-controller
-        namespace: openshift-multus
+        namespace: {{.AdmissionControllerNamespace}}
         component: network
         type: infra
         openshift.io/component: network
     spec:
+{{- if .HyperShiftEnabled}}
+      initContainers:
+        - name: hosted-cluster-kubecfg-setup
+          image: "{{.CLIImage}}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              kc=/var/run/secrets/hosted_cluster/kubeconfig
+              kubectl --kubeconfig $kc config set clusters.default.server "https://[${KUBERNETES_SERVICE_HOST}]:${KUBERNETES_SERVICE_PORT}"
+              kubectl --kubeconfig $kc config set clusters.default.certificate-authority /hosted-ca/ca.crt
+              kubectl --kubeconfig $kc config set users.admin.tokenFile /var/run/secrets/hosted_cluster/token
+              kubectl --kubeconfig $kc config set contexts.default.cluster default
+              kubectl --kubeconfig $kc config set contexts.default.user admin
+              kubectl --kubeconfig $kc config set contexts.default.namespace openshift-multus
+              kubectl --kubeconfig $kc config use-context default
+          volumeMounts:
+            - mountPath: /var/run/secrets/hosted_cluster
+              name: hosted-cluster-api-access
+          env:
+            - name: KUBERNETES_SERVICE_PORT
+              value: "{{.KubernetesServicePort}}"
+            - name: KUBERNETES_SERVICE_HOST
+              value: "{{.KubernetesServiceHost}}"
+{{- end }}
       containers:
+{{- if .HyperShiftEnabled}}
+      # hosted-cluster-token creates a token with a custom path(/var/run/secrets/hosted_cluster/token)
+      # The token path is included in the kubeconfig used by webhook container to talk to the hosted clusters API server
+      - name: hosted-cluster-token
+        image: "{{.TokenMinterImage}}"
+        command: [ "/usr/bin/control-plane-operator", "token-minter" ]
+        args:
+          - --service-account-namespace=openshift-multus
+          - --service-account-name=multus-ac
+          - --token-audience={{.TokenAudience}}
+          - --token-file=/var/run/secrets/hosted_cluster/token
+          - --kubeconfig=/etc/kubernetes/kubeconfig
+        resources:
+          requests:
+            cpu: 10m
+            memory: 30Mi
+        volumeMounts:
+          - mountPath: /etc/kubernetes
+            name: admin-kubeconfig
+          - mountPath: /var/run/secrets/hosted_cluster
+            name: hosted-cluster-api-access
+{{- end }}
       - name: multus-admission-controller
         image: {{.MultusAdmissionControllerImage}}
         command:
@@ -45,6 +95,16 @@ spec:
         - name: webhook-certs
           mountPath: /etc/webhook
           readOnly: True
+{{- if .HyperShiftEnabled}}
+        - mountPath: /var/run/secrets/hosted_cluster
+          name: hosted-cluster-api-access
+        - mountPath: /hosted-ca
+          name: hosted-ca-cert
+          readOnly: True
+        env:
+          - name: KUBECONFIG
+            value: "/var/run/secrets/hosted_cluster/kubeconfig"
+{{- end }}
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -74,10 +134,12 @@ spec:
         - name: webhook-certs
           mountPath: /etc/webhook
           readOnly: True
+{{- if not .HyperShiftEnabled}}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
-      serviceAccountName: multus
+      serviceAccountName: multus-ac
+{{- end }}
       priorityClassName: "system-cluster-critical"
       restartPolicy: Always
 {{- if not .ExternalControlPlane }}
@@ -88,6 +150,19 @@ spec:
       - name: webhook-certs
         secret:
           secretName: multus-admission-controller-secret
+{{- if .HyperShiftEnabled}}
+      - name: hosted-cluster-api-access
+        emptyDir: {}
+      - name: hosted-ca-cert
+        secret:
+          secretName: root-ca
+          items:
+            - key: ca.crt
+              path: ca.crt
+      - name: admin-kubeconfig
+        secret:
+          secretName: service-network-admin-kubeconfig
+{{- end }}
       tolerations:
       - key: "node-role.kubernetes.io/master"
         operator: Exists

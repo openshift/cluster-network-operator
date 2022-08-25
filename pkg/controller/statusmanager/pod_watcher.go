@@ -3,7 +3,7 @@ package statusmanager
 import (
 	"context"
 
-	"github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -79,7 +79,7 @@ func (s *StatusManager) AddPodWatcher(mgr manager.Manager) error {
 
 	// If Hypershift is enable, also watch that single namespace
 	if s.hyperShiftConfig.Enabled {
-		s.initInformersFor(client.ManagementClusterName, s.hyperShiftConfig.Namespace, true)
+		s.initInformersFor(names.ManagementClusterName, s.hyperShiftConfig.Namespace, true)
 	}
 
 	pw := &PodWatcher{

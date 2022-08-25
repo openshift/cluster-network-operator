@@ -7,9 +7,9 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 
+	cnofake "github.com/openshift/cluster-network-operator/pkg/client/fake"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/fake"
 )
 
 var MultusAdmissionControllerConfig = operv1.Network{
@@ -40,7 +40,7 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	config.DisableMultiNetwork = &disabled
 	fillDefaults(config, nil)
 
-	fakeClient := fake.NewSimpleClientset(
+	fakeClient := cnofake.NewFakeClient(
 		&corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test1-ignored",
@@ -76,7 +76,7 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 
 	// Check rendered object
-	g.Expect(len(objs)).To(Equal(9))
+	g.Expect(len(objs)).To(Equal(10))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Service", "openshift-multus", "multus-admission-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "multus-admission-controller-webhook")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "multus-admission-controller-webhook")))
@@ -88,7 +88,7 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 func TestRenderMultusAdmissionControllerGetNamespace(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	fakeClient := fake.NewSimpleClientset(
+	fakeClient := cnofake.NewFakeClient(
 		&corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test1-ignored",
