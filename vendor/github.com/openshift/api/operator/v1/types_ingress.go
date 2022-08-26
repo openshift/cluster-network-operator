@@ -384,7 +384,32 @@ type LoadBalancerStrategy struct {
 	//
 	// +optional
 	ProviderParameters *ProviderLoadBalancerParameters `json:"providerParameters,omitempty"`
+
+	// dnsManagementPolicy indicates if the lifecyle of the wildcard DNS record
+	// associated with the load balancer service will be managed by
+	// the ingress operator. It defaults to Managed.
+	// Valid values are: Managed and Unmanaged.
+	//
+	// +kubebuilder:default:="Managed"
+	// +kubebuilder:validation:Optional
+	// +optional
+	DNSManagementPolicy LoadBalancerDNSManagementPolicy `json:"dnsManagementPolicy"`
 }
+
+// LoadBalancerDNSManagementPolicy is a policy for configuring how
+// ingresscontrollers manage DNS.
+//
+// +kubebuilder:validation:Enum=Managed;Unmanaged
+type LoadBalancerDNSManagementPolicy string
+
+const (
+	// ManagedLoadBalancerDNS specifies that the operator manages
+	// a wildcard DNS record for the ingresscontroller.
+	ManagedLoadBalancerDNS LoadBalancerDNSManagementPolicy = "Managed"
+	// UnmanagedLoadBalancerDNS specifies that the operator does not manage
+	// any wildcard DNS record for the ingresscontroller.
+	UnmanagedLoadBalancerDNS LoadBalancerDNSManagementPolicy = "Unmanaged"
+)
 
 // ProviderLoadBalancerParameters holds desired load balancer information
 // specific to the underlying infrastructure provider.
@@ -1481,6 +1506,38 @@ type IngressControllerTuningOptions struct {
 	// +kubebuilder:validation:Optional
 	// +optional
 	MaxConnections int32 `json:"maxConnections,omitempty"`
+
+	// reloadInterval defines the minimum interval at which the router is allowed to reload
+	// to accept new changes. Increasing this value can prevent the accumulation of
+	// HAProxy processes, depending on the scenario. Increasing this interval can
+	// also lessen load imbalance on a backend's servers when using the roundrobin
+	// balancing algorithm. Alternatively, decreasing this value may decrease latency
+	// since updates to HAProxy's configuration can take effect more quickly.
+	//
+	// The value must be a time duration value; see <https://pkg.go.dev/time#ParseDuration>.
+	// Currently, the minimum value allowed is 1s, and the maximum allowed value is
+	// 120s. Minimum and maximum allowed values may change in future versions of OpenShift.
+	// Note that if a duration outside of these bounds is provided, the value of reloadInterval
+	// will be capped/floored and not rejected (e.g. a duration of over 120s will be capped to
+	// 120s; the IngressController will not reject and replace this disallowed value with
+	// the default).
+	//
+	// A zero value for reloadInterval tells the IngressController to choose the default,
+	// which is currently 5s and subject to change without notice.
+	//
+	// This field expects an unsigned duration string of decimal numbers, each with optional
+	// fraction and a unit suffix, e.g. "100s", "1m30s". Valid time units are "s" and "m".
+	//
+	// Note: Setting a value significantly larger than the default of 5s can cause latency
+	// in observing updates to routes and their endpoints. HAProxy's configuration will
+	// be reloaded less frequently, and newly created routes will not be served until the
+	// subsequent reload.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Pattern=^(0|([0-9]+(\.[0-9]+)?(s|m))+)$
+	// +kubebuilder:validation:Type:=string
+	// +optional
+	ReloadInterval metav1.Duration `json:"reloadInterval,omitempty"`
 }
 
 // HTTPEmptyRequestsPolicy indicates how HTTP connections for which no request
