@@ -139,8 +139,10 @@ spec:
         runAsNonRoot: true
         runAsUser: 65534
       serviceAccountName: multus-ac
-{{- end }}
       priorityClassName: "system-cluster-critical"
+{{- else}}
+      priorityClassName: "hypershift-control-plane"
+{{- end }}
       restartPolicy: Always
 {{- if not .ExternalControlPlane }}
       nodeSelector:
