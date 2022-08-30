@@ -17,7 +17,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -385,21 +384,17 @@ func isNonCritical(obj metav1.Object) bool {
 }
 
 func (status *StatusManager) listAllStatusObjects() (dss []*appsv1.DaemonSet, deps []*appsv1.Deployment, sss []*appsv1.StatefulSet) {
-	selector, err := labels.Parse(generateStatusSelector)
-	if err != nil {
-		panic(err) // selector is guaranteed valid, unreachable
-	}
 	// these lists can't fail, they're backed by informers
 	for _, lister := range status.dsListers {
-		l, _ := lister.List(selector)
+		l, _ := lister.List(status.labelSelector)
 		dss = append(dss, l...)
 	}
 	for _, lister := range status.depListers {
-		l, _ := lister.List(selector)
+		l, _ := lister.List(status.labelSelector)
 		deps = append(deps, l...)
 	}
 	for _, lister := range status.ssListers {
-		l, _ := lister.List(selector)
+		l, _ := lister.List(status.labelSelector)
 		sss = append(sss, l...)
 	}
 	return

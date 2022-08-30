@@ -42,7 +42,7 @@ func (s *StatusManager) initInformersFor(clusterName, namespace string, stateful
 			0, // resync Period
 			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 			func(options *metav1.ListOptions) {
-				options.LabelSelector = generateStatusSelector
+				options.LabelSelector = s.labelSelector.String()
 			})
 		s.client.ClientFor(clusterName).AddCustomInformer(inf)
 		s.dsInformers[clusterName] = inf
@@ -54,7 +54,7 @@ func (s *StatusManager) initInformersFor(clusterName, namespace string, stateful
 			0, // resync Period
 			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 			func(options *metav1.ListOptions) {
-				options.LabelSelector = generateStatusSelector
+				options.LabelSelector = s.labelSelector.String()
 			})
 		s.client.ClientFor(clusterName).AddCustomInformer(inf)
 		s.depInformers[clusterName] = inf
@@ -66,7 +66,7 @@ func (s *StatusManager) initInformersFor(clusterName, namespace string, stateful
 		0, // resync Period
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = generateStatusSelector
+			options.LabelSelector = s.labelSelector.String()
 		})
 	s.client.ClientFor(clusterName).AddCustomInformer(inf)
 	s.ssInformers[clusterName] = inf

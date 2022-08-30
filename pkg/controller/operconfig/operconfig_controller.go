@@ -304,6 +304,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	relatedObjects := []configv1.ObjectReference{}
 	relatedClusterObjects := []network.RelatedObject{}
+	hcpCfg := network.NewHyperShiftConfig()
 	for _, obj := range objs {
 		// Label all DaemonSets, Deployments, and StatefulSets with the label that generates Status.
 		if obj.GetAPIVersion() == "apps/v1" && (obj.GetKind() == "DaemonSet" || obj.GetKind() == "Deployment" || obj.GetKind() == "StatefulSet") {
@@ -311,7 +312,14 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			if l == nil {
 				l = map[string]string{}
 			}
-			l[names.GenerateStatusLabel] = ""
+
+			// In HyperShift use the infrastructure name to differentiate between resources deployed by the management cluster CNO and CNO deployed in the hosted clusters control plane namespace
+			// Without that the CNO running against the management cluster would pick the resources rendered by the hosted cluster CNO
+			if hcpCfg.Enabled {
+				l[names.GenerateStatusLabel] = bootstrapResult.Infra.InfraName
+			} else {
+				l[names.GenerateStatusLabel] = names.StandAloneClusterName
+			}
 			obj.SetLabels(l)
 		}
 		restMapping, err := r.mapper.RESTMapping(obj.GroupVersionKind().GroupKind())

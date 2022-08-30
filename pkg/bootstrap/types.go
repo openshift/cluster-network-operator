@@ -77,6 +77,7 @@ type InfraStatus struct {
 	PlatformRegion       string
 	PlatformStatus       *configv1.PlatformStatus
 	ExternalControlPlane bool
+	InfraName            string
 
 	// KubeCloudConfig is the contents of the openshift-config-managed/kube-cloud-config ConfigMap
 	KubeCloudConfig map[string]string
