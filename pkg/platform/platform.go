@@ -30,6 +30,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		PlatformType:           infraConfig.Status.PlatformStatus.Type,
 		PlatformStatus:         infraConfig.Status.PlatformStatus,
 		ControlPlaneTopology:   infraConfig.Status.ControlPlaneTopology,
+		InfraName:              infraConfig.Status.InfrastructureName,
 		InfrastructureTopology: infraConfig.Status.InfrastructureTopology,
 		APIServers:             map[string]bootstrap.APIServer{},
 	}

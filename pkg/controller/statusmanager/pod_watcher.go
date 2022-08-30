@@ -2,7 +2,6 @@ package statusmanager
 
 import (
 	"context"
-
 	"github.com/openshift/cluster-network-operator/pkg/names"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +41,7 @@ func (s *StatusManager) initInformersFor(clusterName, namespace string, includeD
 			0, // resync Period
 			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 			func(options *metav1.ListOptions) {
-				options.LabelSelector = generateStatusSelector
+				options.LabelSelector = s.labelSelector.String()
 			})
 		s.client.ClientFor(clusterName).AddCustomInformer(inf)
 		s.dsInformers[clusterName] = inf
@@ -56,7 +55,7 @@ func (s *StatusManager) initInformersFor(clusterName, namespace string, includeD
 		0, // resync Period
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = generateStatusSelector
+			options.LabelSelector = s.labelSelector.String()
 		})
 	s.client.ClientFor(clusterName).AddCustomInformer(inf)
 	s.depInformers[clusterName] = inf
@@ -68,7 +67,7 @@ func (s *StatusManager) initInformersFor(clusterName, namespace string, includeD
 		0, // resync Period
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = generateStatusSelector
+			options.LabelSelector = s.labelSelector.String()
 		})
 	s.client.ClientFor(clusterName).AddCustomInformer(inf)
 	s.ssInformers[clusterName] = inf
