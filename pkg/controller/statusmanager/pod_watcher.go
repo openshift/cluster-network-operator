@@ -32,10 +32,10 @@ type PodWatcher struct {
 
 // initInformersFor sets up the DaemonSet, Deployment, and StatefulSet informers
 // for the given cluster and namespace
-// minor hack: Hypershift doesn't have permission to create or watch Deployments and Daemonsets
-// in the management cluster. So statefulSetOnly works around that :-/
-func (s *StatusManager) initInformersFor(clusterName, namespace string, statefulSetOnly bool) {
-	if !statefulSetOnly {
+// minor hack: Hypershift doesn't have permission to create or watch Daemonsets
+// in the management cluster. So includeDaemonsets works around that :-/
+func (s *StatusManager) initInformersFor(clusterName, namespace string, includeDaemonsets bool) {
+	if includeDaemonsets {
 		inf := v1appsinformers.NewFilteredDaemonSetInformer(
 			s.client.ClientFor(clusterName).Kubernetes(),
 			namespace,
@@ -48,19 +48,21 @@ func (s *StatusManager) initInformersFor(clusterName, namespace string, stateful
 		s.dsInformers[clusterName] = inf
 		s.dsListers[clusterName] = v1appslisters.NewDaemonSetLister(inf.GetIndexer())
 
-		inf = v1appsinformers.NewFilteredDeploymentInformer(
-			s.client.ClientFor(clusterName).Kubernetes(),
-			namespace,
-			0, // resync Period
-			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-			func(options *metav1.ListOptions) {
-				options.LabelSelector = generateStatusSelector
-			})
-		s.client.ClientFor(clusterName).AddCustomInformer(inf)
-		s.depInformers[clusterName] = inf
-		s.depListers[clusterName] = v1appslisters.NewDeploymentLister(inf.GetIndexer())
 	}
-	inf := v1appsinformers.NewFilteredStatefulSetInformer(
+
+	inf := v1appsinformers.NewFilteredDeploymentInformer(
+		s.client.ClientFor(clusterName).Kubernetes(),
+		namespace,
+		0, // resync Period
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		func(options *metav1.ListOptions) {
+			options.LabelSelector = generateStatusSelector
+		})
+	s.client.ClientFor(clusterName).AddCustomInformer(inf)
+	s.depInformers[clusterName] = inf
+	s.depListers[clusterName] = v1appslisters.NewDeploymentLister(inf.GetIndexer())
+
+	inf = v1appsinformers.NewFilteredStatefulSetInformer(
 		s.client.ClientFor(clusterName).Kubernetes(),
 		namespace,
 		0, // resync Period
@@ -75,11 +77,11 @@ func (s *StatusManager) initInformersFor(clusterName, namespace string, stateful
 
 // AddPodWatcher wires up the PodWatcher to the controller-manager.
 func (s *StatusManager) AddPodWatcher(mgr manager.Manager) error {
-	s.initInformersFor("", metav1.NamespaceAll, false)
+	s.initInformersFor("", metav1.NamespaceAll, true)
 
-	// If Hypershift is enable, also watch that single namespace
+	// If Hypershift is enabled, also watch that single namespace
 	if s.hyperShiftConfig.Enabled {
-		s.initInformersFor(names.ManagementClusterName, s.hyperShiftConfig.Namespace, true)
+		s.initInformersFor(names.ManagementClusterName, s.hyperShiftConfig.Namespace, false)
 	}
 
 	pw := &PodWatcher{
