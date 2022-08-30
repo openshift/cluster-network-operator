@@ -106,7 +106,7 @@ func conditionsEqual(oldConditions, newConditions []operv1.OperatorCondition) bo
 
 func TestStatusManager_set(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing")
+	status := New(client, "testing", "")
 
 	// No operator config yet; should reflect this in the cluster operator
 	status.set(false)
@@ -242,7 +242,7 @@ func TestStatusManager_set(t *testing.T) {
 
 func TestStatusManagerSetDegraded(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing")
+	status := New(client, "testing", "")
 
 	_, err := getOC(client)
 	if !errors.IsNotFound(err) {
@@ -334,7 +334,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 
 func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing")
+	status := New(client, "testing", "")
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	set(t, client, no)
@@ -934,7 +934,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 
 func TestStatusManagerSetFromDeployments(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing")
+	status := New(client, "testing", "")
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	set(t, client, no)
@@ -1226,7 +1226,7 @@ func setLastPodState(t *testing.T, client cnoclient.Client, name string, ps podS
 
 func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing")
+	status := New(client, "testing", "")
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	set(t, client, no)
@@ -1437,6 +1437,85 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 			Type:   operv1.OperatorStatusTypeProgressing,
 			Status: operv1.ConditionTrue,
 			Reason: "Deploying",
+		},
+		{
+			Type:   operv1.OperatorStatusTypeAvailable,
+			Status: operv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+}
+
+// In HyperShift environment there is more than one CNO running in the management cluster.
+// The default CNO runs against the management cluster but there is also one CNO per hosted cluster.
+// Make sure that the default CNO does not reconcile its status based on resources created by the hosted clusters CNO.
+func TestStatusManagerHyperShift(t *testing.T) {
+	validConditions := []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionFalse,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Status: operv1.ConditionTrue,
+		},
+	}
+
+	// mgmt status
+	mgmtClient := fake.NewFakeClient()
+	mgmtStatus := New(mgmtClient, "testing", "")
+	setFakeListers(mgmtStatus)
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	set(t, mgmtClient, no)
+	mgmtStatus.set(true, validConditions...)
+
+	// Create valid minimal Deployment in the management cluster
+	depMgmt := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Labels: sl}, Status: appsv1.DeploymentStatus{
+		AvailableReplicas: 1,
+	}}
+	set(t, mgmtClient, depMgmt)
+
+	// Create minimal failing Deployment in the hosted clusters control namespace(mgmt cluster) that should not be managed by mgmtStatus
+	depHCP := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "hcp-cluster-ns",
+			Name:        "beta",
+			Labels:      map[string]string{names.GenerateStatusLabel: "hosted-cluster-id"},
+			Annotations: map[string]string{names.ClusterNameAnnotation: names.ManagementClusterName},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "beta"},
+			},
+		}, Status: appsv1.DeploymentStatus{
+			UnavailableReplicas: 1,
+		}}
+	set(t, mgmtClient, depHCP)
+
+	mgmtStatus.SetFromPods()
+
+	// mgmt conditions should not reflect the failures in hosted clusters namespace
+	oc, err := getOC(mgmtClient)
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionFalse,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Status: operv1.ConditionTrue,
 		},
 		{
 			Type:   operv1.OperatorStatusTypeAvailable,
