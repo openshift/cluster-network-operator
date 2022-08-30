@@ -16,6 +16,8 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 )
 
+const defaultEgressFirewallName = "default"
+
 var gvrEgressFirewall = schema.GroupVersionResource{Group: "k8s.ovn.org", Version: "v1", Resource: "egressfirewalls"}
 var gvrEgressNetworkPolicy = schema.GroupVersionResource{Group: "network.openshift.io", Version: "v1", Resource: "egressnetworkpolicies"}
 
@@ -47,7 +49,8 @@ func convertEgressNetworkPolicyToEgressFirewall(ctx context.Context, client cnoc
 				"apiVersion": "k8s.ovn.org/v1",
 				"kind":       "EgressFirewall",
 				"metadata": map[string]interface{}{
-					"name":      enp.GetName(),
+					// The name for the EgressFirewall CR must be 'default', other values are not allowed.
+					"name":      defaultEgressFirewallName,
 					"namespace": enp.GetNamespace(),
 				},
 				"spec": spec,
