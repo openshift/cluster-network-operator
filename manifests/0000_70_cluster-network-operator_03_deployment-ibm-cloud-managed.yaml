@@ -9,9 +9,15 @@ metadata:
   name: network-operator
   namespace: openshift-network-operator
 spec:
+  replicas: 1
   selector:
     matchLabels:
       name: network-operator
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
   template:
     metadata:
       annotations:
@@ -19,6 +25,15 @@ spec:
       labels:
         name: network-operator
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  name: network-operator
+              topologyKey: kubernetes.io/hostname
+            weight: 100
       containers:
       - command:
         - /bin/bash
