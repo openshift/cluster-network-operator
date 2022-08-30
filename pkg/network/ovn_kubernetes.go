@@ -25,6 +25,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	hyperv1 "github.com/openshift/hypershift/api/v1alpha1"
+	hyperutil "github.com/openshift/hypershift/support/util"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -155,14 +156,14 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["ClusterID"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ClusterID
 	data.Data["ClusterIDLabel"] = ClusterIDLabel
 	data.Data["OVNDbServiceType"] = corev1.ServiceTypeClusterIP
-	data.Data["OVNSbDbRouteHost"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost
+	sbDBRouteHost := bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost
 	data.Data["OVNSbDbRouteLabels"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteLabels
 	data.Data["OVN_SB_NODE_PORT"] = nil
 	data.Data["OVN_NB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
 	data.Data["OVN_SB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
 	pubStrategy := bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ServicePublishingStrategy
 	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost == "" && pubStrategy != nil && pubStrategy.Type == hyperv1.Route && pubStrategy.Route != nil && pubStrategy.Route.Hostname != "" {
-		data.Data["OVNSbDbRouteHost"] = pubStrategy.Route.Hostname
+		sbDBRouteHost = pubStrategy.Route.Hostname
 	} else if pubStrategy != nil && pubStrategy.Type == hyperv1.NodePort {
 		data.Data["OVNDbServiceType"] = corev1.ServiceTypeNodePort
 		data.Data["OVN_SB_NODE_PORT"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort
@@ -170,6 +171,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVN_SB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%d", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort)
 	}
 
+	if sbDBRouteHost == "" {
+		sbDBRouteHost = hyperutil.ShortenRouteHostnameIfNeeded("ovnkube-sbdb", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Namespace, bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.DefaultIngressDomain)
+	}
+	data.Data["OVNSbDbRouteHost"] = sbDBRouteHost
 	// Hypershift proxy
 	if bootstrapResult.Infra.Proxy.HTTPProxy == "" {
 		data.Data["ENABLE_OVN_NODE_PROXY"] = false
@@ -478,10 +483,11 @@ func renderOVNFlowsConfig(bootstrapResult *bootstrap.BootstrapResult, data *rend
 
 func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Client) (*bootstrap.OVNHyperShiftBootstrapResult, error) {
 	ovnHypershiftResult := &bootstrap.OVNHyperShiftBootstrapResult{
-		Enabled:            hc.Enabled,
-		Namespace:          hc.Namespace,
-		OVNSbDbRouteHost:   hc.OVNSbDbRouteHost,
-		OVNSbDbRouteLabels: hc.OVNSbDbRouteLabels,
+		Enabled:              hc.Enabled,
+		Namespace:            hc.Namespace,
+		OVNSbDbRouteHost:     hc.OVNSbDbRouteHost,
+		OVNSbDbRouteLabels:   hc.OVNSbDbRouteLabels,
+		DefaultIngressDomain: hc.DefaultIngressDomain,
 	}
 
 	if !hc.Enabled {
@@ -506,8 +512,7 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 		ovnHypershiftResult.ControlPlaneReplicas = 1
 	}
 	for _, svc := range hcp.Spec.Services {
-		// TODO: instead of the hardcoded string use ServiceType hyperv1.OVNSbDb once the API is updated
-		if svc.Service == "OVNSbDb" {
+		if svc.Service == hyperv1.OVNSbDb {
 			s := svc.ServicePublishingStrategy
 			ovnHypershiftResult.ServicePublishingStrategy = &s
 		}

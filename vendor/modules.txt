@@ -46,6 +46,31 @@ github.com/coreos/go-systemd/v22/journal
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/docker/distribution v2.7.1+incompatible
+## explicit
+github.com/docker/distribution
+github.com/docker/distribution/digestset
+github.com/docker/distribution/manifest
+github.com/docker/distribution/manifest/manifestlist
+github.com/docker/distribution/manifest/ocischema
+github.com/docker/distribution/manifest/schema1
+github.com/docker/distribution/manifest/schema2
+github.com/docker/distribution/metrics
+github.com/docker/distribution/reference
+github.com/docker/distribution/registry/api/errcode
+github.com/docker/distribution/registry/api/v2
+github.com/docker/distribution/registry/client
+github.com/docker/distribution/registry/client/auth
+github.com/docker/distribution/registry/client/auth/challenge
+github.com/docker/distribution/registry/client/transport
+github.com/docker/distribution/registry/storage/cache
+github.com/docker/distribution/registry/storage/cache/memory
+# github.com/docker/go-metrics v0.0.1
+## explicit; go 1.11
+github.com/docker/go-metrics
+# github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7
+## explicit
+github.com/docker/libtrust
 # github.com/emicklei/go-restful v2.9.5+incompatible
 ## explicit
 github.com/emicklei/go-restful
@@ -147,6 +172,9 @@ github.com/gophercloud/utils/env
 github.com/gophercloud/utils/gnocchi
 github.com/gophercloud/utils/internal
 github.com/gophercloud/utils/openstack/clientconfig
+# github.com/gorilla/mux v1.8.0
+## explicit; go 1.12
+github.com/gorilla/mux
 # github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 ## explicit
 github.com/grpc-ecosystem/go-grpc-prometheus
@@ -208,6 +236,13 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
+# github.com/opencontainers/go-digest v1.0.0
+## explicit; go 1.13
+github.com/opencontainers/go-digest
+# github.com/opencontainers/image-spec v1.0.2
+## explicit
+github.com/opencontainers/image-spec/specs-go
+github.com/opencontainers/image-spec/specs-go/v1
 # github.com/openshift/api v0.0.0-20220823152035-864c47647c02
 ## explicit; go 1.18
 github.com/openshift/api
@@ -314,6 +349,17 @@ github.com/openshift/client-go/operatorcontrolplane/listers/operatorcontrolplane
 # github.com/openshift/hypershift v0.0.0-20220525174911-c7c2b57c98ca
 ## explicit; go 1.18
 github.com/openshift/hypershift/api/v1alpha1
+github.com/openshift/hypershift/support/api
+github.com/openshift/hypershift/support/thirdparty/kubernetes/pkg/credentialprovider
+github.com/openshift/hypershift/support/thirdparty/library-go/pkg/image/dockerv1client
+github.com/openshift/hypershift/support/thirdparty/library-go/pkg/image/internal/digest
+github.com/openshift/hypershift/support/thirdparty/library-go/pkg/image/internal/reference
+github.com/openshift/hypershift/support/thirdparty/library-go/pkg/image/reference
+github.com/openshift/hypershift/support/thirdparty/library-go/pkg/image/registryclient
+github.com/openshift/hypershift/support/thirdparty/oc/pkg/cli/image/manifest
+github.com/openshift/hypershift/support/thirdparty/oc/pkg/cli/image/manifest/dockercredentials
+github.com/openshift/hypershift/support/thirdparty/oc/pkg/helpers/image/dockerlayer/add
+github.com/openshift/hypershift/support/util
 # github.com/openshift/library-go v0.0.0-20220525173854-9b950a41acdc
 ## explicit; go 1.17
 github.com/openshift/library-go/pkg/authorization/hardcodedauthorizer
@@ -353,6 +399,10 @@ github.com/pkg/profile
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
+# github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.51.1
+## explicit; go 1.14
+github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring
+github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1
 # github.com/prometheus/client_golang v1.12.1
 ## explicit; go 1.13
 github.com/prometheus/client_golang/prometheus

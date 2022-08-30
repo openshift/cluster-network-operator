@@ -23,12 +23,13 @@ func init() {
 }
 
 var (
-	enabled        = os.Getenv("HYPERSHIFT")
-	name           = os.Getenv("HOSTED_CLUSTER_NAME")
-	namespace      = os.Getenv("HOSTED_CLUSTER_NAMESPACE")
-	routeHost      = os.Getenv("OVN_SBDB_ROUTE_HOST")
-	routeLabels    = map[string]string{}
-	routeLabelsRaw = os.Getenv("OVN_SBDB_ROUTE_LABELS")
+	enabled              = os.Getenv("HYPERSHIFT")
+	name                 = os.Getenv("HOSTED_CLUSTER_NAME")
+	namespace            = os.Getenv("HOSTED_CLUSTER_NAMESPACE")
+	routeHost            = os.Getenv("OVN_SBDB_ROUTE_HOST")
+	routeLabels          = map[string]string{}
+	routeLabelsRaw       = os.Getenv("OVN_SBDB_ROUTE_LABELS")
+	defaultIngressDomain = os.Getenv("DEFAULT_INGRESS_DOMAIN")
 )
 
 const (
@@ -47,21 +48,23 @@ type RelatedObject struct {
 
 type HyperShiftConfig struct {
 	sync.Mutex
-	Enabled            bool
-	Name               string
-	Namespace          string
-	OVNSbDbRouteHost   string
-	OVNSbDbRouteLabels map[string]string
-	RelatedObjects     []RelatedObject
+	Enabled              bool
+	Name                 string
+	Namespace            string
+	OVNSbDbRouteHost     string
+	DefaultIngressDomain string
+	OVNSbDbRouteLabels   map[string]string
+	RelatedObjects       []RelatedObject
 }
 
 func NewHyperShiftConfig() *HyperShiftConfig {
 	return &HyperShiftConfig{
-		Enabled:            hyperShiftEnabled(),
-		Name:               name,
-		Namespace:          namespace,
-		OVNSbDbRouteHost:   routeHost,
-		OVNSbDbRouteLabels: routeLabels,
+		Enabled:              hyperShiftEnabled(),
+		Name:                 name,
+		Namespace:            namespace,
+		OVNSbDbRouteHost:     routeHost,
+		OVNSbDbRouteLabels:   routeLabels,
+		DefaultIngressDomain: defaultIngressDomain,
 	}
 }
 

@@ -138,6 +138,16 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
+require (
+	github.com/docker/distribution v2.7.1+incompatible // indirect
+	github.com/docker/go-metrics v0.0.1 // indirect
+	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
+	github.com/gorilla/mux v1.8.0 // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.0.2 // indirect
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.51.1 // indirect
+)
+
 replace (
 	github.com/openshift/hypershift/api => github.com/openshift/hypershift v0.0.0-20220323152148-c356b8b72d66
 
