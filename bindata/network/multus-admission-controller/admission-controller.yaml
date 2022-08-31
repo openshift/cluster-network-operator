@@ -82,15 +82,29 @@ spec:
       - name: multus-admission-controller
         image: {{.MultusAdmissionControllerImage}}
         command:
-        - /usr/bin/webhook
-        args:
-        - -bind-address=0.0.0.0
-        - -port=6443
-        - -tls-private-key-file=/etc/webhook/tls.key
-        - -tls-cert-file=/etc/webhook/tls.crt
-        - -alsologtostderr=true
-        - -metrics-listen-address=127.0.0.1:9091
-        - -ignore-namespaces=openshift-etcd,openshift-console,openshift-ingress-canary,{{.IgnoredNamespace}}
+        - /bin/bash
+        - -c
+        - |-
+          set -euo pipefail
+{{- if .HyperShiftEnabled}}
+          retries=0
+          while [ ! -f /var/run/secrets/hosted_cluster/token ]; do
+            (( retries += 1 ))
+            sleep 1
+            if [[ "${retries}" -gt 30 ]]; then
+              echo "$(date -Iseconds) - Hosted cluster token not found"
+                exit 1
+            fi
+          done
+{{- end }}
+          exec /usr/bin/webhook \
+            -bind-address=0.0.0.0 \
+            -port=6443 \
+            -tls-private-key-file=/etc/webhook/tls.key \
+            -tls-cert-file=/etc/webhook/tls.crt \
+            -alsologtostderr=true \
+            -metrics-listen-address=127.0.0.1:9091 \
+            -ignore-namespaces=openshift-etcd,openshift-console,openshift-ingress-canary,{{.IgnoredNamespace}}
         volumeMounts:
         - name: webhook-certs
           mountPath: /etc/webhook
