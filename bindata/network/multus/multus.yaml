@@ -38,7 +38,7 @@ data:
     rhelmajor=
     # detect which version we're using in order to copy the proper binaries
     case "${ID}" in
-      rhcos) rhelmajor=8
+      rhcos|scos) rhelmajor=8
       ;;
       rhel) rhelmajor=$(echo "${VERSION_ID}" | cut -f 1 -d .)
       ;;
