@@ -408,6 +408,12 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 				return reconcile.Result{}, err
 			}
 		}
+		if migration.Features == nil || migration.Features.Multicast {
+			err = migrateMulticastEnablement(ctx, operConfig, r.client)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		}
 	}
 
 	// Update Network.config.openshift.io.Status
