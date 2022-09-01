@@ -21,6 +21,17 @@ const defaultEgressFirewallName = "default"
 var gvrEgressFirewall = schema.GroupVersionResource{Group: "k8s.ovn.org", Version: "v1", Resource: "egressfirewalls"}
 var gvrEgressNetworkPolicy = schema.GroupVersionResource{Group: "network.openshift.io", Version: "v1", Resource: "egressnetworkpolicies"}
 
+func migrateMulticastEnablement(ctx context.Context, operConfig *operv1.Network, client cnoclient.Client) error {
+	switch operConfig.Spec.Migration.NetworkType {
+	case string(operv1.NetworkTypeOVNKubernetes):
+		return enableMulticastOVN(ctx, client)
+	case string(operv1.NetworkTypeOpenShiftSDN):
+		return enableMulticastSDN(ctx, client)
+	}
+
+	return nil
+}
+
 func migrateEgressFirewallCRs(ctx context.Context, operConfig *operv1.Network, client cnoclient.Client) error {
 	switch operConfig.Spec.Migration.NetworkType {
 	case string(operv1.NetworkTypeOVNKubernetes):
@@ -29,6 +40,84 @@ func migrateEgressFirewallCRs(ctx context.Context, operConfig *operv1.Network, c
 		return convertEgressFirewallToEgressNetworkPolicy(ctx, client)
 	}
 
+	return nil
+}
+
+func enableMulticastOVN(ctx context.Context, client cnoclient.Client) error {
+	// 1. query for netnamespaces
+	nnsList, err := client.Default().Dynamic().Resource(gvrNetnamespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	// 2. iterate through netnamespaces
+	//    - any with multicast-enabled="true" annotation will cause an update to the corresponding
+	//      namespace to add the necessary OVN annotation
+	for _, nns := range nnsList.Items {
+		if nns.Object["metadata"].(map[string]interface{})["annotations"] == nil {
+			continue
+		}
+		multicastAnnotation := nns.Object["metadata"].(map[string]interface{})["annotations"].(map[string]interface{})["netnamespace.network.openshift.io/multicast-enabled"]
+		if multicastAnnotation == "true" {
+			// first update namespace to have the same annotation
+			nspStr := fmt.Sprintf("%v", nns.Object["netname"])
+			namespaceObj, err := client.Default().Kubernetes().CoreV1().Namespaces().Get(ctx, nspStr, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			namespaceObj.Annotations["k8s.ovn.org/multicast-enabled"] = "true"
+
+			if err := apply.ApplyObject(ctx, client, namespaceObj, ""); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func enableMulticastSDN(ctx context.Context, client cnoclient.Client) error {
+	multicastRollbackReady, err := netNamespacesExistForAllNamespaces(ctx, client)
+	if !multicastRollbackReady {
+		return nil // wait for all SDN netnamespace resources to be created before rollback
+	} else if err != nil {
+		return err
+	}
+
+	// 2. query for namespaces
+	namespaceList, err := client.Default().Kubernetes().CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	// 2. iterate through namespaces
+	//    - any with multicast-enabled=true annotation will cause an update to the corresponding
+	//      netnamespace to add the necessary SDN annotation
+	for _, ns := range namespaceList.Items {
+		if ns.Annotations["k8s.ovn.org/multicast-enabled"] == "true" {
+			// update netnamespace to have multicast annotation
+			netNamespaceObj := &uns.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "network.openshift.io/v1",
+					"kind":       "NetNamespace",
+					"metadata": map[string]interface{}{
+						"annotations": map[string]interface{}{
+							"netnamespace.network.openshift.io/multicast-enabled": "true",
+						},
+						"name": ns.Name,
+					},
+				},
+			}
+			if err := apply.ApplyObject(ctx, client, netNamespaceObj, ""); err != nil {
+				return err
+			}
+
+			// cleanup: remove the annotation from namespace
+			delete(ns.Annotations, "k8s.ovn.org/multicast-enabled")
+			if err := apply.ApplyObject(ctx, client, &ns, ""); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -96,4 +185,33 @@ func convertEgressFirewallToEgressNetworkPolicy(ctx context.Context, client cnoc
 		}
 	}
 	return nil
+}
+
+func netNamespacesExistForAllNamespaces(ctx context.Context, client cnoclient.Client) (bool, error) {
+	// get all namespaces
+	// get all netnamespaces
+	// iterate over all namespaces and return false if any of them don't have an associated netnamespace
+	namespaceList, err := client.Default().Kubernetes().CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	netnamespaceList, err := client.Default().Dynamic().Resource(gvrNetnamespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+
+	for _, namespace := range namespaceList.Items {
+		found := false
+		for _, netnamespace := range netnamespaceList.Items {
+			if netnamespace.Object["netname"] == namespace.Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
