@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/util/retry"
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
@@ -46,7 +47,7 @@ func migrateEgressFirewallCRs(ctx context.Context, operConfig *operv1.Network, c
 
 func enableMulticastOVN(ctx context.Context, client cnoclient.Client) error {
 	// 1. query for netnamespaces
-	nnsList, err := client.Default().Dynamic().Resource(gvrNetnamespace).List(ctx, metav1.ListOptions{})
+	netNamespaceList, err := cnoclient.ListAllOfSpecifiedType(gvrNetnamespace, ctx, client)
 	if err != nil {
 		return err
 	}
@@ -54,21 +55,27 @@ func enableMulticastOVN(ctx context.Context, client cnoclient.Client) error {
 	// 2. iterate through netnamespaces
 	//    - any with multicast-enabled="true" annotation will cause an update to the corresponding
 	//      namespace to add the necessary OVN annotation
-	for _, nns := range nnsList.Items {
+	for _, nns := range netNamespaceList {
 		if nns.Object["metadata"].(map[string]interface{})["annotations"] == nil {
 			continue
 		}
-		multicastAnnotation := nns.Object["metadata"].(map[string]interface{})["annotations"].(map[string]interface{})["netnamespace.network.openshift.io/multicast-enabled"]
+		multicastAnnotation := nns.GetAnnotations()["netnamespace.network.openshift.io/multicast-enabled"]
 		if multicastAnnotation == "true" {
-			// first update namespace to have the same annotation
+			// update namespace to have the same annotation
 			nspStr := fmt.Sprintf("%v", nns.Object["netname"])
 			namespaceObj, err := client.Default().Kubernetes().CoreV1().Namespaces().Get(ctx, nspStr, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
+			if namespaceObj.Annotations == nil {
+				namespaceObj.Annotations = make(map[string]string)
+			}
 			namespaceObj.Annotations["k8s.ovn.org/multicast-enabled"] = "true"
 
-			if err := apply.ApplyObject(ctx, client, namespaceObj, ""); err != nil {
+			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				_, err := client.Default().Kubernetes().CoreV1().Namespaces().Update(ctx, namespaceObj, metav1.UpdateOptions{})
+				return err
+			}); err != nil {
 				return err
 			}
 		}
@@ -84,8 +91,8 @@ func enableMulticastSDN(ctx context.Context, client cnoclient.Client) error {
 		return err
 	}
 
-	// 2. query for namespaces
-	namespaceList, err := client.Default().Kubernetes().CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	// 1. query for namespaces
+	namespaceList, err := cnoclient.ListAllNamespaces(ctx, client)
 	if err != nil {
 		return err
 	}
@@ -93,7 +100,7 @@ func enableMulticastSDN(ctx context.Context, client cnoclient.Client) error {
 	// 2. iterate through namespaces
 	//    - any with multicast-enabled=true annotation will cause an update to the corresponding
 	//      netnamespace to add the necessary SDN annotation
-	for _, ns := range namespaceList.Items {
+	for _, ns := range namespaceList {
 		if ns.Annotations["k8s.ovn.org/multicast-enabled"] == "true" {
 			// update netnamespace to have multicast annotation
 			netNamespaceObj := &uns.Unstructured{
@@ -108,13 +115,16 @@ func enableMulticastSDN(ctx context.Context, client cnoclient.Client) error {
 					},
 				},
 			}
-			if err := apply.ApplyObject(ctx, client, netNamespaceObj, ""); err != nil {
+			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				_, err := client.Default().Dynamic().Resource(gvrNetnamespace).Update(ctx, netNamespaceObj, metav1.UpdateOptions{})
+				return err
+			}); err != nil {
 				return err
 			}
 
 			// cleanup: remove the annotation from namespace
 			delete(ns.Annotations, "k8s.ovn.org/multicast-enabled")
-			if err := apply.ApplyObject(ctx, client, &ns, ""); err != nil {
+			if err := apply.ApplyObject(ctx, client, ns, ""); err != nil {
 				return err
 			}
 		}
@@ -123,11 +133,11 @@ func enableMulticastSDN(ctx context.Context, client cnoclient.Client) error {
 }
 
 func convertEgressNetworkPolicyToEgressFirewall(ctx context.Context, client cnoclient.Client) error {
-	enpList, err := client.Default().Dynamic().Resource(gvrEgressNetworkPolicy).List(ctx, metav1.ListOptions{})
+	egressNetworkPolicyList, err := cnoclient.ListAllOfSpecifiedType(gvrEgressNetworkPolicy, ctx, client)
 	if err != nil {
 		return err
 	}
-	for _, enp := range enpList.Items {
+	for _, enp := range egressNetworkPolicyList {
 		log.Printf("Convert EgressNetworkPolicy %s/%s", enp.GetNamespace(), enp.GetName())
 		spec, ok := enp.Object["spec"]
 		if !ok {
@@ -154,11 +164,11 @@ func convertEgressNetworkPolicyToEgressFirewall(ctx context.Context, client cnoc
 }
 
 func convertEgressFirewallToEgressNetworkPolicy(ctx context.Context, client cnoclient.Client) error {
-	efList, err := client.Default().Dynamic().Resource(gvrEgressFirewall).List(ctx, metav1.ListOptions{})
+	egressFirewallList, err := cnoclient.ListAllOfSpecifiedType(gvrEgressFirewall, ctx, client)
 	if err != nil {
 		return err
 	}
-	for _, ef := range efList.Items {
+	for _, ef := range egressFirewallList {
 		log.Printf("Convert EgressNetworkPolicy %s/%s", ef.GetNamespace(), ef.GetName())
 		spec, ok := ef.Object["spec"]
 		if !ok {
@@ -204,7 +214,7 @@ func netNamespacesExistForAllNamespaces(ctx context.Context, client cnoclient.Cl
 	for _, namespace := range namespaceList.Items {
 		found := false
 		for _, netnamespace := range netnamespaceList.Items {
-			if netnamespace.Object["netname"] == namespace.Name {
+			if netnamespace.GetName() == namespace.Name {
 				found = true
 				break
 			}
