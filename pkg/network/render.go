@@ -18,7 +18,14 @@ import (
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilnet "k8s.io/utils/net"
+)
+
+var dualStackPlatforms = sets.NewString(
+	string(configv1.BareMetalPlatformType),
+	string(configv1.NonePlatformType),
+	string(configv1.VSpherePlatformType),
 )
 
 func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client cnoclient.Client) ([]*uns.Unstructured, bool, error) {
@@ -343,7 +350,8 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 	// PlatformTypes, migration to DualStack is prohibited
 	if len(prev.ServiceNetwork) < len(next.ServiceNetwork) {
 		if !isSupportedDualStackPlatform(infraRes.PlatformType) {
-			return errors.Errorf("DualStack deployments are allowed only for the BareMetal Platform type or the None Platform type")
+			return errors.Errorf("%s is not one of the supported platforms for dual stack (%s)", infraRes.PlatformType,
+				strings.Join(dualStackPlatforms.List(), ", "))
 		}
 	}
 
@@ -718,5 +726,5 @@ func renderNetworkPublic(manifestDir string) ([]*uns.Unstructured, error) {
 }
 
 func isSupportedDualStackPlatform(platformType configv1.PlatformType) bool {
-	return platformType == configv1.BareMetalPlatformType || platformType == configv1.NonePlatformType
+	return dualStackPlatforms.Has(string(platformType))
 }

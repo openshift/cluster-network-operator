@@ -1,6 +1,8 @@
 package network
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -210,7 +212,8 @@ func TestIsChangeSafe(t *testing.T) {
 		HostPrefix: 64,
 	})
 	err = IsChangeSafe(prev, next, infra)
-	g.Expect(err).To(MatchError(ContainSubstring("DualStack deployments are allowed only for the BareMetal Platform type or the None Platform type")))
+	g.Expect(err).To(MatchError(ContainSubstring(fmt.Sprintf("%s is not one of the supported platforms for dual stack (%s)", infra.PlatformType,
+		strings.Join(dualStackPlatforms.List(), ", ")))))
 	// ... but the migration in the other direction should work
 	err = IsChangeSafe(next, prev, infra)
 	g.Expect(err).NotTo(HaveOccurred())
