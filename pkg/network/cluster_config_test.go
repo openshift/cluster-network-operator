@@ -1,6 +1,8 @@
 package network
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -172,7 +174,8 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 		CIDR:       "fd01::/48",
 		HostPrefix: 64,
 	})
-	haveError(cc, "DualStack deployments are allowed only for the BareMetal Platform type or the None Platform type")
+	haveError(cc, fmt.Sprintf("%s is not one of the supported platforms for dual stack (%s)",
+		infrastructure.Status.PlatformStatus.Type, strings.Join(dualStackPlatforms.List(), ", ")))
 }
 
 func TestMergeClusterConfig(t *testing.T) {

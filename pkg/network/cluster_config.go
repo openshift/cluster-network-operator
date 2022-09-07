@@ -2,6 +2,7 @@ package network
 
 import (
 	"net"
+	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
@@ -104,7 +105,8 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec, client cnoclient.
 	// PlatformTypes, migration to DualStack is prohibited
 	if ipv4Service && ipv6Service || ipv4Cluster && ipv6Cluster {
 		if !isSupportedDualStackPlatform(infraRes.PlatformType) {
-			return errors.Errorf("DualStack deployments are allowed only for the BareMetal Platform type or the None Platform type")
+			return errors.Errorf("%s is not one of the supported platforms for dual stack (%s)", infraRes.PlatformType,
+				strings.Join(dualStackPlatforms.List(), ", "))
 		}
 	}
 
