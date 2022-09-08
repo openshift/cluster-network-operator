@@ -2,6 +2,7 @@ package fake
 
 import (
 	"context"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -9,6 +10,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
+	faketyped "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -30,6 +32,9 @@ type FakeClusterClient struct {
 	// dynclient is an untyped, uncached client for making direct requests
 	// against the apiserver.
 	dynclient dynamic.Interface
+
+	// kClient is an fake kubernetes client for kubernetes objects
+	kClient kubernetes.Interface
 
 	// crclient is the controller-runtime ClusterClient, for controllers that have
 	// not yet been migrated.
@@ -59,6 +64,16 @@ func (fc *FakeClient) Clients() map[string]cnoclient.ClusterClient {
 	return out
 }
 
+func isOpenShiftObject(obj crclient.Object) bool {
+	kKind, _, _ := scheme.Scheme.ObjectKinds(obj)
+	for _, v := range kKind {
+		if strings.HasSuffix(v.Group, "openshift.io") {
+			return true
+		}
+	}
+	return false
+}
+
 // NewFakeClient creates a fake client with a backing store that contains the given objexts.
 //
 // Note that, due to limitations in the test infrastructure, each client has an independent store.
@@ -70,11 +85,15 @@ func (fc *FakeClient) Clients() map[string]cnoclient.ClusterClient {
 func NewFakeClient(objs ...crclient.Object) cnoclient.Client {
 	// silly go type conversion
 	oo := make([]runtime.Object, 0, len(objs))
+	ooTyped := make([]runtime.Object, 0, len(objs))
 	for _, o := range objs {
 		oo = append(oo, o)
+		if !isOpenShiftObject(o) {
+			ooTyped = append(ooTyped, o)
+		}
 	}
 	fc := FakeClusterClient{
-		// kClient:   faketyped.NewSimpleClientset(oo...), // TODO: fix this, it doesn't work for non-kubernetes objects
+		kClient:   faketyped.NewSimpleClientset(ooTyped...),
 		dynclient: fakedynamic.NewSimpleDynamicClient(scheme.Scheme, oo...),
 		crclient:  crfake.NewClientBuilder().WithObjects(objs...).Build(),
 	}
@@ -123,7 +142,7 @@ func (f *fakeRESTMapper) ResourceSingularizer(resource string) (singular string,
 }
 
 func (fc *FakeClusterClient) Kubernetes() kubernetes.Interface {
-	panic("not implemented!")
+	return fc.kClient
 }
 
 func (fc *FakeClusterClient) OpenshiftOperatorClient() *osoperclient.Clientset {
