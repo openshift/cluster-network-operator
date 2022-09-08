@@ -18,6 +18,8 @@ import (
 )
 
 const defaultEgressFirewallName = "default"
+const multicastEnabledSDN = "netnamespace.network.openshift.io/multicast-enabled"
+const multicastEnabledOVN = "k8s.ovn.org/multicast-enabled"
 
 var gvrEgressFirewall = schema.GroupVersionResource{Group: "k8s.ovn.org", Version: "v1", Resource: "egressfirewalls"}
 var gvrEgressNetworkPolicy = schema.GroupVersionResource{Group: "network.openshift.io", Version: "v1", Resource: "egressnetworkpolicies"}
@@ -56,24 +58,21 @@ func enableMulticastOVN(ctx context.Context, client cnoclient.Client) error {
 	//    - any with multicast-enabled="true" annotation will cause an update to the corresponding
 	//      namespace to add the necessary OVN annotation
 	for _, nns := range netNamespaceList {
-		if nns.Object["metadata"].(map[string]interface{})["annotations"] == nil {
-			continue
-		}
-		multicastAnnotation := nns.GetAnnotations()["netnamespace.network.openshift.io/multicast-enabled"]
+		multicastAnnotation := nns.GetAnnotations()[multicastEnabledSDN]
 		if multicastAnnotation == "true" {
 			// update namespace to have the same annotation
-			nspStr := fmt.Sprintf("%v", nns.Object["netname"])
-			namespaceObj, err := client.Default().Kubernetes().CoreV1().Namespaces().Get(ctx, nspStr, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if namespaceObj.Annotations == nil {
-				namespaceObj.Annotations = make(map[string]string)
-			}
-			namespaceObj.Annotations["k8s.ovn.org/multicast-enabled"] = "true"
+			nspStr := nns.GetName()
 
 			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				_, err := client.Default().Kubernetes().CoreV1().Namespaces().Update(ctx, namespaceObj, metav1.UpdateOptions{})
+				namespaceObj, err := client.Default().Kubernetes().CoreV1().Namespaces().Get(ctx, nspStr, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if namespaceObj.Annotations == nil {
+					namespaceObj.Annotations = make(map[string]string)
+				}
+				namespaceObj.Annotations[multicastEnabledOVN] = "true"
+				_, err = client.Default().Kubernetes().CoreV1().Namespaces().Update(ctx, namespaceObj, metav1.UpdateOptions{})
 				return err
 			}); err != nil {
 				return err
@@ -101,29 +100,24 @@ func enableMulticastSDN(ctx context.Context, client cnoclient.Client) error {
 	//    - any with multicast-enabled=true annotation will cause an update to the corresponding
 	//      netnamespace to add the necessary SDN annotation
 	for _, ns := range namespaceList {
-		if ns.Annotations["k8s.ovn.org/multicast-enabled"] == "true" {
-			// update netnamespace to have multicast annotation
-			netNamespaceObj := &uns.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "network.openshift.io/v1",
-					"kind":       "NetNamespace",
-					"metadata": map[string]interface{}{
-						"annotations": map[string]interface{}{
-							"netnamespace.network.openshift.io/multicast-enabled": "true",
-						},
-						"name": ns.Name,
-					},
-				},
-			}
+		if ns.Annotations[multicastEnabledOVN] == "true" {
 			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				_, err := client.Default().Dynamic().Resource(gvrNetnamespace).Update(ctx, netNamespaceObj, metav1.UpdateOptions{})
+				nns, err := client.Default().Dynamic().Resource(gvrNetnamespace).Get(ctx, ns.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if nns.Object["metadata"].(map[string]interface{})["annotations"] == nil {
+					nns.Object["metadata"].(map[string]interface{})["annotations"] = make(map[string]string)
+				}
+				nns.Object["metadata"].(map[string]interface{})["annotations"].(map[string]interface{})[multicastEnabledSDN] = "true"
+				_, err = client.Default().Dynamic().Resource(gvrNetnamespace).Update(ctx, nns, metav1.UpdateOptions{})
 				return err
 			}); err != nil {
 				return err
 			}
 
 			// cleanup: remove the annotation from namespace
-			delete(ns.Annotations, "k8s.ovn.org/multicast-enabled")
+			delete(ns.Annotations, multicastEnabledOVN)
 			if err := apply.ApplyObject(ctx, client, ns, ""); err != nil {
 				return err
 			}

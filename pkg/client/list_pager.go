@@ -16,20 +16,9 @@ import (
 func ListAllOfSpecifiedType(resourceType schema.GroupVersionResource, ctx context.Context, client Client) ([]*uns.Unstructured, error) {
 	list := []*uns.Unstructured{}
 	err := pager.New(func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
-		return client.Default().Dynamic().Resource(resourceType).List(ctx, metav1.ListOptions{})
+		return client.Default().Dynamic().Resource(resourceType).List(ctx, opts)
 	}).EachListItem(ctx, metav1.ListOptions{}, func(obj runtime.Object) error {
 		list = append(list, obj.(*uns.Unstructured))
-		return nil
-	})
-	return list, err
-}
-
-func ListAllNodes(ctx context.Context, client Client) ([]*v1.Node, error) {
-	list := []*v1.Node{}
-	err := pager.New(func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
-		return client.Default().Kubernetes().CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	}).EachListItem(ctx, metav1.ListOptions{}, func(obj runtime.Object) error {
-		list = append(list, obj.(*v1.Node))
 		return nil
 	})
 	return list, err
@@ -38,7 +27,7 @@ func ListAllNodes(ctx context.Context, client Client) ([]*v1.Node, error) {
 func ListAllNamespaces(ctx context.Context, client Client) ([]*v1.Namespace, error) {
 	list := []*v1.Namespace{}
 	err := pager.New(func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
-		return client.Default().Kubernetes().CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+		return client.Default().Kubernetes().CoreV1().Namespaces().List(ctx, opts)
 	}).EachListItem(ctx, metav1.ListOptions{}, func(obj runtime.Object) error {
 		list = append(list, obj.(*v1.Namespace))
 		return nil
