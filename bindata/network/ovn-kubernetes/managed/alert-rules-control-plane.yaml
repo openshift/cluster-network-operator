@@ -352,3 +352,23 @@ spec:
       for: 5m
       labels:
         severity: critical
+    - alert: OVNKubernetesMasterNorthboundDatabaseMonitorLoss
+      annotations:
+        summary: OVN kubernetes master can not monitor northbound database(s).
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/OVNKubernetesMasterNorthboundDatabaseMonitorLoss.md
+        description: |
+          OVN Kubernetes master cannot monitor northbound database(s). This maybe the monitoring of the OVN leader itself, or the database which indicates the leaders status.
+      expr: |
+        max_over_time(ovnkube_master_libovsdb_monitors{primary_model="OVN_Northbound"}[5m]) != 2
+      labels:
+        severity: warning
+    - alert: OVNKubernetesMasterSouthboundDatabaseMonitorLoss
+      annotations:
+        summary: OVN kubernetes master can not monitor the southbound database(s).
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/OVNKubernetesMasterSouthboundDatabaseMonitorLoss.md
+        description: |
+          OVN Kubernetes master cannot monitor southbound database(s). This maybe the monitoring of the OVN leader itself, or the database which indicates the leaders status.
+      expr: |
+        max_over_time(ovnkube_master_libovsdb_monitors{primary_model="OVN_Southbound"}[5m]) != 2
+      labels:
+        severity: warning
