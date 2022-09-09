@@ -15,6 +15,9 @@ const CLUSTER_CONFIG = "cluster"
 // PROXY_CONFIG is the name of the default proxy object.
 const PROXY_CONFIG = "cluster"
 
+// INFRASTRUCTURE_CONFIG is the name of the default infrastructure object.
+const INFRASTRUCTURE_CONFIG = "cluster"
+
 // APPLIED_PREFIX is the prefix applied to the config maps
 // where we store previously applied configuration
 const APPLIED_PREFIX = "applied-"

@@ -34,7 +34,7 @@ func GetClusterName(obj Object) string {
 // This causes fields we own to be updated, and fields we don't own to be preserved.
 // For more information, see https://kubernetes.io/docs/reference/using-api/server-side-apply/
 // The subcontroller, if set, is used to assign field ownership.
-func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subcontroller string) error {
+func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subcontroller string, subresources ...string) error {
 	name := obj.GetName()
 	namespace := obj.GetNamespace()
 	clusterClient := client.ClientFor(GetClusterName(obj))
@@ -122,7 +122,7 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 		log.Printf("could not encode %s for apply", objDesc)
 		return fmt.Errorf("could not encode for patching: %w", err)
 	}
-	if _, err := clusterClient.Dynamic().Resource(rm.Resource).Namespace(namespace).Patch(ctx, name, types.ApplyPatchType, data, patchOptions); err != nil {
+	if _, err := clusterClient.Dynamic().Resource(rm.Resource).Namespace(namespace).Patch(ctx, name, types.ApplyPatchType, data, patchOptions, subresources...); err != nil {
 		return fmt.Errorf("failed to apply / update %s: %w", objDesc, err)
 	}
 	log.Printf("Apply / Create of %s was successful", objDesc)
