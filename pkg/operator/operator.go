@@ -3,6 +3,10 @@ package operator
 import (
 	"context"
 	"fmt"
+	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/network"
+	"k8s.io/apimachinery/pkg/types"
 
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller"
@@ -51,7 +55,17 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
-	o.StatusManager = statusmanager.New(o.client, "network")
+	// In HyperShift use the infrastructure name to differentiate between resources deployed by the management cluster CNO and CNO deployed in the hosted clusters control plane namespace
+	// Without that the CNO running against the management cluster would pick the resources rendered by the hosted cluster CNO
+	cluster := names.StandAloneClusterName
+	if hcp := network.NewHyperShiftConfig(); hcp.Enabled {
+		infraConfig := &configv1.Infrastructure{}
+		if err := o.client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
+			return fmt.Errorf("failed to get infrastructure 'cluster': %v", err)
+		}
+		cluster = infraConfig.Status.InfrastructureName
+	}
+	o.StatusManager = statusmanager.New(o.client, "network", cluster)
 
 	// Add controller-runtime controllers
 	klog.Info("Adding controller-runtime controllers")
