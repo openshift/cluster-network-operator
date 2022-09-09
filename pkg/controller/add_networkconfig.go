@@ -4,6 +4,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/clusterconfig"
 	configmapcainjector "github.com/openshift/cluster-network-operator/pkg/controller/configmap_ca_injector"
 	"github.com/openshift/cluster-network-operator/pkg/controller/egress_router"
+	"github.com/openshift/cluster-network-operator/pkg/controller/infrastructureconfig"
 	"github.com/openshift/cluster-network-operator/pkg/controller/ingressconfig"
 	"github.com/openshift/cluster-network-operator/pkg/controller/operconfig"
 	"github.com/openshift/cluster-network-operator/pkg/controller/pki"
@@ -22,5 +23,6 @@ func init() {
 		configmapcainjector.Add,
 		signer.Add,
 		ingressconfig.Add,
+		infrastructureconfig.Add,
 	)
 }

@@ -49,6 +49,7 @@ const (
 	EgressRouterConfig
 	RolloutHung
 	CertificateSigner
+	InfrastructureConfig
 	maxStatusLevel
 )
 
