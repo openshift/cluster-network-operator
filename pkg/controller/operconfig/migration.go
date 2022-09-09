@@ -109,7 +109,11 @@ func enableMulticastSDN(ctx context.Context, client cnoclient.Client) error {
 				if nns.Object["metadata"].(map[string]interface{})["annotations"] == nil {
 					nns.Object["metadata"].(map[string]interface{})["annotations"] = make(map[string]string)
 				}
-				nns.Object["metadata"].(map[string]interface{})["annotations"].(map[string]interface{})[multicastEnabledSDN] = "true"
+
+				multicastEnabledMap := map[string]string{
+					multicastEnabledSDN: "true",
+				}
+				uns.SetNestedStringMap(nns.Object, multicastEnabledMap, "metadata", "annotations")
 				_, err = client.Default().Dynamic().Resource(gvrNetnamespace).Update(ctx, nns, metav1.UpdateOptions{})
 				return err
 			}); err != nil {
@@ -117,8 +121,15 @@ func enableMulticastSDN(ctx context.Context, client cnoclient.Client) error {
 			}
 
 			// cleanup: remove the annotation from namespace
-			delete(ns.Annotations, multicastEnabledOVN)
-			if err := apply.ApplyObject(ctx, client, ns, ""); err != nil {
+			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				ns, err = client.Default().Kubernetes().CoreV1().Namespaces().Get(ctx, ns.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				delete(ns.Annotations, multicastEnabledOVN)
+				_, err = client.Default().Kubernetes().CoreV1().Namespaces().Update(ctx, ns, metav1.UpdateOptions{})
+				return err
+			}); err != nil {
 				return err
 			}
 		}
