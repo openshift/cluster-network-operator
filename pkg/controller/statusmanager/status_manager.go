@@ -3,6 +3,7 @@ package statusmanager
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/labels"
 	"log"
 	"os"
 	"reflect"
@@ -74,8 +75,6 @@ func (c ClusteredName) String() string {
 	return c.ClusterName + string(ClusteredNameSeparator) + c.Namespace + string(ClusteredNameSeparator) + c.Name
 }
 
-const generateStatusSelector = names.GenerateStatusLabel // Just a single label is an EXISTS selector. Easy.
-
 // StatusManager coordinates changes to ClusterOperator.Status
 type StatusManager struct {
 	sync.Mutex
@@ -97,11 +96,13 @@ type StatusManager struct {
 	ssInformers map[string]cache.SharedIndexInformer
 	ssListers   map[string]StatefulSetLister
 
+	labelSelector labels.Selector
+
 	relatedObjects []configv1.ObjectReference
 }
 
-func New(client cnoclient.Client, name string) *StatusManager {
-	return &StatusManager{
+func New(client cnoclient.Client, name, cluster string) *StatusManager {
+	status := &StatusManager{
 		client:           client,
 		name:             name,
 		hyperShiftConfig: network.NewHyperShiftConfig(),
@@ -113,6 +114,12 @@ func New(client cnoclient.Client, name string) *StatusManager {
 		ssInformers:  map[string]cache.SharedIndexInformer{},
 		ssListers:    map[string]StatefulSetLister{},
 	}
+	var err error
+	status.labelSelector, err = labels.Parse(fmt.Sprintf("%s==%s", names.GenerateStatusLabel, cluster))
+	if err != nil {
+		panic(err) // selector is guaranteed valid, unreachable
+	}
+	return status
 }
 
 // setClusterOperAnnotation sets an annotation on the clusterOperator network object
