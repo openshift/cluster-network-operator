@@ -113,7 +113,10 @@ func enableMulticastSDN(ctx context.Context, client cnoclient.Client) error {
 				multicastEnabledMap := map[string]string{
 					multicastEnabledSDN: "true",
 				}
-				uns.SetNestedStringMap(nns.Object, multicastEnabledMap, "metadata", "annotations")
+				err = uns.SetNestedStringMap(nns.Object, multicastEnabledMap, "metadata", "annotations")
+				if err != nil {
+					return err
+				}
 				_, err = client.Default().Dynamic().Resource(gvrNetnamespace).Update(ctx, nns, metav1.UpdateOptions{})
 				return err
 			}); err != nil {
