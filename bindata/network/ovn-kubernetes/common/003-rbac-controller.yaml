@@ -78,6 +78,7 @@ rules:
 - apiGroups: [""]
   resources:
   - "nodes/status"
+  - services
   verbs:
   - patch
   - update
