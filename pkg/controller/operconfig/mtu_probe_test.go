@@ -7,7 +7,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
-	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -88,22 +88,4 @@ func TestProbeMTU(t *testing.T) {
 			}
 		})
 	}
-}
-
-type fakeCNOClient struct {
-	cnoclient.Client
-	clusterClient cnoclient.ClusterClient
-}
-
-func (f *fakeCNOClient) Default() cnoclient.ClusterClient {
-	return f.clusterClient
-}
-
-type fakeClusterClient struct {
-	cnoclient.ClusterClient
-	crclient crclient.Client
-}
-
-func (f *fakeClusterClient) CRClient() crclient.Client {
-	return f.crclient
 }
