@@ -409,6 +409,10 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	if operConfig.Spec.Migration != nil && operConfig.Spec.Migration.NetworkType != "" {
+		if !(operConfig.Spec.Migration.NetworkType == string(operv1.NetworkTypeOpenShiftSDN) || operConfig.Spec.Migration.NetworkType == string(operv1.NetworkTypeOVNKubernetes)) {
+			err = fmt.Errorf("Error: operConfig.Spec.Migration.NetworkType: %s is not equal to either \"OpenshiftSDN\" or \"OVNKubernetes\"", operConfig.Spec.Migration.NetworkType)
+			return reconcile.Result{}, err
+		}
 		migration := operConfig.Spec.Migration
 		if migration.Features == nil || migration.Features.EgressFirewall {
 			err = migrateEgressFirewallCRs(ctx, operConfig, r.client)
@@ -418,6 +422,12 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		}
 		if migration.Features == nil || migration.Features.Multicast {
 			err = migrateMulticastEnablement(ctx, operConfig, r.client)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+		if migration.Features == nil || migration.Features.EgressIP {
+			err = migrateEgressIpCRs(ctx, operConfig, r.client)
 			if err != nil {
 				return reconcile.Result{}, err
 			}
