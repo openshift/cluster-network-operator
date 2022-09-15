@@ -17,38 +17,39 @@ type apiAndIngressVipsSynchronizer struct{}
 
 // VipsSynchronize synchronizes new API & Ingress VIPs with old fields.
 // It returns if the status was updated and the updated infrastructure object.
+//
 //nolint:staticcheck
 func (*apiAndIngressVipsSynchronizer) VipsSynchronize(infraConfig *configv1.Infrastructure) *configv1.Infrastructure {
 	var apiVIPs, ingressVIPs *[]string // new fields
 	var apiVIP, ingressVIP *string     // old/deprecated fields
 
 	updatedInfraConfig := infraConfig.DeepCopy()
-	switch updatedInfraConfig.Status.Platform {
-	case configv1.BareMetalPlatformType:
+	switch {
+	case updatedInfraConfig.Status.Platform == configv1.BareMetalPlatformType:
 		apiVIPs = &updatedInfraConfig.Status.PlatformStatus.BareMetal.APIServerInternalIPs
 		apiVIP = &updatedInfraConfig.Status.PlatformStatus.BareMetal.APIServerInternalIP
 		ingressVIPs = &updatedInfraConfig.Status.PlatformStatus.BareMetal.IngressIPs
 		ingressVIP = &updatedInfraConfig.Status.PlatformStatus.BareMetal.IngressIP
 
-	case configv1.VSpherePlatformType:
+	case updatedInfraConfig.Status.Platform == configv1.VSpherePlatformType && updatedInfraConfig.Status.PlatformStatus.VSphere != nil: // VSphere UPI doesn't populate VSphere field
 		apiVIPs = &updatedInfraConfig.Status.PlatformStatus.VSphere.APIServerInternalIPs
 		apiVIP = &updatedInfraConfig.Status.PlatformStatus.VSphere.APIServerInternalIP
 		ingressVIPs = &updatedInfraConfig.Status.PlatformStatus.VSphere.IngressIPs
 		ingressVIP = &updatedInfraConfig.Status.PlatformStatus.VSphere.IngressIP
 
-	case configv1.OpenStackPlatformType:
+	case updatedInfraConfig.Status.Platform == configv1.OpenStackPlatformType:
 		apiVIPs = &updatedInfraConfig.Status.PlatformStatus.OpenStack.APIServerInternalIPs
 		apiVIP = &updatedInfraConfig.Status.PlatformStatus.OpenStack.APIServerInternalIP
 		ingressVIPs = &updatedInfraConfig.Status.PlatformStatus.OpenStack.IngressIPs
 		ingressVIP = &updatedInfraConfig.Status.PlatformStatus.OpenStack.IngressIP
 
-	case configv1.OvirtPlatformType:
+	case updatedInfraConfig.Status.Platform == configv1.OvirtPlatformType:
 		apiVIPs = &updatedInfraConfig.Status.PlatformStatus.Ovirt.APIServerInternalIPs
 		apiVIP = &updatedInfraConfig.Status.PlatformStatus.Ovirt.APIServerInternalIP
 		ingressVIPs = &updatedInfraConfig.Status.PlatformStatus.Ovirt.IngressIPs
 		ingressVIP = &updatedInfraConfig.Status.PlatformStatus.Ovirt.IngressIP
 
-	case configv1.NutanixPlatformType:
+	case updatedInfraConfig.Status.Platform == configv1.NutanixPlatformType:
 		apiVIPs = &updatedInfraConfig.Status.PlatformStatus.Nutanix.APIServerInternalIPs
 		apiVIP = &updatedInfraConfig.Status.PlatformStatus.Nutanix.APIServerInternalIP
 		ingressVIPs = &updatedInfraConfig.Status.PlatformStatus.Nutanix.IngressIPs
