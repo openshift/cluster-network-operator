@@ -267,6 +267,19 @@ func Test_apiAndIngressVipsSynchronizer_VipsSynchronize(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "should not panic on empty PlatformStatus.VSphere field (VSphere UPI doesn't populate VSphere field)",
+			givenStatus: configv1.InfrastructureStatus{
+				Platform: configv1.VSpherePlatformType,
+				PlatformStatus: &configv1.PlatformStatus{
+					VSphere: nil,
+				},
+			},
+			wantStatus: configv1.InfrastructureStatus{
+				Platform:       configv1.VSpherePlatformType,
+				PlatformStatus: &configv1.PlatformStatus{},
+			},
+		},
 	}
 
 	for _, tt := range tests {
