@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/pager"
-	// cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 )
 
 // for use with dynamic client
