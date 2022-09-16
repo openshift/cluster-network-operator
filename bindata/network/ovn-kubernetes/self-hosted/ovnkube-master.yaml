@@ -205,6 +205,16 @@ spec:
           }
           # end of cluster_exists()
 
+          # RAFT clusters need an odd number of members to achieve consensus.
+          # The CNO determines which members make up the cluster, so if this container
+          # is not supposed to be part of the cluster, wait forever doing nothing
+          # (instad of exiting and causing CrashLoopBackoffs for no reason).
+          if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
+            echo "$(date -Iseconds) - not selected as RAFT member; sleeping..."
+            sleep 1500d
+            exit 0
+          fi
+
           OVN_ARGS="--db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
@@ -292,6 +302,12 @@ spec:
                 set -x
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
                 rm -f /var/run/ovn/ovnnb_db.pid
+
+                # exit early if this DB is not supposed to be part of the cluster
+                if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
+                  exit 0
+                fi
+
                 if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - nbdb - postStart - waiting for master to be selected"
 
@@ -385,10 +401,11 @@ spec:
               if [[ ! -z "${leader_status}" ]]; then
                 echo "NB DB Raft leader is unknown to the cluster node."
                 exit 1
-              else
+              fi
+              # set trim-on-compaction if this DB is supposed to be part of the cluster
+              if [[ "{{.OVN_NB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] || [[ "{{.OVN_NB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
                 /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
               fi
-
         env:
         - name: OVN_LOG_LEVEL
           value: info 
@@ -558,6 +575,16 @@ spec:
           }
           # end of cluster_exists()
 
+          # RAFT clusters need an odd number of members to achieve consensus.
+          # The CNO determines which members make up the cluster, so if this container
+          # is not supposed to be part of the cluster, wait forever doing nothing
+          # (instad of exiting and causing CrashLoopBackoffs for no reason).
+          if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
+            echo "$(date -Iseconds) - not selected as RAFT member; sleeping..."
+            sleep 1500d
+            exit 0
+          fi
+
           OVN_ARGS="--db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
@@ -643,6 +670,12 @@ spec:
                 set -x
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
                 rm -f /var/run/ovn/ovnsb_db.pid
+
+                # exit early if this DB is not supposed to be part of the cluster
+                if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
+                  exit 0
+                fi
+
                 if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - sdb - postStart - waiting for master to be selected"
 
@@ -698,7 +731,9 @@ spec:
               if [[ ! -z "${leader_status}" ]]; then
                 echo "SB DB Raft leader is unknown to the cluster node."
                 exit 1
-              else
+              fi
+              # set trim-on-compaction if this DB is supposed to be part of the cluster
+              if [[ "{{.OVN_SB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] || [[ "{{.OVN_SB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
                 /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
               fi
         env:

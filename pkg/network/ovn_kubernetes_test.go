@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/gomega"
@@ -20,12 +21,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/scheme"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
+	crfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 )
+
+//nolint:errcheck
+func init() {
+	operv1.AddToScheme(scheme.Scheme)
+	appsv1.AddToScheme(scheme.Scheme)
+}
 
 var OVNKubernetesConfig = operv1.Network{
 	Spec: operv1.NetworkSpec{
@@ -2049,6 +2058,117 @@ func Test_getDisableUDPAggregation(t *testing.T) {
 		},
 	})
 	assert.Equal(t, true, disable, "with configmap that sets 'disable-udp-aggregation' to 'true'")
+}
+
+func makeNodes(ips ...string) []*v1.Node {
+	nodes := make([]*v1.Node, 0, len(ips))
+	created := time.Now()
+	for i, ip := range ips {
+		ipStr := strings.ReplaceAll(ip, ".", "")
+		ipStr = strings.ReplaceAll(ipStr, ":", "")
+		nodeName := fmt.Sprintf("node-%d-%s", i, ipStr)
+
+		created = created.Add(1 * time.Minute)
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              nodeName,
+				Labels:            map[string]string{"node-role.kubernetes.io/master": ""},
+				CreationTimestamp: metav1.NewTime(created),
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{},
+			},
+		}
+		if ip != "" {
+			node.Status.Addresses = []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: ip}}
+		}
+		nodes = append(nodes, node)
+	}
+	return nodes
+}
+
+func TestGetMasterAddresses(t *testing.T) {
+	testCases := []struct {
+		Description  string
+		ReplicaCount int
+		Nodes        []*v1.Node
+		HypershiftNS string
+		Expected     []string
+		Err          bool
+	}{
+		{
+			Description:  "Three masters",
+			ReplicaCount: 3,
+			Nodes:        makeNodes("1.2.3.4", "1.2.3.5", "1.2.3.6"),
+			Expected:     []string{"1.2.3.4", "1.2.3.5", "1.2.3.6"},
+		},
+		{
+			Description:  "Too many masters",
+			ReplicaCount: 3,
+			Nodes:        makeNodes("1.2.3.4", "1.2.3.5", "1.2.3.6", "1.2.3.7"),
+			Expected:     []string{"1.2.3.4", "1.2.3.5", "1.2.3.6"},
+		},
+		{
+			Description:  "Three IPv6 masters",
+			ReplicaCount: 3,
+			Nodes:        makeNodes("fd01::1", "fd01::2", "fd01::3"),
+			Expected:     []string{"fd01::1", "fd01::2", "fd01::3"},
+		},
+		{
+			Description:  "Too many IPv6 masters",
+			ReplicaCount: 3,
+			Nodes:        makeNodes("fd01::4", "fd01::5", "fd01::6", "fd01::7"),
+			Expected:     []string{"fd01::4", "fd01::5", "fd01::6"},
+		},
+		{
+			Description:  "Master without address",
+			ReplicaCount: 3,
+			Nodes:        makeNodes("1.2.3.4", "1.2.3.5", ""),
+			Err:          true,
+		},
+		{
+			Description:  "Timeout because fewer masters than expected",
+			ReplicaCount: 3,
+			Nodes:        makeNodes("1.2.3.4", "1.2.3.5"),
+			Expected:     []string{"1.2.3.4", "1.2.3.5"},
+		},
+		{
+			Description:  "Only one master",
+			ReplicaCount: 1,
+			Nodes:        makeNodes("1.2.3.4"),
+			Expected:     []string{"1.2.3.4"},
+		},
+		{
+			Description:  "Hypershift",
+			ReplicaCount: 1,
+			HypershiftNS: "blahblah",
+			Expected:     []string{"ovnkube-master-0.ovnkube-master-internal.blahblah.svc.cluster.local"},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.Description, func(t *testing.T) {
+			t.Cleanup(func() {
+				os.Unsetenv("HOSTED_CLUSTER_NAMESPACE")
+			})
+			if tc.HypershiftNS != "" {
+				os.Setenv("HOSTED_CLUSTER_NAMESPACE", tc.HypershiftNS)
+			}
+
+			objects := make([]crclient.Object, 0, len(tc.Nodes))
+			for _, node := range tc.Nodes {
+				objects = append(objects, node)
+			}
+
+			client := crfake.NewClientBuilder().WithObjects(objects...).Build()
+			foundAddrs, _, err := getMasterAddresses(client, tc.ReplicaCount, tc.HypershiftNS != "", 5)
+			if tc.Err {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.ElementsMatch(t, foundAddrs, tc.Expected)
+			}
+		})
+	}
 }
 
 type fakeClientReader struct {
