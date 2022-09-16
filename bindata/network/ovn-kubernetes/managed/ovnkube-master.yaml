@@ -200,7 +200,7 @@ spec:
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
           # initialize variables
-          ovn_kubernetes_namespace={{.HostedClusterNamespace}}
+          pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
           ovndb_ctl_ssl_opts="-p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt"
           transport="ssl"
           ovn_raft_conn_ip_url_suffix=""
@@ -252,8 +252,18 @@ spec:
           }
           # end of cluster_exists()
 
+          # RAFT clusters need an odd number of members to achieve consensus.
+          # The CNO determines which members make up the cluster, so if this container
+          # is not supposed to be part of the cluster, wait forever doing nothing
+          # (instad of exiting and causing CrashLoopBackoffs for no reason).
+          if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+            echo "$(date -Iseconds) - not selected as RAFT member; sleeping..."
+            sleep 1500d
+            exit 0
+          fi
+
           OVN_ARGS="--db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
-            --db-nb-cluster-local-addr=$(bracketify ${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local) \
+            --db-nb-cluster-local-addr=${pod_dns_name} \
             --no-monitor \
             --db-nb-cluster-local-proto=ssl \
             --ovn-nb-db-ssl-key=/ovn-cert/tls.key \
@@ -296,7 +306,7 @@ spec:
               wait $!
             else
               # either we need to initialize a new cluster or wait for master to create it
-              if [[ "${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local" == "${CLUSTER_INITIATOR_IP}" ]]; then
+              if [[ "${pod_dns_name}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                 # set DB election timer at DB creation time if OVN supports it
                 election_timer=
                 if test -n "$(/usr/share/ovn/scripts/ovn-ctl --help 2>&1 | grep "\--db-nb-election-timer")"; then
@@ -338,9 +348,16 @@ spec:
               - |
                 set -x
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
-
                 rm -f /var/run/ovn/ovnnb_db.pid
-                if [[ "${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local" == "${CLUSTER_INITIATOR_IP}" ]]; then
+
+                pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
+
+                # exit early if this DB is not supposed to be part of the cluster
+                if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+                  exit 0
+                fi
+
+                if [[ "${pod_dns_name}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - nbdb - postStart - waiting for master to be selected"
 
                   # set the connection and inactivity probe
@@ -428,7 +445,11 @@ spec:
                 echo "NB DB Raft leader is unknown to the cluster node."
                 exit 1
               fi
-
+              # set trim-on-compaction if this DB is supposed to be part of the cluster
+              pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
+              if [[ "{{.OVN_NB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] || [[ "{{.OVN_NB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+                /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
+              fi
         env:
         - name: OVN_LOG_LEVEL
           value: info
@@ -495,7 +516,7 @@ spec:
           trap quit TERM INT
 
           # initialize variables
-          ovn_kubernetes_namespace={{.HostedClusterNamespace}}
+          pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
           ovndb_ctl_ssl_opts="-p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt"
           transport="ssl"
           ovn_raft_conn_ip_url_suffix=""
@@ -541,8 +562,18 @@ spec:
           }
           # end of cluster_exists()
 
+          # RAFT clusters need an odd number of members to achieve consensus.
+          # The CNO determines which members make up the cluster, so if this container
+          # is not supposed to be part of the cluster, wait forever doing nothing
+          # (instad of exiting and causing CrashLoopBackoffs for no reason).
+          if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+            echo "$(date -Iseconds) - not selected as RAFT member; sleeping..."
+            sleep 1500d
+            exit 0
+          fi
+
           OVN_ARGS="--db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
-            --db-sb-cluster-local-addr="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local" \
+            --db-sb-cluster-local-addr="${pod_dns_name}" \
             --no-monitor \
             --db-sb-cluster-local-proto=ssl \
             --ovn-sb-db-ssl-key=/ovn-cert/tls.key \
@@ -585,7 +616,7 @@ spec:
               wait $!
             else
               # either we need to initialize a new cluster or wait for master to create it
-              if [[ "${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local" == "${CLUSTER_INITIATOR_IP}" ]]; then
+              if [[ "${pod_dns_name}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                 # set DB election timer at DB creation time if OVN supports it
                 election_timer=
                 if test -n "$(/usr/share/ovn/scripts/ovn-ctl --help 2>&1 | grep "\--db-sb-election-timer")"; then
@@ -626,7 +657,15 @@ spec:
                 set -x
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
                 rm -f /var/run/ovn/ovnsb_db.pid
-                if [[ "${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local" == "${CLUSTER_INITIATOR_IP}" ]]; then
+
+                pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
+
+                # exit early if this DB is not supposed to be part of the cluster
+                if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+                  exit 0
+                fi
+
+                if [[ "${pod_dns_name}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - sdb - postStart - waiting for master to be selected"
 
                   # set the connection and inactivity probe
@@ -679,6 +718,11 @@ spec:
               if [[ ! -z "${leader_status}" ]]; then
                 echo "SB DB Raft leader is unknown to the cluster node."
                 exit 1
+              fi
+              # set trim-on-compaction if this DB is supposed to be part of the cluster
+              pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
+              if [[ "{{.OVN_SB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] || [[ "{{.OVN_SB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+                /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
               fi
         env:
         - name: OVN_LOG_LEVEL
