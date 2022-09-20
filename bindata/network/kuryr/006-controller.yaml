@@ -51,6 +51,7 @@ spec:
             path: /alive
             port: {{ default 8091 .ControllerProbesPort }}
           initialDelaySeconds: 15
+          timeoutSeconds: 10
 {{ end }}
         env:
         # Tell controller to talk to the apiserver directly.
