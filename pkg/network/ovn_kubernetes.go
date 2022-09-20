@@ -155,15 +155,14 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["ClusterID"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ClusterID
 	data.Data["ClusterIDLabel"] = ClusterIDLabel
 	data.Data["OVNDbServiceType"] = corev1.ServiceTypeClusterIP
-	data.Data["OVNSbDbRouteHost"] = nil
+	data.Data["OVNSbDbRouteHost"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost
+	data.Data["OVNSbDbRouteLabels"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteLabels
 	data.Data["OVN_SB_NODE_PORT"] = nil
 	data.Data["OVN_NB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
 	data.Data["OVN_SB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
 	pubStrategy := bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ServicePublishingStrategy
-	if pubStrategy != nil && pubStrategy.Type == hyperv1.Route {
-		if pubStrategy.Route != nil && pubStrategy.Route.Hostname != "" {
-			data.Data["OVNSbDbRouteHost"] = pubStrategy.Route.Hostname
-		}
+	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost == "" && pubStrategy != nil && pubStrategy.Type == hyperv1.Route && pubStrategy.Route != nil && pubStrategy.Route.Hostname != "" {
+		data.Data["OVNSbDbRouteHost"] = pubStrategy.Route.Hostname
 	} else if pubStrategy != nil && pubStrategy.Type == hyperv1.NodePort {
 		data.Data["OVNDbServiceType"] = corev1.ServiceTypeNodePort
 		data.Data["OVN_SB_NODE_PORT"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort
@@ -477,8 +476,10 @@ func renderOVNFlowsConfig(bootstrapResult *bootstrap.BootstrapResult, data *rend
 
 func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Client) (*bootstrap.OVNHyperShiftBootstrapResult, error) {
 	ovnHypershiftResult := &bootstrap.OVNHyperShiftBootstrapResult{
-		Enabled:   hc.Enabled,
-		Namespace: hc.Namespace,
+		Enabled:            hc.Enabled,
+		Namespace:          hc.Namespace,
+		OVNSbDbRouteHost:   hc.OVNSbDbRouteHost,
+		OVNSbDbRouteLabels: hc.OVNSbDbRouteLabels,
 	}
 
 	if !hc.Enabled {
@@ -515,6 +516,11 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 			Type: hyperv1.Route,
 		}
 	}
+
+	if ovnHypershiftResult.OVNSbDbRouteHost != "" {
+		return ovnHypershiftResult, nil
+	}
+
 	switch ovnHypershiftResult.ServicePublishingStrategy.Type {
 	case hyperv1.Route:
 		{
