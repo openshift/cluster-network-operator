@@ -399,8 +399,21 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient crclient.Client) (*boot
 		}
 	}
 
+	// Figure out information needed to create networks
+	workerSubnet, err := getWorkersSubnetFromMasters(client, kubeClient, clusterID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to find worker nodes subnet")
+	}
+	log.Printf("Found worker nodes subnet %s", workerSubnet.ID)
+
+	mtu, err := getOpenStackNetworkMTU(client, workerSubnet.NetworkID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get network MTU")
+	}
+	log.Printf("Found Nodes Network MTU %d", mtu)
+
 	log.Print("Ensuring services network")
-	svcNetId, err := ensureOpenStackNetwork(client, generateName("kuryr-service-network", clusterID), tag)
+	svcNetId, err := ensureOpenStackNetwork(client, generateName("kuryr-service-network", clusterID), tag, mtu)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create service network")
 	}
@@ -492,18 +505,6 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient crclient.Client) (*boot
 		return nil, errors.Wrap(err, "failed to create pod subnetpool")
 	}
 	log.Printf("Pod subnetpool %s present", podSubnetpoolId)
-
-	workerSubnet, err := getWorkersSubnetFromMasters(client, kubeClient, clusterID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to find worker nodes subnet")
-	}
-	log.Printf("Found worker nodes subnet %s", workerSubnet.ID)
-
-	mtu, err := getOpenStackNetworkMTU(client, workerSubnet.NetworkID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get network MTU")
-	}
-	log.Printf("Found Nodes Network MTU %d", mtu)
 
 	router, err := ensureOpenStackRouter(client, generateName("external-router", clusterID), tag, workerSubnet.NetworkID)
 	if err != nil {

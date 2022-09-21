@@ -4,7 +4,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/attributestags"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/mtu"
+	networkMTU "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/mtu"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/subnetpools"
@@ -24,7 +24,7 @@ func tagResource(client *gophercloud.ServiceClient, resource, id, tag string) ([
 
 // Looks for a Neutron network by name and tag, if it does not exist creates it.
 // Will fail if two networks match with name and tag.
-func ensureOpenStackNetwork(client *gophercloud.ServiceClient, name, tag string) (string, error) {
+func ensureOpenStackNetwork(client *gophercloud.ServiceClient, name, tag string, mtu uint32) (string, error) {
 	page, err := networks.List(client, networks.ListOpts{Name: name, Tags: tag}).AllPages()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get network list")
@@ -38,9 +38,14 @@ func ensureOpenStackNetwork(client *gophercloud.ServiceClient, name, tag string)
 	} else if len(nets) == 1 {
 		return nets[0].ID, nil
 	} else {
-		opts := networks.CreateOpts{
+		baseOpts := networks.CreateOpts{
 			Name: name,
 		}
+		opts := networkMTU.CreateOptsExt{
+			CreateOptsBuilder: baseOpts,
+			MTU:               int(mtu),
+		}
+
 		netObj, err := networks.Create(client, opts).Extract()
 		if err != nil {
 			return "", errors.Wrap(err, "failed to create network")
@@ -115,15 +120,14 @@ func findOpenStackNetwork(client *gophercloud.ServiceClient, tag string) (networ
 
 // Gets the MTU of a Network
 func getOpenStackNetworkMTU(client *gophercloud.ServiceClient, networkID string) (uint32, error) {
-	var networkMTU uint32 = 0
 	type NetworkMTU struct {
 		networks.Network
-		mtu.NetworkMTUExt
+		networkMTU.NetworkMTUExt
 	}
 	var mtu NetworkMTU
 	err := networks.Get(client, networkID).ExtractInto(&mtu)
 	if err != nil {
-		return networkMTU, errors.Wrap(err, "failed to extract network MTU")
+		return 0, errors.Wrap(err, "failed to extract network MTU")
 	}
 	return uint32(mtu.MTU), nil
 }
