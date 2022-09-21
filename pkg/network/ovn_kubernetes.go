@@ -616,7 +616,7 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *H
 	var err error
 	ovnConfigResult.HyperShiftConfig, err = bootstrapOVNHyperShiftConfig(hc, kubeClient)
 	if err != nil {
-		return ovnConfigResult, err
+		return nil, err
 	}
 
 	cm := &corev1.ConfigMap{}
@@ -624,9 +624,7 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *H
 	err = kubeClient.ClientFor("").CRClient().Get(context.TODO(), dmc, cm)
 
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			klog.Infof("Did not find dpu-mode-config")
-		} else {
+		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Could not determine Node Mode: %w", err)
 		}
 	} else {
@@ -634,11 +632,12 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *H
 		if nodeModeOverride != OVN_NODE_MODE_DPU_HOST && nodeModeOverride != OVN_NODE_MODE_DPU {
 			klog.Warningf("dpu-mode-config does not match %q or %q, is: %q. Using OVN configuration: %+v",
 				OVN_NODE_MODE_DPU_HOST, OVN_NODE_MODE_DPU, nodeModeOverride, ovnConfigResult)
-			return ovnConfigResult, nil
+		} else {
+			ovnConfigResult.NodeMode = nodeModeOverride
+			klog.Infof("Overriding OVN configuration to %+v", ovnConfigResult)
 		}
-		ovnConfigResult.NodeMode = nodeModeOverride
-		klog.Infof("Overriding OVN configuration to %+v", ovnConfigResult)
 	}
+
 	return ovnConfigResult, nil
 }
 
