@@ -813,6 +813,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: ALL_PROXY
+          value: socks5://127.0.0.1:8090
+        - name: NO_PROXY
+          value: kube-apiserver
         ports:
         - name: metrics-port
           containerPort: 29102
@@ -883,6 +887,26 @@ spec:
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
         terminationMessagePolicy: FallbackToLogsOnError
+      - name: socks-proxy
+        image: "{{.Socks5ProxyImage}}"
+        command:
+        - /usr/bin/control-plane-operator
+        - konnectivity-socks5-proxy
+        args:
+        - "run"
+        volumeMounts:
+        - mountPath: /etc/kubernetes/
+          name: admin-kubeconfig
+        - mountPath: /etc/konnectivity-proxy-tls
+          name: konnectivity-proxy-cert
+        resources:
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        env:
+        - name: KUBECONFIG
+          value: "/etc/kubernetes/kubeconfig"
+        terminationMessagePolicy: FallbackToLogsOnError
       nodeSelector:
         node-role.kubernetes.io/worker: ""
         beta.kubernetes.io/os: "linux"
@@ -890,6 +914,9 @@ spec:
       - name: ovnkube-config
         configMap:
           name: ovnkube-config
+      - name: konnectivity-proxy-cert
+        secret:
+          secretName: konnectivity-client
       - name: env-overrides
         configMap:
           name: env-overrides
