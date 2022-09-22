@@ -14,7 +14,18 @@ spec:
     rules:
     - record: cluster:ovnkube_master_egress_routing_via_host:max
       expr: max(ovnkube_master_egress_routing_via_host)
-
+    - record: cluster:ovnkube_master_nbdb_server_status_diff:abs
+      expr: abs(count(ovn_db_cluster_server_status{db_name="OVN_Northbound", server_status="cluster member"}) - sum(kube_node_role{role="master"}))
+    - record: cluster:ovnkube_master_sbdb_server_status_diff:abs
+      expr: abs(count(ovn_db_cluster_server_status{db_name="OVN_Southbound", server_status="cluster member"}) - sum(kube_node_role{role="master"}))
+    - record: cluster:ovnkube_master_nbdb_inbound_connections_diff:abs
+      expr: abs(sum(ovn_db_cluster_inbound_connections_total{db_name="OVN_Northbound"}) - count(kube_node_role{role="master"}) * (count(kube_node_role{role="master"})-1))
+    - record: cluster:ovnkube_master_sbdb_inbound_connections_diff:abs
+      expr: abs(sum(ovn_db_cluster_inbound_connections_total{db_name="OVN_Southbound"}) - count(kube_node_role{role="master"}) * (count(kube_node_role{role="master"})-1))
+    - record: cluster:ovnkube_master_nbdb_outbound_connections_diff:abs
+      expr: abs(sum(ovn_db_cluster_outbound_connections_total{db_name="OVN_Northbound"}) - count(kube_node_role{role="master"}) * (count(kube_node_role{role="master"})-1))
+    - record: cluster:ovnkube_master_sbdb_outbound_connections_diff:abs
+      expr: abs(sum(ovn_db_cluster_outbound_connections_total{db_name="OVN_Southbound"}) - count(kube_node_role{role="master"}) * (count(kube_node_role{role="master"})-1))
     # OVN kubernetes master functional alerts
     - alert: NoRunningOvnMaster
       annotations:
@@ -187,10 +198,9 @@ spec:
         description: OVN northbound database server(s) has not been a RAFT cluster member for a period of time which may indicate
           degraded OVN database high availability cluster.
       expr: |
-        # Without max_over_time, failed scrapes could create false negatives, see
+        # Without min_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        count(max_over_time(ovn_db_cluster_server_status{db_name="OVN_Northbound", server_status="cluster member"}[5m])) 
-        != sum(max_over_time(kube_node_role{role="master"}[5m]))
+        min_over_time(cluster:ovnkube_master_nbdb_server_status_diff:abs[5m]) != 0
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
@@ -201,10 +211,9 @@ spec:
         description: OVN southbound database server(s) has not been a RAFT cluster member for a period of time which may indicate
           degraded OVN database high availability.
       expr: |
-        # Without max_over_time, failed scrapes could create false negatives, see
+        # Without min_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        count(max_over_time(ovn_db_cluster_server_status{db_name="OVN_Southbound", server_status="cluster member"}[5m])) 
-        != sum(max_over_time(kube_node_role{role="master"}[5m]))
+        min_over_time(cluster:ovnkube_master_sbdb_server_status_diff:abs[5m]) != 0
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
@@ -268,10 +277,9 @@ spec:
           which may indicate degraded OVN database high availability.
       expr: |
         # Expected sum of inbound connections is number of control plane nodes * number of control plane nodes minus one
-        # Without max_over_time, failed scrapes could create false negatives, see
+        # Without min_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        sum(max_over_time(ovn_db_cluster_inbound_connections_total{db_name="OVN_Northbound"}[5m]))
-        != count(max_over_time(kube_node_role{role="master"}[5m])) * (count(max_over_time(kube_node_role{role="master"}[5m]))-1)
+        min_over_time(cluster:ovnkube_master_nbdb_inbound_connections_diff:abs[5m]) != 0
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
@@ -283,10 +291,9 @@ spec:
           which may indicate degraded OVN database high availability.
       expr: |
         # Expected sum of inbound connections is number of control plane nodes * number of control plane nodes minus one
-        # Without max_over_time, failed scrapes could create false negatives, see
+        # Without min_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        sum(max_over_time(ovn_db_cluster_inbound_connections_total{db_name="OVN_Southbound"}[5m]))
-        != count(max_over_time(kube_node_role{role="master"}[5m])) * (count(max_over_time(kube_node_role{role="master"}[5m]))-1)
+        min_over_time(cluster:ovnkube_master_sbdb_inbound_connections_diff:abs[5m]) != 0
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
@@ -298,10 +305,9 @@ spec:
           which may indicate degraded OVN database high availability.
       expr: |
         # Expected sum of outbound connections is number of control plane nodes * number of control plane nodes minus one
-        # Without max_over_time, failed scrapes could create false negatives, see
+        # Without min_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        sum(max_over_time(ovn_db_cluster_outbound_connections_total{db_name="OVN_Northbound"}[5m]))
-        != count(max_over_time(kube_node_role{role="master"}[5m])) * (count(max_over_time(kube_node_role{role="master"}[5m]))-1)
+        min_over_time(cluster:ovnkube_master_nbdb_outbound_connections_diff:abs[5m]) != 0
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
@@ -313,10 +319,9 @@ spec:
           which may indicate degraded OVN database high availability.
       expr: |
         # Expected sum of outbound connections is number of control plane nodes * number of control plane nodes minus one
-        # Without max_over_time, failed scrapes could create false negatives, see
+        # Without min_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        sum(max_over_time(ovn_db_cluster_outbound_connections_total{db_name="OVN_Southbound"}[5m]))
-        != count(max_over_time(kube_node_role{role="master"}[5m])) * (count(max_over_time(kube_node_role{role="master"}[5m]))-1)
+        min_over_time(cluster:ovnkube_master_sbdb_outbound_connections_diff:abs[5m]) != 0
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
