@@ -184,6 +184,7 @@ platform-type="GCP"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+egressip-node-healthcheck-port=9107
 
 [gateway]
 mode=shared
@@ -211,6 +212,7 @@ platform-type="GCP"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+egressip-node-healthcheck-port=9107
 
 [gateway]
 mode=shared
@@ -241,6 +243,7 @@ platform-type="GCP"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+egressip-node-healthcheck-port=9107
 
 [gateway]
 mode=local
@@ -283,6 +286,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
 egressip-reachability-total-timeout=3
+egressip-node-healthcheck-port=9107
 
 [gateway]
 mode=local
@@ -327,6 +331,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
 egressip-reachability-total-timeout=0
+egressip-node-healthcheck-port=9107
 
 [gateway]
 mode=local
@@ -370,6 +375,7 @@ platform-type="GCP"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+egressip-node-healthcheck-port=9107
 
 [gateway]
 mode=local
@@ -413,6 +419,7 @@ platform-type="GCP"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+egressip-node-healthcheck-port=9107
 
 [gateway]
 mode=shared
@@ -445,6 +452,7 @@ platform-type="GCP"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+egressip-node-healthcheck-port=9107
 
 [gateway]
 mode=shared
