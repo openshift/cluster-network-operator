@@ -99,6 +99,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["OvnImage"] = os.Getenv("OVN_IMAGE")
+	data.Data["OvnkubeMasterReplicas"] = len(bootstrapResult.OVN.MasterAddresses)
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 	data.Data["Socks5ProxyImage"] = os.Getenv("SOCKS5_PROXY_IMAGE")
 	data.Data["KUBERNETES_SERVICE_HOST"] = apiServer.Host
@@ -160,7 +161,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// Hypershift
 	data.Data["ManagementClusterName"] = names.ManagementClusterName
 	data.Data["HostedClusterNamespace"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Namespace
-	data.Data["OvnkubeMasterReplicas"] = len(bootstrapResult.OVN.MasterAddresses)
 	data.Data["ClusterID"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ClusterID
 	data.Data["ClusterIDLabel"] = ClusterIDLabel
 	data.Data["OVNDbServiceType"] = corev1.ServiceTypeClusterIP
