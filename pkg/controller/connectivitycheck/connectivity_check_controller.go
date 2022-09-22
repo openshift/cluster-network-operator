@@ -3,12 +3,13 @@ package connectivitycheck
 import (
 	"context"
 	"fmt"
-	"github.com/openshift/cluster-network-operator/pkg/network"
 	"net"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/openshift/cluster-network-operator/pkg/network"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/api/operatorcontrolplane/v1alpha1"
@@ -22,8 +23,10 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/genericoperatorclient"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
+	v1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -85,6 +88,7 @@ func NewNetworkConnectivityCheckController(
 		defaultServiceLister:              kubeInformersForNamespaces.InformersFor("default").Core().V1().Services().Lister(),
 		openshiftAPIServerEndpointsLister: kubeInformersForNamespaces.InformersFor("openshift-apiserver").Core().V1().Endpoints().Lister(),
 		openshiftAPIServerServiceLister:   kubeInformersForNamespaces.InformersFor("openshift-apiserver").Core().V1().Services().Lister(),
+		nodeLister:                        kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Lister(),
 		infrastructureLister:              configInformers.Config().V1().Infrastructures().Lister(),
 	}
 	return c.WithPodNetworkConnectivityCheckFn(generator.generate)
@@ -105,6 +109,7 @@ type connectivityCheckTemplateProvider struct {
 	defaultServiceLister              corev1listers.ServiceLister
 	openshiftAPIServerEndpointsLister corev1listers.EndpointsLister
 	openshiftAPIServerServiceLister   corev1listers.ServiceLister
+	nodeLister                        corev1listers.NodeLister
 	infrastructureLister              configv1listers.InfrastructureLister
 }
 
@@ -137,15 +142,33 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 	}
 
 	var checks []*v1alpha1.PodNetworkConnectivityCheck
+	nodes := make(map[string]*v1.Node)
 	for _, pod := range pods {
 		if pod.Spec.NodeName == "" {
 			// network-checker pod hasn't been assigned a node yet, skip
 			continue
 		}
+		var node *v1.Node
+		var ok bool
+		if node, ok = nodes[pod.Spec.NodeName]; !ok {
+			var err error
+			node, err = c.nodeLister.Get(pod.Spec.NodeName)
+			if err != nil {
+				return nil, err
+			}
+			nodes[node.Name] = node
+		}
 		for _, template := range templates {
 			check := template.DeepCopy()
 			WithSource("network-check-source-" + strings.Split(pod.Spec.NodeName, ".")[0])(check)
 			check.Spec.SourcePod = pod.Name
+			nodeRef := metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "Node",
+				UID:        node.GetUID(),
+				Name:       node.GetName(),
+			}
+			check.SetOwnerReferences(append(check.GetOwnerReferences(), nodeRef))
 			checks = append(checks, check)
 		}
 	}
@@ -392,6 +415,7 @@ func Start(ctx context.Context, kubeConfig *rest.Config) error {
 		"openshift-kube-apiserver",
 		"openshift-apiserver",
 		"default",
+		"",
 	)
 	configInformers := configinformers.NewSharedInformerFactory(configClient, 10*time.Minute)
 	connectivityCheckController := NewNetworkConnectivityCheckController(
