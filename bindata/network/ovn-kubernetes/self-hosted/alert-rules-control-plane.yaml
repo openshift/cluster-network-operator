@@ -189,8 +189,7 @@ spec:
       expr: |
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        count(max_over_time(ovn_db_cluster_server_status{db_name="OVN_Northbound", server_status="cluster member"}[5m])) 
-        != sum(max_over_time(kube_node_role{role="master"}[5m]))
+        count(max_over_time(ovn_db_cluster_server_status{db_name="OVN_Northbound", server_status="cluster member"}[5m])) != {{.OvnkubeMasterReplicas}}
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
@@ -203,8 +202,7 @@ spec:
       expr: |
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        count(max_over_time(ovn_db_cluster_server_status{db_name="OVN_Southbound", server_status="cluster member"}[5m])) 
-        != sum(max_over_time(kube_node_role{role="master"}[5m]))
+        count(max_over_time(ovn_db_cluster_server_status{db_name="OVN_Southbound", server_status="cluster member"}[5m])) != {{.OvnkubeMasterReplicas}}
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
@@ -271,7 +269,7 @@ spec:
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
         sum(max_over_time(ovn_db_cluster_inbound_connections_total{db_name="OVN_Northbound"}[5m]))
-        != count(max_over_time(kube_node_role{role="master"}[5m])) * (count(max_over_time(kube_node_role{role="master"}[5m]))-1)
+        != {{.OvnkubeMasterReplicas}} * ({{.OvnkubeMasterReplicas}}-1)
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
@@ -286,7 +284,7 @@ spec:
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
         sum(max_over_time(ovn_db_cluster_inbound_connections_total{db_name="OVN_Southbound"}[5m]))
-        != count(max_over_time(kube_node_role{role="master"}[5m])) * (count(max_over_time(kube_node_role{role="master"}[5m]))-1)
+        != {{.OvnkubeMasterReplicas}} * ({{.OvnkubeMasterReplicas}}-1)
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
@@ -301,7 +299,7 @@ spec:
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
         sum(max_over_time(ovn_db_cluster_outbound_connections_total{db_name="OVN_Northbound"}[5m]))
-        != count(max_over_time(kube_node_role{role="master"}[5m])) * (count(max_over_time(kube_node_role{role="master"}[5m]))-1)
+        != {{.OvnkubeMasterReplicas}} * ({{.OvnkubeMasterReplicas}}-1)
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
@@ -316,7 +314,7 @@ spec:
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
         sum(max_over_time(ovn_db_cluster_outbound_connections_total{db_name="OVN_Southbound"}[5m]))
-        != count(max_over_time(kube_node_role{role="master"}[5m])) * (count(max_over_time(kube_node_role{role="master"}[5m]))-1)
+        != {{.OvnkubeMasterReplicas}} * ({{.OvnkubeMasterReplicas}}-1)
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
