@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -1477,7 +1476,7 @@ metadata:
 			prepullerStatus := &bootstrap.OVNUpdateStatus{}
 			crd := OVNKubernetesConfig.DeepCopy()
 			config := &crd.Spec
-			os.Setenv("RELEASE_VERSION", tc.rv)
+			t.Setenv("RELEASE_VERSION", tc.rv)
 
 			errs := validateOVNKubernetes(config)
 			g.Expect(errs).To(HaveLen(0))
