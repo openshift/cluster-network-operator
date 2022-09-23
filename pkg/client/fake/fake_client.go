@@ -82,7 +82,8 @@ func isOpenShiftObject(obj crclient.Object) bool {
 // Kubernetes client
 // TODO: stop using the crclient entirely
 // TODO: Somehow convince upstream client-go to allow sharing the store between the dynamic and typed clients.
-//       (this is't that big a deal since we don't actually use the typed client that much).
+//
+//	(this is't that big a deal since we don't actually use the typed client that much).
 func NewFakeClient(objs ...crclient.Object) cnoclient.Client {
 	// silly go type conversion
 	oo := make([]runtime.Object, 0, len(objs))
