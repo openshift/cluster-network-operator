@@ -102,8 +102,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        - name: OVN_EGRESSIP_HEALTHCHECK_PORT
-          value: "9107"
         image: quay.io/openshift/origin-cluster-network-operator:latest
         name: network-operator
         ports:
