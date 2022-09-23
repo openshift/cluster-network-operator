@@ -11,12 +11,15 @@ import (
 // a certificate signed by that CA. The certificate has both ClientAuth
 // and ServerAuth extended usages enabled.
 //
-//  More specifically, given an OperatorPKI with <name>, the CNO will manage:
+//	More specifically, given an OperatorPKI with <name>, the CNO will manage:
+//
 // - A Secret called <name>-ca with two data keys:
 //   - tls.key - the private key
 //   - tls.crt - the CA certificate
+//
 // - A ConfigMap called <name>-ca with a single data key:
 //   - cabundle.crt - the CA certificate(s)
+//
 // - A Secret called <name>-cert with two data keys:
 //   - tls.key - the private key
 //   - tls.crt - the certificate, signed by the CA
