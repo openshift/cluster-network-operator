@@ -15,7 +15,9 @@ const ipamTypeWhereabouts = "whereabouts"
 func detectIPAMTypeRaw(targetType string, addNet *operv1.AdditionalNetworkDefinition) bool {
 	// Parse the RawCNIConfig
 	var rawConfig map[string]interface{}
+	var useipam interface{}
 	var err error
+	foundipam := false
 
 	confBytes := []byte(addNet.RawCNIConfig)
 	err = json.Unmarshal(confBytes, &rawConfig)
@@ -24,11 +26,39 @@ func detectIPAMTypeRaw(targetType string, addNet *operv1.AdditionalNetworkDefini
 		return false
 	}
 
+	// First we determine if it's a conflist.
+	if rawConfig["plugins"] != nil {
+		// As a limitation, we'll only look for the first instance of ipam (should be the primary case)
+		plugins, okplugincast := rawConfig["plugins"].([]interface{})
+		if !okplugincast {
+			log.Printf("WARNING: Plugins (conflist) element has data of type %T but wanted []interface{}", rawConfig["plugins"])
+			return false
+		}
+
+		for _, pvalue := range plugins {
+			eachConfig, okeachconfigcast := pvalue.(map[string]interface{})
+			if !okeachconfigcast {
+				log.Printf("WARNING: Each Plugin element (conflist) has data of type %T but wanted map[string]interface{}", pvalue)
+				return false
+			}
+			if eachConfig["ipam"] != nil {
+				useipam = eachConfig["ipam"]
+				foundipam = true
+				break
+			}
+		}
+	}
+
 	// Cycle through the IPAM keys, and determine if the type is dhcp
-	if rawConfig["ipam"] != nil {
-		ipam, okipamcast := rawConfig["ipam"].(map[string]interface{})
+	if rawConfig["ipam"] != nil && !foundipam {
+		useipam = rawConfig["ipam"]
+		foundipam = true
+	}
+
+	if foundipam {
+		ipam, okipamcast := useipam.(map[string]interface{})
 		if !okipamcast {
-			log.Printf("WARNING: IPAM element has data of type %T but wanted map[string]interface{}", rawConfig["ipam"])
+			log.Printf("WARNING: IPAM element has data of type %T but wanted map[string]interface{}", useipam)
 			return false
 		}
 
@@ -46,6 +76,7 @@ func detectIPAMTypeRaw(targetType string, addNet *operv1.AdditionalNetworkDefini
 			}
 		}
 	}
+
 	return false
 }
 
