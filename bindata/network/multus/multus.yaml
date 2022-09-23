@@ -102,31 +102,6 @@ data:
       exit 1
     fi
     rm -Rf $UPGRADE_DIRECTORY
-
-  #
-  # Safe sysctls
-  # -------------
-  # add to this list only sysctls that
-  # * must not have any influence on any other pod on the node
-  # * must not allow to harm the node's health
-  # * must not allow to gain CPU or memory resources outside of the resource limit of the pod
-  #
-  allowlist.conf: |-
-    ^net.ipv4.conf.IFNAME.accept_ra$
-    ^net.ipv4.conf.IFNAME.accept_redirects$
-    ^net.ipv4.conf.IFNAME.accept_source_route$
-    ^net.ipv4.conf.IFNAME.arp_accept$
-    ^net.ipv4.conf.IFNAME.arp_notify$
-    ^net.ipv4.conf.IFNAME.disable_policy$
-    ^net.ipv4.conf.IFNAME.secure_redirects$
-    ^net.ipv4.conf.IFNAME.send_redirects$
-    ^net.ipv6.conf.IFNAME.accept_ra$
-    ^net.ipv6.conf.IFNAME.accept_redirects$
-    ^net.ipv6.conf.IFNAME.accept_source_route$
-    ^net.ipv6.conf.IFNAME.arp_accept$
-    ^net.ipv6.conf.IFNAME.arp_notify$
-    ^net.ipv6.neigh.IFNAME.base_reachable_time_ms$
-    ^net.ipv6.neigh.IFNAME.retrans_time_ms$
 ---
 kind: DaemonSet
 apiVersion: apps/v1
@@ -303,7 +278,7 @@ spec:
           value: "/usr/src/egress-router-cni/bin/"
       - name: cni-plugins
         image: {{.CNIPluginsImage}}
-        command: ["/bin/bash", "-c", "/entrypoint/cnibincopy.sh && cp /entrypoint/allowlist.conf /host/etc/cni/tuning/"]
+        command: ["/bin/bash", "-c", "/entrypoint/cnibincopy.sh && cp -n /sysctls/allowlist.conf /host/etc/cni/tuning/"]
         volumeMounts:
         - mountPath: /entrypoint
           name: cni-binary-copy
@@ -315,6 +290,8 @@ spec:
         - mountPath: /host/etc/cni/tuning/
           name: tuning-conf-dir
           readOnly: false
+        - mountPath: /sysctls
+          name: cni-sysctl-allowlist
         env:
         - name: RHEL7_SOURCE_DIRECTORY
           value: "/usr/src/plugins/rhel7/bin/"
@@ -538,6 +515,10 @@ spec:
             path: /etc/cni/tuning/
             type: DirectoryOrCreate
           name: tuning-conf-dir
+        - name: cni-sysctl-allowlist
+          configMap:
+            name: {{.CniSysctlAllowlist}}
+            defaultMode: 0744
 {{if .RenderIpReconciler}}
 ---
 apiVersion: batch/v1

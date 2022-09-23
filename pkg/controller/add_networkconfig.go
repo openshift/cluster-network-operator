@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"github.com/openshift/cluster-network-operator/pkg/controller/allowlist"
 	"github.com/openshift/cluster-network-operator/pkg/controller/clusterconfig"
 	configmapcainjector "github.com/openshift/cluster-network-operator/pkg/controller/configmap_ca_injector"
 	"github.com/openshift/cluster-network-operator/pkg/controller/egress_router"
@@ -24,5 +25,6 @@ func init() {
 		signer.Add,
 		ingressconfig.Add,
 		infrastructureconfig.Add,
+		allowlist.Add,
 	)
 }

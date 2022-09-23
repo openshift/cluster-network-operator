@@ -1,0 +1,46 @@
+---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: cni-sysctl-allowlist-ds
+  namespace: openshift-multus
+spec:
+  selector:
+    matchLabels:
+      app: cni-sysctl-allowlist-ds
+  template:
+    metadata:
+      labels:
+        app: cni-sysctl-allowlist-ds
+    spec:
+      containers:
+        - name: kube-multus-additional-cni-plugins
+          image:  {{.MultusImage}}
+          command: ["/bin/bash", "-c", "cp /entrypoint/allowlist.conf /host/etc/cni/tuning/ && touch /ready/ready && sleep INF"]
+          securityContext:
+            privileged: true
+          readinessProbe:
+            exec:
+              command: ["/bin/bash", "-c", "test -f /ready/ready"]
+            initialDelaySeconds: 1
+          volumeMounts:
+            - mountPath: /entrypoint
+              name: cni-sysctl-allowlist
+            - mountPath: /host/etc/cni/tuning/
+              name: tuning-conf-dir
+              readOnly: false
+            - mountPath: /ready
+              name: ready
+              readOnly: false
+      volumes:
+        - name: cni-sysctl-allowlist
+          configMap:
+            name: {{.CniSysctlAllowlist}}
+            namespace: openshift-multus
+          defaultMode: 0744
+        - hostPath:
+            path: /etc/cni/tuning/
+            type: DirectoryOrCreate
+          name: tuning-conf-dir
+        - name: ready
+          emptyDir: { }
