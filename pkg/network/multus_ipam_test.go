@@ -79,6 +79,31 @@ var WhereaboutsConfig = operv1.Network{
 	},
 }
 
+var WhereaboutsConflistConfig = operv1.Network{
+	Spec: operv1.NetworkSpec{
+		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
+			{
+				Type:         operv1.NetworkTypeRaw,
+				Name:         "net-attach-whereabouts",
+				RawCNIConfig: "{\"cniVersion\":\"0.4.0\",\"name\":\"test-whereabouts-chain\",\"plugins\":[{\"type\":\"bridge\",\"name\":\"mybridge\",\"bridge\":\"whereaboutsbr0\",\"ipam\":{\"type\":\"whereabouts\",\"range\":\"192.0.2.0/24\"}}]}",
+			},
+		},
+		ServiceNetwork: []string{"172.30.0.0/16"},
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+		},
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOpenShiftSDN,
+			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
+				Mode: operv1.SDNModeNetworkPolicy,
+			},
+		},
+	},
+}
+
 var InvalidIPAMConfig = operv1.Network{
 	Spec: operv1.NetworkSpec{
 		AdditionalNetworks: []operv1.AdditionalNetworkDefinition{
@@ -206,6 +231,19 @@ func TestRenderWithWhereabouts(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	crd := WhereaboutsConfig.DeepCopy()
+	config := &crd.Spec
+	fillDefaults(config, nil)
+
+	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("CronJob", "openshift-multus", "ip-reconciler")))
+}
+
+// TestRenderWithWhereabouts tests a rendering with the ip reconciler
+func TestRenderWithWhereaboutsConflist(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := WhereaboutsConflistConfig.DeepCopy()
 	config := &crd.Spec
 	fillDefaults(config, nil)
 
