@@ -44,8 +44,13 @@ const NonCriticalAnnotation = "networkoperator.openshift.io/non-critical"
 // GenerateStatusLabel can be set by the various Controllers to tell the
 // StatusController that this object is relevant, and should be included
 // when generating status from deployed pods.
-// Currently, this is looked for on Deployments, DaemonSets, and StatefulSets
+// Currently, this is looked for on Deployments, DaemonSets, and StatefulSets.
+// Its value reflects which cluster the resource belongs to. This helps avoid an overlap
+// in Hypershift where there can be multiple CNO instances running in the management cluster.
 const GenerateStatusLabel = "networkoperator.openshift.io/generates-operator-status"
+
+// StandAloneClusterName is a value used for GenerateStatusLabel label when running in non-Hypershift environments
+const StandAloneClusterName = "stand-alone"
 
 // NetworkMigrationAnnotation is an annotation on the networks.operator.openshift.io CR to indicate
 // that executing network migration (switching the default network type of the cluster) is allowed.
