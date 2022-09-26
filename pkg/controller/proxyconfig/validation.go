@@ -5,10 +5,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"k8s.io/apimachinery/pkg/types"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -89,7 +89,7 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 				}
 			} else {
 				// No trustedCA is set, so use the system trust bundle for readinessEndpoints.
-				systemData, err = ioutil.ReadFile(names.SYSTEM_TRUST_BUNDLE)
+				systemData, err = os.ReadFile(names.SYSTEM_TRUST_BUNDLE)
 				if err != nil {
 					return fmt.Errorf("failed to read system trust bundle '%s': %v",
 						names.SYSTEM_TRUST_BUNDLE, err)
@@ -173,7 +173,7 @@ func (r *ReconcileProxyConfig) validateTrustBundle(cfgMap *corev1.ConfigMap) ([]
 // PEM block is type "CERTIFICATE" and the block can be parsed as an
 // x509 CA certificate, returning the parsed certificates as a []byte.
 func (r *ReconcileProxyConfig) validateSystemTrustBundle(trustBundle string) ([]byte, error) {
-	bundleData, err := ioutil.ReadFile(trustBundle)
+	bundleData, err := os.ReadFile(trustBundle)
 	if err != nil {
 		return nil, err
 	}
