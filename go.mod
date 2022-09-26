@@ -11,12 +11,12 @@ require (
 	github.com/gophercloud/gophercloud v0.19.0
 	github.com/gophercloud/utils v0.0.0-20210720165645-8a3ad2ad9e70
 	github.com/onsi/gomega v1.20.1
-	github.com/openshift/api v0.0.0-20220823152035-864c47647c02
-	github.com/openshift/build-machinery-go v0.0.0-20211213093930-7e33a7eb4ce3
-	github.com/openshift/client-go v0.0.0-20220525160904-9e1acff93e4a
-	github.com/openshift/library-go v0.0.0-20220525173854-9b950a41acdc
+	github.com/openshift/api v0.0.0-20220831183848-09c070622e2c
+	github.com/openshift/build-machinery-go v0.0.0-20220913142420-e25cf57ea46d
+	github.com/openshift/client-go v0.0.0-20220831193253-4950ae70c8ea
+	github.com/openshift/library-go v0.0.0-20220922140741-7772048e4447
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.12.1
+	github.com/prometheus/client_golang v1.12.2
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
@@ -33,8 +33,8 @@ require (
 	k8s.io/klog/v2 v2.80.1
 	k8s.io/kube-proxy v0.25.2
 	k8s.io/utils v0.0.0-20220922133306-665eaaec4324
-	sigs.k8s.io/cluster-api-provider-openstack v0.3.3
-	sigs.k8s.io/controller-runtime v0.12.0
+	sigs.k8s.io/cluster-api-provider-openstack v0.6.3
+	sigs.k8s.io/controller-runtime v0.13.0
 )
 
 require (
@@ -53,7 +53,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect
-	github.com/fsnotify/fsnotify v1.5.1 // indirect
+	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.6 // indirect
@@ -104,8 +104,8 @@ require (
 	go.opentelemetry.io/proto/otlp v0.7.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	go.uber.org/zap v1.19.1 // indirect
-	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
+	go.uber.org/zap v1.21.0 // indirect
+	golang.org/x/crypto v0.0.0-20220331220935-ae2d96664a29 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1 // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
@@ -136,7 +136,10 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-require github.com/emicklei/go-restful/v3 v3.8.0 // indirect
+require (
+	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
+	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
+)
 
 replace (
 	github.com/openshift/hypershift/api => github.com/openshift/hypershift v0.0.0-20220323152148-c356b8b72d66
