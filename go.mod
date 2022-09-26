@@ -25,13 +25,13 @@ require (
 	golang.org/x/net v0.0.0-20220921203646-d300de134e69
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.25.2
-	k8s.io/apiextensions-apiserver v0.24.0
+	k8s.io/apiextensions-apiserver v0.25.2
 	k8s.io/apimachinery v0.25.2
 	k8s.io/client-go v0.25.2
-	k8s.io/code-generator v0.24.0
+	k8s.io/code-generator v0.25.2
 	k8s.io/component-base v0.25.2
 	k8s.io/klog/v2 v2.80.1
-	k8s.io/kube-proxy v0.24.0
+	k8s.io/kube-proxy v0.25.2
 	k8s.io/utils v0.0.0-20220922133306-665eaaec4324
 	sigs.k8s.io/cluster-api-provider-openstack v0.3.3
 	sigs.k8s.io/controller-runtime v0.12.0
@@ -51,7 +51,6 @@ require (
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
@@ -115,7 +114,6 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20220922220347-f3bd1da661af // indirect
 	golang.org/x/tools v0.1.12 // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 // indirect
@@ -126,9 +124,9 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiserver v0.25.2 // indirect
 	k8s.io/gengo v0.0.0-20211129171323-c02415ce4185 // indirect
-	k8s.io/kube-aggregator v0.24.0 // indirect
+	k8s.io/kube-aggregator v0.25.2 // indirect
 	k8s.io/kube-openapi v0.0.0-20220803164354-a70c9af30aea // indirect
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.32 // indirect
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33 // indirect
 	sigs.k8s.io/cluster-api v1.1.3 // indirect
 	sigs.k8s.io/cluster-api-provider-aws v1.1.0 // indirect
 	sigs.k8s.io/cluster-api-provider-ibmcloud v0.2.0 // indirect
