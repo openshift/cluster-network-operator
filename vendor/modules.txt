@@ -46,8 +46,6 @@ github.com/coreos/go-systemd/v22/journal
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/emicklei/go-restful v2.9.5+incompatible
-## explicit
 # github.com/emicklei/go-restful/v3 v3.8.0
 ## explicit; go 1.13
 github.com/emicklei/go-restful/v3
@@ -604,8 +602,6 @@ golang.org/x/tools/internal/imports
 golang.org/x/tools/internal/packagesinternal
 golang.org/x/tools/internal/typeparams
 golang.org/x/tools/internal/typesinternal
-# golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
-## explicit; go 1.11
 # gomodules.xyz/jsonpatch/v2 v2.2.0
 ## explicit; go 1.12
 gomodules.xyz/jsonpatch/v2
@@ -778,8 +774,8 @@ k8s.io/api/scheduling/v1beta1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
-# k8s.io/apiextensions-apiserver v0.24.0
-## explicit; go 1.16
+# k8s.io/apiextensions-apiserver v0.25.2
+## explicit; go 1.19
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
@@ -1270,8 +1266,8 @@ k8s.io/client-go/util/jsonpath
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/retry
 k8s.io/client-go/util/workqueue
-# k8s.io/code-generator v0.24.0
-## explicit; go 1.16
+# k8s.io/code-generator v0.25.2
+## explicit; go 1.19
 k8s.io/code-generator
 k8s.io/code-generator/cmd/client-gen
 k8s.io/code-generator/cmd/client-gen/args
@@ -1344,8 +1340,8 @@ k8s.io/klog/v2/internal/clock
 k8s.io/klog/v2/internal/dbg
 k8s.io/klog/v2/internal/serialize
 k8s.io/klog/v2/internal/severity
-# k8s.io/kube-aggregator v0.24.0
-## explicit; go 1.16
+# k8s.io/kube-aggregator v0.25.2
+## explicit; go 1.19
 k8s.io/kube-aggregator/pkg/apis/apiregistration
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
@@ -1372,8 +1368,8 @@ k8s.io/kube-openapi/pkg/util
 k8s.io/kube-openapi/pkg/util/proto
 k8s.io/kube-openapi/pkg/util/sets
 k8s.io/kube-openapi/pkg/validation/spec
-# k8s.io/kube-proxy v0.24.0
-## explicit; go 1.16
+# k8s.io/kube-proxy v0.25.2
+## explicit; go 1.19
 k8s.io/kube-proxy/config/v1alpha1
 # k8s.io/utils v0.0.0-20220922133306-665eaaec4324
 ## explicit; go 1.18
@@ -1389,7 +1385,7 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.32 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.24
+# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.24
 ## explicit; go 1.13
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
