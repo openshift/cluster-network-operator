@@ -658,8 +658,18 @@ func TestValidateOVNKubernetes(t *testing.T) {
 				ContainSubstring(substr))))
 	}
 
+	errNotExpect := func(substr string) {
+		t.Helper()
+		g.Expect(validateOVNKubernetes(config)).To(
+			Not(
+				ContainElement(MatchError(
+					ContainSubstring(substr)))))
+	}
+
 	ovnConfig.V4InternalSubnet = "100.64.0.0/22"
 	errExpect("v4InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.V4InternalSubnet = "100.64.0.0/21"
+	errNotExpect("v4InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork")
 	ovnConfig.V6InternalSubnet = "fd01::/48"
 	errExpect("v6InternalSubnet and ClusterNetwork must have matching IP families")
 	ovnConfig.V4InternalSubnet = "10.128.0.0/16"
@@ -675,7 +685,6 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	ovnConfig.GenevePort = ptrToUint32(70001)
 	errExpect("invalid GenevePort 70001")
 
-	// invalid ipv6 mtu
 	config.ServiceNetwork = []string{"fd02::/112"}
 	config.ClusterNetwork = []operv1.ClusterNetworkEntry{{
 		CIDR: "fd01::/48", HostPrefix: 64,
@@ -685,8 +694,12 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	errExpect("v6InternalSubnet overlaps with ClusterNetwork fd01::/48")
 	ovnConfig.V6InternalSubnet = "fd03::/112"
 	errExpect("v6InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.V6InternalSubnet = "fd03::/111"
+	errNotExpect("v6InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork")
 	ovnConfig.V6InternalSubnet = "fd02::/64"
 	errExpect("v6InternalSubnet overlaps with ServiceNetwork fd02::/112")
+
+	// invalid ipv6 mtu
 	ovnConfig.MTU = ptrToUint32(576)
 	errExpect("invalid MTU 576")
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/big"
 	"net"
 	"net/url"
 	"os"
@@ -699,7 +700,7 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 			if err != nil {
 				out = append(out, errors.Errorf("v4InternalSubnet is invalid: %s", err))
 			}
-			if !isInternalSubnetLargeEnough(conf, true) {
+			if !isV4InternalSubnetLargeEnough(conf) {
 				out = append(out, errors.Errorf("v4InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork"))
 			}
 		}
@@ -711,7 +712,7 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 			if err != nil {
 				out = append(out, errors.Errorf("v6InternalSubnet is invalid: %s", err))
 			}
-			if !isInternalSubnetLargeEnough(conf, false) {
+			if !isV6InternalSubnetLargeEnough(conf) {
 				out = append(out, errors.Errorf("v6InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork"))
 			}
 		}
@@ -1519,16 +1520,12 @@ func setOVNObjectAnnotation(objs []*uns.Unstructured, key, value string) error {
 	return nil
 }
 
-func isInternalSubnetLargeEnough(conf *operv1.NetworkSpec, v4 bool) bool {
+func isV4InternalSubnetLargeEnough(conf *operv1.NetworkSpec) bool {
 	var maxNodesNum int
 	subnet := conf.DefaultNetwork.OVNKubernetesConfig.V4InternalSubnet
 	addrLen := 32
-	if !v4 {
-		subnet = conf.DefaultNetwork.OVNKubernetesConfig.V6InternalSubnet
-		addrLen = 128
-	}
 	for _, n := range conf.ClusterNetwork {
-		if (utilnet.IsIPv6CIDRString(n.CIDR) && v4) || (!utilnet.IsIPv6CIDRString(n.CIDR) && !v4) {
+		if utilnet.IsIPv6CIDRString(n.CIDR) {
 			continue
 		}
 		mask, _ := strconv.Atoi(strings.Split(n.CIDR, "/")[1])
@@ -1537,5 +1534,26 @@ func isInternalSubnetLargeEnough(conf *operv1.NetworkSpec, v4 bool) bool {
 	}
 	// We need to ensure each node can be assigned an IP address from the internal subnet
 	intSubnetMask, _ := strconv.Atoi(strings.Split(subnet, "/")[1])
-	return maxNodesNum < (1<<(addrLen-intSubnetMask) - 2)
+	// reserve one IP for the gw, one IP for network and one for broadcasting
+	return maxNodesNum < (1<<(addrLen-intSubnetMask) - 3)
+}
+
+func isV6InternalSubnetLargeEnough(conf *operv1.NetworkSpec) bool {
+	var addrLen uint32
+	maxNodesNum, nodesNum, capacity := new(big.Int), new(big.Int), new(big.Int)
+	subnet := conf.DefaultNetwork.OVNKubernetesConfig.V6InternalSubnet
+	addrLen = 128
+	for _, n := range conf.ClusterNetwork {
+		if !utilnet.IsIPv6CIDRString(n.CIDR) {
+			continue
+		}
+		mask, _ := strconv.Atoi(strings.Split(n.CIDR, "/")[1])
+		nodesNum.Lsh(big.NewInt(1), uint(n.HostPrefix)-uint(mask))
+		maxNodesNum.Add(maxNodesNum, nodesNum)
+	}
+	// We need to ensure each node can be assigned an IP address from the internal subnet
+	intSubnetMask, _ := strconv.Atoi(strings.Split(subnet, "/")[1])
+	capacity.Lsh(big.NewInt(1), uint(addrLen)-uint(intSubnetMask))
+	// reserve one IP for the gw, one IP for network and one for broadcasting
+	return capacity.Cmp(maxNodesNum.Add(maxNodesNum, big.NewInt(3))) != -1
 }
