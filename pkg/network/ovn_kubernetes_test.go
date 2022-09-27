@@ -2054,7 +2054,7 @@ type fakeClientReader struct {
 	configMap *v1.ConfigMap
 }
 
-func (f *fakeClientReader) Get(_ context.Context, _ crclient.ObjectKey, obj crclient.Object) error {
+func (f *fakeClientReader) Get(_ context.Context, _ crclient.ObjectKey, obj crclient.Object, opts ...crclient.GetOption) error {
 	if cmPtr, ok := obj.(*v1.ConfigMap); !ok {
 		return fmt.Errorf("expecting *v1.ConfigMap, got %T", obj)
 	} else if f.configMap == nil {
