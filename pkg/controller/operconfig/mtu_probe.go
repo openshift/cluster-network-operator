@@ -155,9 +155,14 @@ func renderMTUProber(infra *bootstrap.InfraStatus) ([]*uns.Unstructured, error) 
 	data.Data["KUBERNETES_SERVICE_PORT"] = infra.APIServers[bootstrap.APIServerDefault].Port
 	data.Data["DestNS"] = cmNamespace
 	data.Data["DestName"] = cmName
-	data.Data["HTTP_PROXY"] = infra.Proxy.HTTPProxy
-	data.Data["HTTPS_PROXY"] = infra.Proxy.HTTPSProxy
-	data.Data["NO_PROXY"] = infra.Proxy.NoProxy
+	data.Data["HTTP_PROXY"] = ""
+	data.Data["HTTPS_PROXY"] = ""
+	data.Data["NO_PROXY"] = ""
+	if infra.ControlPlaneTopology == configv1.ExternalTopologyMode {
+		data.Data["HTTP_PROXY"] = infra.Proxy.HTTPProxy
+		data.Data["HTTPS_PROXY"] = infra.Proxy.HTTPSProxy
+		data.Data["NO_PROXY"] = infra.Proxy.NoProxy
+	}
 
 	objs, err := render.RenderDir("bindata/network/mtu-prober", &data)
 	if err != nil {

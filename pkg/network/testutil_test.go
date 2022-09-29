@@ -1,11 +1,14 @@
 package network
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/onsi/gomega/types"
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	"github.com/openshift/cluster-network-operator/pkg/client"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -72,4 +75,14 @@ func fakeBootstrapResult() *bootstrap.BootstrapResult {
 			},
 		},
 	}
+}
+
+// createProxy creates an empty proxy object.
+func createProxy(client client.Client) error {
+	proxy := &configv1.Proxy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+	}
+	return client.Default().CRClient().Create(context.TODO(), proxy)
 }
