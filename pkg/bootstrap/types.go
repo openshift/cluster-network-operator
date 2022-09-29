@@ -36,9 +36,10 @@ type OVNHyperShiftBootstrapResult struct {
 }
 
 type OVNConfigBoostrapResult struct {
-	GatewayMode      string
-	NodeMode         string
-	HyperShiftConfig *OVNHyperShiftBootstrapResult
+	GatewayMode           string
+	NodeMode              string
+	HyperShiftConfig      *OVNHyperShiftBootstrapResult
+	DisableUDPAggregation bool
 }
 
 // OVNUpdateStatus contains the status of existing daemonset
