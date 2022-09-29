@@ -116,6 +116,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["RoutableMTU"] = nil
 	data.Data["V4JoinSubnet"] = c.V4InternalSubnet
 	data.Data["V6JoinSubnet"] = c.V6InternalSubnet
+	data.Data["EnableUDPAggregation"] = !bootstrapResult.OVN.OVNKubernetesConfig.DisableUDPAggregation
 
 	if conf.Migration != nil && conf.Migration.MTU != nil {
 		if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
@@ -603,6 +604,27 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 	return ovnHypershiftResult, nil
 }
 
+func getDisableUDPAggregation(cl crclient.Reader) bool {
+	cm := &corev1.ConfigMap{}
+	if err := cl.Get(context.TODO(), types.NamespacedName{
+		Namespace: "openshift-network-operator",
+		Name:      "udp-aggregation-config",
+	}, cm); err != nil {
+		if !apierrors.IsNotFound(err) {
+			klog.Warningf("Error fetching udp-aggregation-config configmap: %v", err)
+		}
+		return false
+	}
+
+	disableUDPAggregation := cm.Data["disable-udp-aggregation"]
+	if disableUDPAggregation == "true" {
+		return true
+	} else {
+		klog.Warningf("Ignoring unexpected udp-aggregation-config override value disable-udp-aggregation=%q", disableUDPAggregation)
+	}
+	return false
+}
+
 // bootstrapOVNConfig returns the value of mode found in the openshift-ovn-kubernetes/dpu-mode-config configMap
 // if it exists, otherwise returns default configuration for OCP clusters using OVN-Kubernetes
 func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *HyperShiftConfig) (*bootstrap.OVNConfigBoostrapResult, error) {
@@ -616,7 +638,7 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *H
 	var err error
 	ovnConfigResult.HyperShiftConfig, err = bootstrapOVNHyperShiftConfig(hc, kubeClient)
 	if err != nil {
-		return ovnConfigResult, err
+		return nil, err
 	}
 
 	cm := &corev1.ConfigMap{}
@@ -624,9 +646,7 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *H
 	err = kubeClient.ClientFor("").CRClient().Get(context.TODO(), dmc, cm)
 
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			klog.Infof("Did not find dpu-mode-config")
-		} else {
+		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Could not determine Node Mode: %w", err)
 		}
 	} else {
@@ -634,11 +654,14 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *H
 		if nodeModeOverride != OVN_NODE_MODE_DPU_HOST && nodeModeOverride != OVN_NODE_MODE_DPU {
 			klog.Warningf("dpu-mode-config does not match %q or %q, is: %q. Using OVN configuration: %+v",
 				OVN_NODE_MODE_DPU_HOST, OVN_NODE_MODE_DPU, nodeModeOverride, ovnConfigResult)
-			return ovnConfigResult, nil
+		} else {
+			ovnConfigResult.NodeMode = nodeModeOverride
+			klog.Infof("Overriding OVN configuration to %+v", ovnConfigResult)
 		}
-		ovnConfigResult.NodeMode = nodeModeOverride
-		klog.Infof("Overriding OVN configuration to %+v", ovnConfigResult)
 	}
+
+	ovnConfigResult.DisableUDPAggregation = getDisableUDPAggregation(kubeClient.ClientFor("").CRClient())
+
 	return ovnConfigResult, nil
 }
 
