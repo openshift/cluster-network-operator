@@ -225,7 +225,6 @@ spec:
 
           CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
           echo "$(date -Iseconds) - starting nbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}, K8S_NODE_IP=${K8S_NODE_IP}"
-          initial_raft_create=true
           initialize="false"
           
           if [[ ! -e ${ovn_db_file} ]]; then
@@ -247,7 +246,6 @@ spec:
 
             if ${cluster_found}; then
               echo "Cluster already exists for DB: ${db}"
-              initial_raft_create=false
               # join existing cluster
               exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
               --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
@@ -595,7 +593,6 @@ spec:
 
           CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
           echo "$(date -Iseconds) - starting sbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}"
-          initial_raft_create=true
           initialize="false"
           
           if [[ ! -e ${ovn_db_file} ]]; then
@@ -617,7 +614,6 @@ spec:
 
             if ${cluster_found}; then
               echo "Cluster already exists for DB: ${db}"
-              initial_raft_create=false
               # join existing cluster
               exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
               --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
