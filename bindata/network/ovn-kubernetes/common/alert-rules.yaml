@@ -26,13 +26,3 @@ spec:
       for: 20m
       labels:
         severity: warning
-    - alert: OVNKubernetesControllerDisconnectedSouthboundDatabase
-      annotations:
-        summary: Networking control plane is degraded on node {{"{{"}} $labels.node {{"}}"}} because OVN controller is not connected to OVN southbound database.
-        # runbook_url: TODO by https://issues.redhat.com/browse/SDN-3444
-        description: |
-          Networking is degraded on nodes when OVN controller is not connected to OVN southbound database connection. No networking control plane updates will be applied to the node.
-      expr: |
-        max_over_time(ovn_controller_southbound_database_connected[5m]) == 0
-      labels:
-        severity: warning
