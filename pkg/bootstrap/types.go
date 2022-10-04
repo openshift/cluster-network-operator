@@ -22,6 +22,7 @@ type KuryrBootstrapResult struct {
 	HttpsProxy         string
 	HttpProxy          string
 	NoProxy            string
+	ProjectID          string
 }
 
 type OVNHyperShiftBootstrapResult struct {

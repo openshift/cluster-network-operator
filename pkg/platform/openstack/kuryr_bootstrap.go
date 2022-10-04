@@ -333,18 +333,21 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient crclient.Client) (*boot
 		return nil, errors.Wrap(err, "failed to authenticate to OpenStack")
 	}
 
-	// Kuryr will need ProjectID to be set, let's make sure it's set.
-	if cloud.AuthInfo.ProjectID == "" && cloud.AuthInfo.ProjectName != "" {
+	// Kuryr needs to configure ProjectID in kuryr.conf. If it's provided, let's use that.
+	// If not, let's use whatever our user is allowed to. Do not mess with cloud.AuthInfo,
+	// as with some auth plugins, providing a project is not allowed. We'll use a separate
+	// field on the KuryrBootstrapResult.
+	projectID := cloud.AuthInfo.ProjectID
+	if projectID == "" {
 		keystone, err := openstack.NewIdentityV3(provider, gophercloud.EndpointOpts{})
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create Keystone client")
 		}
 
-		projectID, err := getProjectID(keystone)
+		projectID, err = getProjectID(keystone)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to find project ID")
 		}
-		cloud.AuthInfo.ProjectID = projectID
 	}
 
 	client, err := openstack.NewNetworkV2(provider, gophercloud.EndpointOpts{})
@@ -667,6 +670,7 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient crclient.Client) (*boot
 		OctaviaProvider:    octaviaProvider,
 		OctaviaVersion:     octaviaVersion.Original(),
 		OpenStackCloud:     cloud,
+		ProjectID:          projectID,
 		UserCACert:         userCACert,
 		HttpProxy:          httpProxy,
 		HttpsProxy:         httpsProxy,

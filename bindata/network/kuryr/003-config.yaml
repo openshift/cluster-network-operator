@@ -59,7 +59,7 @@ data:
     {{- $AuthInfo := .OpenStackCloud.AuthInfo }}
     [neutron_defaults]
     service_subnet = {{ .ServiceSubnet }}
-    project = {{ default "\"\"" $AuthInfo.ProjectID }}
+    project = {{ default "\"\"" .ProjectID }}
     pod_security_groups = {{ default "default" .PodSecurityGroups }}
     resource_tags = {{ default "" .ResourceTags }}
     external_svc_net = {{ default "\"\"" .ExternalNetwork }}
