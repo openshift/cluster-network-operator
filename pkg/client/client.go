@@ -23,6 +23,7 @@ import (
 	osoperclient "github.com/openshift/client-go/operator/clientset/versioned"
 	osoperinformer "github.com/openshift/client-go/operator/informers/externalversions"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
@@ -45,6 +46,7 @@ func init() {
 	utilruntime.Must(netopv1.Install(scheme.Scheme))
 	utilruntime.Must(machineapi.AddToScheme(scheme.Scheme))
 	utilruntime.Must(op_netopv1.Install(scheme.Scheme))
+	utilruntime.Must(mcfgv1.Install(scheme.Scheme))
 }
 
 // OperatorClusterClient is a bag of holding for object clients & informers.
