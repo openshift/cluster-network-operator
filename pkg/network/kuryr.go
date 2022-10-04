@@ -60,6 +60,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["ServiceSubnet"] = b.ServiceSubnet
 	data.Data["ExternalNetwork"] = b.ExternalNetwork
 	data.Data["OpenStackCloud"] = b.OpenStackCloud
+	data.Data["ProjectID"] = b.ProjectID
 	// FIXME(dulek): Move that logic to the template once it's known how to dereference pointers there.
 	data.Data["OpenStackInsecureAPI"] = b.OpenStackCloud.Verify != nil && !*b.OpenStackCloud.Verify
 	data.Data["DebugEnabled"] = conf.LogLevel != operv1.Normal
