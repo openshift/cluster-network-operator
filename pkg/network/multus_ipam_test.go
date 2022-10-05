@@ -236,7 +236,8 @@ func TestRenderWithWhereabouts(t *testing.T) {
 
 	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("CronJob", "openshift-multus", "ip-reconciler")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "whereabouts-controlloop-deployment")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("PrometheusRule", "openshift-multus", "whereabouts-alert-rules")))
 }
 
 // TestRenderWithWhereabouts tests a rendering with the ip reconciler
@@ -249,7 +250,8 @@ func TestRenderWithWhereaboutsConflist(t *testing.T) {
 
 	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("CronJob", "openshift-multus", "ip-reconciler")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "whereabouts-controlloop-deployment")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("PrometheusRule", "openshift-multus", "whereabouts-alert-rules")))
 }
 
 // TestRenderNoIPAM tests a rendering WITHOUT an IPAM configured.
@@ -263,7 +265,8 @@ func TestRenderNoIPAM(t *testing.T) {
 	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "dhcp-daemon")))
-	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("CronJob", "openshift-multus", "ip-reconciler")))
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "whereabouts-controlloop-deployment")))
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("PrometheusRule", "openshift-multus", "whereabouts-alert-rules")))
 }
 
 // TestRenderInvalidIPAMConfig tests a rendering without auxiliary IPAM, due to an invalid IPAM configuration.
@@ -277,7 +280,8 @@ func TestRenderInvalidIPAMConfig(t *testing.T) {
 	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "dhcp-daemon")))
-	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("CronJob", "openshift-multus", "ip-reconciler")))
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "whereabouts-controlloop-deployment")))
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("PrometheusRule", "openshift-multus", "whereabouts-alert-rules")))
 }
 
 // TestRenderWithDHCPSimpleMacvlan tests a rendering with the DHCP daemonset SimpleMacvlan.
