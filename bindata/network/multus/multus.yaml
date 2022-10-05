@@ -546,7 +546,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: whereabouts-controlloop-deployment
+  name: whereabouts-controlloop-deployment-upgraded
   namespace: openshift-multus
   labels:
     tier: node
@@ -561,7 +561,7 @@ spec:
         app: whereabouts
     spec:
       containers:
-        - name: whereabouts-controlloop-deployment
+        - name: whereabouts-controlloop-deployment-upgraded
           securityContext:
             privileged: true
           image: "nicklesimba/whereabouts:prometheus-metrics"
