@@ -1,5 +1,5 @@
 ---
-# The ovnconfig config file. Used by both node and master processes.
+# The ovnconfig config file. Used by ovnkube-node in hypershift hostedcluster.
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -39,12 +39,6 @@ data:
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
     nodeport=true
-{{- if (index . "V4JoinSubnet") }}
-    v4-join-subnet="{{.V4JoinSubnet}}"
-{{- end }}
-{{- if (index . "V6JoinSubnet") }}
-    v6-join-subnet="{{.V6JoinSubnet}}"
-{{- end }}
 {{- if .OVNHybridOverlayEnable }}
 
     [hybridoverlay]
@@ -114,6 +108,12 @@ data:
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
     nodeport=true
+{{- if (index . "V4JoinSubnet") }}
+    v4-join-subnet="{{.V4JoinSubnet}}"
+{{- end }}
+{{- if (index . "V6JoinSubnet") }}
+    v6-join-subnet="{{.V6JoinSubnet}}"
+{{- end }}
 {{- if .OVNHybridOverlayEnable }}
 
     [hybridoverlay]
