@@ -32,6 +32,14 @@ spec:
         key: tls.key
         name: multus-admission-controller-secret
       serverName: multus-admission-controller.{{.AdmissionControllerNamespace}}.svc
+    metricRelabelings:
+      - action: replace
+        replacement: {{.ClusterID}}
+        targetLabel: {{.ClusterIDLabel}}
+    relabelings:
+      - action: replace
+        replacement: {{.ClusterID}}
+        targetLabel: {{.ClusterIDLabel}}
 {{ else }}
     bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
     tlsConfig:

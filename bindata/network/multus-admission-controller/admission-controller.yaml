@@ -102,8 +102,13 @@ spec:
             -port=6443 \
             -tls-private-key-file=/etc/webhook/tls.key \
             -tls-cert-file=/etc/webhook/tls.crt \
-            -alsologtostderr=true \
+{{- if .HyperShiftEnabled}}
+            -encrypt-metrics=true \
+            -metrics-listen-address=:9091 \
+{{- else }}
             -metrics-listen-address=127.0.0.1:9091 \
+{{- end }}
+            -alsologtostderr=true \
             -ignore-namespaces=openshift-etcd,openshift-console,openshift-ingress-canary,{{.IgnoredNamespace}}
         volumeMounts:
         - name: webhook-certs
@@ -127,6 +132,7 @@ spec:
         ports:
         - name: metrics-port
           containerPort: 9091
+{{- if not .HyperShiftEnabled}}
       - name: kube-rbac-proxy
         image: {{.KubeRBACProxyImage}}
         args:
@@ -148,7 +154,6 @@ spec:
         - name: webhook-certs
           mountPath: /etc/webhook
           readOnly: True
-{{- if not .HyperShiftEnabled}}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
