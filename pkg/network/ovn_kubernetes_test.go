@@ -810,8 +810,7 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	next.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = &hybridOverlayConfigNext
 
 	errs = isOVNKubernetesChangeSafe(prev, next)
-	g.Expect(errs).To(HaveLen(1))
-	g.Expect(errs[0]).To(MatchError("cannot start a hybrid overlay network after install time"))
+	g.Expect(errs).To(BeEmpty())
 
 	//try to change a previous hybrid overlay
 	hybridOverlayConfigPrev :=
@@ -827,6 +826,13 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 
 	prev.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = nil
 	next.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = nil
+
+	//try to disable a running hybrid overlay
+	prev.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = &hybridOverlayConfigPrev
+	next.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = nil
+
+	errs = isOVNKubernetesChangeSafe(prev, next)
+	g.Expect(errs).To(BeEmpty())
 
 	// change the mtu without migration
 	next.DefaultNetwork.OVNKubernetesConfig.MTU = ptrToUint32(70000)
