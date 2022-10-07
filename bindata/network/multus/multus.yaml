@@ -542,7 +542,6 @@ spec:
             type: DirectoryOrCreate
           name: tuning-conf-dir
 ---
-{{if .RenderIpReconciler}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -583,4 +582,3 @@ spec:
         - name: system-cni-dir
           hostPath:
             path: {{ .SystemCNIConfDir }}/whereabouts.d
-{{- end}}
