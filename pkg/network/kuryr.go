@@ -109,16 +109,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 	data.Data["ConfigMapHash"] = hash
 
 	// Pods Network MTU
-	mtu := b.PodsNetworkMTU
-	if c.MTU != nil {
-		if mtu >= *c.MTU {
-			mtu = *c.MTU
-		} else {
-			return nil, progressing, errors.Errorf("Configured MTU (%d) is incompatible with OpenShift nodes network MTU (%d).", *c.MTU, mtu)
-		}
-	}
-	c.MTU = &mtu
-	data.Data["PodsNetworkMTU"] = mtu
+	data.Data["PodsNetworkMTU"] = b.PodsNetworkMTU
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/kuryr"), &data)
 	if err != nil {
