@@ -75,6 +75,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 	data.Data["HTTP_PROXY"] = proxy.HTTPProxy
 	data.Data["HTTPS_PROXY"] = proxy.HTTPSProxy
 	data.Data["NO_PROXY"] = proxy.NoProxy
+	data.Data["CniSysctlAllowlist"] = "default-cni-sysctl-allowlist"
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus"), &data)
 	if err != nil {
