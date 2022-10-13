@@ -104,7 +104,7 @@ spec:
         count(count(min_over_time(ovn_db_cluster_id{db_name="OVN_Northbound"}[5m])) by (cluster_id, namespace)) by (namespace) > 1
       for: 5m
       labels:
-        severity: info
+        severity: critical
     - alert: OVNKubernetesSouthboundDatabaseClusterIDError
       annotations:
         summary: Multiple OVN southbound database cluster IDs exist.
@@ -116,7 +116,7 @@ spec:
         count(count(min_over_time(ovn_db_cluster_id{db_name="OVN_Southbound"}[5m])) by (cluster_id, namespace)) by (namespace) > 1
       for: 5m
       labels:
-        severity: info
+        severity: critical
     - alert: OVNKubernetesNorthboundDatabaseTermLag
       annotations:
         summary: OVN northbound databases RAFT term have not been equal for a period of time.
@@ -127,7 +127,7 @@ spec:
         max(max_over_time(ovn_db_cluster_term{db_name="OVN_Northbound"}[5m])) by (namespace) - min(max_over_time(ovn_db_cluster_term{db_name="OVN_Northbound"}[5m])) by (namespace) > 0
       for: 25m
       labels:
-        severity: info
+        severity: warning
     - alert: OVNKubernetesSouthboundDatabaseTermLag
       annotations:
         summary: OVN southbound databases RAFT term have not been equal for a period of time.
@@ -138,7 +138,7 @@ spec:
         max(max_over_time(ovn_db_cluster_term{db_name="OVN_Southbound"}[5m])) by (namespace) - min(max_over_time(ovn_db_cluster_term{db_name="OVN_Southbound"}[5m])) by (namespace) > 0
       for: 25m
       labels:
-        severity: info
+        severity: warning
     - alert: OVNKubernetesNorthboundDatabaseLeaderError
       annotations:
         summary: OVN northbound database(s) have no RAFT leader
@@ -148,7 +148,7 @@ spec:
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
         count(max_over_time(ovn_db_cluster_server_role{db_name="OVN_Northbound", server_role="leader"}[5m])) by (namespace) == 0
       labels:
-        severity: info
+        severity: critical
     - alert: OVNKubernetesSouthboundDatabaseLeaderError
       annotations:
         summary: OVN southbound database(s) have no RAFT leader
@@ -158,7 +158,7 @@ spec:
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
         count(max_over_time(ovn_db_cluster_server_role{db_name="OVN_Southbound", server_role="leader"}[5m])) by (namespace) == 0
       labels:
-        severity: info
+        severity: critical
     - alert: OVNKubernetesNorthboundDatabaseMultipleLeadersError
       annotations:
         summary: OVN northbound database(s) have multiple RAFT leaders
@@ -169,7 +169,7 @@ spec:
         count(min_over_time(ovn_db_cluster_server_role{db_name="OVN_Northbound", server_role="leader"}[1m])) by (leader, namespace) > 1
       for: 5m
       labels:
-        severity: info
+        severity: warning
     - alert: OVNKubernetesSouthboundDatabaseMultipleLeadersError
       annotations:
         summary: OVN southbound database(s) have multiple RAFT leaders
@@ -180,7 +180,7 @@ spec:
         count(min_over_time(ovn_db_cluster_server_role{db_name="OVN_Southbound", server_role="leader"}[1m])) by (leader, namespace) > 1
       for: 5m
       labels:
-        severity: info
+        severity: warning
     - alert: OVNKubernetesNorthboundDatabaseClusterMemberError
       annotations:
         summary: OVN northbound database server(s) has not been a member of the databases high availability for a period of time.
@@ -193,7 +193,7 @@ spec:
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
-        severity: info
+        severity: warning
     - alert: OVNKubernetesSouthboundDatabaseClusterMemberError
       annotations:
         summary: OVN southbound database server(s) has not been a member of the databases high availability for a period of time.
@@ -206,7 +206,7 @@ spec:
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
-        severity: info
+        severity: warning
     - alert: OVNKubernetesNorthboundDatabaseInboundConnectionError
       annotations:
         summary: OVN northbound database server(s) is experiencing inbound RAFT connectivity errors.
@@ -219,7 +219,7 @@ spec:
         min_over_time(ovn_db_cluster_inbound_connections_error_total{db_name="OVN_Northbound"}[5m]) > 0
       for: 5m
       labels:
-        severity: info
+        severity: warning
     - alert: OVNKubernetesSouthboundDatabaseInboundConnectionError
       annotations:
         summary: OVN southbound database server(s) is experiencing inbound RAFT connectivity errors.
@@ -232,7 +232,7 @@ spec:
         min_over_time(ovn_db_cluster_inbound_connections_error_total{db_name="OVN_Southbound"}[5m]) > 0
       for: 5m
       labels:
-        severity: info
+        severity: warning
     - alert: OVNKubernetesNorthboundDatabaseOutboundConnectionError
       annotations:
         summary: OVN northbound database server(s) is experiencing outbound RAFT connectivity errors.
@@ -245,7 +245,7 @@ spec:
         min_over_time(ovn_db_cluster_outbound_connections_error_total{db_name="OVN_Northbound"}[5m]) > 0
       for: 5m
       labels:
-        severity: info
+        severity: warning
     - alert: OVNKubernetesSouthboundDatabaseOutboundConnectionError
       annotations:
         summary: OVN southbound database server(s) is experiencing outbound RAFT connectivity errors.
@@ -258,7 +258,7 @@ spec:
         min_over_time(ovn_db_cluster_outbound_connections_error_total{db_name="OVN_Southbound"}[5m]) > 0
       for: 5m
       labels:
-        severity: info
+        severity: warning
     - alert: OVNKubernetesNorthboundDatabaseInboundConnectionMissing
       annotations:
         summary: OVN northbound database server(s) do not have expected number of inbound RAFT connections.
@@ -273,7 +273,7 @@ spec:
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
-        severity: info
+        severity: warning
     - alert: OVNKubernetesSouthboundDatabaseInboundConnectionMissing
       annotations:
         summary: OVN southbound database server(s) do not have expected number of inbound RAFT connections.
@@ -288,7 +288,7 @@ spec:
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
-        severity: info
+        severity: warning
     - alert: OVNKubernetesNorthboundDatabaseOutboundConnectionMissing
       annotations:
         summary: OVN northbound database server(s) do not have expected number of outbound RAFT connections.
@@ -303,7 +303,7 @@ spec:
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
-        severity: info
+        severity: warning
     - alert: OVNKubernetesSouthboundDatabaseOutboundConnectionMissing
       annotations:
         summary: OVN southbound database server(s) do not have expected number of outbound RAFT connections.
@@ -318,7 +318,7 @@ spec:
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
-        severity: info
+        severity: warning
     # OVN northbound and southbound database performance alerts
     - alert: OVNKubernetesNorthboundDatabaseCPUUsageHigh
       annotations:
