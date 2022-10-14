@@ -153,7 +153,7 @@ func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
 			return false, err
 		}
 		for _, pod := range podList.Items {
-			if !pod.Status.ContainerStatuses[0].Ready {
+			if len(pod.Status.ContainerStatuses) == 0 || !pod.Status.ContainerStatuses[0].Ready {
 				return false, nil
 			}
 		}
