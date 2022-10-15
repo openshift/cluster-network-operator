@@ -11,7 +11,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	targets/openshift/crd-schema-gen.mk \
 )
 
-EXCLUDE_DIRS := _output/ dependencymagnet/ hack/ third_party/ tls/ vendor/
+EXCLUDE_DIRS := _output/ dependencymagnet/ hack/ third_party/ tls/ tools/ vendor/
 GO_PACKAGES :=$(addsuffix ...,$(addprefix ./,$(filter-out $(EXCLUDE_DIRS), $(wildcard */))))
 GO_BUILD_PACKAGES :=$(GO_PACKAGES)
 GO_BUILD_PACKAGES_EXPANDED :=$(GO_BUILD_PACKAGES)
@@ -46,6 +46,7 @@ $(call add-crd-gen,machine-beta,./machine/v1beta1,./machine/v1beta1,./machine/v1
 $(call add-crd-gen,machine,./machine/v1,./machine/v1,./machine/v1)
 $(call add-crd-gen,monitoring-alpha,./monitoring/v1alpha1,./monitoring/v1alpha1,./monitoring/v1alpha1)
 $(call add-crd-gen,route,./route/v1,./route/v1,./route/v1)
+$(call add-crd-gen,platform,./platform/v1alpha1,./platform/v1alpha1,./platform/v1alpha1)
 
 RUNTIME ?= podman
 RUNTIME_IMAGE_NAME ?= registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.18-openshift-4.12
@@ -57,19 +58,48 @@ verify-scripts:
 	bash -x hack/verify-swagger-docs.sh
 	hack/verify-crds.sh
 	bash -x hack/verify-types.sh
-	hack/verify-crds-version-upgrade.sh
 	bash -x hack/verify-compatibility.sh
 
 .PHONY: verify-scripts
 verify: verify-scripts verify-codegen-crds
 
-update-scripts:
-	hack/update-deepcopy.sh
-	hack/update-compatibility.sh
-	hack/update-openapi.sh
-	hack/update-protobuf.sh
-	hack/update-swagger-docs.sh
+################################################################################################
+#
+# BEGIN: Update scripts. Defaults to generating updates for all API packages.
+#        Set API_GROUP_VERSIONS to a space separated list of <group>/<version> to limit
+#        the scope of the updates. Eg API_GROUP_VERSIONS="apps/v1 build/v1" make update-scripts.
+#        Note: Protobuf generation is handled separately, see hack/lib/init.sh.
+#
+################################################################################################
+
 .PHONY: update-scripts
+update-scripts: update-compatibility update-openapi update-deepcopy update-protobuf update-swagger-docs
+
+.PHONY: update-compatibility
+update-compatibility:
+	hack/update-compatibility.sh
+
+.PHONY: update-openapi
+update-openapi:
+	hack/update-openapi.sh
+
+.PHONY: update-deepcopy
+update-deepcopy:
+	hack/update-deepcopy.sh
+
+.PHONY: update-protobuf
+update-protobuf:
+	hack/update-protobuf.sh
+
+.PHONY: update-swagger-docs
+update-swagger-docs:
+	hack/update-swagger-docs.sh
+
+#####################
+#
+# END: Update scripts
+#
+#####################
 
 verify-with-container:
 	$(RUNTIME) run -ti --rm -v $(PWD):/go/src/github.com/openshift/api:z -w /go/src/github.com/openshift/api $(RUNTIME_IMAGE_NAME) make verify

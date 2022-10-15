@@ -131,13 +131,15 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 
 // getCopySource retrieves an object using copy-from annotation from obj.
 // Returns an object that has it's readonly fields cleared, the following metadata fields are preserved from obj:
-//  Name
-//  Namespace
-//  ClusterName
-//  Labels
-//  OwnerReferences
-//  ManagedFields
-//  Finalizers
+//
+//	Name
+//	Namespace
+//	ClusterName
+//	Labels
+//	OwnerReferences
+//	ManagedFields
+//	Finalizers
+//
 // Annotations are merged, when there is a conflict obj's annotation is used.
 func getCopySource(ctx context.Context, obj Object, client cnoclient.Client) (Object, error) {
 	anno, exists := obj.GetAnnotations()[names.CopyFromAnnotation]

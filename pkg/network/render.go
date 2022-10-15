@@ -152,7 +152,7 @@ func deprecatedCanonicalizeSimpleMacvlanConfig(conf *operv1.SimpleMacvlanConfig)
 // DeprecatedCanonicalize converts configuration to a canonical form for backward
 // compatibility.
 //
-//      *** DO NOT ADD ANY NEW CANONICALIZATION TO THIS FUNCTION! ***
+//	*** DO NOT ADD ANY NEW CANONICALIZATION TO THIS FUNCTION! ***
 //
 // Altering the user-provided configuration from CNO causes problems when other components
 // need to look at the configuration before CNO starts. Users should just write the
