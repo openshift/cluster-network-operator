@@ -61,8 +61,7 @@ type OVNBootstrapResult struct {
 	MasterUpdateStatus *OVNUpdateStatus
 	// NodeUpdateStatus is the status of ovnkube-node daemonset
 	NodeUpdateStatus *OVNUpdateStatus
-	// IPsecUpdateStatus is the status of ovn-ipsec daemonset
-	IPsecUpdateStatus *OVNUpdateStatus
+	IPsecUpdateStatus *IPsecStatus
 	// PrePullerUpdateStatus is the status of ovnkube-upgrades-prepuller daemonset
 	PrePullerUpdateStatus *OVNUpdateStatus
 	OVNKubernetesConfig   *OVNConfigBoostrapResult
@@ -123,4 +122,11 @@ type FlowsConfig struct {
 
 	// Sampling is the sampling rate on the reporter. 100 means one flow on 100 is sent. 0 means disabled.
 	Sampling *uint
+}
+
+type IPsecStatus struct {
+	// IPsecUpdateStatus is the status of ovn-ipsec daemonset
+	IPsecUpdateStatus *OVNUpdateStatus
+	MigrationStatus string
+
 }

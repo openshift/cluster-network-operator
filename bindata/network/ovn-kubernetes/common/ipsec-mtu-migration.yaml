@@ -1,0 +1,15 @@
+{{if .OVNIPsecDaemonsetEnable}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ipsec-mtu-migration
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    kubernetes.io/description: |
+      This ConfigMap contains useful data for the IPsec MTU migration process.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+data:
+{{- if .IPsecMigrationStatus }}
+    MigrationStatus: {{.IPsecMigrationStatus}}
+{{- end }}
+{{end}}

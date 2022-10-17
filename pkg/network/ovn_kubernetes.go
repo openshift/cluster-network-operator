@@ -20,6 +20,8 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -79,7 +81,8 @@ const (
 // - the ovnkube-node daemonset
 // - the ovnkube-master deployment
 // and some other small things.
-func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, bool, error) {
+func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string,
+		client cnoclient.Client, hostMTU int) ([]*uns.Unstructured, bool, error) {
 	var progressing bool
 
 	// TODO: Fix operator behavior when running in a cluster with an externalized control plane.
@@ -118,22 +121,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["V6JoinSubnet"] = c.V6InternalSubnet
 	data.Data["EnableUDPAggregation"] = !bootstrapResult.OVN.OVNKubernetesConfig.DisableUDPAggregation
 
-	if conf.Migration != nil && conf.Migration.MTU != nil {
-		if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
-			data.Data["MTU"] = conf.Migration.MTU.Network.From
-			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.To
-		} else {
-			data.Data["MTU"] = conf.Migration.MTU.Network.To
-			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.From
-		}
-
-		// c.MTU is used to set the applied network configuration MTU
-		// MTU migration procedure:
-		//  1. User sets the MTU they want to migrate to
-		//  2. CNO sets the MTU as applied
-		//  3. User can then set the MTU as configured
-		c.MTU = conf.Migration.MTU.Network.To
-	}
 	data.Data["GenevePort"] = c.GenevePort
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
@@ -273,21 +260,73 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// If we only unrender the IPsec daemonset, we will be unable to cleanup
 	// the IPsec state on the node and the traffic will continue to be
 	// encrypted.
+	status := bootstrapResult.OVN.IPsecUpdateStatus.MigrationStatus
 	if c.IPsecConfig != nil {
 		// IPsec is enabled
 		data.Data["OVNIPsecDaemonsetEnable"] = true
 		data.Data["OVNIPsecEnable"] = true
+		switch status {
+		case "":
+			log.Printf("MOhammad starting ipsec migration first time")
+			data.Data["IPsecMigrationStatus"] = "disabled"
+		case "disabled":
+			log.Printf("MOhammad starting ipsec in disabled")
+			IPsecMtuMigrationInit(conf, true, hostMTU, client)
+			progressing = true
+			data.Data["IPsecMigrationStatus"] = "enabling"
+		case "enabling":
+			log.Printf("MOhammad starting ipsec in enabling")
+			if IPsecNeedToFinalizeMtuMigration(client){
+				if IPsecFinalizeMtuMigration(conf, client) {
+					data.Data["IPsecMigrationStatus"] = "enabled"
+				} else {
+					progressing = true
+				}
+			}
+		}
 	} else {
-		if bootstrapResult.OVN.IPsecUpdateStatus != nil {
+		if bootstrapResult.OVN.IPsecUpdateStatus.IPsecUpdateStatus != nil {
 			// IPsec has previously started and
 			// now it has been requested to be disabled
 			data.Data["OVNIPsecDaemonsetEnable"] = true
 			data.Data["OVNIPsecEnable"] = false
+			switch status {
+			case "enabled":
+				log.Printf("MOhammad stoping  ipsec in enabled")
+				IPsecMtuMigrationInit(conf, false, hostMTU, client)
+				data.Data["IPsecMigrationStatus"] = "disabling"
+				progressing = true
+			case "disabling":
+				log.Printf("MOhammad stoping  ipsec in disabling")
+				if IPsecNeedToFinalizeMtuMigration(client){
+					if IPsecFinalizeMtuMigration(conf, client) {
+						data.Data["IPsecMigrationStatus"] = "disabled"
+					} else {
+						progressing = true
+					}
+				}
+			}
 		} else {
 			// IPsec has never started
 			data.Data["OVNIPsecDaemonsetEnable"] = false
 			data.Data["OVNIPsecEnable"] = false
 		}
+	}
+	if conf.Migration != nil && conf.Migration.MTU != nil {
+		if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
+			data.Data["MTU"] = conf.Migration.MTU.Network.From
+			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.To
+		} else {
+			data.Data["MTU"] = conf.Migration.MTU.Network.To
+			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.From
+		}
+
+		// c.MTU is used to set the applied network configuration MTU
+		// MTU migration procedure:
+		//  1. User sets the MTU they want to migrate to
+		//  2. CNO sets the MTU as applied
+		//  3. User can then set the MTU as configured
+		c.MTU = conf.Migration.MTU.Network.To
 	}
 
 	if c.GatewayConfig != nil && c.GatewayConfig.RoutingViaHost {
@@ -778,6 +817,210 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 	return out
 }
 
+// Init MTU Migration to increase/decrease the MTU before
+// enabling IPsec.
+// enable: tell if we need to increase or decrease the MTU
+func IPsecMtuMigrationInit(next *operv1.NetworkSpec, enable bool, hostMTU int, c cnoclient.Client) (bool) {
+	var MachineMTU uint32
+	var NetMTU uint32
+	var NetMTUTo uint32
+	const ipsecOverhead = 48
+	sc := next.DefaultNetwork.OVNKubernetesConfig
+
+	NetMTU = uint32(*sc.MTU)
+	if hostMTU != 0 {
+		MachineMTU = uint32(hostMTU)
+	} else {
+		var tmp int
+		tmp, _ = GetDefaultMTU()
+		MachineMTU = uint32(tmp)
+	}
+
+	if enable == true {
+		NetMTUTo = uint32(NetMTU - ipsecOverhead)
+	} else {
+		NetMTUTo = uint32(NetMTU + ipsecOverhead)
+	}
+
+	cm := &corev1.ConfigMap{}
+	nsn := types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ipsec-mtu-migration"}
+	err := c.Default().CRClient().Get(context.TODO(), nsn, cm)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			log.Printf("cannot retrieve ipsec-mtu-migration ConfigMap: %v", err)
+		}
+		return false
+	}
+
+	cm.Data["NetMtuTO"] = strconv.Itoa(int(NetMTUTo))
+	cm.Data["NetMTU"] = strconv.Itoa(int(NetMTU))
+	cm.Data["MachineMTU"] = strconv.Itoa(int(MachineMTU))
+
+	next.Migration = &operv1.NetworkMigration{
+		MTU: &operv1.MTUMigration{
+			Network: &operv1.MTUMigrationValues{
+				From: &NetMTU,
+				To:   &NetMTUTo,
+			},
+			Machine: &operv1.MTUMigrationValues{
+				To: &MachineMTU,
+			},
+		},
+	}
+
+	// Update network.operator 'cluster' to contain the new MTU migration
+	// TODO: FIX: Use Patch instaed of Update
+	operConfig := &operv1.Network{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}}
+	nsn = types.NamespacedName{Name: names.OPERATOR_CONFIG}
+	err = c.Default().CRClient().Get(context.TODO(), nsn, operConfig)
+	if err != nil {
+		log.Printf("Error: Failed to adjust MTU to fit IPsec overhead: %v\n", err)
+		next.Migration = nil
+		return false
+	}
+	operConfig.Spec.Migration = next.Migration
+	_ = c.Default().CRClient().Update(context.Background(), operConfig)
+	_ = c.Default().CRClient().Update(context.Background(), cm)
+	log.Printf("Starting MTU migration to fit IPsec overhead, New MTU = %v", NetMTUTo)
+	return true
+}
+
+// IPsecNeedToFinalizeMtuMigration: check if we have
+// an ongoing MTU migration that was triggered by the IPsec enablement
+// and we can finlize it.
+func IPsecNeedToFinalizeMtuMigration(c cnoclient.Client) bool {
+	// retrieve the existing cluster config object
+	clusterConfig := &configv1.Network{
+		TypeMeta:   metav1.TypeMeta{APIVersion: configv1.GroupVersion.String(), Kind: "Network"},
+		ObjectMeta: metav1.ObjectMeta{Name: names.CLUSTER_CONFIG},
+	}
+	err := c.Default().CRClient().Get(context.TODO(), types.NamespacedName{
+		Name: names.CLUSTER_CONFIG,
+	}, clusterConfig)
+
+	if err != nil {
+		log.Printf("cannot retrieve cluster configuration: %v\n", err)
+		return false
+	}
+	if clusterConfig.Status.Migration == nil || clusterConfig.Status.Migration.MTU == nil {
+		return false
+	}
+
+	cm := &corev1.ConfigMap{}
+	nsn := types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ipsec-mtu-migration"}
+	err = c.Default().CRClient().Get(context.TODO(), nsn, cm)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			log.Printf("cannot retrieve ipsec-mtu-migration ConfigMap: %v", err)
+		}
+		return false
+	}
+
+	// Get Migration values
+	var NetToMig uint32 = *clusterConfig.Status.Migration.MTU.Network.To
+	var NetMig uint32 = *clusterConfig.Status.Migration.MTU.Network.From
+	var MachMig uint32 = *clusterConfig.Status.Migration.MTU.Machine.To
+	// Get IPsec Migration requests values
+	nettocm, _ := strconv.ParseInt(cm.Data["NetMtuTO"], 10, 32)
+	netcm, _ := strconv.ParseInt(cm.Data["NetMTU"], 10, 32)
+	machcm, _ := strconv.ParseInt(cm.Data["MachineMTU"], 10, 32)
+
+	var IPsecNetTo uint32 = uint32(nettocm)
+	var IPsecNetFRom uint32 = uint32(netcm)
+	var IPsecMach uint32 = uint32(machcm)
+
+	// IF we have match between the CM and Migrations values that mean it's the
+	// Migration that was triggered by IPsec and it safe to Finalize it.
+	// otherwise, this a regualr MTU migration that was triggered by end user
+	// and we are not suppose to touch it.
+
+	if NetToMig == IPsecNetTo && NetMig == IPsecNetFRom && MachMig == IPsecMach {
+		return true
+	}
+
+	return false
+}
+
+// IPsecFinalizeMtuMigration: check if the first stage of MTU migration
+// has been fully completed and if machines completed the first reboot.
+// Apply the second stage configuration and trigger the second reboot by
+// changing the network. operator configuration.
+func IPsecFinalizeMtuMigration(next *operv1.NetworkSpec, c cnoclient.Client) bool {
+	sc := next.DefaultNetwork.OVNKubernetesConfig
+	mcp_master := &mcfgv1.MachineConfigPool{}
+	err := c.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "master"}, mcp_master)
+	if err != nil {
+		log.Printf("Error: cannot retrieve machineconfigpool master: %v IPsec MTU migration Failed", err)
+		return false
+	}
+
+	mcp_worker := &mcfgv1.MachineConfigPool{}
+	err = c.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "worker"}, mcp_worker)
+	if err != nil {
+		log.Printf("Error: cannot retrieve machineconfigpool worker: %v IPsec MTU migration Failed", err)
+		return false
+	}
+
+	cm := &corev1.ConfigMap{}
+	nsn := types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ipsec-mtu-migration"}
+	err = c.Default().CRClient().Get(context.TODO(), nsn, cm)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			log.Printf("Error: cannot retrieve ipsec-mtu-migration ConfigMap: %v", err)
+		}
+		return false
+	}
+	master_pool_updating := mcfgv1.IsMachineConfigPoolConditionTrue(mcp_master.Status.Conditions, mcfgv1.MachineConfigPoolUpdating)
+	worker_pool_updating := mcfgv1.IsMachineConfigPoolConditionTrue(mcp_worker.Status.Conditions, mcfgv1.MachineConfigPoolUpdating)
+	// Update still in progress
+	if  master_pool_updating || worker_pool_updating {
+		return false
+	}
+
+	//TODO:FIX: make sure that status is exist
+	// if not exist use the spec Configuration name.
+	master_mc_name := mcp_master.Status.Configuration.Name
+	worker_mc_name := mcp_worker.Status.Configuration.Name
+
+	var applied_mc_master mcfgv1.MachineConfig
+	var applied_mc_worker  mcfgv1.MachineConfig
+	err = c.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: master_mc_name}, &applied_mc_master)
+	if err != nil {
+		log.Printf("Error: cannot retrieve machineconfig %s: %v IPsec MTU migration Failed", master_mc_name, err)
+		return false
+	}
+	err = c.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: worker_mc_name}, &applied_mc_worker)
+	if err != nil {
+		log.Printf("Error: cannot retrieve machineconfig %s: %v IPsec MTU migration Failed", worker_mc_name, err)
+		return false
+	}
+
+	target_mtu := fmt.Sprintf("CNI_TARGET_MTU=%s", cm.Data["NetMtuTO"])
+	worker_content := fmt.Sprintf("%s", applied_mc_worker.Spec.Config)
+	master_content := fmt.Sprintf("%s", applied_mc_master.Spec.Config)
+	if strings.Contains(worker_content, target_mtu) && strings.Contains(master_content, target_mtu) {
+		// Update network.operator 'cluster' to contain the new MTU migration
+		// TODO: FIX: Use Patch instaed of Update
+		operConfig := &operv1.Network{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}}
+		nsn = types.NamespacedName{Name: names.OPERATOR_CONFIG}
+		err = c.Default().CRClient().Get(context.TODO(), nsn, operConfig)
+		if err != nil {
+			log.Printf("Error: Failed to adjust MTU to fit IPsec overhead: %v\n", err)
+			return false
+		}
+		tmp, _ := strconv.ParseInt(cm.Data["NetMtuTO"], 10, 32)
+		var mtu uint32 = uint32(tmp)
+		sc.MTU = &mtu
+		next.Migration = nil
+		operConfig.Spec.Migration = next.Migration
+		sc = operConfig.Spec.DefaultNetwork.OVNKubernetesConfig
+		sc.MTU = &mtu
+		_ = c.Default().CRClient().Update(context.Background(), operConfig)
+		return true
+	}
+	return false
+}
+
 func getOVNEncapOverhead(conf *operv1.NetworkSpec) uint32 {
 	const geneveOverhead = 100
 	const ipsecOverhead = 46 // Transport mode, AES-GCM
@@ -1065,7 +1308,9 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client) (*bootstrap
 	var nsn types.NamespacedName
 	masterStatus := &bootstrap.OVNUpdateStatus{}
 	nodeStatus := &bootstrap.OVNUpdateStatus{}
-	ipsecStatus := &bootstrap.OVNUpdateStatus{}
+	ipsecStatus := &bootstrap.IPsecStatus{}
+	ipsecStatus.IPsecUpdateStatus = &bootstrap.OVNUpdateStatus{}
+	ipsecStatus.MigrationStatus = ""
 	prepullerStatus := &bootstrap.OVNUpdateStatus{}
 
 	if hc.Enabled {
@@ -1168,13 +1413,25 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client) (*bootstrap
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Failed to retrieve existing ipsec DaemonSet: %w", err)
 		} else {
-			ipsecStatus = nil
+			ipsecStatus.IPsecUpdateStatus = nil
 		}
 	} else {
-		ipsecStatus.Namespace = ipsecDS.Namespace
-		ipsecStatus.Name = ipsecDS.Name
-		ipsecStatus.IPFamilyMode = ipsecDS.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
-		ipsecStatus.Version = ipsecDS.GetAnnotations()["release.openshift.io/version"]
+		ipsecStatus.IPsecUpdateStatus.Namespace = ipsecDS.Namespace
+		ipsecStatus.IPsecUpdateStatus.Name = ipsecDS.Name
+		ipsecStatus.IPsecUpdateStatus.IPFamilyMode = ipsecDS.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+		ipsecStatus.IPsecUpdateStatus.Version = ipsecDS.GetAnnotations()["release.openshift.io/version"]
+	}
+
+	cm := &corev1.ConfigMap{}
+	nsn = types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "ipsec-mtu-migration"}
+	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, cm); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to retrieve existing ipsec ConfigMaps: %w", err)
+		} else {
+			ipsecStatus.MigrationStatus = ""
+		}
+	} else {
+		ipsecStatus.MigrationStatus = cm.Data["MigrationStatus"]
 	}
 
 	res := bootstrap.OVNBootstrapResult{
