@@ -18,6 +18,10 @@ spec:
     targetPort: 6443
   - name: metrics
     port: 8443
+{{- if .HyperShiftEnabled}}
+    targetPort: metrics-port
+{{- else }}
     targetPort: https
+{{- end }}
   selector:
     app: multus-admission-controller
