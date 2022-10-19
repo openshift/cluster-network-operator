@@ -17,7 +17,6 @@ data:
   # * must not allow to gain CPU or memory resources outside of the resource limit of the pod
   #
   allowlist.conf: |-
-    ^net.ipv4.conf.IFNAME.accept_ra$
     ^net.ipv4.conf.IFNAME.accept_redirects$
     ^net.ipv4.conf.IFNAME.accept_source_route$
     ^net.ipv4.conf.IFNAME.arp_accept$
