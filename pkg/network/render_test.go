@@ -253,8 +253,10 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	}
 
 	client := fake.NewFakeClient(infrastructure)
+	err := createProxy(client)
+	g.Expect(err).NotTo(HaveOccurred())
 
-	err := Validate(&config.Spec)
+	err = Validate(&config.Spec)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	prev := config.Spec.DeepCopy()
