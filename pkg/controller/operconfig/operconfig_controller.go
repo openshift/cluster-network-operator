@@ -385,7 +385,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 		// Open question: should an error here indicate we will never retry?
 		if err := apply.ApplyObject(ctx, r.client, obj, ControllerName); err != nil {
-			err = errors.Wrapf(err, "could not apply (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
+			err = errors.Wrapf(err, "!bang: could not apply (%s) %s/%s --> %+v", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), obj)
 
 			// If error comes from nonexistent namespace print out a help message.
 			if obj.GroupVersionKind().Kind == "NetworkAttachmentDefinition" && strings.Contains(err.Error(), "namespaces") {
