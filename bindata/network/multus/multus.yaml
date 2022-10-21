@@ -428,7 +428,7 @@ spec:
             current-context: whereabouts-context
             EOF
 
-            # Kubeconfig file for Multus CNI plugin.
+            # Kubeconfig file for Whereabouts CNI plugin.
             cat > $WHEREABOUTS_GLOBALCONFIG <<EOF
             {
               "datastore": "kubernetes",
