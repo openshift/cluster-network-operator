@@ -13,7 +13,7 @@ spec:
   - interval: 5s
     port: metrics
     bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-    scheme: 'http'
+    scheme: 'https'
     tlsConfig:
       caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
       serverName: whereabouts.openshift-multus.svc
@@ -32,11 +32,13 @@ metadata:
   namespace: openshift-multus
   labels:
     app: whereabouts
+  annotations:
+    service.alpha.openshift.io/serving-cert-secret-name: whereabouts-secret
 spec:
   ports:
   - name: metrics
     port: 1984
-    targetPort: 1984
+    targetPort: https
   selector:
     app: whereabouts
 ---

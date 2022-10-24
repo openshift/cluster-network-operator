@@ -554,7 +554,8 @@ spec:
           - ./ip-control-loop
           - -log-level=verbose
           ports:
-          - containerPort: 1984
+          - name: metrics-port
+            containerPort: 1984
             protocol: TCP
           volumeMounts:
           - name: system-cni-dir
