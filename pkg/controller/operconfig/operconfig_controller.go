@@ -371,6 +371,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	// Apply the objects to the cluster
 	setDegraded := false
+	var degradedErr error
 	for _, obj := range objs {
 		// TODO: OwnerRef for non default clusters. For HyperShift this should probably be HostedControlPlane CR
 		if apply.GetClusterName(obj) == "" {
@@ -404,12 +405,13 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 				}
 			}
 			setDegraded = true
+			degradedErr = err
 		}
 	}
 
 	if setDegraded {
 		r.status.SetDegraded(statusmanager.OperatorConfig, "ApplyOperatorConfig",
-			fmt.Sprintf("Error while updating operator configuration: %v", err))
+			fmt.Sprintf("Error while updating operator configuration: %v", degradedErr))
 		return reconcile.Result{}, err
 	}
 
