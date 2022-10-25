@@ -382,22 +382,6 @@ spec:
                   if ! retry 60 "inactivity-probe" "ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_NB_INACTIVITY_PROBE}}"; then
                     exit 1
                   fi
-
-                  # Upgrade the db if required.
-                  DB_SCHEMA="/usr/share/ovn/ovn-nb.ovsschema"
-                  DB_SERVER="unix:/var/run/ovn/ovnnb_db.sock"
-                  schema_name=$(ovsdb-tool schema-name $DB_SCHEMA)
-                  db_version=$(ovsdb-client -t 10 get-schema-version "$DB_SERVER" "$schema_name")
-                  target_version=$(ovsdb-tool schema-version "$DB_SCHEMA")
-
-                  if ovsdb-tool compare-versions "$db_version" == "$target_version"; then
-                    :
-                  elif ovsdb-tool compare-versions "$db_version" ">" "$target_version"; then
-                      echo "Database $schema_name has newer schema version ($db_version) than our local schema ($target_version), possibly an upgrade is partially complete?"
-                  else
-                      echo "Upgrading database $schema_name from schema version $db_version to $target_version"
-                      ovsdb-client -t 30 convert "$DB_SERVER" "$DB_SCHEMA"
-                  fi
                 fi
 
                 # read the current northd_probe_interval from the DB
@@ -702,23 +686,6 @@ spec:
                   if ! retry 60 "inactivity-probe" "ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_CONTROLLER_INACTIVITY_PROBE}}"; then
                     exit 1
                   fi
-
-                  # Upgrade the db if required.
-                  DB_SCHEMA="/usr/share/ovn/ovn-sb.ovsschema"
-                  DB_SERVER="unix:/var/run/ovn/ovnsb_db.sock"
-                  schema_name=$(ovsdb-tool schema-name $DB_SCHEMA)
-                  db_version=$(ovsdb-client -t 10 get-schema-version "$DB_SERVER" "$schema_name")
-                  target_version=$(ovsdb-tool schema-version "$DB_SCHEMA")
-
-                  if ovsdb-tool compare-versions "$db_version" == "$target_version"; then
-                    :
-                  elif ovsdb-tool compare-versions "$db_version" ">" "$target_version"; then
-                      echo "Database $schema_name has newer schema version ($db_version) than our local schema ($target_version), possibly an upgrade is partially complete?"
-                  else
-                      echo "Upgrading database $schema_name from schema version $db_version to $target_version"
-                      ovsdb-client -t 30 convert "$DB_SERVER" "$DB_SCHEMA"
-                  fi
-                fi
 
                 # Kill some time while the cluster converges by checking IPsec status
                 OVN_SB_CTL="ovn-sbctl -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt --db "{{.OVN_SB_DB_LIST}}""
