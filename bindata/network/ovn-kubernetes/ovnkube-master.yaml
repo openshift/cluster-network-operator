@@ -304,6 +304,29 @@ spec:
                   sleep 2
                   done
                 fi
+                
+                # Remove the nbdb on schema downgrade
+                DB_SCHEMA="/usr/share/ovn/ovn-nb.ovsschema"
+                DB_SERVER="unix:/var/run/ovn/ovnnb_db.sock"
+                retries=0
+                while [[ "${retries}" -lt 10 ]]; do
+                  schema_name=$(ovsdb-tool schema-name $DB_SCHEMA)
+                  db_version=$(ovsdb-client -t 10 get-schema-version "$DB_SERVER" "$schema_name")
+                  if [[ $? != 0 ]]; then
+                    sleep 2
+                    (( retries += 1 ))
+                    continue
+                  fi
+                
+                  target_version=$(ovsdb-tool schema-version "$DB_SCHEMA")
+                  if ovsdb-tool compare-versions "$db_version" ">" "$target_version"; then
+                    # Schema conversion should happen in ovndbchecker
+                    echo "Removing nbdb database, schema is being downgraded from $db_version to $target_version"
+                    rm -f /etc/ovn/ovnnb_db.db"
+                  fi
+                  break
+                done
+                
                 #configure northd_probe_interval
                 OVN_NB_CTL="ovn-nbctl -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
                 --db "{{.OVN_NB_DB_LIST}}""
