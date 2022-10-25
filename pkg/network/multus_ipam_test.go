@@ -237,7 +237,6 @@ func TestRenderWithWhereabouts(t *testing.T) {
 	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "whereabouts-controlloop-deployment")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("PrometheusRule", "openshift-multus", "whereabouts-alert-rules")))
 }
 
 // TestRenderWithWhereabouts tests a rendering with the ip reconciler
@@ -251,7 +250,6 @@ func TestRenderWithWhereaboutsConflist(t *testing.T) {
 	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "whereabouts-controlloop-deployment")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("PrometheusRule", "openshift-multus", "whereabouts-alert-rules")))
 }
 
 // TestRenderNoIPAM tests a rendering WITHOUT an IPAM configured.
