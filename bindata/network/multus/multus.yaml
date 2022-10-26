@@ -522,7 +522,7 @@ spec:
           configMap:
             name: {{.CniSysctlAllowlist}}
             defaultMode: 0744
-{{if .RenderIpReconciler}}
+{{ if (eq .RenderIpReconciler true) }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -565,4 +565,4 @@ spec:
         - name: system-cni-dir
           hostPath:
             path: {{ .SystemCNIConfDir }}/whereabouts.d
-{{- end}}
+{{ end }}
