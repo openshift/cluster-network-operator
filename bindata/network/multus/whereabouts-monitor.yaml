@@ -34,13 +34,15 @@ metadata:
     app: whereabouts
   annotations:
     service.alpha.openshift.io/serving-cert-secret-name: whereabouts-secret
+    prometheus.io/scrape: "true"
 spec:
   ports:
   - name: metrics
-    port: 1984
+    port: 8443
     targetPort: https
   selector:
     app: whereabouts
+  type: ClusterIP
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -58,6 +60,13 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - get
+  - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
