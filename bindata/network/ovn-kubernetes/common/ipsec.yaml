@@ -207,13 +207,13 @@ spec:
           # Start the pluto IKE daemon
           /usr/libexec/ipsec/pluto --leak-detective --config /etc/ipsec.conf --logfile /var/log/openvswitch/libreswan.log
 
-          # Environment variables are for workaround for https://mail.openvswitch.org/pipermail/ovs-dev/2020-October/375734.html
-          # We now start ovs-monitor-ipsec which will monitor for changes in the ovs
+          # Start ovs-monitor-ipsec which will monitor for changes in the ovs
           # tunnelling configuration (for example addition of a node) and configures
           # libreswan appropriately.
-          OVS_LOGDIR=/var/log/openvswitch OVS_RUNDIR=/var/run/openvswitch OVS_PKGDATADIR=/usr/share/openvswitch /usr/share/openvswitch/scripts/ovs-ctl --ike-daemon=libreswan --no-restart-ike-daemon start-ovs-ipsec
-
-          sleep infinity
+          # We are running this in the foreground so that the container will be restarted when ovs-monitor-ipsec fails.
+          /usr/libexec/platform-python /usr/share/openvswitch/scripts/ovs-monitor-ipsec \
+            --pidfile=/var/run/openvswitch/ovs-monitor-ipsec.pid --ike-daemon=libreswan --no-restart-ike-daemon \
+            --log-file --monitor unix:/var/run/openvswitch/db.sock
         env:
         - name: K8S_NODE
           valueFrom:
@@ -236,27 +236,6 @@ spec:
             cpu: 10m
             memory: 100Mi
         terminationMessagePolicy: FallbackToLogsOnError
-        readinessProbe:
-          exec:
-            command:
-            - /bin/bash
-            - -c
-            - |
-              #!/bin/bash
-              ovs-appctl -t ovs-monitor-ipsec ipsec/status && ipsec status
-          initialDelaySeconds: 120
-          periodSeconds: 30
-          timeoutSeconds: 40
-        livenessProbe:
-          exec:
-            command:
-            - /bin/bash
-            - -c
-            - |
-              #!/bin/bash
-              ovs-appctl -t ovs-monitor-ipsec ipsec/status && ipsec status
-          initialDelaySeconds: 60
-          periodSeconds: 60
       nodeSelector:
         beta.kubernetes.io/os: "linux"
       terminationGracePeriodSeconds: 10
