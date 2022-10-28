@@ -508,8 +508,8 @@ spec:
           ip route show
           iptables -nvL
           iptables -nvL -t nat
-          oc observe pods -n openshift-ovn-kubernetes -l app=ovnkube-node -a '{ .status.hostIP }' -- /var/run/ovn/add_iptables.sh
-          #systemd-run -qPG -- oc observe pods -n openshift-ovn-kubernetes -l app=ovnkube-node -a '{ .status.hostIP }' -- /var/run/ovn/add_iptables.sh
+          oc observe pods -n openshift-ovn-kubernetes --listen-addr='' -l app=ovnkube-node -a '{ .status.hostIP }' -- /var/run/ovn/add_iptables.sh
+          #systemd-run -qPG -- oc observe pods -n openshift-ovn-kubernetes --listen-addr='' -l app=ovnkube-node -a '{ .status.hostIP }' -- /var/run/ovn/add_iptables.sh
         lifecycle:
           preStop:
             exec:
