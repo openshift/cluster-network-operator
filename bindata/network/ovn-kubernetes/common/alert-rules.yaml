@@ -33,8 +33,9 @@ spec:
           Networking is degraded on nodes when OVN controller is not connected to OVN southbound database connection. No networking control plane updates will be applied to the node.
       expr: |
         max_over_time(ovn_controller_southbound_database_connected[5m]) == 0
+      for: 10m
       labels:
-        severity: info
+        severity: warning
     - alert: OVNKubernetesNodePodAddError
       annotations:
         summary: OVN Kubernetes is experiencing pod creation errors at an elevated rate.
@@ -47,7 +48,7 @@ spec:
         > 0.1
       for: 15m
       labels:
-        severity: info
+        severity: warning
     - alert: OVNKubernetesNodePodDeleteError
       annotations:
         summary: OVN Kubernetes experiencing pod deletion errors at an elevated rate.
@@ -60,4 +61,4 @@ spec:
         > 0.1
       for: 15m
       labels:
-        severity: info
+        severity: warning

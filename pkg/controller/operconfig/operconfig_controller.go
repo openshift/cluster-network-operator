@@ -125,6 +125,9 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 		UpdateFunc: func(_ event.UpdateEvent) bool {
 			return false
 		},
+		DeleteFunc: func(_ event.DeleteEvent) bool {
+			return true
+		},
 	}
 	if err := c.Watch(
 		&source.Kind{Type: &corev1.Node{}},
