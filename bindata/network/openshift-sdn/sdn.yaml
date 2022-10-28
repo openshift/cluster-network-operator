@@ -310,7 +310,7 @@ spec:
           iptables -F AZURE_ICMP_ACTION
           iptables -A AZURE_ICMP_ACTION -j LOG
           iptables -A AZURE_ICMP_ACTION -j DROP
-          /host/usr/bin/oc observe pods -n openshift-sdn -l app=sdn -a '{ .status.hostIP }' -- /var/run/add_iptables.sh
+          /host/usr/bin/oc observe pods -n openshift-sdn --listen-addr='' -l app=sdn -a '{ .status.hostIP }' -- /var/run/add_iptables.sh
         lifecycle:
           preStop:
             exec:
