@@ -570,10 +570,17 @@ spec:
           ports:
             - containerPort: 8443
               name: https
+          volumeMounts:
+            - name: linuxptp-certs
+              mountPath: /etc/metrics
+              readOnly: True
       priorityClassName: openshift-user-critical
       serviceAccountName: multus
       volumes:
         - name: system-cni-dir
           hostPath:
             path: {{ .SystemCNIConfDir }}/whereabouts.d
+        - name: linuxptp-certs
+          secret: 
+            secretName: linuxptp-daemon-secret
 {{- end}}

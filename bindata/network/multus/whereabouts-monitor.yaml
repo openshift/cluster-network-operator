@@ -35,6 +35,7 @@ metadata:
   annotations:
     service.alpha.openshift.io/serving-cert-secret-name: whereabouts-secret
     prometheus.io/scrape: "true"
+    service.beta.openshift.io/serving-cert-secret-name: linuxptp-daemon-secret
 spec:
   ports:
   - name: metrics
