@@ -44,7 +44,7 @@ spec:
       containers:
       # ovn-northd: convert network objects in nbdb to flows in sbdb
       - name: northd
-        image: {{ .ReleaseImage.ovn_kubernetes }}
+        image: {{ .ReleaseImage.ovn_kubernetes_microshift }}
         command:
         - /bin/bash
         - -c
@@ -95,9 +95,9 @@ spec:
             memory: 10Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
-      # nbdb: the northbound, or logical network object DB. In standalone mode
+      # nbdb: the northbound, or logical network object DB. In raft mode
       - name: nbdb
-        image: {{ .ReleaseImage.ovn_kubernetes }}
+        image: {{ .ReleaseImage.ovn_kubernetes_microshift }}
         command:
         - /bin/bash
         - -c
@@ -199,8 +199,7 @@ spec:
                 echo "$(date -Iseconds) - nbdb stopped"
                 rm -f /var/run/ovn/ovnnb_db.pid
         readinessProbe:
-          timeoutSeconds: 10
-          periodSeconds: 600
+          timeoutSeconds: 5
           exec:
             command:
             - /bin/bash
@@ -208,7 +207,6 @@ spec:
             - |
               set -xeo pipefail
               /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
-              /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/compact 2>/dev/null
 
         env:
         - name: OVN_LOG_LEVEL
@@ -228,9 +226,9 @@ spec:
             memory: 10Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
-      # sbdb: The southbound, or flow DB. In standalone mode
+      # sbdb: The southbound, or flow DB. In raft mode
       - name: sbdb
-        image: {{ .ReleaseImage.ovn_kubernetes }}
+        image: {{ .ReleaseImage.ovn_kubernetes_microshift }}
         command:
         - /bin/bash
         - -c
@@ -301,8 +299,7 @@ spec:
                 echo "$(date -Iseconds) - sbdb stopped"
                 rm -f /var/run/ovn/ovnsb_db.pid
         readinessProbe:
-          timeoutSeconds: 10
-          periodSeconds: 600
+          timeoutSeconds: 5
           exec:
             command:
             - /bin/bash
@@ -310,8 +307,6 @@ spec:
             - |
               set -xeo pipefail
               /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
-              /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/compact 2>/dev/null
-
         env:
         - name: OVN_LOG_LEVEL
           value: info
@@ -330,7 +325,7 @@ spec:
 
       # ovnkube master: convert kubernetes objects in to nbdb logical network components
       - name: ovnkube-master
-        image: {{ .ReleaseImage.ovn_kubernetes }}
+        image: {{ .ReleaseImage.ovn_kubernetes_microshift }}
         command:
         - /bin/bash
         - -c
@@ -355,7 +350,15 @@ spec:
           ip6tables -t raw -A OUTPUT -p udp --dport 6081 -j NOTRACK
           echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node"
 
-          gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
+          gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
+
+          gw_interface_flag=
+          # if br-ex1 is configured on the node, we want to use it for external gateway traffic
+          if [ -d /sys/class/net/br-ex1 ]; then
+            gw_interface_flag="--exgw-interface=br-ex1"
+            # the functionality depends on ip_forwarding being enabled
+            sysctl net.ipv4.ip_forward=1
+          fi
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE} --init-node ${K8S_NODE}"
           exec /usr/bin/ovnkube \
@@ -364,6 +367,7 @@ spec:
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             ${gateway_mode_flags} \
+            ${gw_interface_flag} \
             --inactivity-probe="180000" \
             --nb-address "" \
             --sb-address "" \
