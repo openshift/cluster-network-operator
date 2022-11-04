@@ -88,6 +88,14 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
 		data.Data["ManagementClusterName"] = names.ManagementClusterName
 		data.Data["HostedClusterNamespace"] = hcpCfg.Namespace
+
+		// In HyperShift CloudNetworkConfigController is deployed as a part of the hosted cluster controlplane
+		// which means that it is created in the management cluster.
+		// CloudNetworkConfigController should use the proxy settings configured by hypershift controlplane operator
+		// on CNO deployment.
+		data.Data["HTTP_PROXY"] = os.Getenv("MGMT_HTTP_PROXY")
+		data.Data["HTTPS_PROXY"] = os.Getenv("MGMT_HTTPS_PROXY")
+		data.Data["NO_PROXY"] = os.Getenv("MGMT_NO_PROXY")
 		caOverride.ObjectMeta = metav1.ObjectMeta{
 			Namespace:   hcpCfg.Namespace,
 			Name:        "cloud-network-config-controller-kube-cloud-config",
