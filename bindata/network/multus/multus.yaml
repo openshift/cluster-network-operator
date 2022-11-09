@@ -140,27 +140,30 @@ spec:
       serviceAccountName: multus
       containers:
       - name: kube-multus
-        image: {{.MultusImage}}
+        # image: {{.MultusImage}}
+        image: ghcr.io/k8snetworkplumbingwg/multus-cni:snapshot-thick
         command: [ "/bin/bash", "-ec", "--" ]
         args:
           - >
             /entrypoint/cnibincopy.sh;
-            exec /entrypoint.sh
-            --multus-conf-file=auto
-            --multus-autoconfig-dir=/host/var/run/multus/cni/net.d
-            --multus-kubeconfig-file-host=/etc/kubernetes/cni/net.d/multus.d/multus.kubeconfig
+            exec /usr/src/multus-cni/bin/multus-daemon
+            -multus-conf-file=auto
+            -cni-config-dir=/host/etc/cni/net.d
+            -multus-autoconfig-dir=/host/var/run/multus/cni/net.d
+            -multus-kubeconfig-file-host=/etc/kubernetes/cni/net.d/multus.d/multus.kubeconfig
 {{- if eq .DefaultNetworkType "OpenShiftSDN"}}
-            --readiness-indicator-file=/var/run/multus/cni/net.d/80-openshift-network.conf
+            -readiness-indicator-file=/var/run/multus/cni/net.d/80-openshift-network.conf
 {{- else if eq .DefaultNetworkType "OVNKubernetes"}}
-            --readiness-indicator-file=/var/run/multus/cni/net.d/10-ovn-kubernetes.conf
+            -readiness-indicator-file=/var/run/multus/cni/net.d/10-ovn-kubernetes.conf
 {{- end}}
-            --cleanup-config-on-exit=true
-            --namespace-isolation=true
-            --multus-log-level=verbose
-            --cni-version=0.3.1
-            --additional-bin-dir=/opt/multus/bin
-            --skip-multus-binary-copy=true
-            - "--global-namespaces=default,openshift-multus,openshift-sriov-network-operator"
+            -cleanup-config-on-exit=true
+            -namespace-isolation=true
+            -multus-log-level=verbose
+            -cni-version=0.3.1
+            -additional-bin-dir=/opt/multus/bin
+            -multus-log-to-stderr=true
+            -skip-multus-binary-copy=true
+            - "-global-namespaces=default,openshift-multus,openshift-sriov-network-operator"
         resources:
           requests:
             cpu: 10m
@@ -178,6 +181,23 @@ spec:
           mountPath: /host/var/run/multus/cni/net.d
         - name: cnibin
           mountPath: /host/opt/cni/bin
+        - name: host-run
+          mountPath: /host/run
+        - name: host-var-lib-cni-multus
+          mountPath: /var/lib/cni/multus
+        - name: host-var-lib-kubelet
+          mountPath: /var/lib/kubelet
+        - name: host-run-k8s-cni-cncf-io
+          mountPath: /run/k8s.cni.cncf.io
+        - name: host-run-netns
+          mountPath: /run/netns
+          mountPropagation: HostToContainer
+        - name: multus-daemon-config
+          mountPath: /etc/cni/net.d/multus.d
+          readOnly: true
+        - name: hostroot
+          mountPath: /hostroot
+          mountPropagation: HostToContainer
         env:
         - name: RHEL7_SOURCE_DIRECTORY
           value: "/usr/src/multus-cni/rhel7/bin/"
@@ -223,6 +243,150 @@ spec:
           configMap:
             name: cni-copy-resources
             defaultMode: 0744
+        - name: hostroot
+          hostPath:
+            path: /
+        - name: multus-daemon-config
+          configMap:
+            name: multus-daemon-config
+            items:
+            - key: daemon-config.json
+              path: daemon-config.json
+        - name: host-run
+          hostPath:
+            path: /run
+        - name: host-var-lib-cni-multus
+          hostPath:
+            path: /var/lib/cni/multus
+        - name: host-var-lib-kubelet
+          hostPath:
+            path: /var/lib/kubelet
+        - name: host-run-k8s-cni-cncf-io
+          hostPath:
+            path: /run/k8s.cni.cncf.io
+        - name: host-run-netns
+          hostPath:
+            path: /run/netns/
+# ---
+# kind: DaemonSet
+# apiVersion: apps/v1
+# metadata:
+#   name: multus
+#   namespace: openshift-multus
+#   annotations:
+#     kubernetes.io/description: |
+#       This daemon set launches the Multus networking component on each node.
+#     release.openshift.io/version: "{{.ReleaseVersion}}"
+# spec:
+#   selector:
+#     matchLabels:
+#       app: multus
+#   updateStrategy:
+#     type: RollingUpdate
+#     rollingUpdate:
+#       maxUnavailable: 10%
+#   template:
+#     metadata:
+#       annotations:
+#         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+#       labels:
+#         app: multus
+#         component: network
+#         type: infra
+#         openshift.io/component: network
+#     spec:
+#       hostNetwork: true
+#       nodeSelector:
+#         kubernetes.io/os: linux
+#       priorityClassName: "system-node-critical"
+#       tolerations:
+#       - operator: Exists
+#       serviceAccountName: multus
+#       containers:
+#       - name: kube-multus
+#         image: {{.MultusImage}}
+#         command: [ "/bin/bash", "-ec", "--" ]
+#         args:
+#           - >
+#             /entrypoint/cnibincopy.sh;
+#             exec /entrypoint.sh
+#             --multus-conf-file=auto
+#             --multus-autoconfig-dir=/host/var/run/multus/cni/net.d
+#             --multus-kubeconfig-file-host=/etc/kubernetes/cni/net.d/multus.d/multus.kubeconfig
+# {{- if eq .DefaultNetworkType "OpenShiftSDN"}}
+#             --readiness-indicator-file=/var/run/multus/cni/net.d/80-openshift-network.conf
+# {{- else if eq .DefaultNetworkType "OVNKubernetes"}}
+#             --readiness-indicator-file=/var/run/multus/cni/net.d/10-ovn-kubernetes.conf
+# {{- end}}
+#             --cleanup-config-on-exit=true
+#             --namespace-isolation=true
+#             --multus-log-level=verbose
+#             --cni-version=0.3.1
+#             --additional-bin-dir=/opt/multus/bin
+#             --skip-multus-binary-copy=true
+#             - "--global-namespaces=default,openshift-multus,openshift-sriov-network-operator"
+#         resources:
+#           requests:
+#             cpu: 10m
+#             memory: 65Mi
+#         securityContext:
+#           privileged: true
+#         volumeMounts:
+#         - mountPath: /entrypoint
+#           name: cni-binary-copy
+#         - mountPath: /host/etc/os-release
+#           name: os-release
+#         - name: system-cni-dir
+#           mountPath: /host/etc/cni/net.d
+#         - name: multus-cni-dir
+#           mountPath: /host/var/run/multus/cni/net.d
+#         - name: cnibin
+#           mountPath: /host/opt/cni/bin
+#         env:
+#         - name: RHEL7_SOURCE_DIRECTORY
+#           value: "/usr/src/multus-cni/rhel7/bin/"
+#         - name: RHEL8_SOURCE_DIRECTORY
+#           value: "/usr/src/multus-cni/rhel8/bin/"
+#         - name: DEFAULT_SOURCE_DIRECTORY
+#           value: "/usr/src/multus-cni/bin/"
+#         - name: KUBERNETES_SERVICE_PORT
+#           value: "{{.KUBERNETES_SERVICE_PORT}}"
+#         - name: KUBERNETES_SERVICE_HOST
+#           value: "{{.KUBERNETES_SERVICE_HOST}}"
+# {{ if .HTTP_PROXY }}
+#         - name: "HTTP_PROXY"
+#           value: "{{ .HTTP_PROXY}}"
+# {{ end }}
+# {{ if .HTTPS_PROXY }}
+#         - name: "HTTPS_PROXY"
+#           value: "{{ .HTTPS_PROXY}}"
+# {{ end }}
+# {{ if .NO_PROXY }}
+#         - name: "NO_PROXY"
+#           value: "{{ .NO_PROXY}}"
+# {{ end }}
+#       terminationGracePeriodSeconds: 10
+#       volumes:
+#         - name: system-cni-dir
+#           hostPath:
+#             path: {{ .SystemCNIConfDir }}
+#             type: Directory
+#         - name: multus-cni-dir
+#           hostPath:
+#             path: {{ .MultusCNIConfDir }}
+#             type: Directory
+#         - name: cnibin
+#           hostPath:
+#             path: {{ .CNIBinDir }}
+#             type: Directory
+#         - name: os-release
+#           hostPath:
+#             path: /etc/os-release
+#             type: File
+#         - name: cni-binary-copy
+#           configMap:
+#             name: cni-copy-resources
+#             defaultMode: 0744
 ---
 kind: DaemonSet
 apiVersion: apps/v1
