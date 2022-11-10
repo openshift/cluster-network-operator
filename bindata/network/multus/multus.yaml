@@ -82,10 +82,11 @@ data:
     fi
 
     # Use a subdirectory called "upgrade" so we can atomically move fully copied files.
+    # We now use --remove-destination after running into an issue with -f not working over symlinks
     UPGRADE_DIRECTORY=${DESTINATION_DIRECTORY}upgrade_$(uuidgen)
     rm -Rf $UPGRADE_DIRECTORY
     mkdir -p $UPGRADE_DIRECTORY
-    cp -rf ${sourcedir}* $UPGRADE_DIRECTORY
+    cp -r --remove-destination ${sourcedir}* $UPGRADE_DIRECTORY
     if [ $? -eq 0 ]; then
       log "Successfully copied files in ${sourcedir} to $UPGRADE_DIRECTORY"
     else
