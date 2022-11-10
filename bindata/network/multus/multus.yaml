@@ -522,7 +522,7 @@ spec:
           configMap:
             name: {{.CniSysctlAllowlist}}
             defaultMode: 0744
-{{ if (eq .RenderIpReconciler true) }}
+{{if .RenderIpReconciler}}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -554,15 +554,34 @@ spec:
           - ./ip-control-loop
           - -log-level=verbose
           ports:
-          - containerPort: 1984
-            protocol: TCP
+          - name: metrics-port
+            containerPort: 1984
           volumeMounts:
           - name: system-cni-dir
             mountPath: /host/etc/cni/net.d/whereabouts.d/
+        - name: kube-rbac-proxy
+          image: quay.io/coreos/kube-rbac-proxy:v0.5.0
+          args:
+            - --logtostderr
+            - --secure-listen-address=:8443
+            - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+            - --upstream=http://127.0.0.1:1984/
+            - --tls-private-key-file=/etc/metrics/tls.key
+            - --tls-cert-file=/etc/metrics/tls.crt
+          ports:
+            - containerPort: 8443
+              name: https
+          volumeMounts:
+            - name: whereabouts-cert
+              mountPath: /etc/metrics
+              readOnly: True
       priorityClassName: openshift-user-critical
       serviceAccountName: multus
       volumes:
         - name: system-cni-dir
           hostPath:
             path: {{ .SystemCNIConfDir }}/whereabouts.d
-{{ end }}
+        - name: whereabouts-cert
+          secret: 
+            secretName: whereabouts-secret
+{{- end}}
