@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -624,9 +625,17 @@ func getDisableUDPAggregation(cl crclient.Reader) bool {
 	disableUDPAggregation := cm.Data["disable-udp-aggregation"]
 	if disableUDPAggregation == "true" {
 		return true
+	} else if disableUDPAggregation == "false" {
+		return false
 	} else {
 		klog.Warningf("Ignoring unexpected udp-aggregation-config override value disable-udp-aggregation=%q", disableUDPAggregation)
 	}
+
+	// Disable on s390x because it sometimes doesn't work there; see OCPBUGS-2532
+	if goruntime.GOARCH == "s390x" {
+		return true
+	}
+
 	return false
 }
 
