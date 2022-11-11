@@ -8,6 +8,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	targetNodeLabelName = "target-node"
+	sourceNodeLabelName = "source-node"
+)
+
 // new PodNetworkConnectivityCheck whose name is '$(SOURCE)-to-$(TARGET)'.
 // Use the WithSource and WithTarget option funcs to replace the '$(SOURCE)' and '$(TARGET)' tokens.
 func NewPodNetworkConnectivityCheckTemplate(address, namespace string, options ...func(*v1alpha1.PodNetworkConnectivityCheck)) *v1alpha1.PodNetworkConnectivityCheck {
@@ -47,5 +52,29 @@ func WithSource(source string) func(*v1alpha1.PodNetworkConnectivityCheck) {
 func WithTarget(target string) func(*v1alpha1.PodNetworkConnectivityCheck) {
 	return func(check *v1alpha1.PodNetworkConnectivityCheck) {
 		check.Name = strings.Replace(check.Name, "$(TARGET)", target, -1)
+	}
+}
+
+// WithTargetNode option sets target node name in the label.
+func WithTargetNode(node string) func(*v1alpha1.PodNetworkConnectivityCheck) {
+	return func(check *v1alpha1.PodNetworkConnectivityCheck) {
+		pnccLabels := check.Labels
+		if pnccLabels == nil {
+			pnccLabels = map[string]string{}
+		}
+		pnccLabels[targetNodeLabelName] = node
+		check.Labels = pnccLabels
+	}
+}
+
+// WithSourceNode option sets source node name in the label.
+func WithSourceNode(node string) func(*v1alpha1.PodNetworkConnectivityCheck) {
+	return func(check *v1alpha1.PodNetworkConnectivityCheck) {
+		pnccLabels := check.Labels
+		if pnccLabels == nil {
+			pnccLabels = map[string]string{}
+		}
+		pnccLabels[sourceNodeLabelName] = node
+		check.Labels = pnccLabels
 	}
 }

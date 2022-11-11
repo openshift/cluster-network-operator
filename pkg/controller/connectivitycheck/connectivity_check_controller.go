@@ -28,6 +28,7 @@ import (
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
@@ -71,11 +72,14 @@ func NewNetworkConnectivityCheckController(
 				kubeInformersForNamespaces.InformersFor("openshift-kube-apiserver").Core().V1().Services().Informer(),
 				kubeInformersForNamespaces.InformersFor("openshift-apiserver").Core().V1().Endpoints().Informer(),
 				kubeInformersForNamespaces.InformersFor("openshift-apiserver").Core().V1().Services().Informer(),
+				kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Informer(),
 				configInformers.Config().V1().Infrastructures().Informer(),
 			},
 			recorder,
 			true,
 		),
+		operatorcontrolplaneClient: operatorcontrolplaneClient,
+		nodeLister:                 kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Lister(),
 	}
 	generator := &connectivityCheckTemplateProvider{
 		operatorClient:                    operatorClient,
@@ -96,6 +100,46 @@ func NewNetworkConnectivityCheckController(
 
 type networkConnectivityCheckController struct {
 	connectivitycheckcontroller.ConnectivityCheckController
+	operatorcontrolplaneClient *operatorcontrolplaneclient.Clientset
+	nodeLister                 corev1listers.NodeLister
+}
+
+func (c *networkConnectivityCheckController) Sync(ctx context.Context, syncContext factory.SyncContext) error {
+	err := c.ConnectivityCheckController.Sync(ctx, syncContext)
+	if err != nil {
+		syncContext.Recorder().Warningf("SyncFailure", "connectivity check controller sync failed: %v", err)
+		return err
+	}
+	checks, err := c.operatorcontrolplaneClient.ControlplaneV1alpha1().PodNetworkConnectivityChecks("openshift-network-diagnostics").List(ctx, metav1.ListOptions{})
+	if err != nil {
+		syncContext.Recorder().Warningf("SyncFailure", "failed to list pod network connectivity checks: %v", err)
+		return err
+	}
+	nodesStr := sets.NewString()
+	nodes, err := c.nodeLister.List(labels.Everything())
+	if err != nil {
+		syncContext.Recorder().Warningf("SyncFailure", "failed to list nodes: %v", err)
+		return err
+	}
+	for _, node := range nodes {
+		nodesStr.Insert(node.Name)
+	}
+	for _, check := range checks.Items {
+		if sourceNode, ok := check.Labels[sourceNodeLabelName]; ok && !nodesStr.Has(sourceNode) {
+			err := c.operatorcontrolplaneClient.ControlplaneV1alpha1().PodNetworkConnectivityChecks("openshift-network-diagnostics").Delete(ctx, check.Name, metav1.DeleteOptions{})
+			if err != nil {
+				syncContext.Recorder().Warningf("SyncFailure", "failed to delete stale pod network connectivity check: %v", err)
+				return err
+			}
+		} else if targetNode, ok := check.Labels[targetNodeLabelName]; ok && !nodesStr.Has(targetNode) {
+			err := c.operatorcontrolplaneClient.ControlplaneV1alpha1().PodNetworkConnectivityChecks("openshift-network-diagnostics").Delete(ctx, check.Name, metav1.DeleteOptions{})
+			if err != nil {
+				syncContext.Recorder().Warningf("SyncFailure", "failed to delete stale pod network connectivity check: %v", err)
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 type connectivityCheckTemplateProvider struct {
@@ -148,31 +192,55 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 			// network-checker pod hasn't been assigned a node yet, skip
 			continue
 		}
-		var node *v1.Node
-		var ok bool
-		if node, ok = nodes[pod.Spec.NodeName]; !ok {
-			var err error
-			node, err = c.nodeLister.Get(pod.Spec.NodeName)
-			if err != nil {
-				return nil, err
-			}
-			nodes[node.Name] = node
+		sourceNode, err := c.getNode(nodes, pod.Spec.NodeName)
+		if err != nil {
+			return nil, err
 		}
 		for _, template := range templates {
 			check := template.DeepCopy()
 			WithSource("network-check-source-" + strings.Split(pod.Spec.NodeName, ".")[0])(check)
+			WithSourceNode(pod.Spec.NodeName)(check)
 			check.Spec.SourcePod = pod.Name
-			nodeRef := metav1.OwnerReference{
+			sourceNodeRef := metav1.OwnerReference{
 				APIVersion: "v1",
 				Kind:       "Node",
-				UID:        node.GetUID(),
-				Name:       node.GetName(),
+				UID:        sourceNode.GetUID(),
+				Name:       sourceNode.GetName(),
 			}
-			check.SetOwnerReferences(append(check.GetOwnerReferences(), nodeRef))
+			ownerRefs := check.GetOwnerReferences()
+			ownerRefs = append(ownerRefs, sourceNodeRef)
+			if targetNodeName, ok := template.Labels[targetNodeLabelName]; ok {
+				targetNode, err := c.getNode(nodes, targetNodeName)
+				if err != nil {
+					return nil, err
+				}
+				targetNodeRef := metav1.OwnerReference{
+					APIVersion: "v1",
+					Kind:       "Node",
+					UID:        targetNode.GetUID(),
+					Name:       targetNode.GetName(),
+				}
+				ownerRefs = append(ownerRefs, targetNodeRef)
+			}
+			check.SetOwnerReferences(ownerRefs)
 			checks = append(checks, check)
 		}
 	}
 	return checks, nil
+}
+
+func (c *connectivityCheckTemplateProvider) getNode(nodeCache map[string]*v1.Node, nodeName string) (*v1.Node, error) {
+	var node *v1.Node
+	var ok bool
+	if node, ok = nodeCache[nodeName]; !ok {
+		var err error
+		node, err = c.nodeLister.Get(nodeName)
+		if err != nil {
+			return nil, err
+		}
+		nodeCache[node.Name] = node
+	}
+	return node, nil
 }
 
 func (c *connectivityCheckTemplateProvider) getTemplatesForKubernetesDefaultServiceCheck(recorder events.Recorder) []*v1alpha1.PodNetworkConnectivityCheck {
@@ -221,7 +289,8 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForKubernetesServiceEndp
 	}
 
 	for _, address := range addresses {
-		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(net.JoinHostPort(address.hostName, address.port), "openshift-network-diagnostics", withTarget("kubernetes-apiserver-endpoint", strings.Split(address.nodeName, ".")[0])))
+		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(net.JoinHostPort(address.hostName, address.port), "openshift-network-diagnostics",
+			withTarget("kubernetes-apiserver-endpoint", strings.Split(address.nodeName, ".")[0]), WithTargetNode(address.nodeName)))
 	}
 	return templates
 }
@@ -285,7 +354,8 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForOpenShiftAPIServerSer
 	}
 	for _, address := range addresses {
 		targetEndpoint := net.JoinHostPort(address.hostName, address.port)
-		templates = append(templates, connectivitycheckcontroller.NewPodNetworkConnectivityCheckTemplate(targetEndpoint, "openshift-network-diagnostics", withTarget("openshift-apiserver-endpoint", strings.Split(address.nodeName, ".")[0])))
+		templates = append(templates, connectivitycheckcontroller.NewPodNetworkConnectivityCheckTemplate(targetEndpoint, "openshift-network-diagnostics",
+			withTarget("openshift-apiserver-endpoint", strings.Split(address.nodeName, ".")[0]), WithTargetNode(address.nodeName)))
 	}
 	return templates
 }
@@ -324,7 +394,8 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForGenericPodServiceEndp
 	}
 
 	for _, address := range addresses {
-		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(net.JoinHostPort(address.hostName, address.port), "openshift-network-diagnostics", withTarget("network-check-target", strings.Split(address.nodeName, ".")[0])))
+		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(net.JoinHostPort(address.hostName, address.port), "openshift-network-diagnostics",
+			withTarget("network-check-target", strings.Split(address.nodeName, ".")[0]), WithTargetNode(address.nodeName)))
 	}
 	return templates
 }
