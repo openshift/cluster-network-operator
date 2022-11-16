@@ -150,7 +150,7 @@ spec:
           readOnly: true
           mountPropagation: HostToContainer
         - name: host-var-run-netns
-          mountPath: /host/var/run/netns
+          mountPath: /var/run/netns
           mountPropagation: HostToContainer
           readOnly: true
         # We mount our socket here
