@@ -26,6 +26,9 @@ metadata:
     kubernetes.io/description: |
       This daemonset launches the ovn-kubernetes controller (master) networking components.
     release.openshift.io/version: "{{.ReleaseVersion}}"
+  labels:
+    # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
+    hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
 spec:
   podManagementPolicy: Parallel
   selector:
@@ -65,6 +68,14 @@ spec:
               matchLabels:
                 app: ovnkube-master
             topologyKey: topology.kubernetes.io/zone
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+                topologyKey: kubernetes.io/hostname
       priorityClassName: hypershift-api-critical
       initContainers:
       # Remove once https://github.com/kubernetes/kubernetes/issues/85966 is addressed
