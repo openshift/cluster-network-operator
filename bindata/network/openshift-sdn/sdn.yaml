@@ -130,10 +130,9 @@ spec:
           readOnly: true
         - mountPath: /env
           name: env-overrides
-        # Mount the entire run directory for socket access for Docker or CRI-o
-        # TODO: remove
-        - mountPath: /var/run
-          name: host-var-run
+        # Mount CRI-o run directory for socket access
+        - mountPath: /var/run/crio
+          name: host-var-run-crio
         # Run directories where we need to be able to access sockets
         - mountPath: /var/run/dbus/
           name: host-var-run-dbus
@@ -149,10 +148,6 @@ spec:
           name: host-run-netns
           readOnly: true
           mountPropagation: HostToContainer
-        - name: host-var-run-netns
-          mountPath: /host/var/run/netns
-          mountPropagation: HostToContainer
-          readOnly: true
         # We mount our socket here
         - mountPath: /var/run/openshift-sdn
           name: host-var-run-openshift-sdn
@@ -350,16 +345,12 @@ spec:
       - name: host-modules
         hostPath:
           path: /lib/modules
-      # TODO: access to the docker socket should be replaced by CRI socket
-      - name: host-var-run
+      - name: host-var-run-crio
         hostPath:
-          path: /var/run
+          path: /var/run/crio
       - name: host-run-netns
         hostPath:
           path: /run/netns
-      - name: host-var-run-netns
-        hostPath:
-          path: /var/run/netns
       - name: host-var-run-dbus
         hostPath:
           path: /var/run/dbus
