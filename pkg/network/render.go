@@ -211,6 +211,7 @@ func Validate(conf *operv1.NetworkSpec) error {
 	errs = append(errs, validateDefaultNetwork(conf)...)
 	errs = append(errs, validateMultus(conf)...)
 	errs = append(errs, validateKubeProxy(conf)...)
+	errs = append(errs, validateMigration(conf)...)
 
 	if len(errs) > 0 {
 		return errors.Errorf("invalid configuration: %v", errs)
@@ -495,6 +496,14 @@ func validateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 	}
 }
 
+// validateMigration validates if migration path is possible
+func validateMigration(conf *operv1.NetworkSpec) []error {
+	if conf.DefaultNetwork.Type == operv1.NetworkTypeKuryr && conf.Migration != nil && conf.Migration.NetworkType != string(operv1.NetworkTypeOVNKubernetes) {
+		return []error{errors.Errorf("when migrating from Kuryr only OVNKubernetes is supported as a target. Currently set %v", conf.Migration.NetworkType)}
+	}
+	return []error{}
+}
+
 // renderDefaultNetwork generates the manifests corresponding to the requested
 // default network
 func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, bool, error) {
@@ -520,7 +529,7 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 // and generates OVNKubernetes CRDs when default network is OpenShiftSDN.
 func renderCRDForMigration(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	switch conf.DefaultNetwork.Type {
-	case operv1.NetworkTypeOpenShiftSDN:
+	case operv1.NetworkTypeOpenShiftSDN, operv1.NetworkTypeKuryr:
 		manifests, err := render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/common/001-crd.yaml"), &render.RenderData{})
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to render OVNKubernetes CRDs")
