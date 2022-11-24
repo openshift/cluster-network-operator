@@ -427,18 +427,21 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		if migration.Features == nil || migration.Features.EgressFirewall {
 			err = migrateEgressFirewallCRs(ctx, operConfig, r.client)
 			if err != nil {
+				log.Printf("Could not migrate EgressFirewall CRs: %v", err)
 				return reconcile.Result{}, err
 			}
 		}
 		if migration.Features == nil || migration.Features.Multicast {
 			err = migrateMulticastEnablement(ctx, operConfig, r.client)
 			if err != nil {
+				log.Printf("Could not migrate Multicast settings: %v", err)
 				return reconcile.Result{}, err
 			}
 		}
 		if migration.Features == nil || migration.Features.EgressIP {
 			err = migrateEgressIpCRs(ctx, operConfig, r.client)
 			if err != nil {
+				log.Printf("Could not migrate EgressIP CRs: %v", err)
 				return reconcile.Result{}, err
 			}
 		}
