@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	SystemCNIConfDir = "/etc/kubernetes/cni/net.d"
-	MultusCNIConfDir = "/var/run/multus/cni/net.d"
-	CNIBinDir        = "/var/lib/cni/bin"
+	SystemCNIConfDir      = "/etc/kubernetes/cni/net.d"
+	MultusCNIConfDir      = "/var/run/multus/cni/net.d"
+	CNIBinDir             = "/var/lib/cni/bin"
+	MultusSocketParentDir = "/var/run/multus-socket"
 )
 
 // renderMultus generates the manifests of Multus
@@ -71,6 +72,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 	data.Data["MultusCNIConfDir"] = MultusCNIConfDir
 	data.Data["SystemCNIConfDir"] = SystemCNIConfDir
 	data.Data["DefaultNetworkType"] = defaultNetworkType
+	data.Data["MultusSocketParentDir"] = MultusSocketParentDir
 	data.Data["CNIBinDir"] = CNIBinDir
 	data.Data["CniSysctlAllowlist"] = "default-cni-sysctl-allowlist"
 	data.Data["HTTP_PROXY"] = ""

@@ -104,6 +104,27 @@ data:
     fi
     rm -Rf $UPGRADE_DIRECTORY
 ---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: multus-daemon-config
+  namespace: openshift-multus
+  labels:
+    tier: node
+    app: multus
+data:
+  daemon-config.json: |
+    {
+        "chrootDir": "/hostroot",
+        "confDir": "/host/etc/cni/net.d",
+        "logToStderr": true,
+        "logLevel": "debug",
+        "logFile": "/tmp/multus.log",
+        "binDir": "{{ .CNIBinDir }}",
+        "cniDir": "/var/lib/cni/multus",
+        "socketDir": "/host{{ .MultusSocketParentDir }}/socket"
+    }
+---
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
@@ -141,28 +162,32 @@ spec:
       containers:
       - name: kube-multus
         # image: {{.MultusImage}}
-        image: ghcr.io/k8snetworkplumbingwg/multus-cni:snapshot-thick
+        image: quay.io/dosmith/multus-thick:gen10
         command: [ "/bin/bash", "-ec", "--" ]
+        # Where does this go?
+        # -multus-kubeconfig-file-host=/etc/kubernetes/cni/net.d/multus.d/multus.kubeconfig
+        # -cleanup-config-on-exit=true
+        # 
+        # -multus-conf-file=auto
+        # -skip-multus-binary-copy=true
+        # -additional-bin-dir=/opt/multus/bin
         args:
           - >
             /entrypoint/cnibincopy.sh;
-            exec /usr/src/multus-cni/bin/multus-daemon
-            -multus-conf-file=auto
+            exec /usr/src/multus-cni/bin/multus-daemon  
             -cni-config-dir=/host/etc/cni/net.d
             -multus-autoconfig-dir=/host/var/run/multus/cni/net.d
-            -multus-kubeconfig-file-host=/etc/kubernetes/cni/net.d/multus.d/multus.kubeconfig
 {{- if eq .DefaultNetworkType "OpenShiftSDN"}}
-            -readiness-indicator-file=/var/run/multus/cni/net.d/80-openshift-network.conf
+            -readiness-indicator-file=/host/var/run/multus/cni/net.d/80-openshift-network.conf
 {{- else if eq .DefaultNetworkType "OVNKubernetes"}}
-            -readiness-indicator-file=/var/run/multus/cni/net.d/10-ovn-kubernetes.conf
+            -readiness-indicator-file=/host/var/run/multus/cni/net.d/10-ovn-kubernetes.conf
 {{- end}}
-            -cleanup-config-on-exit=true
             -namespace-isolation=true
-            -multus-log-level=verbose
-            -cni-version=0.3.1
-            -additional-bin-dir=/opt/multus/bin
+            -multus-log-level=debug
+            -multus-log-file=/tmp/multus.log
             -multus-log-to-stderr=true
-            -skip-multus-binary-copy=true
+            -cni-version=0.3.1
+            -socket-dir={{ .MultusSocketParentDir }}/socket
             - "-global-namespaces=default,openshift-multus,openshift-sriov-network-operator"
         resources:
           requests:
@@ -179,6 +204,8 @@ spec:
           mountPath: /host/etc/cni/net.d
         - name: multus-cni-dir
           mountPath: /host/var/run/multus/cni/net.d
+        - name: multus-socket-dir-parent
+          mountPath: /host/var/run/multus-socket
         - name: cnibin
           mountPath: /host/opt/cni/bin
         - name: host-run
@@ -190,7 +217,7 @@ spec:
         - name: host-run-k8s-cni-cncf-io
           mountPath: /run/k8s.cni.cncf.io
         - name: host-run-netns
-          mountPath: /run/netns
+          mountPath: /var/run/netns
           mountPropagation: HostToContainer
         - name: multus-daemon-config
           mountPath: /etc/cni/net.d/multus.d
@@ -235,6 +262,10 @@ spec:
           hostPath:
             path: {{ .CNIBinDir }}
             type: Directory
+        - name: multus-socket-dir-parent
+          hostPath:
+            path: {{ .MultusSocketParentDir }}
+            type: DirectoryOrCreate
         - name: os-release
           hostPath:
             path: /etc/os-release
@@ -266,7 +297,7 @@ spec:
             path: /run/k8s.cni.cncf.io
         - name: host-run-netns
           hostPath:
-            path: /run/netns/
+            path: /var/run/netns/
 # ---
 # kind: DaemonSet
 # apiVersion: apps/v1
@@ -442,7 +473,8 @@ spec:
         - name: DEFAULT_SOURCE_DIRECTORY
           value: "/usr/src/egress-router-cni/bin/"
       - name: cni-plugins
-        image: {{.CNIPluginsImage}}
+        # image: {{.CNIPluginsImage}}
+        image: quay.io/dosmith/cni-plugins:gen6
         command: ["/bin/bash", "-c", "/entrypoint/cnibincopy.sh && cp -n /sysctls/allowlist.conf /host/etc/cni/tuning/"]
         volumeMounts:
         - mountPath: /entrypoint
