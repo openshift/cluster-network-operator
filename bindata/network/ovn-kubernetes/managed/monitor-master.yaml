@@ -1,5 +1,9 @@
 ---
+{{- if eq .RHOBSMonitoring "1" }}
+apiVersion: monitoring.rhobs/v1
+{{- else }}
 apiVersion: monitoring.coreos.com/v1
+{{- end }}
 kind: ServiceMonitor
 metadata:
   labels:
