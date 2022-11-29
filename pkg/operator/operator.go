@@ -3,18 +3,19 @@ package operator
 import (
 	"context"
 	"fmt"
-	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/network"
-	"k8s.io/apimachinery/pkg/types"
 
+	configv1 "github.com/openshift/api/config/v1"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller"
 	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
+	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/network"
 	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -60,11 +61,23 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	cluster := names.StandAloneClusterName
 	if hcp := network.NewHyperShiftConfig(); hcp.Enabled {
 		infraConfig := &configv1.Infrastructure{}
-		if err := o.client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
-			return fmt.Errorf("failed to get infrastructure 'cluster': %v", err)
+
+		err := retry.OnError(retry.DefaultBackoff, func(error) bool { return true }, func() error {
+			if err := o.client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
+				return fmt.Errorf("failed to get infrastructure 'cluster': %v", err)
+			}
+			if infraConfig.Status.InfrastructureName == "" {
+				return fmt.Errorf("infrastructureName not set in infrastructure 'cluster'")
+			}
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get infrastructure name: %v", err)
 		}
 		cluster = infraConfig.Status.InfrastructureName
 	}
+
+	klog.Info("Creating status manager for %s cluster", cluster)
 	o.StatusManager = statusmanager.New(o.client, "network", cluster)
 
 	// Add controller-runtime controllers
