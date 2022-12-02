@@ -1546,10 +1546,9 @@ func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 func statefulSetProgressing(ss *appsv1.StatefulSet) bool {
 	status := ss.Status
 
-	// Copy-pasted from status_manager: Determine if a DaemonSet is progressing
-	progressing := (status.ReadyReplicas < status.Replicas ||
-		status.AvailableReplicas == 0 ||
-		ss.Generation > status.ObservedGeneration)
+	progressing := status.UpdatedReplicas < status.Replicas ||
+		status.AvailableReplicas < status.Replicas ||
+		ss.Generation > status.ObservedGeneration
 
 	s := "progressing"
 	if !progressing {
