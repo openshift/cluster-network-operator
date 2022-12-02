@@ -997,8 +997,10 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}
 
 	// Update to report expected deployment size
+	depA.Status.Replicas = 1
+	depA.Status.UpdatedReplicas = depA.Status.Replicas
 	depA.Status.UnavailableReplicas = 0
-	depA.Status.AvailableReplicas = 1
+	depA.Status.AvailableReplicas = depA.Status.Replicas
 	set(t, client, depA)
 	status.SetFromPods()
 
@@ -1033,6 +1035,8 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depB := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "beta", Labels: sl},
 		Status: appsv1.DeploymentStatus{
+			Replicas:            1,
+			UpdatedReplicas:     1,
 			UnavailableReplicas: 1,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -1108,6 +1112,49 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		t.Fatalf("Didn't find %s in pod state", nsn)
 	}
 
+	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: depB.Namespace, Name: depB.Name}, depB)
+	if err != nil {
+		t.Fatalf("error getting Deployment: %v", err)
+	}
+
+	depB.Status.Replicas = 1
+	// UpdatedReplicas < Replicas indicates the deployment update is rolling out
+	depB.Status.UpdatedReplicas = depB.Status.Replicas - 1
+	depB.Status.UnavailableReplicas = 0
+	depB.Status.AvailableReplicas = depB.Status.Replicas
+
+	set(t, client, depB)
+	status.SetFromPods()
+
+	co, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	// We should still be Progressing, since deployment is being updated
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionTrue,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Status: operv1.ConditionTrue,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeAvailable,
+			Status: operv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
+	}
+
 	// intermission: set back last-seen times by an hour, see that we mark
 	// as hung
 	ps = getLastPodState(t, client, "testing")
@@ -1155,8 +1202,10 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		t.Fatalf("error getting Deployment: %v", err)
 	}
 
+	depB.Status.Replicas = 1
+	depB.Status.UpdatedReplicas = depB.Status.Replicas
 	depB.Status.UnavailableReplicas = 0
-	depB.Status.AvailableReplicas = 1
+	depB.Status.AvailableReplicas = depB.Status.Replicas
 	set(t, client, depB)
 	status.SetFromPods()
 
