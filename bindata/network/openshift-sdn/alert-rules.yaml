@@ -72,7 +72,7 @@ spec:
         summary: OpenShift SDN pod {{"{{"}} $labels.pod {{"}}"}} on node {{"{{"}} $labels.node {{"}}"}} is not ready.
         description: Network control plane configuration on the node could be degraded.
       expr: |
-        kube_pod_status_ready{namespace='openshift-sdn', condition='true'} == 0
+        sum by(pod, namespace) (kube_pod_status_ready{condition="true",namespace="openshift-sdn"}) * on(pod, namespace) group_right() kube_pod_info == 0
       for: 10m
       labels:
         severity: warning
