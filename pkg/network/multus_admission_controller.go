@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	hyperv1 "github.com/openshift/hypershift/api/v1alpha1"
 	"os"
 	"path/filepath"
 	"strings"
+
+	hyperv1 "github.com/openshift/hypershift/api/v1alpha1"
 
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
@@ -72,6 +73,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	data.Data["HyperShiftEnabled"] = hsc.Enabled
 	data.Data["ManagementClusterName"] = names.ManagementClusterName
 	data.Data["AdmissionControllerNamespace"] = "openshift-multus"
+	data.Data["RHOBSMonitoring"] = os.Getenv("RHOBS_MONITORING")
 	if hsc.Enabled {
 		data.Data["AdmissionControllerNamespace"] = hsc.Namespace
 		data.Data["KubernetesServiceHost"] = bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal].Host
