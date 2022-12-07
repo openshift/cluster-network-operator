@@ -310,6 +310,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		klog.Infof("OVN_EGRESSIP_HEALTHCHECK_PORT env var is not defined. Using: %s", reachability_node_port)
 	}
 	data.Data["ReachabilityNodePort"] = reachability_node_port
+	data.Data["RHOBSMonitoring"] = os.Getenv("RHOBS_MONITORING")
 
 	exportNetworkFlows := conf.ExportNetworkFlows
 	if exportNetworkFlows != nil {
