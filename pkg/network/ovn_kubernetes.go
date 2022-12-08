@@ -612,6 +612,13 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 }
 
 func getDisableUDPAggregation(cl crclient.Reader) bool {
+	// Disable on s390x because it sometimes doesn't work there; see OCPBUGS-2532
+	// It looks like the interfaces features cannot be set using the go ethtool for s390x.
+	// BZ: https://bugzilla.redhat.com/show_bug.cgi?id=2143567
+	if goruntime.GOARCH == "s390x" {
+		return true
+	}
+
 	cm := &corev1.ConfigMap{}
 	if err := cl.Get(context.TODO(), types.NamespacedName{
 		Namespace: "openshift-network-operator",
@@ -630,11 +637,6 @@ func getDisableUDPAggregation(cl crclient.Reader) bool {
 		return false
 	} else {
 		klog.Warningf("Ignoring unexpected udp-aggregation-config override value disable-udp-aggregation=%q", disableUDPAggregation)
-	}
-
-	// Disable on s390x because it sometimes doesn't work there; see OCPBUGS-2532
-	if goruntime.GOARCH == "s390x" {
-		return true
 	}
 
 	return false
