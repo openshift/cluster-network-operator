@@ -77,7 +77,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		cluster = infraConfig.Status.InfrastructureName
 	}
 
-	klog.Info("Creating status manager for %s cluster", cluster)
+	klog.Infof("Creating status manager for %s cluster", cluster)
 	o.StatusManager = statusmanager.New(o.client, "network", cluster)
 
 	// Add controller-runtime controllers

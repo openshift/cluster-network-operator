@@ -95,7 +95,7 @@ func (r EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			klog.Info("Egress Router %s seems to have been deleted\n", request.NamespacedName)
+			klog.Infof("Egress Router %s seems to have been deleted\n", request.NamespacedName)
 			return reconcile.Result{}, nil
 		}
 		klog.Error(err)
