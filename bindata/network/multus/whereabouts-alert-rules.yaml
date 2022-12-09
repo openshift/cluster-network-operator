@@ -16,6 +16,6 @@ spec:
       annotations:
         summary: Fake alert just to see if it makes a difference
       expr: |
-        1 == 1
+        1 == bool 1
       labels:
         severity: critical
