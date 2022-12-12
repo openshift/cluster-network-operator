@@ -612,6 +612,13 @@ func bootstrapOVNHyperShiftConfig(hc *HyperShiftConfig, kubeClient cnoclient.Cli
 }
 
 func getDisableUDPAggregation(cl crclient.Reader) bool {
+	disable := false
+
+	// Disable by default on s390x because it sometimes doesn't work there; see OCPBUGS-2532
+	if goruntime.GOARCH == "s390x" {
+		disable = true
+	}
+
 	cm := &corev1.ConfigMap{}
 	if err := cl.Get(context.TODO(), types.NamespacedName{
 		Namespace: "openshift-network-operator",
@@ -620,24 +627,19 @@ func getDisableUDPAggregation(cl crclient.Reader) bool {
 		if !apierrors.IsNotFound(err) {
 			klog.Warningf("Error fetching udp-aggregation-config configmap: %v", err)
 		}
-		return false
+		return disable
 	}
 
 	disableUDPAggregation := cm.Data["disable-udp-aggregation"]
 	if disableUDPAggregation == "true" {
-		return true
+		disable = true
 	} else if disableUDPAggregation == "false" {
-		return false
+		disable = false
 	} else {
 		klog.Warningf("Ignoring unexpected udp-aggregation-config override value disable-udp-aggregation=%q", disableUDPAggregation)
 	}
 
-	// Disable on s390x because it sometimes doesn't work there; see OCPBUGS-2532
-	if goruntime.GOARCH == "s390x" {
-		return true
-	}
-
-	return false
+	return disable
 }
 
 // bootstrapOVNConfig returns the value of mode found in the openshift-ovn-kubernetes/dpu-mode-config configMap
