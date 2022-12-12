@@ -42,7 +42,7 @@ function override_install_manifests() {
 function extract_environment_from_running_cluster() {
     if [[ ! -e "${CLUSTER_DIR}/env.sh" ]]; then
         echo "Copying environment variables from manifest to ${CLUSTER_DIR}/env.sh"
-        oc get deployment -n openshift-network-operator network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
+        oc get deployment -n openshift-network-operator network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' | grep -v URL_ONLY_KUBECONFIG > "${CLUSTER_DIR}/env.sh"
     fi
     if [[ $EXPORT_ENV_ONLY == true ]]; then
         exit 0
@@ -53,7 +53,7 @@ function extract_environment_from_running_cluster() {
 function extract_environment_from_manifests() {
     if [[ manifests/0000_70_cluster-network-operator_03_deployment.yaml -nt "${CLUSTER_DIR}/env.sh" ]]; then
         echo "Copying environment variables from manifest to ${CLUSTER_DIR}/env.sh"
-        oc --kubeconfig=hack/null-kubeconfig patch --local=true -f manifests/0000_70_cluster-network-operator_03_deployment.yaml -p '{}' -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
+        oc --kubeconfig=hack/null-kubeconfig patch --local=true -f manifests/0000_70_cluster-network-operator_03_deployment.yaml -p '{}' -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' | grep -v URL_ONLY_KUBECONFIG > "${CLUSTER_DIR}/env.sh"
     fi
 }
 

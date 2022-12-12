@@ -51,8 +51,7 @@ spec:
           if [[ -f /etc/kubernetes/apiserver-url.env ]]; then
             source /etc/kubernetes/apiserver-url.env
           else
-            echo "Error: /etc/kubernetes/apiserver-url.env is missing"
-            exit 1
+            URL_ONLY_KUBECONFIG=/etc/kubernetes/kubeconfig
           fi
           exec /usr/bin/cluster-network-operator start --listen=0.0.0.0:9104
         resources:
