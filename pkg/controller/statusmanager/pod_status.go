@@ -148,6 +148,9 @@ func (status *StatusManager) SetFromPods() {
 		if isNonCritical(ss) && ss.Status.ReadyReplicas == 0 && !status.installComplete {
 			progressing = append(progressing, fmt.Sprintf("StatefulSet %q is waiting for other operators to become ready", ssName.String()))
 			ssProgressing = true
+		} else if ss.Status.UpdatedReplicas < ss.Status.Replicas {
+			progressing = append(progressing, fmt.Sprintf("StatefulSet %q update is rolling out (%d out of %d updated)", ssName.String(), ss.Status.UpdatedReplicas, ss.Status.Replicas))
+			ssProgressing = true
 		} else if ss.Status.ReadyReplicas > 0 && ss.Status.ReadyReplicas < ss.Status.Replicas {
 			progressing = append(progressing, fmt.Sprintf("StatefulSet %q is not available (awaiting %d nodes)", ssName.String(), (ss.Status.Replicas-ss.Status.ReadyReplicas)))
 			ssProgressing = true
@@ -199,6 +202,9 @@ func (status *StatusManager) SetFromPods() {
 
 		if isNonCritical(dep) && dep.Status.UnavailableReplicas > 0 && !status.installComplete {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q is waiting for other operators to become ready", depName.String()))
+			depProgressing = true
+		} else if dep.Status.UpdatedReplicas < dep.Status.Replicas {
+			progressing = append(progressing, fmt.Sprintf("Deployment %q update is rolling out (%d out of %d updated)", depName.String(), dep.Status.UpdatedReplicas, dep.Status.Replicas))
 			depProgressing = true
 		} else if dep.Status.UnavailableReplicas > 0 {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q is not available (awaiting %d nodes)", depName.String(), dep.Status.UnavailableReplicas))
