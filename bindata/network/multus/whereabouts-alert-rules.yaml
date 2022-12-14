@@ -16,6 +16,6 @@ spec:
       annotations:
         summary: Fake alert just to see if it makes a difference
       expr: |
-        1 == bool 1
+        changes(reconciler_success_total[60s]) == 0 and reconciler_attempted > 0
       labels:
         severity: critical
