@@ -463,6 +463,7 @@ data:
         rightid=@$remote_name
         leftcert="ovs_certkey_$local_name"
         leftrsasigkey=%cert
+        auto=route
         rightca=%same""")}
     
         CERT_PREFIX = "ovs_cert_"
