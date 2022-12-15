@@ -463,7 +463,7 @@ data:
         rightid=@$remote_name
         leftcert="ovs_certkey_$local_name"
         leftrsasigkey=%cert
-        auto=route
+        auto=ondemand
         rightca=%same""")}
     
         CERT_PREFIX = "ovs_cert_"
@@ -726,7 +726,7 @@ data:
                 proc = subprocess.Popen([self.IPSEC, "auto",
                                         "--config", self.IPSEC_CONF,
                                         "--ctlsocket", self.IPSEC_CTL,
-                                        "--route",
+                                        "--ondemand",
                                         "--asynchronous", conn],
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE)
