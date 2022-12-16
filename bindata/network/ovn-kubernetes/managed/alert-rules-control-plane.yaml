@@ -89,7 +89,7 @@ spec:
         time() - max_over_time(ovnkube_master_nb_e2e_timestamp[5m]) > 120
       for: 10m
       labels:
-        severity: warning
+        severity: critical
     - alert: SouthboundStale
       annotations:
         summary: ovn-northd has not successfully synced any changes to the southbound DB for too long.
@@ -104,7 +104,7 @@ spec:
         max_over_time(ovnkube_master_nb_e2e_timestamp[5m]) - max_over_time(ovnkube_master_sb_e2e_timestamp[5m]) > 120
       for: 10m
       labels:
-        severity: warning
+        severity: critical
     - alert: OVNKubernetesNorthboundDatabaseClusterIDError
       annotations:
         summary: Multiple OVN northbound database cluster IDs exist.
