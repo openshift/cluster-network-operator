@@ -110,6 +110,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 
 	// Pods Network MTU
 	data.Data["PodsNetworkMTU"] = b.PodsNetworkMTU
+	c.MTU = &b.PodsNetworkMTU
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/kuryr"), &data)
 	if err != nil {
