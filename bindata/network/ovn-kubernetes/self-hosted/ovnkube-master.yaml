@@ -205,6 +205,16 @@ spec:
           }
           # end of cluster_exists()
 
+          # RAFT clusters need an odd number of members to achieve consensus.
+          # The CNO determines which members make up the cluster, so if this container
+          # is not supposed to be part of the cluster, wait forever doing nothing
+          # (instad of exiting and causing CrashLoopBackoffs for no reason).
+          if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
+            echo "$(date -Iseconds) - not selected as RAFT member; sleeping..."
+            sleep 1500d
+            exit 0
+          fi
+
           OVN_ARGS="--db-nb-cluster-local-port={{.OVN_NB_RAFT_PORT}} \
             --db-nb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
@@ -215,7 +225,6 @@ spec:
 
           CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
           echo "$(date -Iseconds) - starting nbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}, K8S_NODE_IP=${K8S_NODE_IP}"
-          initial_raft_create=true
           initialize="false"
           
           if [[ ! -e ${ovn_db_file} ]]; then
@@ -237,7 +246,6 @@ spec:
 
             if ${cluster_found}; then
               echo "Cluster already exists for DB: ${db}"
-              initial_raft_create=false
               # join existing cluster
               exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
               --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
@@ -292,19 +300,39 @@ spec:
                 set -x
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
                 rm -f /var/run/ovn/ovnnb_db.pid
+
+                # exit early if this DB is not supposed to be part of the cluster
+                if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
+                  exit 0
+                fi
+
+                # retry an operation a number of times, sleeping 2 seconds between each try
+                retry() {
+                  local tries=${1}
+                  local desc=${2}
+                  local cmd=${3}
+
+                  local retries=0
+                  while ! ${cmd}; do
+                    (( retries += 1 ))
+                    if [[ "${retries}" -gt ${tries} ]]; then
+                      echo "$(date -Iseconds) - ERROR - nbdb ${desc} - too many failed attempts, giving up"
+                      return 1
+                    fi
+                    echo "$(date -Iseconds) - WARN - nbdb ${desc} - failed try ${retries}, retrying..."
+                    sleep 2
+                  done
+                  echo "$(date -Iseconds) - INFO - nbdb ${desc} - success"
+                  return 0
+                }
+
                 if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - nbdb - postStart - waiting for master to be selected"
 
                   # set the connection and inactivity probe
-                  retries=0
-                  while ! ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_NB_INACTIVITY_PROBE}}; do
-                    (( retries += 1 ))
-                  if [[ "${retries}" -gt 40 ]]; then
-                    echo "$(date -Iseconds) - ERROR RESTARTING - nbdb - too many failed ovn-nbctl attempts, giving up"
-                      exit 1
+                  if ! retry 60 "inactivity-probe" "ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_NB_INACTIVITY_PROBE}}"; then
+                    exit 1
                   fi
-                  sleep 2
-                  done
 
                   # Upgrade the db if required.
                   DB_SCHEMA="/usr/share/ovn/ovn-nb.ovsschema"
@@ -322,14 +350,14 @@ spec:
                       ovsdb-client -t 30 convert "$DB_SERVER" "$DB_SCHEMA"
                   fi
                 fi
-                #configure northd_probe_interval
-                OVN_NB_CTL="ovn-nbctl -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
-                --db "{{.OVN_NB_DB_LIST}}""
+
+                # read the current northd_probe_interval from the DB
+                OVN_NB_CTL="ovn-nbctl -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt --db "{{.OVN_NB_DB_LIST}}""
                 northd_probe_interval=${OVN_NORTHD_PROBE_INTERVAL:-10000}
                 echo "Setting northd probe interval to ${northd_probe_interval} ms"
                 retries=0
                 current_probe_interval=0
-                while [[ "${retries}" -lt 10 ]]; do
+                while [[ "${retries}" -lt 20 ]]; do
                   current_probe_interval=$(${OVN_NB_CTL} --if-exists get NB_GLOBAL . options:northd_probe_interval)
                   if [[ $? == 0 ]]; then
                     current_probe_interval=$(echo ${current_probe_interval} | tr -d '\"')
@@ -340,26 +368,22 @@ spec:
                   fi
                 done
 
+                # ensure the northd_probe_interval is set to the configured value
                 if [[ "${current_probe_interval}" != "${northd_probe_interval}" ]]; then
-                  retries=0
-                  while [[ "${retries}" -lt 10 ]]; do
-                    ${OVN_NB_CTL} set NB_GLOBAL . options:northd_probe_interval=${northd_probe_interval}
-                    if [[ $? != 0 ]]; then
-                      echo "Failed to set northd probe interval to ${northd_probe_interval}. retrying....."
-                      sleep 2
-                      (( retries += 1 ))
-                    else
-                      echo "Successfully set northd probe interval to ${northd_probe_interval} ms"
-                      break
-                    fi
-                  done
+                  if ! retry 20 "northd-probe" "${OVN_NB_CTL} set NB_GLOBAL . options:northd_probe_interval=${northd_probe_interval}"; then
+                    exit 1
+                  fi
                 fi
 
+                # Enable/disable IPsec
                 {{ if .OVNIPsecEnable }}
-                ${OVN_NB_CTL} set nb_global . ipsec=true
+                ipsec=true
                 {{ else }}
-                ${OVN_NB_CTL} set nb_global . ipsec=false
+                ipsec=false
                 {{ end }}
+                if ! retry 20 "ipsec" "${OVN_NB_CTL} set nb_global . ipsec=${ipsec}"; then
+                  exit 1
+                fi
           preStop:
             exec:
               command:
@@ -385,10 +409,11 @@ spec:
               if [[ ! -z "${leader_status}" ]]; then
                 echo "NB DB Raft leader is unknown to the cluster node."
                 exit 1
-              else
+              fi
+              # set trim-on-compaction if this DB is supposed to be part of the cluster
+              if [[ "{{.OVN_NB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] || [[ "{{.OVN_NB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
                 /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
               fi
-
         env:
         - name: OVN_LOG_LEVEL
           value: info 
@@ -558,6 +583,16 @@ spec:
           }
           # end of cluster_exists()
 
+          # RAFT clusters need an odd number of members to achieve consensus.
+          # The CNO determines which members make up the cluster, so if this container
+          # is not supposed to be part of the cluster, wait forever doing nothing
+          # (instad of exiting and causing CrashLoopBackoffs for no reason).
+          if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
+            echo "$(date -Iseconds) - not selected as RAFT member; sleeping..."
+            sleep 1500d
+            exit 0
+          fi
+
           OVN_ARGS="--db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
@@ -568,7 +603,6 @@ spec:
 
           CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
           echo "$(date -Iseconds) - starting sbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}"
-          initial_raft_create=true
           initialize="false"
           
           if [[ ! -e ${ovn_db_file} ]]; then
@@ -590,7 +624,6 @@ spec:
 
             if ${cluster_found}; then
               echo "Cluster already exists for DB: ${db}"
-              initial_raft_create=false
               # join existing cluster
               exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
               --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
@@ -643,19 +676,39 @@ spec:
                 set -x
                 CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
                 rm -f /var/run/ovn/ovnsb_db.pid
+
+                # exit early if this DB is not supposed to be part of the cluster
+                if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
+                  exit 0
+                fi
+
+                # retry an operation a number of times, sleeping 2 seconds between each try
+                retry() {
+                  local tries=${1}
+                  local desc=${2}
+                  local cmd=${3}
+
+                  local retries=0
+                  while ! ${cmd}; do
+                    (( retries += 1 ))
+                    if [[ "${retries}" -gt ${tries} ]]; then
+                      echo "$(date -Iseconds) - ERROR - nbdb ${desc} - too many failed attempts, giving up"
+                      return 1
+                    fi
+                    echo "$(date -Iseconds) - WARN - nbdb ${desc} - failed try ${retries}, retrying..."
+                    sleep 2
+                  done
+                  echo "$(date -Iseconds) - INFO - nbdb ${desc} - success"
+                  return 0
+                }
+
                 if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
                   echo "$(date -Iseconds) - sdb - postStart - waiting for master to be selected"
 
                   # set the connection and inactivity probe
-                  retries=0
-                  while ! ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_CONTROLLER_INACTIVITY_PROBE}}; do
-                    (( retries += 1 ))
-                  if [[ "${retries}" -gt 40 ]]; then
-                    echo "$(date -Iseconds) - ERROR RESTARTING - sbdb - too many failed ovn-sbctl attempts, giving up"
-                      exit 1
+                  if ! retry 60 "inactivity-probe" "ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_CONTROLLER_INACTIVITY_PROBE}}"; then
+                    exit 1
                   fi
-                  sleep 2
-                  done
 
                   # Upgrade the db if required.
                   DB_SCHEMA="/usr/share/ovn/ovn-sb.ovsschema"
@@ -672,6 +725,12 @@ spec:
                       echo "Upgrading database $schema_name from schema version $db_version to $target_version"
                       ovsdb-client -t 30 convert "$DB_SERVER" "$DB_SCHEMA"
                   fi
+                fi
+
+                # Kill some time while the cluster converges by checking IPsec status
+                OVN_SB_CTL="ovn-sbctl -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt --db "{{.OVN_SB_DB_LIST}}""
+                if ! retry 20 "ipsec" "${OVN_SB_CTL} get sb_global . ipsec"; then
+                  exit 1
                 fi
           preStop:
             exec:
@@ -698,7 +757,9 @@ spec:
               if [[ ! -z "${leader_status}" ]]; then
                 echo "SB DB Raft leader is unknown to the cluster node."
                 exit 1
-              else
+              fi
+              # set trim-on-compaction if this DB is supposed to be part of the cluster
+              if [[ "{{.OVN_SB_DB_LIST}}" =~ .*":${K8S_NODE_IP}:".* ]] || [[ "{{.OVN_SB_DB_LIST}}" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
                 /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
               fi
         env:
