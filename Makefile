@@ -28,7 +28,7 @@ golangci-lint:
 .PHONY: golangci-lint
 
 install.tools:
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b ${GOPATH}/bin
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | bash -s -- -b ${GOPATH}/bin
 .PHONY: install.tools
 
 
