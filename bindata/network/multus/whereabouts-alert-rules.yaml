@@ -1,3 +1,4 @@
+{{ if (eq .RenderIpReconciler true) }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -12,7 +13,7 @@ spec:
   groups:
   - name: cluster-network-operator-whereabouts.rules
     rules:
-    - alert: IPReconcilerHasNotSucceededDummy
+    - alert: IPReconcilerHasNotSucceeded
       annotations:
         summary: Whereabouts noticed ip-reconciler has not succeeded in the past 60 seconds
       expr: |
@@ -26,4 +27,4 @@ spec:
         changes(reconciler_success_total[60s]) > 0 and reconciler_attempted > 0
       labels:
         severity: warning
-
+{{ end }}
