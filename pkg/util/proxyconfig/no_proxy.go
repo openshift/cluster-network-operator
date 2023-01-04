@@ -109,6 +109,15 @@ func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 			} else {
 				set.Insert(fmt.Sprintf(".%s.compute.internal", region))
 			}
+		case configv1.AzurePlatformType:
+			if cloudName := infra.Status.PlatformStatus.Azure.CloudName; cloudName != configv1.AzurePublicCloud {
+				// https://learn.microsoft.com/en-us/azure/virtual-network/what-is-ip-address-168-63-129-16
+				set.Insert("168.63.129.16")
+				// https://bugzilla.redhat.com/show_bug.cgi?id=2104997
+				if cloudName == configv1.AzureStackCloud {
+					set.Insert(infra.Status.PlatformStatus.Azure.ARMEndpoint)
+				}
+			}
 		case configv1.GCPPlatformType:
 			// From https://cloud.google.com/vpc/docs/special-configurations add GCP metadata.
 			// "metadata.google.internal." added due to https://bugzilla.redhat.com/show_bug.cgi?id=1754049
