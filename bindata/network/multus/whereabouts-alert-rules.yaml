@@ -28,3 +28,5 @@ spec:
       labels:
         severity: warning
 {{ end }}
+
+# changes(reconciler_success_total[3s]) == 0 <== should be changed back to 60m
