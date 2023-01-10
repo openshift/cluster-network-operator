@@ -1056,7 +1056,6 @@ func getMasterAddresses(kubeClient crclient.Client, controlPlaneReplicaCount int
 		}
 		ovnMasterAddresses = append(ovnMasterAddresses, ni.address)
 	}
-	sort.Strings(ovnMasterAddresses)
 	klog.V(2).Infof("Preferring %s for database clusters", ovnMasterAddresses)
 
 	return ovnMasterAddresses, timeout, nil
