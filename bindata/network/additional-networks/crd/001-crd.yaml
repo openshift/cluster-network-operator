@@ -143,6 +143,8 @@ spec:
             properties:
               containerid:
                 type: string
+              podref:
+                type: string
             required:
             - containerid
             type: object
