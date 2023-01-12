@@ -166,8 +166,10 @@ func Test_apiAndIngressVipsSynchronizer_VipsSynchronize(t *testing.T) {
 				Platform: configv1.OpenStackPlatformType,
 				PlatformStatus: &configv1.PlatformStatus{
 					OpenStack: &configv1.OpenStackPlatformStatus{
-						APIServerInternalIP: "fooA",
-						IngressIP:           "fooI",
+						APIServerInternalIP:  "fooA",
+						APIServerInternalIPs: []string{"fooA"},
+						IngressIP:            "fooI",
+						IngressIPs:           []string{"fooI"},
 					},
 				},
 			},
@@ -277,6 +279,19 @@ func Test_apiAndIngressVipsSynchronizer_VipsSynchronize(t *testing.T) {
 			},
 			wantStatus: configv1.InfrastructureStatus{
 				Platform:       configv1.VSpherePlatformType,
+				PlatformStatus: &configv1.PlatformStatus{},
+			},
+		},
+		{
+			name: "should not panic on empty PlatformStatus.OpenStack field (if an External LB is being used, this field isn't populated)",
+			givenStatus: configv1.InfrastructureStatus{
+				Platform: configv1.OpenStackPlatformType,
+				PlatformStatus: &configv1.PlatformStatus{
+					OpenStack: nil,
+				},
+			},
+			wantStatus: configv1.InfrastructureStatus{
+				Platform:       configv1.OpenStackPlatformType,
 				PlatformStatus: &configv1.PlatformStatus{},
 			},
 		},

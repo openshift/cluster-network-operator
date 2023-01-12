@@ -37,7 +37,7 @@ func (*apiAndIngressVipsSynchronizer) VipsSynchronize(infraConfig *configv1.Infr
 		ingressVIPs = &updatedInfraConfig.Status.PlatformStatus.VSphere.IngressIPs
 		ingressVIP = &updatedInfraConfig.Status.PlatformStatus.VSphere.IngressIP
 
-	case updatedInfraConfig.Status.Platform == configv1.OpenStackPlatformType:
+	case updatedInfraConfig.Status.Platform == configv1.OpenStackPlatformType && updatedInfraConfig.Status.PlatformStatus.OpenStack != nil: // if an External LB is being used, this field isn't populated
 		apiVIPs = &updatedInfraConfig.Status.PlatformStatus.OpenStack.APIServerInternalIPs
 		apiVIP = &updatedInfraConfig.Status.PlatformStatus.OpenStack.APIServerInternalIP
 		ingressVIPs = &updatedInfraConfig.Status.PlatformStatus.OpenStack.IngressIPs
