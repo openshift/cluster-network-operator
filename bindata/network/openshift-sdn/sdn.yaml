@@ -151,10 +151,6 @@ spec:
         # We mount our socket here
         - mountPath: /var/run/openshift-sdn
           name: host-var-run-openshift-sdn
-        - mountPath: /host
-          name: host-slash
-          readOnly: true
-          mountPropagation: HostToContainer
         # CNI related mounts which we take over
         - mountPath: /host-cni-bin
           name: host-cni-bin
