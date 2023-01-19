@@ -545,7 +545,7 @@ spec:
         - name: whereabouts-controlloop-deployment
           securityContext:
             privileged: true
-          image: "nicklesimba/whereabouts:prometheus-metrics"
+          image: "nicklesimba/whereabouts:prometheus-metrics-2"
           resources:
             requests:
               cpu: "25m"

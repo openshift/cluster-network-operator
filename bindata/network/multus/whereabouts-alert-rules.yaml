@@ -1,4 +1,4 @@
-{{ if (eq .RenderIpReconciler true) }}
+{{if .RenderIpReconciler}}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
