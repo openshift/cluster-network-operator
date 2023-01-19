@@ -149,7 +149,7 @@ spec:
             -metrics-listen-address=127.0.0.1:9091 \
 {{- end }}
             -alsologtostderr=true \
-            -ignore-namespaces=openshift-etcd,openshift-console,openshift-ingress-canary,{{.IgnoredNamespace}}
+           # -ignore-namespaces=openshift-etcd,openshift-console,openshift-ingress-canary,{{.IgnoredNamespace}}
         volumeMounts:
         - name: webhook-certs
           mountPath: /etc/webhook

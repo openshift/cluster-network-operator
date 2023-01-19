@@ -163,7 +163,8 @@ spec:
       containers:
       - name: kube-multus
         # image: {{.MultusImage}}
-        image: quay.io/dosmith/multus-thick:gen10
+        # image: quay.io/dosmith/multus-thick:gen10
+        image: ghcr.io/k8snetworkplumbingwg/multus-cni:snapshot-thick
         command: [ "/bin/bash", "-ec", "--" ]
         # Where does this go?
         # -multus-kubeconfig-file-host=/etc/kubernetes/cni/net.d/multus.d/multus.kubeconfig
@@ -188,8 +189,8 @@ spec:
             -multus-log-file=/tmp/multus.log
             -multus-log-to-stderr=true
             -cni-version=0.3.1
-            -socket-dir={{ .MultusSocketParentDir }}/socket
             - "-global-namespaces=default,openshift-multus,openshift-sriov-network-operator"
+            # -socket-dir={{ .MultusSocketParentDir }}/socket
         resources:
           requests:
             cpu: 10m
