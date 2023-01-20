@@ -200,16 +200,16 @@ func (c *Client) OperatorHelperClient() operatorv1helpers.OperatorClient {
 // Example for a label-selected ConfigMap watch:
 //
 // c.AddCustomInformer(
-//     v1coreinformers.NewFilteredServiceInformer(
-//          c.Kubernetes(),
-//			kapi.NamespaceAll,
-//			5 * time.Minute, // resync Period
-//			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-//			func(options *metav1.ListOptions) {
-//				// use k8s.io/apimachinery/pkg/labels for more sophisticated selectors
-//				options.LabelSelector = "operator.example.dev/mylabel=myval"
-//			}))
 //
+//	    v1coreinformers.NewFilteredServiceInformer(
+//	         c.Kubernetes(),
+//				kapi.NamespaceAll,
+//				5 * time.Minute, // resync Period
+//				cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+//				func(options *metav1.ListOptions) {
+//					// use k8s.io/apimachinery/pkg/labels for more sophisticated selectors
+//					options.LabelSelector = "operator.example.dev/mylabel=myval"
+//				}))
 func (c *Client) AddCustomInformer(inf cache.SharedInformer) {
 	c.informers = append(c.informers, inf)
 	if c.started {

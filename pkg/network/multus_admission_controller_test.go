@@ -7,6 +7,10 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var MultusAdmissionControllerConfig = operv1.Network{
@@ -37,15 +41,37 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	config.DisableMultiNetwork = &disabled
 	FillDefaults(config, nil)
 
+	fakeClient := fake.NewClientBuilder().WithObjects(
+		&corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test1-ignored",
+				Labels: map[string]string{
+					"openshift.io/cluster-monitoring": "true",
+				},
+			},
+		},
+		&corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test2-not-ignored",
+			},
+		},
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name: "test3-ignored",
+			Labels: map[string]string{
+				"openshift.io/cluster-monitoring": "true",
+			},
+		},
+		}).Build()
+
 	// disable MultusAdmissionController
-	objs, err := renderMultusAdmissionController(config, manifestDir, false)
+	objs, err := renderMultusAdmissionController(config, manifestDir, false, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus-admission-controller")))
 
 	// enable MultusAdmissionController
 	enabled := false
 	config.DisableMultiNetwork = &enabled
-	objs, err = renderMultusAdmissionController(config, manifestDir, false)
+	objs, err = renderMultusAdmissionController(config, manifestDir, false, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus-admission-controller")))
 
@@ -71,4 +97,34 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 		tweakMetaForCompare(cur)
 		g.Expect(cur).To(Equal(upd))
 	}
+}
+
+// TestRenderMultusAdmissionControllerGetNamespace tests getOpenshiftNamespaces()
+func TestRenderMultusAdmissionControllerGetNamespace(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakeClient := fake.NewClientBuilder().WithObjects(
+		&corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test1-ignored",
+				Labels: map[string]string{
+					"openshift.io/cluster-monitoring": "true",
+				},
+			},
+		},
+		&corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test2-not-ignored",
+			},
+		},
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name: "test3-ignored",
+			Labels: map[string]string{
+				"openshift.io/cluster-monitoring": "true",
+			},
+		},
+		}).Build()
+	namespaces, err := getOpenshiftNamespaces(fakeClient)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(namespaces).To(Equal("test1-ignored,test3-ignored"))
 }

@@ -218,7 +218,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// Generate the objects
-	objs, err := network.Render(&operConfig.Spec, bootstrapResult, ManifestPath)
+	objs, err := network.Render(&operConfig.Spec, bootstrapResult, ManifestPath, r.client)
 	if err != nil {
 		log.Printf("Failed to render: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "RenderError",
