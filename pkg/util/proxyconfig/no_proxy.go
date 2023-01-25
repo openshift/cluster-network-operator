@@ -8,9 +8,8 @@ import (
 	"strings"
 
 	"github.com/ghodss/yaml"
-
 	configv1 "github.com/openshift/api/config/v1"
-
+	cnonetwork "github.com/openshift/cluster-network-operator/pkg/network"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -55,6 +54,10 @@ func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		".svc",
 		".cluster.local",
 	)
+	if hcpCfg := cnonetwork.NewHyperShiftConfig(); hcpCfg.Enabled {
+		set.Insert(".hypershift.local")
+	}
+
 	if ic.Networking.MachineCIDR != "" {
 		if _, _, err := net.ParseCIDR(ic.Networking.MachineCIDR); err != nil {
 			return "", fmt.Errorf("MachineCIDR has an invalid CIDR: %s", ic.Networking.MachineCIDR)
