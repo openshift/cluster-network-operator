@@ -10,7 +10,7 @@ At a high level, the deployment will create a docker container per K8S node. Thi
 containerd instance, and pods, kubelet, etc will all run inside of these docker containers.
 
 ``ovn-kind-cno.sh`` is the script that will handle deploying K8S, CNO, and consequently Multus/OVN-K8S.
-By default it will use the following configuration for kind, and IPv4 multinode cluster:
+By default, it will use the following configuration for kind and IPv4 multi-node cluster:
 
 ```yaml
 # config for 1 control plane node and 2 workers (necessary for conformance)
@@ -30,7 +30,7 @@ nodes:
 It accepts environment variables to customize the environment, with the following defaults:
 
 ```sh
-K8S_VERSION=${K8S_VERSION:-v1.18.2}
+K8S_VERSION=${K8S_VERSION:-v1.25.3}
 BUILD_OVN=${BUILD_OVN:-false}
 BUILD_CNO=${BUILD_CNO:-false}
 BUILD_MULTUS=${BUILD_MULTUS:-false}
@@ -45,10 +45,10 @@ OVN_KIND_VERBOSITY=${OVN_KIND_VERBOSITY:-5}
 ## Requirements
 
 The deployment should work locally on a laptop for a single node. To deploy, it is required to have golang
-(1.11 or later), kubectl, and docker installed. The KIND deployment requires at least Kubernetes v1.17 (installed by
+(1.18 or later), kubectl, and docker installed. The KIND deployment requires at least Kubernetes v1.17 (installed by
 default) so building corresponding kubectl client is best.
 
-It is also required to install KIND before deploying. As of this writing the latest KIND release is v0.8.1, and
+It is also required to install KIND before deploying. As of this writing the latest KIND release is v0.17.0, and
 installation instructions can be found at https://github.com/kubernetes-sigs/kind#installation-and-usage.
 
 ## Usage
@@ -76,12 +76,13 @@ To build an IPv6 ONLY cluster:
 $ IP_FAMILY=ipv6 ovn-kind-cno.sh
 ```
 
-This will build an OVN K8S docker image to use with the deployment from a local git workspace. By default the script will use
-a path relative to your GOPATH. To override this, specify `CNO_PATH` or `OVN_K8S_PATH` when executing the above.
+This will build an OVN K8S docker image to use with the deployment from a local git workspace. By default, the script
+will use a path relative to your GOPATH. To override this, specify `CNO_PATH` or `OVN_K8S_PATH` when executing the
+above.
 
 ### Post deployment
 
-Post deployment you can simply use kubectl to interact with your cluster. Additionally you may wish to exec into the
+Post deployment you can simply use kubectl to interact with your cluster. Additionally, you may wish to exec into the
 docker node and poke around. Inside the docker container you can see all the running pods via:
 
 ```sh
@@ -149,7 +150,7 @@ ovn-worker          Ready    <none>   4h28m   v1.18.2   172.18.0.2    <none>    
 ovn-worker2         Ready    <none>   4h28m   v1.18.2   172.18.0.4    <none>        Ubuntu 20.04 LTS   5.4.0-33-generic   containerd://1.3.3-14-g449e9269
 ```
 
-if everything is ok, and using this examples IP 172.18.0.2 and Port 32591, we should obtain an answer like this:
+if everything is ok, and using this example's IP 172.18.0.2 and Port 32591, we should obtain an answer like this:
 
 ```sh
 curl http://172.18.0.2:32591

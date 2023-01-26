@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Version v1.17.0 or higher is required
-K8S_VERSION=${K8S_VERSION:-v1.18.2}
+K8S_VERSION=${K8S_VERSION:-v1.25.3}
 BUILD_OVN=${BUILD_OVN:-false}
 BUILD_CNO=${BUILD_CNO:-false}
 BUILD_MULTUS=${BUILD_MULTUS:-false}
@@ -68,9 +68,9 @@ CNO_TEMPLATES=$CNO_PATH/manifests
 if [ "$BUILD_CNO" = true ]; then
   echo "Building CNO"
   pushd $CNO_PATH
-  sed -i '/host-run-netns/{n;s/readOnly.*/mountPropagation: Bidirectional/}' bindata/network/ovn-kubernetes/ovnkube-node.yaml
+  sed -i '/host-run-netns/{n;s/readOnly.*/mountPropagation: Bidirectional/}' bindata/network/ovn-kubernetes/self-hosted/ovnkube-node.yaml
   CNO_IMAGE=$(BUILDCMD="docker build" ./hack/build-image.sh | grep 'Successfully tagged' | grep -Eo cluster-network-operator:.*)
-  sed -i '/host-run-netns/{n;s/mountPropagation.*/readOnly: true/}' bindata/network/ovn-kubernetes/ovnkube-node.yaml
+  sed -i '/host-run-netns/{n;s/mountPropagation.*/readOnly: true/}' bindata/network/ovn-kubernetes/self-hosted/ovnkube-node.yaml
   if [ -z "$CNO_IMAGE" ]; then
     echo "Error locating built CNO Image"
     exit 1
@@ -90,7 +90,7 @@ if [ "$BUILD_OVN" = true ]; then
   pushd dist/images
   sudo cp -f ../../go-controller/_output/go/bin/* .
   cat << EOF | docker build -t origin-ovn-kubernetes:dev -f - .
-FROM quay.io/openshift/origin-ovn-kubernetes:4.5
+FROM quay.io/openshift/origin-ovn-kubernetes:4.12
 COPY ovnkube ovn-kube-util /usr/bin/
 COPY ovn-k8s-cni-overlay /usr/libexec/cni/ovn-k8s-cni-overlay
 COPY ovnkube.sh /root/
@@ -102,6 +102,10 @@ EOF
 fi
 
 NODES=$(docker ps | grep "kindest/node" | awk '{ print $1 }')
+
+kubectl label node ovn-control-plane k8s.ovn.org/ovnkube-db=true node-role.kubernetes.io/master="" node-role.kubernetes.io/control-plane="" --overwrite
+kubectl taint node ovn-control-plane node-role.kubernetes.io/control-plane:NoSchedule- || true
+
 for n in $NODES; do
   echo "Modifying node $n"
   echo "Modifying os-release for Multus"
@@ -115,17 +119,17 @@ docker exec ovn-control-plane cp /etc/kubernetes/admin.conf /etc/kubernetes/kube
 docker exec ovn-control-plane chmod 666 /etc/kubernetes/kubeconfig
 
 # Create Proxy resource
-kubectl create -f https://raw.githubusercontent.com/openshift/api/e7fa4b871a25985ef0cc36c2fbd9f2cb4445dc9c/config/v1/0000_03_config-operator_01_proxy.crd.yaml
+kubectl create -f https://raw.githubusercontent.com/openshift/api/6ba31fa438f20d6c822ef47ad3d771309cb5216b/config/v1/0000_03_config-operator_01_proxy.crd.yaml
 
 # Create Network resource
-kubectl create -f https://raw.githubusercontent.com/openshift/api/e7fa4b871a25985ef0cc36c2fbd9f2cb4445dc9c/config/v1/0000_10_config-operator_01_network.crd.yaml
+kubectl create -f https://raw.githubusercontent.com/openshift/api/6ba31fa438f20d6c822ef47ad3d771309cb5216b/config/v1/0000_10_config-operator_01_network.crd.yaml
 
 # Create cluster operator
-kubectl create -f https://raw.githubusercontent.com/openshift/machine-api-operator/050a65a2bdabcc2c2f17036de967c6bcee6d6a48/config/0000_00_cluster-version-operator_01_clusteroperator.crd.yaml
+kubectl create -f https://raw.githubusercontent.com/openshift/api/6ba31fa438f20d6c822ef47ad3d771309cb5216b/config/v1/0000_00_cluster-version-operator_01_clusteroperator.crd.yaml
 
 if [ "$BUILD_OVN" = true ] || [ "$BUILD_CNO" = true ]; then
   pushd $CNO_TEMPLATES
-  DEPLOYMENT_TEMPLATE=$(ls 0000*deployment*)
+  DEPLOYMENT_TEMPLATE=$(ls 0000*deployment.yaml)
   if [ -z "$DEPLOYMENT_TEMPLATE" ]; then
     echo "error locating deployment template in $CNO_TEMPLATES"
     exit 1
@@ -135,12 +139,17 @@ if [ "$BUILD_OVN" = true ] || [ "$BUILD_CNO" = true ]; then
     sed -i 's/".*origin-ovn-kubernetes:.*/"origin-ovn-kubernetes:dev"/' $DEPLOYMENT_TEMPLATE
   fi
   if [ "$BUILD_CNO" = true ]; then
-    sed -i "s#quay.io/openshift/origin-cluster-network-operator:.*#$CNO_IMAGE#" $DEPLOYMENT_TEMPLATE
+    # match cases with surrounding quotes
+    sed -i "s/\"quay.io\/openshift\/origin-cluster-network-operator:.*\"/\"$CNO_IMAGE\"/g" $DEPLOYMENT_TEMPLATE
+    # match cases without quotes
+    sed -i "s#quay.io/openshift/origin-cluster-network-operator:.*#$CNO_IMAGE#g" $DEPLOYMENT_TEMPLATE
+    # note the above two sed commands can be achieved with a much less readable one-liner like this:
+    # sed -i 's/\("\{0,1\}quay\.io\/openshift\/origin-cluster-network-operator:\)[^"]*\("\{0,1\}\)$/\1'$CNO_IMAGE'\2/g' $DEPLOYMENT_TEMPLATE
   fi
 fi
 
 echo "Creating CNO operator"
-for f in $(ls $CNO_TEMPLATES| grep 0000| grep -v credentials); do
+for f in $(ls $CNO_TEMPLATES| grep 0000 | egrep -v 'credentials|ibm'); do
   kubectl create -f ${CNO_TEMPLATES}/$f
 done
 
@@ -189,6 +198,16 @@ spec:
   serviceNetwork:
   - ${SERVICE_NETWORK}
 EOF
+
+# create the apiserver-url.env file that is normally created by MCO and copy it to ovn-control-plane
+API_URL=$(kind get kubeconfig --internal --name "ovn" | grep server | awk '{ print $2 }')
+ADDRESS=\'$(echo $API_URL | cut -d/ -f3 | cut -d':' -f1)\'
+PORT=\'$(echo $API_URL | cut -d':' -f3)\'
+cat > /tmp/apiserver-url.env << EOL
+KUBERNETES_SERVICE_HOST=$ADDRESS
+KUBERNETES_SERVICE_PORT=$PORT
+EOL
+docker cp /tmp/apiserver-url.env ovn-control-plane:/etc/kubernetes/apiserver-url.env
 
 for n in $NODES; do
   echo "Sym-linking cni dirs for node $n"
