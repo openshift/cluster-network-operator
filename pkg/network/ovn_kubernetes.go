@@ -186,7 +186,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	// Hypershift proxy
-	if bootstrapResult.Infra.Proxy.HTTPProxy == "" {
+	// proxy should not be used for internal routes
+	if bootstrapResult.Infra.Proxy.HTTPProxy == "" ||
+		bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteLabels[HyperShiftInternalRouteLabel] == "true" {
 		data.Data["ENABLE_OVN_NODE_PROXY"] = false
 	} else {
 		data.Data["ENABLE_OVN_NODE_PROXY"] = true
