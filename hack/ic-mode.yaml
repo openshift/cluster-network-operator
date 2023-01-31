@@ -1,0 +1,6 @@
+# Example ConfigMap to enable OVN IC in OVN-Kubernetes instead of legacy OVN-kubernetes.
+apiVersion: v1
+kind: ConfigMap                                             
+metadata:
+    name: ovn-ic-mode
+    namespace: openshift-network-operator

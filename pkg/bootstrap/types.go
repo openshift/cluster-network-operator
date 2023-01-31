@@ -67,6 +67,7 @@ type OVNBootstrapResult struct {
 	PrePullerUpdateStatus *OVNUpdateStatus
 	OVNKubernetesConfig   *OVNConfigBoostrapResult
 	FlowsConfig           *FlowsConfig
+	OVNICMode             bool
 }
 
 type BootstrapResult struct {

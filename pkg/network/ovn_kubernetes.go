@@ -144,6 +144,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["GenevePort"] = c.GenevePort
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
+	data.Data["OVN_IC_MODE"] = bootstrapResult.OVN.OVNICMode
 	data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_FULL
 	data.Data["OVN_NB_PORT"] = OVN_NB_PORT
 	data.Data["OVN_SB_PORT"] = OVN_SB_PORT
@@ -682,6 +683,24 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *H
 	return ovnConfigResult, nil
 }
 
+// returns the value of mode found in the openshift-network-operator/ovn-ic-mode configMap
+// if the configMap exists, otherwise returns legacy by default.
+func IsOvnIcEnabled(kubeClient crclient.Client) (bool, error) {
+	cm := &corev1.ConfigMap{}
+	nsn := types.NamespacedName{Namespace: "openshift-network-operator", Name: "ovn-ic-mode"}
+	err := kubeClient.Get(context.TODO(), nsn, cm)
+	if err != nil {
+		if apierrors.IsNotFound(err) { // OVN IC disabled by default if configMap is not found
+			klog.Infof("Did not find ovn-ic-mode configMap. OVN IC is disabled")
+			return false, nil
+		} else {
+			return false, fmt.Errorf("Could not determine OVN IC mode: %w", err)
+		}
+	}
+	klog.Infof("Found ovn-ic-mode configMap. OVN IC is enabled.")
+	return true, nil
+}
+
 // validateOVNKubernetes checks that the ovn-kubernetes specific configuration
 // is basically sane.
 func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
@@ -1090,6 +1109,11 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client) (*bootstrap
 		controlPlaneReplicaCount, _ = strconv.Atoi(rcD.ControlPlane.Replicas)
 	}
 
+	ovnICMode, err := IsOvnIcEnabled(kubeClient.ClientFor("").CRClient())
+	if err != nil {
+		return nil, fmt.Errorf("Unable to bootstrap OVN, undetermined OVN IC mode")
+	}
+
 	ovnMasterAddresses, newTimeout, err := getMasterAddresses(kubeClient.ClientFor("").CRClient(), controlPlaneReplicaCount, hc.Enabled, OVN_MASTER_DISCOVERY_TIMEOUT)
 	if err != nil {
 		return nil, err
@@ -1241,6 +1265,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client) (*bootstrap
 		PrePullerUpdateStatus: prepullerStatus,
 		OVNKubernetesConfig:   ovnConfigResult,
 		FlowsConfig:           bootstrapFlowsConfig(kubeClient.ClientFor("").CRClient()),
+		OVNICMode:             ovnICMode,
 	}
 	return &res, nil
 }

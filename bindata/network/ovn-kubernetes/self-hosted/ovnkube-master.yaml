@@ -57,6 +57,46 @@ spec:
       # /run/openvswitch -> tmpfs - sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
+{{ if .OVN_IC_MODE }}
+      # OVN IC is enabled (one zone per node): run only cluster manager on master nodes
+      - name: ovnkube-cluster-manager
+        image: "{{.OvnImage}}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+          if [[ -f "/env/_master" ]]; then
+            set -o allexport
+            source "/env/_master"
+            set +o allexport
+          fi
+
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-cluster-manager - start ovnkube --init-cluster-manager ${K8S_NODE}"
+
+          exec /usr/bin/ovnkube \
+            --init-cluster-manager "${K8S_NODE}" \
+            --config-file=/run/ovnkube-config/ovnkube.conf \
+            --loglevel 4 # "${OVN_KUBE_LOG_LEVEL}" \
+            --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
+            # --cluster-subnets <cidr representing the global pod network e.g. 192.168.0.0/16>  ## cluster-subnets is already in config-file
+            # any input arguments related to metrics?
+        env:
+        - name: OVN_KUBE_LOG_LEVEL
+          value: "4"
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - mountPath: /run/ovnkube-config/
+          name: ovnkube-config
+        # ports:
+        # - name: metrics-port
+        #   containerPort: 29102
+        terminationMessagePolicy: FallbackToLogsOnError
+{{ else }}
+      # OVN IC is in legacy-like mode (all nodes in one zone): run all legacy ovnk master containers on master nodes
       # ovn-northd: convert network objects in nbdb to flows in sbdb
       - name: northd
         image: "{{.OvnImage}}"
@@ -102,7 +142,7 @@ spec:
                 - OVN_MANAGE_OVSDB=no /usr/share/ovn/scripts/ovn-ctl stop_northd
         env:
         - name: OVN_LOG_LEVEL
-          value: info 
+          value: info
         volumeMounts:
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
@@ -961,6 +1001,7 @@ spec:
             fieldRef:
               fieldPath: status.hostIP
         terminationMessagePolicy: FallbackToLogsOnError
+{{ end }}
       nodeSelector:
         node-role.kubernetes.io/master: ""
         beta.kubernetes.io/os: "linux"

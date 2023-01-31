@@ -79,6 +79,9 @@ $ IP_FAMILY=ipv6 ovn-kind-cno.sh
 This will build an OVN K8S docker image to use with the deployment from a local git workspace. By default the script will use
 a path relative to your GOPATH. To override this, specify `CNO_PATH` or `OVN_K8S_PATH` when executing the above.
 
+In order to deploy OVN-Kubernetes in OVN InterConnect (IC) mode, which is disabled by default, you can modify the `ovn-kind-cno.sh`
+script to create a configMap using the example found [here](./ic-mode.yaml). This should be done right after the cluster-config-v1 configMap is created.
+
 ### Post deployment
 
 Post deployment you can simply use kubectl to interact with your cluster. Additionally you may wish to exec into the
