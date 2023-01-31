@@ -308,6 +308,10 @@ spec:
             exit 1
           fi
 
+          if [ "{{.OVNHybridOverlayEnable}}" == "true" ]; then
+            echo "HybridOverlay enabled"
+          fi
+
           export_network_flows_flags=
           if [[ -n "${NETFLOW_COLLECTORS}" ]] ; then
             export_network_flows_flags="--netflow-targets ${NETFLOW_COLLECTORS}"

@@ -849,6 +849,10 @@ spec:
             fi
           done
 
+          if [ "{{.OVNHybridOverlayEnable}}" == "true" ]; then
+            echo "HybridOverlay enabled"
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --init-master "${K8S_NODE}" \
