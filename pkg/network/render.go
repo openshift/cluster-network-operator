@@ -27,6 +27,7 @@ var dualStackPlatforms = sets.NewString(
 	string(configv1.BareMetalPlatformType),
 	string(configv1.NonePlatformType),
 	string(configv1.VSpherePlatformType),
+	string(configv1.OpenStackPlatformType),
 )
 
 func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client cnoclient.Client) ([]*uns.Unstructured, bool, error) {
@@ -353,6 +354,8 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 		if !isSupportedDualStackPlatform(infraRes.PlatformType) {
 			return errors.Errorf("%s is not one of the supported platforms for dual stack (%s)", infraRes.PlatformType,
 				strings.Join(dualStackPlatforms.List(), ", "))
+		} else if string(configv1.OpenStackPlatformType) == string(infraRes.PlatformType) {
+			return errors.Errorf("%s does not allow conversion to dual-stack cluster", infraRes.PlatformType)
 		}
 	}
 
