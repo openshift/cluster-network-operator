@@ -38,6 +38,9 @@ data:
 {{- if .ReachabilityNodePort }}
     egressip-node-healthcheck-port={{.ReachabilityNodePort}}
 {{- end }}
+{{- if .OVN_MULTI_NETWORK_ENABLE }}
+    enable-multi-network=true
+{{- end }}
 
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
