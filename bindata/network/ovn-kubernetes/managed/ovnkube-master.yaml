@@ -452,16 +452,20 @@ spec:
             - -c
             - |
               set -xeo pipefail
+
+              # exit early if this DB is not supposed to be part of the cluster
+              pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
+              if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+                exit 0
+              fi
+
               leader_status=$(/usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=3 cluster/status OVN_Northbound  2>/dev/null | { grep "Leader: unknown" || true; })
               if [[ ! -z "${leader_status}" ]]; then
                 echo "NB DB Raft leader is unknown to the cluster node."
                 exit 1
               fi
-              # set trim-on-compaction if this DB is supposed to be part of the cluster
-              pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
-              if [[ "{{.OVN_NB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] || [[ "{{.OVN_NB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
-                /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
-              fi
+              # set trim-on-compaction
+              /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
         env:
         - name: OVN_LOG_LEVEL
           value: info
@@ -744,16 +748,20 @@ spec:
             - -c
             - |
               set -xeo pipefail
+
+              # exit early if this DB is not supposed to be part of the cluster
+              pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
+              if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+                exit 0
+              fi
+
               leader_status=$(/usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=3 cluster/status OVN_Southbound  2>/dev/null | { grep "Leader: unknown" || true; })
               if [[ ! -z "${leader_status}" ]]; then
                 echo "SB DB Raft leader is unknown to the cluster node."
                 exit 1
               fi
-              # set trim-on-compaction if this DB is supposed to be part of the cluster
-              pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
-              if [[ "{{.OVN_SB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] || [[ "{{.OVN_SB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
-                /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
-              fi
+              # set trim-on-compaction
+              /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
         env:
         - name: OVN_LOG_LEVEL
           value: info
@@ -920,6 +928,18 @@ spec:
           done
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovn-dbchecker - start ovn-dbchecker"
+
+          # RAFT clusters need an odd number of members to achieve consensus.
+          # The CNO determines which members make up the cluster, so if this container
+          # is not supposed to be part of the cluster, wait forever doing nothing
+          # (instad of exiting and causing CrashLoopBackoffs for no reason).
+          pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
+          if [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_NB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+            echo "$(date -Iseconds) - not selected as RAFT member; sleeping..."
+            sleep 1500d
+            exit 0
+          fi
+
           exec /usr/bin/ovndbchecker \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
@@ -960,6 +980,10 @@ spec:
         env:
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
+        - name: K8S_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         terminationMessagePolicy: FallbackToLogsOnError
       - name: socks-proxy
         image: "{{.Socks5ProxyImage}}"
