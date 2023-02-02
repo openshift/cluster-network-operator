@@ -1,5 +1,4 @@
 ---
-# The ovnconfig config file. Used by both node and master processes.
 kind: ConfigMap
 apiVersion: v1
 metadata:
