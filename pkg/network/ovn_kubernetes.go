@@ -80,7 +80,7 @@ const (
 // - the ovnkube-node daemonset
 // - the ovnkube-master deployment
 // and some other small things.
-func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, bool, error) {
+func renderOVNKubernetes(conf *operv1.NetworkSpec, prevConf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, bool, error) {
 	var progressing bool
 
 	// TODO: Fix operator behavior when running in a cluster with an externalized control plane.
@@ -414,6 +414,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	if err != nil {
 		return nil, progressing, errors.Wrapf(err, "failed to set IP family %s annotation on daemonsets or statefulsets", ipFamilyMode)
 	}
+
+	log.Printf("\nDEBUG:\ncurrent conf:\n%#v\nprev conf:\n%#v\nupdateNode: %#v\nupdateMaster: %#v\n", conf, prevConf, updateNode, updateMaster)
+	updateNode, updateMaster, _ = shouldUpdateOVNKonClusterNetworkCidrExpansionChange(objs, conf, prevConf, updateNode, updateMaster)
 
 	// don't process upgrades if we are handling a dual-stack conversion.
 	if updateMaster && updateNode {
@@ -1338,6 +1341,24 @@ func listenDualStack(masterIP string) string {
 		// IPv4 master, be IPv4-only for backward-compatibility
 		return ""
 	}
+}
+
+// shouldUpdateOVNKonClusterNetworkCidrExpansionChange will roll out changes to
+// master and node daemonsets if the clusterNetwork CIDR(s) have a config change
+// expanding the range of available IPs
+func shouldUpdateOVNKonClusterNetworkCidrExpansionChange(objs []*uns.Unstructured, conf *operv1.NetworkSpec, prevConf *operv1.NetworkSpec, updateMasterStatus, updateNodeStatus bool) (updateNode, updateMaster bool, err error) {
+
+	if !reflect.DeepEqual(conf.ClusterNetwork, prevConf.ClusterNetwork) {
+		log.Printf("DEBUG: marking both node and master with true")
+		// annotate the daemonset and the daemonset template with the current IP family mode,
+		// this triggers a daemonset restart if there are changes.
+		err := setOVNObjectAnnotation(objs, names.NetworkIPFamilyModeAnnotation, "ClusterNetworkCidrExpansion")
+		if err != nil {
+			return updateMasterStatus, updateNodeStatus, errors.Wrapf(err, "failed to set ClusterNetworkCidrExpansion annotation on daemonsets or statefulsets")
+		}
+		return true, true, nil
+	}
+	return updateMasterStatus, updateNodeStatus, nil
 }
 
 // shouldUpdateOVNKonIPFamilyChange determines if we should roll out changes to

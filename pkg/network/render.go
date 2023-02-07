@@ -28,7 +28,7 @@ var dualStackPlatforms = sets.NewString(
 	string(configv1.VSpherePlatformType),
 )
 
-func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client cnoclient.Client) ([]*uns.Unstructured, bool, error) {
+func Render(conf *operv1.NetworkSpec, prevConf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client cnoclient.Client) ([]*uns.Unstructured, bool, error) {
 	log.Printf("Starting render phase")
 	var progressing bool
 	objs := []*uns.Unstructured{}
@@ -65,7 +65,7 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	objs = append(objs, o...)
 
 	// render default network
-	o, progressing, err = renderDefaultNetwork(conf, bootstrapResult, manifestDir)
+	o, progressing, err = renderDefaultNetwork(conf, prevConf, bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -338,6 +338,9 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 	case len(prev.ServiceNetwork) > len(next.ServiceNetwork):
 		// Going from dual to single
 		dualStack, singleStack = prev, next
+	case validateCidrExpansion(prev.ClusterNetwork, next.ClusterNetwork):
+		// this was a CIDR Expansion change not a single/dual stack change. can just get out of here now.
+		return nil
 	default:
 		// They didn't change single-vs-dual
 		if reflect.DeepEqual(prev.ServiceNetwork, next.ServiceNetwork) {
@@ -383,6 +386,31 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 	}
 
 	return nil
+}
+
+func validateCidrExpansion(prev, next []operv1.ClusterNetworkEntry) bool {
+
+	// TODO/FIXME: this is currently assuming the prev slice of ClusterNetworkEntry has not been
+	// reorganized in the "next" slice. the comparison of each slice is [i] to [i]. It is likely
+	// possible that with some more commplex ClusterNetwork configs that the "next" slice could
+	// have definition of some ip/mask cidr in a different index of the slice.
+	for i, e := range prev {
+		prevIp, prevMask, _ := net.ParseCIDR(e.CIDR)
+		nextIp, nextMask, _ := net.ParseCIDR(next[i].CIDR)
+
+		if !prevIp.Equal(nextIp) {
+			log.Printf("Modifying IP network value for clusterNetwork CIDR is unsupported")
+			return false
+		}
+
+		prevMaskSize, _ := prevMask.Mask.Size()
+		nextMaskSize, _ := nextMask.Mask.Size()
+		if prevMaskSize < nextMaskSize {
+			log.Printf("Reducing IP range with a larger CIDR mask for clusterNetwork CIDR is unsupported")
+			return false
+		}
+	}
+	return true
 }
 
 // validateIPPools checks that all IP addresses are valid
@@ -506,7 +534,7 @@ func validateMigration(conf *operv1.NetworkSpec) []error {
 
 // renderDefaultNetwork generates the manifests corresponding to the requested
 // default network
-func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, bool, error) {
+func renderDefaultNetwork(conf *operv1.NetworkSpec, prevConf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, bool, error) {
 	dn := conf.DefaultNetwork
 	if errs := validateDefaultNetwork(conf); len(errs) > 0 {
 		return nil, false, errors.Errorf("invalid Default Network configuration: %v", errs)
@@ -516,7 +544,7 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 	case operv1.NetworkTypeOpenShiftSDN:
 		return renderOpenShiftSDN(conf, bootstrapResult, manifestDir)
 	case operv1.NetworkTypeOVNKubernetes:
-		return renderOVNKubernetes(conf, bootstrapResult, manifestDir)
+		return renderOVNKubernetes(conf, prevConf, bootstrapResult, manifestDir)
 	case operv1.NetworkTypeKuryr:
 		return renderKuryr(conf, bootstrapResult, manifestDir)
 	default:
