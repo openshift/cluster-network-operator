@@ -420,6 +420,17 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		return nil, progressing, errors.Wrapf(err, "failed to set IP family %s annotation on daemonsets or statefulsets", ipFamilyMode)
 	}
 
+	// logic to pretty print the clusterNetwork CIDR (possibly only one) in its annotation
+	var clusterNetworkCIDRs []string
+	for _, c := range conf.ClusterNetwork {
+		clusterNetworkCIDRs = append(clusterNetworkCIDRs, c.CIDR)
+	}
+
+	err = setOVNObjectAnnotation(objs, names.ClusterNetworkCIDRsAnnotation, strings.Join(clusterNetworkCIDRs, ","))
+	if err != nil {
+		return nil, progressing, errors.Wrapf(err, "failed to set %s annotation on daemonsets or statefulsets", clusterNetworkCIDRs)
+	}
+
 	// don't process upgrades if we are handling a dual-stack conversion.
 	if updateMaster && updateNode {
 		updateNode, updateMaster = shouldUpdateOVNKonUpgrade(bootstrapResult.OVN, os.Getenv("RELEASE_VERSION"))
