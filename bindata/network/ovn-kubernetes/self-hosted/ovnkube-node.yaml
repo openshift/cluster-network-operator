@@ -338,6 +338,11 @@ spec:
             node_mgmt_port_netdev_flags="--ovnkube-node-mgmt-port-netdev ${OVNKUBE_NODE_MGMT_PORT_NETDEV}"
           fi
 
+          multi_network_enabled_flag=
+          if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" ]]; then
+            multi_network_enabled_flag="--enable-multi-network"
+          fi
+
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --nb-address "{{.OVN_NB_DB_LIST}}" \
             --sb-address "{{.OVN_SB_DB_LIST}}" \
@@ -363,6 +368,7 @@ spec:
             --export-ovs-metrics \
             --disable-snat-multiple-gws \
             ${export_network_flows_flags} \
+            ${multi_network_enabled_flag} \
             ${gw_interface_flag}
         env:
         # for kubectl
