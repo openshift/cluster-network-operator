@@ -48,6 +48,10 @@ func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, 
 			klog.Infof("AWS cluster, omitting MTU probing and using default of %d", azureMTU)
 			return azureMTU, nil
 		}
+		if infra.PlatformType == configv1.BareMetalPlatformType {
+			klog.Infof("Baremetal cluster, omitting MTU probing and using host local MTU")
+			return 0, nil
+		}
 	}
 	mtu, err := r.readMTUConfigMap(ctx)
 	if err == nil {
