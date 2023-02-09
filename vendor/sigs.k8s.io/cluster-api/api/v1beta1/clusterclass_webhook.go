@@ -26,24 +26,32 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"sigs.k8s.io/cluster-api/feature"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"sigs.k8s.io/cluster-api/feature"
 )
 
+// Deprecated: This file, including all public and private methods, will be removed in a future release.
+// The ClusterClass webhook validation implementation and API can now be found in the webhooks package.
+
+// SetupWebhookWithManager sets up ClusterClass webhooks.
+// Deprecated: This method is going to be removed in a next release.
+// Note: We're not using this method anymore and are using webhooks.ClusterClass.SetupWebhookWithManager instead.
+// Note: We don't have to call this func for the conversion webhook as there is only a single conversion webhook instance
+// for all resources and we already register it through other types.
 func (in *ClusterClass) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(in).
 		Complete()
 }
 
-// +kubebuilder:webhook:verbs=create;update,path=/validate-cluster-x-k8s-io-v1beta1-clusterclass,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=cluster.x-k8s.io,resources=clusterclasses,versions=v1beta1,name=validation.clusterclass.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-cluster-x-k8s-io-v1beta1-clusterclass,mutating=true,failurePolicy=fail,matchPolicy=Equivalent,groups=cluster.x-k8s.io,resources=clusterclasses,versions=v1beta1,name=default.clusterclass.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
-
 var _ webhook.Validator = &ClusterClass{}
 var _ webhook.Defaulter = &ClusterClass{}
 
 // Default satisfies the defaulting webhook interface.
+// Deprecated: This method is going to be removed in a next release.
+// Note: We're not using this method anymore and are using webhooks.ClusterClass.Default instead.
 func (in *ClusterClass) Default() {
 	// Default all namespaces in the references to the object namespace.
 	defaultNamespace(in.Spec.Infrastructure.Ref, in.Namespace)
@@ -60,17 +68,21 @@ func (in *ClusterClass) Default() {
 }
 
 func defaultNamespace(ref *corev1.ObjectReference, namespace string) {
-	if ref != nil && len(ref.Namespace) == 0 {
+	if ref != nil && ref.Namespace == "" {
 		ref.Namespace = namespace
 	}
 }
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
+// Deprecated: This method is going to be removed in a next release.
+// Note: We're not using this method anymore and are using webhooks.ClusterClass.ValidateCreate instead.
 func (in *ClusterClass) ValidateCreate() error {
 	return in.validate(nil)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
+// Deprecated: This method is going to be removed in a next release.
+// Note: We're not using this method anymore and are using webhooks.ClusterClass.ValidateUpdate instead.
 func (in *ClusterClass) ValidateUpdate(old runtime.Object) error {
 	oldClusterClass, ok := old.(*ClusterClass)
 	if !ok {
@@ -80,6 +92,8 @@ func (in *ClusterClass) ValidateUpdate(old runtime.Object) error {
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
+// Deprecated: This method is going to be removed in a next release.
+// Note: We're not using this method anymore and are using webhooks.ClusterClass.ValidateDelete instead.
 func (in *ClusterClass) ValidateDelete() error {
 	return nil
 }
