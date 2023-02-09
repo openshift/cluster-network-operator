@@ -75,6 +75,10 @@ const NetworkIPFamilyModeAnnotation = "networkoperator.openshift.io/ip-family-mo
 // to indicate the current list of clusterNetwork CIDRs available to the cluster.
 const ClusterNetworkCIDRsAnnotation = "networkoperator.openshift.io/cluster-network-cidr"
 
+// NetworkHybridOverlayAnnotatiion is an annotation on the OVN networks.operator.io.daemonsets
+// to indicate the current state of of the Hybrid overlay on the cluster: "enabled" or "disabled"
+const NetworkHybridOverlayAnnotation = "networkoperator.openshift.io/hybrid-overlay-status"
+
 // OVNRaftClusterInitiator is an annotation on the networks.operator.openshift.io CR to indicate
 // which node IP was the raft cluster initiator. The NB and SB DB will be initialized by the same member.
 const OVNRaftClusterInitiator = "networkoperator.openshift.io/ovn-cluster-initiator"
