@@ -50,6 +50,7 @@ enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 0
   minSyncPeriod: 0s
@@ -70,7 +71,6 @@ nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
 showHiddenMetricsForVersion: ""
-udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
   forwardHealthCheckVip: false
@@ -113,6 +113,7 @@ enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 14
   minSyncPeriod: 0s
@@ -133,7 +134,6 @@ nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
 showHiddenMetricsForVersion: ""
-udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
   forwardHealthCheckVip: false
@@ -172,6 +172,7 @@ enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 0
   minSyncPeriod: 0s
@@ -192,7 +193,6 @@ nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
 showHiddenMetricsForVersion: ""
-udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
   forwardHealthCheckVip: false
@@ -231,6 +231,7 @@ enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 0
   minSyncPeriod: 0s
@@ -251,7 +252,6 @@ nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
 showHiddenMetricsForVersion: ""
-udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
   forwardHealthCheckVip: false
@@ -293,6 +293,7 @@ enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: null
   masqueradeAll: true
   masqueradeBit: 0
   minSyncPeriod: 10s
@@ -315,7 +316,6 @@ nodePortAddresses: null
 oomScoreAdj: null
 portRange: 1000+10
 showHiddenMetricsForVersion: ""
-udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
   forwardHealthCheckVip: false
