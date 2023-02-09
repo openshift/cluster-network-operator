@@ -506,6 +506,7 @@ enableProfiling: true
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 0
   minSyncPeriod: 0s
@@ -526,7 +527,6 @@ nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
 showHiddenMetricsForVersion: ""
-udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
   forwardHealthCheckVip: false
@@ -565,6 +565,7 @@ enableProfiling: true
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 0
   minSyncPeriod: 0s
@@ -585,7 +586,6 @@ nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
 showHiddenMetricsForVersion: ""
-udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
   forwardHealthCheckVip: false
