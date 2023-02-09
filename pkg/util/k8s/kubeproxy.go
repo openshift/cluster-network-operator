@@ -66,8 +66,6 @@ func GenerateKubeProxyConfiguration(args map[string]operv1.ProxyArgumentList) (s
 
 	kpc.PortRange = ka.getPortRange("proxy-port-range")
 
-	kpc.UDPIdleTimeout.Duration = ka.getDuration("udp-timeout")
-
 	kpc.Conntrack.MaxPerCore = ka.getOptInt32("conntrack-max-per-core")
 	kpc.Conntrack.Min = ka.getOptInt32("conntrack-min")
 	if duration := ka.getDuration("conntrack-tcp-timeout-established"); duration != 0 {
