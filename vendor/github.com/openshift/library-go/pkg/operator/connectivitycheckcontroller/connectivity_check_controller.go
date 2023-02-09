@@ -4,19 +4,25 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"fmt"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/api/operatorcontrolplane/v1alpha1"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	configv1listers "github.com/openshift/client-go/config/listers/config/v1"
+	applyconfigv1alpha1 "github.com/openshift/client-go/operatorcontrolplane/applyconfigurations/operatorcontrolplane/v1alpha1"
 	operatorcontrolplaneclient "github.com/openshift/client-go/operatorcontrolplane/clientset/versioned"
+	operatorcontrolplaneinformers "github.com/openshift/client-go/operatorcontrolplane/informers/externalversions"
+	listerv1alpha1 "github.com/openshift/client-go/operatorcontrolplane/listers/operatorcontrolplane/v1alpha1"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
 
@@ -26,10 +32,17 @@ import (
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 )
 
+const (
+	managedByLabelKey   = "networking.openshift.io/managedBy"
+	managedByLabelValue = "oc-connectivity-check-controller"
+)
+
 type ConnectivityCheckController interface {
 	factory.Controller
 
 	WithPodNetworkConnectivityCheckFn(podNetworkConnectivityCheckFn PodNetworkConnectivityCheckFunc) ConnectivityCheckController
+	WithPodNetworkConnectivityCheckApplyFn(podNetworkConnectivityCheckApplyFn PodNetworkConnectivityCheckApplyFunc) ConnectivityCheckController
+	WithReapOldConnectivityCheck(operatorcontrolplaneInformers operatorcontrolplaneinformers.SharedInformerFactory) ConnectivityCheckController
 }
 
 func NewConnectivityCheckController(
@@ -73,16 +86,31 @@ type connectivityCheckController struct {
 	operatorcontrolplaneClient *operatorcontrolplaneclient.Clientset
 	apiextensionsClient        *apiextensionsclient.Clientset
 	clusterVersionLister       configv1listers.ClusterVersionLister
+	checkLister                listerv1alpha1.PodNetworkConnectivityCheckNamespaceLister
 
-	podNetworkConnectivityCheckFn PodNetworkConnectivityCheckFunc
+	podNetworkConnectivityCheckFn      PodNetworkConnectivityCheckFunc
+	podNetworkConnectivityCheckApplyFn PodNetworkConnectivityCheckApplyFunc
 
 	enabledByDefault bool
 }
 
 type PodNetworkConnectivityCheckFunc func(ctx context.Context, syncContext factory.SyncContext) ([]*v1alpha1.PodNetworkConnectivityCheck, error)
+type PodNetworkConnectivityCheckApplyFunc func(ctx context.Context, syncContext factory.SyncContext) ([]*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration, error)
 
 func (c *connectivityCheckController) WithPodNetworkConnectivityCheckFn(podNetworkConnectivityCheckFn PodNetworkConnectivityCheckFunc) ConnectivityCheckController {
 	c.podNetworkConnectivityCheckFn = podNetworkConnectivityCheckFn
+	return c
+}
+
+func (c *connectivityCheckController) WithPodNetworkConnectivityCheckApplyFn(podNetworkConnectivityCheckApplyFn PodNetworkConnectivityCheckApplyFunc) ConnectivityCheckController {
+	c.podNetworkConnectivityCheckApplyFn = podNetworkConnectivityCheckApplyFn
+	return c
+}
+
+func (c *connectivityCheckController) WithReapOldConnectivityCheck(operatorcontrolplaneInformers operatorcontrolplaneinformers.SharedInformerFactory) ConnectivityCheckController {
+	if operatorcontrolplaneInformers != nil {
+		c.checkLister = operatorcontrolplaneInformers.Controlplane().V1alpha1().PodNetworkConnectivityChecks().Lister().PodNetworkConnectivityChecks(c.namespace)
+	}
 	return c
 }
 
@@ -160,43 +188,104 @@ func (c *connectivityCheckController) Sync(ctx context.Context, syncContext fact
 		return nil
 	}
 
-	checks, err := c.podNetworkConnectivityCheckFn(ctx, syncContext)
+	var existingChecks []*v1alpha1.PodNetworkConnectivityCheck
+	if c.checkLister != nil {
+		existingChecks, err = c.checkLister.List(labels.Everything())
+		if err != nil {
+			return err
+		}
+	}
+
+	var newCheckNames sets.String
+	if c.podNetworkConnectivityCheckFn != nil {
+		newCheckNames, err = c.handlePodNetworkConnectivityCheckFn(ctx, syncContext)
+	} else if c.podNetworkConnectivityCheckApplyFn != nil {
+		newCheckNames, err = c.handlePodNetworkConnectivityCheckApplyFn(ctx, syncContext)
+	}
 	if err != nil {
 		return err
 	}
 
+	// TODO for checks which longer exist, mark them as completed
+
+	// reap old connectivity checks
+	for _, existingCheck := range existingChecks {
+		if value, ok := existingCheck.Labels[managedByLabelKey]; !ok || value != managedByLabelValue || newCheckNames.Has(existingCheck.Name) {
+			continue
+		}
+		err := c.operatorcontrolplaneClient.ControlplaneV1alpha1().PodNetworkConnectivityChecks(c.namespace).Delete(ctx, existingCheck.Name, metav1.DeleteOptions{})
+		if err != nil {
+			syncContext.Recorder().Eventf("EndpointCheckDeletionFailure", "%s: %v", resourcehelper.FormatResourceForCLIWithNamespace(existingCheck), err)
+			continue
+		}
+		syncContext.Recorder().Eventf("EndpointCheckDeleted", "Deleted %s because it is no more valid.", resourcehelper.FormatResourceForCLIWithNamespace(existingCheck))
+	}
+
+	return nil
+}
+
+func (c *connectivityCheckController) handlePodNetworkConnectivityCheckFn(ctx context.Context, syncContext factory.SyncContext) (sets.String, error) {
+	newChecks, err := c.podNetworkConnectivityCheckFn(ctx, syncContext)
+	if err != nil {
+		return nil, err
+	}
 	pnccClient := c.operatorcontrolplaneClient.ControlplaneV1alpha1().PodNetworkConnectivityChecks(c.namespace)
-	for _, check := range checks {
-		existing, err := pnccClient.Get(ctx, check.Name, metav1.GetOptions{})
+	newCheckNames := sets.NewString()
+	for _, newCheck := range newChecks {
+		newCheckNames.Insert(newCheck.Name)
+		existing, err := pnccClient.Get(ctx, newCheck.Name, metav1.GetOptions{})
 		if err == nil {
-			if equality.Semantic.DeepEqual(existing.Spec, check.Spec) {
+			if value, ok := existing.Labels[managedByLabelKey]; ok &&
+				value == managedByLabelValue && equality.Semantic.DeepEqual(existing.Spec, newCheck.Spec) {
 				// already exists, no changes, skip
 				continue
 			}
 			updated := existing.DeepCopy()
-			updated.Spec = *check.Spec.DeepCopy()
+			updated.Spec = *newCheck.Spec.DeepCopy()
+			updated = setWithManagedByLabel(updated)
 			_, err := pnccClient.Update(ctx, updated, metav1.UpdateOptions{})
 			if err != nil {
-				syncContext.Recorder().Warningf("EndpointDetectionFailure", "%s: %v", resourcehelper.FormatResourceForCLIWithNamespace(check), err)
+				syncContext.Recorder().Warningf("EndpointDetectionFailure", "%s: %v", resourcehelper.FormatResourceForCLIWithNamespace(newCheck), err)
 				continue
 			}
-			syncContext.Recorder().Eventf("EndpointCheckUpdated", "Updated %s because it changed.", resourcehelper.FormatResourceForCLIWithNamespace(check))
-		}
-		if errors.IsNotFound(err) {
-			_, err = pnccClient.Create(ctx, check, metav1.CreateOptions{})
-		}
-		if err != nil {
-			syncContext.Recorder().Warningf("EndpointDetectionFailure", "%s: %v", resourcehelper.FormatResourceForCLIWithNamespace(check), err)
+			syncContext.Recorder().Eventf("EndpointCheckUpdated", "Updated %s because it changed.", resourcehelper.FormatResourceForCLIWithNamespace(newCheck))
 			continue
 		}
-		syncContext.Recorder().Eventf("EndpointCheckCreated", "Created %s because it was missing.", resourcehelper.FormatResourceForCLIWithNamespace(check))
+		if errors.IsNotFound(err) {
+			newCheck = setWithManagedByLabel(newCheck)
+			_, err = pnccClient.Create(ctx, newCheck, metav1.CreateOptions{})
+		}
+		if err != nil {
+			syncContext.Recorder().Warningf("EndpointDetectionFailure", "%s: %v", resourcehelper.FormatResourceForCLIWithNamespace(newCheck), err)
+			continue
+		}
+		syncContext.Recorder().Eventf("EndpointCheckCreated", "Created %s because it was missing.", resourcehelper.FormatResourceForCLIWithNamespace(newCheck))
 	}
+	return newCheckNames, nil
+}
 
-	// TODO for checks which longer exist, mark them as completed
-
-	// TODO reap old connectivity checks
-
-	return nil
+func (c *connectivityCheckController) handlePodNetworkConnectivityCheckApplyFn(ctx context.Context, syncContext factory.SyncContext) (sets.String, error) {
+	newChecks, err := c.podNetworkConnectivityCheckApplyFn(ctx, syncContext)
+	if err != nil {
+		return nil, err
+	}
+	pnccClient := c.operatorcontrolplaneClient.ControlplaneV1alpha1().PodNetworkConnectivityChecks(c.namespace)
+	newCheckNames := sets.NewString()
+	for _, newCheck := range newChecks {
+		newCheckNames.Insert(*newCheck.Name)
+		newCheck.WithLabels(map[string]string{managedByLabelKey: managedByLabelValue})
+		_, err := pnccClient.Apply(ctx, newCheck, metav1.ApplyOptions{
+			Force:        true,
+			FieldManager: c.Name(),
+		})
+		newCheckStrForCLI := FormatResourceForCLIWithNamespace(newCheck)
+		if err != nil {
+			syncContext.Recorder().Warningf("EndpointDetectionFailure", "%s: %v", newCheckStrForCLI, err)
+			continue
+		}
+		syncContext.Recorder().Eventf("EndpointCheckApplied", "The check %s is applied", newCheckStrForCLI)
+	}
+	return newCheckNames, nil
 }
 
 //go:embed manifests
@@ -250,4 +339,19 @@ func (c *connectivityCheckController) enabled(operatorSpec *operatorv1.OperatorS
 		klog.V(3).Info("ConnectivityCheckController is disabled by default.")
 		return false, nil
 	}
+}
+
+func setWithManagedByLabel(check *v1alpha1.PodNetworkConnectivityCheck) *v1alpha1.PodNetworkConnectivityCheck {
+	if check == nil {
+		return check
+	}
+	if check.Labels == nil {
+		check.Labels = make(map[string]string)
+	}
+	check.Labels[managedByLabelKey] = managedByLabelValue
+	return check
+}
+
+func FormatResourceForCLIWithNamespace(pncc *applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration) string {
+	return fmt.Sprintf("%s/%s -n %s", *pncc.Kind, *pncc.Name, *pncc.Namespace)
 }
