@@ -25,31 +25,39 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"sigs.k8s.io/cluster-api/feature"
-	"sigs.k8s.io/cluster-api/util/version"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"sigs.k8s.io/cluster-api/feature"
+	"sigs.k8s.io/cluster-api/util/version"
 )
 
+// Deprecated: This file, including all public and private methods, will be removed in a future release.
+// The Cluster webhook validation implementation and API can now be found in the webhooks package.
+
+// SetupWebhookWithManager sets up Cluster webhooks.
+// Deprecated: This method is going to be removed in a next release.
+// Note: We're not using this method anymore and are using webhooks.Cluster.SetupWebhookWithManager instead.
+// Note: We don't have to call this func for the conversion webhook as there is only a single conversion webhook instance
+// for all resources and we already register it through other types.
 func (c *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(c).
 		Complete()
 }
 
-// +kubebuilder:webhook:verbs=create;update,path=/validate-cluster-x-k8s-io-v1beta1-cluster,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=cluster.x-k8s.io,resources=clusters,versions=v1beta1,name=validation.cluster.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-cluster-x-k8s-io-v1beta1-cluster,mutating=true,failurePolicy=fail,matchPolicy=Equivalent,groups=cluster.x-k8s.io,resources=clusters,versions=v1beta1,name=default.cluster.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
-
 var _ webhook.Defaulter = &Cluster{}
 var _ webhook.Validator = &Cluster{}
 
 // Default satisfies the defaulting webhook interface.
+// Deprecated: This method is going to be removed in a next release.
+// Note: We're not using this method anymore and are using webhooks.Cluster.Default instead.
 func (c *Cluster) Default() {
-	if c.Spec.InfrastructureRef != nil && len(c.Spec.InfrastructureRef.Namespace) == 0 {
+	if c.Spec.InfrastructureRef != nil && c.Spec.InfrastructureRef.Namespace == "" {
 		c.Spec.InfrastructureRef.Namespace = c.Namespace
 	}
 
-	if c.Spec.ControlPlaneRef != nil && len(c.Spec.ControlPlaneRef.Namespace) == 0 {
+	if c.Spec.ControlPlaneRef != nil && c.Spec.ControlPlaneRef.Namespace == "" {
 		c.Spec.ControlPlaneRef.Namespace = c.Namespace
 	}
 
@@ -63,11 +71,15 @@ func (c *Cluster) Default() {
 }
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
+// Deprecated: This method is going to be removed in a next release.
+// Note: We're not using this method anymore and are using webhooks.Cluster.ValidateCreate instead.
 func (c *Cluster) ValidateCreate() error {
 	return c.validate(nil)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
+// Deprecated: This method is going to be removed in a next release.
+// Note: We're not using this method anymore and are using webhooks.Cluster.ValidateUpdate instead.
 func (c *Cluster) ValidateUpdate(old runtime.Object) error {
 	oldCluster, ok := old.(*Cluster)
 	if !ok {
@@ -77,6 +89,8 @@ func (c *Cluster) ValidateUpdate(old runtime.Object) error {
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
+// Deprecated: This method is going to be removed in a next release.
+// Note: We're not using this method anymore and are using webhooks.Cluster.ValidateDelete instead.
 func (c *Cluster) ValidateDelete() error {
 	return nil
 }
@@ -133,7 +147,7 @@ func (c *Cluster) validateTopology(old *Cluster) field.ErrorList {
 	var allErrs field.ErrorList
 
 	// class should be defined.
-	if len(c.Spec.Topology.Class) == 0 {
+	if c.Spec.Topology.Class == "" {
 		allErrs = append(
 			allErrs,
 			field.Invalid(
@@ -173,30 +187,7 @@ func (c *Cluster) validateTopology(old *Cluster) field.ErrorList {
 		}
 	}
 
-	switch old {
-	case nil: // On create
-		// c.Spec.InfrastructureRef and c.Spec.ControlPlaneRef could not be set
-		if c.Spec.InfrastructureRef != nil {
-			allErrs = append(
-				allErrs,
-				field.Invalid(
-					field.NewPath("spec", "infrastructureRef"),
-					c.Spec.InfrastructureRef,
-					"cannot be set when a Topology is defined",
-				),
-			)
-		}
-		if c.Spec.ControlPlaneRef != nil {
-			allErrs = append(
-				allErrs,
-				field.Invalid(
-					field.NewPath("spec", "controlPlaneRef"),
-					c.Spec.ControlPlaneRef,
-					"cannot be set when a Topology is defined",
-				),
-			)
-		}
-	default: // On update
+	if old != nil { // On update
 		// Class could not be mutated.
 		if c.Spec.Topology.Class != old.Spec.Topology.Class {
 			allErrs = append(
