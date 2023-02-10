@@ -40,10 +40,8 @@ function override_install_manifests() {
 
 # Extract environment from a running cluster
 function extract_environment_from_running_cluster() {
-    if [[ ! -e "${CLUSTER_DIR}/env.sh" ]]; then
-        echo "Copying environment variables from manifest to ${CLUSTER_DIR}/env.sh"
-        oc get deployment -n openshift-network-operator network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
-    fi
+    echo "Copying environment variables from manifest to ${CLUSTER_DIR}/env.sh"
+    oc get deployment -n openshift-network-operator network-operator -ojsonpath='{range .spec.template.spec.containers[0].env[?(@.value)]}{.name}{"="}{.value}{"\n"}' > "${CLUSTER_DIR}/env.sh"
     if [[ $EXPORT_ENV_ONLY == true ]]; then
         exit 0
     fi
