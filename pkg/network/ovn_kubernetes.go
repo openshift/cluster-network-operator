@@ -351,6 +351,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["NorthdThreads"] = 4
 	}
 
+	data.Data["OVN_MULTI_NETWORK_ENABLE"] = true
+	if conf.DisableMultiNetwork != nil && *conf.DisableMultiNetwork {
+		data.Data["OVN_MULTI_NETWORK_ENABLE"] = false
+	}
+
 	var manifestSubDir string
 	manifestDirs := make([]string, 0, 2)
 	manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "network/ovn-kubernetes/common"))

@@ -171,6 +171,7 @@ func TestRenderedOVNKubernetesConfig(t *testing.T) {
 		masterIPs           []string
 		v4InternalSubnet    string
 		disableGRO          bool
+		disableMultiNet     bool
 	}
 	testcases := []testcase{
 		{
@@ -196,6 +197,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
 
 [gateway]
 mode=shared
@@ -225,6 +227,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
 
 [gateway]
 mode=shared
@@ -257,6 +260,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
 
 [gateway]
 mode=local
@@ -301,6 +305,7 @@ enable-egress-firewall=true
 enable-egress-qos=true
 egressip-reachability-total-timeout=3
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
 
 [gateway]
 mode=local
@@ -347,6 +352,7 @@ enable-egress-firewall=true
 enable-egress-qos=true
 egressip-reachability-total-timeout=0
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
 
 [gateway]
 mode=local
@@ -392,6 +398,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
 
 [gateway]
 mode=local
@@ -437,6 +444,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
 
 [gateway]
 mode=shared
@@ -471,6 +479,7 @@ enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
 
 [gateway]
 mode=shared
@@ -508,12 +517,43 @@ enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
 
 [gateway]
 mode=shared
 nodeport=true`,
 			masterIPs:  []string{"1.2.3.4", "2.3.4.5"},
 			disableGRO: true,
+		},
+		{
+			desc: "disabled multi-network",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://testing.test:8443"
+host-network-namespace="openshift-host-network"
+platform-type="GCP"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+egressip-node-healthcheck-port=9107
+
+[gateway]
+mode=shared
+nodeport=true`,
+			masterIPs:       []string{"1.2.3.4", "2.3.4.5"},
+			disableMultiNet: true,
 		},
 	}
 	g := NewGomegaWithT(t)
@@ -536,6 +576,8 @@ nodeport=true`,
 			if tc.v4InternalSubnet != "" {
 				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.V4InternalSubnet = tc.v4InternalSubnet
 			}
+
+			OVNKubeConfig.Spec.DisableMultiNetwork = &tc.disableMultiNet
 
 			crd := OVNKubeConfig.DeepCopy()
 			config := &crd.Spec

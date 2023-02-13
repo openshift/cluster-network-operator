@@ -849,6 +849,11 @@ spec:
             fi
           done
 
+          multi_network_enabled_flag=
+          if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" ]]; then
+            multi_network_enabled_flag="--enable-multi-network"
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --init-master "${K8S_NODE}" \
@@ -874,6 +879,7 @@ spec:
             --disable-snat-multiple-gws \
             --node-server-privkey ${TLS_PK} \
             --node-server-cert ${TLS_CERT} \
+            ${multi_network_enabled_flag} \
             --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
         volumeMounts:
         - mountPath: /etc/ovn
