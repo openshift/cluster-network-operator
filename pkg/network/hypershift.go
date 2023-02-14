@@ -9,6 +9,8 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
+const HyperShiftInternalRouteLabel = "hypershift.openshift.io/internal-route"
+
 func init() {
 	for _, label := range strings.Split(routeLabelsRaw, ",") {
 		if label == "" {
