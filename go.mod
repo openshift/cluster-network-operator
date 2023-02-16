@@ -148,6 +148,7 @@ require (
 replace (
 	github.com/openshift/hypershift/api => github.com/openshift/hypershift v0.0.0-20220323152148-c356b8b72d66
 
+	k8s.io/apimachinery => k8s.io/apimachinery v0.26.0-alpha.3.0.20221108052757-4fe4321a9d5e
 	// for Hypershift
 	kubevirt.io/containerized-data-importer-api => github.com/kubevirt/containerized-data-importer-api v1.41.1-0.20211201033752-05520fb9f18d
 	sigs.k8s.io/cluster-api-provider-kubevirt => github.com/openshift/cluster-api-provider-kubevirt v0.0.0-20211223062810-ef64d5ff1cde
