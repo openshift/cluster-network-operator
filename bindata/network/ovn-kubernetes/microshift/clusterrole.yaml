@@ -59,6 +59,8 @@ rules:
   - get
   - list
   - watch
+  - egressservices
+  - egressservices/status
 - apiGroups: ["apiextensions.k8s.io"]
   resources:
   - customresourcedefinitions
@@ -154,6 +156,8 @@ rules:
   - egressfirewalls
   - egressips
   - egressqoses
+  - egressservices
+  - egressservices/status
   verbs:
   - get
   - list

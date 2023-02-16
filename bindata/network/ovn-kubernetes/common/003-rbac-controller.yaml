@@ -87,6 +87,8 @@ rules:
   - egressfirewalls
   - egressips
   - egressqoses
+  - egressservices
+  - egressservices/status
   verbs:
   - get
   - list

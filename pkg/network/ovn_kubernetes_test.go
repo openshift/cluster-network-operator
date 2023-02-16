@@ -206,6 +206,7 @@ healthz-bind-address="0.0.0.0:10256"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
 
@@ -237,6 +238,7 @@ healthz-bind-address="0.0.0.0:10256"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
 
@@ -271,6 +273,7 @@ healthz-bind-address="0.0.0.0:10256"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
 
@@ -316,6 +319,7 @@ healthz-bind-address="0.0.0.0:10256"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+enable-egress-service=true
 egressip-reachability-total-timeout=3
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
@@ -364,6 +368,7 @@ healthz-bind-address="0.0.0.0:10256"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+enable-egress-service=true
 egressip-reachability-total-timeout=0
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
@@ -412,6 +417,7 @@ healthz-bind-address="0.0.0.0:10256"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
 
@@ -459,6 +465,7 @@ healthz-bind-address="0.0.0.0:10256"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
 
@@ -495,6 +502,7 @@ healthz-bind-address="0.0.0.0:10256"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
 
@@ -534,6 +542,7 @@ healthz-bind-address="0.0.0.0:10256"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
 
@@ -566,6 +575,7 @@ healthz-bind-address="0.0.0.0:10256"
 enable-egress-ip=true
 enable-egress-firewall=true
 enable-egress-qos=true
+enable-egress-service=true
 egressip-node-healthcheck-port=9107
 
 [gateway]

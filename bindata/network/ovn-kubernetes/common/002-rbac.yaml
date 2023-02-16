@@ -92,6 +92,8 @@ rules:
 - apiGroups: ["k8s.ovn.org"]
   resources:
   - egressips
+  - egressservices
+  - egressservices/status
   verbs:
   - get
   - list
