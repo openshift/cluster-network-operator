@@ -88,6 +88,8 @@ rules:
   - egressips
   - egressqoses
   - adminpolicybasedexternalroutes
+  - egressservices
+  - egressservices/status
   verbs:
   - get
   - list
