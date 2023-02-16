@@ -11,6 +11,7 @@ rules:
   - egressfirewalls
   - egressips
   - egressqoses
+  - egressservices
   - adminpolicybasedexternalroutes
   verbs:
   - get

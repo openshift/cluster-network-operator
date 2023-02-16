@@ -92,6 +92,7 @@ rules:
 - apiGroups: ["k8s.ovn.org"]
   resources:
   - egressips
+  - egressservices
   - adminpolicybasedexternalroutes
   verbs:
   - get
