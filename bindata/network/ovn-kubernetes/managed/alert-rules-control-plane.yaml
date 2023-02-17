@@ -27,7 +27,25 @@ spec:
       expr: abs(sum(ovn_db_cluster_outbound_connections_total{db_name="OVN_Northbound"}) - ({{.OvnkubeMasterReplicas}} * ({{.OvnkubeMasterReplicas}}-1)))
     - record: cluster:ovn_db_sbdb_missing_outbound_connections:abs
       expr: abs(sum(ovn_db_cluster_outbound_connections_total{db_name="OVN_Southbound"}) - ({{.OvnkubeMasterReplicas}} * ({{.OvnkubeMasterReplicas}}-1)))
-     # OVN kubernetes master functional alerts
+    # OVN kubernetes cluster manager functional alerts
+    - alert: V4SubnetAllocationThresholdExceeded
+      annotations:
+        summary: More than 80% of v4 subnets available to assign to the nodes are allocated. Current v4 subnet allocation percentage is {{"{{"}} $value | humanizePercentage {{"}}"}}.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/V4SubnetAllocationThresholdExceeded.md
+        description: More than 80% of IPv4 subnets are used. Insufficient IPv4 subnets could degrade provisioning of workloads.
+      expr: ovnkube_clustermanager_allocated_v4_host_subnets / ovnkube_clustermanager_num_v4_host_subnets > 0.8
+      for: 10m
+      labels:
+        severity: warning
+    - alert: V6SubnetAllocationThresholdExceeded
+      annotations:
+        summary: More than 80% of the v6 subnets available to assign to the nodes are allocated. Current v6 subnet allocation percentage is {{"{{"}} $value | humanizePercentage {{"}}"}}.
+        description: More than 80% of IPv6 subnets are used. Insufficient IPv6 subnets could degrade provisioning of workloads.
+      expr: ovnkube_clustermanager_allocated_v6_host_subnets / ovnkube_clustermanager_num_v6_host_subnets > 0.8
+      for: 10m
+      labels:
+        severity: warning
+    # OVN kubernetes master functional alerts
     - alert: NoRunningOvnMaster
       annotations:
         summary: There is no running ovn-kubernetes master.
@@ -56,24 +74,6 @@ spec:
       for: 5m
       labels:
         severity: critical
-    - alert: V4SubnetAllocationThresholdExceeded
-      annotations:
-        summary: More than 80% of v4 subnets available to assign to the nodes are allocated. Current v4 subnet allocation percentage is {{"{{"}} $value | humanizePercentage {{"}}"}}.
-        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/V4SubnetAllocationThresholdExceeded.md
-        description: More than 80% of IPv4 subnets are used. Insufficient IPv4 subnets could degrade provisioning of workloads.
-      expr: ovnkube_master_allocated_v4_host_subnets / ovnkube_master_num_v4_host_subnets > 0.8
-      for: 10m
-      labels:
-        severity: warning
-    - alert: V6SubnetAllocationThresholdExceeded
-      annotations:
-        summary: More than 80% of the v6 subnets available to assign to the nodes are allocated. Current v6 subnet allocation percentage is {{"{{"}} $value | humanizePercentage {{"}}"}}.
-        description: More than 80% of IPv6 subnets are used. Insufficient IPv6 subnets could degrade provisioning of workloads.
-      expr: ovnkube_master_allocated_v6_host_subnets / ovnkube_master_num_v6_host_subnets > 0.8
-      for: 10m
-      labels:
-        severity: warning
-
     # OVN northbound and southbound databases functional alerts
     - alert: NorthboundStale
       annotations:
