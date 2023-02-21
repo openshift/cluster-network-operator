@@ -56,7 +56,7 @@ func validateRaw(conf *operv1.AdditionalNetworkDefinition) []error {
 	confBytes := []byte(conf.RawCNIConfig)
 	err = json.Unmarshal(confBytes, &rawConfig)
 	if err != nil {
-		out = append(out, errors.Errorf("Failed to Unmarshal RawCNIConfig: %v", confBytes))
+		out = append(out, errors.Errorf("Failed to Unmarshal RawCNIConfig: %s", string(confBytes)))
 	}
 
 	return out
