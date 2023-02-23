@@ -42,14 +42,14 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-container-networking-plugins:latest
-  - name: ovn-kubernetes
+  - name: ovn-kubernetes-rhel-9
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-ovn-kubernetes:latest
-  - name: ovn-kubernetes-microshift
+      name: quay.io/openshift/origin-ovn-kubernetes-rhel-9:latest
+  - name: ovn-kubernetes-microshift-rhel-9
     from:
       kind: DockerImage
-      name: quay.io/openshift/origin-ovn-kubernetes-microshift:latest
+      name: quay.io/openshift/origin-ovn-kubernetes-microshift-rhel-9:latest
   - name: egress-router-cni
     from:
       kind: DockerImage
