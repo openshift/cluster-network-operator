@@ -62,3 +62,12 @@ spec:
       for: 15m
       labels:
         severity: warning
+    - alert: OVNKubernetesResourceRetryFailure
+      annotations:
+        summary: OVN Kubernetes failed to apply networking control plane configuration.
+        description: |
+          OVN Kubernetes failed to apply networking control plane configuration after several attempts. This might be because the configuration
+          provided by the user is invalid or because of an internal error. As a consequence, the cluster might have a degraded status.
+      expr: increase(ovnkube_resource_retry_failures_total[10m]) > 0
+      labels:
+        severity: warning
