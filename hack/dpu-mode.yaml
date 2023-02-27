@@ -1,9 +1,0 @@
-# Example ConfigMap to enable dpu-host mode with OVNKubernetes
-apiVersion: v1
-kind: ConfigMap
-metadata:
-    name: dpu-mode-config
-    namespace: openshift-network-operator
-data:
-    mode: "dpu-host"
-immutable: true

@@ -1,0 +1,11 @@
+# Example ConfigMap to watch for specific label names and resource names for hardware offloading with OVNKubernetes
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: hardware-offload-config
+    namespace: openshift-network-operator
+data:
+    dpu-host-mode-label: "network.operator.openshift.io/dpu-host"
+    dpu-mode-label: "network.operator.openshift.io/dpu"
+    smart-nic-mode-label: "network.operator.openshift.io/smart-nic"
+    mgmt-port-resource-name: "openshift.io/mgmtvf"
