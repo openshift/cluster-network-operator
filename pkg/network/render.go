@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -325,7 +326,9 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 		return nil
 	}
 
-	// Currently the only change we allow is switching to/from dual-stack.
+	// Currently the only changes we allow are:
+	//   -  switching to/from dual-stack.
+	//   -  ClusterNetwork modification (check isClusterNetworkChangeSafe()) for what is supported
 
 	// validateIPPools() will have ensured that each config is independently either
 	// a valid single-stack config or a valid dual-stack config. Make sure we have
@@ -338,13 +341,13 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 	case len(prev.ServiceNetwork) > len(next.ServiceNetwork):
 		// Going from dual to single
 		dualStack, singleStack = prev, next
+	case !reflect.DeepEqual(prev.ServiceNetwork, next.ServiceNetwork):
+		// If the ServiceNetwork has changed, but it's not part of a single<->dual stack migration
+		// then we do not support
+		return errors.Errorf("unsupported change to ServiceNetwork")
 	default:
-		// They didn't change single-vs-dual
-		if reflect.DeepEqual(prev.ServiceNetwork, next.ServiceNetwork) {
-			return errors.Errorf("unsupported change to ClusterNetwork")
-		} else {
-			return errors.Errorf("unsupported change to ServiceNetwork")
-		}
+		// this is not a single/dual stack migration; check if the clusterNetwork change is ok
+		return isClusterNetworkChangeSafe(prev, next)
 	}
 
 	// Validate that this is either a BareMetal or None PlatformType. For all other
@@ -382,6 +385,61 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 		}
 	}
 
+	return nil
+}
+
+func isClusterNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
+
+	// quick check to make sure clusterNetwork slices are of same size as we do not
+	// support adding/removing additional clusterNetwork entries unless it's for a
+	// single/dual stack migration. in those cases validation is done in isNetworkChangeSafe()
+	if len(prev.ClusterNetwork) != len(next.ClusterNetwork) {
+		return errors.Errorf("adding/removing clusterNetwork entries of the same type is not supported")
+	}
+
+	// Only support changing ClusterNetwork CIDR if it's OVNK
+	if !reflect.DeepEqual(next.DefaultNetwork.Type, operv1.NetworkTypeOVNKubernetes) {
+		return errors.Errorf("network type is %v. changing clusterNetwork entries is only supported for OVNKubernetes", next.DefaultNetwork.Type)
+	}
+
+	// sort prev and next just in case there was some re-ordering of the slice, since we
+	// want to know for sure we are comparing the same elements in each below
+	sort.SliceStable(prev.ClusterNetwork, func(i, j int) bool {
+		return prev.ClusterNetwork[i].CIDR < prev.ClusterNetwork[j].CIDR
+	})
+	sort.SliceStable(next.ClusterNetwork, func(i, j int) bool {
+		return next.ClusterNetwork[i].CIDR < next.ClusterNetwork[j].CIDR
+	})
+
+	// since we do not allow the clusterNetwork[] size to change, it should be safe to compare
+	// prev[i] to next[i] in this validation
+	for i, e := range prev.ClusterNetwork {
+		prevIp, prevMask, err := net.ParseCIDR(e.CIDR)
+		if err != nil {
+			return errors.Errorf("error parsing CIDR from ClusterNetwork entry %s: %v", e.CIDR, err)
+		}
+		nextIp, nextMask, err := net.ParseCIDR(next.ClusterNetwork[i].CIDR)
+		if err != nil {
+			return errors.Errorf("error parsing CIDR from ClusterNetwork entry %s: %v", next.ClusterNetwork[i].CIDR, err)
+		}
+		prevHostPrefix := e.HostPrefix
+		nextHostPrefix := next.ClusterNetwork[i].HostPrefix
+
+		// changing hostPrefix is not allowed
+		if prevHostPrefix != nextHostPrefix {
+			return errors.Errorf("modifying a clusterNetwork's hostPrefix value is unsupported")
+		}
+
+		if !prevIp.Equal(nextIp) {
+			return errors.Errorf("modifying IP network value for clusterNetwork CIDR is unsupported")
+		}
+
+		prevMaskSize, _ := prevMask.Mask.Size()
+		nextMaskSize, _ := nextMask.Mask.Size()
+		if prevMaskSize < nextMaskSize {
+			return errors.Errorf("reducing IP range with a larger CIDR mask for clusterNetwork CIDR is unsupported")
+		}
+	}
 	return nil
 }
 
