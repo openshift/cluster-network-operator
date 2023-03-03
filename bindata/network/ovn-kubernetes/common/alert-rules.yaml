@@ -71,3 +71,21 @@ spec:
       expr: increase(ovnkube_resource_retry_failures_total[10m]) > 0
       labels:
         severity: warning
+    - alert: OVNKubernetesNodeOVSOverflowUserspace
+      annotations:
+        summary: OVS vSwitch daemon drops packets due to buffer overflow.
+        description: Netlink messages dropped by OVS vSwitch daemon due to netlink socket buffer overflow.
+          This will result in packet loss.
+      expr: increase(ovs_vswitchd_netlink_overflow[5m]) > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: OVNKubernetesNodeOVSOverflowKernel
+      annotations:
+        summary: OVS kernel module drops packets due to buffer overflow.
+        description: Netlink messages dropped by OVS kernel module due to netlink socket buffer overflow.
+          This will result in packet loss.
+      expr: increase(ovs_vswitchd_dp_flows_lookup_lost[5m]) > 0
+      for: 15m
+      labels:
+        severity: warning
