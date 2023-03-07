@@ -369,7 +369,8 @@ spec:
             --disable-snat-multiple-gws \
             ${export_network_flows_flags} \
             ${multi_network_enabled_flag} \
-            ${gw_interface_flag}
+            ${gw_interface_flag} \
+            --ofctrl-wait-before-clear 10000
         env:
         # for kubectl
         - name: KUBERNETES_SERVICE_PORT

@@ -373,7 +373,8 @@ spec:
             --sb-address "" \
             --enable-multicast \
             --disable-snat-multiple-gws \
-            --acl-logging-rate-limit "20"
+            --acl-logging-rate-limit "20" \
+            --ofctrl-wait-before-clear 5000
         lifecycle:
           preStop:
             exec:
