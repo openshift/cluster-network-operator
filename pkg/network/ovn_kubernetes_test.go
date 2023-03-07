@@ -186,6 +186,7 @@ ovn-config-namespace="openshift-ovn-kubernetes"
 apiserver="https://testing.test:8443"
 host-network-namespace="openshift-host-network"
 platform-type="GCP"
+healthz-bind-address="0.0.0.0:10256"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -214,6 +215,7 @@ apiserver="https://testing.test:8443"
 host-network-namespace="openshift-host-network"
 no-hostsubnet-nodes="kubernetes.io/os=windows"
 platform-type="GCP"
+healthz-bind-address="0.0.0.0:10256"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -254,6 +256,7 @@ apiserver="https://testing.test:8443"
 host-network-namespace="openshift-host-network"
 no-hostsubnet-nodes="kubernetes.io/os=windows"
 platform-type="GCP"
+healthz-bind-address="0.0.0.0:10256"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -297,6 +300,7 @@ apiserver="https://testing.test:8443"
 host-network-namespace="openshift-host-network"
 no-hostsubnet-nodes="kubernetes.io/os=windows"
 platform-type="GCP"
+healthz-bind-address="0.0.0.0:10256"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
@@ -329,6 +333,7 @@ ovn-config-namespace="openshift-ovn-kubernetes"
 apiserver="https://testing.test:8443"
 host-network-namespace="openshift-host-network"
 platform-type="GCP"
+healthz-bind-address="0.0.0.0:10256"
 
 [ovnkubernetesfeature]
 enable-egress-ip=true
