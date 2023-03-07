@@ -39,7 +39,7 @@ func TestDisallowServiceNetworkChange(t *testing.T) {
 	g.Expect(err).To(MatchError(ContainSubstring("unsupported change to ServiceNetwork")))
 }
 
-func TestDisallowHostPrefixChange(t *testing.T) {
+func TestDisallowHostPrefixChangeOnSdn(t *testing.T) {
 	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
 
 	// Changes to the cluster network's prefix are not supported.
@@ -259,6 +259,15 @@ func TestDisallowExpandingClusterNetworkCIDRMaskForSDN(t *testing.T) {
 	g.Expect(err).To(MatchError(ContainSubstring("network type is OpenShiftSDN. changing clusterNetwork entries is only supported for OVNKubernetes")))
 }
 
+func TestDisallowHostPrefixChangeOnOvn(t *testing.T) {
+	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OVNKubernetesConfig, OVNKubernetesConfig)
+
+	// Changes to the cluster network's prefix are not supported.
+	next.ClusterNetwork[0].HostPrefix = 31
+	err := IsChangeSafe(prev, next, infra)
+	g.Expect(err).To(MatchError(ContainSubstring("invalid configuration: [modifying a clusterNetwork's hostPrefix value is unsupported]")))
+}
+
 func TestDisallowShrinkingClusterNetworkCIDRMaskForOVN(t *testing.T) {
 	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OVNKubernetesConfig, OVNKubernetesConfig)
 
@@ -272,7 +281,7 @@ func TestDisallowShrinkingClusterNetworkCIDRMaskForSDN(t *testing.T) {
 	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
 
 	// Changes to the cluster network's CIDR mask is not allowed for OpenShiftSDN.
-	next.ClusterNetwork[0].CIDR = "10.128.0.0/16"
+	next.ClusterNetwork[0].CIDR = "10.128.0.0/14"
 	err := IsChangeSafe(prev, next, infra)
 	g.Expect(err).To(MatchError(ContainSubstring("network type is OpenShiftSDN. changing clusterNetwork entries is only supported for OVNKubernetes")))
 }
