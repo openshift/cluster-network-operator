@@ -255,6 +255,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	data.Data["OVN_service_cidr"] = strings.Join(conf.ServiceNetwork, ",")
 
+	hybridOverlayStatus := "disabled"
 	if c.HybridOverlayConfig != nil {
 		if len(c.HybridOverlayConfig.HybridClusterNetwork) > 0 {
 			data.Data["OVNHybridOverlayNetCIDR"] = c.HybridOverlayConfig.HybridClusterNetwork[0].CIDR
@@ -267,6 +268,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			data.Data["OVNHybridOverlayVXLANPort"] = ""
 		}
 		data.Data["OVNHybridOverlayEnable"] = true
+		hybridOverlayStatus = "enabled"
 	} else {
 		data.Data["OVNHybridOverlayNetCIDR"] = ""
 		data.Data["OVNHybridOverlayEnable"] = false
@@ -372,6 +374,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		return nil, progressing, errors.Wrap(err, "failed to render manifests")
 	}
 	objs = append(objs, manifests...)
+
+	err = setOVNObjectAnnotation(objs, names.NetworkHybridOverlayAnnotation, hybridOverlayStatus)
+	if err != nil {
+		return nil, progressing, errors.Wrapf(err, "failed to set the status of hybrid overlay %s annotation on daemonsets or statefulsets", hybridOverlayStatus)
+	}
 
 	nodeMode := bootstrapResult.OVN.OVNKubernetesConfig.NodeMode
 	if nodeMode == OVN_NODE_MODE_DPU_HOST {
