@@ -9,6 +9,9 @@ metadata:
     release.openshift.io/version: "{{.ReleaseVersion}}"
     networkoperator.openshift.io/non-critical: ""
     network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
+  labels:
+    # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
+    hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
 spec:
   selector:
     matchLabels:
@@ -26,6 +29,15 @@ spec:
         type: infra
         openshift.io/component: network
     spec:
+      affinity:
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+                topologyKey: kubernetes.io/hostname
       securityContext:
         runAsNonRoot: true
         seccompProfile:
