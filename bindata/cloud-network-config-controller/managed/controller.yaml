@@ -30,6 +30,22 @@ spec:
         openshift.io/component: network
     spec:
       affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 50
+              preference:
+                matchExpressions:
+                  - key: hypershift.openshift.io/control-plane
+                    operator: In
+                    values:
+                      - "true"
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: hypershift.openshift.io/cluster
+                    operator: In
+                    values:
+                      - {{.HostedClusterNamespace}}
         podAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
@@ -178,8 +194,13 @@ spec:
           readOnly: true
         terminationMessagePolicy: FallbackToLogsOnError
       tolerations:
-      - key: "node-role.kubernetes.io/master"
-        operator: "Exists"
+      - key: "hypershift.openshift.io/control-plane"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      - key: "hypershift.openshift.io/cluster"
+        operator: "Equal"
+        value: {{.HostedClusterNamespace}}
         effect: "NoSchedule"
       volumes:
       - name: hosted-cluster-api-access
