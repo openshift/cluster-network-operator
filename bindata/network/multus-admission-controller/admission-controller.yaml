@@ -37,6 +37,22 @@ spec:
     spec:
 {{- if .HyperShiftEnabled}}
       affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 50
+              preference:
+                matchExpressions:
+                  - key: hypershift.openshift.io/control-plane
+                    operator: In
+                    values:
+                      - "true"
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: hypershift.openshift.io/cluster
+                    operator: In
+                    values:
+                      - {{.AdmissionControllerNamespace}}
         podAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
@@ -196,8 +212,18 @@ spec:
       - name: admin-kubeconfig
         secret:
           secretName: service-network-admin-kubeconfig
-{{- end }}
+      tolerations:
+        - key: "hypershift.openshift.io/control-plane"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+        - key: "hypershift.openshift.io/cluster"
+          operator: "Equal"
+          value: {{.AdmissionControllerNamespace}}
+          effect: "NoSchedule"
+{{- else }}
       tolerations:
       - key: "node-role.kubernetes.io/master"
         operator: Exists
         effect: NoSchedule
+{{- end }}
