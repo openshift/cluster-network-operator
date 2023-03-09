@@ -13,11 +13,11 @@ import (
 func Bootstrap(conf *operv1.Network, client cnoclient.Client) (*bootstrap.BootstrapResult, error) {
 	out := &bootstrap.BootstrapResult{}
 
-	i, err := platform.InfraStatus(client)
+	infraStatus, err := platform.InfraStatus(client)
 	if err != nil {
 		return nil, err
 	}
-	out.Infra = *i
+	out.Infra = *infraStatus
 
 	switch conf.Spec.DefaultNetwork.Type {
 	case operv1.NetworkTypeKuryr:
@@ -27,7 +27,7 @@ func Bootstrap(conf *operv1.Network, client cnoclient.Client) (*bootstrap.Bootst
 		}
 		out.Kuryr = *k
 	case operv1.NetworkTypeOVNKubernetes:
-		o, err := bootstrapOVN(conf, client)
+		o, err := bootstrapOVN(conf, client, infraStatus)
 		if err != nil {
 			return nil, err
 		}

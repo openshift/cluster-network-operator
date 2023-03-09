@@ -91,6 +91,9 @@ type InfraStatus struct {
 
 	// Proxy settings to use for all communication to the KAS
 	Proxy configv1.ProxyStatus
+
+	// HostedControlPlane defines the hosted control plane, only used in HyperShift
+	HostedControlPlane *hyperv1.HostedControlPlane
 }
 
 // APIServer is the hostname & port of a given APIServer. (This is the
