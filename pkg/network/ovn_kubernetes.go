@@ -525,7 +525,7 @@ func renderOVNFlowsConfig(bootstrapResult *bootstrap.BootstrapResult, data *rend
 	}
 }
 
-func bootstrapOVNHyperShiftConfig(hc *platform.HyperShiftConfig, kubeClient cnoclient.Client) (*bootstrap.OVNHyperShiftBootstrapResult, error) {
+func bootstrapOVNHyperShiftConfig(hc *platform.HyperShiftConfig, kubeClient cnoclient.Client, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNHyperShiftBootstrapResult, error) {
 	ovnHypershiftResult := &bootstrap.OVNHyperShiftBootstrapResult{
 		Enabled:            hc.Enabled,
 		Namespace:          hc.Namespace,
@@ -537,15 +537,7 @@ func bootstrapOVNHyperShiftConfig(hc *platform.HyperShiftConfig, kubeClient cnoc
 		return ovnHypershiftResult, nil
 	}
 
-	hcp := &hyperv1.HostedControlPlane{ObjectMeta: metav1.ObjectMeta{Name: hc.Name}}
-	err := kubeClient.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, hcp)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			klog.Infof("Did not find hosted control plane")
-		} else {
-			return nil, fmt.Errorf("Could not get hosted control plane: %v", err)
-		}
-	}
+	hcp := infraStatus.HostedControlPlane
 
 	ovnHypershiftResult.ClusterID = hcp.Spec.ClusterID
 	switch hcp.Spec.ControllerAvailabilityPolicy {
@@ -609,7 +601,7 @@ func bootstrapOVNHyperShiftConfig(hc *platform.HyperShiftConfig, kubeClient cnoc
 		{
 			svc := &corev1.Service{}
 			clusterClient := kubeClient.ClientFor(names.ManagementClusterName)
-			err = clusterClient.CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: "ovnkube-master-external"}, svc)
+			err := clusterClient.CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: "ovnkube-master-external"}, svc)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					klog.Infof("Did not find ovnkube-master service")
@@ -670,7 +662,7 @@ func getDisableUDPAggregation(cl crclient.Reader) bool {
 
 // bootstrapOVNConfig returns the value of mode found in the openshift-ovn-kubernetes/dpu-mode-config configMap
 // if it exists, otherwise returns default configuration for OCP clusters using OVN-Kubernetes
-func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *platform.HyperShiftConfig) (*bootstrap.OVNConfigBoostrapResult, error) {
+func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *platform.HyperShiftConfig, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNConfigBoostrapResult, error) {
 	ovnConfigResult := &bootstrap.OVNConfigBoostrapResult{
 		NodeMode: OVN_NODE_MODE_FULL,
 	}
@@ -679,7 +671,7 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *p
 	}
 
 	var err error
-	ovnConfigResult.HyperShiftConfig, err = bootstrapOVNHyperShiftConfig(hc, kubeClient)
+	ovnConfigResult.HyperShiftConfig, err = bootstrapOVNHyperShiftConfig(hc, kubeClient, infraStatus)
 	if err != nil {
 		return nil, err
 	}
@@ -1090,7 +1082,7 @@ func getMasterAddresses(kubeClient crclient.Client, controlPlaneReplicaCount int
 	return ovnMasterAddresses, timeout, nil
 }
 
-func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client) (*bootstrap.OVNBootstrapResult, error) {
+func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNBootstrapResult, error) {
 	clusterConfig := &corev1.ConfigMap{}
 	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
 
@@ -1104,7 +1096,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client) (*bootstrap
 	}
 
 	hc := platform.NewHyperShiftConfig()
-	ovnConfigResult, err := bootstrapOVNConfig(conf, kubeClient, hc)
+	ovnConfigResult, err := bootstrapOVNConfig(conf, kubeClient, hc, infraStatus)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to bootstrap OVN config, err: %v", err)
 	}
