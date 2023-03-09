@@ -1,4 +1,4 @@
-package network
+package platform
 
 import (
 	"fmt"
