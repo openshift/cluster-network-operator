@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 
 	"github.com/pkg/errors"
 
@@ -82,7 +83,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 
 	manifestDirs := make([]string, 0, 2)
 	manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "cloud-network-config-controller/common"))
-	if hcpCfg := NewHyperShiftConfig(); hcpCfg.Enabled {
+	if hcpCfg := platform.NewHyperShiftConfig(); hcpCfg.Enabled {
 		data.Data["CLIImage"] = os.Getenv("CLI_IMAGE")
 		data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
 		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")

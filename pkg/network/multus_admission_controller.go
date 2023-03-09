@@ -12,6 +12,7 @@ import (
 
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -69,7 +70,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	data.Data["ExternalControlPlane"] = externalControlPlane
 	data.Data["Replicas"] = replicas
 	// Hypershift
-	hsc := NewHyperShiftConfig()
+	hsc := platform.NewHyperShiftConfig()
 	data.Data["HyperShiftEnabled"] = hsc.Enabled
 	data.Data["ManagementClusterName"] = names.ManagementClusterName
 	data.Data["AdmissionControllerNamespace"] = "openshift-multus"
@@ -102,7 +103,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 		if err != nil {
 			return nil, fmt.Errorf("failed to get hosted controlplane: %v", err)
 		}
-		data.Data["ClusterIDLabel"] = ClusterIDLabel
+		data.Data["ClusterIDLabel"] = platform.ClusterIDLabel
 		data.Data["ClusterID"] = hcp.Spec.ClusterID
 	}
 
