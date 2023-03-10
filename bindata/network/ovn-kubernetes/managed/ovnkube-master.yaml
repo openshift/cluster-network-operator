@@ -1022,8 +1022,12 @@ spec:
         volumeMounts:
         - mountPath: /etc/kubernetes/
           name: admin-kubeconfig
-        - mountPath: /etc/konnectivity-proxy-tls
+        - mountPath: /etc/konnectivity/proxy-client
           name: konnectivity-proxy-cert
+          readOnly: true
+        - mountPath: /etc/konnectivity/proxy-ca
+          name: konnectivity-proxy-ca
+          readOnly: true
         resources:
           requests:
             cpu: 10m
@@ -1039,8 +1043,12 @@ spec:
       - name: ovnkube-config
         configMap:
           name: ovnkube-config
+      - name: konnectivity-proxy-ca
+        configMap:
+          name: konnectivity-ca-bundle
       - name: konnectivity-proxy-cert
         secret:
+          defaultMode: 0640
           secretName: konnectivity-client
       - name: env-overrides
         configMap:
