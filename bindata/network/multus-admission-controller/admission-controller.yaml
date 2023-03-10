@@ -6,6 +6,10 @@ metadata:
   namespace: {{.AdmissionControllerNamespace}}
   labels:
     app: multus-admission-controller
+{{- if .HyperShiftEnabled}}
+    # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
+    hypershift.openshift.io/hosted-control-plane: {{.AdmissionControllerNamespace}}
+{{- end }}
   annotations:
     kubernetes.io/description: |
       This deployment launches the Multus admisson controller component.
@@ -32,6 +36,31 @@ spec:
         openshift.io/component: network
     spec:
 {{- if .HyperShiftEnabled}}
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 50
+              preference:
+                matchExpressions:
+                  - key: hypershift.openshift.io/control-plane
+                    operator: In
+                    values:
+                      - "true"
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: hypershift.openshift.io/cluster
+                    operator: In
+                    values:
+                      - {{.AdmissionControllerNamespace}}
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    hypershift.openshift.io/hosted-control-plane: {{.AdmissionControllerNamespace}}
+                topologyKey: kubernetes.io/hostname
       initContainers:
         - name: hosted-cluster-kubecfg-setup
           image: "{{.CLIImage}}"
@@ -183,8 +212,18 @@ spec:
       - name: admin-kubeconfig
         secret:
           secretName: service-network-admin-kubeconfig
-{{- end }}
+      tolerations:
+        - key: "hypershift.openshift.io/control-plane"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+        - key: "hypershift.openshift.io/cluster"
+          operator: "Equal"
+          value: {{.AdmissionControllerNamespace}}
+          effect: "NoSchedule"
+{{- else }}
       tolerations:
       - key: "node-role.kubernetes.io/master"
         operator: Exists
         effect: NoSchedule
+{{- end }}
