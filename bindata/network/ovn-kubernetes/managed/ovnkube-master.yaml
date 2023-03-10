@@ -62,6 +62,22 @@ spec:
         kubernetes.io/os: "linux"
     spec:
       affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchExpressions:
+                - key: hypershift.openshift.io/control-plane
+                  operator: In
+                  values:
+                    - "true"
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: hypershift.openshift.io/cluster
+                  operator: In
+                  values:
+                    - {{.HostedClusterNamespace}}
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
@@ -1056,3 +1072,12 @@ spec:
           items:
             - key: ca.crt
               path: ca.crt
+      tolerations:
+        - key: "hypershift.openshift.io/control-plane"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+        - key: "hypershift.openshift.io/cluster"
+          operator: "Equal"
+          value: {{.HostedClusterNamespace}}
+          effect: "NoSchedule"

@@ -9,6 +9,9 @@ metadata:
     release.openshift.io/version: "{{.ReleaseVersion}}"
     networkoperator.openshift.io/non-critical: ""
     network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
+  labels:
+    # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
+    hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
 spec:
   selector:
     matchLabels:
@@ -26,6 +29,32 @@ spec:
         type: infra
         openshift.io/component: network
     spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 50
+              preference:
+                matchExpressions:
+                  - key: hypershift.openshift.io/control-plane
+                    operator: In
+                    values:
+                      - "true"
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: hypershift.openshift.io/cluster
+                    operator: In
+                    values:
+                      - {{.HostedClusterNamespace}}
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+                topologyKey: kubernetes.io/hostname
+      priorityClassName: hypershift-control-plane
       securityContext:
         runAsNonRoot: true
         seccompProfile:
@@ -166,8 +195,13 @@ spec:
           readOnly: true
         terminationMessagePolicy: FallbackToLogsOnError
       tolerations:
-      - key: "node-role.kubernetes.io/master"
-        operator: "Exists"
+      - key: "hypershift.openshift.io/control-plane"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      - key: "hypershift.openshift.io/cluster"
+        operator: "Equal"
+        value: {{.HostedClusterNamespace}}
         effect: "NoSchedule"
       volumes:
       - name: hosted-cluster-api-access
