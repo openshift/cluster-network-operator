@@ -33,6 +33,7 @@ type OVNHyperShiftBootstrapResult struct {
 	OVNSbDbRouteHost          string
 	OVNSbDbRouteNodePort      int32
 	OVNSbDbRouteLabels        map[string]string
+	HCPNodeSelector           map[string]string
 	ControlPlaneReplicas      int
 }
 
