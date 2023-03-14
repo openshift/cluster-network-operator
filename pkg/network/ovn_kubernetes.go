@@ -173,6 +173,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNDbServiceType"] = corev1.ServiceTypeClusterIP
 	data.Data["OVNSbDbRouteHost"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost
 	data.Data["OVNSbDbRouteLabels"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteLabels
+	data.Data["HCPNodeSelector"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.HCPNodeSelector
 	data.Data["OVN_SB_NODE_PORT"] = nil
 	data.Data["OVN_NB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
 	data.Data["OVN_SB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
@@ -517,6 +518,7 @@ func bootstrapOVNHyperShiftConfig(hc *platform.HyperShiftConfig, kubeClient cnoc
 	hcp := infraStatus.HostedControlPlane
 
 	ovnHypershiftResult.ClusterID = hcp.Spec.ClusterID
+	ovnHypershiftResult.HCPNodeSelector = hcp.Spec.NodeSelector
 	switch hcp.Spec.ControllerAvailabilityPolicy {
 	case hyperv1.HighlyAvailable:
 		ovnHypershiftResult.ControlPlaneReplicas = 3
