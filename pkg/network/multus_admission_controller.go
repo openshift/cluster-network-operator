@@ -98,6 +98,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 
 		data.Data["ClusterIDLabel"] = platform.ClusterIDLabel
 		data.Data["ClusterID"] = bootstrapResult.Infra.HostedControlPlane.Spec.ClusterID
+		data.Data["HCPNodeSelector"] = bootstrapResult.Infra.HostedControlPlane.Spec.NodeSelector
 	}
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus-admission-controller"), &data)
