@@ -537,7 +537,6 @@ spec:
   template:
     metadata:
       labels:
-        tier: node
         app: whereabouts-reconciler
         name: whereabouts-reconciler
     spec:
@@ -568,12 +567,15 @@ spec:
           limits:
             cpu: "50m"
             memory: "100Mi"
-        securityContext:
-          privileged: true
         volumeMounts:
           - name: cni-net-dir
             mountPath: /host/etc/cni/net.d
         env:
+        - name: NODENAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
         - name: KUBERNETES_SERVICE_PORT
           value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: KUBERNETES_SERVICE_HOST
