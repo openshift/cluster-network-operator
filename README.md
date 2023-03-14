@@ -19,7 +19,7 @@ The network operator gets its configuration from two objects: the Cluster and th
 Any changes to the Cluster configuration are propagated down in to the Operator configuration. In the event of conflicts, the Operator configuration will be updated to match the Cluster configuration.
 
 For example, if you want to use OVN networking instead of the default SDN networking, do the following:
- 
+
 Create the cluster using openshift-install and generate the install-config. Use a convenient directory for the cluster.
 ```
 $ openshift-install --dir=MY_CLUSTER create install-config
@@ -108,7 +108,7 @@ spec:
 ## Configuring IP address pools
 The ClusterNetworks and ServiceNetwork are configured in the `MY_CLUSTER/install-config` from above. They cannot be changed in the manifests.
 
-Users must supply at least two address pools - ClusterNetwork for pods, and ServiceNetwork for services. Some network plugins, such as OpenShiftSDN and OVNKubernetes, support multiple ClusterNetworks. All address blocks must be non-overlapping and a multiple of `hostPrefix`. 
+Users must supply at least two address pools - ClusterNetwork for pods, and ServiceNetwork for services. Some network plugins, such as OpenShiftSDN and OVNKubernetes, support multiple ClusterNetworks. All address blocks must be non-overlapping and a multiple of `hostPrefix`.
 
 For future expansion, multiple `serviceNetwork` entries are allowed by the configuration but not actually supported by any network plugins. Supplying multiple addresses is invalid.
 
@@ -332,15 +332,15 @@ Example of disabling IPsec at runtime:
 $ oc patch networks.operator.openshift.io cluster --type=json -p='[{"op":"remove", "path":"/spec/defaultNetwork/ovnKubernetesConfig/ipsecConfig"}]'
 ```
 
-#### Configuring Network Policy audit logging with OVNKubernetes 
+#### Configuring Network Policy audit logging with OVNKubernetes
 
-OVNKubernetes supports audit logging of network policy traffic events.  Add the following to the `spec:` section of the operator config: 
+OVNKubernetes supports audit logging of network policy traffic events.  Add the following to the `spec:` section of the operator config:
 
 ```yaml
 spec:
   defaultNetwork:
     type: OVNKubernetes
-    ovnKubernetesConfig: 
+    ovnKubernetesConfig:
       policyAuditingConfig:
         maxFileSize: 1
         rateLimit: 5
