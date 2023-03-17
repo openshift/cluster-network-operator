@@ -17,6 +17,7 @@ import (
 	configv1listers "github.com/openshift/client-go/config/listers/config/v1"
 	applyconfigv1alpha1 "github.com/openshift/client-go/operatorcontrolplane/applyconfigurations/operatorcontrolplane/v1alpha1"
 	operatorcontrolplaneclient "github.com/openshift/client-go/operatorcontrolplane/clientset/versioned"
+	operatorcontrolplaneinformers "github.com/openshift/client-go/operatorcontrolplane/informers/externalversions"
 	"github.com/openshift/cluster-network-operator/pkg/controller/eventrecorder"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/connectivitycheckcontroller"
@@ -51,6 +52,7 @@ func NewNetworkConnectivityCheckController(
 	kubeInformersForNamespaces v1helpers.KubeInformersForNamespaces,
 	configInformers configinformers.SharedInformerFactory,
 	apiextensionsInformers apiextensionsinformers.SharedInformerFactory,
+	operatorcontrolplaneInformers operatorcontrolplaneinformers.SharedInformerFactory,
 	recorder events.Recorder,
 ) NetworkConnectivityCheckController {
 	c := networkConnectivityCheckController{
@@ -76,6 +78,7 @@ func NewNetworkConnectivityCheckController(
 			true,
 		),
 	}
+	c.ConnectivityCheckController = c.WithReapOldConnectivityCheck(operatorcontrolplaneInformers)
 	generator := &connectivityCheckTemplateProvider{
 		operatorClient:                    operatorClient,
 		operatorcontrolplaneClient:        operatorcontrolplaneClient,
@@ -421,6 +424,8 @@ func Start(ctx context.Context, kubeConfig *rest.Config) error {
 		"",
 	)
 	configInformers := configinformers.NewSharedInformerFactory(configClient, 10*time.Minute)
+	operatorcontrolplaneInformers := operatorcontrolplaneinformers.NewSharedInformerFactoryWithOptions(operatorcontrolplaneClient,
+		10*time.Minute, operatorcontrolplaneinformers.WithNamespace("openshift-network-diagnostics"))
 	connectivityCheckController := NewNetworkConnectivityCheckController(
 		operatorClient,
 		operatorcontrolplaneClient,
@@ -428,6 +433,7 @@ func Start(ctx context.Context, kubeConfig *rest.Config) error {
 		kubeInformersForNamespaces,
 		configInformers,
 		apiextensionsInformers,
+		operatorcontrolplaneInformers,
 		eventRecorder,
 	)
 
@@ -436,6 +442,7 @@ func Start(ctx context.Context, kubeConfig *rest.Config) error {
 	kubeInformersForNamespaces.Start(ctx.Done())
 	dynamicInformers.Start(ctx.Done())
 	configInformers.Start(ctx.Done())
+	operatorcontrolplaneInformers.Start(ctx.Done())
 
 	return nil
 }
