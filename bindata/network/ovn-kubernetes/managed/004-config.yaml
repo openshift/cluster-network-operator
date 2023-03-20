@@ -26,6 +26,7 @@ data:
     no-hostsubnet-nodes="kubernetes.io/os=windows"
 {{- end  }}
     platform-type="{{.PlatformType}}"
+    healthz-bind-address="0.0.0.0:10256"
  
     [ovnkubernetesfeature]
     enable-egress-ip=true
