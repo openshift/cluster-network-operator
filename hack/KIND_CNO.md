@@ -1,5 +1,6 @@
 # Kubernetes in Docker (KIND) CNO Deployment
 
+
 The [KIND](https://github.com/kubernetes-sigs/kind) deployment is used for reproducing an OpenShift networking
 environment with upstream K8S. The value proposition is really for developers who want to reproduce an issue or test a
 fix in an environment that can be brought up locally and within a few minutes.
