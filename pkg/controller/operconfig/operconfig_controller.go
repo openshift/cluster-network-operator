@@ -415,7 +415,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if setDegraded {
 		r.status.SetDegraded(statusmanager.OperatorConfig, "ApplyOperatorConfig",
 			fmt.Sprintf("Error while updating operator configuration: %v", degradedErr))
-		return reconcile.Result{}, err
+		return reconcile.Result{}, degradedErr
 	}
 
 	if operConfig.Spec.Migration != nil && operConfig.Spec.Migration.NetworkType != "" {
