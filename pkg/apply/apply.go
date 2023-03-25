@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -107,7 +108,39 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 
 	fieldManager := "cluster-network-operator"
 	if subcontroller != "" {
+		depreciatedFieldManager := fieldManager
 		fieldManager = fmt.Sprintf("%s/%s", fieldManager, subcontroller)
+
+		if us, err := clusterClient.Dynamic().Resource(rm.Resource).Namespace(namespace).Get(ctx, name, metav1.GetOptions{}); err == nil {
+			// Prior to OCP 4.11, we used "cluster-network-operator" as the field manager name and the Operation type
+			// was always 'Update'.
+			// In OCP 4.11 and later, we changed the field manager name by appending 'subcontroller'
+			// to the field manager without handling our previous manager field. The operation also changed to 'Apply'.
+			// This means there would be two field managers sharing ownership of some fields but also
+			// managers individually owning field. This may mean if we removed a field in our spec,
+			// by simply not defining it, implying we wish to remove it and if we upgraded from a
+			// cluster using the depreciated field manager to the current defined field manager, it may
+			// not be deleted following an apply patch operation.
+			// Therefore, we need to check if the depreciated field manager exists and if so, remove all fields it
+			// manages.
+			// This should be removed in 4.18 when we will be sure all depreciated field manager names
+			// do not exist anymore.
+
+			// Ensure the current field manager has Apply'd at least once. This is to ensure
+			// that no newly created field manager is created if we remove a field manager.
+			if managerOpExists(us.GetManagedFields(), fieldManager, metav1.ManagedFieldsOperationApply) {
+				// check if the depreciated manager + operation is present
+				if managerOpExists(us.GetManagedFields(), depreciatedFieldManager, metav1.ManagedFieldsOperationUpdate) {
+					if err = depreciateFieldManager(ctx, clusterClient, depreciatedFieldManager, us.GetManagedFields(),
+						us.GetAPIVersion(), us.GetKind(), us.GetName(), us.GetNamespace(), rm.Resource); err != nil {
+						klog.Errorf("Failed to depreciate field manager %q: %w", depreciatedFieldManager, err)
+					} else {
+						klog.Infof("Depreciated field manager %q from obj %s/%s", depreciatedFieldManager,
+							us.GetNamespace(), us.GetName())
+					}
+				}
+			}
+		}
 	}
 
 	// Use server-side apply to merge the desired object with the object on disk
