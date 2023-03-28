@@ -213,18 +213,23 @@ spec:
       volumes:
       - name: webhook-certs
         secret:
+{{- if .HyperShiftEnabled}}
+          defaultMode: 0640
+{{- end }}
           secretName: multus-admission-controller-secret
 {{- if .HyperShiftEnabled}}
       - name: hosted-cluster-api-access
         emptyDir: {}
       - name: hosted-ca-cert
         secret:
+          defaultMode: 0640
           secretName: root-ca
           items:
             - key: ca.crt
               path: ca.crt
       - name: admin-kubeconfig
         secret:
+          defaultMode: 0640
           secretName: service-network-admin-kubeconfig
 {{- if not (eq .RunAsUser "")}}
       securityContext:
