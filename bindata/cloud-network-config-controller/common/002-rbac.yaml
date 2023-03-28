@@ -23,6 +23,15 @@ rules:
   - patch
   - update
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - featuregates
+  - clusterversions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - ""
   resources:
   - nodes
