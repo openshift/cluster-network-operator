@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 
 	"github.com/openshift/library-go/pkg/operator/management"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctmanager "sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -50,7 +51,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		MapperProvider: func(cfg *rest.Config) (meta.RESTMapper, error) {
 			return o.client.Default().RESTMapper(), nil
 		},
-		MetricsBindAddress: "0",
+		MetricsBindAddress:     "0",
+		HealthProbeBindAddress: "0.0.0.0:6060",
 	})
 	if err != nil {
 		return err
@@ -84,6 +86,13 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	klog.Info("Adding controller-runtime controllers")
 	if err := controller.AddToManager(o.manager, o.StatusManager, o.client); err != nil {
 		return fmt.Errorf("Failed to add controllers to manager: %w", err)
+	}
+
+	if err := o.manager.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		return fmt.Errorf("unable to set up health check: %v", err)
+	}
+	if err := o.manager.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		return fmt.Errorf("unable to set up ready check: %v", err)
 	}
 
 	// Initialize individual (non-controller-runtime) controllers
