@@ -11,5 +11,5 @@ import (
 	_ "github.com/openshift/build-machinery-go"
 	_ "k8s.io/code-generator"
 
-	_ "github.com/openshift/hypershift/api/v1alpha1"
+	_ "github.com/openshift/hypershift/api/v1beta1"
 )
