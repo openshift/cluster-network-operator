@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	"fmt"
+	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/feature"
+	"sigs.k8s.io/cluster-api/util/version"
 )
 
 func (m *MachinePool) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -49,11 +52,11 @@ func (m *MachinePool) Default() {
 	m.Labels[clusterv1.ClusterLabelName] = m.Spec.ClusterName
 
 	if m.Spec.Replicas == nil {
-		m.Spec.Replicas = pointer.Int32Ptr(1)
+		m.Spec.Replicas = pointer.Int32(1)
 	}
 
 	if m.Spec.MinReadySeconds == nil {
-		m.Spec.MinReadySeconds = pointer.Int32Ptr(0)
+		m.Spec.MinReadySeconds = pointer.Int32(0)
 	}
 
 	if m.Spec.Template.Spec.Bootstrap.ConfigRef != nil && m.Spec.Template.Spec.Bootstrap.ConfigRef.Namespace == "" {
@@ -62,6 +65,12 @@ func (m *MachinePool) Default() {
 
 	if m.Spec.Template.Spec.InfrastructureRef.Namespace == "" {
 		m.Spec.Template.Spec.InfrastructureRef.Namespace = m.Namespace
+	}
+
+	// tolerate version strings without a "v" prefix: prepend it if it's not there.
+	if m.Spec.Template.Spec.Version != nil && !strings.HasPrefix(*m.Spec.Template.Spec.Version, "v") {
+		normalizedVersion := "v" + *m.Spec.Template.Spec.Version
+		m.Spec.Template.Spec.Version = &normalizedVersion
 	}
 }
 
@@ -85,12 +94,21 @@ func (m *MachinePool) ValidateDelete() error {
 }
 
 func (m *MachinePool) validate(old *MachinePool) error {
+	// NOTE: MachinePool is behind MachinePool feature gate flag; the web hook
+	// must prevent creating new objects new case the feature flag is disabled.
+	specPath := field.NewPath("spec")
+	if !feature.Gates.Enabled(feature.MachinePool) {
+		return field.Forbidden(
+			specPath,
+			"can be set only if the MachinePool feature flag is enabled",
+		)
+	}
 	var allErrs field.ErrorList
 	if m.Spec.Template.Spec.Bootstrap.ConfigRef == nil && m.Spec.Template.Spec.Bootstrap.DataSecretName == nil {
 		allErrs = append(
 			allErrs,
 			field.Required(
-				field.NewPath("spec", "template", "spec", "bootstrap", "data"),
+				specPath.Child("template", "spec", "bootstrap", "data"),
 				"expected either spec.bootstrap.dataSecretName or spec.bootstrap.configRef to be populated",
 			),
 		)
@@ -100,7 +118,7 @@ func (m *MachinePool) validate(old *MachinePool) error {
 		allErrs = append(
 			allErrs,
 			field.Invalid(
-				field.NewPath("spec", "template", "spec", "bootstrap", "configRef", "namespace"),
+				specPath.Child("template", "spec", "bootstrap", "configRef", "namespace"),
 				m.Spec.Template.Spec.Bootstrap.ConfigRef.Namespace,
 				"must match metadata.namespace",
 			),
@@ -111,7 +129,7 @@ func (m *MachinePool) validate(old *MachinePool) error {
 		allErrs = append(
 			allErrs,
 			field.Invalid(
-				field.NewPath("spec", "infrastructureRef", "namespace"),
+				specPath.Child("infrastructureRef", "namespace"),
 				m.Spec.Template.Spec.InfrastructureRef.Namespace,
 				"must match metadata.namespace",
 			),
@@ -121,8 +139,16 @@ func (m *MachinePool) validate(old *MachinePool) error {
 	if old != nil && old.Spec.ClusterName != m.Spec.ClusterName {
 		allErrs = append(
 			allErrs,
-			field.Invalid(field.NewPath("spec", "clusterName"), m.Spec.ClusterName, "field is immutable"),
+			field.Forbidden(
+				specPath.Child("clusterName"),
+				"field is immutable"),
 		)
+	}
+
+	if m.Spec.Template.Spec.Version != nil {
+		if !version.KubeSemver.MatchString(*m.Spec.Template.Spec.Version) {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("template", "spec", "version"), *m.Spec.Template.Spec.Version, "must be a valid semantic version"))
+		}
 	}
 
 	if len(allErrs) == 0 {
