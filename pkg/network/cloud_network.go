@@ -88,6 +88,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
 		data.Data["ManagementClusterName"] = names.ManagementClusterName
 		data.Data["HostedClusterNamespace"] = hcpCfg.Namespace
+		data.Data["ReleaseImage"] = hcpCfg.ReleaseImage
 
 		// In HyperShift CloudNetworkConfigController is deployed as a part of the hosted cluster controlplane
 		// which means that it is created in the management cluster.
