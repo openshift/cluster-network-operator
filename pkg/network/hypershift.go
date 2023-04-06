@@ -32,6 +32,7 @@ var (
 	routeLabels    = map[string]string{}
 	routeLabelsRaw = os.Getenv("OVN_SBDB_ROUTE_LABELS")
 	runAsUser      = os.Getenv("RUN_AS_USER")
+	releaseImage   = os.Getenv("OPENSHIFT_RELEASE_IMAGE")
 )
 
 const (
@@ -57,6 +58,7 @@ type HyperShiftConfig struct {
 	RunAsUser          string
 	OVNSbDbRouteLabels map[string]string
 	RelatedObjects     []RelatedObject
+	ReleaseImage       string
 }
 
 func NewHyperShiftConfig() *HyperShiftConfig {
@@ -67,6 +69,7 @@ func NewHyperShiftConfig() *HyperShiftConfig {
 		RunAsUser:          runAsUser,
 		OVNSbDbRouteHost:   routeHost,
 		OVNSbDbRouteLabels: routeLabels,
+		ReleaseImage:       releaseImage,
 	}
 }
 

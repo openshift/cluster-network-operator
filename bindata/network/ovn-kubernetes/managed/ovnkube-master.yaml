@@ -51,6 +51,7 @@ spec:
   template:
     metadata:
       annotations:
+        hypershift.openshift.io/release-image: {{.ReleaseImage}}
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: ovnkube-master

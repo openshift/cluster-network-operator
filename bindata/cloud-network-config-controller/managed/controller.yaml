@@ -22,6 +22,7 @@ spec:
     metadata:
       name: cloud-network-config-controller
       annotations:
+        hypershift.openshift.io/release-image: {{.ReleaseImage}}
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: cloud-network-config-controller

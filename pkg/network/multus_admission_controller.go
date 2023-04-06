@@ -104,6 +104,8 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 		}
 		data.Data["ClusterIDLabel"] = ClusterIDLabel
 		data.Data["ClusterID"] = hcp.Spec.ClusterID
+
+		data.Data["ReleaseImage"] = hsc.ReleaseImage
 	}
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus-admission-controller"), &data)
