@@ -219,6 +219,10 @@ spec:
       - name: admin-kubeconfig
         secret:
           secretName: service-network-admin-kubeconfig
+{{- if not (eq .RunAsUser "")}}
+      securityContext:
+        runAsUser: {{.RunAsUser}}
+{{- end }}
       tolerations:
         - key: "hypershift.openshift.io/control-plane"
           operator: "Equal"
