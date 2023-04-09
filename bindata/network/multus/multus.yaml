@@ -436,6 +436,7 @@ spec:
               "kubernetes": {
                 "kubeconfig": "/etc/kubernetes/cni/net.d/whereabouts.d/whereabouts.kubeconfig"
               },
+              "reconciler_cron_expression": "30 4 * * *",
               "log_level": "debug"
             }
             EOF
@@ -522,49 +523,65 @@ spec:
             defaultMode: 0744
 {{if .RenderIpReconciler}}
 ---
-apiVersion: batch/v1
-kind: CronJob
+apiVersion: apps/v1
+kind: DaemonSet
 metadata:
-  name: ip-reconciler
+  name: whereabouts-reconciler
   namespace: openshift-multus
-  labels:
-    tier: node
-    app: whereabouts
 spec:
-  # reconcile loop every 15 minutes, starting at the top of the hour
-  schedule: "*/15 * * * *"
-  concurrencyPolicy: Replace
-  successfulJobsHistoryLimit: 0
-  jobTemplate:
+  selector:
+    matchLabels:
+      name: whereabouts-reconciler
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: whereabouts-reconciler
+        name: whereabouts-reconciler
     spec:
-      backoffLimit: 0
-      ttlSecondsAfterFinished: 900
-      template:
-        spec:
-          priorityClassName: "system-cluster-critical"
-          serviceAccountName: multus
-          hostNetwork: true
-          containers:
-            - name: whereabouts
-              image: {{.WhereaboutsImage}}
-              resources:
-                requests:
-                  cpu: "25m"
-                  memory: "25Mi"
-              command:
-              - /ip-reconciler
-              - -log-level=verbose
-              volumeMounts:
-                - name: cni-net-dir
-                  mountPath: /host/etc/cni/net.d
-              env:
-              - name: KUBERNETES_SERVICE_PORT
-                value: "{{.KUBERNETES_SERVICE_PORT}}"
-              - name: KUBERNETES_SERVICE_HOST
-                value: "{{.KUBERNETES_SERVICE_HOST}}"
-          volumes:
-            - name: cni-net-dir
-              hostPath:
-                path: {{ .SystemCNIConfDir }}
-          restartPolicy: Never
+      hostNetwork: true      
+      serviceAccountName: multus
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: whereabouts
+        command: [ "/bin/sh" ]
+        args:
+          - -c
+          - >
+            /usr/src/whereabouts/bin/ip-control-loop -log-level debug
+        image: {{.WhereaboutsImage}}
+        env:
+        - name: WHEREABOUTS_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "50Mi"
+          limits:
+            cpu: "50m"
+            memory: "100Mi"
+        volumeMounts:
+          - name: cni-net-dir
+            mountPath: /host/etc/cni/net.d
+        env:
+        - name: NODENAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
+      volumes:
+        - name: cni-net-dir
+          hostPath:
+            path: {{ .SystemCNIConfDir }}
 {{- end}}
