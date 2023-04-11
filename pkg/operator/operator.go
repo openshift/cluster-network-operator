@@ -14,14 +14,17 @@ import (
 	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
-
 	"github.com/openshift/library-go/pkg/operator/management"
+
+	"sigs.k8s.io/controller-runtime/pkg/config/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctmanager "sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -51,6 +54,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			return o.client.Default().RESTMapper(), nil
 		},
 		MetricsBindAddress: "0",
+		Controller: v1alpha1.ControllerConfigurationSpec{
+			RecoverPanic: pointer.Bool(true),
+		},
 	})
 	if err != nil {
 		return err
@@ -80,10 +86,19 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	klog.Infof("Creating status manager for %s cluster", cluster)
 	o.StatusManager = statusmanager.New(o.client, "network", cluster)
 
+	// Add a panic handler that sets the status to degraded
+	utilruntime.PanicHandlers = append(utilruntime.PanicHandlers, func(panicValue interface{}) {
+		// Use PanicLevel level so the degraded state is not cleared by any of the running controllers
+		o.StatusManager.SetDegraded(statusmanager.PanicLevel, "ReconcileError", fmt.Sprintf("Panic detected: %v", panicValue))
+
+		// forward the panic
+		panic(panicValue)
+	})
+
 	// Add controller-runtime controllers
 	klog.Info("Adding controller-runtime controllers")
 	if err := controller.AddToManager(o.manager, o.StatusManager, o.client); err != nil {
-		return fmt.Errorf("Failed to add controllers to manager: %w", err)
+		return fmt.Errorf("failed to add controllers to manager: %w", err)
 	}
 
 	// Initialize individual (non-controller-runtime) controllers
