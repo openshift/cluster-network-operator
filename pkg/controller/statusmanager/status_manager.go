@@ -39,7 +39,8 @@ import (
 type StatusLevel int
 
 const (
-	ClusterConfig StatusLevel = iota
+	PanicLevel StatusLevel = iota // Special StatusLevel used when recovering from a panic
+	ClusterConfig
 	OperatorConfig
 	OperatorRender
 	ProxyConfig
