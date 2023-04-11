@@ -297,7 +297,7 @@ migration:
       to: 1500
     network:
       from: 1400
-      to: 1352
+      to: 1354
 ```
 2. wait until Machine-Config-Operator updates the machines, it will reboot each node one by one:
 
@@ -312,7 +312,7 @@ spec:
   defaultNetwork:
     ovnKubernetesConfig:
       ...
-      mtu: 1352
+      mtu: 1354
 ```
 For more information about [MTU change at runtime](https://docs.openshift.com/container-platform/4.10/networking/changing-cluster-network-mtu.html)
 
