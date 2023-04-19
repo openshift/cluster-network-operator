@@ -87,6 +87,7 @@ type StatusManager struct {
 
 	failing         [maxStatusLevel]*operv1.OperatorCondition
 	installComplete bool
+	configUpdated   bool
 
 	// All our informers and listers
 	dsInformers map[string]cache.SharedIndexInformer
@@ -531,6 +532,12 @@ func (status *StatusManager) SetNotDegraded(statusLevel StatusLevel) {
 	status.Lock()
 	defer status.Unlock()
 	status.setNotDegraded(statusLevel)
+}
+
+func (status *StatusManager) SetConfigUpdated(updated bool) {
+	status.Lock()
+	defer status.Unlock()
+	status.configUpdated = updated
 }
 
 // syncProgressing syncs the current Progressing status
