@@ -2,7 +2,9 @@ package allowlist
 
 import (
 	"context"
+	"log"
 	"os"
+	"strings"
 	"time"
 
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
@@ -17,11 +19,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	v1coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -37,20 +43,35 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.C
 	return add(mgr, newReconciler(mgr, status, c))
 }
 
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) *ReconcileAllowlist {
 	return &ReconcileAllowlist{client: c, scheme: mgr.GetScheme(), status: status}
 }
 
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r *ReconcileAllowlist) error {
 	c, err := controller.New("allowlist-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
-	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-	return nil
+
+	// watch for changes in all configmaps in our namespace
+	cmInformer := v1coreinformers.NewConfigMapInformer(
+		r.client.Default().Kubernetes(),
+		names.MULTUS_NAMESPACE,
+		0, // don't resync
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	r.client.Default().AddCustomInformer(cmInformer) // Tell the ClusterClient about this informer
+
+	return c.Watch(&source.Informer{Informer: cmInformer},
+		&handler.EnqueueRequestForObject{},
+		predicate.ResourceVersionChangedPredicate{},
+		predicate.NewPredicateFuncs(func(object crclient.Object) bool {
+			// Only care about cni-sysctl-allowlist, but also watching for default-cni-sysctl-allowlist
+			// as a trigger for creating cni-sysctl-allowlist if it doesn't exist
+			return (strings.Contains(object.GetName(), names.ALLOWLIST_CONFIG_NAME))
+
+		}),
+	)
 }
 
 var _ reconcile.Reconciler = &ReconcileAllowlist{}
@@ -76,6 +97,7 @@ func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Re
 	if request.Namespace != names.MULTUS_NAMESPACE || request.Name != names.ALLOWLIST_CONFIG_NAME {
 		return reconcile.Result{}, nil
 	}
+	log.Printf("Reconcile allowlist for %s/%s", request.Namespace, request.Name)
 
 	configMap, err := getConfig(ctx, r.client, request.NamespacedName)
 	if err != nil {
