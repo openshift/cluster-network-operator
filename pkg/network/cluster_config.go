@@ -173,6 +173,9 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec, oldStatus *configv1.
 		}
 	}
 
+	// PANIC
+	operConf.DefaultNetwork.OVNKubernetesConfig.MTU = nil
+
 	// Determine the MTU from the provider
 	switch operConf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
