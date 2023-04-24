@@ -45,6 +45,9 @@ spec:
         component: network
         type: infra
         openshift.io/component: network
+{{- if .HyperShiftEnabled}}
+        hypershift.openshift.io/hosted-control-plane: {{.AdmissionControllerNamespace}}
+{{- end }}
     spec:
 {{- if .HyperShiftEnabled}}
       affinity:
@@ -72,6 +75,12 @@ spec:
                   matchLabels:
                     hypershift.openshift.io/hosted-control-plane: {{.AdmissionControllerNamespace}}
                 topologyKey: kubernetes.io/hostname
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: multus-admission-controller
+            topologyKey: topology.kubernetes.io/zone
       initContainers:
         - name: hosted-cluster-kubecfg-setup
           image: "{{.CLIImage}}"
