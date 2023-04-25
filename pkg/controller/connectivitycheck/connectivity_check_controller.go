@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/cluster-network-operator/pkg/network"
-
 	operatorv1 "github.com/openshift/api/operator/v1"
 	configv1client "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
@@ -19,6 +17,7 @@ import (
 	operatorcontrolplaneclient "github.com/openshift/client-go/operatorcontrolplane/clientset/versioned"
 	operatorcontrolplaneinformers "github.com/openshift/client-go/operatorcontrolplane/informers/externalversions"
 	"github.com/openshift/cluster-network-operator/pkg/controller/eventrecorder"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/connectivitycheckcontroller"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -119,7 +118,7 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 	var templates []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration
 	// kas default service IP
 	templates = append(templates, c.getTemplatesForKubernetesDefaultServiceCheck(syncContext.Recorder())...)
-	if hcpCfg := network.NewHyperShiftConfig(); !hcpCfg.Enabled {
+	if hcpCfg := platform.NewHyperShiftConfig(); !hcpCfg.Enabled {
 		// In hypershift, the following services/endpoints are not present in the hosted cluster
 		// kas service IP
 		templates = append(templates, c.getTemplatesForKubernetesServiceMonitorService(syncContext.Recorder())...)

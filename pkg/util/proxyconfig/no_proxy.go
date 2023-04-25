@@ -9,7 +9,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	configv1 "github.com/openshift/api/config/v1"
-	cnonetwork "github.com/openshift/cluster-network-operator/pkg/network"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -54,7 +54,7 @@ func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		".svc",
 		".cluster.local",
 	)
-	if hcpCfg := cnonetwork.NewHyperShiftConfig(); hcpCfg.Enabled {
+	if hcpCfg := platform.NewHyperShiftConfig(); hcpCfg.Enabled {
 		set.Insert(".hypershift.local")
 	}
 

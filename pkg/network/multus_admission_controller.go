@@ -8,10 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	hyperv1 "github.com/openshift/hypershift/api/v1alpha1"
-
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -69,7 +68,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	data.Data["ExternalControlPlane"] = externalControlPlane
 	data.Data["Replicas"] = replicas
 	// Hypershift
-	hsc := NewHyperShiftConfig()
+	hsc := platform.NewHyperShiftConfig()
 	data.Data["HyperShiftEnabled"] = hsc.Enabled
 	data.Data["ManagementClusterName"] = names.ManagementClusterName
 	data.Data["AdmissionControllerNamespace"] = "openshift-multus"
@@ -97,13 +96,9 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 
 		data.Data["ManagementServiceCABundle"] = base64.URLEncoding.EncodeToString([]byte(ca))
 
-		hcp := &hyperv1.HostedControlPlane{ObjectMeta: metav1.ObjectMeta{Name: hsc.Name}}
-		err = client.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hsc.Namespace, Name: hsc.Name}, hcp)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get hosted controlplane: %v", err)
-		}
-		data.Data["ClusterIDLabel"] = ClusterIDLabel
-		data.Data["ClusterID"] = hcp.Spec.ClusterID
+		data.Data["ClusterIDLabel"] = platform.ClusterIDLabel
+		data.Data["ClusterID"] = bootstrapResult.Infra.HostedControlPlane.Spec.ClusterID
+		data.Data["HCPNodeSelector"] = bootstrapResult.Infra.HostedControlPlane.Spec.NodeSelector
 	}
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus-admission-controller"), &data)
