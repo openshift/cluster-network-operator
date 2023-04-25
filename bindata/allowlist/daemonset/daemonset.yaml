@@ -44,4 +44,4 @@ spec:
           name: tuning-conf-dir
         - name: ready
           emptyDir: { }
-      priorityClassName: "system-user-critical"
+      priorityClassName: "openshift-user-critical"
