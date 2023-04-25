@@ -146,12 +146,17 @@ func createObject(ctx context.Context, client cnoclient.Client, obj *unstructure
 }
 
 func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
-	err := wait.Poll(time.Second, time.Minute, func() (done bool, err error) {
+	return wait.Poll(time.Second, time.Minute, func() (done bool, err error) {
 		podList, err := client.Default().Kubernetes().CoreV1().Pods(names.MULTUS_NAMESPACE).List(
 			ctx, metav1.ListOptions{LabelSelector: allowlistAnnotation})
 		if err != nil {
 			return false, err
 		}
+
+		if len(podList.Items) == 0 {
+			return false, nil
+		}
+
 		for _, pod := range podList.Items {
 			if len(pod.Status.ContainerStatuses) == 0 || !pod.Status.ContainerStatuses[0].Ready {
 				return false, nil
@@ -159,10 +164,6 @@ func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
 		}
 		return true, nil
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func cleanup(ctx context.Context, client cnoclient.Client) {
