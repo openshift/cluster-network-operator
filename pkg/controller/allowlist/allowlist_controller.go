@@ -2,7 +2,6 @@ package allowlist
 
 import (
 	"context"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -94,10 +93,10 @@ func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	if request.Namespace != names.MULTUS_NAMESPACE || request.Name != names.ALLOWLIST_CONFIG_NAME {
+	if request.Name != names.ALLOWLIST_CONFIG_NAME {
 		return reconcile.Result{}, nil
 	}
-	log.Printf("Reconcile allowlist for %s/%s", request.Namespace, request.Name)
+	klog.Infof("Reconcile allowlist for %s/%s", request.Namespace, request.Name)
 
 	configMap, err := getConfig(ctx, r.client, request.NamespacedName)
 	if err != nil {
