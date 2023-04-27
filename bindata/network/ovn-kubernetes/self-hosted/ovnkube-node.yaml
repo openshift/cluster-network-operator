@@ -64,6 +64,31 @@ spec:
       # /run/openvswitch -> tmpfs - ovsdb sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
+      - name: monitor-ovs-logs
+        image: "{{.OvnImage}}"
+        command:
+          - /bin/bash
+          - -c
+          - |
+            lscpu
+            while true; do
+              now=`date`
+              output=$(cat /var/log/openvswitch/ovs-vswitchd.log | grep "Unreasonably long")
+              echo "$now -- $output"
+              top -b -n 1
+              ovs-vsctl list interface
+              sleep 15
+            done
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - mountPath: /var/log/openvswitch
+            name: host-var-log-ovs
+        terminationMessagePolicy: FallbackToLogsOnError
+        resources:
+          requests:
+            cpu: 10m
+            memory: 300Mi
       {{ if eq .OVN_NODE_MODE "full" }}
       # ovn-controller: programs the vswitch with flows from the sbdb
       - name: ovn-controller
@@ -610,5 +635,8 @@ spec:
         secret:
           secretName: ovn-node-metrics-cert
           optional: true
+      - name: host-var-log-ovs
+        hostPath:
+          path: /var/log/openvswitch
       tolerations:
       - operator: "Exists"
