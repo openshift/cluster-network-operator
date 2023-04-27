@@ -163,15 +163,16 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 
 func TestRenderedOVNKubernetesConfig(t *testing.T) {
 	type testcase struct {
-		desc                string
-		expected            string
-		hybridOverlayConfig *operv1.HybridOverlayConfig
-		gatewayConfig       *operv1.GatewayConfig
-		egressIPConfig      *operv1.EgressIPConfig
-		masterIPs           []string
-		v4InternalSubnet    string
-		disableGRO          bool
-		disableMultiNet     bool
+		desc                   string
+		expected               string
+		hybridOverlayConfig    *operv1.HybridOverlayConfig
+		gatewayConfig          *operv1.GatewayConfig
+		egressIPConfig         *operv1.EgressIPConfig
+		masterIPs              []string
+		v4InternalSubnet       string
+		disableGRO             bool
+		disableMultiNet        bool
+		enableMultiNetPolicies bool
 	}
 	testcases := []testcase{
 		{
@@ -565,6 +566,71 @@ nodeport=true`,
 			masterIPs:       []string{"1.2.3.4", "2.3.4.5"},
 			disableMultiNet: true,
 		},
+		{
+			desc: "enable multi-network policies",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://testing.test:8443"
+host-network-namespace="openshift-host-network"
+platform-type="GCP"
+healthz-bind-address="0.0.0.0:10256"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-multi-networkpolicy=true
+
+[gateway]
+mode=shared
+nodeport=true`,
+			masterIPs:              []string{"1.2.3.4", "2.3.4.5"},
+			enableMultiNetPolicies: true,
+		},
+		{
+			desc: "enable multi-network policies without multi-network support",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://testing.test:8443"
+host-network-namespace="openshift-host-network"
+platform-type="GCP"
+healthz-bind-address="0.0.0.0:10256"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+egressip-node-healthcheck-port=9107
+
+[gateway]
+mode=shared
+nodeport=true`,
+			masterIPs:              []string{"1.2.3.4", "2.3.4.5"},
+			disableMultiNet:        true,
+			enableMultiNetPolicies: true,
+		},
 	}
 	g := NewGomegaWithT(t)
 
@@ -588,6 +654,7 @@ nodeport=true`,
 			}
 
 			OVNKubeConfig.Spec.DisableMultiNetwork = &tc.disableMultiNet
+			OVNKubeConfig.Spec.UseMultiNetworkPolicy = &tc.enableMultiNetPolicies
 
 			crd := OVNKubeConfig.DeepCopy()
 			config := &crd.Spec
