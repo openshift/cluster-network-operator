@@ -81,6 +81,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 		data.Data["CLIImage"] = os.Getenv("CLI_IMAGE")
 		data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
 		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
+		data.Data["RunAsUser"] = hsc.RunAsUser
 
 		// Get serving CA from the management cluster since the service resides there
 		serviceCA := &corev1.ConfigMap{}
