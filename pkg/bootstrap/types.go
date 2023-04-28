@@ -3,7 +3,7 @@ package bootstrap
 import (
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	configv1 "github.com/openshift/api/config/v1"
-	hyperv1 "github.com/openshift/hypershift/api/v1alpha1"
+	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 )
 
 type KuryrBootstrapResult struct {
@@ -33,6 +33,7 @@ type OVNHyperShiftBootstrapResult struct {
 	OVNSbDbRouteHost          string
 	OVNSbDbRouteNodePort      int32
 	OVNSbDbRouteLabels        map[string]string
+	HCPNodeSelector           map[string]string
 	ControlPlaneReplicas      int
 	ReleaseImage              string
 }
@@ -92,6 +93,9 @@ type InfraStatus struct {
 
 	// Proxy settings to use for all communication to the KAS
 	Proxy configv1.ProxyStatus
+
+	// HostedControlPlane defines the hosted control plane, only used in HyperShift
+	HostedControlPlane *hyperv1.HostedControlPlane
 }
 
 // APIServer is the hostname & port of a given APIServer. (This is the

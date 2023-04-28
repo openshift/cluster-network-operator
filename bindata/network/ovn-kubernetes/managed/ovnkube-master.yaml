@@ -1043,9 +1043,12 @@ spec:
         - name: KUBECONFIG
           value: "/etc/kubernetes/kubeconfig"
         terminationMessagePolicy: FallbackToLogsOnError
+      {{ if .HCPNodeSelector }}
       nodeSelector:
-        node-role.kubernetes.io/worker: ""
-        beta.kubernetes.io/os: "linux"
+        {{ range $key, $value := .HCPNodeSelector }}
+        "{{$key}}": "{{$value}}"
+        {{ end }}
+      {{ end }}
       volumes:
       - name: ovnkube-config
         configMap:

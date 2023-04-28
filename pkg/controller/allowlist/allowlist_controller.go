@@ -2,22 +2,22 @@ package allowlist
 
 import (
 	"context"
-	"github.com/openshift/cluster-network-operator/pkg/render"
-	"github.com/pkg/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"log"
 	"os"
 	"time"
 
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/render"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -65,10 +65,12 @@ func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Re
 	if exists, err := daemonsetConfigExists(ctx, r.client); !exists {
 		err = createObjects(ctx, r.client, allowlistManifestDir)
 		if err != nil {
-			return reconcile.Result{}, errors.Wrapf(err, "error creating allowlist config map")
+			klog.Errorf("Failed to create allowlist config map: %v", err)
+			return reconcile.Result{}, err
 		}
 	} else if err != nil {
-		return reconcile.Result{}, errors.Wrapf(err, "error looking up allowlist config map")
+		klog.Errorf("Failed to look up allowlist config map: %v", err)
+		return reconcile.Result{}, err
 	}
 
 	if request.Namespace != names.MULTUS_NAMESPACE || request.Name != names.ALLOWLIST_CONFIG_NAME {
@@ -77,6 +79,7 @@ func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Re
 
 	configMap, err := getConfig(ctx, r.client, request.NamespacedName)
 	if err != nil {
+		klog.Errorf("Failed to get config map: %v", err)
 		return reconcile.Result{}, err
 	}
 
@@ -89,20 +92,26 @@ func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Re
 
 	// If daemonset still exists, delete it and reconcile again
 	if daemonsetExists, err := daemonsetExists(ctx, r.client); daemonsetExists {
-		return reconcile.Result{}, errors.New("daemonset already exist: deleting and retrying")
+		klog.Errorln("Allowlist daemonset already exists: deleting and retrying")
+		return reconcile.Result{}, errors.New("retrying")
 	} else if err != nil {
+		klog.Errorf("Failed to look up allowlist daemonset: %v", err)
 		return reconcile.Result{}, err
 	}
 
 	err = createObjects(ctx, r.client, manifestDir)
 	if err != nil {
-		return reconcile.Result{}, errors.Wrapf(err, "error creating allowlist daemonset")
+		klog.Errorf("Failed to create allowlist daemonset: %v", err)
+		return reconcile.Result{}, err
 	}
 
 	err = checkDsPodsReady(ctx, r.client)
 	if err != nil {
+		klog.Errorf("Failed to verify ready status on allowlist daemonset pods: %v", err)
 		return reconcile.Result{}, err
 	}
+
+	klog.Errorln("Successfully updated sysctl allowlist")
 	return reconcile.Result{}, nil
 }
 
@@ -146,12 +155,17 @@ func createObject(ctx context.Context, client cnoclient.Client, obj *unstructure
 }
 
 func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
-	err := wait.Poll(time.Second, time.Minute, func() (done bool, err error) {
+	return wait.Poll(time.Second, time.Minute, func() (done bool, err error) {
 		podList, err := client.Default().Kubernetes().CoreV1().Pods(names.MULTUS_NAMESPACE).List(
 			ctx, metav1.ListOptions{LabelSelector: allowlistAnnotation})
 		if err != nil {
 			return false, err
 		}
+
+		if len(podList.Items) == 0 {
+			return false, nil
+		}
+
 		for _, pod := range podList.Items {
 			if len(pod.Status.ContainerStatuses) == 0 || !pod.Status.ContainerStatuses[0].Ready {
 				return false, nil
@@ -159,20 +173,16 @@ func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
 		}
 		return true, nil
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func cleanup(ctx context.Context, client cnoclient.Client) {
 	if exists, err := daemonsetExists(ctx, client); exists {
 		err = deleteDeamonSet(ctx, client)
 		if err != nil {
-			log.Printf("Error cleaning up allow list daemonset: %+v", err)
+			klog.Errorf("Error cleaning up allow list daemonset: %+v", err)
 		}
 	} else if err != nil && !apierrors.IsNotFound(err) {
-		log.Printf("Error looking up allowlist daemonset : %+v", err)
+		klog.Errorf("Error looking up allowlist daemonset : %+v", err)
 	}
 }
 

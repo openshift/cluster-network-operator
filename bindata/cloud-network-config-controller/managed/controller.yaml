@@ -204,6 +204,12 @@ spec:
         operator: "Equal"
         value: {{.HostedClusterNamespace}}
         effect: "NoSchedule"
+      {{ if .HCPNodeSelector }}
+      nodeSelector:
+        {{ range $key, $value := .HCPNodeSelector }}
+        "{{$key}}": "{{$value}}"
+        {{ end }}
+      {{ end }}
       volumes:
       - name: hosted-cluster-api-access
         emptyDir: {}
