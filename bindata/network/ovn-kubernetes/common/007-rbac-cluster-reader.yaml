@@ -1,0 +1,17 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-cluster-reader: "true"
+  name: openshift-ovn-kubernetes-cluster-reader
+rules:
+- apiGroups: ["k8s.ovn.org"]
+  resources:
+  - egressfirewalls
+  - egressips
+  - egressqoses
+  verbs:
+  - get
+  - list
+  - watch
