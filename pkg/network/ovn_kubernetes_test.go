@@ -75,7 +75,10 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		MasterAddresses: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			NodeMode: "full",
+			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName: "",
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -128,7 +131,10 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		MasterAddresses: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			NodeMode: "full",
+			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName: "",
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -146,7 +152,10 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		MasterAddresses: []string{"fd01::1", "fd01::2", "fd01::3"},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			NodeMode: "full",
+			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName: "",
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -600,7 +609,10 @@ nodeport=true`,
 			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 				MasterAddresses: tc.masterIPs,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-					NodeMode: "full",
+					DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+					DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+					SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+					MgmtPortResourceName: "",
 					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 						Enabled: false,
 					},
@@ -1596,7 +1608,10 @@ metadata:
 				MasterUpdateStatus: masterStatus,
 				NodeUpdateStatus:   nodeStatus,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-					NodeMode: "full",
+					DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+					DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+					SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+					MgmtPortResourceName: "",
 					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 						Enabled: false,
 					},
@@ -1899,7 +1914,10 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 			IPFamilyMode: names.IPFamilySingleStack,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			NodeMode: "full",
+			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName: "",
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
