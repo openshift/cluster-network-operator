@@ -66,6 +66,13 @@ data:
     v6-join-subnet="{{.V6JoinSubnet}}"
 {{- end }}
 
+{{- if (index . "V4InternalMasqueradeSubnet")}}
+    v4-masquerade-subnet="{{.V4InternalMasqueradeSubnet}}"
+{{- end }}
+{{- if (index . "V6InternalMasqueradeSubnet")}}
+    v6-masquerade-subnet="{{.V6InternalMasqueradeSubnet}}"
+{{- end }}
+
     [logging]
     libovsdblogfile=/var/log/ovnkube/libovsdb.log
     logfile-maxsize=100
