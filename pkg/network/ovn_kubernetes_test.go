@@ -272,6 +272,52 @@ logfile-maxage=0`,
 			masterIPs:        []string{"1.2.3.4", "2.3.4.5"},
 		},
 		{
+			desc: "custom masquerade subnet",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://testing.test:8443"
+host-network-namespace="openshift-host-network"
+platform-type="GCP"
+healthz-bind-address="0.0.0.0:10256"
+dns-service-namespace="openshift-dns"
+dns-service-name="dns-default"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-multi-external-gateway=true
+
+[gateway]
+mode=shared
+nodeport=true
+v4-masquerade-subnet="100.98.0.0/16"
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0`,
+			gatewayConfig: &operv1.GatewayConfig{
+				IPv4: operv1.IPv4GatewayConfig{
+					InternalMasqueradeSubnet: "100.98.0.0/16",
+				},
+			},
+		},
+		{
 			desc: "HybridOverlay",
 			expected: `
 [default]
@@ -766,8 +812,11 @@ logfile-maxage=0`,
 			if tc.hybridOverlayConfig != nil {
 				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = tc.hybridOverlayConfig
 			}
-			if tc.hybridOverlayConfig != nil {
+			if tc.gatewayConfig != nil {
 				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig = tc.gatewayConfig
+				if tc.gatewayConfig.IPv4.InternalMasqueradeSubnet != "" {
+					OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = tc.gatewayConfig.IPv4.InternalMasqueradeSubnet
+				}
 			}
 			if tc.egressIPConfig != nil {
 				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.EgressIPConfig = *tc.egressIPConfig
@@ -971,6 +1020,7 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	crd := OVNKubernetesConfig.DeepCopy()
 	config := &crd.Spec
 	ovnConfig := config.DefaultNetwork.OVNKubernetesConfig
+	ovnConfig.GatewayConfig = &operv1.GatewayConfig{}
 
 	err := validateOVNKubernetes(config)
 	g.Expect(err).To(BeEmpty())
@@ -992,15 +1042,21 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	}
 
 	ovnConfig.V4InternalSubnet = "100.64.0.0/22"
-	errExpect("v4InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	errExpect("v4InternalSubnet 100.64.0.0/22 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
 	ovnConfig.V4InternalSubnet = "100.64.0.0/21"
-	errNotExpect("v4InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	errNotExpect("v4InternalSubnet 100.64.0.0/21 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
 	ovnConfig.V6InternalSubnet = "fd01::/48"
-	errExpect("v6InternalSubnet and ClusterNetwork must have matching IP families")
+	errExpect("v6InternalSubnet fd01::/48 and ClusterNetwork must have matching IP families")
 	ovnConfig.V4InternalSubnet = "10.128.0.0/16"
-	errExpect("v4InternalSubnet overlaps with ClusterNetwork 10.128.0.0/15")
+	errExpect("v4InternalSubnet 10.128.0.0/16 overlaps with ClusterNetwork 10.128.0.0/15")
 	ovnConfig.V4InternalSubnet = "172.30.0.0/18"
-	errExpect("v4InternalSubnet overlaps with ServiceNetwork 172.30.0.0/16")
+	errExpect("v4InternalSubnet 172.30.0.0/18 overlaps with ServiceNetwork 172.30.0.0/16")
+	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "10.128.0.0/16"
+	errExpect("v4InternalMasqueradeSubnet 10.128.0.0/16 overlaps with ClusterNetwork 10.128.0.0/15")
+	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd01::/48"
+	errExpect("v6InternalMasqueradeSubnet fd01::/48 and ClusterNetwork must have matching IP families")
+	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "172.30.0.0/18"
+	errExpect("v4InternalMasqueradeSubnet 172.30.0.0/18 overlaps with ServiceNetwork 172.30.0.0/16")
 
 	// set mtu to insanity
 	ovnConfig.MTU = ptrToUint32(70000)
@@ -1014,15 +1070,26 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	config.ClusterNetwork = []operv1.ClusterNetworkEntry{{
 		CIDR: "fd01::/48", HostPrefix: 64,
 	}}
-	errExpect("v4InternalSubnet and ClusterNetwork must have matching IP families")
+	errExpect("v4InternalSubnet 172.30.0.0/18 and ClusterNetwork must have matching IP families")
+	errExpect("v4InternalMasqueradeSubnet 172.30.0.0/18 and ClusterNetwork must have matching IP families")
 	ovnConfig.V6InternalSubnet = "fd01::/64"
-	errExpect("v6InternalSubnet overlaps with ClusterNetwork fd01::/48")
+	errExpect("v6InternalSubnet fd01::/64 overlaps with ClusterNetwork fd01::/48")
 	ovnConfig.V6InternalSubnet = "fd03::/112"
-	errExpect("v6InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	errExpect("v6InternalSubnet fd03::/112 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
 	ovnConfig.V6InternalSubnet = "fd03::/111"
-	errNotExpect("v6InternalSubnet is no large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	errNotExpect("v6InternalSubnet fd03::/111 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
 	ovnConfig.V6InternalSubnet = "fd02::/64"
-	errExpect("v6InternalSubnet overlaps with ServiceNetwork fd02::/112")
+	errExpect("v6InternalSubnet fd02::/64 overlaps with ServiceNetwork fd02::/112")
+	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd01::/64"
+	errExpect("v6InternalMasqueradeSubnet fd01::/64 overlaps with ClusterNetwork fd01::/48")
+	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd02::/64"
+	errExpect("v6InternalMasqueradeSubnet fd02::/64 overlaps with ServiceNetwork fd02::/112")
+	ovnConfig.V4InternalSubnet = "100.99.0.0/16"
+	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "100.99.0.0/16"
+	errExpect("v4InternalMasqueradeSubnet 100.99.0.0/16 overlaps with v4InternalSubnet 100.99.0.0/16")
+	ovnConfig.V6InternalSubnet = "fd69::/125"
+	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd69::/125"
+	errExpect("v6InternalMasqueradeSubnet fd69::/125 overlaps with v6InternalSubnet fd69::/125")
 
 	// invalid ipv6 mtu
 	ovnConfig.MTU = ptrToUint32(576)
