@@ -144,14 +144,21 @@ data:
 {{- if (index . "V6JoinSubnet") }}
     v6-join-subnet="{{.V6JoinSubnet}}"
 {{- end }}
+{{- if (index . "V4InternalMasqueradeSubnet")}}
+    v4-internal-masquerade-subnet="{{.V4InternalMasqueradeSubnet}}"
+{{- end }}
+{{- if (index . "V6InternalMasqueradeSubnet")}}
+    v6-internal-masquerade-subnet="{{.V6InternalMasqueradeSubnet}}"
+{{- end }}
+
 
     [logging]
     libovsdblogfile=/var/log/ovnkube/libovsdb.log
     logfile-maxsize=100
     logfile-maxbackups=5
     logfile-maxage=0
-{{- if .OVNHybridOverlayEnable }}
 
+{{- if .OVNHybridOverlayEnable }}
     [hybridoverlay]
     enabled=true
     {{- if .OVNHybridOverlayNetCIDR }}
