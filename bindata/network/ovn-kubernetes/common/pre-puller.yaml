@@ -28,7 +28,7 @@ spec:
         # ovnkube-upgrades-prepuller: no-op container that simply pulls the new image during upgrades
       - name: ovnkube-upgrades-prepuller
         image: "{{.OvnImage}}"
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         command:
         - /bin/bash
         - -c
