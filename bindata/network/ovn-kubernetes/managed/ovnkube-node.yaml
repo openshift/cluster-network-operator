@@ -4,8 +4,6 @@ apiVersion: apps/v1
 metadata:
   {{ if eq .OVN_NODE_MODE "dpu-host" }}
   name: ovnkube-node-dpu-host
-  {{ else if eq .OVN_NODE_MODE "smart-nic" }}
-  name: ovnkube-node-smart-nic
   {{ else }}
   name: ovnkube-node
   {{ end }}
@@ -19,8 +17,6 @@ spec:
     matchLabels:
       {{ if eq .OVN_NODE_MODE "dpu-host" }}
       app: ovnkube-node-dpu-host
-      {{ else if eq .OVN_NODE_MODE "smart-nic" }}
-      app: ovnkube-node-smart-nic
       {{ else }}
       app: ovnkube-node
       {{ end }}
@@ -35,8 +31,6 @@ spec:
       labels:
         {{ if eq .OVN_NODE_MODE "dpu-host" }}
         app: ovnkube-node-dpu-host
-        {{ else if eq .OVN_NODE_MODE "smart-nic" }}
-        app: ovnkube-node-smart-nic
         {{ else }}
         app: ovnkube-node
         {{ end }}
@@ -50,30 +44,14 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
             - matchExpressions:
-              {{ if .DpuHostModeLabel }}
-              - key: {{ .DpuHostModeLabel }}
+              - key: network.operator.openshift.io/dpu-host
                 {{ if eq .OVN_NODE_MODE "dpu-host" }}
-                operator: Exists
-                {{ else if eq .OVN_NODE_MODE "smart-nic" }}
-                operator: DoesNotExist
-                {{ else }}
-                operator: DoesNotExist
-                {{ end }}
-              {{ end }}
-              {{ if .SmartNicModeLabel }}
-              - key: {{ .SmartNicModeLabel }}
-                {{ if eq .OVN_NODE_MODE "dpu-host" }}
-                operator: DoesNotExist
-                {{ else if eq .OVN_NODE_MODE "smart-nic" }}
                 operator: Exists
                 {{ else }}
                 operator: DoesNotExist
                 {{ end }}
-              {{ end }}
-              {{ if .DpuModeLabel }}
-              - key: {{ .DpuModeLabel }}
+              - key: network.operator.openshift.io/dpu
                 operator: DoesNotExist
-              {{ end }}
       serviceAccountName: ovn-kubernetes-node
       hostNetwork: true
       dnsPolicy: Default
@@ -91,7 +69,7 @@ spec:
       {{end}}
       initContainers:
       # ovnkube-node-init: wait for sbdb ready
-      {{ if or (eq .OVN_NODE_MODE "full") (eq .OVN_NODE_MODE "smart-nic") }}
+      {{ if eq .OVN_NODE_MODE "full" }}
       - name: ovnkube-node-init
         image: "{{.OvnImage}}"
         command:
@@ -144,7 +122,7 @@ spec:
       # /run/openvswitch -> tmpfs - ovsdb sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
-      {{ if or (eq .OVN_NODE_MODE "full") (eq .OVN_NODE_MODE "smart-nic") }}
+      {{ if eq .OVN_NODE_MODE "full" }}
       {{if .ENABLE_OVN_NODE_PROXY}}
       # ovnkube-node-proxy redirects ovn sbdb traffic to http proxy
       - name: ovnkube-node-proxy
@@ -452,9 +430,6 @@ spec:
           if [[ -n "${OVNKUBE_NODE_MGMT_PORT_NETDEV}" ]] ; then
             node_mgmt_port_netdev_flags="--ovnkube-node-mgmt-port-netdev ${OVNKUBE_NODE_MGMT_PORT_NETDEV}"
           fi
-          if [[ -n "${OVNKUBE_NODE_MGMT_PORT_DP_RESOURCE_NAME}" ]] ; then
-            node_mgmt_port_netdev_flags="$node_mgmt_port_netdev_flags --ovnkube-node-mgmt-port-dp-resource-name ${OVNKUBE_NODE_MGMT_PORT_DP_RESOURCE_NAME}"
-          fi
 
           multi_network_enabled_flag=
           if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" ]]; then
@@ -534,10 +509,6 @@ spec:
         - name: IPFIX_SAMPLING
           value: "{{.IPFIXSampling}}"
         {{ end }}
-        {{ if and (.MgmtPortResourceName) (or (eq .OVN_NODE_MODE "smart-nic") (eq .OVN_NODE_MODE "dpu-host")) }}
-        - name: OVNKUBE_NODE_MGMT_PORT_DP_RESOURCE_NAME
-          value: {{ .MgmtPortResourceName }}
-        {{ end }}
         - name: K8S_NODE
           valueFrom:
             fieldRef:
@@ -602,13 +573,6 @@ spec:
           requests:
             cpu: 10m
             memory: 300Mi
-            {{ if and (.MgmtPortResourceName) (or (eq .OVN_NODE_MODE "smart-nic") (eq .OVN_NODE_MODE "dpu-host")) }}
-            {{ .MgmtPortResourceName }}: '1'
-            {{ end }}
-          {{ if and (.MgmtPortResourceName) (or (eq .OVN_NODE_MODE "smart-nic") (eq .OVN_NODE_MODE "dpu-host")) }}
-          limits:
-            {{ .MgmtPortResourceName }}: '1'
-          {{ end }}
         lifecycle:
           preStop:
             exec:
@@ -712,7 +676,7 @@ spec:
       - name: run-ovn
         hostPath:
           path: /var/run/ovn
-      {{ if or (eq .OVN_NODE_MODE "full") (eq .OVN_NODE_MODE "smart-nic") }}
+      {{ if eq .OVN_NODE_MODE "full" }}
       # Used for placement of ACL audit logs
       - name: node-log
         hostPath:

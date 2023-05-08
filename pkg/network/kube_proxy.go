@@ -217,9 +217,13 @@ func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, bootstrapResult *bootst
 	data.Data["HealthzPort"] = healthzPort
 	data.Data["KUBE_PROXY_NODE_SELECTOR"] = ""
 	// DPU_DEV_PREVIEW
+	// Node Mode is currently configured via a stand-alone configMap and stored
+	// in bootstrapResult. Once out of DevPreview, CNO API will be expanded to
+	// include Node Mode and it will be stored in conf (operv1.NetworkSpec) and
+	// this code will not need to access bootstrapResult.OVN.OVNKubernetesConfig.
 	if bootstrapResult.OVN.OVNKubernetesConfig != nil {
-		if len(bootstrapResult.OVN.OVNKubernetesConfig.DpuModeNodes) > 0 {
-			data.Data["KUBE_PROXY_NODE_SELECTOR"] = bootstrapResult.OVN.OVNKubernetesConfig.DpuModeLabel + ": ''"
+		if bootstrapResult.OVN.OVNKubernetesConfig.NodeMode == OVN_NODE_MODE_DPU {
+			data.Data["KUBE_PROXY_NODE_SELECTOR"] = OVN_NODE_SELECTOR_DPU
 		}
 	}
 

@@ -59,10 +59,7 @@ const OVN_LOG_PATTERN_CONSOLE = "%D{%Y-%m-%dT%H:%M:%S.###Z}|%05N|%c%T|%p|%m"
 const OVN_NODE_MODE_FULL = "full"
 const OVN_NODE_MODE_DPU_HOST = "dpu-host"
 const OVN_NODE_MODE_DPU = "dpu"
-const OVN_NODE_MODE_SMART_NIC = "smart-nic"
-const OVN_NODE_SELECTOR_DEFAULT_DPU_HOST = "network.operator.openshift.io/dpu-host"
-const OVN_NODE_SELECTOR_DEFAULT_DPU = "network.operator.openshift.io/dpu"
-const OVN_NODE_SELECTOR_DEFAULT_SMART_NIC = "network.operator.openshift.io/smart-nic"
+const OVN_NODE_SELECTOR_DPU = "network.operator.openshift.io/dpu: ''"
 
 // gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
@@ -149,10 +146,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
 	data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_FULL
-	data.Data["DpuHostModeLabel"] = bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeLabel
-	data.Data["DpuModeLabel"] = bootstrapResult.OVN.OVNKubernetesConfig.DpuModeLabel
-	data.Data["SmartNicModeLabel"] = bootstrapResult.OVN.OVNKubernetesConfig.SmartNicModeLabel
-	data.Data["MgmtPortResourceName"] = bootstrapResult.OVN.OVNKubernetesConfig.MgmtPortResourceName
 	data.Data["OVN_NB_PORT"] = OVN_NB_PORT
 	data.Data["OVN_SB_PORT"] = OVN_SB_PORT
 	data.Data["OVN_NB_RAFT_PORT"] = OVN_NB_RAFT_PORT
@@ -389,36 +382,30 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		return nil, progressing, errors.Wrapf(err, "failed to set the status of hybrid overlay %s annotation on daemonsets or statefulsets", hybridOverlayStatus)
 	}
 
-	if len(bootstrapResult.OVN.OVNKubernetesConfig.SmartNicModeNodes) > 0 {
-		data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_SMART_NIC
+	nodeMode := bootstrapResult.OVN.OVNKubernetesConfig.NodeMode
+	if nodeMode == OVN_NODE_MODE_DPU_HOST {
+		data.Data["OVN_NODE_MODE"] = nodeMode
 		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, manifestSubDir+"/ovnkube-node.yaml"), &data)
 		if err != nil {
-			return nil, progressing, errors.Wrap(err, "failed to render manifests for smart-nic")
+			return nil, progressing, errors.Wrap(err, "failed to render manifests")
 		}
 		objs = append(objs, manifests...)
-	}
-
-	if len(bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeNodes) > 0 {
-		data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_DPU_HOST
-		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, manifestSubDir+"/ovnkube-node.yaml"), &data)
-		if err != nil {
-			return nil, progressing, errors.Wrap(err, "failed to render manifests for dpu-host")
-		}
-		objs = append(objs, manifests...)
-	}
-
-	if len(bootstrapResult.OVN.OVNKubernetesConfig.DpuModeNodes) > 0 {
+	} else if nodeMode == OVN_NODE_MODE_DPU {
 		// "OVN_NODE_MODE" not set when render.RenderDir() called above,
 		// so render just the error-cni.yaml with "OVN_NODE_MODE" set.
-		data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_DPU
+		data.Data["OVN_NODE_MODE"] = nodeMode
 		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/common/error-cni.yaml"), &data)
 		if err != nil {
-			return nil, progressing, errors.Wrap(err, "failed to render manifests for dpu")
+			return nil, progressing, errors.Wrap(err, "failed to render manifests")
 		}
 		objs = append(objs, manifests...)
 
 		// Run KubeProxy on DPU
 		// DPU_DEV_PREVIEW
+		// Node Mode is currently configured via a stand-alone configMap and stored
+		// in bootstrapResult. Once out of DevPreview, CNO API will be expanded to
+		// include Node Mode and it will be stored in conf (operv1.NetworkSpec) and
+		// defaultDeployKubeProxy() will have access and this can be removed.
 		if conf.DeployKubeProxy == nil {
 			v := true
 			conf.DeployKubeProxy = &v
@@ -675,42 +662,11 @@ func getDisableUDPAggregation(cl crclient.Reader) bool {
 	return disable
 }
 
-// getNodeListByLabel returns a list of node names that matches the provided label.
-func getNodeListByLabel(kubeClient cnoclient.Client, label string) ([]string, error) {
-	var nodeNames []string
-	nodeList, err := kubeClient.Default().Kubernetes().CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: label})
-	if err != nil {
-		return nil, err
-	}
-	for _, node := range nodeList.Items {
-		nodeNames = append(nodeNames, node.Name)
-	}
-	klog.Infof("For Label %s, the list of nodes are %+q", label, nodeNames)
-	return nodeNames, nil
-}
-
-// findCommonNode returns true if there is a common node in the node list.
-func findCommonNode(nodeLists ...[]string) (bool, string) {
-	exists := make(map[string]bool)
-	for _, list := range nodeLists {
-		for _, value := range list {
-			if exists[value] {
-				return true, value
-			}
-			exists[value] = true
-		}
-	}
-	return false, ""
-}
-
-// bootstrapOVNConfig returns the values in the openshift-ovn-kubernetes/hardware-offload-config configMap
+// bootstrapOVNConfig returns the value of mode found in the openshift-ovn-kubernetes/dpu-mode-config configMap
 // if it exists, otherwise returns default configuration for OCP clusters using OVN-Kubernetes
 func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *platform.HyperShiftConfig, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNConfigBoostrapResult, error) {
 	ovnConfigResult := &bootstrap.OVNConfigBoostrapResult{
-		DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-		DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-		SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-		MgmtPortResourceName: "",
+		NodeMode: OVN_NODE_MODE_FULL,
 	}
 	if conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig == nil {
 		bootstrapOVNGatewayConfig(conf, kubeClient.ClientFor("").CRClient())
@@ -723,7 +679,7 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *p
 	}
 
 	cm := &corev1.ConfigMap{}
-	dmc := types.NamespacedName{Namespace: "openshift-network-operator", Name: "hardware-offload-config"}
+	dmc := types.NamespacedName{Namespace: "openshift-network-operator", Name: "dpu-mode-config"}
 	err = kubeClient.ClientFor("").CRClient().Get(context.TODO(), dmc, cm)
 
 	if err != nil {
@@ -731,50 +687,15 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *p
 			return nil, fmt.Errorf("Could not determine Node Mode: %w", err)
 		}
 	} else {
-		dpuHostModeLabel, exists := cm.Data["dpu-host-mode-label"]
-		if exists {
-			ovnConfigResult.DpuHostModeLabel = dpuHostModeLabel
-		}
-
-		dpuModeLabel, exists := cm.Data["dpu-mode-label"]
-		if exists {
-			ovnConfigResult.DpuModeLabel = dpuModeLabel
-		}
-
-		smartNicModeLabel, exists := cm.Data["smart-nic-mode-label"]
-		if exists {
-			ovnConfigResult.SmartNicModeLabel = smartNicModeLabel
-		}
-
-		mgmtPortresourceName, exists := cm.Data["mgmt-port-resource-name"]
-		if exists {
-			ovnConfigResult.MgmtPortResourceName = mgmtPortresourceName
+		nodeModeOverride := cm.Data["mode"]
+		if nodeModeOverride != OVN_NODE_MODE_DPU_HOST && nodeModeOverride != OVN_NODE_MODE_DPU {
+			klog.Warningf("dpu-mode-config does not match %q or %q, is: %q. Using OVN configuration: %+v",
+				OVN_NODE_MODE_DPU_HOST, OVN_NODE_MODE_DPU, nodeModeOverride, ovnConfigResult)
+		} else {
+			ovnConfigResult.NodeMode = nodeModeOverride
+			klog.Infof("Overriding OVN configuration to %+v", ovnConfigResult)
 		}
 	}
-
-	// We want to see if there are any nodes that are labeled for specific modes.
-	ovnConfigResult.DpuHostModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.DpuHostModeLabel+"=")
-	if err != nil {
-		return nil, fmt.Errorf("Could not get node list with label %s : %w", ovnConfigResult.DpuHostModeLabel, err)
-	}
-
-	ovnConfigResult.DpuModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.DpuModeLabel+"=")
-	if err != nil {
-		return nil, fmt.Errorf("Could not get node list with label %s : %w", ovnConfigResult.DpuModeLabel, err)
-	}
-
-	ovnConfigResult.SmartNicModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.SmartNicModeLabel+"=")
-	if err != nil {
-		return nil, fmt.Errorf("Could not get node list with label %s : %w", ovnConfigResult.SmartNicModeLabel, err)
-	}
-
-	// No node shall have any other label set. Each node should be ONLY be DPU, DPU Host, or Smart NIC.
-	found, nodeName := findCommonNode(ovnConfigResult.DpuHostModeNodes, ovnConfigResult.DpuModeNodes, ovnConfigResult.SmartNicModeNodes)
-	if found {
-		return nil, fmt.Errorf("Node %s has multiple hardware offload labels.", nodeName)
-	}
-
-	klog.Infof("OVN configuration is now %+v", ovnConfigResult)
 
 	ovnConfigResult.DisableUDPAggregation = getDisableUDPAggregation(kubeClient.ClientFor("").CRClient())
 

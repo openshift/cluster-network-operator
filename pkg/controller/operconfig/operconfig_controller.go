@@ -117,15 +117,13 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 		return err
 	}
 
-	// Watch when nodes are created and updated.
-	// We need to watch when nodes are updated since we are interested in the labels
-	// of nodes for hardware offloading.
-	nodePredicate := predicate.Funcs{
+	// Watch when nodes are created too
+	newNodePredicate := predicate.Funcs{
 		CreateFunc: func(_ event.CreateEvent) bool {
 			return true
 		},
 		UpdateFunc: func(_ event.UpdateEvent) bool {
-			return true
+			return false
 		},
 		DeleteFunc: func(_ event.DeleteEvent) bool {
 			return true
@@ -134,7 +132,7 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 	if err := c.Watch(
 		&source.Kind{Type: &corev1.Node{}},
 		handler.EnqueueRequestsFromMapFunc(reconcileOperConfig),
-		nodePredicate,
+		newNodePredicate,
 	); err != nil {
 		return err
 	}
