@@ -262,7 +262,8 @@ func (status *StatusManager) SetFromPods() {
 		status.unsetProgressing(PodDeployment)
 	}
 
-	if reachedAvailableLevel {
+	// set the operator as available only after it rolled out all resources and the operator config was updated
+	if reachedAvailableLevel && status.configUpdated {
 		status.set(reachedAvailableLevel, operv1.OperatorCondition{
 			Type:   operv1.OperatorStatusTypeAvailable,
 			Status: operv1.ConditionTrue})
