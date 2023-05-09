@@ -470,6 +470,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 				fmt.Sprintf("Could not update cluster configuration status: %v", err))
 			return reconcile.Result{}, err
 		}
+		r.status.SetConfigUpdated(true)
 	}
 
 	r.status.SetNotDegraded(statusmanager.OperatorConfig)
