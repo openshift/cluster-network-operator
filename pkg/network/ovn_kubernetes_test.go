@@ -1626,14 +1626,19 @@ metadata:
 			_, preserveNode := renderedNode.GetAnnotations()[names.CreateOnlyAnnotation]
 			renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-master", "openshift-ovn-kubernetes", objs)
 			_, preserveMaster := renderedMaster.GetAnnotations()[names.CreateOnlyAnnotation]
-			renderedPrePuller := findInObjs("apps", "DaemonSet", "ovnkube-upgrades-prepuller", "openshift-ovn-kubernetes", objs) != nil
+			renderedPrePuller := findInObjs("apps", "DaemonSet", "ovnkube-upgrades-prepuller", "openshift-ovn-kubernetes", objs)
 
 			// if we expect a node update, the original node and the rendered one must be different
 			g.Expect(tc.expectNode).To(Equal(!preserveNode), "Check node rendering")
 			// if we expect a master update, the original master and the rendered one must be different
 			g.Expect(tc.expectMaster).To(Equal(!preserveMaster), "Check master rendering")
 			// if we expect a prepuller update, the original prepuller and the rendered one must be different
-			g.Expect(tc.expectPrePull).To(Equal(renderedPrePuller), "Check prepuller rendering")
+			g.Expect(tc.expectPrePull).To(Equal(renderedPrePuller != nil), "Check prepuller rendering")
+
+			// All the containers in the pre-puller should use the IfNotPresent image pull policy:
+			if renderedPrePuller != nil {
+				checkDaemonSetImagePullPolicy(g, renderedPrePuller)
+			}
 
 			updateNode, updateMaster := shouldUpdateOVNKonUpgrade(bootstrapResult.OVN, tc.rv)
 			g.Expect(updateMaster).To(Equal(tc.expectMaster), "Check master")
@@ -2346,6 +2351,27 @@ func checkDaemonsetAnnotation(g *WithT, objs []*uns.Unstructured, key, value str
 		}
 	}
 	return foundMaster && foundNode
+}
+
+func checkDaemonSetImagePullPolicy(g *WithT, obj *uns.Unstructured) {
+	initContainers, _, err := uns.NestedSlice(obj.Object, "spec", "template", "spec", "initContainers")
+	g.Expect(err).ToNot(HaveOccurred())
+	checkContainersImagePullPolicy(g, initContainers)
+	containers, _, err := uns.NestedSlice(obj.Object, "spec", "template", "spec", "containers")
+	g.Expect(err).ToNot(HaveOccurred())
+	checkContainersImagePullPolicy(g, containers)
+}
+
+func checkContainersImagePullPolicy(g *WithT, containers []any) {
+	for _, container := range containers {
+		checkContainerImagePullPolicy(g, container.(map[string]any))
+	}
+}
+
+func checkContainerImagePullPolicy(g *WithT, container map[string]any) {
+	policy, _, err := uns.NestedString(container, "imagePullPolicy")
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(policy).To(Equal(string(v1.PullIfNotPresent)))
 }
 
 func ptrToUint32(x uint32) *uint32 {
