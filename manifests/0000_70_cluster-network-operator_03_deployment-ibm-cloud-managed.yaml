@@ -127,6 +127,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
+      serviceAccountName: cluster-network-operator-service-account
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
