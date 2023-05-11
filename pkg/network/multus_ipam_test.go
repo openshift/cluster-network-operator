@@ -226,7 +226,7 @@ func TestRenderWithDHCP(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "dhcp-daemon")))
 }
 
-// TestRenderWithWhereabouts tests a rendering with the ip reconciler
+// TestRenderWithWhereabouts tests a rendering with the whereabouts-reconciler.
 func TestRenderWithWhereabouts(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -236,10 +236,10 @@ func TestRenderWithWhereabouts(t *testing.T) {
 
 	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("CronJob", "openshift-multus", "ip-reconciler")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "whereabouts-reconciler")))
 }
 
-// TestRenderWithWhereabouts tests a rendering with the ip reconciler
+// TestRenderWithWhereabouts tests a rendering with the whereabouts-reconciler.
 func TestRenderWithWhereaboutsConflist(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -249,7 +249,7 @@ func TestRenderWithWhereaboutsConflist(t *testing.T) {
 
 	objs, err := renderMultus(config, fakeBootstrapResult(), manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("CronJob", "openshift-multus", "ip-reconciler")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "whereabouts-reconciler")))
 }
 
 // TestRenderNoIPAM tests a rendering WITHOUT an IPAM configured.
