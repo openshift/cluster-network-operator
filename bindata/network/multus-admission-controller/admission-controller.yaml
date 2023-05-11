@@ -41,6 +41,7 @@ spec:
         - -tls-cert-file=/etc/webhook/tls.crt
         - -alsologtostderr=true
         - -metrics-listen-address=127.0.0.1:9091
+        - -ignore-namespaces=openshift-etcd,openshift-console,openshift-ingress-canary,{{.IgnoredNamespace}}
         volumeMounts:
         - name: webhook-certs
           mountPath: /etc/webhook

@@ -6,6 +6,9 @@ import (
 	. "github.com/onsi/gomega"
 
 	operv1 "github.com/openshift/api/operator/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestIsChangeSafe(t *testing.T) {
@@ -173,6 +176,27 @@ func TestRenderUnknownNetwork(t *testing.T) {
 			},
 		},
 	}
+	fakeClient := fake.NewClientBuilder().WithObjects(
+		&corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test1-ignored",
+				Labels: map[string]string{
+					"openshift.io/cluster-monitoring": "true",
+				},
+			},
+		},
+		&corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test2-not-ignored",
+			},
+		},
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name: "test3-ignored",
+			Labels: map[string]string{
+				"openshift.io/cluster-monitoring": "true",
+			},
+		},
+		}).Build()
 
 	err := Validate(&config.Spec)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -188,7 +212,7 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	bootstrapResult, err := Bootstrap(&config, nil)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	objs, err := Render(prev, bootstrapResult, manifestDir)
+	objs, err := Render(prev, bootstrapResult, manifestDir, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Validate that openshift-sdn isn't rendered

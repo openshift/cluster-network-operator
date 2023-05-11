@@ -17,9 +17,10 @@ import (
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilnet "k8s.io/utils/net"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client client.Client) ([]*uns.Unstructured, error) {
 	log.Printf("Starting render phase")
 	objs := []*uns.Unstructured{}
 
@@ -40,7 +41,7 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	objs = append(objs, o...)
 
 	// render MultusAdmissionController
-	o, err = renderMultusAdmissionController(conf, manifestDir, bootstrapResult.Infra.ExternalControlPlane)
+	o, err = renderMultusAdmissionController(conf, manifestDir, bootstrapResult.Infra.ExternalControlPlane, client)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +132,7 @@ func deprecatedCanonicalizeSimpleMacvlanConfig(conf *operv1.SimpleMacvlanConfig)
 // DeprecatedCanonicalize converts configuration to a canonical form for backward
 // compatibility.
 //
-//      *** DO NOT ADD ANY NEW CANONICALIZATION TO THIS FUNCTION! ***
+//	*** DO NOT ADD ANY NEW CANONICALIZATION TO THIS FUNCTION! ***
 //
 // Altering the user-provided configuration from CNO causes problems when other components
 // need to look at the configuration before CNO starts. Users should just write the
@@ -581,7 +582,7 @@ func renderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 }
 
 // renderMultusAdmissionController generates the manifests of Multus Admission Controller
-func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string, externalControlPlane bool) ([]*uns.Unstructured, error) {
+func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string, externalControlPlane bool, client client.Client) ([]*uns.Unstructured, error) {
 	if *conf.DisableMultiNetwork {
 		return nil, nil
 	}
@@ -589,7 +590,7 @@ func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir strin
 	var err error
 	out := []*uns.Unstructured{}
 
-	objs, err := renderMultusAdmissonControllerConfig(manifestDir, externalControlPlane)
+	objs, err := renderMultusAdmissonControllerConfig(manifestDir, externalControlPlane, client)
 	if err != nil {
 		return nil, err
 	}
