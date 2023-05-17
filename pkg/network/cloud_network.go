@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 
 	"github.com/pkg/errors"
 
@@ -82,13 +83,13 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 
 	manifestDirs := make([]string, 0, 2)
 	manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "cloud-network-config-controller/common"))
-	if hcpCfg := NewHyperShiftConfig(); hcpCfg.Enabled {
+	if hcpCfg := platform.NewHyperShiftConfig(); hcpCfg.Enabled {
 		data.Data["CLIImage"] = os.Getenv("CLI_IMAGE")
 		data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
 		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
 		data.Data["ManagementClusterName"] = names.ManagementClusterName
 		data.Data["HostedClusterNamespace"] = hcpCfg.Namespace
-
+		data.Data["HCPNodeSelector"] = cloudBootstrapResult.HostedControlPlane.Spec.NodeSelector
 		// In HyperShift CloudNetworkConfigController is deployed as a part of the hosted cluster controlplane
 		// which means that it is created in the management cluster.
 		// CloudNetworkConfigController should use the proxy settings configured by hypershift controlplane operator

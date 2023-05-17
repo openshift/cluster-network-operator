@@ -10,7 +10,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/network"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
@@ -59,7 +59,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// In HyperShift use the infrastructure name to differentiate between resources deployed by the management cluster CNO and CNO deployed in the hosted clusters control plane namespace
 	// Without that the CNO running against the management cluster would pick the resources rendered by the hosted cluster CNO
 	cluster := names.StandAloneClusterName
-	if hcp := network.NewHyperShiftConfig(); hcp.Enabled {
+	if hcp := platform.NewHyperShiftConfig(); hcp.Enabled {
 		infraConfig := &configv1.Infrastructure{}
 
 		err := retry.OnError(retry.DefaultBackoff, func(error) bool { return true }, func() error {
