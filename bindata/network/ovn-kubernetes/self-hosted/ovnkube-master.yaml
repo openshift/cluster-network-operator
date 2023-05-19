@@ -385,7 +385,7 @@ spec:
                 if [ "${ipsec}" == "true" ]; then
                     # IBMCloud does not forward ESP (IP proto 50)
                     # Instead, force IBMCloud IPsec to always use NAT-T
-                    if [ "{{.PlatformType}}" == "IBMCloud" ]; then
+                    if [ "{{.PlatformType}}" == "Azure" ]; then
                         ipsec_encapsulation=true
                     fi
                 fi
