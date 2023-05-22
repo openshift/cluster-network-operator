@@ -175,6 +175,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// Hypershift
 	data.Data["ManagementClusterName"] = names.ManagementClusterName
 	data.Data["HostedClusterNamespace"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Namespace
+	data.Data["ReleaseImage"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ReleaseImage
 	data.Data["ClusterID"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ClusterID
 	data.Data["ClusterIDLabel"] = platform.ClusterIDLabel
 	data.Data["OVNDbServiceType"] = corev1.ServiceTypeClusterIP
@@ -545,6 +546,7 @@ func bootstrapOVNHyperShiftConfig(hc *platform.HyperShiftConfig, kubeClient cnoc
 		Namespace:          hc.Namespace,
 		OVNSbDbRouteHost:   hc.OVNSbDbRouteHost,
 		OVNSbDbRouteLabels: hc.OVNSbDbRouteLabels,
+		ReleaseImage:       hc.ReleaseImage,
 	}
 
 	if !hc.Enabled {

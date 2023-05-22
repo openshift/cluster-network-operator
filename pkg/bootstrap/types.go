@@ -35,6 +35,7 @@ type OVNHyperShiftBootstrapResult struct {
 	OVNSbDbRouteLabels        map[string]string
 	HCPNodeSelector           map[string]string
 	ControlPlaneReplicas      int
+	ReleaseImage              string
 }
 
 type OVNConfigBoostrapResult struct {
