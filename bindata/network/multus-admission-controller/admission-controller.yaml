@@ -27,6 +27,9 @@ spec:
   template:
     metadata:
       annotations:
+{{- if .HyperShiftEnabled}}
+        hypershift.openshift.io/release-image: {{.ReleaseImage}}
+{{- end }}      
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: multus-admission-controller
