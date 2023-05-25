@@ -339,7 +339,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	set(t, client, no)
 
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 	co, oc, err := getStatuses(client, "testing")
 	if err != nil {
@@ -377,7 +376,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}
 	set(t, client, dsB)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	// Since the DaemonSet.Status reports no pods Available, the status should be Progressing
@@ -434,7 +432,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	for dsA.Status.NumberUnavailable > 0 || dsB.Status.NumberUnavailable > 0 {
 		set(t, client, dsA)
 		set(t, client, dsB)
-		status.SetConfigUpdated(true)
 		status.SetFromPods()
 
 		co, oc, err = getStatuses(client, "testing")
@@ -489,7 +486,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	set(t, client, dsA)
 	set(t, client, dsB)
 	time.Sleep(1 * time.Second) // minimum transition time fidelity
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -534,7 +530,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	// that we enter Progressing state but otherwise stay Available
 	dsA.Generation = 2
 	set(t, client, dsA)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -576,7 +571,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		ObservedGeneration:     2,
 	}
 	set(t, client, dsA)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -617,7 +611,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		ObservedGeneration:     2,
 	}
 	set(t, client, dsA)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -662,7 +655,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 
 	t0 := time.Now()
 	time.Sleep(time.Second / 10)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -724,7 +716,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		}
 	}
 	setLastPodState(t, client, "testing", ps)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -776,7 +767,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		UpdatedNumberScheduled: 1,
 	}
 	set(t, client, dsA)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	// see that the pod state is sensible
@@ -834,7 +824,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}
 	set(t, client, dsNC)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	// We should now be Progressing, but not un-Available
@@ -876,7 +865,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		}
 	}
 	setLastPodState(t, client, "testing", ps)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -913,7 +901,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	dsNC.Status.DesiredNumberScheduled = 1
 	dsNC.Status.UpdatedNumberScheduled = 1
 	set(t, client, dsNC)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -952,7 +939,6 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	set(t, client, no)
 
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err := getStatuses(client, "testing")
@@ -978,7 +964,6 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depA := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Labels: sl}}
 	set(t, client, depA)
 
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -1017,7 +1002,6 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depA.Status.UnavailableReplicas = 0
 	depA.Status.AvailableReplicas = depA.Status.Replicas
 	set(t, client, depA)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -1074,7 +1058,6 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 
 	t0 := time.Now()
 	time.Sleep(time.Second / 10)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -1141,7 +1124,6 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depB.Status.AvailableReplicas = depB.Status.Replicas
 
 	set(t, client, depB)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -1183,7 +1165,6 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		}
 	}
 	setLastPodState(t, client, "testing", ps)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -1226,7 +1207,6 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depB.Status.UnavailableReplicas = 0
 	depB.Status.AvailableReplicas = depB.Status.Replicas
 	set(t, client, depB)
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -1422,7 +1402,6 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	}
 	set(t, client, podnC)
 
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 
 	oc, err := getOC(client)
@@ -1490,7 +1469,6 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	}
 	set(t, client, podC)
 
-	status.SetConfigUpdated(true)
 	status.SetFromPods()
 	oc, err = getOC(client)
 	if err != nil {
@@ -1568,115 +1546,10 @@ func TestStatusManagerHyperShift(t *testing.T) {
 		}}
 	set(t, mgmtClient, depHCP)
 
-	mgmtStatus.SetConfigUpdated(true)
 	mgmtStatus.SetFromPods()
 
 	// mgmt conditions should not reflect the failures in hosted clusters namespace
 	oc, err := getOC(mgmtClient)
-	if err != nil {
-		t.Fatalf("error getting ClusterOperator: %v", err)
-	}
-	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
-		{
-			Type:   operv1.OperatorStatusTypeDegraded,
-			Status: operv1.ConditionFalse,
-		},
-		{
-			Type:   operv1.OperatorStatusTypeProgressing,
-			Status: operv1.ConditionFalse,
-		},
-		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
-			Status: operv1.ConditionTrue,
-		},
-		{
-			Type:   operv1.OperatorStatusTypeAvailable,
-			Status: operv1.ConditionTrue,
-		},
-	}) {
-		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
-	}
-}
-
-func TestStatusManagerSetConfigUpdated(t *testing.T) {
-	client := fake.NewFakeClient()
-	status := New(client, "testing", "")
-	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	set(t, client, no)
-
-	status.SetFromPods()
-	co, oc, err := getStatuses(client, "testing")
-	if err != nil {
-		t.Fatalf("error getting ClusterOperator: %v", err)
-	}
-	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
-		{
-			Type:   operv1.OperatorStatusTypeProgressing,
-			Status: operv1.ConditionTrue,
-			Reason: "Deploying",
-		},
-	}) {
-		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
-	}
-	if len(co.Status.Versions) > 0 {
-		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
-	}
-
-	// Create minimal Deployment
-	depA := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Labels: sl},
-		Status: appsv1.DeploymentStatus{
-			Replicas:          1,
-			UpdatedReplicas:   1,
-			AvailableReplicas: 1,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": "gamma"},
-			},
-		},
-	}
-	set(t, client, depA)
-
-	// Even though the deployment is done the operator should not be Available if the config is not updated
-	status.SetConfigUpdated(false)
-	status.SetFromPods()
-
-	co, oc, err = getStatuses(client, "testing")
-	if err != nil {
-		t.Fatalf("error getting ClusterOperator: %v", err)
-	}
-	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
-		{
-			Type:   operv1.OperatorStatusTypeDegraded,
-			Status: operv1.ConditionFalse,
-		},
-		{
-			Type:   operv1.OperatorStatusTypeProgressing,
-			Status: operv1.ConditionFalse,
-		},
-		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
-			Status: operv1.ConditionTrue,
-		},
-		{
-			Type:   operv1.OperatorStatusTypeAvailable,
-			Status: operv1.ConditionFalse,
-			Reason: "Startup",
-		},
-	}) {
-		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
-	}
-	if len(co.Status.Versions) > 0 {
-		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
-	}
-
-	// Operator should be available when the deployment is done and the config is updated
-	status.SetConfigUpdated(true)
-	status.SetFromPods()
-
-	oc, err = getOC(client)
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
