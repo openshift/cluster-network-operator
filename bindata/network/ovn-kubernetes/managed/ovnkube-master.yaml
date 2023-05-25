@@ -53,6 +53,7 @@ spec:
       annotations:
         hypershift.openshift.io/release-image: {{.ReleaseImage}}
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: "hosted-cluster-api-access"
       labels:
         app: ovnkube-master
         ovn-db-pod: "true"

@@ -36,7 +36,8 @@ spec:
       annotations:
 {{- if .HyperShiftEnabled}}
         hypershift.openshift.io/release-image: {{.ReleaseImage}}
-{{- end }}      
+{{- end }}
+        cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: "hosted-cluster-api-access"
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: multus-admission-controller
