@@ -7,6 +7,8 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 
 	configv1 "github.com/openshift/api/config/v1"
+
+	"github.com/openshift/hypershift/api/util/ipnet"
 )
 
 func init() {
@@ -50,6 +52,11 @@ const (
 	// PortierisImageAnnotation is an annotation that allows the specification of the portieries component
 	// (performs container image verification).
 	PortierisImageAnnotation = "hypershift.openshift.io/portieris-image"
+	// Configure ingress controller with endpoint publishing strategy as Private.
+	// This overrides any opinionated strategy set by platform in ReconcileDefaultIngressController.
+	// It's used by IBM cloud to support ingress endpoint publishing strategy scope
+	// NOTE: We'll expose this in the API if the use case gets generalised.
+	PrivateIngressControllerAnnotation = "hypershift.openshift.io/private-ingress-controller"
 
 	// ClusterAPIProviderAWSImage overrides the CAPI AWS provider image to use for
 	// a HostedControlPlane.
@@ -66,6 +73,10 @@ const (
 	// ClusterAPIAzureProviderImage overrides the CAPI Azure provider image to use for
 	// a HostedControlPlane.
 	ClusterAPIAzureProviderImage = "hypershift.openshift.io/capi-provider-azure-image"
+
+	// ClusterAPIPowerVSProviderImage overrides the CAPI PowerVS provider image to use for
+	// a HostedControlPlane.
+	ClusterAPIPowerVSProviderImage = "hypershift.openshift.io/capi-provider-powervs-image"
 
 	// AESCBCKeySecretKey defines the Kubernetes secret key name that contains the aescbc encryption key
 	// in the AESCBC secret encryption strategy
@@ -90,9 +101,30 @@ const (
 	// ExternalDNSHostnameAnnotation is the annotation external-dns uses to register DNS name for different HCP services.
 	ExternalDNSHostnameAnnotation = "external-dns.alpha.kubernetes.io/hostname"
 
+	// ForceUpgradeToAnnotation is the annotation that forces HostedCluster upgrade even if the underlying ClusterVersion
+	// is reporting it is not Upgradeable.  The annotation value must be set to the release image being forced.
+	ForceUpgradeToAnnotation = "hypershift.openshift.io/force-upgrade-to"
+
 	// ServiceAccountSigningKeySecretKey is the name of the secret key that should contain the service account signing
 	// key if specified.
 	ServiceAccountSigningKeySecretKey = "key"
+
+	// DisableProfilingAnnotation is the annotation that allows disabling profiling for control plane components.
+	// Any components specified in this list will have profiling disabled. Profiling is disabled by default for etcd and konnectivity.
+	// Components this annotation can apply to: kube-scheduler, kube-controller-manager, kube-apiserver.
+	DisableProfilingAnnotation = "hypershift.openshift.io/disable-profiling"
+
+	// CleanupCloudResourcesAnnotation is an annotation that indicates whether a guest cluster's resources should be
+	// removed when deleting the corresponding HostedCluster. If set to "true", resources created on the cloud provider during the life
+	// of the cluster will be removed, including image registry storage, ingress dns records, load balancers, and persistent storage.
+	CleanupCloudResourcesAnnotation = "hypershift.openshift.io/cleanup-cloud-resources"
+
+	// ResourceRequestOverrideAnnotationPrefix is a prefix for an annotation to override resource requests for a particular deployment/container
+	// in a hosted control plane. The format of the annotation is:
+	// resource-request-override.hypershift.openshift.io/[deployment-name].[container-name]: [resource-type-1]=[value1],[resource-type-2]=[value2],...
+	// For example, to override the memory and cpu request for the Kubernetes APIServer:
+	// resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver: memory=3Gi,cpu=2000m
+	ResourceRequestOverrideAnnotationPrefix = "resource-request-override.hypershift.openshift.io"
 )
 
 // HostedClusterSpec is the desired behavior of a HostedCluster.
@@ -116,6 +148,13 @@ type HostedClusterSpec struct {
 	// +kubebuilder:validation:Pattern:="[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
 	// +optional
 	ClusterID string `json:"clusterID,omitempty"`
+
+	// channel is an identifier for explicitly requesting that a non-default
+	// set of updates be applied to this cluster. The default channel will be
+	// contain stable updates that are appropriate for production clusters.
+	//
+	// +optional
+	Channel string `json:"channel,omitempty"`
 
 	// InfraID is a globally unique identifier for the cluster. This identifier
 	// will be used to associate various cloud resources with the HostedCluster
@@ -169,7 +208,7 @@ type HostedClusterSpec struct {
 	// changed.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={managementType: "Managed"}
+	// +kubebuilder:default={managementType: "Managed", managed: {storage: {type: "PersistentVolume", persistentVolume: {size: "4Gi"}}}}
 	// +immutable
 	Etcd EtcdSpec `json:"etcd"`
 
@@ -202,6 +241,7 @@ type HostedClusterSpec struct {
 	// +kubebuilder:default:="https://kubernetes.default.svc"
 	// +immutable
 	// +optional
+	// +kubebuilder:validation:Format=uri
 	IssuerURL string `json:"issuerURL,omitempty"`
 
 	// ServiceAccountSigningKey is a reference to a secret containing the private key
@@ -279,6 +319,11 @@ type HostedClusterSpec struct {
 	// +optional
 	// +immutable
 	OLMCatalogPlacement OLMCatalogPlacement `json:"olmCatalogPlacement,omitempty"`
+
+	// NodeSelector when specified, must be true for the pods managed by the HostedCluster to be scheduled.
+	//
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 }
 
 // OLMCatalogPlacement is an enum specifying the placement of OLM catalog components.
@@ -415,6 +460,13 @@ type DNSSpec struct {
 	// +immutable
 	BaseDomain string `json:"baseDomain"`
 
+	// BaseDomainPrefix is the base domain prefix of the cluster.
+	// defaults to clusterName if not set
+	//
+	// +optional
+	// +immutable
+	BaseDomainPrefix *string `json:"baseDomainPrefix,omitempty"`
+
 	// PublicZoneID is the Hosted Zone ID where all the DNS records that are
 	// publicly accessible to the internet exist.
 	//
@@ -432,26 +484,52 @@ type DNSSpec struct {
 
 // ClusterNetworking specifies network configuration for a cluster.
 type ClusterNetworking struct {
-	// ServiceCIDR is...
-	//
-	// TODO(dan): document it
-	//
+	// Deprecated
+	// This field will be removed in the next API release.
+	// Use ServiceNetwork instead
 	// +immutable
-	ServiceCIDR string `json:"serviceCIDR"`
+	// +optional
+	// +kubebuilder:validation:Format=cidr
+	ServiceCIDR string `json:"serviceCIDR,omitempty"`
 
-	// PodCIDR is...
-	//
-	// TODO(dan): document it
+	// Deprecated
+	// This field will be removed in the next API release.
+	// Use ClusterNetwork instead
 	//
 	// +immutable
-	PodCIDR string `json:"podCIDR"`
+	// +optional
+	// +kubebuilder:validation:Format=cidr
+	PodCIDR string `json:"podCIDR,omitempty"`
 
-	// MachineCIDR is...
-	//
-	// TODO(dan): document it
+	// Deprecated
+	// This field will be removed in the next API release.
+	// Use MachineNetwork instead
+	// +immutable
+	// +optional
+	// +kubebuilder:validation:Format=cidr
+	MachineCIDR string `json:"machineCIDR,omitempty"`
+
+	// MachineNetwork is the list of IP address pools for machines.
+	// TODO: make this required in the next version of the API
 	//
 	// +immutable
-	MachineCIDR string `json:"machineCIDR"`
+	// +optional
+	MachineNetwork []MachineNetworkEntry `json:"machineNetwork,omitempty"`
+
+	// ClusterNetwork is the list of IP address pools for pods.
+	// TODO: make this required in the next version of the API
+	//
+	// +immutable
+	// +optional
+	ClusterNetwork []ClusterNetworkEntry `json:"clusterNetwork,omitempty"`
+
+	// ServiceNetwork is the list of IP address pools for services.
+	// NOTE: currently only one entry is supported.
+	// TODO: make this required in the next version of the API
+	//
+	// +immutable
+	// +optional
+	ServiceNetwork []ServiceNetworkEntry `json:"serviceNetwork,omitempty"`
 
 	// NetworkType specifies the SDN provider used for cluster networking.
 	//
@@ -466,6 +544,34 @@ type ClusterNetworking struct {
 	APIServer *APIServerNetworking `json:"apiServer,omitempty"`
 }
 
+// MachineNetworkEntry is a single IP address block for node IP blocks.
+type MachineNetworkEntry struct {
+	// CIDR is the IP block address pool for machines within the cluster.
+	CIDR ipnet.IPNet `json:"cidr"`
+}
+
+// ClusterNetworkEntry is a single IP address block for pod IP blocks. IP blocks
+// are allocated with size 2^HostSubnetLength.
+type ClusterNetworkEntry struct {
+	// CIDR is the IP block address pool.
+	CIDR ipnet.IPNet `json:"cidr"`
+
+	// HostPrefix is the prefix size to allocate to each node from the CIDR.
+	// For example, 24 would allocate 2^8=256 adresses to each node. If this
+	// field is not used by the plugin, it can be left unset.
+	// +optional
+	HostPrefix int32 `json:"hostPrefix,omitempty"`
+}
+
+// ServiceNetworkEntry is a single IP address block for the service network.
+type ServiceNetworkEntry struct {
+	// CIDR is the IP block address pool for services within the cluster.
+	CIDR ipnet.IPNet `json:"cidr"`
+}
+
+// +kubebuilder:validation:Pattern:=`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(3[0-2]|[1-2][0-9]|[0-9]))$`
+type CIDRBlock string
+
 // APIServerNetworking specifies how the APIServer is exposed inside a cluster
 // node.
 type APIServerNetworking struct {
@@ -478,6 +584,11 @@ type APIServerNetworking struct {
 	// pods using host networking cannot listen on this port. If not specified,
 	// 6443 is used.
 	Port *int32 `json:"port,omitempty"`
+
+	// AllowedCIDRBlocks is an allow list of CIDR blocks that can access the APIServer
+	// If not specified, traffic is allowed from all addresses.
+	// This depends on underlying support by the cloud provider for Service LoadBalancerSourceRanges
+	AllowedCIDRBlocks []CIDRBlock `json:"allowedCIDRBlocks,omitempty"`
 }
 
 // NetworkType specifies the SDN provider used for cluster networking.
@@ -486,7 +597,7 @@ type APIServerNetworking struct {
 type NetworkType string
 
 const (
-	// OpenShiftSDN specifies OpenshiftSDN as the SDN provider
+	// OpenShiftSDN specifies OpenShiftSDN as the SDN provider
 	OpenShiftSDN NetworkType = "OpenShiftSDN"
 
 	// Calico specifies Calico as the SDN provider
@@ -560,6 +671,40 @@ type PlatformSpec struct {
 	// +optional
 	// +immutable
 	PowerVS *PowerVSPlatformSpec `json:"powervs,omitempty"`
+
+	// KubeVirt defines KubeVirt specific settings for cluster components.
+	//
+	// +optional
+	// +immutable
+	Kubevirt *KubevirtPlatformSpec `json:"kubevirt,omitempty"`
+}
+
+// KubevirtPlatformSpec specifies configuration for kubevirt guest cluster installations
+type KubevirtPlatformSpec struct {
+	// BaseDomainPassthrough toggles whether or not an automatically
+	// generated base domain for the guest cluster should be used that
+	// is a subdomain of the management cluster's *.apps DNS.
+	//
+	// For the KubeVirt platform, the basedomain can be autogenerated using
+	// the *.apps domain of the management/infra hosting cluster
+	// This makes the guest cluster's base domain a subdomain of the
+	// hypershift infra/mgmt cluster's base domain.
+	//
+	// Example:
+	//   Infra/Mgmt cluster's DNS
+	//     Base: example.com
+	//     Cluster: mgmt-cluster.example.com
+	//     Apps:    *.apps.mgmt-cluster.example.com
+	//   KubeVirt Guest cluster's DNS
+	//     Base: apps.mgmt-cluster.example.com
+	//     Cluster: guest.apps.mgmt-cluster.example.com
+	//     Apps: *.apps.guest.apps.mgmt-cluster.example.com
+	//
+	// This is possible using OCP wildcard routes
+	//
+	// +optional
+	// +immutable
+	BaseDomainPassthrough *bool `json:"baseDomainPassthrough,omitempty"`
 }
 
 // AgentPlatformSpec specifies configuration for agent-based installations.
@@ -576,6 +721,19 @@ type IBMCloudPlatformSpec struct {
 
 // PowerVSPlatformSpec defines IBMCloud PowerVS specific settings for components
 type PowerVSPlatformSpec struct {
+	// AccountID is the IBMCloud account id.
+	// This field is immutable. Once set, It can't be changed.
+	//
+	// +immutable
+	AccountID string `json:"accountID"`
+
+	// CISInstanceCRN is the IBMCloud CIS Service Instance's Cloud Resource Name
+	// This field is immutable. Once set, It can't be changed.
+	//
+	// +kubebuilder:validation:Pattern=`^crn:`
+	// +immutable
+	CISInstanceCRN string `json:"cisInstanceCRN"`
+
 	// ResourceGroup is the IBMCloud Resource Group in which the cluster resides.
 	// This field is immutable. Once set, It can't be changed.
 	//
@@ -624,9 +782,7 @@ type PowerVSPlatformSpec struct {
 	VPC *PowerVSVPC `json:"vpc"`
 
 	// KubeCloudControllerCreds is a reference to a secret containing cloud
-	// credentials with permissions matching the cloud controller policy. The
-	// secret should have exactly one key, `credentials`, whose value is an AWS
-	// credentials file.
+	// credentials with permissions matching the cloud controller policy.
 	// This field is immutable. Once set, It can't be changed.
 	//
 	// TODO(dan): document the "cloud controller policy"
@@ -635,9 +791,7 @@ type PowerVSPlatformSpec struct {
 	KubeCloudControllerCreds corev1.LocalObjectReference `json:"kubeCloudControllerCreds"`
 
 	// NodePoolManagementCreds is a reference to a secret containing cloud
-	// credentials with permissions matching the node pool management policy. The
-	// secret should have exactly one key, `credentials`, whose value is an AWS
-	// credentials file.
+	// credentials with permissions matching the node pool management policy.
 	// This field is immutable. Once set, It can't be changed.
 	//
 	// TODO(dan): document the "node pool management policy"
@@ -645,16 +799,17 @@ type PowerVSPlatformSpec struct {
 	// +immutable
 	NodePoolManagementCreds corev1.LocalObjectReference `json:"nodePoolManagementCreds"`
 
-	// ControlPlaneOperatorCreds is a reference to a secret containing cloud
-	// credentials with permissions matching the control-plane-operator policy.
-	// The secret should have exactly one key, `credentials`, whose value is
-	// an AWS credentials file.
-	// This field is immutable. Once set, It can't be changed.
-	//
-	// TODO(dan): document the "control plane operator policy"
+	// IngressOperatorCloudCreds is a reference to a secret containing ibm cloud
+	// credentials for ingress operator to get authenticated with ibm cloud.
 	//
 	// +immutable
-	ControlPlaneOperatorCreds corev1.LocalObjectReference `json:"controlPlaneOperatorCreds"`
+	IngressOperatorCloudCreds corev1.LocalObjectReference `json:"ingressOperatorCloudCreds"`
+
+	// StorageOperatorCloudCreds is a reference to a secret containing ibm cloud
+	// credentials for storage operator to get authenticated with ibm cloud.
+	//
+	// +immutable
+	StorageOperatorCloudCreds corev1.LocalObjectReference `json:"storageOperatorCloudCreds"`
 }
 
 // PowerVSVPC specifies IBM Cloud PowerVS LoadBalancer configuration for the control
@@ -747,7 +902,8 @@ type AWSPlatformSpec struct {
 
 	// CloudProviderConfig specifies AWS networking configuration for the control
 	// plane.
-	//
+	// This is mainly used for cloud provider controller config:
+	// https://github.com/kubernetes/kubernetes/blob/f5be5052e3d0808abb904aebd3218fe4a5c2dd82/staging/src/k8s.io/legacy-cloud-providers/aws/aws.go#L1347-L1364
 	// TODO(dan): should this be named AWSNetworkConfig?
 	//
 	// +optional
@@ -763,47 +919,35 @@ type AWSPlatformSpec struct {
 	// +immutable
 	ServiceEndpoints []AWSServiceEndpoint `json:"serviceEndpoints,omitempty"`
 
-	// Roles must contain exactly 4 entries representing the locators for roles
-	// supporting the following OCP services:
+	// RolesRef contains references to various AWS IAM roles required to enable
+	// integrations such as OIDC.
 	//
-	// - openshift-ingress-operator/cloud-credentials
-	// - openshift-image-registry/installer-cloud-credentials
-	// - openshift-cluster-csi-drivers/ebs-cloud-credentials
-	// - cloud-network-config-controller/cloud-credentials
-	//
-	// Each role has unique permission requirements whose documentation is TBD.
-	//
-	// TODO(dan): revisit this field; it's really 3 required fields with specific content requirements
-	//
+	// +immutable
+	RolesRef AWSRolesRef `json:"rolesRef"`
+
+	// Deprecated
+	// This field will be removed in the next API release.
+	// Use RolesRef instead.
 	// +immutable
 	Roles []AWSRoleCredentials `json:"roles,omitempty"`
 
-	// KubeCloudControllerCreds is a reference to a secret containing cloud
-	// credentials with permissions matching the cloud controller policy. The
-	// secret should have exactly one key, `credentials`, whose value is an AWS
-	// credentials file.
-	//
-	// TODO(dan): document the "cloud controller policy"
+	// Deprecated
+	// This field will be removed in the next API release.
+	// Use RolesRef instead.
 	//
 	// +immutable
 	KubeCloudControllerCreds corev1.LocalObjectReference `json:"kubeCloudControllerCreds"`
 
-	// NodePoolManagementCreds is a reference to a secret containing cloud
-	// credentials with permissions matching the node pool management policy. The
-	// secret should have exactly one key, `credentials`, whose value is an AWS
-	// credentials file.
-	//
-	// TODO(dan): document the "node pool management policy"
+	// Deprecated
+	// This field will be removed in the next API release.
+	// Use RolesRef instead.
 	//
 	// +immutable
 	NodePoolManagementCreds corev1.LocalObjectReference `json:"nodePoolManagementCreds"`
 
-	// ControlPlaneOperatorCreds is a reference to a secret containing cloud
-	// credentials with permissions matching the control-plane-operator policy.
-	// The secret should have exactly one key, `credentials`, whose value is
-	// an AWS credentials file.
-	//
-	// TODO(dan): document the "control plane operator policy"
+	// Deprecated
+	// This field will be removed in the next API release.
+	// Use RolesRef instead.
 	//
 	// +immutable
 	ControlPlaneOperatorCreds corev1.LocalObjectReference `json:"controlPlaneOperatorCreds"`
@@ -816,6 +960,8 @@ type AWSPlatformSpec struct {
 	// for the user.
 	//
 	// +kubebuilder:validation:MaxItems=25
+	// +listType=map
+	// +listMapKey=key
 	// +optional
 	ResourceTags []AWSResourceTag `json:"resourceTags,omitempty"`
 
@@ -826,6 +972,21 @@ type AWSPlatformSpec struct {
 	// +kubebuilder:default=Public
 	// +optional
 	EndpointAccess AWSEndpointAccessType `json:"endpointAccess,omitempty"`
+
+	// AdditionalAllowedPrincipals specifies a list of additional allowed principal ARNs
+	// to be added to the hosted control plane's VPC Endpoint Service to enable additional
+	// VPC Endpoint connection requests to be automatically accepted.
+	// See https://docs.aws.amazon.com/vpc/latest/privatelink/configure-endpoint-service.html
+	// for more details around VPC Endpoint Service allowed principals.
+	//
+	// +optional
+	AdditionalAllowedPrincipals []string `json:"additionalAllowedPrincipals,omitempty"`
+}
+
+type AWSRoleCredentials struct {
+	ARN       string `json:"arn"`
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
 }
 
 // AWSResourceTag is a tag to apply to AWS resources created for the cluster.
@@ -848,10 +1009,372 @@ type AWSResourceTag struct {
 	Value string `json:"value"`
 }
 
-type AWSRoleCredentials struct {
-	ARN       string `json:"arn"`
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
+// AWSRolesRef contains references to various AWS IAM roles required for operators to make calls against the AWS API.
+type AWSRolesRef struct {
+	// The referenced role must have a trust relationship that allows it to be assumed via web identity.
+	// https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_oidc.html.
+	// Example:
+	// {
+	//		"Version": "2012-10-17",
+	//		"Statement": [
+	//			{
+	//				"Effect": "Allow",
+	//				"Principal": {
+	//					"Federated": "{{ .ProviderARN }}"
+	//				},
+	//					"Action": "sts:AssumeRoleWithWebIdentity",
+	//				"Condition": {
+	//					"StringEquals": {
+	//						"{{ .ProviderName }}:sub": {{ .ServiceAccounts }}
+	//					}
+	//				}
+	//			}
+	//		]
+	//	}
+	//
+	// IngressARN is an ARN value referencing a role appropriate for the Ingress Operator.
+	//
+	// The following is an example of a valid policy document:
+	//
+	// {
+	//	"Version": "2012-10-17",
+	//	"Statement": [
+	//		{
+	//			"Effect": "Allow",
+	//			"Action": [
+	//				"elasticloadbalancing:DescribeLoadBalancers",
+	//				"tag:GetResources",
+	//				"route53:ListHostedZones"
+	//			],
+	//			"Resource": "*"
+	//		},
+	//		{
+	//			"Effect": "Allow",
+	//			"Action": [
+	//				"route53:ChangeResourceRecordSets"
+	//			],
+	//			"Resource": [
+	//				"arn:aws:route53:::PUBLIC_ZONE_ID",
+	//				"arn:aws:route53:::PRIVATE_ZONE_ID"
+	//			]
+	//		}
+	//	]
+	// }
+	IngressARN string `json:"ingressARN"`
+
+	// ImageRegistryARN is an ARN value referencing a role appropriate for the Image Registry Operator.
+	//
+	// The following is an example of a valid policy document:
+	//
+	// {
+	//	"Version": "2012-10-17",
+	//	"Statement": [
+	//		{
+	//			"Effect": "Allow",
+	//			"Action": [
+	//				"s3:CreateBucket",
+	//				"s3:DeleteBucket",
+	//				"s3:PutBucketTagging",
+	//				"s3:GetBucketTagging",
+	//				"s3:PutBucketPublicAccessBlock",
+	//				"s3:GetBucketPublicAccessBlock",
+	//				"s3:PutEncryptionConfiguration",
+	//				"s3:GetEncryptionConfiguration",
+	//				"s3:PutLifecycleConfiguration",
+	//				"s3:GetLifecycleConfiguration",
+	//				"s3:GetBucketLocation",
+	//				"s3:ListBucket",
+	//				"s3:GetObject",
+	//				"s3:PutObject",
+	//				"s3:DeleteObject",
+	//				"s3:ListBucketMultipartUploads",
+	//				"s3:AbortMultipartUpload",
+	//				"s3:ListMultipartUploadParts"
+	//			],
+	//			"Resource": "*"
+	//		}
+	//	]
+	// }
+	ImageRegistryARN string `json:"imageRegistryARN"`
+
+	// StorageARN is an ARN value referencing a role appropriate for the Storage Operator.
+	//
+	// The following is an example of a valid policy document:
+	//
+	// {
+	//	"Version": "2012-10-17",
+	//	"Statement": [
+	//		{
+	//			"Effect": "Allow",
+	//			"Action": [
+	//				"ec2:AttachVolume",
+	//				"ec2:CreateSnapshot",
+	//				"ec2:CreateTags",
+	//				"ec2:CreateVolume",
+	//				"ec2:DeleteSnapshot",
+	//				"ec2:DeleteTags",
+	//				"ec2:DeleteVolume",
+	//				"ec2:DescribeInstances",
+	//				"ec2:DescribeSnapshots",
+	//				"ec2:DescribeTags",
+	//				"ec2:DescribeVolumes",
+	//				"ec2:DescribeVolumesModifications",
+	//				"ec2:DetachVolume",
+	//				"ec2:ModifyVolume"
+	//			],
+	//			"Resource": "*"
+	//		}
+	//	]
+	// }
+	StorageARN string `json:"storageARN"`
+
+	// NetworkARN is an ARN value referencing a role appropriate for the Network Operator.
+	//
+	// The following is an example of a valid policy document:
+	//
+	// {
+	//	"Version": "2012-10-17",
+	//	"Statement": [
+	//		{
+	//			"Effect": "Allow",
+	//			"Action": [
+	//				"ec2:DescribeInstances",
+	//        "ec2:DescribeInstanceStatus",
+	//        "ec2:DescribeInstanceTypes",
+	//        "ec2:UnassignPrivateIpAddresses",
+	//        "ec2:AssignPrivateIpAddresses",
+	//        "ec2:UnassignIpv6Addresses",
+	//        "ec2:AssignIpv6Addresses",
+	//        "ec2:DescribeSubnets",
+	//        "ec2:DescribeNetworkInterfaces"
+	//			],
+	//			"Resource": "*"
+	//		}
+	//	]
+	// }
+	NetworkARN string `json:"networkARN"`
+
+	// KubeCloudControllerARN is an ARN value referencing a role appropriate for the KCM/KCC.
+	//
+	// The following is an example of a valid policy document:
+	//
+	//  {
+	//  "Version": "2012-10-17",
+	//  "Statement": [
+	//    {
+	//      "Action": [
+	//        "ec2:DescribeInstances",
+	//        "ec2:DescribeImages",
+	//        "ec2:DescribeRegions",
+	//        "ec2:DescribeRouteTables",
+	//        "ec2:DescribeSecurityGroups",
+	//        "ec2:DescribeSubnets",
+	//        "ec2:DescribeVolumes",
+	//        "ec2:CreateSecurityGroup",
+	//        "ec2:CreateTags",
+	//        "ec2:CreateVolume",
+	//        "ec2:ModifyInstanceAttribute",
+	//        "ec2:ModifyVolume",
+	//        "ec2:AttachVolume",
+	//        "ec2:AuthorizeSecurityGroupIngress",
+	//        "ec2:CreateRoute",
+	//        "ec2:DeleteRoute",
+	//        "ec2:DeleteSecurityGroup",
+	//        "ec2:DeleteVolume",
+	//        "ec2:DetachVolume",
+	//        "ec2:RevokeSecurityGroupIngress",
+	//        "ec2:DescribeVpcs",
+	//        "elasticloadbalancing:AddTags",
+	//        "elasticloadbalancing:AttachLoadBalancerToSubnets",
+	//        "elasticloadbalancing:ApplySecurityGroupsToLoadBalancer",
+	//        "elasticloadbalancing:CreateLoadBalancer",
+	//        "elasticloadbalancing:CreateLoadBalancerPolicy",
+	//        "elasticloadbalancing:CreateLoadBalancerListeners",
+	//        "elasticloadbalancing:ConfigureHealthCheck",
+	//        "elasticloadbalancing:DeleteLoadBalancer",
+	//        "elasticloadbalancing:DeleteLoadBalancerListeners",
+	//        "elasticloadbalancing:DescribeLoadBalancers",
+	//        "elasticloadbalancing:DescribeLoadBalancerAttributes",
+	//        "elasticloadbalancing:DetachLoadBalancerFromSubnets",
+	//        "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+	//        "elasticloadbalancing:ModifyLoadBalancerAttributes",
+	//        "elasticloadbalancing:RegisterInstancesWithLoadBalancer",
+	//        "elasticloadbalancing:SetLoadBalancerPoliciesForBackendServer",
+	//        "elasticloadbalancing:AddTags",
+	//        "elasticloadbalancing:CreateListener",
+	//        "elasticloadbalancing:CreateTargetGroup",
+	//        "elasticloadbalancing:DeleteListener",
+	//        "elasticloadbalancing:DeleteTargetGroup",
+	//        "elasticloadbalancing:DescribeListeners",
+	//        "elasticloadbalancing:DescribeLoadBalancerPolicies",
+	//        "elasticloadbalancing:DescribeTargetGroups",
+	//        "elasticloadbalancing:DescribeTargetHealth",
+	//        "elasticloadbalancing:ModifyListener",
+	//        "elasticloadbalancing:ModifyTargetGroup",
+	//        "elasticloadbalancing:RegisterTargets",
+	//        "elasticloadbalancing:SetLoadBalancerPoliciesOfListener",
+	//        "iam:CreateServiceLinkedRole",
+	//        "kms:DescribeKey"
+	//      ],
+	//      "Resource": [
+	//        "*"
+	//      ],
+	//      "Effect": "Allow"
+	//    }
+	//  ]
+	// }
+	// +immutable
+	KubeCloudControllerARN string `json:"kubeCloudControllerARN"`
+
+	// NodePoolManagementARN is an ARN value referencing a role appropriate for the CAPI Controller.
+	//
+	// The following is an example of a valid policy document:
+	//
+	// {
+	//   "Version": "2012-10-17",
+	//  "Statement": [
+	//    {
+	//      "Action": [
+	//        "ec2:AllocateAddress",
+	//        "ec2:AssociateRouteTable",
+	//        "ec2:AttachInternetGateway",
+	//        "ec2:AuthorizeSecurityGroupIngress",
+	//        "ec2:CreateInternetGateway",
+	//        "ec2:CreateNatGateway",
+	//        "ec2:CreateRoute",
+	//        "ec2:CreateRouteTable",
+	//        "ec2:CreateSecurityGroup",
+	//        "ec2:CreateSubnet",
+	//        "ec2:CreateTags",
+	//        "ec2:DeleteInternetGateway",
+	//        "ec2:DeleteNatGateway",
+	//        "ec2:DeleteRouteTable",
+	//        "ec2:DeleteSecurityGroup",
+	//        "ec2:DeleteSubnet",
+	//        "ec2:DeleteTags",
+	//        "ec2:DescribeAccountAttributes",
+	//        "ec2:DescribeAddresses",
+	//        "ec2:DescribeAvailabilityZones",
+	//        "ec2:DescribeImages",
+	//        "ec2:DescribeInstances",
+	//        "ec2:DescribeInternetGateways",
+	//        "ec2:DescribeNatGateways",
+	//        "ec2:DescribeNetworkInterfaces",
+	//        "ec2:DescribeNetworkInterfaceAttribute",
+	//        "ec2:DescribeRouteTables",
+	//        "ec2:DescribeSecurityGroups",
+	//        "ec2:DescribeSubnets",
+	//        "ec2:DescribeVpcs",
+	//        "ec2:DescribeVpcAttribute",
+	//        "ec2:DescribeVolumes",
+	//        "ec2:DetachInternetGateway",
+	//        "ec2:DisassociateRouteTable",
+	//        "ec2:DisassociateAddress",
+	//        "ec2:ModifyInstanceAttribute",
+	//        "ec2:ModifyNetworkInterfaceAttribute",
+	//        "ec2:ModifySubnetAttribute",
+	//        "ec2:ReleaseAddress",
+	//        "ec2:RevokeSecurityGroupIngress",
+	//        "ec2:RunInstances",
+	//        "ec2:TerminateInstances",
+	//        "tag:GetResources",
+	//        "ec2:CreateLaunchTemplate",
+	//        "ec2:CreateLaunchTemplateVersion",
+	//        "ec2:DescribeLaunchTemplates",
+	//        "ec2:DescribeLaunchTemplateVersions",
+	//        "ec2:DeleteLaunchTemplate",
+	//        "ec2:DeleteLaunchTemplateVersions"
+	//      ],
+	//      "Resource": [
+	//        "*"
+	//      ],
+	//      "Effect": "Allow"
+	//    },
+	//    {
+	//      "Condition": {
+	//        "StringLike": {
+	//          "iam:AWSServiceName": "elasticloadbalancing.amazonaws.com"
+	//        }
+	//      },
+	//      "Action": [
+	//        "iam:CreateServiceLinkedRole"
+	//      ],
+	//      "Resource": [
+	//        "arn:*:iam::*:role/aws-service-role/elasticloadbalancing.amazonaws.com/AWSServiceRoleForElasticLoadBalancing"
+	//      ],
+	//      "Effect": "Allow"
+	//    },
+	//    {
+	//      "Action": [
+	//        "iam:PassRole"
+	//      ],
+	//      "Resource": [
+	//        "arn:*:iam::*:role/*-worker-role"
+	//      ],
+	//      "Effect": "Allow"
+	//    },
+	// 	  {
+	// 	  	"Effect": "Allow",
+	// 	  	"Action": [
+	// 	  		"kms:Decrypt",
+	// 	  		"kms:Encrypt",
+	// 	  		"kms:GenerateDataKey",
+	// 	  		"kms:GenerateDataKeyWithoutPlainText",
+	// 	  		"kms:DescribeKey"
+	// 	  	],
+	// 	  	"Resource": "*"
+	// 	  },
+	// 	  {
+	// 	  	"Effect": "Allow",
+	// 	  	"Action": [
+	// 	  		"kms:RevokeGrant",
+	// 	  		"kms:CreateGrant",
+	// 	  		"kms:ListGrants"
+	// 	  	],
+	// 	  	"Resource": "*",
+	// 	  	"Condition": {
+	// 	  		"Bool": {
+	// 	  			"kms:GrantIsForAWSResource": true
+	// 	  		}
+	// 	  	}
+	// 	  }
+	//  ]
+	// }
+	//
+	// +immutable
+	NodePoolManagementARN string `json:"nodePoolManagementARN"`
+
+	// ControlPlaneOperatorARN  is an ARN value referencing a role appropriate for the Control Plane Operator.
+	//
+	// The following is an example of a valid policy document:
+	//
+	// {
+	//	"Version": "2012-10-17",
+	//	"Statement": [
+	//		{
+	//			"Effect": "Allow",
+	//			"Action": [
+	//				"ec2:CreateVpcEndpoint",
+	//				"ec2:DescribeVpcEndpoints",
+	//				"ec2:ModifyVpcEndpoint",
+	//				"ec2:DeleteVpcEndpoints",
+	//				"ec2:CreateTags",
+	//				"route53:ListHostedZones"
+	//			],
+	//			"Resource": "*"
+	//		},
+	//		{
+	//			"Effect": "Allow",
+	//			"Action": [
+	//				"route53:ChangeResourceRecordSets",
+	//				"route53:ListResourceRecordSets"
+	//			],
+	//			"Resource": "arn:aws:route53:::%s"
+	//		}
+	//	]
+	// }
+	// +immutable
+	ControlPlaneOperatorARN string `json:"controlPlaneOperatorARN"`
 }
 
 // AWSServiceEndpoint stores the configuration for services to
@@ -995,6 +1518,16 @@ type ManagedEtcdStorageSpec struct {
 	//
 	// +optional
 	PersistentVolume *PersistentVolumeEtcdStorageSpec `json:"persistentVolume,omitempty"`
+
+	// RestoreSnapshotURL allows an optional list of URLs to be provided where
+	// an etcd snapshot can be downloaded, for example a pre-signed URL
+	// referencing a storage service, one URL per replica.
+	// This snapshot will be restored on initial startup, only when the etcd PV
+	// is empty.
+	//
+	// +optional
+	// +immutable
+	RestoreSnapshotURL []string `json:"restoreSnapshotURL,omitempty"`
 }
 
 // PersistentVolumeEtcdStorageSpec is the configuration for PersistentVolume
@@ -1172,10 +1705,55 @@ type AWSKMSSpec struct {
 
 // AWSKMSAuthSpec defines metadata about the management of credentials used to interact with AWS KMS
 type AWSKMSAuthSpec struct {
+	// Deprecated
+	// This field is deprecated and will be removed in a future release. Use AWSKMSRoleARN instead.
 	// Credentials contains the name of the secret that holds the aws credentials that can be used
 	// to make the necessary KMS calls. It should at key AWSCredentialsFileSecretKey contain the
 	// aws credentials file that can be used to configure AWS SDKs
 	Credentials corev1.LocalObjectReference `json:"credentials"`
+
+	// The referenced role must have a trust relationship that allows it to be assumed via web identity.
+	// https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_oidc.html.
+	// Example:
+	// {
+	//		"Version": "2012-10-17",
+	//		"Statement": [
+	//			{
+	//				"Effect": "Allow",
+	//				"Principal": {
+	//					"Federated": "{{ .ProviderARN }}"
+	//				},
+	//					"Action": "sts:AssumeRoleWithWebIdentity",
+	//				"Condition": {
+	//					"StringEquals": {
+	//						"{{ .ProviderName }}:sub": {{ .ServiceAccounts }}
+	//					}
+	//				}
+	//			}
+	//		]
+	//	}
+	//
+	// AWSKMSARN is an ARN value referencing a role appropriate for managing the auth via the AWS KMS key.
+	//
+	// The following is an example of a valid policy document:
+	//
+	// {
+	//	"Version": "2012-10-17",
+	//	"Statement": [
+	//    	{
+	//			"Effect": "Allow",
+	//			"Action": [
+	//				"kms:Encrypt",
+	//				"kms:Decrypt",
+	//				"kms:ReEncrypt*",
+	//				"kms:GenerateDataKey*",
+	//				"kms:DescribeKey"
+	//			],
+	//			"Resource": %q
+	//		}
+	//	]
+	// }
+	AWSKMSRoleARN string `json:"awsKms"`
 }
 
 // AWSKMSKeyEntry defines metadata to locate the encryption key in AWS
@@ -1194,80 +1772,6 @@ type AESCBCSpec struct {
 	// +optional
 	BackupKey *corev1.LocalObjectReference `json:"backupKey,omitempty"`
 }
-
-const (
-	// HostedClusterAvailable indicates whether the HostedCluster has a healthy
-	// control plane.
-	HostedClusterAvailable ConditionType = "Available"
-
-	// IgnitionEndpointAvailable indicates whether the ignition server for the
-	// HostedCluster is available to handle ignition requests.
-	IgnitionEndpointAvailable ConditionType = "IgnitionEndpointAvailable"
-
-	// UnmanagedEtcdAvailable indicates whether a user-managed etcd cluster is
-	// healthy.
-	UnmanagedEtcdAvailable ConditionType = "UnmanagedEtcdAvailable"
-
-	// ValidHostedClusterConfiguration indicates (if status is true) that the
-	// ClusterConfiguration specified for the HostedCluster is valid.
-	ValidHostedClusterConfiguration ConditionType = "ValidConfiguration"
-
-	// SupportedHostedCluster indicates whether a HostedCluster is supported by
-	// the current configuration of the hypershift-operator.
-	// e.g. If HostedCluster requests endpointAcess Private but the hypershift-operator
-	// is running on a management cluster outside AWS or is not configured with AWS
-	// credentials, the HostedCluster is not supported.
-	SupportedHostedCluster ConditionType = "SupportedHostedCluster"
-
-	// ClusterVersionSucceeding indicates the current status of the desired release
-	// version of the HostedCluster as indicated by the Failing condition in the
-	// underlying cluster's ClusterVersion.
-	ClusterVersionSucceeding ConditionType = "ClusterVersionSucceeding"
-
-	// ReconciliationPaused indicates if reconciliation of the hostedcluster is
-	// paused.
-	ReconciliationPaused ConditionType = "ReconciliationPaused"
-
-	// OIDCConfigurationInvalid indicates if an AWS cluster's OIDC condition is
-	// detected as invalid.
-	OIDCConfigurationInvalid ConditionType = "OIDCConfigurationInvalid"
-)
-
-const (
-	IgnitionServerDeploymentAsExpectedReason    = "IgnitionServerDeploymentAsExpected"
-	IgnitionServerDeploymentStatusUnknownReason = "IgnitionServerDeploymentStatusUnknown"
-	IgnitionServerDeploymentNotFoundReason      = "IgnitionServerDeploymentNotFound"
-	IgnitionServerDeploymentUnavailableReason   = "IgnitionServerDeploymentUnavailable"
-
-	HostedClusterAsExpectedReason          = "HostedClusterAsExpected"
-	HostedClusterUnhealthyComponentsReason = "UnhealthyControlPlaneComponents"
-	InvalidConfigurationReason             = "InvalidConfiguration"
-
-	DeploymentNotFoundReason      = "DeploymentNotFound"
-	DeploymentStatusUnknownReason = "DeploymentStatusUnknown"
-
-	HostedControlPlaneComponentsUnavailableReason = "ComponentsUnavailable"
-	KubeconfigUnavailableReason                   = "KubeconfigUnavailable"
-	ClusterVersionStatusUnknownReason             = "ClusterVersionStatusUnknown"
-
-	StatusUnknownReason = "StatusUnknown"
-	AsExpectedReason    = "AsExpected"
-
-	EtcdQuorumAvailableReason     = "QuorumAvailable"
-	EtcdQuorumUnavailableReason   = "QuorumUnavailable"
-	EtcdStatusUnknownReason       = "EtcdStatusUnknown"
-	EtcdStatefulSetNotFoundReason = "StatefulSetNotFound"
-
-	UnsupportedHostedClusterReason = "UnsupportedHostedCluster"
-
-	UnmanagedEtcdStatusUnknownReason = "UnmanagedEtcdStatusUnknown"
-	UnmanagedEtcdMisconfiguredReason = "UnmanagedEtcdMisconfigured"
-	UnmanagedEtcdAsExpected          = "UnmanagedEtcdAsExpected"
-
-	InsufficientClusterCapabilitiesReason = "InsufficientClusterCapabilities"
-
-	OIDCConfigurationInvalidReason = "OIDCConfigurationInvalid"
-)
 
 // HostedClusterStatus is the latest observed status of a HostedCluster.
 type HostedClusterStatus struct {
@@ -1291,6 +1795,12 @@ type HostedClusterStatus struct {
 	// +optional
 	IgnitionEndpoint string `json:"ignitionEndpoint,omitempty"`
 
+	// ControlPlaneEndpoint contains the endpoint information by which
+	// external clients can access the control plane. This is populated
+	// after the infrastructure is ready.
+	// +kubebuilder:validation:Optional
+	ControlPlaneEndpoint APIEndpoint `json:"controlPlaneEndpoint,omitempty"`
+
 	// OAuthCallbackURLTemplate contains a template for the URL to use as a callback
 	// for identity providers. The [identity-provider-name] placeholder must be replaced
 	// with the name of an identity provider defined on the HostedCluster.
@@ -1300,7 +1810,27 @@ type HostedClusterStatus struct {
 
 	// Conditions represents the latest available observations of a control
 	// plane's current state.
-	Conditions []metav1.Condition `json:"conditions"`
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// Platform contains platform-specific status of the HostedCluster
+	// +optional
+	Platform *PlatformStatus `json:"platform,omitempty"`
+}
+
+// PlatformStatus contains platform-specific status
+type PlatformStatus struct {
+	// +optional
+	AWS *AWSPlatformStatus `json:"aws,omitempty"`
+}
+
+// AWSPlatformStatus contains status specific to the AWS platform
+type AWSPlatformStatus struct {
+	// DefaultWorkerSecurityGroupID is the ID of a security group created by
+	// the control plane operator. It is used for NodePools that don't specify a
+	// security group.
+	// +optional
+	DefaultWorkerSecurityGroupID string `json:"defaultWorkerSecurityGroupID,omitempty"`
 }
 
 // ClusterVersionStatus reports the status of the cluster versioning,
@@ -1313,7 +1843,7 @@ type ClusterVersionStatus struct {
 	// desired is the version that the cluster is reconciling towards.
 	// If the cluster is not yet fully initialized desired will be set
 	// with the information available, which may be an image or a tag.
-	Desired Release `json:"desired"`
+	Desired configv1.Release `json:"desired"`
 
 	// history contains a list of the most recent versions applied to the cluster.
 	// This value may be empty during cluster startup, and then will be updated
@@ -1330,6 +1860,27 @@ type ClusterVersionStatus struct {
 	// If this value is not equal to metadata.generation, then the desired
 	// and conditions fields may represent a previous version.
 	ObservedGeneration int64 `json:"observedGeneration"`
+
+	// availableUpdates contains updates recommended for this
+	// cluster. Updates which appear in conditionalUpdates but not in
+	// availableUpdates may expose this cluster to known issues. This list
+	// may be empty if no updates are recommended, if the update service
+	// is unavailable, or if an invalid channel has been specified.
+	// +nullable
+	// +kubebuilder:validation:Required
+	// +required
+	AvailableUpdates []configv1.Release `json:"availableUpdates"`
+
+	// conditionalUpdates contains the list of updates that may be
+	// recommended for this cluster if it meets specific required
+	// conditions. Consumers interested in the set of updates that are
+	// actually recommended for this cluster should use
+	// availableUpdates. This list may be empty if no updates are
+	// recommended, if the update service is unavailable, or if an empty
+	// or invalid channel has been specified.
+	// +listType=atomic
+	// +optional
+	ConditionalUpdates []configv1.ConditionalUpdate `json:"conditionalUpdates,omitempty"`
 }
 
 // ClusterConfiguration specifies configuration for individual OCP components in the
@@ -1342,6 +1893,9 @@ type ClusterConfiguration struct {
 	// SecretRefs holds references to any secrets referenced by configuration
 	// entries. Entries can reference the secrets using local object references.
 	//
+	// Deprecated
+	// This field is deprecated and will be removed in a future release
+	//
 	// +kubebuilder:validation:Optional
 	// +optional
 	SecretRefs []corev1.LocalObjectReference `json:"secretRefs,omitempty"`
@@ -1350,16 +1904,72 @@ type ClusterConfiguration struct {
 	// configuration entries. Entries can reference the configmaps using local
 	// object references.
 	//
+	// Deprecated
+	// This field is deprecated and will be removed in a future release
+	//
 	// +kubebuilder:validation:Optional
 	// +optional
 	ConfigMapRefs []corev1.LocalObjectReference `json:"configMapRefs,omitempty"`
 
 	// Items embeds the serialized configuration resources.
 	//
+	// Deprecated
+	// This field is deprecated and will be removed in a future release
+	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Optional
 	// +optional
 	Items []runtime.RawExtension `json:"items,omitempty"`
+
+	// APIServer holds configuration (like serving certificates, client CA and CORS domains)
+	// shared by all API servers in the system, among them especially kube-apiserver
+	// and openshift-apiserver.
+	// +optional
+	APIServer *configv1.APIServerSpec `json:"apiServer,omitempty"`
+
+	// Authentication specifies cluster-wide settings for authentication (like OAuth and
+	// webhook token authenticators).
+	// +optional
+	Authentication *configv1.AuthenticationSpec `json:"authentication,omitempty"`
+
+	// FeatureGate holds cluster-wide information about feature gates.
+	// +optional
+	FeatureGate *configv1.FeatureGateSpec `json:"featureGate,omitempty"`
+
+	// Image governs policies related to imagestream imports and runtime configuration
+	// for external registries. It allows cluster admins to configure which registries
+	// OpenShift is allowed to import images from, extra CA trust bundles for external
+	// registries, and policies to block or allow registry hostnames.
+	// When exposing OpenShift's image registry to the public, this also lets cluster
+	// admins specify the external hostname.
+	// +optional
+	Image *configv1.ImageSpec `json:"image,omitempty"`
+
+	// Ingress holds cluster-wide information about ingress, including the default ingress domain
+	// used for routes.
+	// +optional
+	Ingress *configv1.IngressSpec `json:"ingress,omitempty"`
+
+	// Network holds cluster-wide information about the network. It is used to configure the desired network configuration, such as: IP address pools for services/pod IPs, network plugin, etc.
+	// Please view network.spec for an explanation on what applies when configuring this resource.
+	// TODO (csrwng): Add validation here to exclude changes that conflict with networking settings in the HostedCluster.Spec.Networking field.
+	// +optional
+	Network *configv1.NetworkSpec `json:"network,omitempty"`
+
+	// OAuth holds cluster-wide information about OAuth.
+	// It is used to configure the integrated OAuth server.
+	// This configuration is only honored when the top level Authentication config has type set to IntegratedOAuth.
+	// +optional
+	OAuth *configv1.OAuthSpec `json:"oauth,omitempty"`
+
+	// Scheduler holds cluster-wide config information to run the Kubernetes Scheduler
+	// and influence its placement decisions. The canonical name for this config is `cluster`.
+	// +optional
+	Scheduler *configv1.SchedulerSpec `json:"scheduler,omitempty"`
+
+	// Proxy holds cluster-wide information on how to configure default proxies for the cluster.
+	// +optional
+	Proxy *configv1.ProxySpec `json:"proxy,omitempty"`
 }
 
 // +genclient
@@ -1372,13 +1982,13 @@ type ClusterConfiguration struct {
 //
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=hostedclusters,shortName=hc;hcs,scope=Namespaced
-// +kubebuilder:storageversion
 // +kubebuilder:subresource:status
+// +kubebuilder:deprecatedversion:warning="v1alpha1 is a deprecated version for HostedCluster"
 // +kubebuilder:printcolumn:name="Version",type="string",JSONPath=".status.version.history[?(@.state==\"Completed\")].version",description="Version"
 // +kubebuilder:printcolumn:name="KubeConfig",type="string",JSONPath=".status.kubeconfig.name",description="KubeConfig Secret"
 // +kubebuilder:printcolumn:name="Progress",type="string",JSONPath=".status.version.history[?(@.state!=\"\")].state",description="Progress"
 // +kubebuilder:printcolumn:name="Available",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].status",description="Available"
-// +kubebuilder:printcolumn:name="Reason",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].reason",description="Reason"
+// +kubebuilder:printcolumn:name="Progressing",type="string",JSONPath=".status.conditions[?(@.type==\"Progressing\")].status",description="Progressing"
 // +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].message",description="Message"
 type HostedCluster struct {
 	metav1.TypeMeta   `json:",inline"`
