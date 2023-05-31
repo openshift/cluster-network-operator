@@ -24,7 +24,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/metric/instrument"
 	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/semconv/v1.17.0/httpconv"
@@ -50,8 +49,8 @@ type Handler struct {
 	writeEvent        bool
 	filters           []Filter
 	spanNameFormatter func(string, *http.Request) string
-	counters          map[string]instrument.Int64Counter
-	valueRecorders    map[string]instrument.Float64Histogram
+	counters          map[string]metric.Int64Counter
+	valueRecorders    map[string]metric.Float64Histogram
 	publicEndpoint    bool
 	publicEndpointFn  func(*http.Request) bool
 }
@@ -101,8 +100,8 @@ func handleErr(err error) {
 }
 
 func (h *Handler) createMeasures() {
-	h.counters = make(map[string]instrument.Int64Counter)
-	h.valueRecorders = make(map[string]instrument.Float64Histogram)
+	h.counters = make(map[string]metric.Int64Counter)
+	h.valueRecorders = make(map[string]metric.Float64Histogram)
 
 	requestBytesCounter, err := h.meter.Int64Counter(RequestContentLength)
 	handleErr(err)
@@ -134,7 +133,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		trace.WithAttributes(httpconv.ServerRequest(h.server, r)...),
 	}
 	if h.server != "" {
-		hostAttr := semconv.NetHostNameKey.String(h.server)
+		hostAttr := semconv.NetHostName(h.server)
 		opts = append(opts, trace.WithAttributes(hostAttr))
 	}
 	opts = append(opts, h.spanStartOptions...)
@@ -217,15 +216,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Add metrics
 	attributes := append(labeler.Get(), httpconv.ServerRequest(h.server, r)...)
 	if rww.statusCode > 0 {
-		attributes = append(attributes, semconv.HTTPStatusCodeKey.Int(rww.statusCode))
+		attributes = append(attributes, semconv.HTTPStatusCode(rww.statusCode))
 	}
-	h.counters[RequestContentLength].Add(ctx, bw.read, attributes...)
-	h.counters[ResponseContentLength].Add(ctx, rww.written, attributes...)
+	o := metric.WithAttributes(attributes...)
+	h.counters[RequestContentLength].Add(ctx, bw.read, o)
+	h.counters[ResponseContentLength].Add(ctx, rww.written, o)
 
 	// Use floating point division here for higher precision (instead of Millisecond method).
 	elapsedTime := float64(time.Since(requestStartTime)) / float64(time.Millisecond)
 
-	h.valueRecorders[ServerLatency].Record(ctx, elapsedTime, attributes...)
+	h.valueRecorders[ServerLatency].Record(ctx, elapsedTime, o)
 }
 
 func setAfterServeAttributes(span trace.Span, read, wrote int64, statusCode int, rerr, werr error) {
@@ -243,7 +243,7 @@ func setAfterServeAttributes(span trace.Span, read, wrote int64, statusCode int,
 		attributes = append(attributes, WroteBytesKey.Int64(wrote))
 	}
 	if statusCode > 0 {
-		attributes = append(attributes, semconv.HTTPStatusCodeKey.Int(statusCode))
+		attributes = append(attributes, semconv.HTTPStatusCode(statusCode))
 	}
 	span.SetStatus(httpconv.ServerStatus(statusCode))
 
@@ -258,7 +258,7 @@ func setAfterServeAttributes(span trace.Span, read, wrote int64, statusCode int,
 func WithRouteTag(route string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		span := trace.SpanFromContext(r.Context())
-		span.SetAttributes(semconv.HTTPRouteKey.String(route))
+		span.SetAttributes(semconv.HTTPRoute(route))
 		h.ServeHTTP(w, r)
 	})
 }
