@@ -1,9 +1,8 @@
 # The ovnkube control-plane components
----
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: ovnkube-cluster-manager
+  name: ovnkube-control-plane
   namespace: openshift-ovn-kubernetes
   annotations:
     kubernetes.io/description: |
@@ -12,7 +11,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: ovnkube-cluster-manager
+      app: ovnkube-control-plane
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -25,20 +24,13 @@ spec:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
-        app: ovnkube-cluster-manager
+        app: ovnkube-control-plane
         ovn-db-pod: "true"
         component: network
         type: infra
         openshift.io/component: network
         kubernetes.io/os: "linux"
     spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: network.operator.openshift.io/ovnkube-ic
-                operator: Exists
       serviceAccountName: ovn-kubernetes-controller
       hostNetwork: true
       dnsPolicy: Default
@@ -83,13 +75,13 @@ spec:
           echo $(date -Iseconds) INFO: ovn-master-metrics-certs mounted, starting kube-rbac-proxy
           exec /usr/bin/kube-rbac-proxy \
             --logtostderr \
-            --secure-listen-address=:9104 \
+            --secure-listen-address=:9106 \
             --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
             --upstream=http://127.0.0.1:29104/ \
             --tls-private-key-file=${TLS_PK} \
             --tls-cert-file=${TLS_CERT}
         ports:
-        - containerPort: 9104
+        - containerPort: 9106
           name: https
         resources:
           requests:
@@ -102,7 +94,7 @@ spec:
           readOnly: True
 
       # ovnkube master: convert kubernetes objects in to nbdb logical network components
-      - name: ovnkube-cluster-manager
+      - name: ovnkube-control-plane
         image: "{{.OvnImage}}"
         command:
         - /bin/bash
@@ -129,7 +121,7 @@ spec:
             multi_network_enabled_flag="--enable-multi-network"
           fi
 
-          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-cluster-manager - start ovnkube --init-master ${K8S_NODE}"
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-master ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --init-cluster-manager "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
