@@ -1,8 +1,7 @@
----
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: ovnkube-local
+  name: ovnkube
   namespace: openshift-ovn-kubernetes
   annotations:
     kubernetes.io/description: |
@@ -11,7 +10,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: ovnkube-local
+      app: ovnkube
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -21,7 +20,7 @@ spec:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
-        app: ovnkube-local
+        app: ovnkube
         component: network
         type: infra
         openshift.io/component: network
@@ -40,8 +39,6 @@ spec:
                 {{ end }}
               - key: network.operator.openshift.io/dpu
                 operator: DoesNotExist
-              - key: network.operator.openshift.io/ovnkube-ic
-                operator: Exists
       serviceAccountName: ovn-kubernetes-controller
       hostNetwork: true
       dnsPolicy: Default
@@ -374,9 +371,20 @@ spec:
                 rm -f /var/run/ovn/ovnnb_db.pid
                 #configure northd_probe_interval
                 OVN_NB_CTL="ovn-nbctl"
-                # Set the zone
-                ${OVN_NB_CTL} set NB_Global . name=${K8S_NODE}
-                ${OVN_NB_CTL} set NB_Global . options:name=${K8S_NODE}
+
+                echo "Setting the IC zone to ${K8S_NODE}"
+                retries=0
+                current_probe_interval=0
+                while [[ "${retries}" -lt 10 ]]; do
+                  current_probe_interval=$(${OVN_NB_CTL} set NB_Global . name="${K8S_NODE}" options:name="${K8S_NODE}")
+                  if [[ $? == 0 ]]; then
+                    current_probe_interval=$(echo ${current_probe_interval} | tr -d '\"')
+                    break
+                  else
+                    sleep 2
+                    (( retries += 1 ))
+                  fi
+                done
 
                 northd_probe_interval=${OVN_NORTHD_PROBE_INTERVAL:-5000}
                 echo "Setting northd probe interval to ${northd_probe_interval} ms"
@@ -609,7 +617,7 @@ spec:
           readOnly: True
 
       # ovnkube local: convert kubernetes objects in to nbdb logical network components
-      - name: ovnkube-network-controller-manager
+      - name: ovnkube-controller
         image: "{{.OvnImage}}"
         command:
         - /bin/bash
@@ -636,9 +644,9 @@ spec:
             multi_network_enabled_flag="--enable-multi-network"
           fi
 
-          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-network-controller-manager - start ovnkube --init-network-controller-manager ${K8S_NODE}"
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-controller - start ovnkube --init-ovnkube-controller ${K8S_NODE}"
           exec /usr/bin/ovnkube \
-            --init-network-controller-manager "${K8S_NODE}" \
+            --init-ovnkube-controller "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
