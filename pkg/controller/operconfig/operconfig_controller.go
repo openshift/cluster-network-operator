@@ -480,8 +480,9 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 func reconcileOperConfig(obj crclient.Object) []reconcile.Request {
 	log.Printf("%s %s/%s changed, triggering operconf reconciliation", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
+	// Update reconcile.Request object to align with unnamespaced default network,
+	// to ensure we don't have multiple requeueing reconcilers running
 	return []reconcile.Request{{NamespacedName: types.NamespacedName{
-		Name:      names.OPERATOR_CONFIG,
-		Namespace: names.APPLIED_NAMESPACE,
+		Name: names.OPERATOR_CONFIG,
 	}}}
 }
