@@ -1100,10 +1100,7 @@ func getMasterAddresses(kubeClient crclient.Client, controlPlaneReplicaCount int
 	}
 
 	// Not Hypershift... find all master nodes by label
-	err := wait.PollImmediate(OVN_MASTER_DISCOVERY_POLL*time.Second, time.Duration(timeout)*time.Second, func() (bool, error) {
-		ctx, cancel := context.WithTimeout(context.TODO(), time.Duration(timeout)*time.Second)
-		defer cancel()
-
+	err := wait.PollUntilContextTimeout(context.TODO(), OVN_MASTER_DISCOVERY_POLL*time.Second, time.Duration(timeout)*time.Second, true, func(ctx context.Context) (bool, error) {
 		matchingLabels := &crclient.MatchingLabels{"node-role.kubernetes.io/master": ""}
 		if err := kubeClient.List(ctx, masterNodeList, matchingLabels); err != nil {
 			return false, err
@@ -1119,7 +1116,7 @@ func getMasterAddresses(kubeClient crclient.Client, controlPlaneReplicaCount int
 		}
 		return false, nil
 	})
-	if wait.ErrWaitTimeout == err {
+	if wait.Interrupted(err) {
 		klog.Warningf("Timeout exceeded while bootstraping OVN, expected amount of control plane nodes (%v) do not match found (%v): continuing deployment with found replicas",
 			controlPlaneReplicaCount, len(masterNodeList.Items))
 		// On certain types of cluster this condition will never be met (assisted installer, for example)
