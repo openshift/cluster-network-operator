@@ -34,17 +34,17 @@ type CustomValidator interface {
 	// ValidateCreate validates the object on creation.
 	// The optional warnings will be added to the response as warning messages.
 	// Return an error if the object is invalid.
-	ValidateCreate(ctx context.Context, obj runtime.Object) (warnings Warnings, err error)
+	ValidateCreate(ctx context.Context, obj runtime.Object) (err error)
 
 	// ValidateUpdate validates the object on update.
 	// The optional warnings will be added to the response as warning messages.
 	// Return an error if the object is invalid.
-	ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (warnings Warnings, err error)
+	ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (err error)
 
 	// ValidateDelete validates the object on deletion.
 	// The optional warnings will be added to the response as warning messages.
 	// Return an error if the object is invalid.
-	ValidateDelete(ctx context.Context, obj runtime.Object) (warnings Warnings, err error)
+	ValidateDelete(ctx context.Context, obj runtime.Object) (err error)
 }
 
 // WithCustomValidator creates a new Webhook for validating the provided type.
@@ -89,7 +89,7 @@ func (h *validatorForType) Handle(ctx context.Context, req Request) Response {
 			return Errored(http.StatusBadRequest, err)
 		}
 
-		warnings, err = h.validator.ValidateCreate(ctx, obj)
+		err = h.validator.ValidateCreate(ctx, obj)
 	case v1.Update:
 		oldObj := obj.DeepCopyObject()
 		if err := h.decoder.DecodeRaw(req.Object, obj); err != nil {
@@ -99,7 +99,7 @@ func (h *validatorForType) Handle(ctx context.Context, req Request) Response {
 			return Errored(http.StatusBadRequest, err)
 		}
 
-		warnings, err = h.validator.ValidateUpdate(ctx, oldObj, obj)
+		err = h.validator.ValidateUpdate(ctx, oldObj, obj)
 	case v1.Delete:
 		// In reference to PR: https://github.com/kubernetes/kubernetes/pull/76346
 		// OldObject contains the object being deleted
@@ -107,7 +107,7 @@ func (h *validatorForType) Handle(ctx context.Context, req Request) Response {
 			return Errored(http.StatusBadRequest, err)
 		}
 
-		warnings, err = h.validator.ValidateDelete(ctx, obj)
+		err = h.validator.ValidateDelete(ctx, obj)
 	default:
 		return Errored(http.StatusBadRequest, fmt.Errorf("unknown operation %q", req.Operation))
 	}

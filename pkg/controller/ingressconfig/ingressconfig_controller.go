@@ -51,7 +51,7 @@ func add(mgr manager.Manager, r *ReconcileIngressConfigs) error {
 	if err != nil {
 		return err
 	}
-	err = c.Watch(&source.Kind{Type: &operv1.IngressController{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &operv1.IngressController{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}

@@ -71,7 +71,7 @@ func add(mgr manager.Manager, r *ReconcileProxyConfig) error {
 	}
 
 	// Watch for changes to the proxy resource.
-	err = c.Watch(&source.Kind{Type: &configv1.Proxy{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &configv1.Proxy{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}

@@ -73,7 +73,7 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 	}
 
 	// Watch for changes to primary resource Network (as long as the spec changes)
-	err = c.Watch(&source.Kind{Type: &operv1.Network{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+	err = c.Watch(source.Kind(mgr.GetCache(), &operv1.Network{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		UpdateFunc: func(evt event.UpdateEvent) bool {
 			old, ok := evt.ObjectOld.(*operv1.Network)
 			if !ok {
@@ -132,7 +132,7 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 		},
 	}
 	if err := c.Watch(
-		&source.Kind{Type: &corev1.Node{}},
+		source.Kind(mgr.GetCache(), &corev1.Node{}),
 		handler.EnqueueRequestsFromMapFunc(reconcileOperConfig),
 		nodePredicate,
 	); err != nil {
@@ -480,7 +480,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
 }
 
-func reconcileOperConfig(obj crclient.Object) []reconcile.Request {
+func reconcileOperConfig(ctx context.Context, obj crclient.Object) []reconcile.Request {
 	log.Printf("%s %s/%s changed, triggering operconf reconciliation", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
 	// Update reconcile.Request object to align with unnamespaced default network,
 	// to ensure we don't have multiple requeueing reconcilers running

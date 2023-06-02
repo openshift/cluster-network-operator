@@ -3,6 +3,8 @@ package operator
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 
 	configv1 "github.com/openshift/api/config/v1"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
@@ -24,7 +26,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
 
-	"sigs.k8s.io/controller-runtime/pkg/config/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctmanager "sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -50,11 +51,12 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// initialize the controller-runtime environment
 	o.manager, err = manager.New(o.client.Default().Config(), manager.Options{
 		Namespace: "",
-		MapperProvider: func(cfg *rest.Config) (meta.RESTMapper, error) {
+		MapperProvider: func(cfg *rest.Config, httpClient *http.Client) (meta.RESTMapper, error) {
 			return o.client.Default().RESTMapper(), nil
 		},
 		MetricsBindAddress: "0",
-		Controller: v1alpha1.ControllerConfigurationSpec{
+		// FIXME(trozet): not sure if this is all we need for controller
+		Controller: config.Controller{
 			RecoverPanic: pointer.Bool(true),
 		},
 	})
