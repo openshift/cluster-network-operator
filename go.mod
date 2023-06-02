@@ -110,7 +110,6 @@ require (
 	k8s.io/kube-openapi v0.0.0-20230601164746-7562a1006961 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2 // indirect
 	sigs.k8s.io/cluster-api v1.3.5 // indirect
-	sigs.k8s.io/cluster-api-provider-ibmcloud v0.2.4 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kube-storage-version-migrator v0.0.4 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
@@ -152,6 +151,7 @@ require (
 	k8s.io/kms v0.27.2 // indirect
 	k8s.io/kube-aggregator v0.26.1 // indirect
 	sigs.k8s.io/cluster-api-provider-aws/v2 v2.0.2 // indirect
+	sigs.k8s.io/cluster-api-provider-ibmcloud v0.2.4 // indirect
 )
 
 replace (

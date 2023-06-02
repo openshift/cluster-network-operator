@@ -121,7 +121,7 @@ func (p *PodWatcher) Reconcile(ctx context.Context, request reconcile.Request) (
 
 // enqueueRP ensure we always have, at most, a single request in the queue.
 // by always enquing the same name, it will be coalesced
-func enqueueRP(obj crclient.Object) []reconcile.Request {
+func enqueueRP(ctx context.Context, obj crclient.Object) []reconcile.Request {
 	klog.Infof("Operand %s %s/%s updated, re-generating status", obj.GetObjectKind().GroupVersionKind().String(), obj.GetNamespace(), obj.GetName())
 	return []reconcile.Request{
 		{
