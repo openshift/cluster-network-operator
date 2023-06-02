@@ -66,7 +66,7 @@ func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, 
 	klog.Info("MTU prober deployed, waiting for result ConfigMap")
 
 	// wait up to 100 seconds for Job to report back.
-	err = wait.PollWithContext(ctx, 5*time.Second, 100*time.Second, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 100*time.Second, false, func(ctx context.Context) (bool, error) {
 		var err error
 		mtu, err = r.readMTUConfigMap(ctx)
 		if err == nil {
