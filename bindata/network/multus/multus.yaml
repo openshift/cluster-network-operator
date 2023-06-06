@@ -542,8 +542,6 @@ spec:
     spec:
       hostNetwork: true      
       serviceAccountName: multus
-      nodeSelector:
-        kubernetes.io/arch: amd64
       tolerations:
       - operator: Exists
         effect: NoSchedule
