@@ -23,7 +23,7 @@ spec:
       name: cloud-network-config-controller
       annotations:
         hypershift.openshift.io/release-image: {{.ReleaseImage}}
-        cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: "cloud-token,hosted-ca-cert"
+        cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: "hosted-cluster-api-access,cloud-token,hosted-ca-cert"
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: cloud-network-config-controller
