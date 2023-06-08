@@ -86,8 +86,7 @@ func TestKubeProxyConfig(t *testing.T) {
 		})
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(cfg).To(MatchYAML(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
-bindAddress: "0.0.0.0"
-bindAddressHardFail: false
+bindAddress: 0.0.0.0
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -101,15 +100,10 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: 10m0s
   tcpEstablishedTimeout: null
-detectLocal:
-  bridgeInterface: ""
-  interfaceNamePrefix: ""
-detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
 iptables:
-  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 14
   minSyncPeriod: 2m0s
@@ -120,21 +114,17 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
-  tcpFinTimeout: 0s
-  tcpTimeout: 0s
-  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 1.2.3.4:999
 mode: blah
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-showHiddenMetricsForVersion: ""
+resourceContainer: ""
+udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
-  forwardHealthCheckVip: false
   networkName: ""
-  rootHnsEndpointName: ""
   sourceVip: ""
 `))
 }
@@ -159,7 +149,6 @@ func TestKubeProxyIPv6Config(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(cfg).To(MatchYAML(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: "::"
-bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -173,15 +162,10 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: 10m0s
   tcpEstablishedTimeout: null
-detectLocal:
-  bridgeInterface: ""
-  interfaceNamePrefix: ""
-detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
 iptables:
-  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 14
   minSyncPeriod: 2m0s
@@ -192,21 +176,17 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
-  tcpFinTimeout: 0s
-  tcpTimeout: 0s
-  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: '[fd00:1234::4]:51999'
 mode: blah
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-showHiddenMetricsForVersion: ""
+resourceContainer: ""
+udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
-  forwardHealthCheckVip: false
   networkName: ""
-  rootHnsEndpointName: ""
   sourceVip: ""
 `))
 }
@@ -402,7 +382,6 @@ func TestRenderKubeProxy(t *testing.T) {
 			g.Expect(val).To(MatchYAML(`
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
-bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -416,15 +395,10 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
-detectLocal:
-  bridgeInterface: ""
-  interfaceNamePrefix: ""
-detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: 0.0.0.0:10255
 hostnameOverride: ""
 iptables:
-  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: null
   minSyncPeriod: 0s
@@ -435,21 +409,17 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
-  tcpFinTimeout: 0s
-  tcpTimeout: 0s
-  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 0.0.0.0:29102
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-showHiddenMetricsForVersion: ""
+resourceContainer: ""
+udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
-  forwardHealthCheckVip: false
   networkName: ""
-  rootHnsEndpointName: ""
   sourceVip: ""
 `))
 		}
