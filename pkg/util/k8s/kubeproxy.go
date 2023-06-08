@@ -59,6 +59,7 @@ func GenerateKubeProxyConfiguration(args map[string]operv1.ProxyArgumentList) (s
 
 	kpc.IPTables.MasqueradeBit = ka.getOptInt32("iptables-masquerade-bit")
 	kpc.IPTables.MasqueradeAll = ka.getBool("masquerade-all")
+	kpc.IPTables.LocalhostNodePorts = ka.getOptBool("iptables-localhost-nodeports")
 	kpc.IPTables.SyncPeriod.Duration = ka.getDuration("iptables-sync-period")
 	kpc.IPTables.MinSyncPeriod.Duration = ka.getDuration("iptables-min-sync-period")
 
@@ -66,6 +67,10 @@ func GenerateKubeProxyConfiguration(args map[string]operv1.ProxyArgumentList) (s
 	kpc.IPVS.MinSyncPeriod.Duration = ka.getDuration("ipvs-min-sync-period")
 	kpc.IPVS.Scheduler = ka.getString("ipvs-scheduler")
 	kpc.IPVS.ExcludeCIDRs = ka.getCIDRList("ipvs-exclude-cidrs")
+	kpc.IPVS.StrictARP = ka.getBool("ipvs-strict-arp")
+	kpc.IPVS.TCPTimeout.Duration = ka.getDuration("ipvs-tcp-timeout")
+	kpc.IPVS.TCPFinTimeout.Duration = ka.getDuration("ipvs-tcp-fin-timeout")
+	kpc.IPVS.UDPTimeout.Duration = ka.getDuration("ipvs-udp-timeout")
 
 	kpc.Mode = kubeproxyconfig.ProxyMode(ka.getString("proxy-mode"))
 
@@ -86,6 +91,12 @@ func GenerateKubeProxyConfiguration(args map[string]operv1.ProxyArgumentList) (s
 
 	// kpc.Winkernel : CNO's kube-proxy config is never used for Windows kube-proxy so
 	// there's no need to allow overriding this.
+
+	kpc.ShowHiddenMetricsForVersion = ka.getString("show-hidden-metrics-for-version")
+
+	kpc.DetectLocalMode = kubeproxyconfig.LocalMode(ka.getString("detect-local-mode"))
+	kpc.DetectLocal.BridgeInterface = ka.getString("pod-bridge-interface")
+	kpc.DetectLocal.InterfaceNamePrefix = ka.getString("pod-interface-name-prefix")
 
 	if err := ka.getError(); err != nil {
 		return "", err
@@ -233,6 +244,20 @@ func (ka *kpcArgs) getBool(key string) bool {
 		return false
 	}
 	return bval
+}
+
+// getOptBool returns a optional boolean
+func (ka *kpcArgs) getOptBool(key string) *bool {
+	value := ka.get(key)
+	if value == "" {
+		return nil
+	}
+	bval, err := strconv.ParseBool(value)
+	if err != nil {
+		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%v)", key, value, err))
+		return nil
+	}
+	return &bval
 }
 
 // getDuration returns a time.Duration
