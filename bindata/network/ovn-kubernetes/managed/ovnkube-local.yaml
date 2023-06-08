@@ -395,6 +395,19 @@ spec:
                 # Set the zone
                 #${OVN_NB_CTL} set NB_Global . name=${K8S_NODE}
                 #${OVN_NB_CTL} set NB_Global . options:name=${K8S_NODE}
+                                echo "Setting the IC zone to ${K8S_NODE}"
+                retries=0
+                current_probe_interval=0
+                while [[ "${retries}" -lt 10 ]]; do
+                  current_probe_interval=$(${OVN_NB_CTL} set NB_Global . name="${K8S_NODE}" options:name="${K8S_NODE}")
+                  if [[ $? == 0 ]]; then
+                    current_probe_interval=$(echo ${current_probe_interval} | tr -d '\"')
+                    break
+                  else
+                    sleep 2
+                    (( retries += 1 ))
+                  fi
+                done
 
                 northd_probe_interval=${OVN_NORTHD_PROBE_INTERVAL:-5000}
                 echo "Setting northd probe interval to ${northd_probe_interval} ms"
