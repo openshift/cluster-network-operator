@@ -134,8 +134,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 			Reason:  "AutoApproved",
 			Message: "Automatically approved by " + signerName})
 		// Update status to "Approved"
-		//nolint:staticcheck
-		csr, err = r.clientset.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, request.Name, csr, metav1.UpdateOptions{})
+		_, err = r.clientset.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, request.Name, csr, metav1.UpdateOptions{})
 		if err != nil {
 			log.Printf("Unable to approve certificate for %v and signer %v: %v", request.Name, signerName, err)
 			return reconcile.Result{}, err
