@@ -206,7 +206,8 @@ spec:
 {{- if not .ExternalControlPlane }}
       nodeSelector:
         node-role.kubernetes.io/master: ""
-{{- else }}
+{{- end }}
+{{- if .HyperShiftEnabled}}
       {{ if .HCPNodeSelector }}
       nodeSelector:
         {{ range $key, $value := .HCPNodeSelector }}

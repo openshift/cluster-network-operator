@@ -8,7 +8,6 @@ import (
 	"time"
 
 	operv1 "github.com/openshift/api/operator/v1"
-
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -39,7 +38,8 @@ const (
 // If, for whatever reason, it takes longer for the MTU to be detected,
 // it will adopt an existing job.
 func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, infra *bootstrap.InfraStatus) (int, error) {
-	if infra.ControlPlaneTopology == configv1.ExternalTopologyMode {
+	// infra.HostedControlPlane is not nil only when HyperShift is enabled
+	if infra.HostedControlPlane != nil {
 		if infra.PlatformType == configv1.AWSPlatformType {
 			klog.Infof("AWS cluster, omitting MTU probing and using default of %d", awsMTU)
 			return awsMTU, nil
