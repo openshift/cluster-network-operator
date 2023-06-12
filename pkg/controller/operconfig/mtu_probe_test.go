@@ -7,6 +7,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,8 +24,12 @@ func TestProbeMTU(t *testing.T) {
 		expectedMTU int
 	}{
 		{
-			name:        "AWS on Hypershift, hardcoded value is used",
-			infra:       &bootstrap.InfraStatus{PlatformType: configv1.AWSPlatformType, ControlPlaneTopology: configv1.ExternalTopologyMode},
+			name: "AWS on Hypershift, hardcoded value is used",
+			infra: &bootstrap.InfraStatus{
+				PlatformType:         configv1.AWSPlatformType,
+				ControlPlaneTopology: configv1.ExternalTopologyMode,
+				HostedControlPlane:   &hyperv1.HostedControlPlane{},
+			},
 			expectedMTU: 9001,
 		},
 		{
@@ -37,8 +42,12 @@ func TestProbeMTU(t *testing.T) {
 			expectedMTU: 5000,
 		},
 		{
-			name:        "Azure on hypershift, hardcoded value is used",
-			infra:       &bootstrap.InfraStatus{PlatformType: configv1.AzurePlatformType, ControlPlaneTopology: configv1.ExternalTopologyMode},
+			name: "Azure on hypershift, hardcoded value is used",
+			infra: &bootstrap.InfraStatus{
+				PlatformType:         configv1.AzurePlatformType,
+				ControlPlaneTopology: configv1.ExternalTopologyMode,
+				HostedControlPlane:   &hyperv1.HostedControlPlane{},
+			},
 			expectedMTU: 1500,
 		},
 		{
@@ -52,7 +61,7 @@ func TestProbeMTU(t *testing.T) {
 		},
 		{
 			name:  "Unknown platform on Hypershift, value from configmap is used",
-			infra: &bootstrap.InfraStatus{ControlPlaneTopology: configv1.ExternalTopologyMode},
+			infra: &bootstrap.InfraStatus{ControlPlaneTopology: configv1.ExternalTopologyMode, HostedControlPlane: &hyperv1.HostedControlPlane{}},
 			objects: []crclient.Object{&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Namespace: cmNamespace, Name: cmName},
 				Data:       map[string]string{"mtu": "5000"},
