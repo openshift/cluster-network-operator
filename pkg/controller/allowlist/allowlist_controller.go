@@ -176,7 +176,7 @@ func createObject(ctx context.Context, client cnoclient.Client, obj *unstructure
 }
 
 func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
-	return wait.Poll(time.Second, time.Minute, func() (done bool, err error) {
+	return wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, false, func(ctx context.Context) (done bool, err error) {
 		podList, err := client.Default().Kubernetes().CoreV1().Pods(names.MULTUS_NAMESPACE).List(
 			ctx, metav1.ListOptions{LabelSelector: allowlistAnnotation})
 		if err != nil {

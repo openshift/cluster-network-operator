@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"sigs.k8s.io/cluster-api-provider-aws/v2/pkg/eks"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const (
@@ -54,7 +53,7 @@ func (r *AWSFargateProfile) Default() {
 	if r.Labels == nil {
 		r.Labels = make(map[string]string)
 	}
-	r.Labels[clusterv1.ClusterLabelName] = r.Spec.ClusterName
+	r.Labels["dontcare"] = r.Spec.ClusterName
 
 	if r.Spec.ProfileName == "" {
 		name, err := eks.GenerateEKSName(r.Name, r.Namespace, maxProfileNameLength)

@@ -50,7 +50,7 @@ func (m *Machine) Default() {
 	if m.Labels == nil {
 		m.Labels = make(map[string]string)
 	}
-	m.Labels[ClusterLabelName] = m.Spec.ClusterName
+	m.Labels[ClusterNameLabel] = m.Spec.ClusterName
 
 	if m.Spec.Bootstrap.ConfigRef != nil && m.Spec.Bootstrap.ConfigRef.Namespace == "" {
 		m.Spec.Bootstrap.ConfigRef.Namespace = m.Namespace
@@ -76,12 +76,12 @@ func (m *Machine) ValidateCreate() error {
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (m *Machine) ValidateUpdate(old runtime.Object) error {
+func (m *Machine) ValidateUpdate(old runtime.Object)  error {
 	oldM, ok := old.(*Machine)
 	if !ok {
 		return apierrors.NewBadRequest(fmt.Sprintf("expected a Machine but got a %T", old))
 	}
-	return m.validate(oldM)
+	return  m.validate(oldM)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.

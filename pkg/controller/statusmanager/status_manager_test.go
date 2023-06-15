@@ -3,6 +3,7 @@ package statusmanager
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"reflect"
 	"testing"
 	"time"
@@ -69,6 +70,14 @@ func set(t *testing.T, client cnoclient.Client, obj crclient.Object) {
 	}
 }
 
+func setStatus(t *testing.T, client cnoclient.Client, obj crclient.Object) {
+	t.Helper()
+	err := client.ClientFor("").CRClient().Status().Update(context.TODO(), obj)
+	if err != nil {
+		t.Fatalf("Failed to set status: %v", err)
+	}
+}
+
 // sl: labels that all status-havers have
 var sl map[string]string = map[string]string{names.GenerateStatusLabel: ""}
 
@@ -121,6 +130,7 @@ func TestStatusManager_set(t *testing.T) {
 	}
 
 	// make the network.operator object
+	log.Print("Creating Network Operator Config")
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	set(t, client, no)
 
@@ -135,6 +145,7 @@ func TestStatusManager_set(t *testing.T) {
 		Reason:  "Reason",
 		Message: "Message",
 	}
+	log.Printf("Setting statuses set to degraded")
 	status.set(false, condFail)
 
 	co, oc, err := getStatuses(client, "testing")
@@ -153,6 +164,8 @@ func TestStatusManager_set(t *testing.T) {
 		Type:   operv1.OperatorStatusTypeProgressing,
 		Status: operv1.ConditionUnknown,
 	}
+
+	log.Print("Setting statuses to progressing")
 	status.set(false, condProgress)
 
 	oc, err = getOC(client)
@@ -358,6 +371,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 
 	// Create minimal DaemonSets
+	log.Print("Creating daemon set A")
 	dsA := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Generation: 1, Labels: sl},
 		Spec: appsv1.DaemonSetSpec{
@@ -367,6 +381,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}
 	set(t, client, dsA)
+	log.Print("Creating daemon set B")
 	dsB := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "beta", Generation: 1, Labels: sl},
 		Spec: appsv1.DaemonSetSpec{
@@ -430,8 +445,8 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 
 	// Now start "deploying"
 	for dsA.Status.NumberUnavailable > 0 || dsB.Status.NumberUnavailable > 0 {
-		set(t, client, dsA)
-		set(t, client, dsB)
+		setStatus(t, client, dsA)
+		setStatus(t, client, dsB)
 		status.SetFromPods()
 
 		co, oc, err = getStatuses(client, "testing")
@@ -483,8 +498,8 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("assertion failed: %#v, %#v", dsA, dsB)
 	}
 
-	set(t, client, dsA)
-	set(t, client, dsB)
+	setStatus(t, client, dsA)
+	setStatus(t, client, dsB)
 	time.Sleep(1 * time.Second) // minimum transition time fidelity
 	status.SetFromPods()
 
@@ -570,7 +585,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		NumberReady:            1,
 		ObservedGeneration:     2,
 	}
-	set(t, client, dsA)
+	setStatus(t, client, dsA)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -610,7 +625,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		NumberUnavailable:      1,
 		ObservedGeneration:     2,
 	}
-	set(t, client, dsA)
+	setStatus(t, client, dsA)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -651,7 +666,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		ObservedGeneration:     2,
 		UpdatedNumberScheduled: 1,
 	}
-	set(t, client, dsA)
+	setStatus(t, client, dsA)
 
 	t0 := time.Now()
 	time.Sleep(time.Second / 10)
@@ -766,7 +781,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		ObservedGeneration:     2,
 		UpdatedNumberScheduled: 1,
 	}
-	set(t, client, dsA)
+	setStatus(t, client, dsA)
 	status.SetFromPods()
 
 	// see that the pod state is sensible
@@ -900,7 +915,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	dsNC.Status.NumberUnavailable = 0
 	dsNC.Status.DesiredNumberScheduled = 1
 	dsNC.Status.UpdatedNumberScheduled = 1
-	set(t, client, dsNC)
+	setStatus(t, client, dsNC)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -958,8 +973,6 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
 	}
 
-	// Create a Deployment that isn't the one we're looking for
-
 	// Create minimal Deployment
 	depA := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Labels: sl}}
 	set(t, client, depA)
@@ -1001,7 +1014,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depA.Status.UpdatedReplicas = depA.Status.Replicas
 	depA.Status.UnavailableReplicas = 0
 	depA.Status.AvailableReplicas = depA.Status.Replicas
-	set(t, client, depA)
+	setStatus(t, client, depA)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
@@ -1123,7 +1136,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depB.Status.UnavailableReplicas = 0
 	depB.Status.AvailableReplicas = depB.Status.Replicas
 
-	set(t, client, depB)
+	setStatus(t, client, depB)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")

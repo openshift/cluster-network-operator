@@ -54,7 +54,7 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.C
 	}
 
 	// Watch for changes to primary resource PKI.network.operator.openshift.io/v1
-	err = c.Watch(&source.Kind{Type: &netopv1.OperatorPKI{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &netopv1.OperatorPKI{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
