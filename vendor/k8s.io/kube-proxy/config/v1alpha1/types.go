@@ -29,9 +29,6 @@ type KubeProxyIPTablesConfiguration struct {
 	MasqueradeBit *int32 `json:"masqueradeBit"`
 	// masqueradeAll tells kube-proxy to SNAT everything if using the pure iptables proxy mode.
 	MasqueradeAll bool `json:"masqueradeAll"`
-	// LocalhostNodePorts tells kube-proxy to allow service NodePorts to be accessed via
-	// localhost (iptables mode only)
-	LocalhostNodePorts *bool `json:"localhostNodePorts"`
 	// syncPeriod is the period that iptables rules are refreshed (e.g. '5s', '1m',
 	// '2h22m').  Must be greater than 0.
 	SyncPeriod metav1.Duration `json:"syncPeriod"`
@@ -57,15 +54,6 @@ type KubeProxyIPVSConfiguration struct {
 	// strict ARP configure arp_ignore and arp_announce to avoid answering ARP queries
 	// from kube-ipvs0 interface
 	StrictARP bool `json:"strictARP"`
-	// tcpTimeout is the timeout value used for idle IPVS TCP sessions.
-	// The default value is 0, which preserves the current timeout value on the system.
-	TCPTimeout metav1.Duration `json:"tcpTimeout"`
-	// tcpFinTimeout is the timeout value used for IPVS TCP sessions after receiving a FIN.
-	// The default value is 0, which preserves the current timeout value on the system.
-	TCPFinTimeout metav1.Duration `json:"tcpFinTimeout"`
-	// udpTimeout is the timeout value used for IPVS UDP packets.
-	// The default value is 0, which preserves the current timeout value on the system.
-	UDPTimeout metav1.Duration `json:"udpTimeout"`
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
@@ -98,24 +86,6 @@ type KubeProxyWinkernelConfiguration struct {
 	// enableDSR tells kube-proxy whether HNS policies should be created
 	// with DSR
 	EnableDSR bool `json:"enableDSR"`
-	// RootHnsEndpointName is the name of hnsendpoint that is attached to
-	// l2bridge for root network namespace
-	RootHnsEndpointName string `json:"rootHnsEndpointName"`
-	// ForwardHealthCheckVip forwards service VIP for health check port on
-	// Windows
-	ForwardHealthCheckVip bool `json:"forwardHealthCheckVip"`
-}
-
-// DetectLocalConfiguration contains optional settings related to DetectLocalMode option
-type DetectLocalConfiguration struct {
-	// BridgeInterface is a string argument which represents a single bridge interface name.
-	// Kube-proxy considers traffic as local if originating from this given bridge.
-	// This argument should be set if DetectLocalMode is set to LocalModeBridgeInterface.
-	BridgeInterface string `json:"bridgeInterface"`
-	// InterfaceNamePrefix is a string argument which represents a single interface prefix name.
-	// Kube-proxy considers traffic as local if originating from one or more interfaces which match
-	// the given prefix. This argument should be set if DetectLocalMode is set to LocalModeInterfaceNamePrefix.
-	InterfaceNamePrefix string `json:"interfaceNamePrefix"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -137,8 +107,6 @@ type KubeProxyConfiguration struct {
 	// metricsBindAddress is the IP address and port for the metrics server to serve on,
 	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
 	MetricsBindAddress string `json:"metricsBindAddress"`
-	// bindAddressHardFail, if true, kube-proxy will treat failure to bind to a port as fatal and exit
-	BindAddressHardFail bool `json:"bindAddressHardFail"`
 	// enableProfiling enables profiling via web interface on /debug/pprof handler.
 	// Profiling handlers will be handled by metrics server.
 	EnableProfiling bool `json:"enableProfiling"`
@@ -163,6 +131,12 @@ type KubeProxyConfiguration struct {
 	// portRange is the range of host ports (beginPort-endPort, inclusive) that may be consumed
 	// in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.
 	PortRange string `json:"portRange"`
+	// resourceContainer is the bsolute name of the resource-only container to create and run
+	// the Kube-proxy in (Default: /kube-proxy).
+	ResourceContainer string `json:"resourceContainer"`
+	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
+	// Must be greater than 0. Only applicable for proxyMode=userspace.
+	UDPIdleTimeout metav1.Duration `json:"udpIdleTimeout"`
 	// conntrack contains conntrack-related configuration options.
 	Conntrack KubeProxyConntrackConfiguration `json:"conntrack"`
 	// configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater
@@ -178,24 +152,19 @@ type KubeProxyConfiguration struct {
 	NodePortAddresses []string `json:"nodePortAddresses"`
 	// winkernel contains winkernel-related configuration options.
 	Winkernel KubeProxyWinkernelConfiguration `json:"winkernel"`
-	// ShowHiddenMetricsForVersion is the version for which you want to show hidden metrics.
-	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion"`
-	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
-	DetectLocalMode LocalMode `json:"detectLocalMode"`
-	// DetectLocal contains optional configuration settings related to DetectLocalMode.
-	DetectLocal DetectLocalConfiguration `json:"detectLocal"`
 }
 
-// ProxyMode represents modes used by the Kubernetes proxy server.
+// Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
+// (newer, faster), 'ipvs'(newest, better in performance and scalability).
 //
-// Currently, two modes of proxy are available on Linux platforms: 'iptables' and 'ipvs'.
-// One mode of proxy is available on Windows platforms: 'kernelspace'.
+// Two modes of proxy are available in Windows platform: 'userspace'(older, stable) and 'kernelspace' (newer, faster).
 //
-// If the proxy mode is unspecified, the best-available proxy mode will be used (currently this
-// is `iptables` on Linux and `kernelspace` on Windows). If the selected proxy mode cannot be
-// used (due to lack of kernel support, missing userspace components, etc) then kube-proxy
-// will exit with an error.
-type ProxyMode string
+// In Linux platform, if proxy mode is blank, use the best-available proxy (currently iptables, but may change in the
+// future). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are
+// insufficient, this always falls back to the userspace proxy. IPVS mode will be enabled when proxy mode is set to 'ipvs',
+// and the fall back path is firstly iptables and then userspace.
 
-// LocalMode represents modes to detect local traffic from the node
-type LocalMode string
+// In Windows platform, if proxy mode is blank, use the best-available proxy (currently userspace, but may change in the
+// future). If winkernel proxy is selected, regardless of how, but the Windows kernel can't support this mode of proxy,
+// this always falls back to the userspace proxy.
+type ProxyMode string

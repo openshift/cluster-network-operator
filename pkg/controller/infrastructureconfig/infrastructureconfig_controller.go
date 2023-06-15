@@ -43,7 +43,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource config.openshift.io/v1/Infrastructure
-	err = c.Watch(&source.Kind{Type: &configv1.Infrastructure{}}, &handler.EnqueueRequestForObject{}, onPremPlatformPredicate())
+	err = c.Watch(source.Kind(mgr.GetCache(), &configv1.Infrastructure{}), &handler.EnqueueRequestForObject{}, onPremPlatformPredicate())
 	if err != nil {
 		return err
 	}

@@ -484,7 +484,6 @@ func TestOpenshiftSDNProxyConfig(t *testing.T) {
 	g.Expect(getProxyConfig(objs)).To(MatchYAML(`
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
-bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -498,15 +497,10 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
-detectLocal:
-  bridgeInterface: ""
-  interfaceNamePrefix: ""
-detectLocalMode: ""
 enableProfiling: true
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:
-  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 0
   minSyncPeriod: 0s
@@ -517,21 +511,17 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
-  tcpFinTimeout: 0s
-  tcpTimeout: 0s
-  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 127.0.0.1:29101
 mode: unidling+iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-showHiddenMetricsForVersion: ""
+resourceContainer: ""
+udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
-  forwardHealthCheckVip: false
   networkName: ""
-  rootHnsEndpointName: ""
   sourceVip: ""
 `))
 
@@ -543,7 +533,6 @@ winkernel:
 	g.Expect(getProxyConfig(objs)).To(MatchYAML(`
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
-bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -557,15 +546,10 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
-detectLocal:
-  bridgeInterface: ""
-  interfaceNamePrefix: ""
-detectLocalMode: ""
 enableProfiling: true
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:
-  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 0
   minSyncPeriod: 0s
@@ -576,21 +560,17 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
-  tcpFinTimeout: 0s
-  tcpTimeout: 0s
-  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 127.0.0.1:29101
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-showHiddenMetricsForVersion: ""
+resourceContainer: ""
+udpIdleTimeout: 0s
 winkernel:
   enableDSR: false
-  forwardHealthCheckVip: false
   networkName: ""
-  rootHnsEndpointName: ""
   sourceVip: ""
 `))
 

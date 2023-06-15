@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -16,6 +17,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
+	configv1 "github.com/openshift/api/config/v1"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 
@@ -94,10 +96,11 @@ func NewFakeClient(objs ...crclient.Object) cnoclient.Client {
 			ooTyped = append(ooTyped, o)
 		}
 	}
+	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: ""}}
 	fc := FakeClusterClient{
 		kClient:   faketyped.NewSimpleClientset(ooTyped...),
 		dynclient: fakedynamic.NewSimpleDynamicClient(scheme.Scheme, oo...),
-		crclient:  crfake.NewClientBuilder().WithObjects(objs...).Build(),
+		crclient:  crfake.NewClientBuilder().WithStatusSubresource(co).WithObjects(objs...).Build(),
 	}
 
 	return &FakeClient{

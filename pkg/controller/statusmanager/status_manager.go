@@ -407,7 +407,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 		if err := status.client.ClientFor("").CRClient().Update(context.TODO(), oc); err != nil {
 			return err
 		}
-		log.Printf("Set operator conditions:\n%s", buf)
+		log.Printf("Network operator config updated with conditions:\n%s", buf)
 
 		return nil
 	})
@@ -471,13 +471,13 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 			if err := status.client.ClientFor("").CRClient().Create(context.TODO(), co); err != nil {
 				return err
 			}
-			log.Printf("Set ClusterOperator conditions:\n%s", buf)
+			log.Printf("ClusterOperator config: %s created with conditions:\n%s", co.Name, buf)
 			return nil
 		}
 		if err := status.client.ClientFor("").CRClient().Status().Update(context.TODO(), co); err != nil {
 			return err
 		}
-		log.Printf("Set ClusterOperator conditions:\n%s", buf)
+		log.Printf("ClusterOperator config status updated with conditions:\n%s", buf)
 		return nil
 	})
 	if err != nil {
