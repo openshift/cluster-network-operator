@@ -541,6 +541,8 @@ spec:
         name: whereabouts-reconciler
     spec:
       hostNetwork: true      
+      nodeSelector:
+        kubernetes.io/os: linux
       serviceAccountName: multus
       tolerations:
       - operator: Exists
