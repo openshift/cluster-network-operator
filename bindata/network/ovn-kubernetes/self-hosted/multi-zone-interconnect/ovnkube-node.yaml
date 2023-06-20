@@ -665,6 +665,8 @@ spec:
             --enable-multicast \
             --zone ${K8S_NODE} \
             --enable-interconnect \
+            --dns-service-namespace openshift-dns \
+            --dns-service-name dns-default \
             --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
         volumeMounts:
         # for checking ovs-configuration service
@@ -795,6 +797,8 @@ spec:
             ${multi_network_policy_enabled_flag} \
             --zone ${K8S_NODE} \
             --enable-interconnect \
+            --dns-service-namespace openshift-dns \
+            --dns-service-name dns-default \
             ${gw_interface_flag}
         env:
         # for kubectl
