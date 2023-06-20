@@ -145,6 +145,8 @@ spec:
             --disable-snat-multiple-gws \
             ${multi_network_enabled_flag} \
             --enable-interconnect \
+            --dns-service-namespace openshift-dns \
+            --dns-service-name dns-default \
             --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
         volumeMounts:
         # for checking ovs-configuration service
