@@ -644,9 +644,9 @@ spec:
             multi_network_enabled_flag="--enable-multi-network"
           fi
 
-          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-controller - start ovnkube --init-ovnkube-controller ${K8S_NODE}"
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-controller - start ovnkube --init-network-controller-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
-            --init-ovnkube-controller "${K8S_NODE}" \
+            --init-network-controller-manager "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
