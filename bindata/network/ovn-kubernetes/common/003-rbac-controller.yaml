@@ -87,6 +87,7 @@ rules:
   - egressfirewalls
   - egressips
   - egressqoses
+  - adminpolicybasedexternalroutes
   verbs:
   - get
   - list
