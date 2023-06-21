@@ -116,8 +116,9 @@ spec:
             mountPath: /etc/pki/tls/metrics-certs
             readOnly: True
       hostNetwork: true
-{{- if not .ExternalControlPlane }}
       nodeSelector:
+        kubernetes.io/os: "linux"
+{{- if not .ExternalControlPlane }}
         node-role.kubernetes.io/master: ""
 {{- end }}
       priorityClassName: "system-cluster-critical"
