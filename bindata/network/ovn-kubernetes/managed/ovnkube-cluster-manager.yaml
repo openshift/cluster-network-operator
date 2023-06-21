@@ -36,17 +36,6 @@ spec:
       app: ovnkube-cluster-manager
   serviceName: ovnkube-cluster-manager-internal
   volumeClaimTemplates:
-  - apiVersion: v1
-    kind: PersistentVolumeClaim
-    metadata:
-      name: datadir
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 1Gi
-      volumeMode: Filesystem
   replicas: {{.OvnkubeMasterReplicas}}
   template:
     metadata:
@@ -206,10 +195,6 @@ spec:
             ${multi_network_enabled_flag} \
             --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
         volumeMounts:
-        - mountPath: /etc/ovn
-          name: datadir
-        - mountPath: /var/run/ovn
-          name: datadir
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
         - mountPath: /env
