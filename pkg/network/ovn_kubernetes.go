@@ -110,10 +110,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			err, "failed to render manifests, could not determine interconnect zone")
 	}
 
-	if err = prepareUpgradeToInterConnect(bootstrapResult.OVN, client, &targetZoneMode); err != nil {
-		return nil, progressing, fmt.Errorf("failed to render manifests: %w", err)
-	}
-
 	// render the manifests on disk
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
@@ -395,11 +391,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		manifestSubDir = "network/ovn-kubernetes/managed"
 		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, manifestSubDir))
 	} else {
-		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "network/ovn-kubernetes/self-hosted/common"))
-		manifestSubDir = "network/ovn-kubernetes/self-hosted/multi-zone-interconnect" // default is multizone
-		if targetZoneMode.zoneMode == zoneModeSingleZone {                            // non-default, internal use only
-			manifestSubDir = "network/ovn-kubernetes/self-hosted/single-zone-interconnect"
-		}
+		manifestSubDir = "network/ovn-kubernetes/self-hosted/single-zone-interconnect"
 		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, manifestSubDir))
 	}
 
@@ -2003,69 +1995,4 @@ func getInterConnectZoneModeForMasterDaemonSet(ds *appsv1.DaemonSet) InterConnec
 
 func getInterConnectZoneModeForNodeDaemonSet(ds *appsv1.DaemonSet) InterConnectZoneMode {
 	return getInterConnectZoneModeForDaemonSet(ds, "nbdb")
-}
-
-func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnoclient.Client, targetZoneMode *targetZoneModeType) error {
-	// if node and master DSs are <= 4.13 (no IC support) and we're upgrading to >= 4.14 (IC),
-	// go through an intermediate step with IC single-zone DSs, tracked by a configmap that overrides
-	// the zone mode, created here by CNO.
-	if ovn.MasterUpdateStatus != nil && ovn.NodeUpdateStatus != nil &&
-		isVersionLessThanOrEqualTo(ovn.MasterUpdateStatus.Version, 4, 13) &&
-		isVersionLessThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 13) &&
-		isVersionGreaterThanOrEqualTo(os.Getenv("RELEASE_VERSION"), 4, 14) &&
-		!ovn.MasterUpdateStatus.Progressing &&
-		!ovn.NodeUpdateStatus.Progressing &&
-		!targetZoneMode.configMapFound {
-
-		klog.Infof("riccardo: [upgrade phase1] 4.13->4.14 creating tmp configmap for single zone")
-
-		configMap := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      OVN_INTERCONNECT_CONFIGMAP_NAME,
-				Namespace: OVN_NAMESPACE,
-			},
-			Data: map[string]string{
-				"zone-mode": "singlezone",
-				"temporary": "true",
-			},
-		}
-		if err := client.ClientFor("").CRClient().Create(context.TODO(), configMap); err != nil {
-			return fmt.Errorf("failed to render manifests, could not create interconnect configmap: %w", err)
-		}
-		// TODO consider running getTargetInterConnectZoneMode again
-		targetZoneMode.configMapFound = true
-		targetZoneMode.temporary = true
-		targetZoneMode.zoneMode = zoneModeSingleZone
-
-	} else if ovn.MasterUpdateStatus != nil && ovn.NodeUpdateStatus != nil &&
-		isVersionGreaterThanOrEqualTo(ovn.MasterUpdateStatus.Version, 4, 14) &&
-		isVersionGreaterThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 14) &&
-		ovn.MasterUpdateStatus.InterConnectZoneMode == string(zoneModeSingleZone) &&
-		ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeSingleZone) &&
-		!ovn.MasterUpdateStatus.Progressing &&
-		!ovn.NodeUpdateStatus.Progressing &&
-		targetZoneMode.configMapFound && targetZoneMode.temporary {
-
-		// if node and master DSs have already upgraded to >= 4.14 single zone and
-		// we previously pushed a configmap for temporary single-mode zone,
-		// remove the configmap and proceed with the change of zone mode to multizone.
-		klog.Infof("riccardo: [upgrade phase2] 4.13->4.14 deleting tmp configmap for single zone")
-
-		// Delete the ConfigMap
-		if err := client.Default().Kubernetes().CoreV1().ConfigMaps(OVN_NAMESPACE).Delete(
-			context.TODO(), OVN_INTERCONNECT_CONFIGMAP_NAME, metav1.DeleteOptions{}); err != nil {
-			if apierrors.IsNotFound(err) {
-				klog.Infof("riccardo [upgrade to IC, phase2] IC config map not found")
-			} else {
-				return fmt.Errorf("failed to render manifests, could not delete interconnect configmap: %w", err)
-			}
-		}
-
-		// TODO consider running getTargetInterConnectZoneMode again
-		targetZoneMode.configMapFound = false
-		targetZoneMode.temporary = false
-		targetZoneMode.zoneMode = zoneModeMultiZone
-	}
-	return nil
-
 }
