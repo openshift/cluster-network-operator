@@ -110,7 +110,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			err, "failed to render manifests, could not determine interconnect zone")
 	}
 
-	if err = prepareUpgradeToInterConnect(bootstrapResult.OVN, client, &targetZoneMode); err != nil {
+	progressing, err = prepareUpgradeToInterConnect(bootstrapResult.OVN, client, &targetZoneMode)
+	if err != nil {
 		return nil, progressing, fmt.Errorf("failed to render manifests: %w", err)
 	}
 
@@ -2006,7 +2007,12 @@ func getInterConnectZoneModeForNodeDaemonSet(ds *appsv1.DaemonSet) InterConnectZ
 	return getInterConnectZoneModeForDaemonSet(ds, "nbdb")
 }
 
-func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnoclient.Client, targetZoneMode *targetZoneModeType) error {
+func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnoclient.Client, targetZoneMode *targetZoneModeType) (bool, error) {
+	// override progressing so that it's true all throughout the two upgrade phases handled below
+	progressing := (targetZoneMode.configMapFound && targetZoneMode.temporary ||
+		(ovn.MasterUpdateStatus != nil && ovn.MasterUpdateStatus.Progressing) ||
+		(ovn.NodeUpdateStatus != nil && ovn.NodeUpdateStatus.Progressing))
+
 	// if node and master DSs are <= 4.13 (no IC support) and we're upgrading to >= 4.14 (IC),
 	// go through an intermediate step with IC single-zone DSs, tracked by a configmap that overrides
 	// the zone mode, created here by CNO.
@@ -2031,12 +2037,14 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 			},
 		}
 		if err := client.ClientFor("").CRClient().Create(context.TODO(), configMap); err != nil {
-			return fmt.Errorf("failed to render manifests, could not create interconnect configmap: %w", err)
+			return progressing, fmt.Errorf("failed to render manifests, could not create interconnect configmap: %w", err)
 		}
 		// TODO consider running getTargetInterConnectZoneMode again
 		targetZoneMode.configMapFound = true
 		targetZoneMode.temporary = true
 		targetZoneMode.zoneMode = zoneModeSingleZone
+
+		progressing = true
 
 	} else if ovn.MasterUpdateStatus != nil && ovn.NodeUpdateStatus != nil &&
 		isVersionGreaterThanOrEqualTo(ovn.MasterUpdateStatus.Version, 4, 14) &&
@@ -2058,7 +2066,7 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 			if apierrors.IsNotFound(err) {
 				klog.Infof("riccardo [upgrade to IC, phase2] IC config map not found")
 			} else {
-				return fmt.Errorf("failed to render manifests, could not delete interconnect configmap: %w", err)
+				return progressing, fmt.Errorf("failed to render manifests, could not delete interconnect configmap: %w", err)
 			}
 		}
 
@@ -2066,7 +2074,10 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 		targetZoneMode.configMapFound = false
 		targetZoneMode.temporary = false
 		targetZoneMode.zoneMode = zoneModeMultiZone
+
+		progressing = true
 	}
-	return nil
+
+	return progressing, nil
 
 }
