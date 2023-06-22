@@ -460,6 +460,11 @@ spec:
           if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" ]]; then
             multi_network_enabled_flag="--enable-multi-network"
           fi
+          
+          multi_network_policy_enabled_flag=
+          if [[ "{{.OVN_MULTI_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
+            multi_network_policy_enabled_flag="--enable-multi-networkpolicy"
+          fi
 
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --nb-address "{{.OVN_NB_DB_ENDPOINT}}" \
@@ -487,6 +492,7 @@ spec:
             --disable-snat-multiple-gws \
             ${export_network_flows_flags} \
             ${multi_network_enabled_flag} \
+            ${multi_network_policy_enabled_flag} \
             ${gw_interface_flag}
         env:
         # for kubectl
