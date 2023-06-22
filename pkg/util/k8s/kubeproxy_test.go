@@ -28,6 +28,7 @@ func TestGenerateKubeProxyConfiguration(t *testing.T) {
 			output: `
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -41,10 +42,15 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
+detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 0
   minSyncPeriod: 0s
@@ -55,17 +61,21 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 0.0.0.0:9102
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-resourceContainer: ""
-udpIdleTimeout: 0s
+showHiddenMetricsForVersion: ""
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
 `,
 		},
@@ -81,6 +91,7 @@ winkernel:
 			output: `
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 1.2.3.4
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -94,10 +105,15 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
+detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 14
   minSyncPeriod: 0s
@@ -108,17 +124,21 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 5.6.7.8:9999
 mode: userspace
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-resourceContainer: ""
-udpIdleTimeout: 0s
+showHiddenMetricsForVersion: ""
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
 `,
 		},
@@ -130,6 +150,7 @@ winkernel:
 			output: `
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -143,10 +164,15 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
+detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 0
   minSyncPeriod: 0s
@@ -157,17 +183,21 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 5.6.7.8:9102
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-resourceContainer: ""
-udpIdleTimeout: 0s
+showHiddenMetricsForVersion: ""
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
 `,
 		},
@@ -179,6 +209,7 @@ winkernel:
 			output: `
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -192,10 +223,15 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
+detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: null
   masqueradeAll: false
   masqueradeBit: 0
   minSyncPeriod: 0s
@@ -206,17 +242,21 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 0.0.0.0:9999
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
-resourceContainer: ""
-udpIdleTimeout: 0s
+showHiddenMetricsForVersion: ""
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
 `,
 		},
@@ -231,6 +271,7 @@ winkernel:
 			output: `
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -244,10 +285,15 @@ conntrack:
   min: null
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
+detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: ""
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: null
   masqueradeAll: true
   masqueradeBit: 0
   minSyncPeriod: 10s
@@ -260,17 +306,21 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 0s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 0.0.0.0:9102
 mode: iptables
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: 1000+10
-resourceContainer: ""
-udpIdleTimeout: 0s
+showHiddenMetricsForVersion: ""
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
 `,
 		},
