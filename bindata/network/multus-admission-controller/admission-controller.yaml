@@ -196,6 +196,14 @@ spec:
       nodeSelector:
         node-role.kubernetes.io/master: ""
 {{- end }}
+{{- if .HyperShiftEnabled}}
+      {{ if .HCPNodeSelector }}
+      nodeSelector:
+        {{ range $key, $value := .HCPNodeSelector }}
+        "{{$key}}": "{{$value}}"
+        {{ end }}
+      {{ end }}
+{{- end }}
       volumes:
       - name: webhook-certs
         secret:

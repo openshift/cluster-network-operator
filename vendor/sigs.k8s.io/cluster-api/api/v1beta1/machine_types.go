@@ -19,6 +19,7 @@ package v1beta1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	capierrors "sigs.k8s.io/cluster-api/errors"
 )
 
@@ -33,10 +34,15 @@ const (
 	ExcludeNodeDrainingAnnotation = "machine.cluster.x-k8s.io/exclude-node-draining"
 
 	// MachineSetLabelName is the label set on machines if they're controlled by MachineSet.
+	// Note: The value of this label may be a hash if the MachineSet name is longer than 63 characters.
 	MachineSetLabelName = "cluster.x-k8s.io/set-name"
 
 	// MachineDeploymentLabelName is the label set on machines if they're controlled by MachineDeployment.
 	MachineDeploymentLabelName = "cluster.x-k8s.io/deployment-name"
+
+	// MachineControlPlaneNameLabel is the label set on machines if they're controlled by a ControlPlane.
+	// Note: The value of this label may be a hash if the control plane name is longer than 63 characters.
+	MachineControlPlaneNameLabel = "cluster.x-k8s.io/control-plane-name"
 
 	// PreDrainDeleteHookAnnotationPrefix annotation specifies the prefix we
 	// search each annotation for during the pre-drain.delete lifecycle hook
@@ -95,6 +101,12 @@ type MachineSpec struct {
 	// NOTE: NodeDrainTimeout is different from `kubectl drain --timeout`
 	// +optional
 	NodeDrainTimeout *metav1.Duration `json:"nodeDrainTimeout,omitempty"`
+
+	// NodeDeletionTimeout defines how long the controller will attempt to delete the Node that the Machine
+	// hosts after the Machine is marked for deletion. A duration of 0 will retry deletion indefinitely.
+	// Defaults to 10 seconds.
+	// +optional
+	NodeDeletionTimeout *metav1.Duration `json:"nodeDeletionTimeout,omitempty"`
 }
 
 // ANCHOR_END: MachineSpec

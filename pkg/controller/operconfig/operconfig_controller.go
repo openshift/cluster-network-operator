@@ -306,8 +306,8 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	objs = append([]*uns.Unstructured{app}, objs...)
 
 	relatedObjects := []configv1.ObjectReference{}
-	relatedClusterObjects := []network.RelatedObject{}
-	hcpCfg := network.NewHyperShiftConfig()
+	relatedClusterObjects := []platform.RelatedObject{}
+	hcpCfg := platform.NewHyperShiftConfig()
 	for _, obj := range objs {
 		// Label all DaemonSets, Deployments, and StatefulSets with the label that generates Status.
 		if obj.GetAPIVersion() == "apps/v1" && (obj.GetKind() == "DaemonSet" || obj.GetKind() == "Deployment" || obj.GetKind() == "StatefulSet") {
@@ -331,7 +331,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			continue
 		}
 		if apply.GetClusterName(obj) != "" {
-			relatedClusterObjects = append(relatedClusterObjects, network.RelatedObject{
+			relatedClusterObjects = append(relatedClusterObjects, platform.RelatedObject{
 				ObjectReference: configv1.ObjectReference{
 					Group:     obj.GetObjectKind().GroupVersionKind().Group,
 					Resource:  restMapping.Resource.Resource,
