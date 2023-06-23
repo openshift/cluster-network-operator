@@ -644,6 +644,11 @@ spec:
             multi_network_enabled_flag="--enable-multi-network"
           fi
 
+          multi_network_policy_enabled_flag=
+          if [[ "{{.OVN_MULTI_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
+            multi_network_policy_enabled_flag="--enable-multi-networkpolicy"
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-controller - start ovnkube --init-network-controller-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --init-network-controller-manager "${K8S_NODE}" \
@@ -656,6 +661,7 @@ spec:
             ${gateway_mode_flags} \
             --disable-snat-multiple-gws \
             ${multi_network_enabled_flag} \
+            ${multi_network_policy_enabled_flag} \
             --enable-multicast \
             --zone ${K8S_NODE} \
             --enable-interconnect \
@@ -765,6 +771,11 @@ spec:
             multi_network_enabled_flag="--enable-multi-network"
           fi
 
+          multi_network_policy_enabled_flag=
+          if [[ "{{.OVN_MULTI_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
+            multi_network_policy_enabled_flag="--enable-multi-networkpolicy"
+          fi
+
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
@@ -781,6 +792,7 @@ spec:
             --disable-snat-multiple-gws \
             ${export_network_flows_flags} \
             ${multi_network_enabled_flag} \
+            ${multi_network_policy_enabled_flag} \
             --zone ${K8S_NODE} \
             --enable-interconnect \
             ${gw_interface_flag}
