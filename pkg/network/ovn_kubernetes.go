@@ -41,6 +41,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -2123,8 +2125,30 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 				return progressing, fmt.Errorf("could not delete interconnect configmap: %w", err)
 			}
 		}
+
+		// Once we're here, there are no more updates to the DSs and CNO won't update the version in its status...
+		// TODO AWFUL HACK! FIND A WAY AROUND THIS
+		return progressing, annotateMasterDaemonset(client.ClientFor("").Kubernetes())
 	}
 
 	return progressing, nil
 
+}
+
+// TODO: TEMPORARY HACK TO TRIGGER POD STATUS UPDATE SO THAT CNO STATUS REPORTS NEW VERSION
+func annotateMasterDaemonset(kubeClient kubernetes.Interface) error {
+	masterDS, err := kubeClient.AppsV1().DaemonSets(util.OVN_NAMESPACE).Get(context.TODO(), "ovnkube-master", metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	masterDS.Annotations["interconnect-upgrade"] = "done"
+
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		_, err = kubeClient.AppsV1().DaemonSets(util.OVN_NAMESPACE).Update(context.TODO(), masterDS, metav1.UpdateOptions{})
+		return err
+	}); err != nil {
+		return err
+	}
+	return nil
 }
