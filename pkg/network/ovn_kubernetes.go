@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -26,6 +27,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	"github.com/openshift/cluster-network-operator/pkg/util"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
@@ -37,7 +39,7 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
@@ -63,10 +65,6 @@ const OVN_NODE_MODE_SMART_NIC = "smart-nic"
 const OVN_NODE_SELECTOR_DEFAULT_DPU_HOST = "network.operator.openshift.io/dpu-host"
 const OVN_NODE_SELECTOR_DEFAULT_DPU = "network.operator.openshift.io/dpu"
 const OVN_NODE_SELECTOR_DEFAULT_SMART_NIC = "network.operator.openshift.io/smart-nic"
-const OVN_NODE_INTERCONNECT_ZONE = "k8s.ovn.org/zone-name"
-const OVN_NODE_INTERCONNECT_ZONE_GLOBAL = "global"
-const OVN_INTERCONNECT_CONFIGMAP_NAME = "ovn-interconnect-configuration"
-const OVN_NAMESPACE = "openshift-ovn-kubernetes"
 
 // gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
@@ -525,11 +523,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	if !renderPrePull {
 		// remove prepull from the list of objects to render.
-		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", OVN_NAMESPACE, "ovnkube-upgrades-prepuller")
+		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovnkube-upgrades-prepuller")
 	}
 
 	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled && bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost == "" {
-		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", OVN_NAMESPACE, "ovnkube-node", func(o *uns.Unstructured) {
+		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovnkube-node", func(o *uns.Unstructured) {
 			anno := o.GetAnnotations()
 			if anno == nil {
 				anno = map[string]string{}
@@ -1204,16 +1202,18 @@ const (
 )
 
 type targetZoneModeType struct {
-	zoneMode       InterConnectZoneMode
-	temporary      bool
+	// zoneMode indicates the target zone mode that CNO is supposed to converge to.
+	zoneMode InterConnectZoneMode
+	// "temporary", if true, marks that the target zone mode is only temporary;
+	// allowing us to switch first to single-zone mode during upgrades to versions with IC support (>= 4.14)
+	temporary bool
+	// "configMapFound" indicates whether the interconnect configmap was found; when not found,
+	// the zone mode defaults to multizone.
 	configMapFound bool
-}
-
-func getInterConnectConfigMap(kubeClient cnoclient.Client) (*corev1.ConfigMap, error) {
-	configMap := &corev1.ConfigMap{}
-	configMapLookup := types.NamespacedName{Name: OVN_INTERCONNECT_CONFIGMAP_NAME, Namespace: OVN_NAMESPACE}
-	err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), configMapLookup, configMap)
-	return configMap, err
+	// "fromVersion" is used during upgrades from versions with no IC support (<= 4.13) to keep track of
+	// which version the cluster is upgrading from; CNO will show fromVersion in the version field in its operator status
+	// all throughout the 2-phase upgrade.
+	fromVersion string
 }
 
 // getTargetInterConnectZoneMode determines the desired interconnect zone mode for the cluster.
@@ -1222,7 +1222,7 @@ func getInterConnectConfigMap(kubeClient cnoclient.Client) (*corev1.ConfigMap, e
 func getTargetInterConnectZoneMode(kubeClient cnoclient.Client) (targetZoneModeType, error) {
 	targetZoneMode := targetZoneModeType{}
 
-	interConnectConfigMap, err := getInterConnectConfigMap(kubeClient)
+	interConnectConfigMap, err := util.GetInterConnectConfigMap(kubeClient.ClientFor("").Kubernetes())
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			klog.Infof("riccardo: No OVN InterConnect configMap found, applying default: multizone")
@@ -1250,6 +1250,10 @@ func getTargetInterConnectZoneMode(kubeClient cnoclient.Client) (targetZoneModeT
 
 	if temporaryFromConfigMap, ok := interConnectConfigMap.Data["temporary"]; ok {
 		targetZoneMode.temporary = strings.ToLower(temporaryFromConfigMap) == "true"
+	}
+
+	if fromVersion, ok := interConnectConfigMap.Data["from-version"]; ok {
+		targetZoneMode.fromVersion = fromVersion
 	}
 
 	klog.Infof("[getTargetInterConnectZoneMode] riccardo zone from configmap: %+v", targetZoneMode)
@@ -1350,7 +1354,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		}
 		// TODO1 decide whether we should have the name ovnkube-master for both zone modes... it'd be less prone to errors
 		// The following commented code retrieves ovkube-control-plane DS first and, if it's missing, ovnkube-master
-		// nsn = types.NamespacedName{Namespace: OVN_NAMESPACE, Name: "ovnkube-control-plane"} // for multizone IC
+		// nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovnkube-control-plane"} // for multizone IC
 		// var errMaster error
 		// masterZoneMode := zoneModeUndefined
 		// if errMaster = kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, masterDS); errMaster != nil {
@@ -1358,7 +1362,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		// 		return nil, fmt.Errorf("Failed to retrieve existing ovnkube-control-plane DaemonSet: %w", errMaster)
 		// 	} else {
 		// 		// if there's no ovnkube-control-plane, see if we're in single-zone mode
-		// 		nsnSingleZone := types.NamespacedName{Namespace: OVN_NAMESPACE, Name: "ovnkube-master"} // for single-zone IC
+		// 		nsnSingleZone := types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovnkube-master"} // for single-zone IC
 		// 		if errMaster = kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsnSingleZone, masterDS); errMaster != nil {
 		// 			if !apierrors.IsNotFound(errMaster) {
 		// 				return nil, fmt.Errorf("Failed to retrieve existing single-zone master DaemonSet: %w", errMaster)
@@ -1383,7 +1387,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		// 	masterStatus.Progressing = daemonSetProgressing(masterDS, false)
 		// 	masterStatus.InterConnectZoneMode = string(masterZoneMode)
 		// }
-		nsn = types.NamespacedName{Namespace: OVN_NAMESPACE, Name: "ovnkube-master"} // for multizone IC
+		nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovnkube-master"} // for multizone IC
 		var errMaster error
 		if errMaster = kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, masterDS); errMaster != nil {
 			if !apierrors.IsNotFound(errMaster) {
@@ -1412,7 +1416,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
 	}
-	nsn = types.NamespacedName{Namespace: OVN_NAMESPACE, Name: "ovnkube-node"}
+	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovnkube-node"}
 	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, nodeDS); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Failed to retrieve existing node DaemonSet: %w", err)
@@ -1439,7 +1443,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
 	}
-	nsn = types.NamespacedName{Namespace: OVN_NAMESPACE, Name: "ovnkube-upgrades-prepuller"}
+	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovnkube-upgrades-prepuller"}
 	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, prePullerDS); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Failed to retrieve existing prepuller DaemonSet: %w", err)
@@ -1460,7 +1464,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
 	}
-	nsn = types.NamespacedName{Namespace: OVN_NAMESPACE, Name: "ovn-ipsec"}
+	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec"}
 	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecDS); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Failed to retrieve existing ipsec DaemonSet: %w", err)
@@ -2007,6 +2011,9 @@ func getInterConnectZoneModeForNodeDaemonSet(ds *appsv1.DaemonSet) InterConnectZ
 	return getInterConnectZoneModeForDaemonSet(ds, "nbdb")
 }
 
+// TODO: hacking the progressing field shouldn't be needed any more, since it's not taken into account
+// by CVO. Try first with hacked version + progressing=True and then remove the hack on
+// progressing field.
 func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnoclient.Client, targetZoneMode *targetZoneModeType) (bool, error) {
 	// override progressing so that it's true all throughout the two upgrade phases handled below
 	progressing := (targetZoneMode.configMapFound && targetZoneMode.temporary ||
@@ -2028,21 +2035,23 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 
 		configMap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      OVN_INTERCONNECT_CONFIGMAP_NAME,
-				Namespace: OVN_NAMESPACE,
+				Name:      util.OVN_INTERCONNECT_CONFIGMAP_NAME,
+				Namespace: util.OVN_NAMESPACE,
 			},
 			Data: map[string]string{
-				"zone-mode": "singlezone",
-				"temporary": "true",
+				"zone-mode":    fmt.Sprint(zoneModeSingleZone),
+				"temporary":    "true",
+				"from-version": ovn.MasterUpdateStatus.Version,
 			},
 		}
 		if err := client.ClientFor("").CRClient().Create(context.TODO(), configMap); err != nil {
-			return progressing, fmt.Errorf("failed to render manifests, could not create interconnect configmap: %w", err)
+			return progressing, fmt.Errorf("could not create interconnect configmap: %w", err)
 		}
 		// TODO consider running getTargetInterConnectZoneMode again
 		targetZoneMode.configMapFound = true
-		targetZoneMode.temporary = true
 		targetZoneMode.zoneMode = zoneModeSingleZone
+		targetZoneMode.temporary = true
+		targetZoneMode.fromVersion = ovn.MasterUpdateStatus.Version
 
 		progressing = true
 
@@ -2058,24 +2067,62 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 		// if node and master DSs have already upgraded to >= 4.14 single zone and
 		// we previously pushed a configmap for temporary single-mode zone,
 		// remove the configmap and proceed with the change of zone mode to multizone.
-		klog.Infof("riccardo: [upgrade phase2] 4.13->4.14 deleting tmp configmap for single zone")
+		klog.Infof("riccardo: [upgrade phase2] 4.13->4.14 patching tmp configmap for multizone")
 
-		// Delete the ConfigMap
-		if err := client.Default().Kubernetes().CoreV1().ConfigMaps(OVN_NAMESPACE).Delete(
-			context.TODO(), OVN_INTERCONNECT_CONFIGMAP_NAME, metav1.DeleteOptions{}); err != nil {
+		patch := []map[string]interface{}{
+			{
+				"op":    "replace",
+				"path":  "/data/zone-mode",
+				"value": fmt.Sprint(zoneModeMultiZone),
+			},
+			{
+				"op":    "replace",
+				"path":  "/data/temporary",
+				"value": "false",
+			},
+		}
+
+		patchBytes, err := json.Marshal(patch)
+		if err != nil {
+			return progressing, fmt.Errorf("could not marshal patch for interconnect configmap: %w", err)
+		}
+		newConfigMap, err := client.ClientFor("").Kubernetes().CoreV1().ConfigMaps(util.OVN_NAMESPACE).Patch(
+			context.TODO(), util.OVN_INTERCONNECT_CONFIGMAP_NAME, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
+		if err != nil {
+			return progressing, fmt.Errorf("could not patch existing interconnect configmap: %w", err)
+		}
+
+		klog.Infof("riccardo patched configmap: %+v", newConfigMap)
+
+		// TODO consider running getTargetInterConnectZoneMode again
+		targetZoneMode.zoneMode = zoneModeMultiZone
+		targetZoneMode.temporary = false
+
+		progressing = true
+
+	} else if ovn.MasterUpdateStatus != nil && ovn.NodeUpdateStatus != nil &&
+		// isVersionGreaterThanOrEqualTo(ovn.MasterUpdateStatus.Version, 4, 14) &&  // not sure if I should inspect the version yet..
+		// isVersionGreaterThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 14) &&
+		ovn.MasterUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) &&
+		ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) &&
+		!ovn.MasterUpdateStatus.Progressing &&
+		!ovn.NodeUpdateStatus.Progressing &&
+		targetZoneMode.configMapFound &&
+		targetZoneMode.zoneMode == zoneModeMultiZone &&
+		!targetZoneMode.temporary {
+
+		// phase 2 is over: daemonsets have rolled out in multizone mode
+		// Remove the configmap: this won't trigger any further roll out, but
+		// CNO will update the version it reports.
+		klog.Infof("riccardo: deleting IC configmap; upgrade is done")
+		if err := client.Default().Kubernetes().CoreV1().ConfigMaps(util.OVN_NAMESPACE).Delete(
+			context.TODO(), util.OVN_INTERCONNECT_CONFIGMAP_NAME, metav1.DeleteOptions{}); err != nil {
 			if apierrors.IsNotFound(err) {
 				klog.Infof("riccardo [upgrade to IC, phase2] IC config map not found")
 			} else {
-				return progressing, fmt.Errorf("failed to render manifests, could not delete interconnect configmap: %w", err)
+				return progressing, fmt.Errorf("could not delete interconnect configmap: %w", err)
 			}
 		}
-
-		// TODO consider running getTargetInterConnectZoneMode again
-		targetZoneMode.configMapFound = false
-		targetZoneMode.temporary = false
-		targetZoneMode.zoneMode = zoneModeMultiZone
-
-		progressing = true
 	}
 
 	return progressing, nil
