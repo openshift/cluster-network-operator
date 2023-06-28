@@ -48,6 +48,8 @@ spec:
           #!/bin/bash
           set -exuo pipefail
 
+          echo "yk test"
+
           # Every time we restart this container, we will create a new key pair if
           # we are close to key expiration or if we do not already have a signed key pair.
           #
