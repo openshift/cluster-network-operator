@@ -81,7 +81,7 @@ spec:
             --tls-private-key-file=${TLS_PK} \
             --tls-cert-file=${TLS_CERT}
         ports:
-        - containerPort: 9206
+        - containerPort: 9106
           name: https
         resources:
           requests:
@@ -182,7 +182,7 @@ spec:
               fieldPath: spec.nodeName
         ports:
         - name: metrics-port
-          containerPort: 29204
+          containerPort: 29104
         terminationMessagePolicy: FallbackToLogsOnError
       nodeSelector:
         node-role.kubernetes.io/master: ""

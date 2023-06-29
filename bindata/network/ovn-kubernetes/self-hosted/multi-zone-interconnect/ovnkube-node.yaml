@@ -195,13 +195,13 @@ spec:
           echo $(date -Iseconds) INFO: ovn-node-metrics-certs mounted, starting kube-rbac-proxy
           exec /usr/bin/kube-rbac-proxy \
             --logtostderr \
-            --secure-listen-address=:9203 \
+            --secure-listen-address=:9103 \
             --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
-            --upstream=http://127.0.0.1:29203/ \
+            --upstream=http://127.0.0.1:29103/ \
             --tls-private-key-file=${TLS_PK} \
             --tls-cert-file=${TLS_CERT}
         ports:
-        - containerPort: 9203
+        - containerPort: 9103
           name: https
         resources:
           requests:
@@ -247,13 +247,13 @@ spec:
           echo $(date -Iseconds) INFO: ovn-node-metrics-certs mounted, starting kube-rbac-proxy
           exec /usr/bin/kube-rbac-proxy \
             --logtostderr \
-            --secure-listen-address=:9205 \
+            --secure-listen-address=:9105 \
             --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
-            --upstream=http://127.0.0.1:29205/ \
+            --upstream=http://127.0.0.1:29105/ \
             --tls-private-key-file=${TLS_PK} \
             --tls-cert-file=${TLS_CERT}
         ports:
-        - containerPort: 9205
+        - containerPort: 9105
           name: https
         resources:
           requests:
@@ -598,13 +598,13 @@ spec:
           echo $(date -Iseconds) INFO: ovn-master-metrics-certs mounted, starting kube-rbac-proxy
           exec /usr/bin/kube-rbac-proxy \
             --logtostderr \
-            --secure-listen-address=:9202 \
+            --secure-listen-address=:9113 \
             --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
-            --upstream=http://127.0.0.1:29202/ \
+            --upstream=http://127.0.0.1:29113/ \
             --tls-private-key-file=${TLS_PK} \
             --tls-cert-file=${TLS_CERT}
         ports:
-        - containerPort: 9202
+        - containerPort: 9113
           name: https
         resources:
           requests:
@@ -655,7 +655,7 @@ spec:
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            --metrics-bind-address "127.0.0.1:29202" \
+            --metrics-bind-address "127.0.0.1:29113" \
             --metrics-enable-pprof \
             --metrics-enable-config-duration \
             ${gateway_mode_flags} \
@@ -702,7 +702,7 @@ spec:
               fieldPath: spec.nodeName
         ports:
         - name: metrics-port
-          containerPort: 29202
+          containerPort: 29113
         terminationMessagePolicy: FallbackToLogsOnError
 
       # ovnkube-node: does node-level bookkeeping and configuration
@@ -785,8 +785,8 @@ spec:
             {{- if eq .OVN_NODE_MODE "dpu-host" }}
             --ovnkube-node-mode dpu-host \
             {{- end }}
-            --metrics-bind-address "127.0.0.1:29203" \
-            --ovn-metrics-bind-address "127.0.0.1:29205" \
+            --metrics-bind-address "127.0.0.1:29103" \
+            --ovn-metrics-bind-address "127.0.0.1:29105" \
             --metrics-enable-pprof \
             --export-ovs-metrics \
             --disable-snat-multiple-gws \
@@ -841,7 +841,7 @@ spec:
               fieldPath: metadata.name
         ports:
         - name: metrics-port
-          containerPort: 29203
+          containerPort: 29103
         securityContext:
           privileged: true
         terminationMessagePolicy: FallbackToLogsOnError
