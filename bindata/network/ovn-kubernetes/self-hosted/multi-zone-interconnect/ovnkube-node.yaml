@@ -67,6 +67,11 @@ spec:
           fi
 
           echo "$(date -Iseconds) - starting ovn-controller"
+          echo "SURYA"
+          ovs-vsctl --retry -t 60 set Open_vSwitch . external_ids:ovn-ofctrl-wait-before-clear="75"
+          output=$(ovs-vsctl --retry -t 60 get Open_vSwitch . external_ids:ovn-ofctrl-wait-before-clear)
+          echo "SURYA"
+          echo $output
           exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
             --no-chdir --pidfile=/var/run/ovn/ovn-controller.pid \
             --syslog-method="{{.OVNPolicyAuditDestination}}" \
