@@ -528,6 +528,8 @@ kind: DaemonSet
 metadata:
   name: whereabouts-reconciler
   namespace: openshift-multus
+  annotations:
+    release.openshift.io/version: "{{.ReleaseVersion}}"
 spec:
   selector:
     matchLabels:
