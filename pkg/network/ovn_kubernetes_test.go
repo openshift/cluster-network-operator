@@ -1724,7 +1724,7 @@ metadata:
 				checkDaemonSetImagePullPolicy(g, renderedPrePuller)
 			}
 
-			updateNode, updateMaster := shouldUpdateOVNKonUpgrade(bootstrapResult.OVN, tc.rv)
+			updateNode, updateMaster := shouldUpdateOVNKonUpgrade(bootstrapResult.OVN, masterStatus, tc.rv)
 			g.Expect(updateMaster).To(Equal(tc.expectMaster), "Check master")
 			if updateNode {
 				var updatePrePuller bool
@@ -1940,7 +1940,7 @@ func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
 				MasterUpdateStatus: masterStatus,
 				NodeUpdateStatus:   nodeStatus,
 			}
-			updateNode, updateMaster := shouldUpdateOVNKonIPFamilyChange(bootResult, tc.ipFamilyMode)
+			updateNode, updateMaster := shouldUpdateOVNKonIPFamilyChange(bootResult, masterStatus, tc.ipFamilyMode)
 			if updateNode != tc.expectNode {
 				t.Errorf("Expected node update: %v received %v", tc.expectNode, updateNode)
 			}

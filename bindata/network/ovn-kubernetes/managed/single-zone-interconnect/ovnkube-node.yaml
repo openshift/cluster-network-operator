@@ -467,6 +467,8 @@ spec:
           fi
 
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
+            --enable-interconnect \
+            --zone global \
             --nb-address "{{.OVN_NB_DB_ENDPOINT}}" \
             --sb-address "{{.OVN_SB_DB_ENDPOINT}}" \
             --nb-client-privkey /ovn-cert/tls.key \

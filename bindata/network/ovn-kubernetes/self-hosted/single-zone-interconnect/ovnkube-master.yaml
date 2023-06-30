@@ -30,7 +30,7 @@ spec:
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
-      # by default, Deployments spin up the new pod before terminating the old one
+      # by default, Deployments spin up the new pod before terminating the gold one
       # but we don't want that - because ovsdb holds the lock.
       maxSurge: 0
       maxUnavailable: 1
