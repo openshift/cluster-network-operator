@@ -110,7 +110,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			err, "failed to render manifests, could not determine interconnect zone")
 	}
 
-	progressing, err = prepareUpgradeToInterConnect(bootstrapResult.OVN, client, &targetZoneMode)
+	progressing, err = prepareUpgradeToInterConnect(bootstrapResult.OVN, client, &targetZoneMode, bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled)
 	if err != nil {
 		return nil, progressing, fmt.Errorf("failed to render manifests: %w", err)
 	}
@@ -393,8 +393,15 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "network/ovn-kubernetes/common"))
 
 	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled {
-		manifestSubDir = "network/ovn-kubernetes/managed"
+		//manifestSubDir = "network/ovn-kubernetes/managed"
+		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "network/ovn-kubernetes/managed/common"))
+		//manifestDirs = append(manifestDirs, filepath.Join(manifestDir, manifestSubDir))
+		manifestSubDir = "network/ovn-kubernetes/managed/multi-zone-interconnect" // default is multizone
+		if targetZoneMode.zoneMode == zoneModeSingleZone {                        // non-default, internal use only
+			manifestSubDir = "network/ovn-kubernetes/managed/single-zone-interconnect"
+		}
 		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, manifestSubDir))
+
 	} else {
 		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "network/ovn-kubernetes/self-hosted/common"))
 		manifestSubDir = "network/ovn-kubernetes/self-hosted/multi-zone-interconnect" // default is multizone
@@ -1345,6 +1352,10 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 			masterStatus.IPFamilyMode = masterSS.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
 			masterStatus.Version = masterSS.GetAnnotations()["release.openshift.io/version"]
 			masterStatus.Progressing = statefulSetProgressing(masterSS)
+			masterStatus.InterConnectZoneMode = string(getInterConnectZoneModeForMasterStatefulSet(masterSS))
+
+			klog.Infof("KEYWORD: jtan: master SS zone-mode=%s, progressing=%t", masterStatus.InterConnectZoneMode, masterStatus.Progressing)
+
 		}
 	} else {
 		masterDS := &appsv1.DaemonSet{
@@ -1994,6 +2005,15 @@ func isV6InternalSubnetLargeEnough(conf *operv1.NetworkSpec) bool {
 	return capacity.Cmp(maxNodesNum.Add(maxNodesNum, big.NewInt(3))) != -1
 }
 
+func getInterConnectZoneModeForMasterStatefulSet(ss *appsv1.StatefulSet) InterConnectZoneMode {
+	for _, container := range ss.Spec.Template.Spec.Containers {
+		if container.Name == "ovnkube-control-plane" {
+			return zoneModeMultiZone
+		}
+	}
+	return zoneModeSingleZone
+}
+
 // Determine the zone mode by looking for a known container name in multizone mode.
 func getInterConnectZoneModeForDaemonSet(ds *appsv1.DaemonSet, knownContainerForMultiZone string) InterConnectZoneMode {
 	for _, container := range ds.Spec.Template.Spec.Containers {
@@ -2015,12 +2035,34 @@ func getInterConnectZoneModeForNodeDaemonSet(ds *appsv1.DaemonSet) InterConnectZ
 // TODO: hacking the progressing field shouldn't be needed any more, since it's not taken into account
 // by CVO. Try first with hacked version + progressing=True and then remove the hack on
 // progressing field.
-func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnoclient.Client, targetZoneMode *targetZoneModeType) (bool, error) {
+func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnoclient.Client, targetZoneMode *targetZoneModeType, hypershiftEnabled bool) (bool, error) {
 	// override progressing so that it's true all throughout the two upgrade phases handled below
 	progressing := (targetZoneMode.configMapFound && targetZoneMode.temporary ||
 		(ovn.MasterUpdateStatus != nil && ovn.MasterUpdateStatus.Progressing) ||
 		(ovn.NodeUpdateStatus != nil && ovn.NodeUpdateStatus.Progressing))
 
+	// TODO: FIX THIS HACK.. in phase 2 of the updated in hypershift have to manually delete the master stateful set and routes
+	if hypershiftEnabled && ovn.MasterUpdateStatus != nil && ovn.NodeUpdateStatus != nil &&
+		ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) &&
+		ovn.MasterUpdateStatus.InterConnectZoneMode == string(zoneModeSingleZone) &&
+		!ovn.NodeUpdateStatus.Progressing && !ovn.MasterUpdateStatus.Progressing &&
+		targetZoneMode.zoneMode == zoneModeMultiZone {
+
+		if err := client.ClientFor(names.ManagementClusterName).Kubernetes().AppsV1().StatefulSets(ovn.MasterUpdateStatus.Namespace).Delete(
+			context.TODO(), "ovnkube-master", metav1.DeleteOptions{}); err != nil {
+			klog.Errorf("KEYWORD: jtan - tried to delete the stateful set: %v", err)
+		}
+		/*
+			if err := client.Default().Kubernetes().CoreV1().ConfigMaps(util.OVN_NAMESPACE).Delete(
+				context.TODO(), util.OVN_INTERCONNECT_CONFIGMAP_NAME, metav1.DeleteOptions{}); err != nil {
+				if apierrors.IsNotFound(err) {
+					klog.Infof("riccardo [upgrade to IC, phase2] IC config map not found")
+				} else {
+					return progressing, fmt.Errorf("could not delete interconnect configmap: %w", err)
+				}
+		*/
+
+	}
 	// if node and master DSs are <= 4.13 (no IC support) and we're upgrading to >= 4.14 (IC),
 	// go through an intermediate step with IC single-zone DSs, tracked by a configmap that overrides
 	// the zone mode, created here by CNO.
