@@ -227,7 +227,7 @@ spec:
           value: kube-apiserver
         ports:
         - name: metrics-port
-          containerPort: 29102
+          containerPort: 29104
         terminationMessagePolicy: FallbackToLogsOnError
       {{ if .HCPNodeSelector }}
       nodeSelector:
