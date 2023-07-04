@@ -25,6 +25,7 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - infrastructures
   - featuregates
   - clusterversions
   verbs:
