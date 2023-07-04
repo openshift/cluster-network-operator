@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	SystemCNIConfDir      = "/etc/kubernetes/cni/net.d"
-	MultusCNIConfDir      = "/var/run/multus/cni/net.d"
-	CNIBinDir             = "/var/lib/cni/bin"
-	MultusSocketParentDir = "/var/run/multus-socket"
+	SystemCNIConfDir = "/etc/kubernetes/cni/net.d"
+	MultusCNIConfDir = "/var/run/multus/cni/net.d"
+	CNIBinDir        = "/var/lib/cni/bin"
+	//MultusSocketParentDir = "/var/run/multus-socket"
+	MultusSocketParentDir = "/run/multus"
 )
 
 // renderMultus generates the manifests of Multus

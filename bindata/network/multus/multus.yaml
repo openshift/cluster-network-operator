@@ -124,7 +124,6 @@ data:
         "cniConfigDir": "/host/etc/cni/net.d",
         "multusConfigFile": "auto",
         "multusAutoconfigDir": "/host/var/run/multus/cni/net.d",
-
         "namespaceIsolation": true,
         "globalNamespaces": "default,openshift-multus,openshift-sriov-network-operator",
 {{- if eq .DefaultNetworkType "OpenShiftSDN"}}
@@ -132,7 +131,7 @@ data:
 {{- else if eq .DefaultNetworkType "OVNKubernetes"}}
         "readinessindicatorfile": "/host/var/run/multus/cni/net.d/10-ovn-kubernetes.conf",
 {{- end}}
-        "socketDir": "/{{ .MultusSocketParentDir }}/socket"
+        "socketDir": "{{ .MultusSocketParentDir }}/socket"
     }
 ---
 kind: DaemonSet
@@ -202,9 +201,12 @@ spec:
         - name: multus-cni-dir
           mountPath: /host/var/run/multus/cni/net.d
         - name: multus-socket-dir-parent
-          mountPath: /var/run/multus-socket
+          mountPath: {{ .MultusSocketParentDir }}
+          mountPropagation: HostToContainer
         - name: cnibin
           mountPath: /host/opt/cni/bin
+        - name: var-lib-cni-bin
+          mountPath: /var/lib/cni/bin
         - name: host-run
           mountPath: /host/run
         - name: host-var-lib-cni-multus
@@ -295,6 +297,9 @@ spec:
         - name: host-run-netns
           hostPath:
             path: /var/run/netns/
+        - name: var-lib-cni-bin
+          hostPath:
+            path: /var/lib/cni/bin
 # ---
 # kind: DaemonSet
 # apiVersion: apps/v1
@@ -470,8 +475,8 @@ spec:
         - name: DEFAULT_SOURCE_DIRECTORY
           value: "/usr/src/egress-router-cni/bin/"
       - name: cni-plugins
-        # image: {{.CNIPluginsImage}}
-        image: quay.io/dosmith/cni-plugins:gen6
+        image: {{.CNIPluginsImage}}
+        #image: quay.io/dosmith/cni-plugins:gen6
         command: ["/bin/bash", "-c", "/entrypoint/cnibincopy.sh && cp -n /sysctls/allowlist.conf /host/etc/cni/tuning/"]
         volumeMounts:
         - mountPath: /entrypoint
