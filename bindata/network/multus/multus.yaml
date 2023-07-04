@@ -115,13 +115,23 @@ metadata:
 data:
   daemon-config.json: |
     {
+        "cniVersion": "0.3.1",
         "chrootDir": "/hostroot",
-        "confDir": "/host/etc/cni/net.d",
         "logToStderr": true,
         "logLevel": "debug",
         "logFile": "/tmp/multus.log",
         "binDir": "{{ .CNIBinDir }}",
-        "cniDir": "/var/lib/cni/multus",
+        "cniConfigDir": "/host/etc/cni/net.d",
+        "multusConfigFile": "auto",
+        "multusAutoconfigDir": "/host/var/run/multus/cni/net.d",
+
+        "namespaceIsolation": true,
+        "globalNamespaces": "default,openshift-multus,openshift-sriov-network-operator",
+{{- if eq .DefaultNetworkType "OpenShiftSDN"}}
+        "readinessindicatorfile": "/host/var/run/multus/cni/net.d/80-openshift-network.conf",
+{{- else if eq .DefaultNetworkType "OVNKubernetes"}}
+        "readinessindicatorfile": "/host/var/run/multus/cni/net.d/10-ovn-kubernetes.conf",
+{{- end}}
         "socketDir": "/host{{ .MultusSocketParentDir }}/socket"
     }
 ---
@@ -162,7 +172,8 @@ spec:
       serviceAccountName: multus
       containers:
       - name: kube-multus
-        image: {{.MultusImage}}
+        #image: {{.MultusImage}}
+        image: "quay.io/s1061123/multus-cni:ocp-40"
         command: [ "/bin/bash", "-ec", "--" ]
         # Where does this go?
         # -multus-kubeconfig-file-host=/etc/kubernetes/cni/net.d/multus.d/multus.kubeconfig
@@ -175,21 +186,6 @@ spec:
           - >
             /entrypoint/cnibincopy.sh;
             exec /usr/src/multus-cni/bin/multus-daemon  
-            -cni-config-dir=/host/etc/cni/net.d
-            -multus-autoconfig-dir=/host/var/run/multus/cni/net.d
-{{- if eq .DefaultNetworkType "OpenShiftSDN"}}
-            -readiness-indicator-file=/host/var/run/multus/cni/net.d/80-openshift-network.conf
-{{- else if eq .DefaultNetworkType "OVNKubernetes"}}
-            -readiness-indicator-file=/host/var/run/multus/cni/net.d/10-ovn-kubernetes.conf
-{{- end}}
-            -namespace-isolation=true
-            -multus-log-level=debug
-            -multus-log-file=/tmp/multus.log
-            -multus-log-to-stderr=true
-            -cni-version=0.3.1
-            -socket-dir={{ .MultusSocketParentDir }}/socket
-            - "-global-namespaces=default,openshift-multus,openshift-sriov-network-operator"
-            # -socket-dir={{ .MultusSocketParentDir }}/socket
         resources:
           requests:
             cpu: 10m
