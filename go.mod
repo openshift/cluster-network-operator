@@ -19,10 +19,10 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
-	golang.org/x/net v0.10.0
+	golang.org/x/net v0.12.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.27.2
-	k8s.io/apimachinery v0.27.2
+	k8s.io/api v0.27.3
+	k8s.io/apimachinery v0.27.3
 	k8s.io/code-generator v0.27.2
 	k8s.io/component-base v0.27.2
 	k8s.io/klog/v2 v2.100.1
@@ -89,13 +89,13 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/crypto v0.9.0 // indirect
+	golang.org/x/crypto v0.11.0 // indirect
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sync v0.2.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/term v0.8.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/sys v0.10.0 // indirect
+	golang.org/x/term v0.10.0 // indirect
+	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.9.1 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
@@ -117,7 +117,7 @@ require (
 )
 
 require (
-	github.com/openshift/api v0.0.0-20230426193520-54a14470e5dc
+	github.com/openshift/api v0.0.0-20230705144233-e28cd4dd28a8
 	github.com/openshift/client-go v0.0.0-20230120202327-72f107311084
 	github.com/openshift/hypershift v0.1.6
 	github.com/openshift/library-go v0.0.0-20230503144409-4cb26a344c37
