@@ -21,10 +21,10 @@ data:
     DESTINATION_DIRECTORY=/host/opt/cni/bin/
 
     # Perform validation of usage
-    if [ -z "$RHEL7_SOURCE_DIRECTORY" ] ||
-       [ -z "$RHEL8_SOURCE_DIRECTORY" ] ||
+    if [ -z "$RHEL8_SOURCE_DIRECTORY" ] ||
+       [ -z "$RHEL9_SOURCE_DIRECTORY" ] ||
        [ -z "$DEFAULT_SOURCE_DIRECTORY" ]; then
-      log "FATAL ERROR: You must set env variables: RHEL7_SOURCE_DIRECTORY, RHEL8_SOURCE_DIRECTORY, DEFAULT_SOURCE_DIRECTORY"
+      log "FATAL ERROR: You must set env variables: RHEL8_SOURCE_DIRECTORY, RHEL9_SOURCE_DIRECTORY, DEFAULT_SOURCE_DIRECTORY"
       exit 1
     fi
 
@@ -38,7 +38,8 @@ data:
     rhelmajor=
     # detect which version we're using in order to copy the proper binaries
     case "${ID}" in
-      rhcos|scos) rhelmajor=8
+      rhcos|scos)
+        rhelmajor=$(echo $RHEL_VERSION | sed -E 's/([0-9]+)\.{1}[0-9]+(\.[0-9]+)?/\1/')
       ;;
       rhel) rhelmajor=$(echo "${VERSION_ID}" | cut -f 1 -d .)
       ;;
@@ -58,15 +59,15 @@ data:
     sourcedir=
     founddir=false
     case "${rhelmajor}" in
-      7)
-        if [ -d "${RHEL7_SOURCE_DIRECTORY}" ]; then
-          sourcedir=${RHEL7_SOURCE_DIRECTORY}
-          founddir=true
-        fi
-      ;;
       8)
         if [ -d "${RHEL8_SOURCE_DIRECTORY}" ]; then
           sourcedir=${RHEL8_SOURCE_DIRECTORY}
+          founddir=true
+        fi
+      ;;
+      9)
+        if [ -d "${RHEL9_SOURCE_DIRECTORY}" ]; then
+          sourcedir=${RHEL9_SOURCE_DIRECTORY}
           founddir=true
         fi
       ;;
@@ -179,10 +180,10 @@ spec:
         - name: cnibin
           mountPath: /host/opt/cni/bin
         env:
-        - name: RHEL7_SOURCE_DIRECTORY
-          value: "/usr/src/multus-cni/rhel7/bin/"
         - name: RHEL8_SOURCE_DIRECTORY
           value: "/usr/src/multus-cni/rhel8/bin/"
+        - name: RHEL9_SOURCE_DIRECTORY
+          value: "/usr/src/multus-cni/rhel9/bin/"
         - name: DEFAULT_SOURCE_DIRECTORY
           value: "/usr/src/multus-cni/bin/"
         - name: KUBERNETES_SERVICE_PORT
@@ -271,10 +272,10 @@ spec:
           name: os-release
           readOnly: true
         env:
-        - name: RHEL7_SOURCE_DIRECTORY
-          value: "/usr/src/egress-router-cni/rhel7/bin/"
         - name: RHEL8_SOURCE_DIRECTORY
           value: "/usr/src/egress-router-cni/rhel8/bin/"
+        - name: RHEL9_SOURCE_DIRECTORY
+          value: "/usr/src/egress-router-cni/rhel9/bin/"
         - name: DEFAULT_SOURCE_DIRECTORY
           value: "/usr/src/egress-router-cni/bin/"
       - name: cni-plugins
@@ -294,10 +295,10 @@ spec:
         - mountPath: /sysctls
           name: cni-sysctl-allowlist
         env:
-        - name: RHEL7_SOURCE_DIRECTORY
-          value: "/usr/src/plugins/rhel7/bin/"
         - name: RHEL8_SOURCE_DIRECTORY
           value: "/usr/src/plugins/rhel8/bin/"
+        - name: RHEL9_SOURCE_DIRECTORY
+          value: "/usr/src/plugins/rhel9/bin/"
         - name: DEFAULT_SOURCE_DIRECTORY
           value: "/usr/src/plugins/bin/"
       - name: bond-cni-plugin
@@ -312,10 +313,10 @@ spec:
           name: os-release
           readOnly: true
         env:
-        - name: RHEL7_SOURCE_DIRECTORY
-          value: "/bondcni/rhel7/"
         - name: RHEL8_SOURCE_DIRECTORY
           value: "/bondcni/rhel8/"
+        - name: RHEL9_SOURCE_DIRECTORY
+          value: "/bondcni/rhel9/"
         - name: DEFAULT_SOURCE_DIRECTORY
           value: "/bondcni/"
       - name: routeoverride-cni
@@ -330,10 +331,10 @@ spec:
           name: os-release
           readOnly: true
         env:
-        - name: RHEL7_SOURCE_DIRECTORY
-          value: "/usr/src/route-override/rhel7/bin/"
         - name: RHEL8_SOURCE_DIRECTORY
-          value: "/usr/src/whereabouts/rhel8/bin/"
+          value: "/usr/src/route-override/rhel8/bin/"
+        - name: RHEL9_SOURCE_DIRECTORY
+          value: "/usr/src/route-override/rhel9/bin/"
         - name: DEFAULT_SOURCE_DIRECTORY
           value: "/usr/src/route-override/bin/"
       - name: whereabouts-cni-bincopy
@@ -352,10 +353,10 @@ spec:
           name: os-release
           readOnly: true
         env:
-        - name: RHEL7_SOURCE_DIRECTORY
-          value: "/usr/src/whereabouts/rhel7/bin/"
         - name: RHEL8_SOURCE_DIRECTORY
           value: "/usr/src/whereabouts/rhel8/bin/"
+        - name: RHEL9_SOURCE_DIRECTORY
+          value: "/usr/src/whereabouts/rhel9/bin/"
         - name: DEFAULT_SOURCE_DIRECTORY
           value: "/usr/src/whereabouts/bin/"
       - name: whereabouts-cni
