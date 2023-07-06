@@ -247,6 +247,7 @@ spec:
 
           # Rotate audit log files when then get to max size (in bytes)
           MAXFILESIZE=$(( "{{.OVNPolicyAuditMaxFileSize}}"*1000000 ))
+          MAXLOGFILES="{{.OVNPolicyAuditMaxLogFiles}}"
           LOGFILE=/var/log/ovn/acl-audit-log.log
           CONTROLLERPID=$(cat /run/ovn/ovn-controller.pid)
 
@@ -269,6 +270,13 @@ spec:
               mv ${LOGFILE} /var/log/ovn/acl-audit-log.$timestamp.log
               ovs-appctl -t /run/ovn/ovn-controller.${CONTROLLERPID}.ctl vlog/reopen
               CONTROLLERPID=$(cat /run/ovn/ovn-controller.pid)
+            fi
+
+            # Ensure total number of log files does not exceed the maximum configured from OVNPolicyAuditMaxLogFiles
+            num_files=$(ls -1 $log_dir/acl-audit-log* 2>/dev/null | wc -l)
+            if [ "$num_files" -gt "MAXLOGFILES" ]; then
+              num_to_delete=$(( num_files - ${MAXLOGFILES} ))
+              ls -1t $log_dir/acl-audit-log* 2>/dev/null | tail -$num_to_delete | xargs -I {} rm {}
             fi
 
             # sleep for 30 seconds to avoid wasting CPU
