@@ -1022,16 +1022,14 @@ type SyslogLoggingDestinationParameters struct {
 	// +optional
 	Facility string `json:"facility,omitempty"`
 
-	// maxLength is the maximum length of the log message.
+	// maxLength is the maximum length of the syslog message
 	//
-	// Valid values are integers in the range 480 to 4096, inclusive.
+	// If this field is empty, the maxLength is set to "1024".
 	//
-	// When omitted, the default value is 1024.
-	//
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Maximum=4096
 	// +kubebuilder:validation:Minimum=480
 	// +kubebuilder:default=1024
-	// +default:=1024
 	// +optional
 	MaxLength uint32 `json:"maxLength,omitempty"`
 }
@@ -1039,18 +1037,6 @@ type SyslogLoggingDestinationParameters struct {
 // ContainerLoggingDestinationParameters describes parameters for the Container
 // logging destination type.
 type ContainerLoggingDestinationParameters struct {
-	// maxLength is the maximum length of the log message.
-	//
-	// Valid values are integers in the range 480 to 8192, inclusive.
-	//
-	// When omitted, the default value is 1024.
-	//
-	// +kubebuilder:validation:Maximum=8192
-	// +kubebuilder:validation:Minimum=480
-	// +kubebuilder:default=1024
-	// +default:=1024
-	// +optional
-	MaxLength int32 `json:"maxLength,omitempty"`
 }
 
 // LoggingDestination describes a destination for log messages.
