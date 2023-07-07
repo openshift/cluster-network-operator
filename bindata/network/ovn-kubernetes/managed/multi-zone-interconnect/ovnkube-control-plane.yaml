@@ -13,36 +13,36 @@ spec:
   minAvailable: {{.OVN_MIN_AVAILABLE}}
   selector:
     matchLabels:
-      app: ovnkube-master
+      app: ovnkube-control-plane
 ---
 {{ end }}
-kind: StatefulSet
+kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: ovnkube-master
+  name: ovnkube-control-plane
   namespace: {{.HostedClusterNamespace}}
   annotations:
     network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
     kubernetes.io/description: |
-      This daemonset launches the ovn-kubernetes controller (master) networking components.
+      This deployment launches the ovn-kubernetes control plane components.
     release.openshift.io/version: "{{.ReleaseVersion}}"
   labels:
     # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
     hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
 spec:
+  replicas: 3
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      app: ovnkube-master
-  serviceName: ovnkube-master-internal
-  volumeClaimTemplates:
+      app: ovnkube-control-plane
+  serviceName: ovnkube-control-plane-internal
   replicas: {{.OvnkubeMasterReplicas}}
   template:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
-        app: ovnkube-master
+        app: ovnkube-control-plane
         ovn-db-pod: "true"
         component: network
         type: infra
@@ -71,7 +71,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
               matchLabels:
-                app: ovnkube-master
+                app: ovnkube-control-plane
             topologyKey: topology.kubernetes.io/zone
         podAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -95,8 +95,8 @@ spec:
             Container start is blocked by postStart hooks. See https://github.com/kubernetes/kubernetes/issues/85966 for more details.
             The NB and SB DB postStart hooks block until the DBs join the RAFT cluster or until a timeout is reached.
             In a standalone cluster every pod is host networked and the DBs use host IP to communicate between the RAFT members.
-            In HyperShift OVN-Kubernetes master is run as a statefulset and the pods are not host networked, meaning we cannot rely on the podIP not changing.
-            To provide a stable network identity for each pod in the statefulset we use a headless service,
+            In HyperShift OVN-Kubernetes control-plane is run as a deployment and the pods are not host networked, meaning we cannot rely on the podIP not changing.
+            To provide a stable network identity for each pod in the daemonset we use a headless service,
              the downside of this approach is the DNS entry for the pod will only start to work after the pod has its Status.PodIP set.
 
             Until https://github.com/kubernetes/kubernetes/issues/85966 is fixed use a no-op init container as a workaround.
@@ -166,14 +166,13 @@ spec:
             multi_network_enabled_flag="--enable-multi-network"
           fi
 
-          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-master ${K8S_NODE}"
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --init-cluster-manager "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            #--metrics-bind-address "0.0.0.0:9102" \
             --metrics-bind-address "127.0.0.1:29104" \
             --metrics-enable-pprof \
             --metrics-enable-config-duration \

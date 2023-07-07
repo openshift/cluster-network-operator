@@ -113,7 +113,7 @@ func (status *StatusManager) SetFromPods() {
 			dsProgressing = true
 		}
 
-		// hack for 2-phase upgrade from non-IC to IC versions:
+		// hack for 2-phase upgrade from non-IC to IC ovnk:
 		// don't update the version field until phase 2 is over
 		twoPhaseUpgradeIsOngoing := false
 		icConfigMap, err := util.GetInterConnectConfigMap(status.client.ClientFor("").Kubernetes())

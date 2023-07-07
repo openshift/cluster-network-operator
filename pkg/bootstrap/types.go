@@ -59,6 +59,7 @@ type OVNUpdateStatus struct {
 	Name                 string
 	Version              string
 	IPFamilyMode         string
+	ClusterNetworkCIDRs  string
 	Progressing          bool
 	InterConnectZoneMode string
 }
@@ -66,6 +67,8 @@ type OVNUpdateStatus struct {
 type OVNBootstrapResult struct {
 	MasterAddresses  []string
 	ClusterInitiator string
+	// ControlPlaneUpdateStatus is the status of ovnkube-control-plane deployment (when hypershift is enabled)
+	ControlPlaneUpdateStatus *OVNUpdateStatus
 	// MasterUpdateStatus is the status of ovnkube-master daemonset or statefulset (when hypershift is enabled)
 	MasterUpdateStatus *OVNUpdateStatus
 	// NodeUpdateStatus is the status of ovnkube-node daemonset

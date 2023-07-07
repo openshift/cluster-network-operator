@@ -1,18 +1,19 @@
 # The ovnkube control-plane components
-kind: DaemonSet
+kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: ovnkube-master
+  name: ovnkube-control-plane
   namespace: openshift-ovn-kubernetes
   annotations:
     kubernetes.io/description: |
-      This daemonset launches the ovn-kubernetes controller (master) networking components.
+      This deployment launches the ovn-kubernetes controller (control-plane) networking components.
     release.openshift.io/version: "{{.ReleaseVersion}}"
 spec:
+  replicas: 3  
   selector:
     matchLabels:
-      app: ovnkube-master
-  updateStrategy:
+      app: ovnkube-control-plane
+  strategy:
     type: RollingUpdate
     rollingUpdate:
       # by default, Deployments spin up the new pod before terminating the old one
@@ -24,7 +25,7 @@ spec:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
-        app: ovnkube-master
+        app: ovnkube-control-plane
         ovn-db-pod: "true"
         component: network
         type: infra
@@ -61,9 +62,9 @@ spec:
           log_missing_certs(){
               CUR_TS=$(date +%s)
               if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
-                echo $(date -Iseconds) WARN: ovn-master-metrics-cert not mounted after 20 minutes.
+                echo $(date -Iseconds) WARN: ovn-control-plane-metrics-cert not mounted after 20 minutes.
               elif [[ "${HAS_LOGGED_INFO}" -eq 0 ]] ; then
-                echo $(date -Iseconds) INFO: ovn-master-metrics-cert not mounted. Waiting 20 minutes.
+                echo $(date -Iseconds) INFO: ovn-control-plane-metrics-cert not mounted. Waiting 20 minutes.
                 HAS_LOGGED_INFO=1
               fi
           }
@@ -72,7 +73,7 @@ spec:
             sleep 5
           done
 
-          echo $(date -Iseconds) INFO: ovn-master-metrics-certs mounted, starting kube-rbac-proxy
+          echo $(date -Iseconds) INFO: ovn-control-plane-metrics-certs mounted, starting kube-rbac-proxy
           exec /usr/bin/kube-rbac-proxy \
             --logtostderr \
             --secure-listen-address=:9106 \
@@ -89,11 +90,11 @@ spec:
             memory: 20Mi
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
-        - name: ovn-master-metrics-cert
+        - name: ovn-control-plane-metrics-cert
           mountPath: /etc/pki/tls/metrics-cert
           readOnly: True
 
-      # ovnkube master: convert kubernetes objects in to nbdb logical network components
+      # ovnkube control-plane: convert kubernetes objects in to nbdb logical network components
       - name: ovnkube-control-plane
         image: "{{.OvnImage}}"
         command:
@@ -121,7 +122,7 @@ spec:
             multi_network_enabled_flag="--enable-multi-network"
           fi
 
-          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-master ${K8S_NODE}"
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-control-plane ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --init-cluster-manager "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
@@ -207,9 +208,9 @@ spec:
       - name: ovn-cert
         secret:
           secretName: ovn-cert
-      - name: ovn-master-metrics-cert
+      - name: ovn-control-plane-metrics-cert
         secret:
-          secretName: ovn-master-metrics-cert
+          secretName: ovn-control-plane-metrics-cert
           optional: true
       tolerations:
       - key: "node-role.kubernetes.io/master"
