@@ -95,7 +95,6 @@ type ConsoleCustomization struct {
 	// providing the brand field.  There is a limited set of specific brand options.
 	// This field controls elements of the console such as the logo.
 	// Invalid value will prevent a console rollout.
-	// +kubebuilder:validation:Enum:=openshift;okd;online;ocp;dedicated;azure;OpenShift;OKD;Online;OCP;Dedicated;Azure;ROSA
 	Brand Brand `json:"brand,omitempty"`
 	// documentationBaseURL links to external documentation are shown in various sections
 	// of the web console.  Providing documentationBaseURL will override the default
@@ -339,35 +338,22 @@ type PinnedResourceReference struct {
 }
 
 // Brand is a specific supported brand within the console.
+// +kubebuilder:validation:Pattern=`^$|^(ocp|origin|okd|dedicated|online|azure)$`
 type Brand string
 
 const (
-	// Legacy branding for OpenShift
-	BrandOpenShiftLegacy Brand = "openshift"
-	// Legacy branding for The Origin Community Distribution of Kubernetes
-	BrandOKDLegacy Brand = "okd"
-	// Legacy branding for OpenShift Online
-	BrandOnlineLegacy Brand = "online"
-	// Legacy branding for OpenShift Container Platform
-	BrandOCPLegacy Brand = "ocp"
-	// Legacy branding for OpenShift Dedicated
-	BrandDedicatedLegacy Brand = "dedicated"
-	// Legacy branding for Azure Red Hat OpenShift
-	BrandAzureLegacy Brand = "azure"
 	// Branding for OpenShift
-	BrandOpenShift Brand = "OpenShift"
+	BrandOpenShift Brand = "openshift"
 	// Branding for The Origin Community Distribution of Kubernetes
-	BrandOKD Brand = "OKD"
+	BrandOKD Brand = "okd"
 	// Branding for OpenShift Online
-	BrandOnline Brand = "Online"
+	BrandOnline Brand = "online"
 	// Branding for OpenShift Container Platform
-	BrandOCP Brand = "OCP"
+	BrandOCP Brand = "ocp"
 	// Branding for OpenShift Dedicated
-	BrandDedicated Brand = "Dedicated"
+	BrandDedicated Brand = "dedicated"
 	// Branding for Azure Red Hat OpenShift
-	BrandAzure Brand = "Azure"
-	// Branding for Red Hat OpenShift Service on AWS
-	BrandROSA Brand = "ROSA"
+	BrandAzure Brand = "azure"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
