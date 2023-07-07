@@ -32,7 +32,7 @@ spec:
         openshift.io/component: network
         kubernetes.io/os: "linux"
     spec:
-      serviceAccountName: ovn-kubernetes-controller
+      serviceAccountName: ovn-kubernetes-control-plane
       hostNetwork: true
       dnsPolicy: Default
       priorityClassName: "system-cluster-critical"
