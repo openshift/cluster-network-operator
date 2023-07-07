@@ -52,15 +52,15 @@ spec:
         description: |
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
           implemented while there are no OVN Kubernetes pods.
-      expr: |
-        absent(up{job="ovnkube-controller", namespace="openshift-ovn-kubernetes"} == 1)
+      expr: | #should we be checking for ovn-controller or ovnkube-controller?
+        absent(up{container="ovnkube-controller", namespace="openshift-ovn-kubernetes"} == 1) # 
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
         severity: critical
     - alert: NoOvnClusterManager
       annotations:
-        summary: There is no ovn-kubernetes master leader.
+        summary: There is no ovn-kubernetes Cluster Manager leader.
         runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoOvnMasterLeader.md #TODO: Update runbook
         description: |
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
@@ -69,14 +69,14 @@ spec:
       expr: |
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        max by (namespace) (max_over_time(ovnkube_cluster_manager[5m])) == 0
+        max by (namespace) (max_over_time(ovnkube_clustermanager[5m])) == 0
       for: 5m
       labels:
         severity: critical
     # OVN northbound and southbound databases functional alerts
-    - alert: NorthboundStale
+    - alert: NorthboundStaleOnNode
       annotations:
-        summary: ovn-kubernetes has not written anything to the northbound database for too long.
+        summary: ovn-kubernetes has not written anything to the northbound database on a node for too long.
         runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NorthboundStaleAlert.md
         description: |
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
@@ -85,11 +85,11 @@ spec:
       expr: |
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        time() - max_over_time(ovnkube_master_nb_e2e_timestamp[5m]) > 120
+        time() - max_over_time(ovnkube_controller_nb_e2e_timestamp[5m]) > 120
       for: 10m
       labels:
-        severity: critical
-    - alert: SouthboundStale
+        severity: critical #todo: Determine severity here as this is not as big a deal anymore
+    - alert: SouthboundStaleOnNode
       annotations:
         summary: ovn-northd has not successfully synced any changes to the southbound DB for too long.
         runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/SouthboundStaleAlert.md
@@ -100,7 +100,7 @@ spec:
       expr: |
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        max_over_time(ovnkube_master_nb_e2e_timestamp[5m]) - max_over_time(ovnkube_master_sb_e2e_timestamp[5m]) > 120
+        max_over_time(ovnkube_controller_nb_e2e_timestamp[5m]) - max_over_time(ovnkube_controller_sb_e2e_timestamp[5m]) > 120
       for: 10m
       labels:
         severity: critical
