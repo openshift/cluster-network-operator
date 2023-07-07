@@ -190,3 +190,6 @@ const ManagementClusterName = "management"
 
 // DefaultClusterName provides the name of the default cluster, for use with Hypershift (or non-Hypershift)
 const DefaultClusterName = "default"
+
+// DashboardNamespace is the namespace where dashboards are created
+const DashboardNamespace = "openshift-config-managed"
