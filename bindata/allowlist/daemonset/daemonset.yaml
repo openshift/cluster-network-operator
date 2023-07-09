@@ -12,6 +12,8 @@ spec:
     metadata:
       labels:
         app: cni-sysctl-allowlist-ds
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
     spec:
       containers:
         - name: kube-multus-additional-cni-plugins
