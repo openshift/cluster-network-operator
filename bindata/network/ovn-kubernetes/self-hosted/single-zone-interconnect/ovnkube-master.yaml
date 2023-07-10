@@ -878,6 +878,7 @@ spec:
             --nb-cert-common-name "{{.OVN_CERT_CN}}" \
             --enable-multicast \
             --disable-snat-multiple-gws \
+            --enable-multi-external-gateway \
             ${multi_network_enabled_flag} \
             ${multi_network_policy_enabled_flag} \
             --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"

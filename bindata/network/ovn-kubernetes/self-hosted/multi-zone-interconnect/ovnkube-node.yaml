@@ -660,6 +660,7 @@ spec:
             --metrics-enable-config-duration \
             ${gateway_mode_flags} \
             --disable-snat-multiple-gws \
+            --enable-multi-external-gateway \
             ${multi_network_enabled_flag} \
             ${multi_network_policy_enabled_flag} \
             --enable-multicast \
@@ -790,6 +791,7 @@ spec:
             --metrics-enable-pprof \
             --export-ovs-metrics \
             --disable-snat-multiple-gws \
+            --enable-multi-external-gateway \
             ${export_network_flows_flags} \
             ${multi_network_enabled_flag} \
             ${multi_network_policy_enabled_flag} \

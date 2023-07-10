@@ -373,6 +373,7 @@ spec:
             --sb-address "" \
             --enable-multicast \
             --disable-snat-multiple-gws \
+            --enable-multi-external-gateway \
             --acl-logging-rate-limit "20"
         lifecycle:
           preStop:

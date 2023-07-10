@@ -133,6 +133,7 @@ spec:
             ${gateway_mode_flags} \
             --enable-multicast \
             --disable-snat-multiple-gws \
+            --enable-multi-external-gateway \
             ${multi_network_enabled_flag} \
             --enable-interconnect \
             --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
