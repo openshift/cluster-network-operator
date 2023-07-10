@@ -146,10 +146,8 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	script, err := findNBDBPostStart(objs)
+	err = checkNBDBPostStart(objs)
 	g.Expect(err).NotTo(HaveOccurred())
-
-	g.Expect(script).To(ContainSubstring("pssl:9641"))
 
 	bootstrapResult = fakeBootstrapResult()
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
@@ -167,10 +165,8 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	script, err = findNBDBPostStart(objs)
+	err = checkNBDBPostStart(objs)
 	g.Expect(err).NotTo(HaveOccurred())
-
-	g.Expect(script).To(ContainSubstring("pssl:9641:[::]"))
 }
 
 func TestRenderedOVNKubernetesConfig(t *testing.T) {
@@ -738,46 +734,72 @@ nodeport=true`,
 
 }
 
-func findNBDBPostStart(objects []*uns.Unstructured) (string, error) {
-	var master *uns.Unstructured
+func checkNBDBPostStart(objects []*uns.Unstructured) error {
+	var dss []*uns.Unstructured
+	masters := 0
 	for _, obj := range objects {
-		if obj.GetKind() == "DaemonSet" && obj.GetNamespace() == "openshift-ovn-kubernetes" && obj.GetName() == "ovnkube-master" {
-			master = obj
-			break
+		if obj.GetKind() == "DaemonSet" && obj.GetNamespace() == "openshift-ovn-kubernetes" {
+			if obj.GetName() == "ovnkube-master" {
+				masters++
+			} else if obj.GetName() != "ovnkube-node" {
+				continue
+			}
+			dss = append(dss, obj)
 		}
 	}
-	if master == nil {
-		return "", fmt.Errorf("could not find DaemonSet openshift-ovn-kubernetes/ovnkube-master")
+	if masters == 0 {
+		return fmt.Errorf("could not find master DaemonSet")
+	}
+	if len(dss) <= 1 {
+		return fmt.Errorf("could not find enough DaemonSets")
 	}
 
-	containers, found, err := uns.NestedSlice(master.Object, "spec", "template", "spec", "containers")
-	if err != nil {
-		return "", err
-	} else if !found {
-		return "", fmt.Errorf("could not find containers in DaemonSet ovnkube-master")
-	}
+	for _, ds := range dss {
 
-	var nbdb map[string]interface{}
-	for _, container := range containers {
-		cmap := container.(map[string]interface{})
-		name, found, err := uns.NestedString(cmap, "name")
-		if found && err == nil && name == "nbdb" {
-			nbdb = cmap
-			break
+		containers, found, err := uns.NestedSlice(ds.Object, "spec", "template", "spec", "containers")
+		if err != nil {
+			return fmt.Errorf("failed to get containers from daemonset %s : %w", ds.GetName(), err)
+		}
+		if !found {
+			return fmt.Errorf("unable to find containers in daemonset %s : %w", ds.GetName(), err)
+		}
+
+		var nbdb map[string]interface{}
+		for _, container := range containers {
+			cmap := container.(map[string]interface{})
+			name, found, err := uns.NestedString(cmap, "name")
+			if found && err == nil && name == "nbdb" {
+				nbdb = cmap
+				break
+			}
+		}
+		if ds.GetName() == "ovnkube-master" {
+			if nbdb != nil {
+				return fmt.Errorf("daemonSet openshift-ovn-kubernetes/ovnkube-master is not expected to have nbdb container")
+			}
+			continue
+		}
+
+		// Check ndbd node containers to have expected script
+		if nbdb == nil {
+			return fmt.Errorf("daemonSet openshift-ovn-kubernetes/ovnkube-node is expected to have nbdb container")
+		}
+
+		script, found, err := uns.NestedStringSlice(nbdb, "lifecycle", "postStart", "exec", "command")
+		if err != nil {
+			return fmt.Errorf("unable to get postStart in daemonset %s : %w", ds.GetName(), err)
+		}
+		if !found {
+			return fmt.Errorf("could not find nbdb postStart script in daemonset %s", ds.GetName())
+		}
+
+		expectedScriptSubStr := "Successfully set northd probe interval"
+		if !strings.Contains(strings.Join(script, " "), expectedScriptSubStr) {
+			return fmt.Errorf("postStart script in daemonset %s does not contain %s: %s", ds.GetName(), expectedScriptSubStr, script)
 		}
 	}
-	if nbdb == nil {
-		return "", fmt.Errorf("could not find nbdb container in DaemonSet ovnkube-master")
-	}
 
-	script, found, err := uns.NestedStringSlice(nbdb, "lifecycle", "postStart", "exec", "command")
-	if err != nil {
-		return "", err
-	} else if !found {
-		return "", fmt.Errorf("could not find nbdb postStart script")
-	}
-
-	return strings.Join(script, " "), nil
+	return nil
 }
 
 func TestFillOVNKubernetesDefaults(t *testing.T) {
@@ -1732,8 +1754,8 @@ metadata:
 
 			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 			_, preserveNode := renderedNode.GetAnnotations()[names.CreateOnlyAnnotation]
-			renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-control-plane", "openshift-ovn-kubernetes", objs)
-			_, preserveMaster := renderedMaster.GetAnnotations()[names.CreateOnlyAnnotation] // TODO panic here
+			renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-master", "openshift-ovn-kubernetes", objs)
+			_, preserveMaster := renderedMaster.GetAnnotations()[names.CreateOnlyAnnotation]
 			renderedPrePuller := findInObjs("apps", "DaemonSet", "ovnkube-upgrades-prepuller", "openshift-ovn-kubernetes", objs)
 
 			// if we expect a node update, the original node and the rendered one must be different
@@ -2045,7 +2067,7 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
-	renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-control-plane", "openshift-ovn-kubernetes", objs)
+	renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-master", "openshift-ovn-kubernetes", objs)
 
 	// the node has to be the same
 	if _, ok := renderedNode.GetAnnotations()[names.CreateOnlyAnnotation]; !ok {
