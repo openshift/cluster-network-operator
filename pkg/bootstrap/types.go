@@ -54,12 +54,13 @@ type OVNConfigBoostrapResult struct {
 // OVNUpdateStatus contains the status of existing daemonset
 // or statefulset that are maily used by upgrade process
 type OVNUpdateStatus struct {
-	Kind         string
-	Namespace    string
-	Name         string
-	Version      string
-	IPFamilyMode string
-	Progressing  bool
+	Kind                 string
+	Namespace            string
+	Name                 string
+	Version              string
+	IPFamilyMode         string
+	Progressing          bool
+	InterConnectZoneMode string
 }
 
 type OVNBootstrapResult struct {
