@@ -6,6 +6,9 @@ metadata:
   namespace: {{.AdmissionControllerNamespace}}
   labels:
     app: multus-admission-controller
+{{- if .HyperShiftEnabled}}
+    hypershift.openshift.io/allow-guest-webhooks: "true"
+{{- end }}
   annotations:
 {{- if .HyperShiftEnabled}}
     network.operator.openshift.io/cluster-name: {{.ManagementClusterName}}
