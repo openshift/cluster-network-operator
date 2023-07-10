@@ -85,12 +85,12 @@ func TestRenderOVNKubernetes(t *testing.T) {
 			},
 		},
 	}
-	fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+	fakeClient := cnofake.NewFakeClient()
 
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-master")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-ovn-kubernetes", "ovnkube-control-plane")))
 
 	// It's important that the namespace is first
 	g.Expect(objs[0]).To(HaveKubernetesID("Namespace", "", "openshift-ovn-kubernetes"))
@@ -99,7 +99,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-ovn-kubernetes", "ovn-kubernetes-node")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-ovn-kubernetes", "ovn-kubernetes-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "openshift-ovn-kubernetes-node")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-master")))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-ovn-kubernetes", "ovnkube-control-plane")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ConfigMap", "openshift-ovn-kubernetes", "ovnkube-config")))
 
@@ -142,14 +142,12 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 			},
 		},
 	}
-	fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+	fakeClient := cnofake.NewFakeClient()
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	script, err := findNBDBPostStart(objs)
+	err = checkNBDBPostStart(objs)
 	g.Expect(err).NotTo(HaveOccurred())
-
-	g.Expect(script).To(ContainSubstring("pssl:9641"))
 
 	bootstrapResult = fakeBootstrapResult()
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
@@ -167,10 +165,8 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	script, err = findNBDBPostStart(objs)
+	err = checkNBDBPostStart(objs)
 	g.Expect(err).NotTo(HaveOccurred())
-
-	g.Expect(script).To(ContainSubstring("pssl:9641:[::]"))
 }
 
 func TestRenderedOVNKubernetesConfig(t *testing.T) {
@@ -701,7 +697,7 @@ nodeport=true`,
 					DisableUDPAggregation: tc.disableGRO,
 				},
 			}
-			fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+			fakeClient := cnofake.NewFakeClient()
 			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 			g.Expect(err).NotTo(HaveOccurred())
 			confFile := extractOVNKubeConfig(g, objs)
@@ -714,46 +710,69 @@ nodeport=true`,
 
 }
 
-func findNBDBPostStart(objects []*uns.Unstructured) (string, error) {
-	var master *uns.Unstructured
+func checkNBDBPostStart(objects []*uns.Unstructured) error {
+	var dss []*uns.Unstructured
+	controlPlanes := 0
 	for _, obj := range objects {
-		if obj.GetKind() == "DaemonSet" && obj.GetNamespace() == "openshift-ovn-kubernetes" && obj.GetName() == "ovnkube-master" {
-			master = obj
-			break
+		if obj.GetKind() == "Deployment" && obj.GetNamespace() == "openshift-ovn-kubernetes" {
+			if obj.GetName() == "ovnkube-control-plane" {
+				controlPlanes++
+			} else if obj.GetName() != "ovnkube-node" {
+				continue
+			}
+			dss = append(dss, obj)
 		}
 	}
-	if master == nil {
-		return "", fmt.Errorf("could not find DaemonSet openshift-ovn-kubernetes/ovnkube-master")
+	if controlPlanes == 0 {
+		return fmt.Errorf("could not find control-plane Deployment")
 	}
 
-	containers, found, err := uns.NestedSlice(master.Object, "spec", "template", "spec", "containers")
-	if err != nil {
-		return "", err
-	} else if !found {
-		return "", fmt.Errorf("could not find containers in DaemonSet ovnkube-master")
-	}
+	for _, ds := range dss {
 
-	var nbdb map[string]interface{}
-	for _, container := range containers {
-		cmap := container.(map[string]interface{})
-		name, found, err := uns.NestedString(cmap, "name")
-		if found && err == nil && name == "nbdb" {
-			nbdb = cmap
-			break
+		containers, found, err := uns.NestedSlice(ds.Object, "spec", "template", "spec", "containers")
+		if err != nil {
+			return fmt.Errorf("failed to get containers from daemonset %s : %w", ds.GetName(), err)
+		}
+		if !found {
+			return fmt.Errorf("unable to find containers in daemonset %s : %w", ds.GetName(), err)
+		}
+
+		var nbdb map[string]interface{}
+		for _, container := range containers {
+			cmap := container.(map[string]interface{})
+			name, found, err := uns.NestedString(cmap, "name")
+			if found && err == nil && name == "nbdb" {
+				nbdb = cmap
+				break
+			}
+		}
+		if ds.GetName() == "ovnkube-control-plane" {
+			if nbdb != nil {
+				return fmt.Errorf("deployment openshift-ovn-kubernetes/ovnkube-control-plane is not expected to have nbdb container")
+			}
+			continue
+		}
+
+		// Check ndbd node containers to have expected script
+		if nbdb == nil {
+			return fmt.Errorf("daemonSet openshift-ovn-kubernetes/ovnkube-node is expected to have nbdb container")
+		}
+
+		script, found, err := uns.NestedStringSlice(nbdb, "lifecycle", "postStart", "exec", "command")
+		if err != nil {
+			return fmt.Errorf("unable to get postStart in daemonset %s : %w", ds.GetName(), err)
+		}
+		if !found {
+			return fmt.Errorf("could not find nbdb postStart script in daemonset %s", ds.GetName())
+		}
+
+		expectedScriptSubStr := "Successfully set northd probe interval"
+		if !strings.Contains(strings.Join(script, " "), expectedScriptSubStr) {
+			return fmt.Errorf("postStart script in daemonset %s does not contain %s: %s", ds.GetName(), expectedScriptSubStr, script)
 		}
 	}
-	if nbdb == nil {
-		return "", fmt.Errorf("could not find nbdb container in DaemonSet ovnkube-master")
-	}
 
-	script, found, err := uns.NestedStringSlice(nbdb, "lifecycle", "postStart", "exec", "command")
-	if err != nil {
-		return "", err
-	} else if !found {
-		return "", fmt.Errorf("could not find nbdb postStart script")
-	}
-
-	return strings.Join(script, " "), nil
+	return nil
 }
 
 func TestFillOVNKubernetesDefaults(t *testing.T) {
@@ -1078,34 +1097,34 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 func TestOVNKubernetestShouldUpdateMasterOnUpgrade(t *testing.T) {
 
 	for idx, tc := range []struct {
-		expectNode    bool // true if node changed
-		expectMaster  bool // true if master changed
-		expectPrePull bool // true if pre-puller rendered
-		node          string
-		master        string
-		prepull       string // a (maybe) existing pre-puller daemonset
-		rv            string // release version
+		expectNode         bool // true if node changed
+		expectControlPlane bool // true if master changed
+		expectPrePull      bool // true if pre-puller rendered
+		node               string
+		controlPlane       string
+		prepull            string // a (maybe) existing pre-puller daemonset
+		rv                 string // release version
 	}{
 
-		// No node, prepuller and master - upgrade = true and config the same
+		// No node, prepuller and controlPlane - upgrade = true and config the same
 		{
-			expectNode:    true,
-			expectMaster:  true,
-			expectPrePull: false,
+			expectNode:         true,
+			expectControlPlane: true,
+			expectPrePull:      false,
 			node: `
 apiVersion: apps/v1
 kind: DaemonSet
 `,
-			master: `
+			controlPlane: `
 apiVersion: apps/v1
 kind: DaemonSet
 `,
 		},
 		// PrePuller has to pull image before node can upgrade
 		{
-			expectNode:    false,
-			expectMaster:  true,
-			expectPrePull: true,
+			expectNode:         false,
+			expectControlPlane: true,
+			expectPrePull:      true,
 			node: `
 apiVersion: apps/v1
 kind: DaemonSet
@@ -1115,28 +1134,28 @@ metadata:
   namespace: openshift-ovn-kubernetes
   name: ovnkube-node
 `,
-			master: `
+			controlPlane: `
 apiVersion: apps/v1
 kind: DaemonSet
 `,
 		},
 
 		{
-			expectNode:   true,
-			expectMaster: true,
+			expectNode:         true,
+			expectControlPlane: true,
 			// Note: For reducing testing complexity, prepuller is set to false
 			// because it hits the condition where the node's version (null) is same
 			// as release version (null). In reality if node's version is different
 			// from expected, prePull will be true.
 			expectPrePull: false,
-			master: `
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 4.7.0-0.ci-2021-01-10-200841
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
 `,
 			node: `
 apiVersion: apps/v1
@@ -1146,18 +1165,18 @@ kind: DaemonSet
 
 		// steady state, no prepuller
 		{
-			expectNode:    true,
-			expectMaster:  true,
-			expectPrePull: false,
-			rv:            "2.0.0",
-			master: `
+			expectNode:         true,
+			expectControlPlane: true,
+			expectPrePull:      false,
+			rv:                 "2.0.0",
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 2.0.0
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
 `,
 			node: `
 apiVersion: apps/v1
@@ -1172,18 +1191,18 @@ name: ovnkube-node
 
 		// upgrade not yet applied, expecting prepuller to get created
 		{
-			expectNode:    false,
-			expectMaster:  false,
-			expectPrePull: true,
-			rv:            "2.0.0",
-			master: `
+			expectNode:         false,
+			expectControlPlane: false,
+			expectPrePull:      true,
+			rv:                 "2.0.0",
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 1.9.9
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
 `,
 			node: `
 apiVersion: apps/v1
@@ -1198,18 +1217,18 @@ metadata:
 
 		// upgrade not yet applied, prepuller rolling out
 		{
-			expectNode:    false,
-			expectMaster:  false,
-			expectPrePull: true,
-			rv:            "2.0.0",
-			master: `
+			expectNode:         false,
+			expectControlPlane: false,
+			expectPrePull:      true,
+			rv:                 "2.0.0",
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 1.9.9
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
 `,
 			node: `
 apiVersion: apps/v1
@@ -1242,18 +1261,18 @@ status:
 
 		// upgrade not yet applied, prepuller having wrong image version
 		{
-			expectNode:    false,
-			expectMaster:  false,
-			expectPrePull: true,
-			rv:            "2.0.0",
-			master: `
+			expectNode:         false,
+			expectControlPlane: false,
+			expectPrePull:      true,
+			rv:                 "2.0.0",
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 1.9.9
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
 `,
 			node: `
 apiVersion: apps/v1
@@ -1277,18 +1296,18 @@ metadata:
 
 		// node upgrade applied, upgrade not yet rolled out, prepuller has done its work.
 		{
-			expectNode:    true,
-			expectMaster:  false,
-			expectPrePull: false,
-			rv:            "2.0.0",
-			master: `
+			expectNode:         true,
+			expectControlPlane: false,
+			expectPrePull:      false,
+			rv:                 "2.0.0",
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 1.9.9
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
 `,
 			node: `
 apiVersion: apps/v1
@@ -1312,19 +1331,19 @@ status:
 
 		// node upgrade rolling out
 		{
-			expectNode:    true,
-			expectMaster:  false,
-			expectPrePull: false,
+			expectNode:         true,
+			expectControlPlane: false,
+			expectPrePull:      false,
 
 			rv: "2.0.0",
-			master: `
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 1.9.9
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
 `,
 			node: `
 apiVersion: apps/v1
@@ -1340,7 +1359,6 @@ status:
   desiredNumberScheduled: 6
   numberAvailable: 5
   numberUnavailable: 1
-  numberMisscheduled: 0
   numberReady: 5
   observedGeneration: 2
   updatedNumberScheduled: 5
@@ -1349,18 +1367,18 @@ status:
 
 		// node upgrade hung but not made progress
 		{
-			expectNode:    true,
-			expectMaster:  false,
-			expectPrePull: false,
-			rv:            "2.0.0",
-			master: `
+			expectNode:         true,
+			expectControlPlane: false,
+			expectPrePull:      false,
+			rv:                 "2.0.0",
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 1.9.9
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
 `,
 			node: `
 apiVersion: apps/v1
@@ -1386,18 +1404,18 @@ status:
 
 		// node upgrade hung but made enough progress
 		{
-			expectNode:    true,
-			expectMaster:  true,
-			expectPrePull: false,
-			rv:            "2.0.0",
-			master: `
+			expectNode:         true,
+			expectControlPlane: true,
+			expectPrePull:      false,
+			rv:                 "2.0.0",
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 1.9.9
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
 `,
 			node: `
 apiVersion: apps/v1
@@ -1423,18 +1441,18 @@ status:
 
 		// Upgrade rolled out, everything is good
 		{
-			expectNode:    true,
-			expectMaster:  true,
-			expectPrePull: false,
-			rv:            "2.0.0",
-			master: `
+			expectNode:         true,
+			expectControlPlane: true,
+			expectPrePull:      false,
+			rv:                 "2.0.0",
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 1.9.9
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
 `,
 			node: `
 apiVersion: apps/v1
@@ -1458,18 +1476,18 @@ status:
 
 		// downgrade not yet applied
 		{
-			expectNode:    false,
-			expectMaster:  true,
-			expectPrePull: false,
-			rv:            "1.8.9",
-			master: `
+			expectNode:         false,
+			expectControlPlane: true,
+			expectPrePull:      false,
+			rv:                 "1.8.9",
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 1.9.9
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
 `,
 			node: `
 apiVersion: apps/v1
@@ -1482,29 +1500,28 @@ metadata:
 `,
 		},
 
-		// master downgrade applied, not yet rolled out
+		// controlPlane downgrade applied, not yet rolled out
 		{
-			expectNode:    false,
-			expectMaster:  true,
-			expectPrePull: false,
-			rv:            "1.8.9",
-			master: `
+			expectNode:         false,
+			expectControlPlane: true,
+			expectPrePull:      false,
+			rv:                 "1.8.9",
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 1.8.9
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
   generation: 2
 status:
-  currentNumberScheduled: 6
-  desiredNumberScheduled: 6
-  numberAvailable: 6
-  numberMisscheduled: 0
-  numberReady: 6
+  availableReplicas: 6
   observedGeneration: 1
-  updatedNumberScheduled: 6
+  readyReplicas: 6
+  replicas: 6
+  unavailableReplicas: 0
+  updatedReplicas: 6
 `,
 			node: `
 apiVersion: apps/v1
@@ -1519,28 +1536,26 @@ metadata:
 
 		// downgrade rolling out
 		{
-			expectNode:    false,
-			expectMaster:  true,
-			expectPrePull: false,
-			rv:            "1.8.9",
-			master: `
+			expectNode:         false,
+			expectControlPlane: true,
+			expectPrePull:      false,
+			rv:                 "1.8.9",
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 1.8.9
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
   generation: 2
 status:
-  currentNumberScheduled: 6
-  desiredNumberScheduled: 6
-  numberAvailable: 5
-  numberUnavailable: 1
-  numberMisscheduled: 0
-  numberReady: 5
+  availableReplicas: 5
   observedGeneration: 2
-  updatedNumberScheduled:
+  readyReplicas: 5
+  replicas: 6
+  unavailableReplicas: 1
+  updatedReplicas:
 `,
 			node: `
 apiVersion: apps/v1
@@ -1555,29 +1570,27 @@ metadata:
 
 		// downgrade hung but not made progress
 		{
-			expectNode:    false,
-			expectMaster:  true,
-			expectPrePull: false,
-			rv:            "1.8.9",
-			master: `
+			expectNode:         false,
+			expectControlPlane: true,
+			expectPrePull:      false,
+			rv:                 "1.8.9",
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 1.8.9
     networkoperator.openshift.io/rollout-hung: ""
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
   generation: 2
 status:
-  currentNumberScheduled: 3
-  desiredNumberScheduled: 3
-  numberAvailable: 2
-  numberUnavailable: 1
-  numberMisscheduled: 0
-  numberReady: 2
+  availableReplicas: 2
   observedGeneration: 2
-  updatedNumberScheduled: 1
+  readyReplicas: 2
+  replicas: 3
+  unavailableReplicas: 1
+  updatedReplicas: 1
 `,
 			node: `
 apiVersion: apps/v1
@@ -1591,31 +1604,29 @@ metadata:
 		},
 
 		// downgrade hung but made enough progress
-		// except we always wait for 100% master.
+		// except we always wait for 100% controlPlane.
 		{
-			expectNode:    false,
-			expectMaster:  true,
-			expectPrePull: false,
-			rv:            "1.8.9",
-			master: `
+			expectNode:         false,
+			expectControlPlane: true,
+			expectPrePull:      false,
+			rv:                 "1.8.9",
+			controlPlane: `
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   annotations:
     release.openshift.io/version: 1.8.9
     networkoperator.openshift.io/rollout-hung: ""
   namespace: openshift-ovn-kubernetes
-  name: ovnkube-master
+  name: ovnkube-control-plane
   generation: 2
 status:
-  currentNumberScheduled: 3
-  desiredNumberScheduled: 3
-  numberAvailable: 2
-  numberUnavailable: 1
-  numberMisscheduled: 0
-  numberReady: 2
+  availableReplicas: 2
   observedGeneration: 2
-  updatedNumberScheduled: 3
+  readyReplicas: 2
+  replicas: 3
+  unavailableReplicas: 1
+  updatedReplicas: 3
 `,
 			node: `
 apiVersion: apps/v1
@@ -1632,10 +1643,10 @@ metadata:
 			g := NewGomegaWithT(t)
 
 			var node *appsv1.DaemonSet
-			var master *appsv1.DaemonSet
+			var controlPlane *appsv1.Deployment
 			var prepuller *appsv1.DaemonSet
 			nodeStatus := &bootstrap.OVNUpdateStatus{}
-			masterStatus := &bootstrap.OVNUpdateStatus{}
+			controlPlaneStatus := &bootstrap.OVNUpdateStatus{}
 			prepullerStatus := &bootstrap.OVNUpdateStatus{}
 			crd := OVNKubernetesConfig.DeepCopy()
 			config := &crd.Spec
@@ -1657,17 +1668,17 @@ metadata:
 			nodeStatus.Version = node.GetAnnotations()["release.openshift.io/version"]
 			nodeStatus.Progressing = daemonSetProgressing(node, true)
 
-			master = &appsv1.DaemonSet{}
-			err = yaml.Unmarshal([]byte(tc.master), master)
+			controlPlane = &appsv1.Deployment{}
+			err = yaml.Unmarshal([]byte(tc.controlPlane), controlPlane)
 			if err != nil {
 				t.Fatal(err)
 			}
-			masterStatus.Kind = master.Kind
-			masterStatus.Namespace = master.Namespace
-			masterStatus.Name = master.Name
-			masterStatus.IPFamilyMode = master.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
-			masterStatus.Version = master.GetAnnotations()["release.openshift.io/version"]
-			masterStatus.Progressing = daemonSetProgressing(master, false)
+			controlPlaneStatus.Kind = controlPlane.Kind
+			controlPlaneStatus.Namespace = controlPlane.Namespace
+			controlPlaneStatus.Name = controlPlane.Name
+			controlPlaneStatus.IPFamilyMode = controlPlane.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+			controlPlaneStatus.Version = controlPlane.GetAnnotations()["release.openshift.io/version"]
+			controlPlaneStatus.Progressing = deploymentProgressing(controlPlane)
 
 			if tc.prepull != "" {
 				prepuller = &appsv1.DaemonSet{}
@@ -1687,9 +1698,9 @@ metadata:
 
 			bootstrapResult := fakeBootstrapResult()
 			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
-				MasterAddresses:    []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
-				MasterUpdateStatus: masterStatus,
-				NodeUpdateStatus:   nodeStatus,
+				MasterAddresses:          []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+				ControlPlaneUpdateStatus: controlPlaneStatus,
+				NodeUpdateStatus:         nodeStatus,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 					DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
 					DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
@@ -1702,20 +1713,20 @@ metadata:
 				PrePullerUpdateStatus: prepullerStatus,
 			}
 
-			fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+			fakeClient := cnofake.NewFakeClient()
 			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 			_, preserveNode := renderedNode.GetAnnotations()[names.CreateOnlyAnnotation]
-			renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-control-plane", "openshift-ovn-kubernetes", objs)
-			_, preserveMaster := renderedMaster.GetAnnotations()[names.CreateOnlyAnnotation] // TODO panic here
+			renderedControlPlane := findInObjs("apps", "Deployment", "ovnkube-control-plane", "openshift-ovn-kubernetes", objs)
+			_, preserveControlPlane := renderedControlPlane.GetAnnotations()[names.CreateOnlyAnnotation]
 			renderedPrePuller := findInObjs("apps", "DaemonSet", "ovnkube-upgrades-prepuller", "openshift-ovn-kubernetes", objs)
 
 			// if we expect a node update, the original node and the rendered one must be different
 			g.Expect(tc.expectNode).To(Equal(!preserveNode), "Check node rendering")
-			// if we expect a master update, the original master and the rendered one must be different
-			g.Expect(tc.expectMaster).To(Equal(!preserveMaster), "Check master rendering")
+			// if we expect a controlPlane update, the original controlPlane and the rendered one must be different
+			g.Expect(tc.expectControlPlane).To(Equal(!preserveControlPlane), "Check controlPlane rendering")
 			// if we expect a prepuller update, the original prepuller and the rendered one must be different
 			g.Expect(tc.expectPrePull).To(Equal(renderedPrePuller != nil), "Check prepuller rendering")
 
@@ -1724,8 +1735,8 @@ metadata:
 				checkDaemonSetImagePullPolicy(g, renderedPrePuller)
 			}
 
-			updateNode, updateMaster := shouldUpdateOVNKonUpgrade(bootstrapResult.OVN, masterStatus, tc.rv)
-			g.Expect(updateMaster).To(Equal(tc.expectMaster), "Check master")
+			updateNode, updateControlPlane := shouldUpdateOVNKonUpgrade(bootstrapResult.OVN, controlPlaneStatus, tc.rv)
+			g.Expect(updateControlPlane).To(Equal(tc.expectControlPlane), "Check controlPlane")
 			if updateNode {
 				var updatePrePuller bool
 				updateNode, updatePrePuller = shouldUpdateOVNKonPrepull(bootstrapResult.OVN, tc.rv)
@@ -1739,28 +1750,28 @@ metadata:
 func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
 
 	for _, tc := range []struct {
-		name         string
-		node         *appsv1.DaemonSet
-		master       *appsv1.DaemonSet
-		ipFamilyMode string
-		expectNode   bool
-		expectMaster bool
+		name               string
+		node               *appsv1.DaemonSet
+		controlPlane       *appsv1.Deployment
+		ipFamilyMode       string
+		expectNode         bool
+		expectControlPlane bool
 	}{
 		{
-			name:         "all empty",
-			node:         &appsv1.DaemonSet{},
-			master:       &appsv1.DaemonSet{},
-			expectNode:   true,
-			expectMaster: true,
-			ipFamilyMode: names.IPFamilySingleStack,
+			name:               "all empty",
+			node:               &appsv1.DaemonSet{},
+			controlPlane:       &appsv1.Deployment{},
+			expectNode:         true,
+			expectControlPlane: true,
+			ipFamilyMode:       names.IPFamilySingleStack,
 		},
 		{
-			name:         "fresh cluster",
-			node:         &appsv1.DaemonSet{},
-			master:       &appsv1.DaemonSet{},
-			expectNode:   true,
-			expectMaster: true,
-			ipFamilyMode: names.IPFamilySingleStack,
+			name:               "fresh cluster",
+			node:               &appsv1.DaemonSet{},
+			controlPlane:       &appsv1.Deployment{},
+			expectNode:         true,
+			expectControlPlane: true,
+			ipFamilyMode:       names.IPFamilySingleStack,
 		},
 		{
 			name: "no configuration change",
@@ -1773,28 +1784,27 @@ func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
 					},
 				},
 			},
-			master: &appsv1.DaemonSet{
+			controlPlane: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "ovnkube-master",
+					Name:      "ovnkube-control-plane",
 					Namespace: "openshift-ovn-kubernetes",
 					Annotations: map[string]string{
 						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
 					},
 					Generation: 1,
 				},
-				Status: appsv1.DaemonSetStatus{
-					CurrentNumberScheduled: 3,
-					DesiredNumberScheduled: 3,
-					NumberAvailable:        3,
-					NumberMisscheduled:     0,
-					NumberReady:            3,
-					ObservedGeneration:     2,
-					UpdatedNumberScheduled: 3,
+
+				Status: appsv1.DeploymentStatus{
+					Replicas:           3,
+					AvailableReplicas:  3,
+					ReadyReplicas:      3,
+					ObservedGeneration: 2,
+					UpdatedReplicas:    3,
 				},
 			},
-			expectNode:   true,
-			expectMaster: true,
-			ipFamilyMode: names.IPFamilySingleStack,
+			expectNode:         true,
+			expectControlPlane: true,
+			ipFamilyMode:       names.IPFamilySingleStack,
 		},
 		{
 			name: "configuration changed",
@@ -1807,21 +1817,21 @@ func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
 					},
 				},
 			},
-			master: &appsv1.DaemonSet{
+			controlPlane: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "ovnkube-master",
+					Name:      "ovnkube-control-plane",
 					Namespace: "openshift-ovn-kubernetes",
 					Annotations: map[string]string{
 						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
 					},
 				},
 			},
-			expectNode:   false,
-			expectMaster: true,
-			ipFamilyMode: names.IPFamilyDualStack,
+			expectNode:         false,
+			expectControlPlane: true,
+			ipFamilyMode:       names.IPFamilyDualStack,
 		},
 		{
-			name: "configuration changed, master updated and node remaining",
+			name: "configuration changed, controlPlane updated and node remaining",
 			node: &appsv1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ovnkube-node",
@@ -1831,31 +1841,29 @@ func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
 					},
 				},
 			},
-			master: &appsv1.DaemonSet{
+			controlPlane: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "ovnkube-master",
+					Name:      "ovnkube-control-plane",
 					Namespace: "openshift-ovn-kubernetes",
 					Annotations: map[string]string{
 						names.NetworkIPFamilyModeAnnotation: names.IPFamilyDualStack,
 					},
 					Generation: 1,
 				},
-				Status: appsv1.DaemonSetStatus{
-					CurrentNumberScheduled: 3,
-					DesiredNumberScheduled: 3,
-					NumberAvailable:        3,
-					NumberMisscheduled:     0,
-					NumberReady:            3,
-					ObservedGeneration:     2,
-					UpdatedNumberScheduled: 3,
+				Status: appsv1.DeploymentStatus{
+					Replicas:           3,
+					AvailableReplicas:  3,
+					ReadyReplicas:      3,
+					UpdatedReplicas:    3,
+					ObservedGeneration: 2,
 				},
 			},
-			expectNode:   true,
-			expectMaster: true,
-			ipFamilyMode: names.IPFamilyDualStack,
+			expectNode:         true,
+			expectControlPlane: true,
+			ipFamilyMode:       names.IPFamilyDualStack,
 		},
 		{
-			name: "configuration changed, master updated and node remaining but still rolling out",
+			name: "configuration changed, controlPlane updated and node remaining but still rolling out",
 			node: &appsv1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ovnkube-node",
@@ -1865,33 +1873,31 @@ func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
 					},
 				},
 			},
-			master: &appsv1.DaemonSet{
+			controlPlane: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "ovnkube-master",
+					Name:      "ovnkube-control-plane",
 					Namespace: "openshift-ovn-kubernetes",
 					Annotations: map[string]string{
 						names.NetworkIPFamilyModeAnnotation: names.IPFamilyDualStack,
 					},
 					Generation: 1,
 				},
-				Status: appsv1.DaemonSetStatus{
-					CurrentNumberScheduled: 3,
-					DesiredNumberScheduled: 3,
-					NumberAvailable:        2,
-					NumberUnavailable:      1,
-					NumberMisscheduled:     0,
-					NumberReady:            2,
-					ObservedGeneration:     2,
-					UpdatedNumberScheduled: 3,
+				Status: appsv1.DeploymentStatus{
+					Replicas:            3,
+					AvailableReplicas:   2,
+					UnavailableReplicas: 1,
+					ReadyReplicas:       2,
+					ObservedGeneration:  2,
+					UpdatedReplicas:     3,
 				},
 			},
-			expectNode:   false,
-			expectMaster: true,
-			ipFamilyMode: names.IPFamilyDualStack,
+			expectNode:         false,
+			expectControlPlane: true,
+			ipFamilyMode:       names.IPFamilyDualStack,
 		},
-		// this should not be possible, because configuration changes always update master first
+		// this should not be possible, because configuration changes always update controlPlane first
 		{
-			name: "configuration changed, node updated and master remaining",
+			name: "configuration changed, node updated and controlPlane remaining",
 			node: &appsv1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ovnkube-node",
@@ -1901,50 +1907,48 @@ func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
 					},
 				},
 			},
-			master: &appsv1.DaemonSet{
+			controlPlane: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "ovnkube-master",
+					Name:      "ovnkube-control-plane",
 					Namespace: "openshift-ovn-kubernetes",
 					Annotations: map[string]string{
 						names.NetworkIPFamilyModeAnnotation: names.IPFamilySingleStack,
 					},
 					Generation: 2,
 				},
-				Status: appsv1.DaemonSetStatus{
-					CurrentNumberScheduled: 3,
-					DesiredNumberScheduled: 3,
-					NumberAvailable:        3,
-					NumberMisscheduled:     0,
-					NumberReady:            3,
-					ObservedGeneration:     2,
-					UpdatedNumberScheduled: 3,
+				Status: appsv1.DeploymentStatus{
+					Replicas:           3,
+					AvailableReplicas:  3,
+					ReadyReplicas:      3,
+					ObservedGeneration: 2,
+					UpdatedReplicas:    3,
 				},
 			},
-			expectNode:   false,
-			expectMaster: true,
-			ipFamilyMode: names.IPFamilyDualStack,
+			expectNode:         false,
+			expectControlPlane: true,
+			ipFamilyMode:       names.IPFamilyDualStack,
 		},
 	} {
 
 		t.Run(tc.name, func(t *testing.T) {
-			masterStatus := &bootstrap.OVNUpdateStatus{}
+			controlPlaneStatus := &bootstrap.OVNUpdateStatus{}
 			nodeStatus := &bootstrap.OVNUpdateStatus{}
-			if tc.master != nil {
-				masterStatus.IPFamilyMode = tc.master.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
-				masterStatus.Progressing = daemonSetProgressing(tc.master, false)
+			if tc.controlPlane != nil {
+				controlPlaneStatus.IPFamilyMode = tc.controlPlane.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+				controlPlaneStatus.Progressing = deploymentProgressing(tc.controlPlane)
 			}
 			if tc.node != nil {
 				nodeStatus.IPFamilyMode = tc.node.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
 			}
 			bootResult := bootstrap.OVNBootstrapResult{
-				MasterUpdateStatus: masterStatus,
-				NodeUpdateStatus:   nodeStatus,
+				ControlPlaneUpdateStatus: controlPlaneStatus,
+				NodeUpdateStatus:         nodeStatus,
 			}
-			updateNode, updateMaster := shouldUpdateOVNKonIPFamilyChange(bootResult, masterStatus, tc.ipFamilyMode)
+			updateNode, updateControlPlane := shouldUpdateOVNKonIPFamilyChange(bootResult, controlPlaneStatus, tc.ipFamilyMode)
 			if updateNode != tc.expectNode {
 				t.Errorf("Expected node update: %v received %v", tc.expectNode, updateNode)
 			}
-			if updateMaster != tc.expectMaster {
+			if updateControlPlane != tc.expectControlPlane {
 				t.Errorf("Expected node update: %v received %v", tc.expectNode, updateNode)
 			}
 
@@ -1988,10 +1992,10 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 	bootstrapResult := fakeBootstrapResult()
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		MasterAddresses: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
-		MasterUpdateStatus: &bootstrap.OVNUpdateStatus{
-			Kind:         "DaemonSet",
+		ControlPlaneUpdateStatus: &bootstrap.OVNUpdateStatus{
+			Kind:         "Deployment",
 			Namespace:    "openshift-ovn-kubernetes",
-			Name:         "ovnkube-master",
+			Name:         "ovnkube-control-plane",
 			Version:      "1.9.9",
 			IPFamilyMode: names.IPFamilySingleStack,
 		},
@@ -2014,22 +2018,22 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 	}
 
 	// the new rendered config should hold the node to do the dualstack conversion
-	// the upgrade code holds the masters to update the nodes first
-	fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+	// the upgrade code holds the controlPlanes to update the nodes first
+	fakeClient := cnofake.NewFakeClient()
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
-	renderedMaster := findInObjs("apps", "DaemonSet", "ovnkube-control-plane", "openshift-ovn-kubernetes", objs)
+	renderedControlPlane := findInObjs("apps", "Deployment", "ovnkube-control-plane", "openshift-ovn-kubernetes", objs)
 
 	// the node has to be the same
 	if _, ok := renderedNode.GetAnnotations()[names.CreateOnlyAnnotation]; !ok {
 		t.Errorf("node DaemonSet should have create-only annotation, does not")
 	}
-	// the master has to use the new annotations for dual-stack so it has to be mutated
-	if _, ok := renderedMaster.GetAnnotations()[names.CreateOnlyAnnotation]; ok {
-		t.Errorf("master daemonset are equal, dual-stack should modify masters")
+	// the controlPlane has to use the new annotations for dual-stack so it has to be mutated
+	if _, ok := renderedControlPlane.GetAnnotations()[names.CreateOnlyAnnotation]; ok {
+		t.Errorf("controlPlane daemonset are equal, dual-stack should modify controlPlanes")
 	}
 }
 
@@ -2109,7 +2113,7 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 				},
 				FlowsConfig: tc.FlowsConfig,
 			}
-			fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+			fakeClient := cnofake.NewFakeClient()
 			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 			g.Expect(err).ToNot(HaveOccurred())
 			nodeDS := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
@@ -2405,10 +2409,11 @@ func checkDaemonsetAnnotation(g *WithT, objs []*uns.Unstructured, key, value str
 	if key == "" || value == "" {
 		return false
 	}
-	foundMaster, foundNode := false, false
+	foundControlPlane, foundNode := false, false
 	for _, obj := range objs {
-		if obj.GetAPIVersion() == "apps/v1" && obj.GetKind() == "DaemonSet" &&
-			(obj.GetName() == "ovnkube-master" || obj.GetName() == "ovnkube-node") {
+		if obj.GetAPIVersion() == "apps/v1" &&
+			(obj.GetName() == "ovnkube-control-plane" && obj.GetKind() == "Deployment" ||
+				obj.GetName() == "ovnkube-node" && obj.GetKind() == "DaemonSet") {
 
 			// check daemonset annotation
 			anno := obj.GetAnnotations()
@@ -2429,14 +2434,14 @@ func checkDaemonsetAnnotation(g *WithT, objs []*uns.Unstructured, key, value str
 				return false
 			}
 			// record the daemonsets we have checked
-			if obj.GetName() == "ovnkube-master" {
-				foundMaster = true
+			if obj.GetName() == "ovnkube-control-plane" {
+				foundControlPlane = true
 			} else {
 				foundNode = true
 			}
 		}
 	}
-	return foundMaster && foundNode
+	return foundControlPlane && foundNode
 }
 
 func checkDaemonSetImagePullPolicy(g *WithT, obj *uns.Unstructured) {
