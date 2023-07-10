@@ -33,6 +33,7 @@ data:
     enable-egress-ip=true
     enable-egress-firewall=true
     enable-egress-qos=true
+    enable-egress-service=true
     {{- if .ReachabilityTotalTimeoutSeconds }}
     egressip-reachability-total-timeout={{.ReachabilityTotalTimeoutSeconds}}
     {{- end }}
