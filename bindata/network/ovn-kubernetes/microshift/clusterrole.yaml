@@ -55,6 +55,7 @@ rules:
 - apiGroups: ["k8s.ovn.org"]
   resources:
   - egressips
+  - egressservices
   verbs:
   - get
   - list
@@ -154,6 +155,8 @@ rules:
   - egressfirewalls
   - egressips
   - egressqoses
+  - egressservices
+  - egressservices/status
   verbs:
   - get
   - list

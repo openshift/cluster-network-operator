@@ -33,6 +33,7 @@ data:
     enable-egress-ip=true
     enable-egress-firewall=true
     enable-egress-qos=true
+    enable-egress-service=true
 {{- if .ReachabilityNodePort }}
     egressip-node-healthcheck-port={{.ReachabilityNodePort}}
 {{- end }}
@@ -108,6 +109,7 @@ data:
     enable-egress-ip=true
     enable-egress-firewall=true
     enable-egress-qos=true
+    enable-egress-service=true
 {{- if .ReachabilityNodePort }}
     egressip-node-healthcheck-port={{.ReachabilityNodePort}}
 {{- end }}
