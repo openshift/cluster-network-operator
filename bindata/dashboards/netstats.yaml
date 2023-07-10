@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{.DashboardNameMain}}
+  name: {{.DashboardNameNetStats}}
   namespace: {{.DashboardNamespace}}
   annotations:
     include.release.openshift.io/ibm-cloud-managed: "true"
@@ -11,4 +11,4 @@ metadata:
     console.openshift.io/dashboard: "true"
 data:
   "dashboard.json": |-
-{{.DashboardContentMain | indent 4}}
+{{.DashboardContentNetStats | indent 4}}

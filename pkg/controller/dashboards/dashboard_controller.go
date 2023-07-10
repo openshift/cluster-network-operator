@@ -30,13 +30,20 @@ const (
 )
 
 var (
-	//go:embed dashboard.json
-	embeddedContent string
-	dashboardRefs   []dashboardRef = []dashboardRef{
+	//go:embed netstats.json
+	netstatsContent string
+	//go:embed ovn-health.json
+	ovnHealthContent string
+	dashboardRefs    []dashboardRef = []dashboardRef{
 		{
-			name:      "grafana-dashboard-network-infra",
-			json:      embeddedContent,
-			tplSuffix: "Main",
+			name:      "grafana-dashboard-network-stats",
+			json:      netstatsContent,
+			tplSuffix: "NetStats",
+		},
+		{
+			name:      "grafana-dashboard-ovn-health",
+			json:      ovnHealthContent,
+			tplSuffix: "OVNHealth",
 		},
 	}
 )
