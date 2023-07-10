@@ -95,6 +95,7 @@ spec:
               value: "{{.KubernetesServicePort}}"
             - name: KUBERNETES_SERVICE_HOST
               value: "{{.KubernetesServiceHost}}"
+      automountServiceAccountToken: false
 {{- end }}
       containers:
 {{- if .HyperShiftEnabled}}
