@@ -501,8 +501,14 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		bootstrapResult.OVN.MasterUpdateStatus != nil, updateMaster,
 		bootstrapResult.OVN.ControlPlaneUpdateStatus != nil, updateControlPlane)
 
-	// If we need to delay the rollout of control plane, we'll tag its deployment with "create-wait"
+	// If we need to delay the rollout of control plane, we'll tag its deployment with "create-wait" during zone mode migration
+	// and "create-only" during upgrades.
 	if !updateControlPlane { // no-op if object is not found
+		annotationKey := names.CreateOnlyAnnotation // skip if object doesn't exist already
+		if isZoneModeMigrationAboutToStartOrOngoing(bootstrapResult.OVN, &targetZoneMode) {
+			annotationKey = names.CreateWaitAnnotation // skip altogether
+		}
+
 		klog.Infof("riccardo: annotating control plane deployment with create-wait")
 		kind := "Deployment"
 		namespace := util.OVN_NAMESPACE
@@ -515,7 +521,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			if anno == nil {
 				anno = map[string]string{}
 			}
-			anno[names.CreateWaitAnnotation] = "true" // skip altogether when annotated
+			anno[annotationKey] = "true"
 			o.SetAnnotations(anno)
 		})
 	}
