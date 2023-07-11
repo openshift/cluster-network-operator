@@ -30,7 +30,6 @@ metadata:
     # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
     hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
 spec:
-  replicas: 3
   selector:
     matchLabels:
       app: ovnkube-control-plane
