@@ -701,7 +701,7 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         ports:
-        - name: metrics-port
+        - name: metrics-port-c  # 15 characters max on windows
           containerPort: 29113
         terminationMessagePolicy: FallbackToLogsOnError
 

@@ -555,8 +555,14 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovnkube-upgrades-prepuller")
 	}
 
-	// don't create ovnkube node if route isn't up yet
-	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled && bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost == "" {
+	// In hypershift, if we're pushing the route (single-zone only) don't create ovnkube node if route isn't up yet
+	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled &&
+		k8s.CheckObjByGroupKindName(
+			objs, "apps", "Route",
+			bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Namespace,
+			"ovnkube-sbdb") &&
+		bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost == "" {
+
 		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovnkube-node", func(o *uns.Unstructured) {
 			anno := o.GetAnnotations()
 			if anno == nil {
@@ -1389,8 +1395,12 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	prepullerStatus := &bootstrap.OVNUpdateStatus{}
 
 	namespaceForControlPlane := util.OVN_NAMESPACE
+	clusterClientForControlPlane := kubeClient.ClientFor("")
 
 	if hc.Enabled {
+		clusterClientForControlPlane = kubeClient.ClientFor(names.ManagementClusterName)
+		namespaceForControlPlane = hc.Namespace
+
 		// only for 4.13 (during upgrade) and 4.14 single-zone
 		masterSS := &appsv1.StatefulSet{
 			TypeMeta: metav1.TypeMeta{
@@ -1398,8 +1408,8 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 				APIVersion: appsv1.SchemeGroupVersion.String(),
 			},
 		}
-		nsn = types.NamespacedName{Namespace: hc.Namespace, Name: "ovnkube-master"}
-		if err := kubeClient.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(), nsn, masterSS); err != nil {
+		nsn = types.NamespacedName{Namespace: namespaceForControlPlane, Name: "ovnkube-master"}
+		if err := clusterClientForControlPlane.CRClient().Get(context.TODO(), nsn, masterSS); err != nil {
 			if !apierrors.IsNotFound(err) {
 				return nil, fmt.Errorf("Failed to retrieve existing master statefulset: %w", err)
 			} else {
@@ -1418,8 +1428,6 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 
 			klog.Infof("KEYWORD: jtan: master SS zone-mode=%s, progressing=%t", masterStatus.InterConnectZoneMode, masterStatus.Progressing)
 		}
-
-		namespaceForControlPlane = hc.Namespace
 
 	} else {
 		// only for 4.13 (during upgrade) and 4.14 single-zone
@@ -1461,8 +1469,9 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
 	}
+
 	nsn = types.NamespacedName{Namespace: namespaceForControlPlane, Name: "ovnkube-control-plane"}
-	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, controlPlaneDeployment); err != nil {
+	if err := clusterClientForControlPlane.CRClient().Get(context.TODO(), nsn, controlPlaneDeployment); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Failed to retrieve control plane daemonset: %w", err)
 		} else {

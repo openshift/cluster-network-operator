@@ -31,11 +31,9 @@ metadata:
     hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
 spec:
   replicas: 3
-  podManagementPolicy: Parallel
   selector:
     matchLabels:
       app: ovnkube-control-plane
-  serviceName: ovnkube-control-plane-internal
   replicas: {{.OvnkubeMasterReplicas}}
   template:
     metadata:
@@ -168,6 +166,7 @@ spec:
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
+            --enable-interconnect \
             --init-cluster-manager "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
