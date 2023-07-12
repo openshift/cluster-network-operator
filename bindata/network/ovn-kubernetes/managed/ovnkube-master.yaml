@@ -904,7 +904,8 @@ spec:
             --node-server-cert ${TLS_CERT} \
             ${multi_network_enabled_flag} \
             ${multi_network_policy_enabled_flag} \
-            --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
+            --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}" \
+            --enable-multi-external-gateway=true
         volumeMounts:
         - mountPath: /etc/ovn
           name: datadir
