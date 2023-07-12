@@ -69,7 +69,7 @@ spec:
       expr: |
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        max by (namespace) (max_over_time(ovnkube_clustermanager[5m])) == 0
+        max by (namespace) (max_over_time(ovnkube_controller_leader[5m])) == 0
       for: 5m
       labels:
         severity: critical
