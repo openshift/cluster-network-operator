@@ -27,7 +27,7 @@ require (
 	k8s.io/component-base v0.27.2
 	k8s.io/klog/v2 v2.100.1
 	k8s.io/kube-proxy v0.27.2
-	k8s.io/utils v0.0.0-20230505201702-9f6742963106
+	k8s.io/utils v0.0.0-20230711102312-30195339c3c7
 	sigs.k8s.io/controller-runtime v0.15.0
 )
 
@@ -112,12 +112,12 @@ require (
 	sigs.k8s.io/cluster-api v1.3.5 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kube-storage-version-migrator v0.0.4 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.3.0 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
 require (
-	github.com/openshift/api v0.0.0-20230705144233-e28cd4dd28a8
+	github.com/openshift/api v0.0.0-20230712170321-16ee8af1cb2a
 	github.com/openshift/client-go v0.0.0-20230120202327-72f107311084
 	github.com/openshift/hypershift v0.1.6
 	github.com/openshift/library-go v0.0.0-20230503144409-4cb26a344c37
