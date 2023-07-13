@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"sigs.k8s.io/controller-runtime/pkg/config"
 
 	configv1 "github.com/openshift/api/config/v1"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
@@ -13,6 +12,9 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"github.com/openshift/library-go/pkg/operator/loglevel"
+	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
@@ -20,11 +22,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
-
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
-	"github.com/openshift/library-go/pkg/operator/loglevel"
-	"github.com/openshift/library-go/pkg/operator/management"
 
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctmanager "sigs.k8s.io/controller-runtime/pkg/manager"
@@ -55,10 +52,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			return o.client.Default().RESTMapper(), nil
 		},
 		MetricsBindAddress: "0",
-		// FIXME(trozet): not sure if this is all we need for controller
-		Controller: config.Controller{
-			RecoverPanic: pointer.Bool(true),
-		},
 	})
 	if err != nil {
 		return err
@@ -87,15 +80,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	klog.Infof("Creating status manager for %s cluster", cluster)
 	o.StatusManager = statusmanager.New(o.client, "network", cluster)
-
-	// Add a panic handler that sets the status to degraded
-	utilruntime.PanicHandlers = append(utilruntime.PanicHandlers, func(panicValue interface{}) {
-		// Use PanicLevel level so the degraded state is not cleared by any of the running controllers
-		o.StatusManager.SetDegraded(statusmanager.PanicLevel, "ReconcileError", fmt.Sprintf("Panic detected: %v", panicValue))
-
-		// forward the panic
-		panic(panicValue)
-	})
+	defer utilruntime.HandleCrash(o.StatusManager.SetDegradedOnPanicAndCrash)
 
 	// Add controller-runtime controllers
 	klog.Info("Adding controller-runtime controllers")

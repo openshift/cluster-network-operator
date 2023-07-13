@@ -527,6 +527,13 @@ func (status *StatusManager) SetDegraded(statusLevel StatusLevel, reason, messag
 	status.setDegraded(statusLevel, reason, message)
 }
 
+func (status *StatusManager) SetDegradedOnPanicAndCrash(panicVal interface{}) {
+	status.Lock()
+	defer status.Unlock()
+	status.setDegraded(PanicLevel, "ReconcileError", fmt.Sprintf("Panic detected: %v", panicVal))
+	panic(panicVal)
+}
+
 func (status *StatusManager) SetNotDegraded(statusLevel StatusLevel) {
 	status.Lock()
 	defer status.Unlock()

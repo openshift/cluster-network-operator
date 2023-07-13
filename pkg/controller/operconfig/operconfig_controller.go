@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	v1coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -157,6 +158,8 @@ type ReconcileOperConfig struct {
 // Reconcile updates the state of the cluster to match that which is desired
 // in the operator configuration (Network.operator.openshift.io)
 func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
+
 	log.Printf("Reconciling Network.operator.openshift.io %s\n", request.Name)
 
 	// We won't create more than one network

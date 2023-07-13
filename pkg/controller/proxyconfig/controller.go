@@ -14,6 +14,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	v1coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -93,6 +94,7 @@ type ReconcileProxyConfig struct {
 // named "cluster" or a configmap object in namespace "openshift-config"
 // and will ensure either object is in the desired state.
 func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	validate := true
 	trustBundle := &corev1.ConfigMap{}
 

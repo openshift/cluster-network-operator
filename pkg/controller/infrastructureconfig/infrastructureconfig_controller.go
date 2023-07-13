@@ -11,6 +11,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,6 +66,7 @@ type ReconcileInfrastructureConfig struct {
 // new and deprecated API & Ingress VIP fields to have consistent APIs between
 // versions.
 func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	log.Printf("Reconciling Infrastructure.config.openshift.io %s\n", request.Name)
 
 	// Only check on the default infrastructure config

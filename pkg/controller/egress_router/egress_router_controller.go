@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 
 	netopv1 "github.com/openshift/api/networkoperator/v1"
@@ -88,6 +89,7 @@ func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.Status
 }
 
 func (r EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	klog.Infof("Reconciling egressrouter.network.operator.openshift.io %s\n", request.NamespacedName)
 
 	obj := &netopv1.EgressRouter{}
