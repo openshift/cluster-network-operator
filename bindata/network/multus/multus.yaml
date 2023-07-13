@@ -556,7 +556,7 @@ spec:
         args:
           - -c
           - >
-            /usr/src/whereabouts/bin/ip-control-loop -log-level debug
+            /usr/src/whereabouts/bin/entrypoint.sh -log-level debug
         image: {{.WhereaboutsImage}}
         env:
         - name: WHEREABOUTS_NAMESPACE
