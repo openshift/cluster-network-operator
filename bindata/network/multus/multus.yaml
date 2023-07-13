@@ -2,6 +2,94 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: run-based-on-host-os
+  namespace: openshift-multus
+  annotations:
+    kubernetes.io/description: |
+      This is a script used to copy CNI binaries based on host OS
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+data:
+  run-based-on-host-os.sh: |-
+    #!/bin/bash
+    set -e
+
+    # Function to handle cleanup tasks
+    cleanup() {
+        echo "Received termination signal."
+        exit 0
+    }
+
+    # Trap SIGTERM and SIGINT signals
+    trap 'cleanup' SIGTERM SIGINT
+
+    function log()
+    {
+        echo "$(date --iso-8601=seconds) [run-based-on-host-os] ${1}"
+    }
+
+    # Perform validation of usage
+    if [ -z "$1" ] ||
+       [ -z "$2" ]; then
+      log "FATAL ERROR: You must set two arguments, such as: ./run-based-on-host-os RHEL8_BIN_PATH RHEL9_BIN_PATH"
+      exit 1
+    else
+      rhel_8_bin_path="$1"
+      rhel_9_bin_path="$2"
+    fi
+
+    if [ ! -f "$rhel_8_bin_path" ]; then
+        echo "RHEL8 File does not exist: $rhel_8_bin_path"
+        exit 1
+    fi
+
+    if [ ! -f "$rhel_9_bin_path" ]; then
+        echo "RHEL9 File does not exist: $rhel_9_bin_path"
+        exit 1
+    fi
+
+    # Collect host OS information
+    . /host/etc/os-release
+    rhelmajor=
+    # detect which version we're using in order to copy the proper binaries
+    case "${ID}" in
+      rhcos|scos)
+        rhelmajor=$(echo $RHEL_VERSION | sed -E 's/([0-9]+)\.{1}[0-9]+(\.[0-9]+)?/\1/')
+      ;;
+      rhel) rhelmajor=$(echo "${VERSION_ID}" | cut -f 1 -d .)
+      ;;
+      fedora)
+        if [ "${VARIANT_ID}" == "coreos" ]; then
+          rhelmajor=8
+        else
+          log "FATAL ERROR: Unsupported Fedora variant=${VARIANT_ID}"
+          exit 1
+        fi
+      ;;
+      *) log "FATAL ERROR: Unsupported OS ID=${ID}"; exit 1
+      ;;
+    esac
+
+    # Set which directory we'll copy from, detect if it exists
+    sourcedir=
+    founddir=false
+    case "${rhelmajor}" in
+      8)
+        log "Running $rhel_8_bin_path"
+        "$rhel_8_bin_path" "$3"
+      ;;
+      9)
+        log "Running $rhel_9_bin_path"
+        "$rhel_9_bin_path" "$3"
+      ;;
+      *)
+        log "ERROR: RHEL Major Version Unsupported, rhelmajor=${rhelmajor}"
+        exit 1
+      ;;
+    esac
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: cni-copy-resources
   namespace: openshift-multus
   annotations:
@@ -554,7 +642,7 @@ spec:
         args:
           - -c
           - >
-            /usr/src/whereabouts/bin/ip-control-loop -log-level debug
+            /run-based-on-host-os/run-based-on-host-os.sh /usr/src/whereabouts/rhel8/bin/ip-control-loop /usr/src/whereabouts/rhel9/bin/ip-control-loop "-log-level debug"
         image: {{.WhereaboutsImage}}
         env:
         - name: WHEREABOUTS_NAMESPACE
@@ -571,6 +659,8 @@ spec:
         volumeMounts:
           - name: cni-net-dir
             mountPath: /host/etc/cni/net.d
+          - name: vol-run-based-on-host-os
+            mountPath: /run-based-on-host-os
         env:
         - name: NODENAME
           valueFrom:
@@ -585,4 +675,9 @@ spec:
         - name: cni-net-dir
           hostPath:
             path: {{ .SystemCNIConfDir }}
+        - name: vol-run-based-on-host-os
+          configMap:
+            name: run-based-on-host-os
+            defaultMode: 0744
+
 {{- end}}
