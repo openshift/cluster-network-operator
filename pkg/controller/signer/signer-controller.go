@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/library-go/pkg/crypto"
 	csrv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"k8s.io/client-go/kubernetes"
 
@@ -95,6 +96,7 @@ type ReconcileCSR struct {
 
 // Reconcile CSR
 func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	csr := &csrv1.CertificateSigningRequest{}
 	err := r.client.Get(ctx, request.NamespacedName, csr)
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -115,6 +116,7 @@ type ReconcileConfigMapInjector struct {
 // 2. a configmap in any namespace with the label config.openshift.io/inject-trusted-cabundle = true and will insure that it contains the ca-bundle.crt
 // entry in the configmap named trusted-ca-bundle in namespace openshift-config-managed.
 func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	log.Printf("Reconciling configmap from  %s/%s\n", request.Namespace, request.Name)
 
 	trustedCAbundleConfigMap, err := r.nsLister.ConfigMaps(names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS).Get(names.TRUSTED_CA_BUNDLE_CONFIGMAP)

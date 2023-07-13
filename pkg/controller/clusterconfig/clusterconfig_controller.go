@@ -16,6 +16,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -64,6 +65,7 @@ type ReconcileClusterConfig struct {
 // In other words, it watches Network.config.openshift.io/v1/cluster and updates
 // Network.operator.openshift.io/v1/cluster.
 func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	log.Printf("Reconciling Network.config.openshift.io %s\n", request.Name)
 
 	// We won't create more than one network

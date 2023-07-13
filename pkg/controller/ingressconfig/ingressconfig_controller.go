@@ -14,6 +14,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -36,12 +37,12 @@ var ManifestPath = "./bindata"
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client) error {
 
-	return add(mgr, newIngressConfigReconciler(mgr.GetClient()))
+	return add(mgr, newIngressConfigReconciler(mgr.GetClient(), status))
 }
 
 // newIngressConfigReconciler returns a new reconcile.Reconciler
-func newIngressConfigReconciler(client crclient.Client) *ReconcileIngressConfigs {
-	return &ReconcileIngressConfigs{client: client}
+func newIngressConfigReconciler(client crclient.Client, status *statusmanager.StatusManager) *ReconcileIngressConfigs {
+	return &ReconcileIngressConfigs{client: client, status: status}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -64,6 +65,7 @@ var _ reconcile.Reconciler = &ReconcileIngressConfigs{}
 // and sets the network policy related labels on the openshift-host-network namespace
 type ReconcileIngressConfigs struct {
 	client crclient.Client
+	status *statusmanager.StatusManager
 }
 
 // Reconcile sets the openshift-host-network namespaces' labels as per the
@@ -76,6 +78,7 @@ type ReconcileIngressConfigs struct {
 // HostNetwork, it reconciles and removes these labels from the host network
 // namespace.
 func (r *ReconcileIngressConfigs) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	if request.Namespace != names.IngressControllerNamespace || request.Name != names.DefaultIngressControllerName {
 		return reconcile.Result{}, nil
 	}
