@@ -944,7 +944,7 @@ spec:
           value: kube-apiserver
         ports:
         - name: metrics-port
-          containerPort: 29102
+          containerPort: 9102
         terminationMessagePolicy: FallbackToLogsOnError
       # ovn-dbchecker: monitor clustered ovn databases for db health and stale raft members
       - name: ovn-dbchecker
