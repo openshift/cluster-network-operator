@@ -12,20 +12,8 @@ spec:
   groups:
   - name: cluster-network-operator-master.rules
     rules:
-    - record: cluster:ovnkube_master_egress_routing_via_host:max
-      expr: max(ovnkube_master_egress_routing_via_host)
-    - record: cluster:ovn_db_nbdb_not_cluster_member:abs
-      expr: abs(count(ovn_db_cluster_server_status{db_name="OVN_Northbound", server_status="cluster member"}) - {{.OvnkubeMasterReplicas}})
-    - record: cluster:ovn_db_sbdb_not_cluster_member:abs
-      expr: abs(count(ovn_db_cluster_server_status{db_name="OVN_Southbound", server_status="cluster member"}) - {{.OvnkubeMasterReplicas}})
-    - record: cluster:ovn_db_nbdb_missing_inbound_connections:abs
-      expr: abs(sum(ovn_db_cluster_inbound_connections_total{db_name="OVN_Northbound"}) - ({{.OvnkubeMasterReplicas}} * ({{.OvnkubeMasterReplicas}}-1)))
-    - record: cluster:ovn_db_sbdb_missing_inbound_connections:abs
-      expr: abs(sum(ovn_db_cluster_inbound_connections_total{db_name="OVN_Southbound"}) - ({{.OvnkubeMasterReplicas}} * ({{.OvnkubeMasterReplicas}}-1)))
-    - record: cluster:ovn_db_nbdb_missing_outbound_connections:abs
-      expr: abs(sum(ovn_db_cluster_outbound_connections_total{db_name="OVN_Northbound"}) - ({{.OvnkubeMasterReplicas}} * ({{.OvnkubeMasterReplicas}}-1)))
-    - record: cluster:ovn_db_sbdb_missing_outbound_connections:abs
-      expr: abs(sum(ovn_db_cluster_outbound_connections_total{db_name="OVN_Southbound"}) - ({{.OvnkubeMasterReplicas}} * ({{.OvnkubeMasterReplicas}}-1)))
+    - record: cluster:ovnkube_controller_egress_routing_via_host:max
+      expr: max(ovnkube_controller_egress_routing_via_host)
     # OVN kubernetes cluster manager functional alerts
     - alert: V4SubnetAllocationThresholdExceeded
       annotations:
@@ -45,23 +33,23 @@ spec:
       labels:
         severity: warning
     # OVN kubernetes master functional alerts
-    - alert: NoRunningOvnController
+    - alert: NoRunningOvnControlPlane
       annotations:
-        summary: There is no running ovn-kubernetes controller.
-        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoRunningOvnMaster.md #TODO: Update Runbook
+        summary: There is no running ovn-kubernetes control plane.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoRunningOvnMaster.md
         description: |
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
           implemented while there are no OVN Kubernetes pods.
-      expr: | #should we be checking for ovn-controller or ovnkube-controller?
-        absent(up{container="ovnkube-controller", namespace="openshift-ovn-kubernetes"} == 1) # 
+      expr: |
+        absent(up{job="ovnkube-controller", namespace="openshift-ovn-kubernetes"} == 1)
       for: 5m
       labels:
         namespace: openshift-ovn-kubernetes
         severity: critical
-    - alert: NoOvnClusterManager
+    - alert: NoOvnClusterManagerLeader
       annotations:
-        summary: There is no ovn-kubernetes Cluster Manager leader.
-        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoOvnMasterLeader.md #TODO: Update runbook
+        summary: There is no ovn-kubernetes cluster manager leader.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoOvnMasterLeader.md
         description: |
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
           implemented while there is no OVN Kubernetes leader. Existing workloads should continue to have connectivity.
@@ -69,14 +57,14 @@ spec:
       expr: |
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        max by (namespace) (max_over_time(ovnkube_controller_leader[5m])) == 0
+        max by (namespace) (max_over_time(ovnkube_clustermanager_leader[5m])) == 0
       for: 5m
       labels:
         severity: critical
     # OVN northbound and southbound databases functional alerts
-    - alert: NorthboundStaleOnNode
+    - alert: NorthboundStale
       annotations:
-        summary: ovn-kubernetes has not written anything to the northbound database on a node for too long.
+        summary: ovn-kubernetes has not written anything to the northbound database for too long.
         runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NorthboundStaleAlert.md
         description: |
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
@@ -88,8 +76,8 @@ spec:
         time() - max_over_time(ovnkube_controller_nb_e2e_timestamp[5m]) > 120
       for: 10m
       labels:
-        severity: critical #todo: Determine severity here as this is not as big a deal anymore
-    - alert: SouthboundStaleOnNode
+        severity: critical
+    - alert: SouthboundStale
       annotations:
         summary: ovn-northd has not successfully synced any changes to the southbound DB for too long.
         runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/SouthboundStaleAlert.md
@@ -100,9 +88,38 @@ spec:
       expr: |
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        max_over_time(ovnkube_controller_nb_e2e_timestamp[5m]) - max_over_time(ovnkube_controller_sb_e2e_timestamp[5m]) > 120
+        max_over_time(ovnkube_master_nb_e2e_timestamp[5m]) - max_over_time(ovnkube_master_sb_e2e_timestamp[5m]) > 120
       for: 10m
       labels:
         severity: critical
-   
-    
+    # OVN northbound and southbound database performance alerts
+    - alert: OVNKubernetesNorthboundDatabaseCPUUsageHigh
+      annotations:
+        summary: OVN northbound database {{"{{"}} $labels.instance {{"}}"}} is greater than {{"{{"}} $value | humanizePercentage {{"}}"}} percent CPU usage for a period of time.
+        description: High OVN northbound CPU usage indicates high load on the networking control plane.
+      expr: (sum(rate(container_cpu_usage_seconds_total{container="nbdb"}[5m])) BY (instance, name, namespace)) > 0.8
+      for: 15m
+      labels:
+        severity: info
+    - alert: OVNKubernetesSouthboundDatabaseCPUUsageHigh
+      annotations:
+        summary: OVN southbound database {{"{{"}} $labels.instance {{"}}"}} is greater than {{"{{"}} $value | humanizePercentage {{"}}"}} percent CPU usage for a period of time.
+        description: High OVN southbound CPU usage indicates high load on the networking control plane.
+      expr: (sum(rate(container_cpu_usage_seconds_total{container="sbdb"}[5m])) BY (instance, name, namespace)) > 0.8
+      for: 15m
+      labels:
+        severity: info
+    # OVN northd functional alerts
+    # TODO fix this metrics https://github.com/ovn-org/ovn-kubernetes/issues/3774
+#    - alert: OVNKubernetesNorthdInactive
+#      annotations:
+#        summary: Exactly one OVN northd instance must have an active status.
+#        description: Exactly one OVN northd must have an active status within the high availability set.
+#          Networking control plane is degraded.
+#      expr: |
+#        # Without max_over_time, failed scrapes could create false negatives, see
+#        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+#        count(ovn_northd_status == 1) by (namespace) != 1
+#      for: 5m
+#      labels:
+#        severity: critical

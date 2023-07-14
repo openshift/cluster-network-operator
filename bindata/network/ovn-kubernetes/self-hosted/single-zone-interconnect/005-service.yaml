@@ -23,3 +23,25 @@ spec:
   sessionAffinity: None
   clusterIP: None
   type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: ovnkube-controller
+  name: ovn-kubernetes-controller
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: ovn-master-metrics-cert
+spec:
+  selector:
+    app: ovnkube-master
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: metrics
+      port: 9102
+      protocol: TCP
+      targetPort: 9102
+  sessionAffinity: None
+  type: ClusterIP
