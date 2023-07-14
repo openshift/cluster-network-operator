@@ -33,7 +33,7 @@ metadata:
   name: ovn-kubernetes-master
   namespace: openshift-ovn-kubernetes
   annotations:
-    service.beta.openshift.io/serving-cert-secret-name: ovn-master-metrics-cert
+    service.beta.openshift.io/serving-cert-secret-name: ovn-control-plane-metrics-cert
 spec:
   selector:
     app: ovnkube-master
