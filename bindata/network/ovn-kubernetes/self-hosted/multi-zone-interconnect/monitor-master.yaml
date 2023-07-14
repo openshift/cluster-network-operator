@@ -3,10 +3,10 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: ovnkube-master
+    app: ovnkube-control-plane
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
-  name: monitor-ovn-master-metrics
+  name: monitor-ovn-control-plane-metrics
   namespace: openshift-ovn-kubernetes
 spec:
   endpoints:
@@ -16,27 +16,27 @@ spec:
     scheme: https
     tlsConfig:
       caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
-      serverName: ovn-kubernetes-master.openshift-ovn-kubernetes.svc
+      serverName: ovn-kubernetes-control-plane.openshift-ovn-kubernetes.svc
   jobLabel: app
   namespaceSelector:
     matchNames:
     - openshift-ovn-kubernetes
   selector:
     matchLabels:
-      app: ovnkube-master
+      app: ovnkube-control-plane
 ---
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: ovnkube-master
-  name: ovn-kubernetes-master
+    app: ovnkube-control-plane
+  name: ovn-kubernetes-control-plane
   namespace: openshift-ovn-kubernetes
   annotations:
     service.beta.openshift.io/serving-cert-secret-name: ovn-control-plane-metrics-cert
 spec:
   selector:
-    app: ovnkube-master
+    app: ovnkube-control-plane
   clusterIP: None
   publishNotReadyAddresses: true
   ports:

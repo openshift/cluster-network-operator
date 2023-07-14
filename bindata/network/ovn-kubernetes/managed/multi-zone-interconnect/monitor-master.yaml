@@ -7,11 +7,11 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: ovnkube-master
+    app: ovnkube-control-plane
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
     network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
-  name: monitor-ovn-master-metrics
+  name: monitor-ovn-control-plane-metrics
   namespace: {{.HostedClusterNamespace}}
 spec:
   endpoints:
@@ -32,7 +32,7 @@ spec:
       keySecret:
         key: tls.key
         name: ovn-control-plane-metrics-cert
-      serverName: ovnkube-master-internal.{{.HostedClusterNamespace}}.svc
+      serverName: ovn-kubernetes-control-plane.{{.HostedClusterNamespace}}.svc
     metricRelabelings:
     - action: replace
       replacement: {{.ClusterID}}
@@ -47,21 +47,21 @@ spec:
     - {{.HostedClusterNamespace}}
   selector:
     matchLabels:
-      app: ovnkube-master
+      app: ovnkube-control-plane
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: ovnkube-master-internal
+  name: ovn-kubernetes-control-plane
   namespace: {{.HostedClusterNamespace}}
   annotations:
     network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
     service.beta.openshift.io/serving-cert-secret-name: ovn-control-plane-metrics-cert
   labels:
-    app: ovnkube-master
+    app: ovnkube-control-plane
 spec:
   selector:
-    app: ovnkube-master
+    app: ovnkube-control-plane
   publishNotReadyAddresses: true
   ports:
     - name: metrics
