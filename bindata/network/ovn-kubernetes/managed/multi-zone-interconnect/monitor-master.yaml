@@ -28,10 +28,10 @@ spec:
       cert:
         secret:
           key: tls.crt
-          name: ovn-master-metrics-cert
+          name: ovn-control-plane-metrics-cert
       keySecret:
         key: tls.key
-        name: ovn-master-metrics-cert
+        name: ovn-control-plane-metrics-cert
       serverName: ovnkube-master-internal.{{.HostedClusterNamespace}}.svc
     metricRelabelings:
     - action: replace
@@ -56,7 +56,7 @@ metadata:
   namespace: {{.HostedClusterNamespace}}
   annotations:
     network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
-    service.beta.openshift.io/serving-cert-secret-name: ovn-master-metrics-cert
+    service.beta.openshift.io/serving-cert-secret-name: ovn-control-plane-metrics-cert
   labels:
     app: ovnkube-master
 spec:
