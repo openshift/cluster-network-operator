@@ -584,9 +584,9 @@ spec:
           log_missing_certs(){
               CUR_TS=$(date +%s)
               if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
-                echo $(date -Iseconds) WARN: ovn-master-metrics-cert not mounted after 20 minutes.
+                echo $(date -Iseconds) WARN: ovn-node-metrics-cert not mounted after 20 minutes.
               elif [[ "${HAS_LOGGED_INFO}" -eq 0 ]] ; then
-                echo $(date -Iseconds) INFO: ovn-master-metrics-cert not mounted. Waiting 20 minutes.
+                echo $(date -Iseconds) INFO: ovn-node-metrics-cert not mounted. Waiting 20 minutes.
                 HAS_LOGGED_INFO=1
               fi
           }
@@ -595,7 +595,7 @@ spec:
             sleep 5
           done
 
-          echo $(date -Iseconds) INFO: ovn-master-metrics-certs mounted, starting kube-rbac-proxy
+          echo $(date -Iseconds) INFO: ovn-node-metrics-certs mounted, starting kube-rbac-proxy
           exec /usr/bin/kube-rbac-proxy \
             --logtostderr \
             --secure-listen-address=:9113 \
@@ -612,7 +612,7 @@ spec:
             memory: 20Mi
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
-        - name: ovn-master-metrics-cert
+        - name: ovn-node-metrics-cert
           mountPath: /etc/pki/tls/metrics-cert
           readOnly: True
 
@@ -1080,10 +1080,6 @@ spec:
       - name: ovn-node-metrics-cert
         secret:
           secretName: ovn-node-metrics-cert
-          optional: true
-      - name: ovn-master-metrics-cert
-        secret:
-          secretName: ovn-master-metrics-cert
           optional: true
       tolerations:
       - operator: "Exists"

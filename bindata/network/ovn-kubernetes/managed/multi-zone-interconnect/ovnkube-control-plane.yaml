@@ -171,7 +171,7 @@ spec:
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            --metrics-bind-address "127.0.0.1:29104" \
+            --metrics-bind-address "127.0.0.1:9104" \
             --metrics-enable-pprof \
             --metrics-enable-config-duration \
             ${gateway_mode_flags} \
@@ -204,7 +204,7 @@ spec:
           name: hosted-ca-cert
         - mountPath: /var/run/secrets/hosted_cluster
           name: hosted-cluster-api-access
-        - name: ovn-master-metrics-cert
+        - name: ovn-control-plane-metrics-cert
           mountPath: /etc/pki/tls/metrics-cert
           readOnly: True
         resources:
@@ -224,7 +224,7 @@ spec:
           value: kube-apiserver
         ports:
         - name: metrics-port
-          containerPort: 29104
+          containerPort: 9104
         terminationMessagePolicy: FallbackToLogsOnError
       {{ if .HCPNodeSelector }}
       nodeSelector:
@@ -253,9 +253,9 @@ spec:
       - name: ovn-cert
         secret:
           secretName: ovn-cert
-      - name: ovn-master-metrics-cert
+      - name: ovn-control-plane-metrics-cert
         secret:
-          secretName: ovn-master-metrics-cert
+          secretName: ovn-control-plane-metrics-cert
       - name: admin-kubeconfig
         secret:
           secretName: service-network-admin-kubeconfig
