@@ -900,6 +900,7 @@ spec:
             --nb-cert-common-name "{{.OVN_CERT_CN}}" \
             --enable-multicast \
             --disable-snat-multiple-gws \
+            --enable-admin-network-policy \
             --node-server-privkey ${TLS_PK} \
             --node-server-cert ${TLS_CERT} \
             ${multi_network_enabled_flag} \
