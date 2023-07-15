@@ -78,7 +78,7 @@ spec:
             --logtostderr \
             --secure-listen-address=:9106 \
             --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
-            --upstream=http://127.0.0.1:29104/ \
+            --upstream=http://127.0.0.1:29106/ \
             --tls-private-key-file=${TLS_PK} \
             --tls-cert-file=${TLS_CERT}
         ports:
@@ -94,8 +94,7 @@ spec:
           mountPath: /etc/pki/tls/metrics-cert
           readOnly: True
 
-      # ovnkube control-plane: convert kubernetes objects in to nbdb logical network components
-      - name: ovnkube-control-plane
+      - name: ovnkube-cluster-manager
         image: "{{.OvnImage}}"
         command:
         - /bin/bash
@@ -122,13 +121,13 @@ spec:
             multi_network_enabled_flag="--enable-multi-network"
           fi
 
-          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-control-plane ${K8S_NODE}"
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --init-cluster-manager "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            --metrics-bind-address "127.0.0.1:29104" \
+            --metrics-bind-address "127.0.0.1:29106" \
             --metrics-enable-pprof \
             --metrics-enable-config-duration \
             ${gateway_mode_flags} \
@@ -159,7 +158,7 @@ spec:
               fieldPath: spec.nodeName
         ports:
         - name: metrics-port
-          containerPort: 29104
+          containerPort: 29106
         terminationMessagePolicy: FallbackToLogsOnError
       nodeSelector:
         node-role.kubernetes.io/master: ""
