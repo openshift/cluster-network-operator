@@ -134,7 +134,7 @@ func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	klog.Errorln("Successfully updated sysctl allowlist")
+	klog.Infoln("Successfully updated sysctl allowlist")
 	return reconcile.Result{}, nil
 }
 
