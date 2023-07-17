@@ -105,10 +105,15 @@ func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	// Do not retry when pods are not ready. The daemonset has a BestEffort QoS which
+	// means that in some cases, the pods won't ever be scheduled.
+	// This also prevents unwanted retries when one or more pods are not ready due to
+	// issues with the cluster.
+	// https://issues.redhat.com/browse/OCPBUGS-15818
 	err = checkDsPodsReady(ctx, r.client)
 	if err != nil {
 		klog.Errorf("Failed to verify ready status on allowlist daemonset pods: %v", err)
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	}
 
 	klog.Infoln("Successfully updated sysctl allowlist")
