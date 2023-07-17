@@ -1999,14 +1999,14 @@ func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResu
 			// Note that updateMaster=false has actually no effect, since the YAML
 			// of single-zone master and multi-zone-tmp master are the same
 			klog.Infof("target=multizone: ovnkube-node DS is single zone, update it to multizone")
-			return true, false, false
+			return true, true, true
 
 		} else if ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) {
 			// Second step, node is already multizone: leave master as is and add control plane only if node DS is done progressing
 			if ovn.NodeUpdateStatus.Progressing {
 				klog.Infof("target=multizone: wait for multizone ovnkube-node to roll out before rolling "+
 					"out ovnkube-control-plane (%s)", getProgressingState(ovn))
-				return true, false, false
+				return true, true, true
 			}
 			klog.Infof("target=multizone: ovnkube-node is already multizone, add ovnkube-control-plane " +
 				"if not already present (and do a no-op update on ovnkube-master)")
@@ -2032,7 +2032,7 @@ func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResu
 				ovn.ControlPlaneUpdateStatus != nil && ovn.ControlPlaneUpdateStatus.Progressing {
 				klog.Infof("target=singlezone: wait for ovnkube-master and ovnkube-control-plane to roll out before rolling "+
 					"out single-zone ovnkube-node (%s)", getProgressingState(ovn))
-				return false, true, true
+				return true, true, true
 			}
 			klog.Infof("target=singlezone: ovnkube-master and ovnkube-control-plane have rolled out, update node to single zone")
 			return true, true, true
