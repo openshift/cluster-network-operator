@@ -2,6 +2,7 @@ package allowlist
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,12 +93,14 @@ func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Re
 	defer cleanup(ctx, r.client)
 
 	// If daemonset still exists, delete it and reconcile again
-	if daemonsetExists, err := daemonsetExists(ctx, r.client); daemonsetExists {
-		klog.Errorln("Allowlist daemonset already exists: deleting and retrying")
-		return reconcile.Result{}, errors.New("retrying")
-	} else if err != nil {
+	ds, err := getDaemonSet(ctx, r.client)
+	if err != nil {
 		klog.Errorf("Failed to look up allowlist daemonset: %v", err)
 		return reconcile.Result{}, err
+	}
+	if ds != nil {
+		klog.Errorln("Allowlist daemonset already exists: deleting and retrying")
+		return reconcile.Result{}, errors.New("retrying")
 	}
 
 	err = createObjects(ctx, r.client, manifestDir)
@@ -161,6 +165,14 @@ func createObject(ctx context.Context, client cnoclient.Client, obj *unstructure
 
 func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
 	return wait.Poll(time.Second, time.Minute, func() (done bool, err error) {
+		ds, err := getDaemonSet(ctx, client)
+		if err != nil {
+			return false, err
+		}
+		if ds == nil || ds.GetUID() == "" {
+			return false, fmt.Errorf("failed to get UID of daemon set")
+		}
+
 		podList, err := client.Default().Kubernetes().CoreV1().Pods(names.MULTUS_NAMESPACE).List(
 			ctx, metav1.ListOptions{LabelSelector: allowlistAnnotation})
 		if err != nil {
@@ -172,6 +184,11 @@ func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
 		}
 
 		for _, pod := range podList.Items {
+			// Ignore pods that are not owned by current daemon set.
+			if len(pod.GetOwnerReferences()) == 0 || pod.GetOwnerReferences()[0].UID != ds.GetUID() {
+				continue
+			}
+
 			if len(pod.Status.ContainerStatuses) == 0 || !pod.Status.ContainerStatuses[0].Ready {
 				return false, nil
 			}
@@ -181,17 +198,20 @@ func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
 }
 
 func cleanup(ctx context.Context, client cnoclient.Client) {
-	if exists, err := daemonsetExists(ctx, client); exists {
-		err = deleteDeamonSet(ctx, client)
+	ds, err := getDaemonSet(ctx, client)
+	if err != nil {
+		klog.Errorf("Error looking up allowlist daemonset : %+v", err)
+		return
+	}
+	if ds != nil {
+		err = deleteDaemonSet(ctx, client)
 		if err != nil {
 			klog.Errorf("Error cleaning up allow list daemonset: %+v", err)
 		}
-	} else if err != nil && !apierrors.IsNotFound(err) {
-		klog.Errorf("Error looking up allowlist daemonset : %+v", err)
 	}
 }
 
-func deleteDeamonSet(ctx context.Context, client cnoclient.Client) error {
+func deleteDaemonSet(ctx context.Context, client cnoclient.Client) error {
 	err := client.Default().Kubernetes().AppsV1().DaemonSets(names.MULTUS_NAMESPACE).Delete(
 		ctx, allowlistDsName, metav1.DeleteOptions{})
 	if err != nil {
@@ -200,16 +220,16 @@ func deleteDeamonSet(ctx context.Context, client cnoclient.Client) error {
 	return nil
 }
 
-func daemonsetExists(ctx context.Context, client cnoclient.Client) (bool, error) {
+func getDaemonSet(ctx context.Context, client cnoclient.Client) (*appsv1.DaemonSet, error) {
 	ds, err := client.Default().Kubernetes().AppsV1().DaemonSets(names.MULTUS_NAMESPACE).Get(
 		ctx, allowlistDsName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return false, nil
+			return nil, nil
 		}
-		return false, err
+		return nil, err
 	}
-	return ds != nil, nil
+	return ds, nil
 }
 
 func daemonsetConfigExists(ctx context.Context, client cnoclient.Client) (bool, error) {
