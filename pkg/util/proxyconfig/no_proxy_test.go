@@ -17,6 +17,19 @@ var cfgMapData = `
     networking:
       machineCIDR: 10.0.0.0/16
 `
+var cfgMapDataWithDefaultMachineCIDR = `
+    controlPlane:
+      replicas: 3
+    networking:
+      machineCIDR: 0.0.0.0/0
+`
+var cfgMapDataWithDefaultMachineNetworkCIDR = `
+    controlPlane:
+      replicas: 3
+    networking:
+      machineNetwork:
+      - cidr: 0.0.0.0/0
+`
 
 func proxyConfig() *configv1.Proxy {
 	return &configv1.Proxy{
@@ -250,6 +263,28 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 			},
 			want: ".cluster.local,.foo.test.com,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,localhost",
+			wantErr: false,
+		},
+		{name: "valid proxy config with install config has default Machine CIDR",
+			args: args{
+				proxy:   proxyConfig(),
+				infra:   infraConfig(configv1.AWSPlatformType, "test.cluster.com", "us-west-2"),
+				network: netConfig("10.128.0.0/14", []string{"172.30.0.0/16"}),
+				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapDataWithDefaultMachineCIDR),
+			},
+			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.128.0.0/14,127.0.0.1," +
+				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
+			wantErr: false,
+		},
+		{name: "valid proxy config with install config has default Machine Network CIDR",
+			args: args{
+				proxy:   proxyConfig(),
+				infra:   infraConfig(configv1.AWSPlatformType, "test.cluster.com", "us-west-2"),
+				network: netConfig("10.128.0.0/14", []string{"172.30.0.0/16"}),
+				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapDataWithDefaultMachineNetworkCIDR),
+			},
+			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.128.0.0/14,127.0.0.1," +
+				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
 	}
