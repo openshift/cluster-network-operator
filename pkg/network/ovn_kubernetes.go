@@ -2245,7 +2245,6 @@ func isMigrationToMultiZoneOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneM
 
 		ovn.MasterUpdateStatus != nil &&
 		isVersionGreaterThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 14) &&
-		!ovn.MasterUpdateStatus.Progressing && // master doesn't roll out during migration to multizone
 
 		(ovn.ControlPlaneUpdateStatus == nil ||
 			ovn.ControlPlaneUpdateStatus != nil && ovn.ControlPlaneUpdateStatus.Progressing && !ovn.NodeUpdateStatus.Progressing)
