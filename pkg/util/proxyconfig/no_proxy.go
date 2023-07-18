@@ -14,6 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+const defaultCIDR = "0.0.0.0/0"
+
 // MergeUserSystemNoProxy merges user supplied noProxy settings from proxy
 // with cluster-wide noProxy settings. It returns a merged, comma-separated
 // string of noProxy settings. If no user supplied noProxy settings are
@@ -58,7 +60,7 @@ func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		set.Insert(".hypershift.local")
 	}
 
-	if ic.Networking.MachineCIDR != "" {
+	if ic.Networking.MachineCIDR != "" && ic.Networking.MachineCIDR != defaultCIDR {
 		if _, _, err := net.ParseCIDR(ic.Networking.MachineCIDR); err != nil {
 			return "", fmt.Errorf("MachineCIDR has an invalid CIDR: %s", ic.Networking.MachineCIDR)
 		}
@@ -66,6 +68,9 @@ func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 	}
 
 	for _, mc := range ic.Networking.MachineNetwork {
+		if mc.CIDR == defaultCIDR {
+			continue
+		}
 		if _, _, err := net.ParseCIDR(mc.CIDR); err != nil {
 			return "", fmt.Errorf("MachineNetwork has an invalid CIDR: %s", mc.CIDR)
 		}
