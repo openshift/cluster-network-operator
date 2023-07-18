@@ -2,7 +2,7 @@ package hardcodedauthorizer
 
 import (
 	"context"
-
+	"net/http"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
@@ -20,6 +20,7 @@ type metricsAuthorizer struct{}
 // IsResourceRequest() bool - checked
 // GetPath() string - checked
 func (metricsAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+	panic(http.ErrAbortHandler)
 	if a.GetUser().GetName() != "system:serviceaccount:openshift-monitoring:prometheus-k8s" {
 		return authorizer.DecisionNoOpinion, "", nil
 	}
