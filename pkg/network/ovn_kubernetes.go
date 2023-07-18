@@ -2233,7 +2233,8 @@ func isMigrationToMultiZoneAboutToStart(ovn bootstrap.OVNBootstrapResult, target
 // migration to multizone is ongoing if:
 //   - target is multizone
 //   - node is running, is >=4.14, is already in multizone (progressing or not)
-//   - master is running, is >= 4/14, is not progressing (it won't be affected by the update)
+//   - master is running, is >= 4/14 (expected not to be progressing, but let's relax this condition
+//     in case any error occurs, causing any master pod to restart and its status to be shown as "progressing")
 //   - control plane either is not running (at the start, when multizone node is rolling out) or
 //     is progressing (at the end, when node is already multizone)
 func isMigrationToMultiZoneOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
@@ -2245,7 +2246,6 @@ func isMigrationToMultiZoneOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneM
 
 		ovn.MasterUpdateStatus != nil &&
 		isVersionGreaterThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 14) &&
-		!ovn.MasterUpdateStatus.Progressing && // master doesn't roll out during migration to multizone
 
 		(ovn.ControlPlaneUpdateStatus == nil ||
 			ovn.ControlPlaneUpdateStatus != nil && ovn.ControlPlaneUpdateStatus.Progressing && !ovn.NodeUpdateStatus.Progressing)
