@@ -78,6 +78,12 @@ func add(mgr manager.Manager, r *ReconcileDashboard) error {
 
 	r.client.Default().AddCustomInformer(cmInformer) // Tell the ClusterClient about this informer
 
+	// Initial rendering
+	err = r.applyManifests(context.Background())
+	if err != nil {
+		return err
+	}
+
 	return c.Watch(&source.Informer{Informer: cmInformer},
 		&handler.EnqueueRequestForObject{},
 		predicate.ResourceVersionChangedPredicate{},
@@ -102,12 +108,7 @@ type ReconcileDashboard struct {
 
 func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	klog.Infof("Reconcile dashboards")
-	manifests, err := renderManifests()
-	if err != nil {
-		klog.Errorf("Failed to render dashboard manifests: %v", err)
-		return reconcile.Result{}, err
-	}
-	err = r.applyManifests(ctx, manifests)
+	err := r.applyManifests(ctx)
 	if err != nil {
 		klog.Errorf("Failed to apply dashboard manifests: %v", err)
 		return reconcile.Result{}, err
@@ -119,6 +120,20 @@ func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Re
 	return reconcile.Result{}, nil
 }
 
+func (r *ReconcileDashboard) applyManifests(ctx context.Context) error {
+	klog.Infof("Applying dashboards manifests")
+	manifests, err := renderManifests()
+	if err != nil {
+		return fmt.Errorf("could not render dashboards manifests: %v", err)
+	}
+	for _, obj := range manifests {
+		if err := apply.ApplyObject(ctx, r.client, obj, "dashboards"); err != nil {
+			return fmt.Errorf("could not apply dashboard %s %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
+		}
+	}
+	return nil
+}
+
 func renderManifests() ([]*unstructured.Unstructured, error) {
 	data := render.MakeRenderData()
 	data.Data["DashboardNamespace"] = names.DashboardNamespace
@@ -127,14 +142,4 @@ func renderManifests() ([]*unstructured.Unstructured, error) {
 		data.Data["DashboardContent"+ref.tplSuffix] = ref.json
 	}
 	return render.RenderDir(manifestDir, &data)
-}
-
-func (r *ReconcileDashboard) applyManifests(ctx context.Context, manifests []*unstructured.Unstructured) error {
-	klog.Infof("Applying dashboards manifests")
-	for _, obj := range manifests {
-		if err := apply.ApplyObject(ctx, r.client, obj, "dashboards"); err != nil {
-			return fmt.Errorf("could not apply dashboard %s %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
-		}
-	}
-	return nil
 }
