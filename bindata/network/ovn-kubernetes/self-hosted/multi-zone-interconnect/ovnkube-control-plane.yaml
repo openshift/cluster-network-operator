@@ -18,7 +18,7 @@ spec:
       # by default, Deployments spin up the new pod before terminating the old one
       # but we don't want that - because ovsdb holds the lock.
       maxSurge: 0
-      maxUnavailable: 3
+      maxUnavailable: 1
   template:
     metadata:
       annotations:
