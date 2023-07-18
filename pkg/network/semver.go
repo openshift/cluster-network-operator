@@ -67,19 +67,3 @@ func isVersionGreaterThanOrEqualTo(version string, major int, minor int) bool {
 		return false
 	}
 }
-
-func isVersionLessThanOrEqualTo(version string, major int, minor int) bool {
-	v, err := semver.NewVersion(version)
-	if err != nil {
-		klog.Errorf("failed to parse version %s: %v", version, err)
-		return false
-	}
-
-	if v.Major() < int64(major) {
-		return true
-	} else if v.Major() == int64(major) {
-		return v.Minor() <= int64(minor)
-	} else {
-		return false
-	}
-}

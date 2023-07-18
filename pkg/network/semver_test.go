@@ -66,50 +66,42 @@ func TestVersionComparison(t *testing.T) {
 		version                    string
 		otherVersionMajor          int
 		otherVersionMinor          int
-		resultLessThanOrEqualTo    bool
 		resultGreaterThanOrEqualTo bool
 	}{
 		{
 			"4.14",
 			4, 14,
-			true, // <=
 			true, // >=
 		},
 		{
 			"4.14",
 			4, 15,
-			true,  // <=
 			false, // >=
 		},
 		{
 			"4.14",
 			4, 13,
-			false, // <=
-			true,  // >=
+			true, // >=
 		},
 		{
 			"4.14.0-0.ci.test-2023-06-14-124931-ci-ln-md7ivqb-latest",
 			4, 14,
-			true, // <=
 			true, // >=
 		},
 		{
 			"4.14.0-0.ci.test-2023-06-14-124931-ci-ln-md7ivqb-latest",
 			4, 15,
-			true,  // <=
 			false, // >=
 		},
 		{
 			"4.14.0-0.ci.test-2023-06-14-124931-ci-ln-md7ivqb-latest",
 			4, 13,
-			false, // <=
-			true,  // >=
+			true, // >=
 		},
 	} {
 		t.Run(strconv.Itoa(idx), func(t *testing.T) {
 			g := NewGomegaWithT(t)
 
-			g.Expect(isVersionLessThanOrEqualTo(tc.version, tc.otherVersionMajor, tc.otherVersionMinor)).To(Equal(tc.resultLessThanOrEqualTo))
 			g.Expect(isVersionGreaterThanOrEqualTo(tc.version, tc.otherVersionMajor, tc.otherVersionMinor)).To(Equal(tc.resultGreaterThanOrEqualTo))
 		})
 	}

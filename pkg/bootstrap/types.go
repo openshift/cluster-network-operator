@@ -61,6 +61,7 @@ type OVNUpdateStatus struct {
 	IPFamilyMode         string
 	ClusterNetworkCIDRs  string
 	Progressing          bool
+	InterConnectEnabled  bool
 	InterConnectZoneMode string
 }
 

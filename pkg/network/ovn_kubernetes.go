@@ -1389,9 +1389,11 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 			masterStatus.ClusterNetworkCIDRs = masterSS.GetAnnotations()[names.ClusterNetworkCIDRsAnnotation]
 			masterStatus.Version = masterSS.GetAnnotations()["release.openshift.io/version"]
 			masterStatus.Progressing = statefulSetProgressing(masterSS)
-			masterStatus.InterConnectZoneMode = string(zoneModeSingleZone) // only used for single zone
+			masterStatus.InterConnectEnabled = isInterConnectEnabledOnMasterStatefulSet(masterSS)
+			masterStatus.InterConnectZoneMode = string(zoneModeSingleZone) // master is only used for single zone
 
-			klog.Infof("ovnkube-master SS status: zone-mode=%s, progressing=%t", masterStatus.InterConnectZoneMode, masterStatus.Progressing)
+			klog.Infof("ovnkube-master SS status: IC=%t, zone-mode=%s, progressing=%t",
+				masterStatus.InterConnectEnabled, masterStatus.InterConnectZoneMode, masterStatus.Progressing)
 		}
 
 	} else {
@@ -1420,9 +1422,11 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 			masterStatus.ClusterNetworkCIDRs = masterDS.GetAnnotations()[names.ClusterNetworkCIDRsAnnotation]
 			masterStatus.Version = masterDS.GetAnnotations()["release.openshift.io/version"]
 			masterStatus.Progressing = daemonSetProgressing(masterDS, false)
-			masterStatus.InterConnectZoneMode = string(zoneModeSingleZone) // only used for single zone
+			masterStatus.InterConnectEnabled = isInterConnectEnabledOnMasterDaemonset(masterDS)
+			masterStatus.InterConnectZoneMode = string(zoneModeSingleZone) // master is only used for single zone
 
-			klog.Infof("ovnkube-master DS status: zone-mode=%s, progressing=%t", masterStatus.InterConnectZoneMode, masterStatus.Progressing)
+			klog.Infof("ovnkube-master DS status: IC=%t, zone-mode=%s, progressing=%t",
+				masterStatus.InterConnectEnabled, masterStatus.InterConnectZoneMode, masterStatus.Progressing)
 		}
 
 	}
@@ -1451,9 +1455,11 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		controlPlaneStatus.ClusterNetworkCIDRs = controlPlaneDeployment.GetAnnotations()[names.ClusterNetworkCIDRsAnnotation]
 		controlPlaneStatus.Version = controlPlaneDeployment.GetAnnotations()["release.openshift.io/version"]
 		controlPlaneStatus.Progressing = deploymentProgressing(controlPlaneDeployment)
+		controlPlaneStatus.InterConnectEnabled = true
 		controlPlaneStatus.InterConnectZoneMode = string(zoneModeMultiZone) // only deployed in multizone
 
-		klog.Infof("ovnkube-control-plane deployment status: zone-mode=%s, progressing=%t", controlPlaneStatus.InterConnectZoneMode, controlPlaneStatus.Progressing)
+		klog.Infof("ovnkube-control-plane deployment status: zone-mode=%s, progressing=%t",
+			controlPlaneStatus.InterConnectZoneMode, controlPlaneStatus.Progressing)
 
 	}
 
@@ -1480,9 +1486,11 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		nodeStatus.ClusterNetworkCIDRs = nodeDS.GetAnnotations()[names.ClusterNetworkCIDRsAnnotation]
 		nodeStatus.Version = nodeDS.GetAnnotations()["release.openshift.io/version"]
 		nodeStatus.Progressing = daemonSetProgressing(nodeDS, true)
+		nodeStatus.InterConnectEnabled = isInterConnectEnabledOnNodeDaemonset(nodeDS)
 		nodeStatus.InterConnectZoneMode = string(getInterConnectZoneModeForNodeDaemonSet(nodeDS))
 
-		klog.Infof("ovnkube-node DS status: zone-mode=%s, progressing=%t", nodeStatus.InterConnectZoneMode, nodeStatus.Progressing)
+		klog.Infof("ovnkube-node DS status: IC=%t,  zone-mode=%s, progressing=%t",
+			nodeStatus.InterConnectEnabled, nodeStatus.InterConnectZoneMode, nodeStatus.Progressing)
 
 	}
 
@@ -1988,8 +1996,8 @@ func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResu
 
 	// When both DSs are in 4.13, we're in phase 1 of the upgrade from a non-IC version;
 	// phase 1 is carried out by shouldUpdateOVNKonUpgrade. Nothing to do here.
-	if isVersionLessThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 13) ||
-		ovn.MasterUpdateStatus != nil && isVersionLessThanOrEqualTo(ovn.MasterUpdateStatus.Version, 4, 13) {
+	if !ovn.NodeUpdateStatus.InterConnectEnabled ||
+		ovn.MasterUpdateStatus != nil && !ovn.MasterUpdateStatus.InterConnectEnabled {
 		return true, true, true
 	}
 
@@ -2218,6 +2226,44 @@ func getInterConnectZoneModeForNodeDaemonSet(ds *appsv1.DaemonSet) InterConnectZ
 	return zoneModeSingleZone
 }
 
+func isInterConnectEnabledOnMasterStatefulSet(ss *appsv1.StatefulSet) bool {
+	for _, container := range ss.Spec.Template.Spec.Containers {
+		if container.Name == "ovnkube-master" {
+			for _, c := range container.Command {
+				if strings.Contains(c, "--enable-interconnect") {
+					return true
+				}
+			}
+			break
+		}
+	}
+	return false
+}
+
+func isInterConnectEnabledOnDaemonset(ds *appsv1.DaemonSet, containerName string) bool {
+	for _, container := range ds.Spec.Template.Spec.Containers {
+		if container.Name == containerName {
+			klog.Infof("ds=%s, found container %s", ds.Name, containerName)
+			for _, c := range container.Command {
+				if strings.Contains(c, "--enable-interconnect") {
+					klog.Infof("ds=%s, found enable-interconnect!!!", ds.Name)
+					return true
+				}
+			}
+			break
+		}
+	}
+	return false
+}
+
+func isInterConnectEnabledOnNodeDaemonset(ds *appsv1.DaemonSet) bool {
+	return isInterConnectEnabledOnDaemonset(ds, "ovnkube-node")
+}
+
+func isInterConnectEnabledOnMasterDaemonset(ds *appsv1.DaemonSet) bool {
+	return isInterConnectEnabledOnDaemonset(ds, "ovnkube-master")
+}
+
 // migration from single zone to multizone is about to start if:
 // - target is multizone during a simple zone migration, single zone during an upgrade from a non-interconnect version (< 4.14)
 // - node is running, is >= 4.14 (--interconnect-enabled), is in single zone and is not progressing
@@ -2231,8 +2277,10 @@ func isMigrationToMultiZoneAboutToStart(ovn bootstrap.OVNBootstrapResult, target
 	return targetZoneMode.zoneMode == targetZoneModeValue &&
 
 		ovn.NodeUpdateStatus != nil && ovn.MasterUpdateStatus != nil && ovn.ControlPlaneUpdateStatus == nil &&
-		isVersionGreaterThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 14) &&
-		isVersionGreaterThanOrEqualTo(ovn.MasterUpdateStatus.Version, 4, 14) &&
+
+		ovn.NodeUpdateStatus.InterConnectEnabled &&
+		ovn.MasterUpdateStatus.InterConnectEnabled &&
+
 		ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeSingleZone) &&
 
 		!ovn.NodeUpdateStatus.Progressing &&
@@ -2243,18 +2291,18 @@ func isMigrationToMultiZoneAboutToStart(ovn bootstrap.OVNBootstrapResult, target
 //   - target is multizone
 //   - node is running, is >=4.14, is already in multizone (progressing or not)
 //   - master is running, is >= 4/14 (expected not to be progressing, but let's relax this condition
-//     in case any error occurs, causing any master pod to restart and its status to be shown as "progressing")
+//     in case any error occurs on the pod, causing any master pod to restart and its status to be shown as "progressing")
 //   - control plane either is not running (at the start, when multizone node is rolling out) or
 //     is progressing (at the end, when node is already multizone)
 func isMigrationToMultiZoneOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
 	return targetZoneMode.zoneMode == zoneModeMultiZone &&
 
 		ovn.NodeUpdateStatus != nil &&
-		isVersionGreaterThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 14) &&
+		ovn.NodeUpdateStatus.InterConnectEnabled &&
 		ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) && // can be progressing or not
 
 		ovn.MasterUpdateStatus != nil &&
-		isVersionGreaterThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 14) &&
+		ovn.MasterUpdateStatus.InterConnectEnabled &&
 
 		(ovn.ControlPlaneUpdateStatus == nil ||
 			ovn.ControlPlaneUpdateStatus != nil && ovn.ControlPlaneUpdateStatus.Progressing && !ovn.NodeUpdateStatus.Progressing)
@@ -2271,15 +2319,14 @@ func isMigrationToMultiZoneComplete(ovn bootstrap.OVNBootstrapResult, targetZone
 
 		ovn.NodeUpdateStatus != nil && ovn.ControlPlaneUpdateStatus != nil &&
 
-		isVersionGreaterThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 14) &&
+		ovn.NodeUpdateStatus.InterConnectEnabled &&
 		ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) &&
 
 		!ovn.NodeUpdateStatus.Progressing &&
 		!ovn.ControlPlaneUpdateStatus.Progressing &&
 
 		// master is still up and updated to 4.14; converge to end of zone migration also if master is already gone
-		(ovn.MasterUpdateStatus == nil ||
-			isVersionGreaterThanOrEqualTo(ovn.MasterUpdateStatus.Version, 4, 14) && !ovn.MasterUpdateStatus.Progressing)
+		(ovn.MasterUpdateStatus == nil || ovn.MasterUpdateStatus.InterConnectEnabled && !ovn.MasterUpdateStatus.Progressing)
 }
 
 func isMigrationToMultiZoneAboutToStartOrOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
@@ -2298,8 +2345,7 @@ func isMigrationToSingleZoneAboutToStart(ovn bootstrap.OVNBootstrapResult, targe
 		ovn.MasterUpdateStatus == nil &&
 		ovn.ControlPlaneUpdateStatus != nil &&
 
-		isVersionGreaterThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 14) &&
-
+		ovn.NodeUpdateStatus.InterConnectEnabled &&
 		ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) &&
 
 		!ovn.NodeUpdateStatus.Progressing &&
@@ -2314,13 +2360,10 @@ func isMigrationToSingleZoneAboutToStart(ovn bootstrap.OVNBootstrapResult, targe
 func isMigrationToSingleZoneOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
 	return targetZoneMode.zoneMode == zoneModeSingleZone &&
 
-		ovn.NodeUpdateStatus != nil &&
-		isVersionGreaterThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 14) &&
-		// ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeSingleZone) && // can be progressing or not
+		ovn.NodeUpdateStatus != nil && ovn.NodeUpdateStatus.InterConnectEnabled &&
 
 		ovn.MasterUpdateStatus != nil &&
-		isVersionGreaterThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 14) &&
-		ovn.MasterUpdateStatus.InterConnectZoneMode == string(zoneModeSingleZone) &&
+		ovn.MasterUpdateStatus.InterConnectEnabled &&
 
 		// node is not progressing (and in multizone) && master is progressing && master is single zone
 		(!ovn.NodeUpdateStatus.Progressing &&
@@ -2343,16 +2386,20 @@ func isZoneModeMigrationAboutToStartOrOngoing(ovn bootstrap.OVNBootstrapResult, 
 	return isMigrationToMultiZoneAboutToStartOrOngoing(ovn, targetZoneMode) || isMigrationToSingleZoneAboutToStartOrOngoing(ovn, targetZoneMode)
 }
 
+func doesVersionEnableInterConnect(string) bool {
+	return isVersionGreaterThanOrEqualTo(os.Getenv("RELEASE_VERSION"), 4, 14)
+}
+
 func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnoclient.Client, targetZoneMode *targetZoneModeType) error {
 
 	// [start of phase 1]
 	// if node and master DSs are <= 4.13 (no IC support) and we're upgrading to >= 4.14 (IC),
 	// go through an intermediate step with IC single-zone DSs. Track this temporary state
 	// by pushing a configmap.
-	if ovn.MasterUpdateStatus != nil && ovn.NodeUpdateStatus != nil && ovn.ControlPlaneUpdateStatus == nil &&
-		isVersionLessThanOrEqualTo(ovn.MasterUpdateStatus.Version, 4, 13) &&
-		isVersionLessThanOrEqualTo(ovn.NodeUpdateStatus.Version, 4, 13) &&
-		isVersionGreaterThanOrEqualTo(os.Getenv("RELEASE_VERSION"), 4, 14) &&
+	if ovn.NodeUpdateStatus != nil && ovn.MasterUpdateStatus != nil && ovn.ControlPlaneUpdateStatus == nil &&
+		!ovn.NodeUpdateStatus.InterConnectEnabled &&
+		!ovn.MasterUpdateStatus.InterConnectEnabled &&
+		doesVersionEnableInterConnect(os.Getenv("RELEASE_VERSION")) &&
 		!ovn.NodeUpdateStatus.Progressing &&
 		!ovn.MasterUpdateStatus.Progressing &&
 		!targetZoneMode.configMapFound {
