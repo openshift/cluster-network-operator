@@ -400,7 +400,8 @@ spec:
             ${export_network_flows_flags} \
             ${multi_network_enabled_flag} \
             ${multi_network_policy_enabled_flag} \
-            ${gw_interface_flag}
+            ${gw_interface_flag} \
+            --enable-multi-external-gateway=true
         env:
         # for kubectl
         - name: KUBERNETES_SERVICE_PORT
