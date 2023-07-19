@@ -102,6 +102,7 @@ spec:
           fi
 
           echo "$(date -Iseconds) - starting ovn-controller"
+          OVNPID=()
           exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
             --no-chdir --pidfile=/var/run/ovn/ovn-controller.pid \
             --syslog-method="{{.OVNPolicyAuditDestination}}" \
@@ -111,7 +112,11 @@ spec:
             -vconsole:"${OVN_LOG_LEVEL}" -vconsole:"acl_log:off" \
             -vPATTERN:console:"{{.OVN_LOG_PATTERN_CONSOLE}}" \
             -vsyslog:"acl_log:info" \
-            -vfile:"acl_log:info"
+            -vfile:"acl_log:info" \
+            -vvconn \
+            -vjsonrpc & OVNPID+=($!)
+          while ! ovn-appctl vlog/disable-rate-limit ; do sleep 1 ; done;
+          wait "${OVNPID[@]}"
         securityContext:
           privileged: true
         env:
