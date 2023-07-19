@@ -24,6 +24,13 @@ spec:
     matchLabels:
       app: multus-admission-controller
       namespace: {{.AdmissionControllerNamespace}}
+{{- if and .HyperShiftEnabled (gt .Replicas 1)}}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+{{- end }}
   template:
     metadata:
       annotations:
