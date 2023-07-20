@@ -28,6 +28,8 @@ data:
 {{- end  }}
     platform-type="{{.PlatformType}}"
     healthz-bind-address="0.0.0.0:10256"
+    dns-service-namespace="openshift-dns"
+    dns-service-name="dns-default"
  
     [ovnkubernetesfeature]
     enable-egress-ip=true
