@@ -27,6 +27,7 @@ import (
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	cnofake "github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 )
 
@@ -84,8 +85,9 @@ func TestRenderOVNKubernetes(t *testing.T) {
 			},
 		},
 	}
+	fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
 
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-master")))
@@ -140,13 +142,12 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 			},
 		},
 	}
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	script, err := findNBDBPostStart(objs)
+	err = checkNBDBPostStart(objs)
 	g.Expect(err).NotTo(HaveOccurred())
-
-	g.Expect(script).To(ContainSubstring("pssl:9641"))
 
 	bootstrapResult = fakeBootstrapResult()
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
@@ -161,13 +162,11 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 			},
 		},
 	}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	script, err = findNBDBPostStart(objs)
+	err = checkNBDBPostStart(objs)
 	g.Expect(err).NotTo(HaveOccurred())
-
-	g.Expect(script).To(ContainSubstring("pssl:9641:[::]"))
 }
 
 func TestRenderedOVNKubernetesConfig(t *testing.T) {
@@ -722,7 +721,8 @@ nodeport=true`,
 					DisableUDPAggregation: tc.disableGRO,
 				},
 			}
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+			fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 			g.Expect(err).NotTo(HaveOccurred())
 			confFile := extractOVNKubeConfig(g, objs)
 			g.Expect(confFile).To(Equal(strings.TrimSpace(tc.expected)))
@@ -734,46 +734,72 @@ nodeport=true`,
 
 }
 
-func findNBDBPostStart(objects []*uns.Unstructured) (string, error) {
-	var master *uns.Unstructured
+func checkNBDBPostStart(objects []*uns.Unstructured) error {
+	var dss []*uns.Unstructured
+	masters := 0
 	for _, obj := range objects {
-		if obj.GetKind() == "DaemonSet" && obj.GetNamespace() == "openshift-ovn-kubernetes" && obj.GetName() == "ovnkube-master" {
-			master = obj
-			break
+		if obj.GetKind() == "DaemonSet" && obj.GetNamespace() == "openshift-ovn-kubernetes" {
+			if obj.GetName() == "ovnkube-master" {
+				masters++
+			} else if obj.GetName() != "ovnkube-node" {
+				continue
+			}
+			dss = append(dss, obj)
 		}
 	}
-	if master == nil {
-		return "", fmt.Errorf("could not find DaemonSet openshift-ovn-kubernetes/ovnkube-master")
+	if masters == 0 {
+		return fmt.Errorf("could not find master DaemonSet")
+	}
+	if len(dss) <= 1 {
+		return fmt.Errorf("could not find enough DaemonSets")
 	}
 
-	containers, found, err := uns.NestedSlice(master.Object, "spec", "template", "spec", "containers")
-	if err != nil {
-		return "", err
-	} else if !found {
-		return "", fmt.Errorf("could not find containers in DaemonSet ovnkube-master")
-	}
+	for _, ds := range dss {
 
-	var nbdb map[string]interface{}
-	for _, container := range containers {
-		cmap := container.(map[string]interface{})
-		name, found, err := uns.NestedString(cmap, "name")
-		if found && err == nil && name == "nbdb" {
-			nbdb = cmap
-			break
+		containers, found, err := uns.NestedSlice(ds.Object, "spec", "template", "spec", "containers")
+		if err != nil {
+			return fmt.Errorf("failed to get containers from daemonset %s : %w", ds.GetName(), err)
+		}
+		if !found {
+			return fmt.Errorf("unable to find containers in daemonset %s : %w", ds.GetName(), err)
+		}
+
+		var nbdb map[string]interface{}
+		for _, container := range containers {
+			cmap := container.(map[string]interface{})
+			name, found, err := uns.NestedString(cmap, "name")
+			if found && err == nil && name == "nbdb" {
+				nbdb = cmap
+				break
+			}
+		}
+		if ds.GetName() == "ovnkube-master" {
+			if nbdb != nil {
+				return fmt.Errorf("daemonSet openshift-ovn-kubernetes/ovnkube-master is not expected to have nbdb container")
+			}
+			continue
+		}
+
+		// Check ndbd node containers to have expected script
+		if nbdb == nil {
+			return fmt.Errorf("daemonSet openshift-ovn-kubernetes/ovnkube-node is expected to have nbdb container")
+		}
+
+		script, found, err := uns.NestedStringSlice(nbdb, "lifecycle", "postStart", "exec", "command")
+		if err != nil {
+			return fmt.Errorf("unable to get postStart in daemonset %s : %w", ds.GetName(), err)
+		}
+		if !found {
+			return fmt.Errorf("could not find nbdb postStart script in daemonset %s", ds.GetName())
+		}
+
+		expectedScriptSubStr := "Successfully set northd probe interval"
+		if !strings.Contains(strings.Join(script, " "), expectedScriptSubStr) {
+			return fmt.Errorf("postStart script in daemonset %s does not contain %s: %s", ds.GetName(), expectedScriptSubStr, script)
 		}
 	}
-	if nbdb == nil {
-		return "", fmt.Errorf("could not find nbdb container in DaemonSet ovnkube-master")
-	}
 
-	script, found, err := uns.NestedStringSlice(nbdb, "lifecycle", "postStart", "exec", "command")
-	if err != nil {
-		return "", err
-	} else if !found {
-		return "", fmt.Errorf("could not find nbdb postStart script")
-	}
-
-	return strings.Join(script, " "), nil
+	return nil
 }
 
 func TestFillOVNKubernetesDefaults(t *testing.T) {
@@ -1722,7 +1748,8 @@ metadata:
 				PrePullerUpdateStatus: prepullerStatus,
 			}
 
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+			fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
@@ -2034,7 +2061,8 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 
 	// the new rendered config should hold the node to do the dualstack conversion
 	// the upgrade code holds the masters to update the nodes first
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+	fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2127,7 +2155,8 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 				},
 				FlowsConfig: tc.FlowsConfig,
 			}
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn)
+			fakeClient := cnofake.NewFakeClient() // TODO add a number of nodes
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
 			g.Expect(err).ToNot(HaveOccurred())
 			nodeDS := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 			ds := appsv1.DaemonSet{}

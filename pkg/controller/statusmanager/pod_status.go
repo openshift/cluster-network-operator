@@ -13,11 +13,14 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/util"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -102,7 +105,7 @@ func (status *StatusManager) SetFromPods() {
 			if !isNonCritical(ds) {
 				hung = append(hung, status.CheckCrashLoopBackOffPods(dsName, ds.Spec.Selector.MatchLabels, "DaemonSet")...)
 			}
-		} else if ds.Status.NumberAvailable == 0 { // NOTE: update this if we ever expect empty (unscheduled) daemonsets ~cdc
+		} else if ds.Status.NumberAvailable == 0 && ds.Status.DesiredNumberScheduled > 0 {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not yet scheduled on any nodes", dsName.String()))
 			dsProgressing = true
 		} else if ds.Generation > ds.Status.ObservedGeneration {
@@ -110,8 +113,29 @@ func (status *StatusManager) SetFromPods() {
 			dsProgressing = true
 		}
 
-		if ds.Annotations["release.openshift.io/version"] != targetLevel {
+		// hack for 2-phase upgrade from non-IC to IC versions:
+		// don't update the version field until phase 2 is over
+		twoPhaseUpgradeIsOngoing := false
+		icConfigMap, err := util.GetInterConnectConfigMap(status.client.ClientFor("").Kubernetes())
+		if err == nil {
+			// while the upgrade is ongoing, the IC configmap exists and exhibits a fromVersion value.
+			// When phase 2 is over, the configmap is deleted.
+			if fromVersion, ok := icConfigMap.Data["from-version"]; ok && fromVersion != "" {
+				twoPhaseUpgradeIsOngoing = true
+				klog.Infof("riccardo: two-phase upgrade is ongoing")
+			}
+		} else {
+			if errors.IsNotFound(err) {
+				klog.Infof("riccardo: IC configmap not found, ") // TODO remove this
+			} else {
+				klog.Errorf("riccardo: could not fetch IC configmap") // TODO remove this
+
+			}
+		}
+
+		if ds.Annotations["release.openshift.io/version"] != targetLevel || twoPhaseUpgradeIsOngoing {
 			reachedAvailableLevel = false
+			klog.Infof("riccardo: two-phase upgrade is ongoing: reachedAvailableLevel=false")
 		}
 
 		var dsHung *string
