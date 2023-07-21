@@ -79,6 +79,7 @@ spec:
             -vsyslog:"acl_log:info" \
             -vfile:"acl_log:info" \
             -vvconn \
+            -vmain \
             -vjsonrpc & OVNPID+=($!)
           while ! ovn-appctl vlog/disable-rate-limit ; do sleep 1 ; done;
           wait "${OVNPID[@]}"
