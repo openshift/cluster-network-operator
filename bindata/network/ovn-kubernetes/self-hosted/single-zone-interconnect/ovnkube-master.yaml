@@ -102,7 +102,7 @@ spec:
                 - OVN_MANAGE_OVSDB=no /usr/share/ovn/scripts/ovn-ctl stop_northd
         env:
         - name: OVN_LOG_LEVEL
-          value: info 
+          value: info
         volumeMounts:
         - mountPath: /etc/openvswitch/
           name: etc-openvswitch
@@ -124,7 +124,7 @@ spec:
             memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
-      # nbdb: the northbound, or logical network object DB. In raft mode 
+      # nbdb: the northbound, or logical network object DB. In raft mode
       - name: nbdb
         image: "{{.OvnImage}}"
         command:
@@ -166,7 +166,7 @@ spec:
             local db=${2}
             local port=${3}
             echo "Checking if ${pod} is part of cluster"
-            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
+            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed.
             init_ip=$(timeout 5 kubectl get pod -n ${ovn_kubernetes_namespace} ${pod} -o=jsonpath='{.status.podIP}')
             if [[ $? != 0 ]]; then
               echo "Unable to get ${pod} ip "
@@ -184,13 +184,13 @@ spec:
             return 0
           }
           # end of db_part_of_cluster
-          
+
           # Checks if cluster has already been initialized.
           # If not it returns false and sets init_ip to CLUSTER_INITIATOR_IP
           cluster_exists() {
             local db=${1}
             local port=${2}
-            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
+            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed.
             db_pods=$(timeout 5 kubectl get pod -n ${ovn_kubernetes_namespace} -o=jsonpath='{.items[*].metadata.name}' | egrep -o 'ovnkube-master-\w+' | grep -v "metrics")
 
             for db_pod in $db_pods; do
@@ -226,7 +226,7 @@ spec:
           CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
           echo "$(date -Iseconds) - starting nbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}, K8S_NODE_IP=${K8S_NODE_IP}"
           initialize="false"
-          
+
           if [[ ! -e ${ovn_db_file} ]]; then
             initialize="true"
           fi
@@ -436,7 +436,7 @@ spec:
               /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
         env:
         - name: OVN_LOG_LEVEL
-          value: info 
+          value: info
         - name: OVN_NORTHD_PROBE_INTERVAL
           value: "{{.OVN_NORTHD_PROBE_INTERVAL}}"
         - name: K8S_NODE_IP
@@ -486,7 +486,7 @@ spec:
           TS=$(date +%s)
           WARN_TS=$(( ${TS} + $(( 20 * 60)) ))
           HAS_LOGGED_INFO=0
-          
+
           log_missing_certs(){
               CUR_TS=$(date +%s)
               if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
@@ -500,7 +500,7 @@ spec:
             log_missing_certs
             sleep 5
           done
-          
+
           echo $(date -Iseconds) INFO: ovn-master-metrics-certs mounted, starting kube-rbac-proxy
           exec /usr/bin/kube-rbac-proxy \
             --logtostderr \
@@ -564,7 +564,7 @@ spec:
             local db=${2}
             local port=${3}
             echo "Checking if ${pod} is part of cluster"
-            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
+            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed.
             init_ip=$(timeout 5 kubectl get pod -n ${ovn_kubernetes_namespace} ${pod} -o=jsonpath='{.status.podIP}')
             if [[ $? != 0 ]]; then
               echo "Unable to get ${pod} ip "
@@ -582,13 +582,13 @@ spec:
             return 0
           }
           # end of db_part_of_cluster
-          
+
           # Checks if cluster has already been initialized.
           # If not it returns false and sets init_ip to CLUSTER_INITIATOR_IP
           cluster_exists() {
             local db=${1}
             local port=${2}
-            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed. 
+            # TODO: change to use '--request-timeout=5s', if https://github.com/kubernetes/kubernetes/issues/49343 is fixed.
             db_pods=$(timeout 5 kubectl get pod -n ${ovn_kubernetes_namespace} -o=jsonpath='{.items[*].metadata.name}' | egrep -o 'ovnkube-master-\w+' | grep -v "metrics")
 
             for db_pod in $db_pods; do
@@ -624,7 +624,7 @@ spec:
           CLUSTER_INITIATOR_IP="{{.OVN_DB_CLUSTER_INITIATOR}}"
           echo "$(date -Iseconds) - starting sbdb  CLUSTER_INITIATOR_IP=${CLUSTER_INITIATOR_IP}"
           initialize="false"
-          
+
           if [[ ! -e ${ovn_db_file} ]]; then
             initialize="true"
           fi
@@ -788,7 +788,7 @@ spec:
               /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
         env:
         - name: OVN_LOG_LEVEL
-          value: info 
+          value: info
         - name: K8S_NODE_IP
           valueFrom:
             fieldRef:
@@ -821,8 +821,125 @@ spec:
             memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
-      # ovnkube master: convert kubernetes objects in to nbdb logical network components
-      - name: ovnkube-master
+      - name: kube-rbac-proxy-cluster-manager
+        image: {{.KubeRBACProxyImage}}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          TLS_PK=/etc/pki/tls/metrics-cert/tls.key
+          TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
+          # As the secret mount is optional we must wait for the files to be present.
+          # The service is created in monitor.yaml and this is created in sdn.yaml.
+          TS=$(date +%s)
+          WARN_TS=$(( ${TS} + $(( 20 * 60)) ))
+          HAS_LOGGED_INFO=0
+
+          log_missing_certs(){
+              CUR_TS=$(date +%s)
+              if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
+                echo $(date -Iseconds) WARN: ovn-master-metrics-cert not mounted after 20 minutes.
+              elif [[ "${HAS_LOGGED_INFO}" -eq 0 ]] ; then
+                echo $(date -Iseconds) INFO: ovn-master-metrics-cert not mounted. Waiting 20 minutes.
+                HAS_LOGGED_INFO=1
+              fi
+          }
+          while [[ ! -f "${TLS_PK}" ||  ! -f "${TLS_CERT}" ]] ; do
+            log_missing_certs
+            sleep 5
+          done
+
+          echo $(date -Iseconds) INFO: ovn-master-metrics-certs mounted, starting kube-rbac-proxy
+          exec /usr/bin/kube-rbac-proxy \
+            --logtostderr \
+            --secure-listen-address=:9108 \
+            --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
+            --upstream=http://127.0.0.1:29108/ \
+            --tls-private-key-file=${TLS_PK} \
+            --tls-cert-file=${TLS_CERT}
+        ports:
+        - containerPort: 9108
+          name: https
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: ovn-master-metrics-cert
+          mountPath: /etc/pki/tls/metrics-cert
+          readOnly: True
+
+      - name: ovnkube-cluster-manager
+        image: "{{.OvnImage}}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+          if [[ -f "/env/_master" ]]; then
+            set -o allexport
+            source "/env/_master"
+            set +o allexport
+          fi
+
+          if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
+            gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
+          elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
+            gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
+          else
+            echo "Invalid OVN_GATEWAY_MODE: \"{{.OVN_GATEWAY_MODE}}\". Must be \"local\" or \"shared\"."
+            exit 1
+          fi
+
+          multi_network_enabled_flag=
+          if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" ]]; then
+            multi_network_enabled_flag="--enable-multi-network"
+          fi
+
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-control-plane ${K8S_NODE}"
+          exec /usr/bin/ovnkube \
+            --init-cluster-manager "${K8S_NODE}" \
+            --config-file=/run/ovnkube-config/ovnkube.conf \
+            --ovn-empty-lb-events \
+            --loglevel "${OVN_KUBE_LOG_LEVEL}" \
+            --metrics-bind-address "127.0.0.1:29108" \
+            --metrics-enable-pprof \
+            --metrics-enable-config-duration \
+            ${gateway_mode_flags} \
+            --enable-multicast \
+            --disable-snat-multiple-gws \
+            ${multi_network_enabled_flag} \
+            --enable-interconnect \
+            --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
+        volumeMounts:
+        - mountPath: /run/ovnkube-config/
+          name: ovnkube-config
+        - mountPath: /env
+          name: env-overrides
+        - mountPath: /ovn-cert
+          name: ovn-cert
+        - mountPath: /ovn-ca
+          name: ovn-ca
+        resources:
+          requests:
+            cpu: 10m
+            memory: 300Mi
+        env:
+        - name: OVN_KUBE_LOG_LEVEL
+          value: "4"
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        ports:
+        - name: metrics-port-cm
+          containerPort: 29108
+
+      # ovnkube-controller: convert kubernetes objects in to nbdb logical network components
+      - name: ovnkube-controller
         image: "{{.OvnImage}}"
         command:
         - /bin/bash
@@ -854,11 +971,11 @@ spec:
             multi_network_policy_enabled_flag="--enable-multi-networkpolicy"
           fi
 
-          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-ovnkube-controller ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
             --zone global \
-            --init-master "${K8S_NODE}" \
+            --init-ovnkube-controller "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \

@@ -830,8 +830,113 @@ spec:
             memory: 130Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
-      # ovnkube master: convert kubernetes objects in to nbdb logical network components
-      - name: ovnkube-master
+      - name: ovnkube-cluster-manager
+        image: "{{.OvnImage}}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+          if [[ -f "/env/_master" ]]; then
+            set -o allexport
+            source "/env/_master"
+            set +o allexport
+          fi
+
+          # TLS for ovnkube-master metrics
+          TLS_PK=/etc/pki/tls/metrics-cert/tls.key
+          TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
+
+          if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
+            gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
+          elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
+            gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
+          else
+            echo "Invalid OVN_GATEWAY_MODE: \"{{.OVN_GATEWAY_MODE}}\". Must be \"local\" or \"shared\"."
+            exit 1
+          fi
+
+          retries=0
+          while [ ! -f /var/run/secrets/hosted_cluster/token ]; do
+            (( retries += 1 ))
+            sleep 1
+            if [[ "${retries}" -gt 30 ]]; then
+              echo "$(date -Iseconds) - Hosted cluster token not found"
+                exit 1
+            fi
+          done
+
+          multi_network_enabled_flag=
+          if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" ]]; then
+            multi_network_enabled_flag="--enable-multi-network"
+          fi
+
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
+          exec /usr/bin/ovnkube \
+            --enable-interconnect \
+            --init-cluster-manager "${K8S_NODE}" \
+            --config-file=/run/ovnkube-config/ovnkube.conf \
+            --k8s-token-file=/var/run/secrets/hosted_cluster/token \
+            --ovn-empty-lb-events \
+            --loglevel "${OVN_KUBE_LOG_LEVEL}" \
+            --metrics-bind-address "127.0.0.1:9108" \
+            --metrics-enable-pprof \
+            --metrics-enable-config-duration \
+            ${gateway_mode_flags} \
+            --sb-address "{{.OVN_SB_DB_LIST}}" \
+            --sb-client-privkey /ovn-cert/tls.key \
+            --sb-client-cert /ovn-cert/tls.crt \
+            --sb-client-cacert /ovn-ca/ca-bundle.crt \
+            --sb-cert-common-name "{{.OVN_CERT_CN}}" \
+            --nb-address "{{.OVN_NB_DB_LIST}}" \
+            --nb-client-privkey /ovn-cert/tls.key \
+            --nb-client-cert /ovn-cert/tls.crt \
+            --nb-client-cacert /ovn-ca/ca-bundle.crt \
+            --nb-cert-common-name "{{.OVN_CERT_CN}}" \
+            --enable-multicast \
+            --disable-snat-multiple-gws \
+            --node-server-privkey ${TLS_PK} \
+            --node-server-cert ${TLS_CERT} \
+            ${multi_network_enabled_flag} \
+            --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
+        volumeMounts:
+        - mountPath: /run/ovnkube-config/
+          name: ovnkube-config
+        - mountPath: /env
+          name: env-overrides
+        - mountPath: /ovn-cert
+          name: ovn-cert
+        - mountPath: /ovn-ca
+          name: ovn-ca
+        - mountPath: /hosted-ca
+          name: hosted-ca-cert
+        - mountPath: /var/run/secrets/hosted_cluster
+          name: hosted-cluster-api-access
+        - name: ovn-control-plane-metrics-cert
+          mountPath: /etc/pki/tls/metrics-cert
+          readOnly: True
+        resources:
+          requests:
+            cpu: 10m
+            memory: 200Mi
+        env:
+        - name: OVN_KUBE_LOG_LEVEL
+          value: "4"
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: ALL_PROXY
+          value: socks5://127.0.0.1:8090
+        - name: NO_PROXY
+          value: kube-apiserver
+        ports:
+        - name: metrics-port-cm
+          containerPort: 9108
+        terminationMessagePolicy: FallbackToLogsOnError
+        
+      # ovnkube-controller: convert kubernetes objects in to nbdb logical network components
+      - name: ovnkube-controller
         image: "{{.OvnImage}}"
         command:
         - /bin/bash
@@ -877,11 +982,11 @@ spec:
             multi_network_policy_enabled_flag="--enable-multi-networkpolicy"
           fi
 
-          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-controller - start ovnkube --init-ovnkube-controller ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
             --zone global \
-            --init-master "${K8S_NODE}" \
+            --init-ovnkube-controller "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
             --ovn-empty-lb-events \

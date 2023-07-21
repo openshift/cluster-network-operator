@@ -2228,7 +2228,7 @@ func getInterConnectZoneModeForNodeDaemonSet(ds *appsv1.DaemonSet) InterConnectZ
 
 func isInterConnectEnabledOnMasterStatefulSet(ss *appsv1.StatefulSet) bool {
 	for _, container := range ss.Spec.Template.Spec.Containers {
-		if container.Name == "ovnkube-master" {
+		if container.Name == "ovnkube-controller" {
 			for _, c := range container.Command {
 				if strings.Contains(c, "--enable-interconnect") {
 					return true
@@ -2261,7 +2261,7 @@ func isInterConnectEnabledOnNodeDaemonset(ds *appsv1.DaemonSet) bool {
 }
 
 func isInterConnectEnabledOnMasterDaemonset(ds *appsv1.DaemonSet) bool {
-	return isInterConnectEnabledOnDaemonset(ds, "ovnkube-master")
+	return isInterConnectEnabledOnDaemonset(ds, "ovnkube-controller")
 }
 
 // migration from single zone to multizone is about to start if:

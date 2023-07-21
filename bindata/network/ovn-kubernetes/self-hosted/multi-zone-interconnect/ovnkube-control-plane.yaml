@@ -94,8 +94,7 @@ spec:
           mountPath: /etc/pki/tls/metrics-cert
           readOnly: True
 
-      # ovnkube control-plane: convert kubernetes objects in to nbdb logical network components
-      - name: ovnkube-control-plane
+      - name: ovnkube-cluster-manager
         image: "{{.OvnImage}}"
         command:
         - /bin/bash
@@ -122,7 +121,7 @@ spec:
             multi_network_enabled_flag="--enable-multi-network"
           fi
 
-          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-control-plane ${K8S_NODE}"
+          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --init-cluster-manager "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
