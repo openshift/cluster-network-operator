@@ -105,6 +105,36 @@ data:
     fi
     rm -Rf $UPGRADE_DIRECTORY
 ---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: multus-daemon-config
+  namespace: openshift-multus
+  labels:
+    tier: node
+    app: multus
+data:
+  daemon-config.json: |
+    {
+        "cniVersion": "0.3.1",
+        "chrootDir": "/hostroot",
+        "logToStderr": true,
+        "logLevel": "verbose",
+        "binDir": "{{ .CNIBinDir }}",
+        "cniConfigDir": "/host/etc/cni/net.d",
+        "multusConfigFile": "auto",
+        "multusAutoconfigDir": "/host/run/multus/cni/net.d",
+        "namespaceIsolation": true,
+        "globalNamespaces": "default,openshift-multus,openshift-sriov-network-operator",
+{{- if eq .DefaultNetworkType "OpenShiftSDN"}}
+        "readinessindicatorfile": "/host/run/multus/cni/net.d/80-openshift-network.conf",
+{{- else if eq .DefaultNetworkType "OVNKubernetes"}}
+        "readinessindicatorfile": "/host/run/multus/cni/net.d/10-ovn-kubernetes.conf",
+{{- end}}
+        "daemonSocketDir": "/run/multus/socket",
+        "socketDir": "/host{{ .MultusSocketParentDir }}/socket"
+    }
+---
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
@@ -133,6 +163,7 @@ spec:
         openshift.io/component: network
     spec:
       hostNetwork: true
+      hostPID: true
       nodeSelector:
         kubernetes.io/os: linux
       priorityClassName: "system-node-critical"
@@ -143,25 +174,14 @@ spec:
       - name: kube-multus
         image: {{.MultusImage}}
         command: [ "/bin/bash", "-ec", "--" ]
+        lifecycle:
+          preStop:
+            exec:
+              command: [ "rm", "-f", "/host/etc/cni/net.d/00-multus.conf" ]
         args:
           - >
             /entrypoint/cnibincopy.sh;
-            exec /entrypoint.sh
-            --multus-conf-file=auto
-            --multus-autoconfig-dir=/host/var/run/multus/cni/net.d
-            --multus-kubeconfig-file-host=/etc/kubernetes/cni/net.d/multus.d/multus.kubeconfig
-{{- if eq .DefaultNetworkType "OpenShiftSDN"}}
-            --readiness-indicator-file=/var/run/multus/cni/net.d/80-openshift-network.conf
-{{- else if eq .DefaultNetworkType "OVNKubernetes"}}
-            --readiness-indicator-file=/var/run/multus/cni/net.d/10-ovn-kubernetes.conf
-{{- end}}
-            --cleanup-config-on-exit=true
-            --namespace-isolation=true
-            --multus-log-level=verbose
-            --cni-version=0.3.1
-            --additional-bin-dir=/opt/multus/bin
-            --skip-multus-binary-copy=true
-            - "--global-namespaces=default,openshift-multus,openshift-sriov-network-operator"
+            exec /usr/src/multus-cni/bin/multus-daemon
         resources:
           requests:
             cpu: 10m
@@ -176,9 +196,32 @@ spec:
         - name: system-cni-dir
           mountPath: /host/etc/cni/net.d
         - name: multus-cni-dir
-          mountPath: /host/var/run/multus/cni/net.d
+          mountPath: /host/run/multus/cni/net.d
         - name: cnibin
           mountPath: /host/opt/cni/bin
+        - name: multus-socket-dir-parent
+          mountPath: /host{{ .MultusSocketParentDir }}
+          mountPropagation: HostToContainer
+        # device-info
+        - name: host-run-k8s-cni-cncf-io
+          mountPath: /run/k8s.cni.cncf.io
+        - name: host-run-netns
+          mountPath: /run/netns
+          mountPropagation: HostToContainer
+        - name: host-var-lib-cni-bin
+          mountPath: /var/lib/cni/bin
+        # cni cache dir
+        - name: host-var-lib-cni-multus
+          mountPath: /var/lib/cni/multus
+        # kubelet socket
+        - name: host-var-lib-kubelet
+          mountPath: /var/lib/kubelet
+        - name: hostroot
+          mountPath: /hostroot
+          mountPropagation: HostToContainer
+        - name: multus-daemon-config
+          mountPath: /etc/cni/net.d/multus.d
+          readOnly: true
         env:
         - name: RHEL8_SOURCE_DIRECTORY
           value: "/usr/src/multus-cni/rhel8/bin/"
@@ -224,6 +267,37 @@ spec:
           configMap:
             name: cni-copy-resources
             defaultMode: 0744
+        - name: multus-socket-dir-parent
+          hostPath:
+            path: {{ .MultusSocketParentDir }}
+            type: DirectoryOrCreate
+        # device-info
+        - name: host-run-k8s-cni-cncf-io
+          hostPath:
+            path: /run/k8s.cni.cncf.io
+        - name: host-run-netns
+          hostPath:
+            path: /run/netns/
+        - name: host-var-lib-cni-bin
+          hostPath:
+            path: /var/lib/cni/bin
+        # cni cache dir
+        - name: host-var-lib-cni-multus
+          hostPath:
+            path: /var/lib/cni/multus
+        # kubelet socket
+        - name: host-var-lib-kubelet
+          hostPath:
+            path: /var/lib/kubelet
+        - name: hostroot
+          hostPath:
+            path: /
+        - name: multus-daemon-config
+          configMap:
+            name: multus-daemon-config
+            items:
+            - key: daemon-config.json
+              path: daemon-config.json
 ---
 kind: DaemonSet
 apiVersion: apps/v1
