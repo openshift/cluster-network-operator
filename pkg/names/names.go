@@ -71,6 +71,10 @@ const NetworkMigrationAnnotation = "networkoperator.openshift.io/network-migrati
 // to indicate the current IP Family mode of the cluster: "single-stack" or "dual-stack"
 const NetworkIPFamilyModeAnnotation = "networkoperator.openshift.io/ip-family-mode"
 
+// NetworkHybridOverlayAnnotation is an annotation on the OVN networks.operator.io.daemonsets
+// to indicate the current state of of the Hybrid overlay on the cluster: "enabled" or "disabled"
+const NetworkHybridOverlayAnnotation = "networkoperator.openshift.io/hybrid-overlay-status"
+
 // OVNRaftClusterInitiator is an annotation on the networks.operator.openshift.io CR to indicate
 // which node IP was the raft cluster initiator. The NB and SB DB will be initialized by the same member.
 const OVNRaftClusterInitiator = "networkoperator.openshift.io/ovn-cluster-initiator"
