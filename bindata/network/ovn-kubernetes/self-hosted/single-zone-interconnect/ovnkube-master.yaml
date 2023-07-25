@@ -861,7 +861,7 @@ spec:
             --tls-cert-file=${TLS_CERT}
         ports:
         - containerPort: 9108
-          name: https
+          name: https-cm
         resources:
           requests:
             cpu: 10m

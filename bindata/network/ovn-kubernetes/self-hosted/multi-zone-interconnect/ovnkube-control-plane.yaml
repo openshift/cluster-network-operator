@@ -76,13 +76,13 @@ spec:
           echo $(date -Iseconds) INFO: ovn-control-plane-metrics-certs mounted, starting kube-rbac-proxy
           exec /usr/bin/kube-rbac-proxy \
             --logtostderr \
-            --secure-listen-address=:9106 \
+            --secure-listen-address=:9104 \
             --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
             --upstream=http://127.0.0.1:29104/ \
             --tls-private-key-file=${TLS_PK} \
             --tls-cert-file=${TLS_CERT}
         ports:
-        - containerPort: 9106
+        - containerPort: 9104
           name: https
         resources:
           requests:
