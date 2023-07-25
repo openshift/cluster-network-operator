@@ -171,7 +171,7 @@ spec:
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
             --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            --metrics-bind-address "127.0.0.1:9104" \
+            --metrics-bind-address "127.0.0.1:9106" \
             --metrics-enable-pprof \
             --metrics-enable-config-duration \
             ${gateway_mode_flags} \
@@ -224,7 +224,7 @@ spec:
           value: kube-apiserver
         ports:
         - name: metrics-port
-          containerPort: 9104
+          containerPort: 9106
         terminationMessagePolicy: FallbackToLogsOnError
       {{ if .HCPNodeSelector }}
       nodeSelector:
