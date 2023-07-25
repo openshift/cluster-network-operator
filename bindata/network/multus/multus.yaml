@@ -180,7 +180,6 @@ spec:
               command: [ "rm", "-f", "/host/etc/cni/net.d/00-multus.conf" ]
         args:
           - >
-            /entrypoint/cnibincopy.sh;
             exec /usr/src/multus-cni/bin/multus-daemon
         resources:
           requests:
@@ -334,6 +333,35 @@ spec:
       - operator: Exists
       serviceAccountName: multus
       initContainers:
+      - name: multus-copy-shim-after-socketfile
+        image: {{.MultusImage}}
+            command: ["/bin/sh", "-c"]
+            args:
+              - |
+                # Wait for the multus.sock
+                while [ ! -e "/host{{ .MultusSocketParentDir }}/multus.sock" ]; do
+                  echo Waiting for multus.sock @ $(date)
+                  sleep 2
+                done
+                /entrypoint/cnibincopy.sh
+        volumeMounts:
+        - name: multus-socket-dir-parent
+          mountPath: /host{{ .MultusSocketParentDir }}
+          mountPropagation: HostToContainer
+        - mountPath: /entrypoint
+          name: cni-binary-copy
+        - mountPath: /host/opt/cni/bin
+          name: cnibin
+        - mountPath: /host/etc/os-release
+          name: os-release
+          readOnly: true
+        env:
+          - name: RHEL8_SOURCE_DIRECTORY
+            value: "/usr/src/egress-router-cni/rhel8/bin/"
+          - name: RHEL9_SOURCE_DIRECTORY
+            value: "/usr/src/egress-router-cni/rhel9/bin/"
+          - name: DEFAULT_SOURCE_DIRECTORY
+            value: "/usr/src/egress-router-cni/bin/"
       - name: egress-router-binary-copy
         image: {{.EgressRouterImage}}
         command: ["/entrypoint/cnibincopy.sh"]
@@ -571,6 +599,10 @@ spec:
           privileged: true
       terminationGracePeriodSeconds: 10
       volumes:
+        - name: multus-socket-dir-parent
+          hostPath:
+            path: {{ .MultusSocketParentDir }}
+            type: DirectoryOrCreate
         - name: system-cni-dir
           hostPath:
             path: {{ .SystemCNIConfDir }}
