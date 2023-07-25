@@ -1046,7 +1046,7 @@ spec:
       # Used for placement of ACL audit logs
       - name: node-log
         hostPath:
-          path: /var/log/ovn-ic  # different path than 4.13 and single-zone 4.14
+          path: /var/log/ovn  # different path than 4.13 and single-zone 4.14
       - name: log-socket
         hostPath:
           path: /dev/log
