@@ -52,6 +52,12 @@ rules:
   - update
 - apiGroups: [""]
   resources:
+  - pods/status
+  verbs:
+  - patch
+  - update
+- apiGroups: [""]
+  resources:
   - namespaces
   - endpoints
   - services
@@ -87,6 +93,12 @@ rules:
   - get
   - list
   - watch
+  - patch
+  - update
+- apiGroups: [""]
+  resources:
+  - nodes/status
+  verbs:
   - patch
   - update
 - apiGroups: ["k8s.ovn.org"]
