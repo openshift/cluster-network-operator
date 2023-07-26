@@ -120,6 +120,7 @@ data:
         "chrootDir": "/hostroot",
         "logToStderr": true,
         "logLevel": "verbose",
+        "logFile": "/tmp/multus.log",
         "binDir": "{{ .CNIBinDir }}",
         "cniConfigDir": "/host/etc/cni/net.d",
         "multusConfigFile": "auto",
@@ -172,7 +173,8 @@ spec:
       serviceAccountName: multus
       containers:
       - name: kube-multus
-        image: {{.MultusImage}}
+        #image: {{ .MultusImage }}
+        image: quay.io/s1061123/multus-cni:cno-test
         command: [ "/bin/bash", "-ec", "--" ]
         lifecycle:
           preStop:
@@ -189,6 +191,8 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
+        - mountPath: /tmp
+          name: host-tmp
         - mountPath: /entrypoint
           name: cni-binary-copy
         - mountPath: /host/etc/os-release
@@ -247,6 +251,10 @@ spec:
 {{ end }}
       terminationGracePeriodSeconds: 10
       volumes:
+        - name: host-tmp
+          hostPath:
+            path: /tmp
+            type: Directory
         - name: system-cni-dir
           hostPath:
             path: {{ .SystemCNIConfDir }}
