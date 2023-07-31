@@ -79,31 +79,28 @@ spec:
 
             csr_64=$(cat /etc/openvswitch/keys/ipsec-req.pem | base64 | tr -d "\n")
 
-            # The signer controller does not allow re-signing a key. We will
-            # delete the old key to be sure it is not there
-            kubectl delete --ignore-not-found=true csr/$(hostname)
-
             # Request that our generated certificate signing request is
             # signed by the "network.openshift.io/signer" signer that is
             # implemented by the CNO signer controller. This will sign the
             # certificate signing request using the signer-ca which has been
             # set up by the OperatorPKI. In this way, we have a signed certificate
             # and our private key has remained private on this host.
-            cat <<EOF | kubectl apply -f -
+            cat <<EOF | kubectl create -f -
             apiVersion: certificates.k8s.io/v1
             kind: CertificateSigningRequest
             metadata:
-              name: $(hostname)
+              generateName: ipsec-csr-$(hostname)-
+              labels:
+                k8s.ovn.org/ipsec-csr: $(hostname)
             spec:
               request: ${csr_64}
               signerName: network.openshift.io/signer
               usages:
               - ipsec tunnel
           EOF
-
             # Wait until the certificate signing request has been signed.
             counter=0
-            until [ ! -z $(kubectl get csr/$(hostname) -o jsonpath='{.status.certificate}' 2>/dev/null) ]
+            until [ ! -z $(kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' 2>/dev/null) ]
             do
               counter=$((counter+1))
               sleep 1
@@ -115,7 +112,7 @@ spec:
             done
 
             # Decode the signed certificate.
-            kubectl get csr/$(hostname) -o jsonpath='{.status.certificate}' | base64 -d | openssl x509 -outform pem -text -out /etc/openvswitch/keys/ipsec-cert.pem
+            kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' | base64 -d | openssl x509 -outform pem -text -out /etc/openvswitch/keys/ipsec-cert.pem
 
             kubectl delete csr/$(hostname)
 
