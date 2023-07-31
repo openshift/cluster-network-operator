@@ -114,8 +114,6 @@ rules:
   verbs:
     - create
     - get
-    - delete
-    - update
     - list
 
 ---
