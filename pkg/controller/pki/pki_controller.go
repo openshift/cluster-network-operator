@@ -27,6 +27,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -101,6 +102,7 @@ func newPKIReconciler(mgr manager.Manager, status *statusmanager.StatusManager) 
 
 // Reconcile configures a CertRotationController from a PKI object
 func (r *PKIReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	log.Printf("Reconciling pki.network.operator.openshift.io %s\n", request.NamespacedName)
 
 	obj := &netopv1.OperatorPKI{}
