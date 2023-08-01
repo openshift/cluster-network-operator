@@ -2,10 +2,11 @@ package statusmanager
 
 import (
 	"context"
-	"github.com/openshift/cluster-network-operator/pkg/names"
 
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	v1appsinformers "k8s.io/client-go/informers/apps/v1"
 	v1appslisters "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/client-go/tools/cache"
@@ -26,7 +27,7 @@ import (
 // Specifically, it watches for objects with the label
 // "networkoperator.openshift.io/generates-operator-status" set.
 type PodWatcher struct {
-	onUpdate func()
+	status *StatusManager
 }
 
 // initInformersFor sets up the DaemonSet, Deployment, and StatefulSet informers
@@ -84,7 +85,7 @@ func (s *StatusManager) AddPodWatcher(mgr manager.Manager) error {
 	}
 
 	pw := &PodWatcher{
-		onUpdate: s.SetFromPods,
+		status: s,
 	}
 	c, err := controller.New("pod-watcher", mgr, controller.Options{Reconciler: pw})
 	if err != nil {
@@ -115,7 +116,8 @@ func (s *StatusManager) AddPodWatcher(mgr manager.Manager) error {
 
 // Reconcile triggers a re-update of Status.
 func (p *PodWatcher) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	p.onUpdate()
+	defer utilruntime.HandleCrash(p.status.SetDegradedOnPanicAndCrash)
+	p.status.SetFromPods()
 	return reconcile.Result{}, nil
 }
 
