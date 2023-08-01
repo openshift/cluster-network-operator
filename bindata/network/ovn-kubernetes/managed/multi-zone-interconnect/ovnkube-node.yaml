@@ -574,147 +574,6 @@ spec:
             memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
-      - name: kube-rbac-proxy-ncm
-        image: {{.KubeRBACProxyImage}}
-        command:
-        - /bin/bash
-        - -c
-        - |
-          #!/bin/bash
-          set -euo pipefail
-          TLS_PK=/etc/pki/tls/metrics-cert/tls.key
-          TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
-          # As the secret mount is optional we must wait for the files to be present.
-          # The service is created in monitor.yaml and this is created in sdn.yaml.
-          TS=$(date +%s)
-          WARN_TS=$(( ${TS} + $(( 20 * 60)) ))
-          HAS_LOGGED_INFO=0
-
-          log_missing_certs(){
-              CUR_TS=$(date +%s)
-              if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
-                echo $(date -Iseconds) WARN: ovn-node-metrics-cert not mounted after 20 minutes.
-              elif [[ "${HAS_LOGGED_INFO}" -eq 0 ]] ; then
-                echo $(date -Iseconds) INFO: ovn-node-metrics-cert not mounted. Waiting 20 minutes.
-                HAS_LOGGED_INFO=1
-              fi
-          }
-          while [[ ! -f "${TLS_PK}" ||  ! -f "${TLS_CERT}" ]] ; do
-            log_missing_certs
-            sleep 5
-          done
-
-          echo $(date -Iseconds) INFO: ovn-node-metrics-certs mounted, starting kube-rbac-proxy
-          exec /usr/bin/kube-rbac-proxy \
-            --logtostderr \
-            --secure-listen-address=:9113 \
-            --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
-            --upstream=http://127.0.0.1:29113/ \
-            --tls-private-key-file=${TLS_PK} \
-            --tls-cert-file=${TLS_CERT}
-        ports:
-        - containerPort: 9113
-          name: https
-        resources:
-          requests:
-            cpu: 10m
-            memory: 20Mi
-        terminationMessagePolicy: FallbackToLogsOnError
-        volumeMounts:
-        - name: ovn-node-metrics-cert
-          mountPath: /etc/pki/tls/metrics-cert
-          readOnly: True
-
-      # ovnkube-controller in multizone mode: convert kubernetes objects in to nbdb logical network components
-      - name: ovnkube-controller
-        image: "{{.OvnImage}}"
-        command:
-        - /bin/bash
-        - -c
-        - |
-          set -xe
-          if [[ -f "/env/_local" ]]; then
-            set -o allexport
-            source "/env/_local"
-            set +o allexport
-          fi
-
-          if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
-            gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
-          elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
-            gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
-          else
-            echo "Invalid OVN_GATEWAY_MODE: \"{{.OVN_GATEWAY_MODE}}\". Must be \"local\" or \"shared\"."
-            exit 1
-          fi
-
-          multi_network_enabled_flag=
-          if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" ]]; then
-            multi_network_enabled_flag="--enable-multi-network"
-          fi
-
-          multi_network_policy_enabled_flag=
-          if [[ "{{.OVN_MULTI_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
-            multi_network_policy_enabled_flag="--enable-multi-networkpolicy"
-          fi
-
-          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-controller - start ovnkube init-ovnkube-controller ${K8S_NODE}"
-          exec /usr/bin/ovnkube \
-            --init-ovnkube-controller "${K8S_NODE}" \
-            --config-file=/run/ovnkube-config/ovnkube.conf \
-            --ovn-empty-lb-events \
-            --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            --metrics-bind-address "127.0.0.1:29113" \
-            --metrics-enable-pprof \
-            --metrics-enable-config-duration \
-            ${gateway_mode_flags} \
-            --disable-snat-multiple-gws \
-            ${multi_network_enabled_flag} \
-            ${multi_network_policy_enabled_flag} \
-            --enable-multicast \
-            --zone ${K8S_NODE} \
-            --enable-interconnect \
-            --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}" \
-            --enable-multi-external-gateway=true
-        volumeMounts:
-        # for checking ovs-configuration service
-        - mountPath: /etc/systemd/system
-          name: systemd-units
-          readOnly: true
-        - mountPath: /etc/openvswitch/
-          name: etc-openvswitch
-        - mountPath: /etc/ovn/
-          name: etc-openvswitch
-        - mountPath: /var/lib/openvswitch/
-          name: var-lib-openvswitch
-        - mountPath: /run/openvswitch/
-          name: run-openvswitch
-        - mountPath: /run/ovn/
-          name: run-ovn
-        - mountPath: /run/ovnkube-config/
-          name: ovnkube-config
-        - mountPath: /env
-          name: env-overrides
-        - mountPath: /ovn-cert
-          name: ovn-cert
-        - mountPath: /ovn-ca
-          name: ovn-ca
-        resources:
-          requests:
-            cpu: 10m
-            memory: 300Mi
-        env:
-        - name: OVN_KUBE_LOG_LEVEL
-          value: "4"
-        - name: K8S_NODE
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        ports:
-        - name: metrics-port-c  # 15 characters max on windows
-          containerPort: 29113
-        terminationMessagePolicy: FallbackToLogsOnError
-
       # ovnkube-node: does node-level bookkeeping and configuration
       - name: ovnkube-node
         image: "{{.OvnImage}}"
@@ -828,8 +687,9 @@ spec:
             multi_network_policy_enabled_flag="--enable-multi-networkpolicy"
           fi
 
-          exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
+          exec /usr/bin/ovnkube --init-ovnkube-controller-with-node "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
+            --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
             ${gateway_mode_flags} \
@@ -840,13 +700,16 @@ spec:
             --metrics-bind-address "127.0.0.1:29103" \
             --ovn-metrics-bind-address "127.0.0.1:29105" \
             --metrics-enable-pprof \
+            --metrics-enable-config-duration \
             --export-ovs-metrics \
             --disable-snat-multiple-gws \
             ${export_network_flows_flags} \
             ${multi_network_enabled_flag} \
             ${multi_network_policy_enabled_flag} \
+            --enable-multicast \
             --zone ${K8S_NODE} \
             --enable-interconnect \
+            --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}" \
             ${gw_interface_flag} \
             --enable-multi-external-gateway=true
         env:

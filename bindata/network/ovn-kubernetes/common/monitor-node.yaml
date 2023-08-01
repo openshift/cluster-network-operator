@@ -18,13 +18,6 @@ spec:
       caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
       serverName: ovn-kubernetes-node.openshift-ovn-kubernetes.svc
   - interval: 30s
-    port: metrics-ncm
-    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-    scheme: https
-    tlsConfig:
-      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
-      serverName: ovn-kubernetes-node.openshift-ovn-kubernetes.svc
-  - interval: 30s
     port: ovn-metrics
     bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
     scheme: https
@@ -58,10 +51,6 @@ spec:
     port: 9103
     protocol: TCP
     targetPort: 9103
-  - name: metrics-ncm
-    port: 9113
-    protocol: TCP
-    targetPort: 9113
   - name: ovn-metrics
     port: 9105
     protocol: TCP
