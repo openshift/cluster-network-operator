@@ -381,7 +381,15 @@ spec:
                 {{ else }}
                 ipsec=false
                 {{ end }}
-                if ! retry 20 "ipsec" "${OVN_NB_CTL} set nb_global . ipsec=${ipsec}"; then
+                ipsec_encapsulation=false
+                if [ "${ipsec}" == "true" ]; then
+                    # IBMCloud does not forward ESP (IP proto 50)
+                    # Instead, force IBMCloud IPsec to always use NAT-T
+                    if [ "{{.PlatformType}}" == "IBMCloud" ]; then
+                        ipsec_encapsulation=true
+                    fi
+                fi
+                if ! retry 20 "ipsec" "${OVN_NB_CTL} set nb_global . ipsec=${ipsec} options:ipsec_encapsulation=${ipsec_encapsulation}"; then
                   exit 1
                 fi
           preStop:
