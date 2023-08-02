@@ -156,6 +156,11 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
         ports:
         - name: metrics-port
           containerPort: 29106

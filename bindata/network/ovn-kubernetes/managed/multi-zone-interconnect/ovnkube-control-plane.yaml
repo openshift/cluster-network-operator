@@ -212,6 +212,11 @@ spec:
           value: socks5://127.0.0.1:8090
         - name: NO_PROXY
           value: kube-apiserver
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
         ports:
         - name: metrics-port
           containerPort: 9106
