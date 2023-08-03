@@ -14,6 +14,7 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/util"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -260,6 +261,8 @@ func (status *StatusManager) SetFromPods() {
 		if ongoingUpgrade, ok := icConfigMap.Data["ongoing-upgrade"]; ok && ongoingUpgrade == "true" {
 			reachedAvailableLevel = false
 		}
+	} else if !apierrors.IsNotFound(err) {
+		log.Printf("Failed to retrieve interconnect configmap: %v", err)
 	}
 
 	status.setNotDegraded(PodDeployment)

@@ -1,21 +1,7 @@
 # The ovnkube control-plane components
-
-{{ if not .IsSNO }}
-# The pod disruption budget ensures that we keep a raft quorum
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: ovn-raft-quorum-guard
-  namespace: {{.HostedClusterNamespace}}
-  annotations:
-    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
-spec:
-  minAvailable: {{.OVN_MIN_AVAILABLE}}
-  selector:
-    matchLabels:
-      app: ovnkube-control-plane
----
-{{ end }}
+# Until 4.13 this was a stateful set named ovnkube-master, providing the centralized OVN control plane.
+# With OVN interconnect (4.14), we have a distributed OVN control plane (one per node); only cluster manager
+# runs on master nodes and doesn't need any persistent volumes, hence the resource type is now a Deployment.
 kind: Deployment
 apiVersion: apps/v1
 metadata:
@@ -37,14 +23,14 @@ spec:
   template:
     metadata:
       annotations:
+        hypershift.openshift.io/release-image: {{.ReleaseImage}}
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: ovnkube-control-plane
-        ovn-db-pod: "true"
         component: network
         type: infra
         openshift.io/component: network
-        hypershift.openshift.io/control-plane-component: ovnkube-master
+        hypershift.openshift.io/control-plane-component: ovnkube-control-plane
         kubernetes.io/os: "linux"
     spec:
       affinity:
@@ -121,7 +107,7 @@ spec:
           name: admin-kubeconfig
         - mountPath: /var/run/secrets/hosted_cluster
           name: hosted-cluster-api-access
-      # ovnkube master: convert kubernetes objects in to nbdb logical network components
+      # ovnkube-control-plane: central component that allocates IPAM for each node in the cluster
       - name: ovnkube-control-plane
         image: "{{.OvnImage}}"
         command:
@@ -135,18 +121,9 @@ spec:
             set +o allexport
           fi
 
-          # TLS for ovnkube-master metrics
+          # TLS for ovnkube-control-plane metrics
           TLS_PK=/etc/pki/tls/metrics-cert/tls.key
           TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
-
-          if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
-            gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
-          elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
-            gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
-          else
-            echo "Invalid OVN_GATEWAY_MODE: \"{{.OVN_GATEWAY_MODE}}\". Must be \"local\" or \"shared\"."
-            exit 1
-          fi
 
           retries=0
           while [ ! -f /var/run/secrets/hosted_cluster/token ]; do
@@ -158,38 +135,23 @@ spec:
             fi
           done
 
-          multi_network_enabled_flag=
-          if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" ]]; then
-            multi_network_enabled_flag="--enable-multi-network"
-          fi
-
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
             --init-cluster-manager "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
-            --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --metrics-bind-address "127.0.0.1:9106" \
             --metrics-enable-pprof \
             --metrics-enable-config-duration \
-            ${gateway_mode_flags} \
-            --enable-multicast \
-            --disable-snat-multiple-gws \
             --node-server-privkey ${TLS_PK} \
-            --node-server-cert ${TLS_CERT} \
-            ${multi_network_enabled_flag} \
-            --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
+            --node-server-cert ${TLS_CERT}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
         - mountPath: /env
           name: env-overrides
-        - mountPath: /ovn-cert
-          name: ovn-cert
-        - mountPath: /ovn-ca
-          name: ovn-ca
         - mountPath: /hosted-ca
           name: hosted-ca-cert
         - mountPath: /var/run/secrets/hosted_cluster
@@ -221,6 +183,32 @@ spec:
         - name: metrics-port
           containerPort: 9106
         terminationMessagePolicy: FallbackToLogsOnError
+
+      - name: socks-proxy
+        image: "{{.Socks5ProxyImage}}"
+        command:
+        - /usr/bin/control-plane-operator
+        - konnectivity-socks5-proxy
+        args:
+        - "run"
+        volumeMounts:
+        - mountPath: /etc/kubernetes/
+          name: admin-kubeconfig
+        - mountPath: /etc/konnectivity/proxy-client
+          name: konnectivity-proxy-cert
+          readOnly: true
+        - mountPath: /etc/konnectivity/proxy-ca
+          name: konnectivity-proxy-ca
+          readOnly: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        env:
+        - name: KUBECONFIG
+          value: "/etc/kubernetes/kubeconfig"
+        terminationMessagePolicy: FallbackToLogsOnError
+
       {{ if .HCPNodeSelector }}
       nodeSelector:
         {{ range $key, $value := .HCPNodeSelector }}
@@ -242,12 +230,6 @@ spec:
         configMap:
           name: env-overrides
           optional: true
-      - name: ovn-ca
-        configMap:
-          name: ovn-ca
-      - name: ovn-cert
-        secret:
-          secretName: ovn-cert
       - name: ovn-control-plane-metrics-cert
         secret:
           secretName: ovn-control-plane-metrics-cert

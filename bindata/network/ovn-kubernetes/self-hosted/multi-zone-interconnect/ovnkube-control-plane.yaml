@@ -16,17 +16,14 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      # by default, Deployments spin up the new pod before terminating the old one
-      # but we don't want that - because ovsdb holds the lock.
-      maxSurge: 0
-      maxUnavailable: 3
+      maxUnavailable: 1
+      maxSurge: 0      
   template:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: ovnkube-control-plane
-        ovn-db-pod: "true"
         component: network
         type: infra
         openshift.io/component: network
@@ -38,9 +35,6 @@ spec:
       priorityClassName: "system-cluster-critical"
       # volumes in all containers:
       # (container) -> (host)
-      # /etc/openvswitch -> /var/lib/ovn/etc - ovsdb data
-      # /var/lib/openvswitch -> /var/lib/ovn/data - ovsdb pki state
-      # /run/openvswitch -> tmpfs - sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
       - name: kube-rbac-proxy
@@ -93,7 +87,7 @@ spec:
         - name: ovn-control-plane-metrics-cert
           mountPath: /etc/pki/tls/metrics-cert
           readOnly: True
-
+      # ovnkube-control-plane: central component that allocates IPAM for each node in the cluster
       - name: ovnkube-cluster-manager
         image: "{{.OvnImage}}"
         command:
@@ -107,44 +101,20 @@ spec:
             set +o allexport
           fi
 
-          if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
-            gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
-          elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
-            gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
-          else
-            echo "Invalid OVN_GATEWAY_MODE: \"{{.OVN_GATEWAY_MODE}}\". Must be \"local\" or \"shared\"."
-            exit 1
-          fi
-
-          multi_network_enabled_flag=
-          if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" ]]; then
-            multi_network_enabled_flag="--enable-multi-network"
-          fi
-
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
+            --enable-interconnect \
             --init-cluster-manager "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
-            --ovn-empty-lb-events \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --metrics-bind-address "127.0.0.1:29106" \
             --metrics-enable-pprof \
-            --metrics-enable-config-duration \
-            ${gateway_mode_flags} \
-            --enable-multicast \
-            --disable-snat-multiple-gws \
-            ${multi_network_enabled_flag} \
-            --enable-interconnect \
-            --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}"
+            --metrics-enable-config-duration
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
         - mountPath: /env
           name: env-overrides
-        - mountPath: /ovn-cert
-          name: ovn-cert
-        - mountPath: /ovn-ca
-          name: ovn-ca
         resources:
           requests:
             cpu: 10m
@@ -169,22 +139,6 @@ spec:
         node-role.kubernetes.io/master: ""
         beta.kubernetes.io/os: "linux"
       volumes:
-      # for checking ovs-configuration service
-      - name: systemd-units
-        hostPath:
-          path: /etc/systemd/system
-      - name: etc-openvswitch
-        hostPath:
-          path: /var/lib/ovn/etc
-      - name: var-lib-openvswitch
-        hostPath:
-          path: /var/lib/ovn/data
-      - name: run-openvswitch
-        hostPath:
-          path: /var/run/openvswitch
-      - name: run-ovn
-        hostPath:
-          path: /var/run/ovn
       - name: ovnkube-config
         configMap:
           name: ovnkube-config
@@ -192,12 +146,6 @@ spec:
         configMap:
           name: env-overrides
           optional: true
-      - name: ovn-ca
-        configMap:
-          name: ovn-ca
-      - name: ovn-cert
-        secret:
-          secretName: ovn-cert
       - name: ovn-control-plane-metrics-cert
         secret:
           secretName: ovn-control-plane-metrics-cert
