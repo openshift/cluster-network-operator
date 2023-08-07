@@ -275,7 +275,7 @@ spec:
 
             # Ensure total number of log files does not exceed the maximum configured from OVNPolicyAuditMaxLogFiles
             num_files=$(ls -1 ${LOGDIR}/acl-audit-log* 2>/dev/null | wc -l)
-            if [ "$num_files" -gt "MAXLOGFILES" ]; then
+            if [ "$num_files" -gt "$MAXLOGFILES" ]; then
               num_to_delete=$(( num_files - ${MAXLOGFILES} ))
               ls -1t ${LOGDIR}/acl-audit-log* 2>/dev/null | tail -$num_to_delete | xargs -I {} rm {}
             fi
