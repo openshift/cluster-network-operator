@@ -33,6 +33,15 @@ rules:
   - watch
 - apiGroups: [""]
   resources:
+  - namespaces/status
+  - nodes/status
+  - pods/status
+  - services/status  
+  verbs:
+  - patch
+  - update  
+- apiGroups: [""]
+  resources:
   - configmaps
   verbs:
   - create
@@ -74,12 +83,6 @@ rules:
   - use
   resourceNames:
   - privileged
-- apiGroups: [""]
-  resources:
-  - "nodes/status"
-  verbs:
-  - patch
-  - update
 - apiGroups: [""]
   resources:
   - services

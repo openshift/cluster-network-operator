@@ -77,14 +77,25 @@ rules:
   - watch
 - apiGroups: [""]
   resources:
+  - nodes/status
+  verbs:
+  - patch
+  - update
+- apiGroups: [""]
+  resources:
   - pods
   verbs:
   - get
   - list
   - patch
-  - watch
   - update
-  - delete  # check if this is necessary
+  - watch
+- apiGroups: [""]
+  resources:
+  - pods/status
+  verbs:
+  - patch
+  - update
 - apiGroups: [""]
   resources:
   - endpoints
@@ -101,12 +112,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups: [""]
-  resources:
-  - "nodes/status"
-  verbs:
-  - patch
-  - update
 - apiGroups:
   - discovery.k8s.io
   resources:
@@ -146,8 +151,8 @@ rules:
   verbs:
     - create
     - get
-    - update
     - list
+    - update
 - apiGroups: ["security.openshift.io"]
   resources:
   - securitycontextconstraints

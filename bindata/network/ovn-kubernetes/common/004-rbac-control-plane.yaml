@@ -13,7 +13,6 @@ metadata:
 rules:
 - apiGroups: [""]
   resources:
-  - namespaces
   - nodes
   verbs:
   - get
@@ -30,33 +29,11 @@ rules:
   - patch
   - update
   - watch
-- apiGroups: [""]
-  resources:
-  - configmaps
-  verbs:
-  - create
-  - get
-  - patch
-  - update
-- apiGroups: [""]
-  resources:
-  - endpoints
-  verbs:
-  - get
-  - list
-  - watch
 - apiGroups:
   - discovery.k8s.io
   resources:
   - endpointslices
   verbs:
-  - list
-  - watch
-- apiGroups: ["networking.k8s.io"]
-  resources:
-  - networkpolicies
-  verbs:
-  - get
   - list
   - watch
 - apiGroups: ["", "events.k8s.io"]
@@ -90,10 +67,7 @@ rules:
   - watch
 - apiGroups: ["k8s.ovn.org"]
   resources:
-  - adminpolicybasedexternalroutes
-  - egressfirewalls
   - egressips
-  - egressqoses
   - egressservices
   - egressservices/status
   verbs:
