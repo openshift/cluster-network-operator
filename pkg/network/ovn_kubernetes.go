@@ -2419,8 +2419,11 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 				Namespace: util.OVN_NAMESPACE,
 			},
 			Data: map[string]string{
-				"zone-mode":       fmt.Sprint(zoneModeSingleZone),
-				"temporary":       "true",
+				"zone-mode": fmt.Sprint(zoneModeSingleZone),
+				"temporary": "true",
+				// we lookup ongoing-upgrade in SetFromPods (pod_status.go) to distinguish a
+				// configmap pushed during a non-IC-> IC upgrade from one that is added
+				// outside of an upgrade by a cluster admin to change the zone mode.
 				"ongoing-upgrade": "",
 			},
 		}
