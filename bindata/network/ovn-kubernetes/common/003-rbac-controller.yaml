@@ -96,6 +96,17 @@ rules:
   - watch
   - update
   - patch
+- apiGroups: ["policy.networking.k8s.io"]
+  resources:
+  - adminnetworkpolicies
+  - baselineadminnetworkpolicies
+  - adminnetworkpolicies/status
+  - baselineadminnetworkpolicies/status
+  verbs:
+  - get
+  - list
+  - watch
+  - update
 - apiGroups: ["cloud.network.openshift.io"]
   resources:
   - cloudprivateipconfigs
