@@ -879,6 +879,8 @@ spec:
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-master - start ovnkube --init-master ${K8S_NODE}"
           exec /usr/bin/ovnkube \
+            --enable-interconnect \
+            --zone global \
             --init-master "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
@@ -943,7 +945,7 @@ spec:
           value: kube-apiserver
         ports:
         - name: metrics-port
-          containerPort: 29102
+          containerPort: 9102
         terminationMessagePolicy: FallbackToLogsOnError
       # ovn-dbchecker: monitor clustered ovn databases for db health and stale raft members
       - name: ovn-dbchecker
