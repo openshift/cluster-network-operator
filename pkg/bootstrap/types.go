@@ -54,17 +54,22 @@ type OVNConfigBoostrapResult struct {
 // OVNUpdateStatus contains the status of existing daemonset
 // or statefulset that are maily used by upgrade process
 type OVNUpdateStatus struct {
-	Kind         string
-	Namespace    string
-	Name         string
-	Version      string
-	IPFamilyMode string
-	Progressing  bool
+	Kind                 string
+	Namespace            string
+	Name                 string
+	Version              string
+	IPFamilyMode         string
+	ClusterNetworkCIDRs  string
+	Progressing          bool
+	InterConnectEnabled  bool   // true if this ovnk component is running with --enable-interconnect
+	InterConnectZoneMode string // zone mode (singlezone, multizone) for this ovnk component
 }
 
 type OVNBootstrapResult struct {
 	MasterAddresses  []string
 	ClusterInitiator string
+	// ControlPlaneUpdateStatus is the status of ovnkube-control-plane deployment
+	ControlPlaneUpdateStatus *OVNUpdateStatus
 	// MasterUpdateStatus is the status of ovnkube-master daemonset or statefulset (when hypershift is enabled)
 	MasterUpdateStatus *OVNUpdateStatus
 	// NodeUpdateStatus is the status of ovnkube-node daemonset
