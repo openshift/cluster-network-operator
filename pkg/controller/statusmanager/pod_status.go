@@ -262,6 +262,7 @@ func (status *StatusManager) SetFromPods() {
 			reachedAvailableLevel = false
 		}
 	} else if !apierrors.IsNotFound(err) {
+		reachedAvailableLevel = false // don't risk reporting new version during zone mode migration until configmap retrieval is successful
 		log.Printf("Failed to retrieve interconnect configmap: %v", err)
 	}
 
