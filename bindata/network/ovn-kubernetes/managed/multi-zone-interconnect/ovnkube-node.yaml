@@ -146,7 +146,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 300Mi
+            memory: 100Mi
       - name: ovn-acl-logging
         image: "{{.OvnImage}}"
         command:
@@ -364,7 +364,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 300Mi
+            memory: 100Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
       # nbdb: the northbound, or logical network object DB. In standalone mode listening on unix socket.
@@ -557,7 +557,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 300Mi
+            memory: 50Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
       # sbdb: the southbound, or flow DB. In standalone mode listening on unix socket
@@ -695,7 +695,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 300Mi
+            memory: 50Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
       - name: kube-rbac-proxy-controller
