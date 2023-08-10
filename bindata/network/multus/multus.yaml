@@ -436,7 +436,7 @@ spec:
               "kubernetes": {
                 "kubeconfig": "/etc/kubernetes/cni/net.d/whereabouts.d/whereabouts.kubeconfig"
               },
-              "reconciler_cron_expression": "30 4 * * *",
+              "reconciler_cron_expression": "*/15 * * * *",
               "log_level": "debug"
             }
             EOF
