@@ -20,6 +20,13 @@ spec:
     matchLabels:
       app: ovnkube-control-plane
   replicas: {{.OvnkubeMasterReplicas}}
+{{ if (gt .OvnkubeMasterReplicas 1)}}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+{{ end }}
   template:
     metadata:
       annotations:
