@@ -67,7 +67,7 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	objs = append(objs, o...)
 
 	// render default network
-	o, progressing, err = renderDefaultNetwork(conf, bootstrapResult, manifestDir, client)
+	o, progressing, err = renderDefaultNetwork(conf, bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -564,7 +564,7 @@ func validateMigration(conf *operv1.NetworkSpec) []error {
 
 // renderDefaultNetwork generates the manifests corresponding to the requested
 // default network
-func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client cnoclient.Client) ([]*uns.Unstructured, bool, error) {
+func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, bool, error) {
 	dn := conf.DefaultNetwork
 	if errs := validateDefaultNetwork(conf); len(errs) > 0 {
 		return nil, false, errors.Errorf("invalid Default Network configuration: %v", errs)
@@ -574,7 +574,7 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 	case operv1.NetworkTypeOpenShiftSDN:
 		return renderOpenShiftSDN(conf, bootstrapResult, manifestDir)
 	case operv1.NetworkTypeOVNKubernetes:
-		return renderOVNKubernetes(conf, bootstrapResult, manifestDir, client)
+		return renderOVNKubernetes(conf, bootstrapResult, manifestDir)
 	case operv1.NetworkTypeKuryr:
 		return renderKuryr(conf, bootstrapResult, manifestDir)
 	default:

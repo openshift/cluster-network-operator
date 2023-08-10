@@ -12,8 +12,8 @@ spec:
   groups:
   - name: cluster-network-operator-master.rules
     rules:
-    - record: cluster:ovnkube_controller_egress_routing_via_host:max
-      expr: max(ovnkube_controller_egress_routing_via_host)
+    - record: cluster:ovnkube_master_egress_routing_via_host:max
+      expr: max(ovnkube_master_egress_routing_via_host)
     - record: cluster:ovn_db_nbdb_not_cluster_member:abs
       expr: abs(count(ovn_db_cluster_server_status{db_name="OVN_Northbound", server_status="cluster member"}) - {{.OvnkubeMasterReplicas}})
     - record: cluster:ovn_db_sbdb_not_cluster_member:abs
@@ -58,9 +58,9 @@ spec:
       labels:
         namespace: openshift-ovn-kubernetes
         severity: critical
-    - alert: NoOvnClusterManagerLeader
+    - alert: NoOvnMasterLeader
       annotations:
-        summary: There is no ovn-kubernetes Cluster Manager leader.
+        summary: There is no ovn-kubernetes master leader.
         runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoOvnMasterLeader.md
         description: |
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
@@ -69,7 +69,7 @@ spec:
       expr: |
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        max by (namespace) (max_over_time(ovnkube_clustermanager_leader[5m])) == 0
+        max by (namespace) (max_over_time(ovnkube_master_leader[5m])) == 0
       for: 5m
       labels:
         severity: critical
@@ -85,7 +85,7 @@ spec:
       expr: |
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        time() - max_over_time(ovnkube_controller_nb_e2e_timestamp[5m]) > 120
+        time() - max_over_time(ovnkube_master_nb_e2e_timestamp[5m]) > 120
       for: 10m
       labels:
         severity: critical
@@ -100,7 +100,7 @@ spec:
       expr: |
         # Without max_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-        max_over_time(ovnkube_controller_nb_e2e_timestamp[5m]) - max_over_time(ovnkube_master_sb_e2e_timestamp[5m]) > 120
+        max_over_time(ovnkube_master_nb_e2e_timestamp[5m]) - max_over_time(ovnkube_master_sb_e2e_timestamp[5m]) > 120
       for: 10m
       labels:
         severity: critical
@@ -321,7 +321,7 @@ spec:
           which may indicate degraded OVN database high availability.
       expr: |
         # Expected sum of outbound connections is number of control plane nodes * number of control plane nodes minus one
-        # Without max_over_time, failed scrapes could create false negatives, see
+        # Without min_over_time, failed scrapes could create false negatives, see
         # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
         min_over_time(cluster:ovn_db_sbdb_missing_outbound_connections:abs[5m]) != 0
       for: 5m
@@ -346,16 +346,15 @@ spec:
       labels:
         severity: info
     # OVN northd functional alerts
-      # TODO fix this metrics https://github.com/ovn-org/ovn-kubernetes/issues/3774
-#    - alert: OVNKubernetesNorthdInactive
-#      annotations:
-#        summary: Exactly one OVN northd instance must have an active status.
-#        description: Exactly one OVN northd must have an active status within the high availability set.
-#          Networking control plane is degraded.
-#      expr: |
-#        # Without max_over_time, failed scrapes could create false negatives, see
-#        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
-#        count(ovn_northd_status == 1) by (namespace) != 1
-#      for: 5m
-#      labels:
-#        severity: critical
+    - alert: OVNKubernetesNorthdInactive
+      annotations:
+        summary: Exactly one OVN northd instance must have an active status.
+        description: Exactly one OVN northd must have an active status within the high availability set.
+          Networking control plane is degraded.
+      expr: |
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        count(ovn_northd_status == 1) by (namespace) != 1
+      for: 5m
+      labels:
+        severity: critical
