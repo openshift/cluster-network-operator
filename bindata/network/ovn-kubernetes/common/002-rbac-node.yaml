@@ -152,7 +152,6 @@ rules:
     - create
     - get
     - list
-    - update
 - apiGroups: ["security.openshift.io"]
   resources:
   - securitycontextconstraints
