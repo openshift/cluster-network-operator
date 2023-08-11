@@ -92,7 +92,7 @@ spec:
             Until https://github.com/kubernetes/kubernetes/issues/85966 is fixed use a no-op init container as a workaround.
             This allows for pod-pod connectivity in postStart hooks the first time they run.
             EOF
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
       containers:
       # token-minter creates a token with the default service account path
       # The token is read by ovn-k containers to authenticate against the hosted cluster api server
@@ -116,7 +116,7 @@ spec:
           name: hosted-cluster-api-access
       # ovnkube-control-plane: central component that allocates IPAM for each node in the cluster
       - name: ovnkube-control-plane
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
         command:
         - /bin/bash
         - -c
