@@ -59,7 +59,7 @@ spec:
       containers:
       # ovn-northd: convert network objects in nbdb to flows in sbdb
       - name: northd
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
         command:
         - /bin/bash
         - -c
@@ -126,7 +126,7 @@ spec:
 
       # nbdb: the northbound, or logical network object DB. In raft mode
       - name: nbdb
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
         command:
         - /bin/bash
         - -c
@@ -531,7 +531,7 @@ spec:
           readOnly: True
       # sbdb: The southbound, or flow DB. In raft mode
       - name: sbdb
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
         command:
         - /bin/bash
         - -c
@@ -831,7 +831,7 @@ spec:
 
       # ovnkube-master: convert kubernetes objects in to nbdb logical network components
       - name: ovnkube-master
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
         command:
         - /bin/bash
         - -c
@@ -930,7 +930,7 @@ spec:
         terminationMessagePolicy: FallbackToLogsOnError
       # ovn-dbchecker: monitor clustered ovn databases for db health and stale raft members
       - name: ovn-dbchecker
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
         command:
         - /bin/bash
         - -c
