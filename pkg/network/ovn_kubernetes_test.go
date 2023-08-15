@@ -25,10 +25,12 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	crfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnofake "github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 )
 
 //nolint:errcheck
@@ -85,9 +87,10 @@ func TestRenderOVNKubernetes(t *testing.T) {
 			},
 		},
 	}
+	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
 	fakeClient := cnofake.NewFakeClient()
 
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-ovn-kubernetes", "ovnkube-control-plane")))
@@ -142,8 +145,9 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 			},
 		},
 	}
+	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
 	fakeClient := cnofake.NewFakeClient()
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	err = checkOVNKubernetesPostStart(objs)
@@ -162,7 +166,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 			},
 		},
 	}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	err = checkOVNKubernetesPostStart(objs)
@@ -181,6 +185,7 @@ func TestRenderedOVNKubernetesConfig(t *testing.T) {
 		disableGRO             bool
 		disableMultiNet        bool
 		enableMultiNetPolicies bool
+		enableAdminNetPolicies bool
 	}
 	testcases := []testcase{
 		{
@@ -605,7 +610,7 @@ nodeport=true`,
 			disableMultiNet: true,
 		},
 		{
-			desc: "enable multi-network policies",
+			desc: "enable multi-network policies and admin network policies",
 			expected: `
 [default]
 mtu="1500"
@@ -633,12 +638,14 @@ enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
 enable-multi-networkpolicy=true
+enable-admin-network-policy=true
 
 [gateway]
 mode=shared
 nodeport=true`,
 			masterIPs:              []string{"1.2.3.4", "2.3.4.5"},
 			enableMultiNetPolicies: true,
+			enableAdminNetPolicies: true,
 		},
 		{
 			desc: "enable multi-network policies without multi-network support",
@@ -667,6 +674,7 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
+enable-admin-network-policy=true
 
 [gateway]
 mode=shared
@@ -674,6 +682,7 @@ nodeport=true`,
 			masterIPs:              []string{"1.2.3.4", "2.3.4.5"},
 			disableMultiNet:        true,
 			enableMultiNetPolicies: true,
+			enableAdminNetPolicies: true,
 		},
 	}
 	g := NewGomegaWithT(t)
@@ -721,8 +730,15 @@ nodeport=true`,
 					DisableUDPAggregation: tc.disableGRO,
 				},
 			}
+			enabled := []configv1.FeatureGateName{}
+			disabled := []configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}
+			if tc.enableAdminNetPolicies {
+				disabled = []configv1.FeatureGateName{}
+				enabled = []configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}
+			}
+			featureGatesCNO := featuregates.NewFeatureGate(enabled, disabled)
 			fakeClient := cnofake.NewFakeClient()
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 			confFile := extractOVNKubeConfig(g, objs)
 			g.Expect(confFile).To(Equal(strings.TrimSpace(tc.expected)))
@@ -1732,9 +1748,10 @@ metadata:
 				},
 				PrePullerUpdateStatus: prepullerStatus,
 			}
+			featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
 
 			fakeClient := cnofake.NewFakeClient()
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
@@ -2036,11 +2053,12 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 			},
 		},
 	}
+	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
 
 	// the new rendered config should hold the node to do the dualstack conversion
 	// the upgrade code holds the controlPlanes to update the nodes first
 	fakeClient := cnofake.NewFakeClient()
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2133,8 +2151,9 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 				},
 				FlowsConfig: tc.FlowsConfig,
 			}
+			featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
 			fakeClient := cnofake.NewFakeClient()
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 			g.Expect(err).ToNot(HaveOccurred())
 			nodeDS := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 			ds := appsv1.DaemonSet{}

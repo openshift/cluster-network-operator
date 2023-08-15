@@ -2,16 +2,19 @@ package network
 
 import (
 	"fmt"
+	"strings"
+
 	. "github.com/onsi/gomega"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"k8s.io/client-go/kubernetes/scheme"
-	"strings"
+
+	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 // NOTE: IsChangeSafe() requires you to have called Validate() beforehand, so we
@@ -386,7 +389,9 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	bootstrapResult, err := Bootstrap(&config, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	objs, _, err := Render(prev, bootstrapResult, manifestDir, client)
+	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{}, []configv1.FeatureGateName{})
+
+	objs, _, err := Render(prev, bootstrapResult, manifestDir, client, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Validate that openshift-sdn isn't rendered
