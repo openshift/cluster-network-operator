@@ -48,6 +48,9 @@ data:
 {{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
     enable-multi-networkpolicy=true
 {{- end }}
+{{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
+    enable-admin-network-policy=true
+{{- end }}
 
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
