@@ -115,7 +115,7 @@ spec:
             Until https://github.com/kubernetes/kubernetes/issues/85966 is fixed use a no-op init container as a workaround.
             This allows for pod-pod connectivity in postStart hooks the first time they run.
             EOF
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
       containers:
       # token-minter creates a token with the default service account path
       # The token is read by ovn-k containers to authenticate against the hosted cluster api server
@@ -139,7 +139,7 @@ spec:
           name: hosted-cluster-api-access
       # ovn-northd: convert network objects in nbdb to flows in sbdb
       - name: northd
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
         command:
         - /bin/bash
         - -c
@@ -204,7 +204,7 @@ spec:
 
       # nbdb: the northbound, or logical network object DB. In raft mode
       - name: nbdb
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
         command:
         - /bin/bash
         - -c
@@ -538,7 +538,7 @@ spec:
 
       # sbdb: The southbound, or flow DB. In raft mode
       - name: sbdb
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
         command:
         - /bin/bash
         - -c
@@ -832,7 +832,7 @@ spec:
 
       # ovnkube master: convert kubernetes objects in to nbdb logical network components
       - name: ovnkube-master
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
         command:
         - /bin/bash
         - -c
@@ -949,7 +949,7 @@ spec:
         terminationMessagePolicy: FallbackToLogsOnError
       # ovn-dbchecker: monitor clustered ovn databases for db health and stale raft members
       - name: ovn-dbchecker
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
         command:
         - /bin/bash
         - -c

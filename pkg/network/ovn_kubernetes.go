@@ -118,6 +118,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["OvnImage"] = os.Getenv("OVN_IMAGE")
+	data.Data["OvnControlPlaneImage"] = os.Getenv("OVN_IMAGE")
+	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled {
+		data.Data["OvnControlPlaneImage"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ControlPlaneImage
+	}
 	data.Data["OvnkubeMasterReplicas"] = len(bootstrapResult.OVN.MasterAddresses)
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 	data.Data["Socks5ProxyImage"] = os.Getenv("SOCKS5_PROXY_IMAGE")
@@ -613,6 +617,7 @@ func bootstrapOVNHyperShiftConfig(hc *platform.HyperShiftConfig, kubeClient cnoc
 		OVNSbDbRouteHost:   hc.OVNSbDbRouteHost,
 		OVNSbDbRouteLabels: hc.OVNSbDbRouteLabels,
 		ReleaseImage:       hc.ReleaseImage,
+		ControlPlaneImage:  hc.ControlPlaneImage,
 	}
 
 	if !hc.Enabled {

@@ -89,7 +89,7 @@ spec:
           readOnly: True
       # ovnkube-control-plane: central component that allocates IPAM for each node in the cluster
       - name: ovnkube-cluster-manager
-        image: "{{.OvnImage}}"
+        image: "{{.OvnControlPlaneImage}}"
         command:
         - /bin/bash
         - -c
