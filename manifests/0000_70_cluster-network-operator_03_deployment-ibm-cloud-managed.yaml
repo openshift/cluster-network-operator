@@ -20,8 +20,6 @@ spec:
     type: RollingUpdate
   template:
     metadata:
-      annotations:
-        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         name: network-operator
     spec:
