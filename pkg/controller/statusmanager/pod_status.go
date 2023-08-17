@@ -256,9 +256,9 @@ func (status *StatusManager) SetFromPods() {
 	// hack for 2-phase upgrade from non-IC to IC ovnk:
 	// don't update the version field until phase 2 is over
 	if icConfigMap, err := util.GetInterConnectConfigMap(status.client.ClientFor("").Kubernetes()); err == nil {
-		// When an upgrade from <= 4.13 is ongoing, the IC configmap exists and exhibits ongoing-upgrade=true.
+		// When an upgrade from <= 4.13 is ongoing, the IC configmap exists and exhibits ongoing-upgrade=''.
 		// When multizone control-plane and node have been rolled out (end of phase 2), the configmap is deleted.
-		if ongoingUpgrade, ok := icConfigMap.Data["ongoing-upgrade"]; ok && ongoingUpgrade == "true" {
+		if _, ok := icConfigMap.Data["ongoing-upgrade"]; ok {
 			reachedAvailableLevel = false
 		}
 	} else if !apierrors.IsNotFound(err) {
