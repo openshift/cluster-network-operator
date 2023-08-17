@@ -173,6 +173,22 @@ rules:
   - patch
   - update
   - watch
+{{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
+- apiGroups: ["policy.networking.k8s.io"]
+  resources:
+  - adminnetworkpolicies
+  - baselineadminnetworkpolicies
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: ["policy.networking.k8s.io"]
+  resources:
+  - adminnetworkpolicies/status
+  - baselineadminnetworkpolicies/status
+  verbs:
+  - update
+{{- end }}
 - apiGroups: ["cloud.network.openshift.io"]
   resources:
   - cloudprivateipconfigs
