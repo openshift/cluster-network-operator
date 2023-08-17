@@ -337,6 +337,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVN_GATEWAY_MODE"] = OVN_SHARED_GW_MODE
 	}
 
+	data.Data["IP_FORWARDING_MODE"] = operv1.IPForwardingRestricted
+	if c.GatewayConfig != nil {
+		data.Data["IP_FORWARDING_MODE"] = c.GatewayConfig.IPForwarding
+	}
+
 	// leverage feature gates
 	data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(configv1.FeatureGateAdminNetworkPolicy)
 
@@ -1544,6 +1549,16 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		ipsecStatus.Version = ipsecDaemonSet.GetAnnotations()["release.openshift.io/version"]
 	}
 
+	// If we are upgrading from 4.13 -> 4.14 set new API for IP Forwarding mode to Global.
+	// This is to ensure backwards compatibility.
+	if masterStatus != nil {
+		klog.Infof("4.13 -> 4.14 upgrade detected. Will set IP Forwarding API to Global mode for backwards compatibility")
+		if conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig == nil {
+			conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig = &operv1.GatewayConfig{}
+		}
+		conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig.IPForwarding = operv1.IPForwardingGlobal
+	}
+
 	res := bootstrap.OVNBootstrapResult{
 		MasterAddresses:          ovnMasterAddresses,
 		ClusterInitiator:         clusterInitiator,
@@ -2258,14 +2273,10 @@ func isMigrationToMultiZoneAboutToStart(ovn bootstrap.OVNBootstrapResult, target
 		targetZoneModeValue = zoneModeSingleZone
 	}
 	return targetZoneMode.zoneMode == targetZoneModeValue &&
-
 		ovn.NodeUpdateStatus != nil && ovn.MasterUpdateStatus != nil && ovn.ControlPlaneUpdateStatus == nil &&
-
 		ovn.NodeUpdateStatus.InterConnectEnabled &&
 		ovn.MasterUpdateStatus.InterConnectEnabled &&
-
 		ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeSingleZone) &&
-
 		!ovn.NodeUpdateStatus.Progressing &&
 		!ovn.MasterUpdateStatus.Progressing
 }
@@ -2279,14 +2290,12 @@ func isMigrationToMultiZoneAboutToStart(ovn bootstrap.OVNBootstrapResult, target
 //     is progressing (at the end, when node is already multizone)
 func isMigrationToMultiZoneOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
 	return targetZoneMode.zoneMode == zoneModeMultiZone &&
-
 		ovn.NodeUpdateStatus != nil &&
 		ovn.NodeUpdateStatus.InterConnectEnabled &&
 		ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) && // can be progressing or not
 
 		ovn.MasterUpdateStatus != nil &&
 		ovn.MasterUpdateStatus.InterConnectEnabled &&
-
 		(ovn.ControlPlaneUpdateStatus == nil ||
 			ovn.ControlPlaneUpdateStatus != nil && ovn.ControlPlaneUpdateStatus.Progressing && !ovn.NodeUpdateStatus.Progressing)
 }
@@ -2299,12 +2308,9 @@ func isMigrationToMultiZoneOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneM
 //   - control plane either is running and not progressing
 func isMigrationToMultiZoneComplete(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
 	return targetZoneMode.zoneMode == zoneModeMultiZone &&
-
 		ovn.NodeUpdateStatus != nil && ovn.ControlPlaneUpdateStatus != nil &&
-
 		ovn.NodeUpdateStatus.InterConnectEnabled &&
 		ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) &&
-
 		!ovn.NodeUpdateStatus.Progressing &&
 		!ovn.ControlPlaneUpdateStatus.Progressing &&
 
@@ -2326,14 +2332,11 @@ func isMigrationToMultiZoneAboutToStartOrOngoing(ovn bootstrap.OVNBootstrapResul
 // - control plane is running and is not progressing
 func isMigrationToSingleZoneAboutToStart(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
 	return targetZoneMode.zoneMode == zoneModeSingleZone &&
-
 		ovn.NodeUpdateStatus != nil &&
 		ovn.MasterUpdateStatus == nil &&
 		ovn.ControlPlaneUpdateStatus != nil &&
-
 		ovn.NodeUpdateStatus.InterConnectEnabled &&
 		ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) &&
-
 		!ovn.NodeUpdateStatus.Progressing &&
 		!ovn.ControlPlaneUpdateStatus.Progressing
 }
@@ -2345,9 +2348,7 @@ func isMigrationToSingleZoneAboutToStart(ovn bootstrap.OVNBootstrapResult, targe
 // - control plane is not running when node is rolling out in single zone
 func isMigrationToSingleZoneOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
 	return targetZoneMode.zoneMode == zoneModeSingleZone &&
-
 		ovn.NodeUpdateStatus != nil && ovn.NodeUpdateStatus.InterConnectEnabled &&
-
 		ovn.MasterUpdateStatus != nil &&
 		ovn.MasterUpdateStatus.InterConnectEnabled &&
 
