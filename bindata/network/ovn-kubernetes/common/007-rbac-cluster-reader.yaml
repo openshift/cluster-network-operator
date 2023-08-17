@@ -17,3 +17,11 @@ rules:
   - get
   - list
   - watch
+- apiGroups: ["policy.networking.k8s.io"]
+  resources:
+  - adminnetworkpolicies
+  - baselineadminnetworkpolicies
+  verbs:
+  - get
+  - list
+  - watch
