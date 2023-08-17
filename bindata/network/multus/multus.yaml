@@ -318,7 +318,7 @@ spec:
         - name: RHEL9_SOURCE_DIRECTORY
           value: "/bondcni/rhel9/"
         - name: DEFAULT_SOURCE_DIRECTORY
-          value: "/bondcni/"
+          value: "/bondcni/rhel9/"
       - name: routeoverride-cni
         image: {{.RouteOverrideImage}}
         command: ["/entrypoint/cnibincopy.sh"]
