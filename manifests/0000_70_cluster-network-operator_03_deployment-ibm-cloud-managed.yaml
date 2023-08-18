@@ -20,6 +20,7 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations: {}
       labels:
         name: network-operator
     spec:
