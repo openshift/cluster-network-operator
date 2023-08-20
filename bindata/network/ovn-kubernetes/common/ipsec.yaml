@@ -78,7 +78,7 @@ spec:
                         -key /etc/openvswitch/keys/ipsec-privkey.pem \
                         -out /etc/openvswitch/keys/ipsec-req.pem
 
-            csr_64=$(cat /etc/openvswitch/keys/ipsec-req.pem | base64 | tr -d "\n")
+            csr_64=$(base64 -w0 /etc/openvswitch/keys/ipsec-req.pem) # -w0 to avoid line-wrap
 
             # Request that our generated certificate signing request is
             # signed by the "network.openshift.io/signer" signer that is
@@ -101,7 +101,7 @@ spec:
           EOF
             # Wait until the certificate signing request has been signed.
             counter=0
-            until [ ! -z $(kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' 2>/dev/null) ]
+            until [ -n $(kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' 2>/dev/null) ]
             do
               counter=$((counter+1))
               sleep 1
@@ -118,7 +118,7 @@ spec:
             # kubectl delete csr/$(hostname)
 
             # Get the CA certificate so we can authenticate peer nodes.
-            cat /signer-ca/ca-bundle.crt | openssl x509 -outform pem -text > /etc/openvswitch/keys/ipsec-cacert.pem
+            openssl x509 -in /signer-ca/ca-bundle.crt -outform pem -text -out /etc/openvswitch/keys/ipsec-cacert.pem
           fi
 
           # Configure OVS with the relevant keys for this node. This is required by ovs-monitor-ipsec.
