@@ -58,10 +58,11 @@ spec:
           # authentic.
           echo "Configuring IPsec keys"
 
+          cert_pem=/etc/openvswitch/keys/ipsec-cert.pem
+
           # If the certificate does not exist or it will expire in the next 6 months
           # (15770000 seconds), we will generate a new one.
-          if [ ! -e /etc/openvswitch/keys/ipsec-cert.pem ] || [ ! openssl x509 -noout -dates -checkend 15770000 ];
-          then
+          if ! openssl x509 -noout -dates -checkedn 15770000 -in $cert_pem; then
             # We use the system-id as the CN for our certificate signing request. This
             # is a requirement by OVN.
             cn=$(ovs-vsctl --retry -t 60 get Open_vSwitch . external-ids:system-id | tr -d "\"")
@@ -112,7 +113,7 @@ spec:
             done
 
             # Decode the signed certificate.
-            kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' | base64 -d | openssl x509 -outform pem -text -out /etc/openvswitch/keys/ipsec-cert.pem
+            kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' | base64 -d | openssl x509 -outform pem -text -out $cert_pem
 
             # kubectl delete csr/$(hostname)
 
@@ -125,7 +126,7 @@ spec:
           # Updating the certificates does not need to be an atomic operation as
           # the will get read and loaded into NSS by the ovs-monitor-ipsec process
           # which has not started yet.
-          ovs-vsctl --retry -t 60 set Open_vSwitch . other_config:certificate=/etc/openvswitch/keys/ipsec-cert.pem \
+          ovs-vsctl --retry -t 60 set Open_vSwitch . other_config:certificate=$cert_pem/g \
                                                      other_config:private_key=/etc/openvswitch/keys/ipsec-privkey.pem \
                                                      other_config:ca_cert=/etc/openvswitch/keys/ipsec-cacert.pem
         env:
