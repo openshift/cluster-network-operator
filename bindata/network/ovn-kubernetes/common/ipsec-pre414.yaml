@@ -48,6 +48,11 @@ spec:
           #!/bin/bash
           set -exuo pipefail
 
+          if rpm --dbpath=/usr/share/rpm -q libreswan; then
+            echo "host have libreswan, ovn-keys will not run"
+            exit 0
+          fi
+
           # Every time we restart this container, we will create a new key pair if
           # we are close to key expiration or if we do not already have a signed key pair.
           #
@@ -143,6 +148,9 @@ spec:
           name: signer-ca
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
+        - mountPath: /usr/share/rpm
+          name: host-usr-share-rpm
+          readOnly: true
         resources:
           requests:
             cpu: 10m
@@ -173,6 +181,11 @@ spec:
             exit 0
           }
           trap cleanup SIGTERM
+
+          if rpm --dbpath=/usr/share/rpm -q libreswan; then
+            echo "host have libreswan, ovn-ipsec will sleep infinity"
+            sleep infinity
+          fi
 
           # Don't start IPsec until ovnkube-node has finished setting up the node
           counter=0
@@ -230,6 +243,9 @@ spec:
           name: host-var-log-ovs
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
+        - mountPath: /usr/share/rpm
+          name: host-usr-share-rpm
+          readOnly: true
         resources:
           requests:
             cpu: 10m
@@ -242,6 +258,11 @@ spec:
             - -c
             - |
               #!/bin/bash
+              if rpm --dbpath=/usr/share/rpm -q libreswan; then
+                echo "host have libreswan, pod is always live"
+                exit 0
+              fi
+
               ipsec status
           initialDelaySeconds: 15
           periodSeconds: 60
@@ -267,6 +288,10 @@ spec:
       - name: host-cni-netd
         hostPath:
           path: "{{.CNIConfDir}}"
+      - name: host-usr-share-rpm
+        hostPath:
+          path: /usr/share/rpm
+          type: Directory
       tolerations:
       - operator: "Exists"
 {{end}}
