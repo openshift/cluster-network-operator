@@ -114,8 +114,6 @@ spec:
             # Decode the signed certificate.
             kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' | base64 -d | openssl x509 -outform pem -text -out /etc/openvswitch/keys/ipsec-cert.pem
 
-            kubectl delete csr/$(hostname)
-
             # Get the CA certificate so we can authenticate peer nodes.
             cat /signer-ca/ca-bundle.crt | openssl x509 -outform pem -text > /etc/openvswitch/keys/ipsec-cacert.pem
           fi
