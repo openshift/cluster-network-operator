@@ -775,20 +775,27 @@ spec:
             - -c
             - |
               set -xeo pipefail
-
+              
+              echo "[Readiness Probe] Start of probe at $(date)"
+              
               # exit early if this DB is not supposed to be part of the cluster
-              pod_dns_name="${K8S_POD_NAME}.ovnkube-master-internal.{{.HostedClusterNamespace}}.svc.cluster.local"
-              if [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":${pod_dns_name}:".* ]] && [[ ! "{{.OVN_SB_DB_LIST}}" =~ .*":[${pod_dns_name}]:".* ]]; then
+              echo "[Readiness Probe] Checking if DB is part of the cluster..."
+              if [[ ! "ssl:10.0.0.5:9642,ssl:10.0.0.3:9642,ssl:10.0.0.4:9642" =~ .*":${K8S_NODE_IP}:".* ]] && [[ ! "ssl:10.0.0.5:9642,ssl:10.0.0.3:9642,ssl:10.0.0.4:9642" =~ .*":[${K8S_NODE_IP}]:".* ]]; then
+                echo "[Readiness Probe] Exiting early. DB not part of cluster."
                 exit 0
               fi
-
-              leader_status=$(/usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=3 cluster/status OVN_Southbound  2>/dev/null | { grep "Leader: unknown" || true; })
+              
+              echo "[Readiness Probe] Checking leader status..."
+              leader_status=$(/usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=3 cluster/status OVN_Southbound 2>/dev/null | { grep "Leader: unknown" || true; })
               if [[ ! -z "${leader_status}" ]]; then
-                echo "SB DB Raft leader is unknown to the cluster node."
+                echo "[Readiness Probe] SB DB Raft leader is unknown to the cluster node."
                 exit 1
               fi
-              # set trim-on-compaction
+              
+              echo "[Readiness Probe] Setting trim-on-compaction..."
               /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
+              
+              echo "[Readiness Probe] Readiness check completed successfully at $(date)"
         env:
         - name: OVN_LOG_LEVEL
           value: info
