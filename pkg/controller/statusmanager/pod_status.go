@@ -253,18 +253,20 @@ func (status *StatusManager) SetFromPods() {
 		}
 	}
 
-	// hack for 2-phase upgrade from non-IC to IC ovnk:
-	// don't update the version field until phase 2 is over
-	if icConfigMap, err := util.GetInterConnectConfigMap(status.client.ClientFor("").Kubernetes()); err == nil {
-		// When an upgrade from <= 4.13 is ongoing, the IC configmap exists and exhibits ongoing-upgrade=''.
-		// When multizone control-plane and node have been rolled out (end of phase 2), the configmap is deleted.
-		if _, ok := icConfigMap.Data["ongoing-upgrade"]; ok {
+	if status.isOVNKubernetes != nil && *status.isOVNKubernetes {
+		// hack for 2-phase upgrade from non-IC to IC ovnk:
+		// don't update the version field until phase 2 is over
+		if icConfigMap, err := util.GetInterConnectConfigMap(status.client.ClientFor("").Kubernetes()); err == nil {
+			// When an upgrade from <= 4.13 is ongoing, the IC configmap exists and exhibits ongoing-upgrade=''.
+			// When multizone control-plane and node have been rolled out (end of phase 2), the configmap is deleted.
+			if _, ok := icConfigMap.Data["ongoing-upgrade"]; ok {
+				reachedAvailableLevel = false
+			}
+		} else if !apierrors.IsNotFound(err) {
+			log.Printf("Failed to retrieve interconnect configmap: %v", err)
+			// don't risk reporting new version during zone mode migration until configmap retrieval is successful
 			reachedAvailableLevel = false
 		}
-	} else if !apierrors.IsNotFound(err) {
-		log.Printf("Failed to retrieve interconnect configmap: %v", err)
-		// don't risk reporting new version during zone mode migration until configmap retrieval is successful
-		reachedAvailableLevel = false
 	}
 
 	status.setNotDegraded(PodDeployment)
@@ -420,4 +422,15 @@ func (status *StatusManager) listAllStatusObjects() (dss []*appsv1.DaemonSet, de
 		sss = append(sss, l...)
 	}
 	return
+}
+
+func (status *StatusManager) isClusterRunningOVNKubernetes() bool {
+	daemonSets, _, _ := status.listAllStatusObjects()
+	for _, ds := range daemonSets {
+		dsName := NewClusteredName(ds)
+		if dsName.Namespace == util.OVN_NAMESPACE {
+			return true
+		}
+	}
+	return false
 }
