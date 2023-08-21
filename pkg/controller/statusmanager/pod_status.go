@@ -263,6 +263,8 @@ func (status *StatusManager) SetFromPods() {
 		}
 	} else if !apierrors.IsNotFound(err) {
 		log.Printf("Failed to retrieve interconnect configmap: %v", err)
+		// don't risk reporting new version during zone mode migration until configmap retrieval is successful
+		reachedAvailableLevel = false
 	}
 
 	status.setNotDegraded(PodDeployment)
