@@ -48,8 +48,8 @@ spec:
           #!/bin/bash
           set -exuo pipefail
 
-          if rpm --dbpath=/usr/share/rpm -q libreswan; then
-            echo "host have libreswan, ovn-keys will not run"
+          if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
+            echo "no libreswan on host, ovn-keys will not run"
             exit 0
           fi
 
@@ -182,8 +182,8 @@ spec:
           }
           trap cleanup SIGTERM
 
-          if rpm --dbpath=/usr/share/rpm -q libreswan; then
-            echo "host have libreswan, ovn-ipsec will sleep infinity"
+          if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
+            echo "no libreswan on host, ovn-ipsec will sleep infinity"
             sleep infinity
           fi
 
@@ -258,8 +258,8 @@ spec:
             - -c
             - |
               #!/bin/bash
-              if rpm --dbpath=/usr/share/rpm -q libreswan; then
-                echo "host have libreswan, pod is always live"
+              if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
+                echo "no libreswan on host, pod is always live"
                 exit 0
               fi
 
