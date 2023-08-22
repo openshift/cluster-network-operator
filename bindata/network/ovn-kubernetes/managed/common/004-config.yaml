@@ -52,6 +52,12 @@ data:
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
     nodeport=true
+{{- if (index . "V4JoinSubnet") }}
+    v4-join-subnet="{{.V4JoinSubnet}}"
+{{- end }}
+{{- if (index . "V6JoinSubnet") }}
+    v6-join-subnet="{{.V6JoinSubnet}}"
+{{- end }}
 {{- if .OVNHybridOverlayEnable }}
 
     [hybridoverlay]
