@@ -177,7 +177,7 @@ spec:
               command:
                 - /bin/bash
                 - -c
-                - OVN_MANAGE_OVSDB=no /usr/share/ovn/scripts/ovn-ctl stop_northd
+                - OVN_MANAGE_OVSDB=no /usr/share/ovn/scripts/ovn-ctl stop_northd || true
         env:
         - name: OVN_LOG_LEVEL
           value: info
@@ -467,7 +467,7 @@ spec:
               - -c
               - |
                 echo "$(date -Iseconds) - stopping nbdb"
-                /usr/share/ovn/scripts/ovn-ctl stop_nb_ovsdb
+                /usr/share/ovn/scripts/ovn-ctl stop_nb_ovsdb || true
                 echo "$(date -Iseconds) - nbdb stopped"
                 rm -f /var/run/ovn/ovnnb_db.pid
         readinessProbe:
@@ -763,7 +763,7 @@ spec:
               - -c
               - |
                 echo "$(date -Iseconds) - stopping sbdb"
-                /usr/share/ovn/scripts/ovn-ctl stop_sb_ovsdb
+                /usr/share/ovn/scripts/ovn-ctl stop_sb_ovsdb || true
                 echo "$(date -Iseconds) - sbdb stopped"
                 rm -f /var/run/ovn/ovnsb_db.pid
         readinessProbe:
