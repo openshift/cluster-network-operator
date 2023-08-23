@@ -102,6 +102,9 @@ spec:
           fi
 
           echo "$(date -Iseconds) - starting ovn-controller"
+          if [ -f /usr/lib64/libjemalloc.so.2 ]; then
+            export LD_PRELOAD=/usr/lib64/libjemalloc.so.2
+          fi
           exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
             --no-chdir --pidfile=/var/run/ovn/ovn-controller.pid \
             --syslog-method="{{.OVNPolicyAuditDestination}}" \
@@ -333,6 +336,9 @@ spec:
           trap quit TERM INT
 
           echo "$(date -Iseconds) - starting ovn-northd"
+          if [ -f /usr/lib64/libjemalloc.so.2 ]; then
+            export LD_PRELOAD=/usr/lib64/libjemalloc.so.2
+          fi
           exec ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off "-vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
             --pidfile /var/run/ovn/ovn-northd.pid \
@@ -396,6 +402,9 @@ spec:
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
           OVN_ARGS="--no-monitor"
+          if [ -f /usr/lib64/libjemalloc.so.2 ]; then
+            export LD_PRELOAD=/usr/lib64/libjemalloc.so.2
+          fi
           exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
             --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
             run_nb_ovsdb &
@@ -604,6 +613,9 @@ spec:
           bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
           OVN_ARGS="--no-monitor"
+          if [ -f /usr/lib64/libjemalloc.so.2 ]; then
+            export LD_PRELOAD=/usr/lib64/libjemalloc.so.2
+          fi
           exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
             run_sb_ovsdb &
