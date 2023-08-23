@@ -82,7 +82,7 @@ spec:
           trap quit TERM INT
 
           echo "$(date -Iseconds) - starting ovn-northd"
-          exec ovn-northd \
+          nohup ovn-northd \
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off "-vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
             --ovnnb-db "{{.OVN_NB_DB_LIST}}" \
             --ovnsb-db "{{.OVN_SB_DB_LIST}}" \
@@ -91,7 +91,8 @@ spec:
             -p /ovn-cert/tls.key \
             -c /ovn-cert/tls.crt \
             -C /ovn-ca/ca-bundle.crt &
-
+          disown %1
+          
           wait $!
         lifecycle:
           preStop:
@@ -247,13 +248,14 @@ spec:
             if ${cluster_found}; then
               echo "Cluster already exists for DB: ${db}"
               # join existing cluster
-              exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
+              nohup /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
               --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
               --db-nb-cluster-remote-addr=${init_ip} \
               --db-nb-cluster-remote-proto=ssl \
               --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
               run_nb_ovsdb &
-
+              disown %1
+          
               wait $!
             else
               # either we need to initialize a new cluster or wait for master to create it
@@ -264,29 +266,32 @@ spec:
                   election_timer="--db-nb-election-timer=$(({{.OVN_NB_RAFT_ELECTION_TIMER}}*1000))"
                 fi
 
-                exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
+                nohup /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
                 ${election_timer} \
                 run_nb_ovsdb &
-
+                disown %1
+          
                 wait $!
               else
                 echo "Joining the nbdb cluster with init_ip=${init_ip}..."
-                exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
+                nohup /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --db-nb-cluster-remote-port={{.OVN_NB_RAFT_PORT}} \
                 --db-nb-cluster-remote-addr=${init_ip} \
                 --db-nb-cluster-remote-proto=ssl \
                 --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
                 run_nb_ovsdb &
-
+                disown %1
+          
                 wait $!
               fi
             fi
           else
-            exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
+            nohup /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
               --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
               run_nb_ovsdb &
-
+              disown %1
+          
               wait $!
           fi
 
@@ -629,13 +634,14 @@ spec:
             if ${cluster_found}; then
               echo "Cluster already exists for DB: ${db}"
               # join existing cluster
-              exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
+              nohup /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
               --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
               --db-sb-cluster-remote-addr=${init_ip} \
               --db-sb-cluster-remote-proto=ssl \
               --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
               run_sb_ovsdb &
-
+              disown %1
+          
               wait $!
             else
               # either we need to initialize a new cluster or wait for master to create it
@@ -646,28 +652,31 @@ spec:
                   election_timer="--db-sb-election-timer=$(({{.OVN_SB_RAFT_ELECTION_TIMER}}*1000))"
                 fi
 
-                exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
+                nohup /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
                 ${election_timer} \
                 run_sb_ovsdb &
-
+                disown %1
+          
                 wait $!
               else
-                exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
+                nohup /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
                 --db-sb-cluster-remote-addr=${init_ip} \
                 --db-sb-cluster-remote-proto=ssl \
                 --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
                 run_sb_ovsdb &
-
+                disown %1
+          
                 wait $!
               fi
             fi
           else
-            exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
+            nohup /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
             run_sb_ovsdb &
-
+            disown %1
+          
             wait $!
           fi
         lifecycle:
