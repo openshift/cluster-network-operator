@@ -2240,7 +2240,7 @@ func isInterConnectEnabledOnDaemonset(ds *appsv1.DaemonSet, containerName string
 }
 
 func isInterConnectEnabledOnNodeDaemonset(ds *appsv1.DaemonSet) bool {
-	return isInterConnectEnabledOnDaemonset(ds, util.OVN_NODE)
+	return isInterConnectEnabledOnDaemonset(ds, util.OVN_NODE) || isInterConnectEnabledOnDaemonset(ds, util.OVN_CONTROLLER)
 }
 
 func isInterConnectEnabledOnMasterDaemonset(ds *appsv1.DaemonSet) bool {
