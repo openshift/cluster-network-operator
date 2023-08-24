@@ -290,12 +290,16 @@ spec:
                     egressIP:
                       description: Assigned egress IP
                       type: string
+                    network:
+                      description: Assigned network
+                      type: string
                     node:
                       description: Assigned node name
                       type: string
                   required:
                   - egressIP
                   - node
+                  - network
                   type: object
                 type: array
             required:
