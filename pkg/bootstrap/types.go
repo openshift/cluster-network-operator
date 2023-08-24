@@ -67,8 +67,10 @@ type OVNUpdateStatus struct {
 }
 
 type OVNBootstrapResult struct {
-	MasterAddresses  []string
-	ClusterInitiator string
+	MasterAddresses          []string
+	OVNWebhookCABundle       string
+	ClusterInitiator         string
+	ClusterBootstrapComplete bool
 	// ControlPlaneUpdateStatus is the status of ovnkube-control-plane deployment
 	ControlPlaneUpdateStatus *OVNUpdateStatus
 	// MasterUpdateStatus is the status of ovnkube-master daemonset or statefulset (when hypershift is enabled)

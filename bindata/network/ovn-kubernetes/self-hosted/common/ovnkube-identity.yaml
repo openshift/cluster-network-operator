@@ -1,0 +1,93 @@
+{{ if eq .OVN_PER_NODE_CERT_ENABLE "true" }}
+# The ovnkube-identity components
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: ovnkube-identity
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    kubernetes.io/description: |
+      This daemonset launches the ovnkube-identity networking components.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+    matchLabels:
+      app: ovnkube-identity
+  updateStrategy:
+    type: RollingUpdate
+    maxUnavailable: 0
+    maxSurge: 100%
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: ovnkube-identity
+        component: network
+        type: infra
+        openshift.io/component: network
+        kubernetes.io/os: "linux"
+    spec:
+      serviceAccountName: ovnkube-identity
+      hostNetwork: true
+      dnsPolicy: Default
+      priorityClassName: "system-cluster-critical"
+      containers:
+      - name: ovnkube-identity
+        image: "{{.OvnImage}}"
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -xe
+            if [[ -f "/env/_master" ]]; then
+              set -o allexport
+              source "/env/_master"
+              set +o allexport
+            fi
+            ho_enable=
+{{- if .OVNHybridOverlayEnable }}
+            ho_enable="--enable-hybrid-overlay"
+{{ end }}
+            echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-identity - start ovnkube-identity"
+            exec /usr/bin/ovnkube-identity  --k8s-apiserver={{.K8S_APISERVER}} \
+                --webhook-cert-dir="/etc/webhook-cert" \
+                --webhook-host={{.OVNKubeWebhookAddress}} \
+                --webhook-port={{.OVNKubeWebhookPort}} \
+                ${ho_enable} \
+                --enable-interconnect \
+                --loglevel="${OVNKUBE_LOGLEVEL}"
+        env:
+          - name: OVNKUBE_LOGLEVEL
+            value: "5"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+          - mountPath: /etc/webhook-cert/
+            name: webhook-cert
+          - mountPath: /env
+            name: env-overrides
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+        beta.kubernetes.io/os: "linux"
+      volumes:
+        - name: webhook-cert
+          secret:
+            secretName: ovnkube-identity-cert
+        - name: env-overrides
+          configMap:
+            name: env-overrides
+            optional: true
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+      - key: "node.kubernetes.io/network-unavailable"
+        operator: "Exists"
+{{ end }}

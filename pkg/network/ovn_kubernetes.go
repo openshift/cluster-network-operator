@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -30,6 +31,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/util"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
+	"github.com/openshift/cluster-network-operator/pkg/util/validation"
 	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/pkg/errors"
@@ -68,6 +70,7 @@ const OVN_NODE_MODE_SMART_NIC = "smart-nic"
 const OVN_NODE_SELECTOR_DEFAULT_DPU_HOST = "network.operator.openshift.io/dpu-host"
 const OVN_NODE_SELECTOR_DEFAULT_DPU = "network.operator.openshift.io/dpu"
 const OVN_NODE_SELECTOR_DEFAULT_SMART_NIC = "network.operator.openshift.io/smart-nic"
+const OVN_WEBHOOK_PORT = 9743
 
 // gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
@@ -124,6 +127,22 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled {
 		data.Data["OvnControlPlaneImage"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ControlPlaneImage
 	}
+	// TODO: WIP
+	data.Data["OvnImage"] = "quay.io/pdiak/ovn-kubernetes:cert_manager_downstream"
+	data.Data["OvnControlPlaneImage"] = "quay.io/pdiak/ovn-kubernetes:cert_manager_downstream"
+	data.Data["OVN_PER_NODE_CERT_ENABLE"] = "true"
+
+	// OVNKubeWebhookAddress is only used in self-hosted deployments where the webhook listens on loopback
+	// listening on localhost always picks the v4 address while dialing to localhost can choose either one
+	// https://github.com/golang/go/issues/9334
+	// For that reason set the webhook address use the loopback address of the primary IP family
+	// Note: ServiceNetwork cannot be empty, so it is safe to use the first element
+	data.Data["OVNKubeWebhookAddress"] = "127.0.0.1"
+	if utilnet.IsIPv6CIDRString(conf.ServiceNetwork[0]) {
+		data.Data["OVNKubeWebhookAddress"] = "[::1]"
+	}
+	data.Data["OVNKubeWebhookPort"] = OVN_WEBHOOK_PORT
+	data.Data["OVNKubeWebhookCABundle"] = bootstrapResult.OVN.OVNWebhookCABundle
 	data.Data["OvnkubeMasterReplicas"] = len(bootstrapResult.OVN.MasterAddresses)
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 	data.Data["Socks5ProxyImage"] = os.Getenv("SOCKS5_PROXY_IMAGE")
@@ -196,6 +215,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["ManagementClusterName"] = names.ManagementClusterName
 	data.Data["HostedClusterNamespace"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Namespace
 	data.Data["ReleaseImage"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ReleaseImage
+	data.Data["CLIImage"] = os.Getenv("CLI_IMAGE")
 	data.Data["ClusterID"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ClusterID
 	data.Data["ClusterIDLabel"] = platform.ClusterIDLabel
 	data.Data["OVNDbServiceType"] = corev1.ServiceTypeClusterIP
@@ -587,6 +607,29 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			o.SetAnnotations(anno)
 		})
 		progressing = true
+	}
+
+	applyWebhook := true
+	if !bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled && !bootstrapResult.OVN.ClusterBootstrapComplete {
+		klog.Infof("ovnkube webhook will not be applied, bootstrap is not complete")
+		applyWebhook = false
+	}
+	if len(bootstrapResult.OVN.OVNWebhookCABundle) == 0 {
+		klog.Warningf("ovnkube webhook will not be applied, CA bundle not found")
+	}
+	if renderPrePull {
+		klog.Warningf("ovnkube webhook will not be applied, pre-pulling images")
+	}
+	if !applyWebhook {
+		klog.Infof("ovnkube webhook will not be applied, if it already exists it won't be removed")
+		k8s.UpdateObjByGroupKindName(objs, "admissionregistration.k8s.io", "ValidatingWebhookConfiguration", "", "ovnkube.openshift.io", func(o *uns.Unstructured) {
+			anno := o.GetAnnotations()
+			if anno == nil {
+				anno = map[string]string{}
+			}
+			anno[names.CreateWaitAnnotation] = "true"
+			o.SetAnnotations(anno)
+		})
 	}
 
 	return objs, progressing, nil
@@ -1310,6 +1353,22 @@ func getTargetInterConnectZoneMode(kubeClient cnoclient.Client) (targetZoneModeT
 	return targetZoneMode, nil
 }
 
+func isBootstrapComplete(cli cnoclient.Client) (bool, error) {
+	clusterBootstrap := &corev1.ConfigMap{}
+	clusterBootstrapLookup := types.NamespacedName{Name: "bootstrap", Namespace: CLUSTER_CONFIG_NAMESPACE}
+	if err := cli.ClientFor("").CRClient().Get(context.TODO(), clusterBootstrapLookup, clusterBootstrap); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return false, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %s", err)
+		}
+	}
+	status, ok := clusterBootstrap.Data["status"]
+	if ok {
+		return status == "complete", nil
+	}
+	klog.Warningf("no status found in bootstrap configmap")
+	return false, nil
+}
+
 func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNBootstrapResult, error) {
 	clusterConfig := &corev1.ConfigMap{}
 	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
@@ -1341,6 +1400,36 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		return nil, err
 	}
 	OVN_MASTER_DISCOVERY_TIMEOUT = newTimeout
+
+	// TODO: Do only if webhook is enabled
+	clusterBootstrapComplete := false
+	if !hc.Enabled {
+		clusterBootstrapComplete, err = isBootstrapComplete(kubeClient)
+		if err != nil {
+			return nil, err
+		}
+	}
+	webhookCAConfigMap := &corev1.ConfigMap{}
+	webhookCAClient := kubeClient.Default()
+	webhookCALookup := types.NamespacedName{Name: "ovnkube-identity-ca", Namespace: util.OVN_NAMESPACE}
+	caKey := "ca-bundle.crt"
+	if hc.Enabled {
+		webhookCAClient = kubeClient.ClientFor(names.ManagementClusterName)
+		webhookCALookup = types.NamespacedName{Name: "openshift-service-ca.crt", Namespace: hc.Namespace}
+		caKey = "service-ca.crt"
+	}
+	var webhookCA []byte
+
+	if err := webhookCAClient.CRClient().Get(context.TODO(), webhookCALookup, webhookCAConfigMap); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("unable to bootstrap OVN, unable to retrieve webhook CA config: %s", err)
+		}
+	} else {
+		_, webhookCA, err = validation.TrustBundleConfigMap(webhookCAConfigMap, caKey)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// clusterInitiator is used to avoid a split-brain scenario for the OVN NB/SB DBs. We want to consistently initialize
 	// any OVN cluster which is bootstrapped here, to the same initiator (should it still exist), hence we annotate the
@@ -1562,6 +1651,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	res := bootstrap.OVNBootstrapResult{
 		MasterAddresses:          ovnMasterAddresses,
 		ClusterInitiator:         clusterInitiator,
+		OVNWebhookCABundle:       base64.URLEncoding.EncodeToString(webhookCA),
 		ControlPlaneUpdateStatus: controlPlaneStatus,
 		MasterUpdateStatus:       masterStatus, // TODO to be removed in 4.15, after making 4.13->4.14 upgrade required
 		NodeUpdateStatus:         nodeStatus,
@@ -1569,6 +1659,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		PrePullerUpdateStatus:    prepullerStatus,
 		OVNKubernetesConfig:      ovnConfigResult,
 		FlowsConfig:              bootstrapFlowsConfig(kubeClient.ClientFor("").CRClient()),
+		ClusterBootstrapComplete: clusterBootstrapComplete,
 	}
 	return &res, nil
 }

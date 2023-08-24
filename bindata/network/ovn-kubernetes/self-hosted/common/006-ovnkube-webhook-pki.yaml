@@ -1,0 +1,12 @@
+{{ if eq .OVN_PER_NODE_CERT_ENABLE "true" }}
+# Request that the cluster network operator PKI controller
+# creates a certificate and key for ovnkube-identity webhook.
+apiVersion: network.operator.openshift.io/v1
+kind: OperatorPKI
+metadata:
+  name: ovnkube-identity
+  namespace: openshift-ovn-kubernetes
+spec:
+  targetCert:
+    commonName: {{.OVNKubeWebhookAddress}}
+{{ end }}

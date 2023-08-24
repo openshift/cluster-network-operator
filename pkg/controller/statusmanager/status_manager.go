@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/ghodss/yaml"
-
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
@@ -21,7 +20,6 @@ import (
 	cohelpers "github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
 	operstatus "github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
-
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -216,6 +215,12 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 			objToDelete.SetName(currentObj.Name)
 			objToDelete.SetNamespace(currentObj.Namespace)
 			objToDelete.SetGroupVersionKind(gvk)
+			// Do not remove old rbac definitions before upgrade completes to avoid disruptions
+			if !status.installComplete && gvk.Group == "rbac.authorization.k8s.io" {
+				klog.Infof("Upgrade in progress, skipping removal of (%s) %s/%s for now", gvk, objToDelete.GetNamespace(), objToDelete.GetName())
+				status.relatedObjects = append(status.relatedObjects, currentObj)
+				continue
+			}
 			err = status.client.ClientFor("").CRClient().Delete(context.TODO(), objToDelete, crclient.PropagationPolicy("Background"))
 			if err != nil {
 				log.Printf("Error deleting related object: %v", err)

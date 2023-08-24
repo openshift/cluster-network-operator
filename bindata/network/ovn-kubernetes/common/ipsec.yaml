@@ -47,7 +47,44 @@ spec:
         - |
           #!/bin/bash
           set -exuo pipefail
+{{ if eq .OVN_PER_NODE_CERT_ENABLE "true" }}
+          # Wait for cert file
+          retries=0
+          tries=20
+          key_cert="/etc/ovn/ovnkube-node-certs/ovnkube-client-current.pem"
+          while [ ! -f "${key_cert}" ]; do
+            (( retries += 1 ))
+            if [[ "${retries}" -gt ${tries} ]]; then
+              echo "$(date -Iseconds) - ERROR - ${key_cert} not found"
+              return 1
+            fi
+            sleep 1
+          done
 
+          cat << EOF > /var/run/ovnkube-kubeconfig
+          apiVersion: v1
+          clusters:
+            - cluster:
+                certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                server: {{.K8S_APISERVER}}
+              name: default-cluster
+          contexts:
+            - context:
+                cluster: default-cluster
+                namespace: default
+                user: default-auth
+              name: default-context
+          current-context: default-context
+          kind: Config
+          preferences: {}
+          users:
+            - name: default-auth
+              user:
+                client-certificate: /etc/ovn/ovnkube-node-certs/ovnkube-client-current.pem
+                client-key: /etc/ovn/ovnkube-node-certs/ovnkube-client-current.pem
+          EOF
+          export KUBECONFIG=/var/run/ovnkube-kubeconfig
+{{ end }}
           # Every time we restart this container, we will create a new key pair if
           # we are close to key expiration or if we do not already have a signed key pair.
           #
@@ -136,6 +173,10 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
+{{ if eq .OVN_PER_NODE_CERT_ENABLE "true" }}
+        - mountPath: /etc/ovn/
+          name: etc-ovn
+{{ end }}
         - mountPath: /var/run/openvswitch
           name: host-var-run-ovs
         - mountPath: /signer-ca
@@ -256,6 +297,11 @@ spec:
         hostPath:
           path: /var/run/openvswitch
           type: DirectoryOrCreate
+{{ if eq .OVN_PER_NODE_CERT_ENABLE "true" }}
+      - name: etc-ovn
+        hostPath:
+          path: /var/lib/ovn-ic/etc
+{{ end }}
       - name: signer-ca
         configMap:
           name: signer-ca

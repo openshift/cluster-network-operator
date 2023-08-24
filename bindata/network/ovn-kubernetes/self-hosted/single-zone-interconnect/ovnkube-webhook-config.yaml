@@ -1,0 +1,19 @@
+{{ if eq .OVN_PER_NODE_CERT_ENABLE "true" }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: ovnkube.openshift.io
+webhooks:
+  - name: node.ovnkube.openshift.io
+    clientConfig:
+      url: https://{{.OVNKubeWebhookAddress}}:{{.OVNKubeWebhookPort}}/validate--v1-node
+      caBundle: {{.OVNKubeWebhookCABundle}}
+    admissionReviewVersions: ['v1']
+    sideEffects: None
+    rules:
+      - operations: [ "UPDATE" ]
+        apiGroups: ["*"]
+        apiVersions: ["*"]
+        resources: ["nodes/status"]
+        scope: "*"
+{{ end }}

@@ -1,0 +1,20 @@
+{{ if eq .OVN_PER_NODE_CERT_ENABLE "true" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: ovnkube-identity
+  namespace: {{.HostedClusterNamespace}}
+  labels:
+    app: ovnkube-identity
+    hypershift.openshift.io/allow-guest-webhooks: "true"
+  annotations:
+    network.operator.openshift.io/cluster-name: {{.ManagementClusterName}}
+    service.alpha.openshift.io/serving-cert-secret-name: ovnkube-identity-secret
+spec:
+  ports:
+    - name: webhook
+      port: {{.OVNKubeWebhookPort}}
+      targetPort: {{.OVNKubeWebhookPort}}
+  selector:
+    app: ovnkube-identity
+{{ end }}
