@@ -2159,7 +2159,10 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 			ds := appsv1.DaemonSet{}
 			g.Expect(convert(nodeDS, &ds)).To(Succeed())
 			nodeCont, ok := findContainer(ds.Spec.Template.Spec.Containers, "ovnkube-node")
-			g.Expect(ok).To(BeTrue(), "expecting container named ovnkube-node in the DaemonSet")
+			if !ok {
+				nodeCont, ok = findContainer(ds.Spec.Template.Spec.Containers, "ovnkube-controller")
+			}
+			g.Expect(ok).To(BeTrue(), "expecting container named ovnkube-node or ovnkube-controller in the DaemonSet")
 			g.Expect(nodeCont.Env).To(ContainElements(tc.Expected))
 			for _, ev := range nodeCont.Env {
 				Expect(tc.NotExpected).ToNot(ContainElement(ev.Name))
