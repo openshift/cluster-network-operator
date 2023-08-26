@@ -13,6 +13,7 @@ const OVN_NAMESPACE = "openshift-ovn-kubernetes"
 const OVN_MASTER = "ovnkube-master"
 const OVN_CONTROL_PLANE = "ovnkube-control-plane"
 const OVN_NODE = "ovnkube-node"
+const OVN_CONTROLLER = "ovnkube-controller"
 
 func GetInterConnectConfigMap(kubeClient kubernetes.Interface) (*corev1.ConfigMap, error) {
 	return kubeClient.CoreV1().ConfigMaps(OVN_NAMESPACE).Get(context.TODO(), OVN_INTERCONNECT_CONFIGMAP_NAME, metav1.GetOptions{})
