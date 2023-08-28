@@ -90,9 +90,7 @@ spec:
             --n-threads={{.NorthdThreads}} \
             -p /ovn-cert/tls.key \
             -c /ovn-cert/tls.crt \
-            -C /ovn-ca/ca-bundle.crt &
-
-          wait $!
+            -C /ovn-ca/ca-bundle.crt
         lifecycle:
           preStop:
             exec:
@@ -252,9 +250,7 @@ spec:
               --db-nb-cluster-remote-addr=${init_ip} \
               --db-nb-cluster-remote-proto=ssl \
               --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-              run_nb_ovsdb &
-
-              wait $!
+              run_nb_ovsdb
             else
               # either we need to initialize a new cluster or wait for master to create it
               if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
@@ -267,9 +263,7 @@ spec:
                 exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
                 ${election_timer} \
-                run_nb_ovsdb &
-
-                wait $!
+                run_nb_ovsdb
               else
                 echo "Joining the nbdb cluster with init_ip=${init_ip}..."
                 exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
@@ -277,17 +271,13 @@ spec:
                 --db-nb-cluster-remote-addr=${init_ip} \
                 --db-nb-cluster-remote-proto=ssl \
                 --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-                run_nb_ovsdb &
-
-                wait $!
+                run_nb_ovsdb
               fi
             fi
           else
             exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
               --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-              run_nb_ovsdb &
-
-              wait $!
+              run_nb_ovsdb
           fi
 
         lifecycle:
@@ -634,9 +624,7 @@ spec:
               --db-sb-cluster-remote-addr=${init_ip} \
               --db-sb-cluster-remote-proto=ssl \
               --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-              run_sb_ovsdb &
-
-              wait $!
+              run_sb_ovsdb
             else
               # either we need to initialize a new cluster or wait for master to create it
               if [[ "${K8S_NODE_IP}" == "${CLUSTER_INITIATOR_IP}" ]]; then
@@ -649,26 +637,20 @@ spec:
                 exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
                 ${election_timer} \
-                run_sb_ovsdb &
-
-                wait $!
+                run_sb_ovsdb
               else
                 exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
                 --db-sb-cluster-remote-port={{.OVN_SB_RAFT_PORT}} \
                 --db-sb-cluster-remote-addr=${init_ip} \
                 --db-sb-cluster-remote-proto=ssl \
                 --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-                run_sb_ovsdb &
-
-                wait $!
+                run_sb_ovsdb
               fi
             fi
           else
             exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-            run_sb_ovsdb &
-
-            wait $!
+            run_sb_ovsdb
           fi
         lifecycle:
           postStart:
