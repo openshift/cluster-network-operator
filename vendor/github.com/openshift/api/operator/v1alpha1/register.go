@@ -37,8 +37,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ImageContentSourcePolicyList{},
 		&OLM{},
 		&OLMList{},
-		&EtcdBackup{},
-		&EtcdBackupList{},
 	)
 
 	return nil

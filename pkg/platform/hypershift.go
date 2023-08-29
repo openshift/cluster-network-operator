@@ -25,15 +25,14 @@ func init() {
 }
 
 var (
-	enabled           = os.Getenv("HYPERSHIFT")
-	name              = os.Getenv("HOSTED_CLUSTER_NAME")
-	namespace         = os.Getenv("HOSTED_CLUSTER_NAMESPACE")
-	routeHost         = os.Getenv("OVN_SBDB_ROUTE_HOST")
-	routeLabels       = map[string]string{}
-	routeLabelsRaw    = os.Getenv("OVN_SBDB_ROUTE_LABELS")
-	runAsUser         = os.Getenv("RUN_AS_USER")
-	releaseImage      = os.Getenv("OPENSHIFT_RELEASE_IMAGE")
-	controlPlaneImage = os.Getenv("OVN_CONTROL_PLANE_IMAGE")
+	enabled        = os.Getenv("HYPERSHIFT")
+	name           = os.Getenv("HOSTED_CLUSTER_NAME")
+	namespace      = os.Getenv("HOSTED_CLUSTER_NAMESPACE")
+	routeHost      = os.Getenv("OVN_SBDB_ROUTE_HOST")
+	routeLabels    = map[string]string{}
+	routeLabelsRaw = os.Getenv("OVN_SBDB_ROUTE_LABELS")
+	runAsUser      = os.Getenv("RUN_AS_USER")
+	releaseImage   = os.Getenv("OPENSHIFT_RELEASE_IMAGE")
 )
 
 const (
@@ -60,7 +59,6 @@ type HyperShiftConfig struct {
 	OVNSbDbRouteLabels map[string]string
 	RelatedObjects     []RelatedObject
 	ReleaseImage       string
-	ControlPlaneImage  string
 }
 
 func NewHyperShiftConfig() *HyperShiftConfig {
@@ -72,7 +70,6 @@ func NewHyperShiftConfig() *HyperShiftConfig {
 		OVNSbDbRouteHost:   routeHost,
 		OVNSbDbRouteLabels: routeLabels,
 		ReleaseImage:       releaseImage,
-		ControlPlaneImage:  controlPlaneImage,
 	}
 }
 

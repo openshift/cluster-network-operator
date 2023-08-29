@@ -1,0 +1,50 @@
+---
+{{- if eq .RHOBSMonitoring "1" }}
+apiVersion: monitoring.rhobs/v1
+{{- else }}
+apiVersion: monitoring.coreos.com/v1
+{{- end }}
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: ovnkube-master
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
+  name: monitor-ovn-master-metrics
+  namespace: {{.HostedClusterNamespace}}
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+    scheme: https
+    bearerTokenSecret:
+      key: ""
+    tlsConfig:
+      ca:
+        configMap:
+          key: service-ca.crt
+          name: openshift-service-ca.crt
+      cert:
+        secret:
+          key: tls.crt
+          name: ovn-master-metrics-cert
+      keySecret:
+        key: tls.key
+        name: ovn-master-metrics-cert
+      serverName: ovnkube-master-internal.{{.HostedClusterNamespace}}.svc
+    metricRelabelings:
+    - action: replace
+      replacement: {{.ClusterID}}
+      targetLabel: {{.ClusterIDLabel}}
+    relabelings:
+    - action: replace
+      replacement: {{.ClusterID}}
+      targetLabel: {{.ClusterIDLabel}}
+  jobLabel: app
+  namespaceSelector:
+    matchNames:
+    - {{.HostedClusterNamespace}}
+  selector:
+    matchLabels:
+      app: ovnkube-master

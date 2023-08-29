@@ -169,7 +169,7 @@ func (status *StatusManager) getClusterOperAnnotation(obj *configv1.ClusterOpera
 }
 
 // deleteRelatedObjects checks for related objects attached to ClusterOperator and deletes
-// whatever is not being rendered from manifests. This is a mechanism to cleanup objects
+// whatever is not been rendered from manifests. This is a mechanism to cleanup objects
 // that are no longer needed and are probably present from a previous version
 func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.ClusterOperator) {
 	if status.relatedObjects == nil && status.hyperShiftConfig.RelatedObjects == nil {
