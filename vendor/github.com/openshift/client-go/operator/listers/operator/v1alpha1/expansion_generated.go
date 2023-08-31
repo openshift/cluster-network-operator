@@ -2,14 +2,6 @@
 
 package v1alpha1
 
-// EtcdBackupListerExpansion allows custom methods to be added to
-// EtcdBackupLister.
-type EtcdBackupListerExpansion interface{}
-
 // ImageContentSourcePolicyListerExpansion allows custom methods to be added to
 // ImageContentSourcePolicyLister.
 type ImageContentSourcePolicyListerExpansion interface{}
-
-// OLMListerExpansion allows custom methods to be added to
-// OLMLister.
-type OLMListerExpansion interface{}

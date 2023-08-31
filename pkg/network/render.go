@@ -17,7 +17,6 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
-	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -31,8 +30,7 @@ var dualStackPlatforms = sets.NewString(
 	string(configv1.OpenStackPlatformType),
 )
 
-func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client cnoclient.Client,
-	featureGates featuregates.FeatureGate) ([]*uns.Unstructured, bool, error) {
+func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client cnoclient.Client) ([]*uns.Unstructured, bool, error) {
 	log.Printf("Starting render phase")
 	var progressing bool
 	objs := []*uns.Unstructured{}
@@ -69,7 +67,7 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	objs = append(objs, o...)
 
 	// render default network
-	o, progressing, err = renderDefaultNetwork(conf, bootstrapResult, manifestDir, client, featureGates)
+	o, progressing, err = renderDefaultNetwork(conf, bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -79,7 +77,7 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 		// During SDN Migration, CNO needs to convert the custom resources of
 		// egressIP, egressFirewall, etc. Therefore we need to render the CRDs for
 		// both OpenShiftSDN and OVNKubernetes.
-		o, err = renderCRDForMigration(conf, manifestDir, featureGates)
+		o, err = renderCRDForMigration(conf, manifestDir)
 		if err != nil {
 			return nil, progressing, err
 		}
@@ -566,8 +564,7 @@ func validateMigration(conf *operv1.NetworkSpec) []error {
 
 // renderDefaultNetwork generates the manifests corresponding to the requested
 // default network
-func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string,
-	client cnoclient.Client, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, bool, error) {
+func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, bool, error) {
 	dn := conf.DefaultNetwork
 	if errs := validateDefaultNetwork(conf); len(errs) > 0 {
 		return nil, false, errors.Errorf("invalid Default Network configuration: %v", errs)
@@ -577,7 +574,7 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 	case operv1.NetworkTypeOpenShiftSDN:
 		return renderOpenShiftSDN(conf, bootstrapResult, manifestDir)
 	case operv1.NetworkTypeOVNKubernetes:
-		return renderOVNKubernetes(conf, bootstrapResult, manifestDir, client, featureGates)
+		return renderOVNKubernetes(conf, bootstrapResult, manifestDir)
 	case operv1.NetworkTypeKuryr:
 		return renderKuryr(conf, bootstrapResult, manifestDir)
 	default:
@@ -588,15 +585,10 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 
 // renderCRDForMigration generates OpenShiftSDN CRDs when default network is OVNKubernetes,
 // and generates OVNKubernetes CRDs when default network is OpenShiftSDN.
-func renderCRDForMigration(conf *operv1.NetworkSpec, manifestDir string, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, error) {
+func renderCRDForMigration(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	switch conf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN, operv1.NetworkTypeKuryr:
-		// When we migrate from SDN/Kuryr to OVNK, we must set the feature gate values so that
-		// the CRD installation can happen according to whether the feature gate is enabled or not
-		// in the cluster
-		data := render.MakeRenderData()
-		data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(configv1.FeatureGateAdminNetworkPolicy)
-		manifests, err := render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/common/001-crd.yaml"), &data)
+		manifests, err := render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/common/001-crd.yaml"), &render.RenderData{})
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to render OVNKubernetes CRDs")
 		}
