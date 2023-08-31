@@ -215,6 +215,8 @@ spec:
         - name: hostroot
           mountPath: /hostroot
           mountPropagation: HostToContainer
+        - name: multus-conf-dir
+          mountPath: /etc/cni/multus/net.d
         - name: multus-daemon-config
           mountPath: /etc/cni/net.d/multus.d
           readOnly: true
@@ -288,6 +290,9 @@ spec:
         - name: hostroot
           hostPath:
             path: /
+        - name: multus-conf-dir
+          hostPath:
+            path: /etc/cni/multus/net.d
         - name: multus-daemon-config
           configMap:
             name: multus-daemon-config
