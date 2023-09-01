@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/ghodss/yaml"
+	"k8s.io/klog/v2"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
@@ -215,6 +216,14 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 				log.Printf("Object without a name GVK %+v, skip", gvk)
 				continue
 			}
+
+			// Do not remove old rbac definitions before upgrade completes to avoid disruptions
+			if !status.installComplete && gvk.Group == "rbac.authorization.k8s.io" {
+				klog.Infof("Upgrade in progress, skipping removal of (%s) %s/%s for now", gvk, currentObj.Namespace, currentObj.Name)
+				status.relatedObjects = append(status.relatedObjects, currentObj)
+				continue
+			}
+
 			log.Printf("Detected related object with GVK %+v, namespace %v and name %v not rendered by manifests, deleting...", gvk, currentObj.Namespace, currentObj.Name)
 			objToDelete := &uns.Unstructured{}
 			objToDelete.SetName(currentObj.Name)
