@@ -9,27 +9,14 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: openshift-ovn-kubernetes-controller
+  name: openshift-ovn-kubernetes-controller-limited
 rules:
-- apiGroups: [""]
-  resources:
-  - namespaces
-  - nodes
-  verbs:
-  - get
-  - list
-  - patch
-  - update
-  - watch
 - apiGroups: [""]
   resources:
   - pods
   verbs:
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups: [""]
   resources:
@@ -39,7 +26,7 @@ rules:
   - services/status  
   verbs:
   - patch
-  - update  
+  - update
 - apiGroups: [""]
   resources:
   - configmaps
@@ -51,6 +38,8 @@ rules:
 - apiGroups: [""]
   resources:
   - endpoints
+  - nodes
+  - namespaces
   verbs:
   - get
   - list
@@ -141,11 +130,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: openshift-ovn-kubernetes-controller
+  name: openshift-ovn-kubernetes-controller-limited
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: openshift-ovn-kubernetes-controller
+  name: openshift-ovn-kubernetes-controller-limited
 subjects:
 - kind: ServiceAccount
   name: ovn-kubernetes-controller
