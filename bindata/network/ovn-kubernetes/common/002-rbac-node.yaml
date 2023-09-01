@@ -9,7 +9,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: openshift-ovn-kubernetes-node
+  name: openshift-ovn-kubernetes-node-limited
   namespace: openshift-ovn-kubernetes
 rules:
 - apiGroups: [""]
@@ -31,23 +31,16 @@ rules:
   - get
   - list
   - update
-- apiGroups: [""]
-  resources:
-  - endpoints
-  verbs:
-  - create
-  - update
-  - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: openshift-ovn-kubernetes-node
+  name: openshift-ovn-kubernetes-node-limited
   namespace: openshift-ovn-kubernetes
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: openshift-ovn-kubernetes-node
+  name: openshift-ovn-kubernetes-node-limited
 subjects:
 - kind: ServiceAccount
   name: ovn-kubernetes-node
@@ -57,11 +50,12 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: openshift-ovn-kubernetes-node
+  name: openshift-ovn-kubernetes-node-limited
 rules:
 - apiGroups: [""]
   resources:
   - pods/status
+  - nodes/status
   verbs:
   - patch
   - update
@@ -69,33 +63,11 @@ rules:
   resources:
   - namespaces
   - nodes
-  verbs:
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups: [""]
-  resources:
-  - nodes/status
-  verbs:
-  - patch
-  - update
-- apiGroups: [""]
-  resources:
   - pods
   verbs:
   - get
   - list
-  - patch
-  - update
   - watch
-- apiGroups: [""]
-  resources:
-  - pods/status
-  verbs:
-  - patch
-  - update
 - apiGroups: [""]
   resources:
   - endpoints
@@ -109,8 +81,6 @@ rules:
   verbs:
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - discovery.k8s.io
@@ -214,11 +184,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: openshift-ovn-kubernetes-node
+  name: openshift-ovn-kubernetes-node-limited
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: openshift-ovn-kubernetes-node
+  name: openshift-ovn-kubernetes-node-limited
 subjects:
 - kind: ServiceAccount
   name: ovn-kubernetes-node
