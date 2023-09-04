@@ -424,6 +424,15 @@ spec:
             multi_network_policy_enabled_flag="--enable-multi-networkpolicy"
           fi
 
+          NETWORK_NODE_IDENTITY_ENABLE=
+          if [[ "{{.NETWORK_NODE_IDENTITY_ENABLE}}" == "true" ]]; then
+            NETWORK_NODE_IDENTITY_ENABLE="
+              --bootstrap-kubeconfig=/var/lib/kubelet/kubeconfig
+              --cert-dir=/etc/ovn/ovnkube-node-certs
+              --cert-duration={{.NodeIdentityCertDuration}}
+            "
+          fi
+
           exec /usr/bin/ovnkube --init-node "${K8S_NODE}" \
             --enable-interconnect \
             --zone global \
@@ -454,6 +463,7 @@ spec:
             ${multi_network_enabled_flag} \
             ${multi_network_policy_enabled_flag} \
             ${gw_interface_flag} \
+            ${NETWORK_NODE_IDENTITY_ENABLE} \
             --enable-multi-external-gateway=true
         env:
         # for kubectl
@@ -509,6 +519,11 @@ spec:
           privileged: true
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
+        {{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+        - mountPath: /var/lib/kubelet
+          name: host-kubelet
+          readOnly: true
+        {{ end }}
         # for checking ovs-configuration service
         - mountPath: /etc/systemd/system
           name: systemd-units
@@ -581,6 +596,31 @@ spec:
         - -c
         - |
           set -xe
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+          cat << EOF > /var/run/ovnkube-kubeconfig
+          apiVersion: v1
+          clusters:
+            - cluster:
+                certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                server: {{.K8S_APISERVER}}
+              name: default-cluster
+          contexts:
+            - context:
+                cluster: default-cluster
+                namespace: default
+                user: default-auth
+              name: default-context
+          current-context: default-context
+          kind: Config
+          preferences: {}
+          users:
+            - name: default-auth
+              user:
+                client-certificate: /etc/ovn/ovnkube-node-certs/ovnkube-client-current.pem
+                client-key: /etc/ovn/ovnkube-node-certs/ovnkube-client-current.pem
+          EOF
+          export KUBECONFIG=/var/run/ovnkube-kubeconfig
+{{ end }}
 
           touch /var/run/ovn/add_iptables.sh
           chmod 0755 /var/run/ovn/add_iptables.sh
@@ -624,6 +664,10 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+        - mountPath: /etc/ovn/
+          name: etc-openvswitch
+{{ end }}
         # for the iptables wrapper
         - mountPath: /host
           name: host-slash
@@ -644,6 +688,11 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: "linux"
       volumes:
+      {{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+      - name: host-kubelet
+        hostPath:
+          path: /var/lib/kubelet
+      {{ end }}
       # for checking ovs-configuration service
       - name: systemd-units
         hostPath:
