@@ -1,0 +1,29 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: network-node-identity.openshift.io
+webhooks:
+  - name: node.network-node-identity.openshift.io
+    clientConfig:
+      url: https://{{.NetworkNodeIdentityAddress}}:{{.NetworkNodeIdentityPort}}/node
+      caBundle: {{.NetworkNodeIdentityCABundle}}
+    admissionReviewVersions: ['v1']
+    sideEffects: None
+    rules:
+      - operations: [ "UPDATE" ]
+        apiGroups: ["*"]
+        apiVersions: ["*"]
+        resources: ["nodes/status"]
+        scope: "*"
+  - name: pod.network-node-identity.openshift.io
+    clientConfig:
+      url: https://{{.NetworkNodeIdentityAddress}}:{{.NetworkNodeIdentityPort}}/pod
+      caBundle: {{.NetworkNodeIdentityCABundle}}
+    admissionReviewVersions: ['v1']
+    sideEffects: None
+    rules:
+      - operations: [ "UPDATE" ]
+        apiGroups: ["*"]
+        apiVersions: ["*"]
+        resources: ["pods/status"]
+        scope: "*"

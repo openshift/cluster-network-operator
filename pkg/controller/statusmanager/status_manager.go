@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/ghodss/yaml"
-	"k8s.io/klog/v2"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
