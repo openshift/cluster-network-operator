@@ -955,7 +955,7 @@ spec:
           name: ovn-ca
         resources:
           requests:
-            cpu: 10m
+            cpu: 20m
             memory: 600Mi
             {{ if and (.MgmtPortResourceName) (or (eq .OVN_NODE_MODE "smart-nic") (eq .OVN_NODE_MODE "dpu-host")) }}
             {{ .MgmtPortResourceName }}: '1'
