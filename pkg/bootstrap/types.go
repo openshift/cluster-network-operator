@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	configv1 "github.com/openshift/api/config/v1"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 )
 
@@ -78,9 +79,11 @@ type OVNBootstrapResult struct {
 	// IPsecUpdateStatus is the status of ovn-ipsec daemonset
 	IPsecUpdateStatus *OVNUpdateStatus
 	// PrePullerUpdateStatus is the status of ovnkube-upgrades-prepuller daemonset
-	PrePullerUpdateStatus *OVNUpdateStatus
-	OVNKubernetesConfig   *OVNConfigBoostrapResult
-	FlowsConfig           *FlowsConfig
+	PrePullerUpdateStatus     *OVNUpdateStatus
+	OVNKubernetesConfig       *OVNConfigBoostrapResult
+	FlowsConfig               *FlowsConfig
+	ControlPlaneNamespace     string
+	ControlPlaneClusterClient cnoclient.ClusterClient
 }
 
 type BootstrapResult struct {

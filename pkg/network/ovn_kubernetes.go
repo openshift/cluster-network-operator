@@ -495,7 +495,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	// process upgrades only if we aren't handling a zone mode migration or an IP family migration
 	if !zoneModeMigrationIsOngoing && updateNode && updateMaster && updateControlPlane {
-		updateNode, updateMaster, updateControlPlane = handleOVNKUpdateUponOpenshiftUpgrade(conf, bootstrapResult.OVN)
+		updateNode, updateMaster, updateControlPlane = handleOVNKUpdateUponOpenshiftUpgrade(client, conf, bootstrapResult.OVN)
 	}
 
 	renderPrePull := false
@@ -1560,15 +1560,17 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	}
 
 	res := bootstrap.OVNBootstrapResult{
-		MasterAddresses:          ovnMasterAddresses,
-		ClusterInitiator:         clusterInitiator,
-		ControlPlaneUpdateStatus: controlPlaneStatus,
-		MasterUpdateStatus:       masterStatus, // TODO to be removed in 4.15, after making 4.13->4.14 upgrade required
-		NodeUpdateStatus:         nodeStatus,
-		IPsecUpdateStatus:        ipsecStatus,
-		PrePullerUpdateStatus:    prepullerStatus,
-		OVNKubernetesConfig:      ovnConfigResult,
-		FlowsConfig:              bootstrapFlowsConfig(kubeClient.ClientFor("").CRClient()),
+		MasterAddresses:           ovnMasterAddresses,
+		ClusterInitiator:          clusterInitiator,
+		ControlPlaneUpdateStatus:  controlPlaneStatus,
+		MasterUpdateStatus:        masterStatus, // TODO to be removed in 4.15, after making 4.13->4.14 upgrade required
+		NodeUpdateStatus:          nodeStatus,
+		IPsecUpdateStatus:         ipsecStatus,
+		PrePullerUpdateStatus:     prepullerStatus,
+		OVNKubernetesConfig:       ovnConfigResult,
+		FlowsConfig:               bootstrapFlowsConfig(kubeClient.ClientFor("").CRClient()),
+		ControlPlaneNamespace:     namespaceForControlPlane,
+		ControlPlaneClusterClient: clusterClientForControlPlane,
 	}
 	return &res, nil
 }
@@ -1702,14 +1704,14 @@ func getIPFamilyAndClusterCIDRsAnnotationOrConfig(conf *operv1.NetworkSpec, ovn 
 	return IPFamilyMode, clusterNetworkCIDRs
 }
 
-func handleOVNKUpdateUponOpenshiftUpgrade(conf *operv1.NetworkSpec, ovn bootstrap.OVNBootstrapResult) (updateNode, updateMaster, updateControlPlane bool) {
+func handleOVNKUpdateUponOpenshiftUpgrade(kubeClient cnoclient.Client, conf *operv1.NetworkSpec, ovn bootstrap.OVNBootstrapResult) (updateNode, updateMaster, updateControlPlane bool) {
 	var updateMasterOrControlPlane bool
 	masterOrControlPlaneStatus := ovn.ControlPlaneUpdateStatus // in multizone
 	if ovn.MasterUpdateStatus != nil {                         // only in single zone mode
 		masterOrControlPlaneStatus = ovn.MasterUpdateStatus
 	}
 
-	updateNode, updateMasterOrControlPlane = shouldUpdateOVNKonUpgrade(ovn, masterOrControlPlaneStatus, os.Getenv("RELEASE_VERSION"))
+	updateNode, updateMasterOrControlPlane = shouldUpdateOVNKonUpgrade(kubeClient, ovn, masterOrControlPlaneStatus, os.Getenv("RELEASE_VERSION"))
 
 	return updateNode, updateMasterOrControlPlane, updateMasterOrControlPlane
 
@@ -1854,10 +1856,68 @@ func shouldUpdateOVNKonPrepull(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 	return true, false
 }
 
+func findImage(psTemplate *corev1.PodTemplateSpec, desiredImage string) bool {
+	for _, container := range psTemplate.Spec.Containers {
+		if container.Image == desiredImage {
+			return false
+		}
+	}
+
+	// None of the containers use the desired image; request an update
+	return true
+}
+
+func ovnkMasterImageNeedsUpdate(kubeClient cnoclient.Client, desiredImage string) (bool, error) {
+	masterDaemonSet := &appsv1.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
+	}
+	nsn := types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: util.OVN_MASTER}
+	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, masterDaemonSet); err != nil {
+		return true, fmt.Errorf("Failed to retrieve %s deployment: %w", util.OVN_MASTER, err)
+	}
+
+	return findImage(&masterDaemonSet.Spec.Template, desiredImage), nil
+}
+
+func ovnkControlPlaneImageNeedsUpdate(kubeClient cnoclient.ClusterClient, cpNamespace, desiredImage string) (bool, error) {
+	// control plane deployment (multizone only)
+	controlPlaneDeployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
+	}
+	nsn := types.NamespacedName{Namespace: cpNamespace, Name: util.OVN_CONTROL_PLANE}
+	if err := kubeClient.CRClient().Get(context.TODO(), nsn, controlPlaneDeployment); err != nil {
+		return true, fmt.Errorf("Failed to retrieve %s deployment: %w", util.OVN_CONTROL_PLANE, err)
+	}
+
+	return findImage(&controlPlaneDeployment.Spec.Template, desiredImage), nil
+}
+
+func ovnkNodeImageNeedsUpdate(kubeClient cnoclient.Client, desiredImage string) (bool, error) {
+	// node daemonset: 4.13, 4.14 single-zone and multizone
+	nodeDaemonSet := &appsv1.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
+	}
+	nsn := types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: util.OVN_NODE}
+	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, nodeDaemonSet); err != nil {
+		return true, fmt.Errorf("Failed to retrieve existing ovnkube-node DaemonSet: %w", err)
+	}
+
+	return findImage(&nodeDaemonSet.Spec.Template, desiredImage), nil
+}
+
 // shouldUpdateOVNKonUpgrade determines if we should roll out changes to
 // the master and node daemonsets and control plane deployment (according to the cluster zone mode) upon upgrades.
 // We roll out node first, then master and/or control plane. In downgrades, we do the opposite.
-func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, masterOrControlPlaneStatus *bootstrap.OVNUpdateStatus, releaseVersion string) (updateNode, updateMaster bool) {
+func shouldUpdateOVNKonUpgrade(kubeClient cnoclient.Client, ovn bootstrap.OVNBootstrapResult, masterOrControlPlaneStatus *bootstrap.OVNUpdateStatus, releaseVersion string) (updateNode, updateMaster bool) {
 	// Fresh cluster - full steam ahead!
 	if ovn.NodeUpdateStatus == nil || masterOrControlPlaneStatus == nil {
 		return true, true
@@ -1865,6 +1925,30 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, masterOrControl
 
 	nodeVersion := ovn.NodeUpdateStatus.Version
 	masterVersion := masterOrControlPlaneStatus.Version
+
+	ovnImage := os.Getenv("OVN_IMAGE")
+	updateNode, err := ovnkNodeImageNeedsUpdate(kubeClient, ovnImage)
+	if err != nil {
+		// Node always exists; always log errors
+		klog.Warning(err.Error())
+	}
+	if updateNode {
+		return true, false
+	}
+
+	updateControlPlane, cpErr := ovnkControlPlaneImageNeedsUpdate(ovn.ControlPlaneClusterClient, ovn.ControlPlaneNamespace, ovnImage)
+	updateMaster, mErr := ovnkMasterImageNeedsUpdate(kubeClient, ovnImage)
+	if cpErr != nil && mErr != nil {
+		// Only log errors if neither master/control-plane could
+		// be found; otherwise we might annoyingly warn about the master
+		// when we're using OVN-IC, or vice-versa
+		klog.Errorf(cpErr.Error())
+		klog.Errorf(mErr.Error())
+	}
+	if updateControlPlane || updateMaster {
+		// Update master/control plane if node image is already updated
+		return false, true
+	}
 
 	// shortcut - we're all rolled out.
 	// Return true so that we reconcile any changes that somehow could have happened.
