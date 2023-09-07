@@ -2,7 +2,7 @@
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: ovn-ipsec
+  name: ovn-ipsec-pre414
   namespace: openshift-ovn-kubernetes
   annotations:
     kubernetes.io/description: |
@@ -35,7 +35,6 @@ spec:
               - key: network.operator.openshift.io/dpu-host
                 operator: DoesNotExist
       serviceAccountName: ovn-kubernetes-node
-      hostPID: true
       hostNetwork: true
       dnsPolicy: Default
       priorityClassName: "system-node-critical"
@@ -49,8 +48,8 @@ spec:
           #!/bin/bash
           set -exuo pipefail
 
-          if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
-            echo "host doesnt have libreswan, therefore ipsec will be configured by ipsec-pre414 daemonset, this ovn ipsec container has nothing to init"
+          if rpm --dbpath=/usr/share/rpm -q libreswan; then
+            echo "host has libreswan and therefore ipsec will be configured by ipsec daemonset, this ovn ipsec container doesnt need to init anything"
             exit 0
           fi
 
@@ -121,8 +120,6 @@ spec:
             # Decode the signed certificate.
             kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' | base64 -d | openssl x509 -outform pem -text -out $cert_pem
 
-            # kubectl delete csr/$(hostname)
-
             # Get the CA certificate so we can authenticate peer nodes.
             openssl x509 -in /signer-ca/ca-bundle.crt -outform pem -text -out /etc/openvswitch/keys/ipsec-cacert.pem
           fi
@@ -143,14 +140,12 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
-        - mountPath: /var/run
-          name: host-var-run
+        - mountPath: /var/run/openvswitch
+          name: host-var-run-ovs
         - mountPath: /signer-ca
           name: signer-ca
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
-        - mountPath: /etc
-          name: host-etc
         - mountPath: /usr/share/rpm
           name: host-usr-share-rpm
           readOnly: true
@@ -170,9 +165,23 @@ spec:
           #!/bin/bash
           set -exuo pipefail
 
+          function cleanup()
+          {
+            # In order to maintain traffic flows during container restart, we
+            # need to ensure that xfrm state and policies are not flushed.
 
-          if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
-            echo "host doesnt have libreswan, therefore ipsec will be configured by ipsec-pre414 daemonset, this ovn ipsec container will sleep to infinity"
+            # Don't allow ovs monitor to cleanup persistent state
+            kill $(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null) 2>/dev/null || true
+            # Don't allow pluto to clear xfrm state and policies on exit
+            kill -9 $(cat /var/run/pluto/pluto.pid 2>/devnull) 2>/dev/null || true
+
+            /usr/sbin/ipsec --stopnflog
+            exit 0
+          }
+          trap cleanup SIGTERM
+
+          if rpm --dbpath=/usr/share/rpm -q libreswan; then
+            echo "host has libreswan and therefore ipsec will be configured by ipsec daemonset, this ovn ipsec container will sleep to infinity"
             sleep infinity
           fi
 
@@ -213,28 +222,8 @@ spec:
           # We are running this in the foreground so that the container will be restarted when ovs-monitor-ipsec fails.
           /usr/libexec/platform-python /usr/share/openvswitch/scripts/ovs-monitor-ipsec \
             --pidfile=/var/run/openvswitch/ovs-monitor-ipsec.pid --ike-daemon=libreswan --no-restart-ike-daemon \
-            --ipsec-conf /etc/ipsec.d/openshift.conf --ipsec-d /var/lib/ipsec/nss \
+            --ipsec-d /var/lib/ipsec/nss \
             --log-file --monitor unix:/var/run/openvswitch/db.sock
-        lifecycle:
-           preStop:
-             exec:
-               command:
-                 - /bin/bash
-                 - -c
-                 - |
-                   #!/bin/bash
-                   set -exuo pipefail
-                   # In order to maintain traffic flows during container restart, we
-                   # need to ensure that xfrm state and policies are not flushed.
-
-                   # Don't allow ovs monitor to cleanup persistent state
-                   kill $(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null) 2>/dev/null || true
-                   # Don't allow pluto to clear xfrm state and policies on exit
-                   kill -9 $(cat /var/run/pluto/pluto.pid 2>/devnull) 2>/dev/null || true
-                   rm /var/run/pluto/pluto.pid
-                   rm /var/run/pluto/pluto.ctl
-
-                   /usr/sbin/ipsec --stopnflog
         env:
         - name: K8S_NODE
           valueFrom:
@@ -246,16 +235,12 @@ spec:
         # To check that network setup is complete
         - mountPath: /etc/cni/net.d
           name: host-cni-netd
-        - mountPath: /var/run
-          name: host-var-run
+        - mountPath: /var/run/openvswitch
+          name: host-var-run-ovs
         - mountPath: /var/log/openvswitch/
           name: host-var-log-ovs
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
-        - mountPath: /var/lib
-          name: host-var-lib
-        - mountPath: /etc
-          name: host-etc
         - mountPath: /usr/share/rpm
           name: host-usr-share-rpm
           readOnly: true
@@ -271,8 +256,8 @@ spec:
             - -c
             - |
               #!/bin/bash
-              if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
-                echo "host doesnt have libreswan, therefore ipsec will be configured by ipsec-pre414 daemonset, this ovn ipsec container is always \"alive\""
+              if rpm --dbpath=/usr/share/rpm -q libreswan; then
+                echo "host has libreswan and therefore ipsec will be configured by ipsec daemonset, this ovn ipsec container is always \"alive\""
                 exit 0
               fi
 
@@ -283,38 +268,28 @@ spec:
         beta.kubernetes.io/os: "linux"
       terminationGracePeriodSeconds: 10
       volumes:
-      - hostPath:
+      - name: host-var-log-ovs
+        hostPath:
           path: /var/log/openvswitch
           type: DirectoryOrCreate
-        name: host-var-log-ovs
-      - configMap:
-          defaultMode: 420
+      - name: host-var-run-ovs
+        hostPath:
+          path: /var/run/openvswitch
+          type: DirectoryOrCreate
+      - name: signer-ca
+        configMap:
           name: signer-ca
-        name: signer-ca
-      - hostPath:
+      - name: etc-openvswitch
+        hostPath:
           path: /var/lib/openvswitch/etc
           type: DirectoryOrCreate
-        name: etc-openvswitch
-      - hostPath:
-          path: /var/run/multus/cni/net.d
-          type: ""
-        name: host-cni-netd
-      - hostPath:
-          path: /var/run
-          type: DirectoryOrCreate
-        name: host-var-run
-      - hostPath:
-          path: /var/lib
-          type: DirectoryOrCreate
-        name: host-var-lib
-      - hostPath:
-          path: /etc
-          type: Directory
-        name: host-etc
+      - name: host-cni-netd
+        hostPath:
+          path: "{{.CNIConfDir}}"
       - name: host-usr-share-rpm
         hostPath:
           path: /usr/share/rpm
-          type: DirectoryOrCreate
+          type: Directory
       tolerations:
       - operator: "Exists"
 {{end}}
