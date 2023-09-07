@@ -34,6 +34,7 @@ func main() {
 }
 
 func newNetworkOperatorCommand() *cobra.Command {
+	os.Exit(1)
 	cmd := &cobra.Command{
 		Use:   "network-operator",
 		Short: "Openshift Cluster Network Operator",
