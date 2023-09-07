@@ -191,6 +191,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		nb_inactivity_probe = "60000"
 		klog.Infof("OVN_NB_INACTIVITY_PROBE env var is not defined. Using: %s", nb_inactivity_probe)
 	}
+	// Tell northd to sleep a bit to save CPU
+	data.Data["OVN_NORTHD_BACKOFF_MS"] = "300"
 
 	// Hypershift
 	data.Data["ManagementClusterName"] = names.ManagementClusterName
