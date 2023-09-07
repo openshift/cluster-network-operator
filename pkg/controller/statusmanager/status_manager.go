@@ -101,6 +101,10 @@ type StatusManager struct {
 	labelSelector labels.Selector
 
 	relatedObjects []configv1.ObjectReference
+
+	// used only for upgrades from <=4.13 to 4.14 with ovn-kubernetes
+	// TODO: remove in 4.15
+	isOVNKubernetes *bool
 }
 
 func New(client cnoclient.Client, name, cluster string) *StatusManager {

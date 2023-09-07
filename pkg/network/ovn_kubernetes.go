@@ -2450,7 +2450,7 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 		// if node and master DaemonSets have already upgraded to >= 4.14 single zone and
 		// we previously pushed a configmap for temporary single zone,
 		// patch the configmap and proceed with the migration to multizone.
-		klog.Infof("Upgrade to interconnect, phase2: patching tmp configmap for multizone")
+		klog.Infof("Upgrade to interconnect, phase2: patching IC configmap for multizone")
 
 		patch := []map[string]interface{}{
 			{
