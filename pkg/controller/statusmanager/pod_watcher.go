@@ -117,6 +117,10 @@ func (s *StatusManager) AddPodWatcher(mgr manager.Manager) error {
 // Reconcile triggers a re-update of Status.
 func (p *PodWatcher) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(p.status.SetDegradedOnPanicAndCrash)
+	if p.status.isOVNKubernetes == nil {
+		val := p.status.isClusterRunningOVNKubernetes()
+		p.status.isOVNKubernetes = &val
+	}
 	p.status.SetFromPods()
 	return reconcile.Result{}, nil
 }
