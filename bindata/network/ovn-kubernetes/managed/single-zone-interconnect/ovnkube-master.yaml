@@ -462,6 +462,11 @@ spec:
                 if ! retry 20 "ipsec" "${OVN_NB_CTL} set nb_global . ipsec=${ipsec}"; then
                   exit 1
                 fi
+
+                # Tell northd to sleep a bit so it takes less CPU
+                if ! retry 20 "northd-backoff" "${OVN_NB_CTL} set nb_global . options:northd-backoff-interval-ms={{.OVN_NORTHD_BACKOFF_MS}}"; then
+                  exit 1
+                fi
           preStop:
             exec:
               command:
