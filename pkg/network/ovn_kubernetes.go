@@ -391,7 +391,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		// Less resource constrained clusters can use multiple threads
 		// in northd to improve network operation latency at the cost
 		// of a bit of CPU.
-		data.Data["NorthdThreads"] = 4
+		data.Data["NorthdThreads"] = 1
 	}
 
 	data.Data["OVN_MULTI_NETWORK_ENABLE"] = true
