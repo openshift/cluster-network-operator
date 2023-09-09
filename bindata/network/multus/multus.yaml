@@ -243,6 +243,10 @@ spec:
         - name: "NO_PROXY"
           value: "{{ .NO_PROXY}}"
 {{ end }}
+        - name: MULTUS_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
       terminationGracePeriodSeconds: 10
       volumes:
         - name: system-cni-dir
