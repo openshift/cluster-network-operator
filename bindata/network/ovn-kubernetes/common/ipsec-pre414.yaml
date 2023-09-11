@@ -261,7 +261,10 @@ spec:
                 exit 0
               fi
 
-              ipsec status
+              if [[ $(ipsec whack --trafficstatus | wc -l) -eq 0 ]]; then
+                echo "no ipsec traffic configured"
+                exit 10
+              fi
           initialDelaySeconds: 15
           periodSeconds: 60
       nodeSelector:
