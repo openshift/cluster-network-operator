@@ -2,7 +2,7 @@
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: ovn-ipsec-pre414
+  name: ovn-ipsec-containerized
   namespace: openshift-ovn-kubernetes
   annotations:
     kubernetes.io/description: |
