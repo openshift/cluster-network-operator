@@ -191,6 +191,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		nb_inactivity_probe = "60000"
 		klog.Infof("OVN_NB_INACTIVITY_PROBE env var is not defined. Using: %s", nb_inactivity_probe)
 	}
+	// Tell northd to sleep a bit to save CPU
+	data.Data["OVN_NORTHD_BACKOFF_MS"] = "300"
 
 	// Hypershift
 	data.Data["ManagementClusterName"] = names.ManagementClusterName
@@ -389,7 +391,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		// Less resource constrained clusters can use multiple threads
 		// in northd to improve network operation latency at the cost
 		// of a bit of CPU.
-		data.Data["NorthdThreads"] = 4
+		data.Data["NorthdThreads"] = 1
 	}
 
 	data.Data["OVN_MULTI_NETWORK_ENABLE"] = true
