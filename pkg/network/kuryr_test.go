@@ -164,6 +164,7 @@ func TestFillKuryrDefaults(t *testing.T) {
 	c := uint32(8091)
 	d := uint32(8090)
 	batch := uint(3)
+	mtu := uint32(0)
 	expected := operv1.NetworkSpec{
 		ServiceNetwork: []string{"172.30.0.0/16"},
 		ClusterNetwork: []operv1.ClusterNetworkEntry{
@@ -182,6 +183,7 @@ func TestFillKuryrDefaults(t *testing.T) {
 				PoolMaxPorts:                 0,
 				PoolMinPorts:                 1,
 				PoolBatchPorts:               &batch,
+				MTU:                          &mtu,
 			},
 		},
 	}

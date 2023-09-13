@@ -417,12 +417,14 @@ func BootstrapKuryr(conf *operv1.NetworkSpec, kubeClient crclient.Client) (*boot
 
 	// Check the MTU. Basically if MTU is configured on KuryrConfig, then we need it to be lower or equal to nodes
 	// network MTU. Use configured value if it is, error out if it isn't.
-	if kc.MTU != nil {
+	if kc.MTU != nil && *kc.MTU != 0 {
 		if mtu >= *kc.MTU {
 			mtu = *kc.MTU
 		} else {
 			return nil, errors.Errorf("Configured MTU (%d) is incompatible with OpenShift nodes network MTU (%d).", *kc.MTU, mtu)
 		}
+	} else {
+		kc.MTU = &mtu
 	}
 
 	log.Print("Ensuring services network")
