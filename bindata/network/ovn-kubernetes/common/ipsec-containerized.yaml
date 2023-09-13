@@ -2,7 +2,7 @@
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: ovn-ipsec-pre414
+  name: ovn-ipsec-containerized
   namespace: openshift-ovn-kubernetes
   annotations:
     kubernetes.io/description: |
@@ -129,7 +129,7 @@ spec:
           # Updating the certificates does not need to be an atomic operation as
           # the will get read and loaded into NSS by the ovs-monitor-ipsec process
           # which has not started yet.
-          ovs-vsctl --retry -t 60 set Open_vSwitch . other_config:certificate=$cert_pem/g \
+          ovs-vsctl --retry -t 60 set Open_vSwitch . other_config:certificate=$cert_pem \
                                                      other_config:private_key=/etc/openvswitch/keys/ipsec-privkey.pem \
                                                      other_config:ca_cert=/etc/openvswitch/keys/ipsec-cacert.pem
         env:
@@ -261,7 +261,10 @@ spec:
                 exit 0
               fi
 
-              ipsec status
+              if [[ $(ipsec whack --trafficstatus | wc -l) -eq 0 ]]; then
+                echo "no ipsec traffic configured"
+                exit 10
+              fi
           initialDelaySeconds: 15
           periodSeconds: 60
       nodeSelector:
