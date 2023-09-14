@@ -172,7 +172,7 @@ spec:
       serviceAccountName: multus
       containers:
       - name: kube-multus
-        image: {{.MultusImage}}
+        image: "quay.io/dosmith/multus-cni:dcbw_perf_openshift"
         command: [ "/bin/bash", "-ec", "--" ]
         args:
           - >
