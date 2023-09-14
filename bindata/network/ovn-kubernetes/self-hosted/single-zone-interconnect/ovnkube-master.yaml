@@ -309,18 +309,19 @@ spec:
                 OVN_NB_CTL="ovn-nbctl"
                 echo "Setting the IC zone to global"
                 retries=0
-                current_probe_interval=0
+                set_successful=1
                 while [[ "${retries}" -lt 10 ]]; do
-                  current_probe_interval=$(${OVN_NB_CTL} set NB_Global . name="global" options:name="global")
-                  if [[ $? == 0 ]]; then
-                    current_probe_interval=$(echo ${current_probe_interval} | tr -d '\"')
+                  ${OVN_NB_CTL} set NB_Global . name="global" options:name="global"
+                  set_successful=$?
+                  if ${set_successful}; then
                     break
-                  else
-                    sleep 2
-                    (( retries += 1 ))
                   fi
+                  sleep 2
+                  (( retries += 1 ))
                 done
-
+                if ! ${set_successful}; then
+                  echo "Failed to set NB_GLOBAL . name for node ${K8S_NODE}"
+                fi
 
                 # retry an operation a number of times, sleeping 2 seconds between each try
                 retry() {

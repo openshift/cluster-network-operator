@@ -457,17 +457,19 @@ spec:
 
                 echo "Setting the IC zone to ${K8S_NODE}"
                 retries=0
-                current_probe_interval=0
+                set_successful=1
                 while [[ "${retries}" -lt 10 ]]; do
-                  current_probe_interval=$(${OVN_NB_CTL} set NB_Global . name="${K8S_NODE}" options:name="${K8S_NODE}")
-                  if [[ $? == 0 ]]; then
-                    current_probe_interval=$(echo ${current_probe_interval} | tr -d '\"')
+                  ${OVN_NB_CTL} set NB_Global . name="${K8S_NODE}" options:name="${K8S_NODE}"
+                  set_successful=$?
+                  if ${set_successful}; then
                     break
-                  else
-                    sleep 2
-                    (( retries += 1 ))
                   fi
+                  sleep 2
+                  (( retries += 1 ))
                 done
+                if ! ${set_successful}; then
+                  echo "Failed to set NB_GLOBAL . name for node ${K8S_NODE}"
+                fi
 
                 northd_probe_interval=${OVN_NORTHD_PROBE_INTERVAL:-10000}
                 echo "Setting northd probe interval to ${northd_probe_interval} ms"
