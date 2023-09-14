@@ -172,7 +172,7 @@ spec:
       serviceAccountName: multus
       containers:
       - name: kube-multus
-        image: {{.MultusImage}}
+        image: quay.io/s1061123/multus-cni:thick-perf
         command: [ "/bin/bash", "-ec", "--" ]
         args:
           - >
