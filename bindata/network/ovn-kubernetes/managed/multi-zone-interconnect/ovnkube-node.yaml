@@ -942,6 +942,8 @@ spec:
           name: host-var-lib-cni-networks-ovn-kubernetes
         - mountPath: /run/openvswitch
           name: run-openvswitch
+        - mountPath: /var/log/ovnkube/
+          name: etc-openvswitch
         - mountPath: /run/ovn/
           name: run-ovn
         - mountPath: /etc/openvswitch

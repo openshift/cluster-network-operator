@@ -219,7 +219,13 @@ enable-multi-network=true
 
 [gateway]
 mode=shared
-nodeport=true`,
+nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0`,
 			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
 		},
 		{
@@ -254,7 +260,13 @@ enable-multi-network=true
 [gateway]
 mode=shared
 nodeport=true
-v4-join-subnet="100.99.0.0/16"`,
+v4-join-subnet="100.99.0.0/16"
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0`,
 			v4InternalSubnet: "100.99.0.0/16",
 			masterIPs:        []string{"1.2.3.4", "2.3.4.5"},
 		},
@@ -291,6 +303,12 @@ enable-multi-network=true
 [gateway]
 mode=local
 nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0
 
 [hybridoverlay]
 enabled=true
@@ -340,6 +358,12 @@ enable-multi-network=true
 [gateway]
 mode=local
 nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0
 
 [hybridoverlay]
 enabled=true
@@ -392,6 +416,12 @@ enable-multi-network=true
 mode=local
 nodeport=true
 
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0
+
 [hybridoverlay]
 enabled=true
 cluster-subnets="10.132.0.0/14"`,
@@ -441,6 +471,12 @@ enable-multi-network=true
 [gateway]
 mode=local
 nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0
 
 [hybridoverlay]
 enabled=true
@@ -492,6 +528,12 @@ enable-multi-network=true
 mode=shared
 nodeport=true
 
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0
+
 [hybridoverlay]
 enabled=true`,
 
@@ -530,6 +572,12 @@ enable-multi-network=true
 [gateway]
 mode=shared
 nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0
 
 [masterha]
 election-lease-duration=137
@@ -571,7 +619,13 @@ enable-multi-network=true
 
 [gateway]
 mode=shared
-nodeport=true`,
+nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0`,
 			masterIPs:  []string{"1.2.3.4", "2.3.4.5"},
 			disableGRO: true,
 		},
@@ -605,7 +659,13 @@ egressip-node-healthcheck-port=9107
 
 [gateway]
 mode=shared
-nodeport=true`,
+nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0`,
 			masterIPs:       []string{"1.2.3.4", "2.3.4.5"},
 			disableMultiNet: true,
 		},
@@ -642,7 +702,13 @@ enable-admin-network-policy=true
 
 [gateway]
 mode=shared
-nodeport=true`,
+nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0`,
 			masterIPs:              []string{"1.2.3.4", "2.3.4.5"},
 			enableMultiNetPolicies: true,
 			enableAdminNetPolicies: true,
@@ -678,7 +744,13 @@ enable-admin-network-policy=true
 
 [gateway]
 mode=shared
-nodeport=true`,
+nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0`,
 			masterIPs:              []string{"1.2.3.4", "2.3.4.5"},
 			disableMultiNet:        true,
 			enableMultiNetPolicies: true,
@@ -741,7 +813,8 @@ nodeport=true`,
 			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 			confFile := extractOVNKubeConfig(g, objs)
-			g.Expect(confFile).To(Equal(strings.TrimSpace(tc.expected)))
+			msg := fmt.Sprintf("XXX TC Desc: %s\n\nXXX GOT: %s\n\nXXX Expected: %s\n", tc.desc, confFile, strings.TrimSpace(tc.expected))
+			g.Expect(confFile).To(Equal(strings.TrimSpace(tc.expected)), msg)
 			// check that the daemonset has the IP family mode annotations
 			ipFamilyMode := names.IPFamilySingleStack
 			g.Expect(checkDaemonsetAnnotation(g, objs, names.NetworkIPFamilyModeAnnotation, ipFamilyMode)).To(BeTrue())
