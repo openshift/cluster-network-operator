@@ -125,6 +125,7 @@ spec:
                 --enable-interconnect \
                 --disable-approver \
                 --extra-allowed-user="system:serviceaccount:openshift-ovn-kubernetes:ovn-kubernetes-control-plane" \
+                --pod-admission-conditions="/var/run/ovnkube-identity-config/additional-pod-admission-cond.json" \
                 --loglevel="${LOGLEVEL}"
         env:
           - name: LOGLEVEL
@@ -147,6 +148,8 @@ spec:
             name: hosted-cluster-api-access
           - mountPath: /hosted-ca
             name: hosted-ca-cert
+          - mountPath: /var/run/ovnkube-identity-config
+            name: ovnkube-identity-cm
       - name: approver
         image: "{{.NetworkNodeIdentityImage}}"
         command:
@@ -173,6 +176,7 @@ spec:
             exec /usr/bin/ovnkube-identity \
                 --kubeconfig=/var/run/secrets/hosted_cluster/kubeconfig \
                 --lease-namespace=openshift-network-node-identity \
+                --csr-acceptance-conditions="/var/run/ovnkube-identity-config/additional-cert-acceptance-cond.json" \
                 --disable-webhook \
                 --loglevel="${LOGLEVEL}"
         env:
@@ -190,6 +194,8 @@ spec:
             name: hosted-cluster-api-access
           - mountPath: /hosted-ca
             name: hosted-ca-cert
+          - mountPath: /var/run/ovnkube-identity-config
+            name: ovnkube-identity-cm
       # token-minter creates a token with the default service account path
       # The token is read by the containers to authenticate against the hosted cluster api server
       - name: token-minter
@@ -236,6 +242,14 @@ spec:
           secret:
             defaultMode: 0640
             secretName: network-node-identity-secret
+        - name: ovnkube-identity-cm
+          configMap:
+            name: ovnkube-identity-cm
+            items:
+              - key: additional-cert-acceptance-cond.json
+                path: additional-cert-acceptance-cond.json
+              - key: additional-pod-admission-cond.json
+                path: additional-pod-admission-cond.json
       tolerations:
         - key: "hypershift.openshift.io/control-plane"
           operator: "Equal"

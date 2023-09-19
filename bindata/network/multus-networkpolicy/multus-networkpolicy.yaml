@@ -53,7 +53,7 @@ spec:
         kubernetes.io/os: linux
       priorityClassName: "system-node-critical"
       restartPolicy: Always
-      serviceAccountName: multus
+      serviceAccountName: multus-ancillary-tools
       tolerations:
       - operator: Exists
       volumes:
