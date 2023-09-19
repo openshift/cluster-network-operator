@@ -5,7 +5,7 @@ N-S IPsec allow creating ipsec tunnels in/out of the cluster.
 
 Prerequsits:
 -------------
-1. Enable ipsec os/extension
+1. Enable ipsec os/extension and pluto service
 ```
 for role in master worker; do
 cat >> "${SHARED_DIR}/manifest_${role}-ipsec-extension.yml" <<-EOF
@@ -19,33 +19,25 @@ spec:
   config:
     ignition:
       version: 3.2.0
+    systemd:
+      units:
+      - name: ipsecenabler.service
+        enabled: true
+        contents: |
+         [Unit]
+         Description=Enable ipsec service after os extension installation
+         Before=kubelet.service
+
+         [Service]
+         Type=oneshot
+         ExecStart=systemctl enable --now ipsec.service
+
+         [Install]
+         WantedBy=multi-user.target
   extensions:
     - ipsec
 EOF
 done
-```
-
-2. optionally enable ipsec service. this probably needed only on workers, but depends on use case
-```
-for role in master worker; do
-cat >> "${SHARED_DIR}/manifest_${role}-ipsec-extension.yml" <<-EOF
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
-metadata:
-  labels:
-    machineconfiguration.openshift.io/role: $role
-  name: 80-$role-ipsec-enable-service
-spec:
-  config:
-    ignition:
-      version: 3.2.0
-  systemd:
-    units:
-    - name: ipsec.service
-      enabled: true
-EOF
-done
-
 ```
 
 3. import external cert to NSS
