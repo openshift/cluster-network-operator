@@ -53,6 +53,62 @@ rules:
   - create
   - patch
   - update
+- apiGroups: ["certificates.k8s.io"]
+  resources:
+    - certificatesigningrequests
+  verbs:
+    - create
+    - get
+    - list
+    - watch
+
+---
+# This role is ancillary tools in the multus namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: multus-ancillary-tools
+rules:
+- apiGroups: ["apiextensions.k8s.io"]
+  resources:
+  - customresourcedefinitions
+  - customresourcedefinitions/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: ["k8s.cni.cncf.io"]
+  resources: ["*"]
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: [""]
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: [""]
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: [""]
+  resources:
+  - nodes
+  verbs:
+  - get
+- apiGroups: ["", "events.k8s.io"]
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
 
 ---
 apiVersion: v1
@@ -60,12 +116,42 @@ kind: ServiceAccount
 metadata:
   name: multus
   namespace: openshift-multus
-
 ---
-apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
+  name: multus-transient
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: multus-ancillary-tools
+subjects:
+- kind: ServiceAccount
   name: multus
+  namespace: openshift-multus
+
+
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: multus-group
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: multus
+subjects:
+  - kind: Group
+    name: system:multus
+    apiGroup: rbac.authorization.k8s.io
+{{ else }}
+# Network node identity is disabled, therefore, we bind to a service account for Multus itself
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: multus-non-identity-enabled
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -74,16 +160,37 @@ subjects:
 - kind: ServiceAccount
   name: multus
   namespace: openshift-multus
+{{ end }}
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: multus-ancillary-tools
+  namespace: openshift-multus
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: multus-ancillary-tools
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: multus-ancillary-tools
+subjects:
+- kind: ServiceAccount
+  name: multus-ancillary-tools
+  namespace: openshift-multus
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: multus-cluster-reader
+  name: multus-cluster-readers
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: multus
+  name: multus-ancillary-tools
 subjects:
 - kind: Group
   name: system:cluster-readers
@@ -99,7 +206,7 @@ roleRef:
   name: whereabouts-cni
 subjects:
 - kind: ServiceAccount
-  name: multus
+  name: multus-ancillary-tools
   namespace: openshift-multus
 
 ---
@@ -114,7 +221,7 @@ roleRef:
   name: whereabouts-cni
 subjects:
 - kind: ServiceAccount
-  name: multus
+  name: multus-ancillary-tools
   namespace: openshift-multus
 
 ---
