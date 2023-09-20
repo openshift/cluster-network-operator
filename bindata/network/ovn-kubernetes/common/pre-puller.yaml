@@ -36,6 +36,6 @@ spec:
           echo "$(date -Iseconds) - finished pulling ovnkube-node image."
           sleep infinity
       nodeSelector:
-        beta.kubernetes.io/os: "linux"
+        kubernetes.io/os: "linux"
       tolerations:
       - operator: "Exists"

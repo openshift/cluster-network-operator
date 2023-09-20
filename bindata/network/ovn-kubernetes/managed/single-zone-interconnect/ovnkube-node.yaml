@@ -747,7 +747,7 @@ spec:
               fieldPath: spec.nodeName
       {{- end}}
       nodeSelector:
-        beta.kubernetes.io/os: "linux"
+        kubernetes.io/os: "linux"
       volumes:
       # for checking ovs-configuration service
       - name: systemd-units

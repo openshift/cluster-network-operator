@@ -137,7 +137,7 @@ spec:
         terminationMessagePolicy: FallbackToLogsOnError
       nodeSelector:
         node-role.kubernetes.io/master: ""
-        beta.kubernetes.io/os: "linux"
+        kubernetes.io/os: "linux"
       volumes:
       - name: ovnkube-config
         configMap:
