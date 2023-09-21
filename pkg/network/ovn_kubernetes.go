@@ -2420,8 +2420,6 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 		!ovn.NodeUpdateStatus.InterConnectEnabled &&
 		!ovn.MasterUpdateStatus.InterConnectEnabled &&
 		doesVersionEnableInterConnect(os.Getenv("RELEASE_VERSION")) &&
-		!ovn.NodeUpdateStatus.Progressing &&
-		!ovn.MasterUpdateStatus.Progressing &&
 		!targetZoneMode.configMapFound {
 
 		klog.Infof("Upgrade to interconnect, phase1: creating IC configmap for single zone")
