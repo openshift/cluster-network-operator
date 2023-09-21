@@ -232,6 +232,10 @@ spec:
           value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: KUBERNETES_SERVICE_HOST
           value: "{{.KUBERNETES_SERVICE_HOST}}"
+        - name: MULTUS_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
 {{ if .HTTP_PROXY }}
         - name: "HTTP_PROXY"
           value: "{{ .HTTP_PROXY}}"
