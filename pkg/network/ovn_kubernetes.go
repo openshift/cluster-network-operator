@@ -2265,10 +2265,12 @@ func isInterConnectEnabledOnMasterDaemonset(ds *appsv1.DaemonSet) bool {
 }
 
 // migration from single zone to multizone is about to start if:
-// - target is multizone during a simple zone migration, single zone during an upgrade from a non-interconnect version (< 4.14)
+// - target is multizone during a simple zone migration, single zone during an upgrade from a non-interconnect version (< 4.14)[*]
 // - node is running, is >= 4.14 (--interconnect-enabled), is in single zone and is not progressing
 // - master is running, is >= 4.14 (--interconnect-enabled), is in single zone and is not progressing
 // - control plane is not running
+// [*] isMigrationToMultiZoneAboutToStart is a precondition for prepareUpgradeToInterConnect to mark the start of phase 2
+// for IC upgrades, hence the target zone in such case is still single zone and will be then set to multizone.
 func isMigrationToMultiZoneAboutToStart(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType, assessEndOfUpgradePhase1 bool) bool {
 	targetZoneModeValue := zoneModeMultiZone
 	if assessEndOfUpgradePhase1 {
@@ -2299,7 +2301,7 @@ func isMigrationToMultiZoneOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneM
 		ovn.MasterUpdateStatus != nil &&
 		ovn.MasterUpdateStatus.InterConnectEnabled &&
 		(ovn.ControlPlaneUpdateStatus == nil ||
-			ovn.ControlPlaneUpdateStatus != nil && ovn.ControlPlaneUpdateStatus.Progressing && !ovn.NodeUpdateStatus.Progressing)
+			ovn.ControlPlaneUpdateStatus.Progressing && !ovn.NodeUpdateStatus.Progressing)
 }
 
 // migration from single zone to multizone is complete if:
@@ -2422,7 +2424,7 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 		doesVersionEnableInterConnect(os.Getenv("RELEASE_VERSION")) &&
 		!targetZoneMode.configMapFound {
 
-		klog.Infof("Upgrade to interconnect, phase1: creating IC configmap for single zone")
+		klog.Infof("Upgrade to interconnect, start of phase1: creating IC configmap for single zone")
 
 		configMap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -2445,12 +2447,12 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 		targetZoneMode.zoneMode = zoneModeSingleZone
 		targetZoneMode.temporary = true
 
-	} else if isMigrationToMultiZoneAboutToStart(ovn, targetZoneMode, true) && targetZoneMode.temporary {
+	} else if isMigrationToMultiZoneAboutToStart(ovn, targetZoneMode, true) && targetZoneMode.temporary && targetZoneMode.ongoingUpgrade {
 		// [start of phase 2]
 		// if node and master DaemonSets have already upgraded to >= 4.14 single zone and
 		// we previously pushed a configmap for temporary single zone,
 		// patch the configmap and proceed with the migration to multizone.
-		klog.Infof("Upgrade to interconnect, phase2: patching IC configmap for multizone")
+		klog.Infof("Upgrade to interconnect, start of phase2: patching IC configmap for multizone")
 
 		patch := []map[string]interface{}{
 			{
@@ -2492,10 +2494,25 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 				return fmt.Errorf("upgrade to interconnect, end of phase2: could not delete interconnect configmap: %w", err)
 			}
 		}
+		targetZoneMode.ongoingUpgrade = false
+		targetZoneMode.configMapFound = false
 
 		// HACK Once we're here, there are no more updates to the DaemonSets and CNO won't update
 		// the version in its status unless we add a dummy annotation to a watched resource
 		return annotateNodeDaemonset(client.ClientFor("").Kubernetes())
+	}
+
+	// Print IC upgrade status when phase 1 or phase 2 are ongoing
+	if targetZoneMode.ongoingUpgrade {
+		if targetZoneMode.zoneMode == zoneModeSingleZone && targetZoneMode.temporary &&
+			ovn.NodeUpdateStatus != nil && ovn.MasterUpdateStatus != nil && ovn.ControlPlaneUpdateStatus == nil &&
+			(ovn.NodeUpdateStatus.Progressing || ovn.MasterUpdateStatus.Progressing) {
+			klog.Warningf("Upgrade to interconnect, phase1 is ongoing")
+
+		} else if isMigrationToMultiZoneOngoing(ovn, targetZoneMode) && !targetZoneMode.temporary {
+			klog.Warningf("Upgrade to interconnect, phase2 is ongoing")
+		}
+
 	}
 	return nil
 
