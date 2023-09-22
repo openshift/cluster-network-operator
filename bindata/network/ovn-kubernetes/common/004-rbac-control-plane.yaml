@@ -9,7 +9,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: openshift-ovn-kubernetes-control-plane-limited
+  name: openshift-ovn-kubernetes-control-plane
 rules:
 - apiGroups: [""]
   resources:
@@ -18,6 +18,8 @@ rules:
   verbs:
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - discovery.k8s.io
@@ -42,8 +44,7 @@ rules:
   - privileged
 - apiGroups: [""]
   resources:
-  - nodes/status
-  - pods/status
+  - "nodes/status"
   verbs:
   - patch
   - update
@@ -102,11 +103,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: openshift-ovn-kubernetes-control-plane-limited
+  name: openshift-ovn-kubernetes-control-plane
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: openshift-ovn-kubernetes-control-plane-limited
+  name: openshift-ovn-kubernetes-control-plane
 subjects:
 - kind: ServiceAccount
   name: ovn-kubernetes-control-plane
@@ -116,7 +117,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: openshift-ovn-kubernetes-control-plane-limited
+  name: openshift-ovn-kubernetes-control-plane
   namespace: openshift-ovn-kubernetes
 rules:
 - apiGroups: [""]
@@ -140,12 +141,12 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: openshift-ovn-kubernetes-control-plane-limited
+  name: openshift-ovn-kubernetes-control-plane
   namespace: openshift-ovn-kubernetes
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: openshift-ovn-kubernetes-control-plane-limited
+  name: openshift-ovn-kubernetes-control-plane
 subjects:
 - kind: ServiceAccount
   name: ovn-kubernetes-control-plane
