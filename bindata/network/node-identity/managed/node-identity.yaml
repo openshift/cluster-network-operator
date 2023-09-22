@@ -1,0 +1,247 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: network-node-identity
+  namespace: {{.HostedClusterNamespace}}
+  annotations:
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
+    kubernetes.io/description: |
+      This deployment launches the network-node-identity control plane components.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+  labels:
+    # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
+    hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+spec:
+  replicas: {{.NetworkNodeIdentityReplicas}}
+{{ if (gt .NetworkNodeIdentityReplicas 1)}}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+{{ end }}
+  selector:
+    matchLabels:
+      app: network-node-identity
+  template:
+    metadata:
+      annotations:
+        hypershift.openshift.io/release-image: {{.ReleaseImage}}
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: network-node-identity
+        component: network
+        type: infra
+        openshift.io/component: network
+        hypershift.openshift.io/control-plane-component: network-node-identity
+        kubernetes.io/os: "linux"
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 50
+              preference:
+                matchExpressions:
+                  - key: hypershift.openshift.io/control-plane
+                    operator: In
+                    values:
+                      - "true"
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: hypershift.openshift.io/cluster
+                    operator: In
+                    values:
+                      - {{.HostedClusterNamespace}}
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: network-node-identity
+              topologyKey: topology.kubernetes.io/zone
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+                topologyKey: kubernetes.io/hostname
+      priorityClassName: hypershift-api-critical
+      initContainers:
+        - name: hosted-cluster-kubecfg-setup
+          image: "{{.CLIImage}}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              kc=/var/run/secrets/hosted_cluster/kubeconfig
+              kubectl --kubeconfig $kc config set clusters.default.server {{ .K8S_LOCAL_APISERVER }}
+              kubectl --kubeconfig $kc config set clusters.default.certificate-authority /hosted-ca/ca.crt
+              kubectl --kubeconfig $kc config set users.admin.tokenFile /var/run/secrets/hosted_cluster/token
+              kubectl --kubeconfig $kc config set contexts.default.cluster default
+              kubectl --kubeconfig $kc config set contexts.default.user admin
+              kubectl --kubeconfig $kc config set contexts.default.namespace openshift-network-node-identity
+              kubectl --kubeconfig $kc config use-context default
+          volumeMounts:
+            - mountPath: /var/run/secrets/hosted_cluster
+              name: hosted-cluster-api-access
+      containers:
+      - name: webhook
+        image: "{{.NetworkNodeIdentityImage}}"
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -xe
+            if [[ -f "/env/_master" ]]; then
+              set -o allexport
+              source "/env/_master"
+              set +o allexport
+            fi
+            
+            retries=0
+            while [ ! -f /var/run/secrets/hosted_cluster/token ]; do
+              (( retries += 1 ))
+              sleep 1
+              if [[ "${retries}" -gt 30 ]]; then
+                echo "$(date -Iseconds) - Hosted cluster token not found"
+                exit 1
+              fi
+            done
+            ho_enable=
+{{- if .OVNHybridOverlayEnable }}
+            ho_enable="--enable-hybrid-overlay"
+{{ end }}
+            echo "I$(date "+%m%d %H:%M:%S.%N") - network-node-identity - start webhook"
+            # extra-allowed-user: service account `ovn-kubernetes-control-plane`
+            # sets pod annotations in multi-homing layer3 network controller (cluster-manager)
+            exec /usr/bin/ovnkube-identity \
+                --kubeconfig=/var/run/secrets/hosted_cluster/kubeconfig \
+                --webhook-cert-dir=/etc/webhook-cert \
+                --webhook-host="" \
+                --webhook-port={{.NetworkNodeIdentityPort}} \
+                ${ho_enable} \
+                --enable-interconnect \
+                --disable-approver \
+                --extra-allowed-user="system:serviceaccount:openshift-ovn-kubernetes:ovn-kubernetes-control-plane" \
+                --loglevel="${LOGLEVEL}"
+        env:
+          - name: LOGLEVEL
+            value: "5"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        ports:
+          - name: webhook
+            containerPort: {{.NetworkNodeIdentityPort}}
+            protocol: TCP
+        volumeMounts:
+          - mountPath: /etc/webhook-cert/
+            name: webhook-cert
+          - mountPath: /env
+            name: env-overrides
+          - mountPath: /var/run/secrets/hosted_cluster
+            name: hosted-cluster-api-access
+          - mountPath: /hosted-ca
+            name: hosted-ca-cert
+      - name: approver
+        image: "{{.NetworkNodeIdentityImage}}"
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -xe
+            if [[ -f "/env/_master" ]]; then
+              set -o allexport
+              source "/env/_master"
+              set +o allexport
+            fi
+            
+            retries=0
+            while [ ! -f /var/run/secrets/hosted_cluster/token ]; do
+              (( retries += 1 ))
+              sleep 1
+              if [[ "${retries}" -gt 30 ]]; then
+                echo "$(date -Iseconds) - Hosted cluster token not found"
+                exit 1
+              fi
+            done
+            echo "I$(date "+%m%d %H:%M:%S.%N") - network-node-identity - start approver"
+            exec /usr/bin/ovnkube-identity \
+                --kubeconfig=/var/run/secrets/hosted_cluster/kubeconfig \
+                --lease-namespace=openshift-network-node-identity \
+                --disable-webhook \
+                --loglevel="${LOGLEVEL}"
+        env:
+          - name: LOGLEVEL
+            value: "5"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+          - mountPath: /env
+            name: env-overrides
+          - mountPath: /var/run/secrets/hosted_cluster
+            name: hosted-cluster-api-access
+          - mountPath: /hosted-ca
+            name: hosted-ca-cert
+      # token-minter creates a token with the default service account path
+      # The token is read by the containers to authenticate against the hosted cluster api server
+      - name: token-minter
+        image: "{{.TokenMinterImage}}"
+        command: ["/usr/bin/control-plane-operator", "token-minter"]
+        args:
+          - --service-account-namespace=openshift-network-node-identity
+          - --service-account-name=network-node-identity
+          - --token-audience={{.TokenAudience}}
+          - --token-file=/var/run/secrets/hosted_cluster/token
+          - --kubeconfig=/etc/kubernetes/kubeconfig
+        resources:
+          requests:
+            cpu: 10m
+            memory: 30Mi
+        volumeMounts:
+          - mountPath: /etc/kubernetes
+            name: admin-kubeconfig
+          - mountPath: /var/run/secrets/hosted_cluster
+            name: hosted-cluster-api-access
+      {{ if .HCPNodeSelector }}
+      nodeSelector:
+        {{ range $key, $value := .HCPNodeSelector }}
+        "{{$key}}": "{{$value}}"
+        {{ end }}
+      {{ end }}
+      volumes:
+        - name: env-overrides
+          configMap:
+            name: env-overrides
+            optional: true
+        - name: admin-kubeconfig
+          secret:
+            secretName: service-network-admin-kubeconfig
+        - name: hosted-cluster-api-access
+          emptyDir: {}
+        - name: hosted-ca-cert
+          secret:
+            secretName: root-ca
+            items:
+              - key: ca.crt
+                path: ca.crt
+        - name: webhook-cert
+          secret:
+            defaultMode: 0640
+            secretName: network-node-identity-secret
+      tolerations:
+        - key: "hypershift.openshift.io/control-plane"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+        - key: "hypershift.openshift.io/cluster"
+          operator: "Equal"
+          value: {{.HostedClusterNamespace}}
+          effect: "NoSchedule"
