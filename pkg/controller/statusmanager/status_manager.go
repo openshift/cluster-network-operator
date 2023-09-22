@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -215,6 +216,14 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 				log.Printf("Object without a name GVK %+v, skip", gvk)
 				continue
 			}
+
+			// Do not remove old rbac definitions before upgrade completes to avoid disruptions
+			if !status.installComplete && gvk.Group == "rbac.authorization.k8s.io" {
+				klog.Infof("Upgrade in progress, skipping removal of (%s) %s/%s for now", gvk, currentObj.Namespace, currentObj.Name)
+				status.relatedObjects = append(status.relatedObjects, currentObj)
+				continue
+			}
+
 			log.Printf("Detected related object with GVK %+v, namespace %v and name %v not rendered by manifests, deleting...", gvk, currentObj.Namespace, currentObj.Name)
 			objToDelete := &uns.Unstructured{}
 			objToDelete.SetName(currentObj.Name)
