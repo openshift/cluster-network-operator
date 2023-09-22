@@ -108,6 +108,9 @@ type InfraStatus struct {
 
 	// HostedControlPlane defines the hosted control plane, only used in HyperShift
 	HostedControlPlane *hyperv1.HostedControlPlane
+
+	// NetworkNodeIdentityEnabled define if the network node identity feature should be enabled
+	NetworkNodeIdentityEnabled bool
 }
 
 // APIServer is the hostname & port of a given APIServer. (This is the
