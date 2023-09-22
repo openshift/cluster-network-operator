@@ -5,13 +5,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
-
-	"k8s.io/apimachinery/pkg/types"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -162,7 +161,7 @@ func (r *ReconcileProxyConfig) validateConfigMapRef(trustedCA string) (*corev1.C
 // of the key is one or more valid PEM encoded certificates, returning slices of
 // the validated certificates and certificate data.
 func (r *ReconcileProxyConfig) validateTrustBundle(cfgMap *corev1.ConfigMap) ([]*x509.Certificate, []byte, error) {
-	certBundle, bundleData, err := validation.TrustBundleConfigMap(cfgMap, names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY)
+	certBundle, bundleData, err := validation.TrustBundleConfigMap(cfgMap)
 	if err != nil {
 		return nil, nil, err
 	}

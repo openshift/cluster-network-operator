@@ -128,7 +128,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 		log.Println(err)
 		return reconcile.Result{}, err
 	}
-	_, trustedCAbundleData, err := validation.TrustBundleConfigMap(trustedCAbundleConfigMap, names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY)
+	_, trustedCAbundleData, err := validation.TrustBundleConfigMap(trustedCAbundleConfigMap)
 
 	if err != nil {
 		log.Println(err)

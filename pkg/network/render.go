@@ -116,13 +116,6 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	}
 	objs = append(objs, o...)
 
-	// render
-	o, err = renderNetworkNodeIdentity(conf, bootstrapResult, manifestDir, client)
-	if err != nil {
-		return nil, progressing, err
-	}
-	objs = append(objs, o...)
-
 	log.Printf("Render phase done, rendered %d objects", len(objs))
 	return objs, progressing, nil
 }
