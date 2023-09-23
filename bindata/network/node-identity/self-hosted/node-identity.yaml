@@ -61,6 +61,7 @@ spec:
                 --disable-approver \
                 --extra-allowed-user="system:serviceaccount:openshift-ovn-kubernetes:ovn-kubernetes-control-plane" \
                 --wait-for-kubernetes-api={{.NetworkNodeIdentityTerminationDurationSeconds}}s \
+                --pod-admission-conditions="/var/run/ovnkube-identity-config/additional-pod-admission-cond.json" \
                 --loglevel="${LOGLEVEL}"
         env:
           - name: LOGLEVEL
@@ -81,6 +82,8 @@ spec:
             name: audit-dir
           - mountPath: /env
             name: env-overrides
+          - mountPath: /var/run/ovnkube-identity-config
+            name: ovnkube-identity-cm
       - name: approver
         image: "{{.NetworkNodeIdentityImage}}"
         command:
@@ -97,6 +100,7 @@ spec:
             echo "I$(date "+%m%d %H:%M:%S.%N") - network-node-identity - start approver"
             exec /usr/bin/ovnkube-identity  --k8s-apiserver={{.K8S_APISERVER}} \
                 --disable-webhook \
+                --csr-acceptance-conditions="/var/run/ovnkube-identity-config/additional-cert-acceptance-cond.json" \
                 --loglevel="${LOGLEVEL}"
         env:
           - name: LOGLEVEL
@@ -109,6 +113,8 @@ spec:
         volumeMounts:
           - mountPath: /env
             name: env-overrides
+          - mountPath: /var/run/ovnkube-identity-config
+            name: ovnkube-identity-cm
       terminationGracePeriodSeconds: {{.NetworkNodeIdentityTerminationDurationSeconds}}
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -124,6 +130,14 @@ spec:
         - hostPath:
             path: /var/log/kube-apiserver
           name: audit-dir
+        - name: ovnkube-identity-cm
+          configMap:
+            name: ovnkube-identity-cm
+            items:
+              - key: additional-cert-acceptance-cond.json
+                path: additional-cert-acceptance-cond.json
+              - key: additional-pod-admission-cond.json
+                path: additional-pod-admission-cond.json
       tolerations:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"
