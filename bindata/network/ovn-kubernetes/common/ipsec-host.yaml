@@ -174,7 +174,7 @@ spec:
           # Updating the certificates does not need to be an atomic operation as
           # the will get read and loaded into NSS by the ovs-monitor-ipsec process
           # which has not started yet.
-          ovs-vsctl --retry -t 60 set Open_vSwitch . other_config:certificate=$cert_pem/g \
+          ovs-vsctl --retry -t 60 set Open_vSwitch . other_config:certificate=$cert_pem \
                                                      other_config:private_key=/etc/openvswitch/keys/ipsec-privkey.pem \
                                                      other_config:ca_cert=/etc/openvswitch/keys/ipsec-cacert.pem
         env:
@@ -236,6 +236,11 @@ spec:
           done
           echo "ovnkube-node has configured node."
 
+          if ! pgrep pluto; then
+            echo "pluto is not running, enable the service and/or check system logs"
+            exit 2
+          fi
+
           # After a restart of this container (or on initial startup), we flush xfrm state and policy
           # before we start pluto and ovs-monitor-ipsec in order to start in a known good state. This
           # will result in a small interruption in traffic until pluto and ovs-monitor-ipsec start again.
@@ -250,8 +255,6 @@ spec:
           /usr/libexec/ipsec/_stackmanager start
           # Check nss database status
           /usr/sbin/ipsec --checknss
-          # Start the pluto IKE daemon
-          /usr/libexec/ipsec/pluto --leak-detective --config /etc/ipsec.conf --logfile /var/log/openvswitch/libreswan.log
 
           # Start ovs-monitor-ipsec which will monitor for changes in the ovs
           # tunnelling configuration (for example addition of a node) and configures
