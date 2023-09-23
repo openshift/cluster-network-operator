@@ -1,0 +1,22 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: ovnkube-identity-cm
+  namespace: openshift-network-node-identity
+  annotations:
+    kubernetes.io/description: |
+      This configmap contains the ovnkube-identity configuration files.
+data:
+  additional-cert-acceptance-cond.json: |
+    [{
+      "commonNamePrefix":"system:multus",
+      "organizations": ["system:multus"],
+      "groups": ["system:nodes", "system:multus", "system:authenticated"],
+      "userPrefixes": ["system:node", "system:multus"]
+    }]
+  additional-pod-admission-cond.json: |
+    [{
+      "commonNamePrefix":"system:multus",
+      "allowedPodAnnotations": ["k8s.v1.cni.cncf.io/network-status"]
+    }]

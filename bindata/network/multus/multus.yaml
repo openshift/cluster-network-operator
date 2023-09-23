@@ -121,6 +121,13 @@ data:
         "logToStderr": true,
         "logLevel": "verbose",
         "binDir": "{{ .CNIBinDir }}",
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+        "perNodeCertificate": {
+          "enabled": true,
+          "bootstrapKubeconfig": "/hostroot/var/lib/kubelet/kubeconfig",
+          "certDir": "/run/multus/certs"
+        },
+{{ end }}
         "cniConfigDir": "/host/etc/cni/net.d",
         "multusConfigFile": "auto",
         "multusAutoconfigDir": "/host/run/multus/cni/net.d",
@@ -166,10 +173,12 @@ spec:
       hostPID: true
       nodeSelector:
         kubernetes.io/os: linux
+{{ if not .NETWORK_NODE_IDENTITY_ENABLE }}
+      serviceAccountName: multus
+{{ end }}
       priorityClassName: "system-node-critical"
       tolerations:
       - operator: Exists
-      serviceAccountName: multus
       containers:
       - name: kube-multus
         image: {{.MultusImage}}
@@ -220,6 +229,8 @@ spec:
         - name: multus-daemon-config
           mountPath: /etc/cni/net.d/multus.d
           readOnly: true
+        - name: host-run-multus-certs
+          mountPath: /run/multus/certs
         env:
         - name: RHEL8_SOURCE_DIRECTORY
           value: "/usr/src/multus-cni/rhel8/bin/"
@@ -247,6 +258,10 @@ spec:
         - name: "NO_PROXY"
           value: "{{ .NO_PROXY}}"
 {{ end }}
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
       terminationGracePeriodSeconds: 10
       volumes:
         - name: system-cni-dir
@@ -303,6 +318,9 @@ spec:
             items:
             - key: daemon-config.json
               path: daemon-config.json
+        - name: host-run-multus-certs
+          hostPath:
+            path: /run/multus_certs
 ---
 kind: DaemonSet
 apiVersion: apps/v1
@@ -337,7 +355,7 @@ spec:
       priorityClassName: "system-node-critical"
       tolerations:
       - operator: Exists
-      serviceAccountName: multus
+      serviceAccountName: multus-ancillary-tools
       initContainers:
       - name: egress-router-binary-copy
         image: {{.EgressRouterImage}}
@@ -625,7 +643,7 @@ spec:
       hostNetwork: true      
       nodeSelector:
         kubernetes.io/os: linux
-      serviceAccountName: multus
+      serviceAccountName: multus-ancillary-tools
       tolerations:
       - operator: Exists
         effect: NoSchedule

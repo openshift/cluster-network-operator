@@ -37,7 +37,7 @@ func renderMultus(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bootstrap
 	usedhcp, usewhereabouts := detectAuxiliaryIPAM(conf)
 	h := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault].Host
 	p := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault].Port
-	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), usedhcp, usewhereabouts, h, p, bootstrapResult.Infra)
+	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), usedhcp, usewhereabouts, h, p, bootstrapResult)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func renderMultus(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bootstrap
 }
 
 // renderMultusConfig returns the manifests of Multus
-func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, useWhereabouts bool, apihost, apiport string, infra bootstrap.InfraStatus) ([]*uns.Unstructured, error) {
+func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, useWhereabouts bool, apihost, apiport string, bootstrapResult *bootstrap.BootstrapResult) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 
 	// render the manifests on disk
@@ -78,11 +78,12 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 	data.Data["HTTP_PROXY"] = ""
 	data.Data["HTTPS_PROXY"] = ""
 	data.Data["NO_PROXY"] = ""
-	if infra.ControlPlaneTopology == configv1.ExternalTopologyMode {
-		data.Data["HTTP_PROXY"] = infra.Proxy.HTTPProxy
-		data.Data["HTTPS_PROXY"] = infra.Proxy.HTTPSProxy
-		data.Data["NO_PROXY"] = infra.Proxy.NoProxy
+	if bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode {
+		data.Data["HTTP_PROXY"] = bootstrapResult.Infra.Proxy.HTTPProxy
+		data.Data["HTTPS_PROXY"] = bootstrapResult.Infra.Proxy.HTTPSProxy
+		data.Data["NO_PROXY"] = bootstrapResult.Infra.Proxy.NoProxy
 	}
+	data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = bootstrapResult.Infra.NetworkNodeIdentityEnabled
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus"), &data)
 	if err != nil {
