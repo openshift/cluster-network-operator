@@ -181,7 +181,7 @@ spec:
       - operator: Exists
       containers:
       - name: kube-multus
-        image: {{.MultusImage}}
+        image: "quay.io/dosmith/multus-cni:openshift415"
         command: [ "/bin/bash", "-ec", "--" ]
         args:
           - >
