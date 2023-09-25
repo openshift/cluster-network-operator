@@ -71,6 +71,11 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 	webhookCALookup := types.NamespacedName{Name: "network-node-identity-ca", Namespace: NetworkNodeIdentityNamespace}
 	caKey := "ca-bundle.crt"
 
+	data.Data["ConfigureNodeAdmissionWebhook"] = false
+	if conf.DefaultNetwork.Type == operv1.NetworkTypeOVNKubernetes {
+		data.Data["ConfigureNodeAdmissionWebhook"] = true
+	}
+
 	webhookReady := false
 	// HyperShift specific
 	if hcpCfg := platform.NewHyperShiftConfig(); hcpCfg.Enabled {

@@ -3,6 +3,7 @@ kind: ValidatingWebhookConfiguration
 metadata:
   name: network-node-identity.openshift.io
 webhooks:
+{{ if .ConfigureNodeAdmissionWebhook }}
   - name: node.network-node-identity.openshift.io
     clientConfig:
       url: https://network-node-identity.{{.HostedClusterNamespace}}.svc:{{.NetworkNodeIdentityPort}}/node
@@ -15,6 +16,7 @@ webhooks:
         apiVersions: ["*"]
         resources: ["nodes/status"]
         scope: "*"
+{{ end }}
   - name: pod.network-node-identity.openshift.io
     clientConfig:
       url: https://network-node-identity.{{.HostedClusterNamespace}}.svc:{{.NetworkNodeIdentityPort}}/pod
