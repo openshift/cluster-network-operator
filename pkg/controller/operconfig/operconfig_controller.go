@@ -343,8 +343,13 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	// Generate the objects
-	objs, progressing, err := network.Render(&newOperConfig.Spec, bootstrapResult, ManifestPath, r.client, r.featureGates)
+	// once updated, use the new config
+	operConfig = newOperConfig
+
+	// Generate the objects.
+	// Note that Render might have side effects in the passed in operConfig that
+	// will be reflected later on in the updated status.
+	objs, progressing, err := network.Render(&operConfig.Spec, bootstrapResult, ManifestPath, r.client, r.featureGates)
 	if err != nil {
 		log.Printf("Failed to render: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "RenderError",
