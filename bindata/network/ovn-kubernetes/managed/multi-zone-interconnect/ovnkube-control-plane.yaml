@@ -149,7 +149,7 @@ spec:
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            --metrics-bind-address "127.0.0.1:9106" \
+            --metrics-bind-address "127.0.0.1:9108" \
             --metrics-enable-pprof \
             --metrics-enable-config-duration \
             --node-server-privkey ${TLS_PK} \
@@ -188,7 +188,7 @@ spec:
               fieldPath: metadata.name
         ports:
         - name: metrics-port
-          containerPort: 9106
+          containerPort: 9108
         terminationMessagePolicy: FallbackToLogsOnError
 
       - name: socks-proxy
