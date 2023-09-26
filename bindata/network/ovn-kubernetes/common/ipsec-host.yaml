@@ -276,14 +276,13 @@ spec:
                    # In order to maintain traffic flows during container restart, we
                    # need to ensure that xfrm state and policies are not flushed.
 
+                   if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
+                     echo "host doesnt have libreswan, therefore ipsec will be configured by ipsec-pre414 daemonset, preStop wont do anything"
+                     exit 0
+                   fi
+
                    # Don't allow ovs monitor to cleanup persistent state
                    kill $(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null) 2>/dev/null || true
-                   # Don't allow pluto to clear xfrm state and policies on exit
-                   kill -9 $(cat /var/run/pluto/pluto.pid 2>/devnull) 2>/dev/null || true
-                   rm /var/run/pluto/pluto.pid
-                   rm /var/run/pluto/pluto.ctl
-
-                   /usr/sbin/ipsec --stopnflog
         env:
         - name: K8S_NODE
           valueFrom:
