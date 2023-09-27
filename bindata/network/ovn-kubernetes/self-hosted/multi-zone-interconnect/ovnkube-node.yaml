@@ -533,7 +533,7 @@ spec:
                 fi
         readinessProbe:
 {{ if not .IsSNO }}
-          initialDelaySeconds: 90
+          initialDelaySeconds: 10
 {{ end }}
           timeoutSeconds: 5
           exec:
@@ -654,7 +654,7 @@ spec:
                 fi
         readinessProbe:
 {{ if not .IsSNO }}
-          initialDelaySeconds: 90
+          initialDelaySeconds: 10
 {{ end }}
           timeoutSeconds: 5
           exec:
