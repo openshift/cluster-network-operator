@@ -464,6 +464,10 @@ spec:
                 if ! retry 60 "inactivity-probe" "ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_NB_INACTIVITY_PROBE}}"; then
                   exit 1
                 fi
+                # set trim-on-compaction
+                if ! retry 60 "trim-on-compaction" "ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on"; then
+                  exit 1
+                fi
 
                 echo "Setting the IC zone to ${K8S_NODE}"
                 retries=0
@@ -547,9 +551,6 @@ spec:
                 echo "NB DB is not running or active."
                 exit 1
               fi
-
-              # set trim-on-compaction
-              /usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
         env:
         - name: OVN_LOG_LEVEL
           value: info
@@ -646,6 +647,10 @@ spec:
                 if ! retry 60 "inactivity-probe" "ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_CONTROLLER_INACTIVITY_PROBE}}"; then
                   exit 1
                 fi
+                # set trim-on-compaction
+                if ! retry 60 "trim-on-compaction" "ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on"; then
+                  exit 1
+                fi
 
                 # Kill some time while the cluster converges by checking IPsec status
                 OVN_SB_CTL="ovn-sbctl"
@@ -668,8 +673,6 @@ spec:
                 echo "SB DB is not running or active."
                 exit 1
               fi
-              # set trim-on-compaction
-              /usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on 2>/dev/null
         env:
         - name: OVN_LOG_LEVEL
           value: info
