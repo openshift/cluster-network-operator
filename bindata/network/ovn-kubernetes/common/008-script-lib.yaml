@@ -20,6 +20,7 @@ data:
       set +o allexport
     fi
 
+    northd_pidfile="/var/run/ovn/ovn-northd.pid"
     controller_pidfile="/var/run/ovn/ovn-controller.pid"
     vswitch_dbsock="/var/run/openvswitch/db.sock"
 
@@ -52,4 +53,41 @@ data:
         -vPATTERN:console:"{{.OVN_LOG_PATTERN_CONSOLE}}" \
         -vsyslog:"acl_log:info" \
         -vfile:"acl_log:info"
+    }
+
+    # quit-ovn-northd() will cleanly shut down ovn-northd. It is intended
+    # to be run from a bash 'trap' like so:
+    #
+    #    trap quit-ovn-northd TERM INT
+    quit-ovn-northd()
+    {
+      echo "$(date -Iseconds) - stopping ovn-northd"
+      OVN_MANAGE_OVSDB=no /usr/share/ovn/scripts/ovn-ctl stop_northd
+      echo "$(date -Iseconds) - ovn-northd stopped"
+      rm -f ${northd_pidfile}
+      exit 0
+    }
+
+    # run-ovn-northd() starts ovn-northd and does not return until
+    # northd exits.
+    #
+    # Requires the following volume mounts:
+    #   /etc/openvswitch/
+    #   /var/lib/openvswitch/
+    #   /run/openvswitch/
+    #   /run/ovn/
+    #   /var/log/ovn/
+    start-ovn-northd()
+    {
+      local log_level=$1
+
+      echo "$(date -Iseconds) - starting ovn-northd"
+      exec ovn-northd \
+        --no-chdir \
+        -vconsole:"${log_level}" \
+        -vfile:off \
+        -vPATTERN:console:"{{.OVN_LOG_PATTERN_CONSOLE}}" \
+        --pidfile ${northd_pidfile} \
+        --n-threads={{.NorthdThreads}} &
+      wait $!
     }
