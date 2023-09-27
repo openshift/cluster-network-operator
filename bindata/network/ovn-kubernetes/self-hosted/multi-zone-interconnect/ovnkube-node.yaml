@@ -120,7 +120,7 @@ spec:
       # /run/openvswitch -> tmpfs - ovsdb sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
-      {{ if or (eq .OVN_NODE_MODE "full") (eq .OVN_NODE_MODE "smart-nic") }}
+{{ if or (eq .OVN_NODE_MODE "full") (eq .OVN_NODE_MODE "smart-nic") }}
       # ovn-controller: programs the vswitch with flows from the sbdb
       - name: ovn-controller
         image: "{{.OvnImage}}"
@@ -237,7 +237,7 @@ spec:
           name: node-log
         - mountPath: /run/ovn/
           name: run-ovn
-      {{ end }}
+{{ end }}
       - name: kube-rbac-proxy-node
         image: {{.KubeRBACProxyImage}}
         command:

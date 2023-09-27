@@ -8,7 +8,6 @@ metadata:
   {{ else }}
   name: ovnkube-node
   {{ end }}
-  name: ovnkube-node
   namespace: openshift-ovn-kubernetes
   annotations:
     kubernetes.io/description: |
@@ -87,6 +86,7 @@ spec:
       # /run/openvswitch -> tmpfs - ovsdb sockets
       # /env -> configmap env-overrides - debug overrides
       containers:
+{{ if or (eq .OVN_NODE_MODE "full") (eq .OVN_NODE_MODE "smart-nic") }}
       # ovn-controller: programs the vswitch with flows from the sbdb
       - name: ovn-controller
         image: "{{.OvnImage}}"
@@ -203,6 +203,7 @@ spec:
           name: node-log
         - mountPath: /run/ovn/
           name: run-ovn
+{{ end }}
       - name: kube-rbac-proxy-node
         image: {{.KubeRBACProxyImage}}
         command:
@@ -211,6 +212,7 @@ spec:
         - |
           #!/bin/bash
           set -euo pipefail
+
           TLS_PK=/etc/pki/tls/metrics-cert/tls.key
           TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
           # As the secret mount is optional we must wait for the files to be present.
@@ -263,6 +265,7 @@ spec:
         - |
           #!/bin/bash
           set -euo pipefail
+
           TLS_PK=/etc/pki/tls/metrics-cert/tls.key
           TLS_CERT=/etc/pki/tls/metrics-cert/tls.crt
           # As the secret mount is optional we must wait for the files to be present.
@@ -336,7 +339,6 @@ spec:
             --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off "-vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
             --pidfile /var/run/ovn/ovn-northd.pid \
             --n-threads={{.NorthdThreads}} &
-
           wait $!
         env:
         - name: OVN_LOG_LEVEL
@@ -350,7 +352,7 @@ spec:
           name: run-ovn
         - mountPath: /env
           name: env-overrides
-        - mountPath: /ovn-cert  # not needed, but useful when exec'ing in to pod.
+        - mountPath: /ovn-cert # not needed, but useful when exec'ing in to pod.
           name: ovn-cert
         - mountPath: /ovn-ca
           name: ovn-ca
@@ -459,7 +461,9 @@ spec:
                   exit 1
                 fi
         readinessProbe:
+{{ if not .IsSNO }}
           initialDelaySeconds: 10
+{{ end }}
           timeoutSeconds: 5
           exec:
             command:
@@ -490,7 +494,7 @@ spec:
           name: run-ovn
         - mountPath: /env
           name: env-overrides
-        - mountPath: /ovn-cert  # not needed, but useful when exec'ing in to pod.
+        - mountPath: /ovn-cert
           name: ovn-cert
         - mountPath: /ovn-ca
           name: ovn-ca
@@ -569,7 +573,9 @@ spec:
                   exit 1
                 fi
         readinessProbe:
+{{ if not .IsSNO }}
           initialDelaySeconds: 10
+{{ end }}
           timeoutSeconds: 5
           exec:
             command:
@@ -592,13 +598,12 @@ spec:
           name: run-ovn
         - mountPath: /env
           name: env-overrides
-        - mountPath: /ovn-cert  # not needed, but useful when exec'ing in to pod.
+        - mountPath: /ovn-cert
           name: ovn-cert
         - mountPath: /ovn-ca
           name: ovn-ca
         - mountPath: /var/log/ovn
           name: node-log
-
         resources:
           requests:
             cpu: 10m
@@ -623,6 +628,7 @@ spec:
           {
               echo "$(date --iso-8601=seconds) [cnibincopy] ${1}"
           }
+
           # collect host os information
           . /host/etc/os-release
           rhelmajor=
@@ -721,7 +727,7 @@ spec:
           if [[ "{{.OVN_MULTI_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
             multi_network_policy_enabled_flag="--enable-multi-networkpolicy"
           fi
-          
+
           admin_network_policy_enabled_flag=
           if [[ "{{.OVN_ADMIN_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
             admin_network_policy_enabled_flag="--enable-admin-network-policy"
@@ -770,7 +776,7 @@ spec:
             --enable-interconnect \
             --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}" \
             ${gw_interface_flag} \
-            --enable-multi-external-gateway=true  \
+            --enable-multi-external-gateway=true \
             ${ip_forwarding_flag} \
             ${NETWORK_NODE_IDENTITY_ENABLE}
         env:
@@ -874,7 +880,7 @@ spec:
           name: ovnkube-config
         - mountPath: /env
           name: env-overrides
-        - mountPath: /ovn-cert  # not needed, but useful when exec'ing in to pod.
+        - mountPath: /ovn-cert
           name: ovn-cert
         - mountPath: /ovn-ca
           name: ovn-ca
