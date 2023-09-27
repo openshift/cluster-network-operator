@@ -340,41 +340,24 @@ spec:
             source /env/_master
             set +o allexport
           fi
+          . /ovnkube-lib/ovnkube-lib.sh || exit 1
 
-          quit() {
-            echo "$(date -Iseconds) - stopping ovn-northd"
-            OVN_MANAGE_OVSDB=no /usr/share/ovn/scripts/ovn-ctl stop_northd
-            echo "$(date -Iseconds) - ovn-northd stopped"
-            rm -f /var/run/ovn/ovn-northd.pid
-            exit 0
-          }
-          # end of quit
-          trap quit TERM INT
-
-          echo "$(date -Iseconds) - starting ovn-northd"
-          exec ovn-northd \
-            --no-chdir "-vconsole:${OVN_LOG_LEVEL}" -vfile:off "-vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-            --pidfile /var/run/ovn/ovn-northd.pid \
-            --n-threads={{.NorthdThreads}} &
-          wait $!
+          trap quit-ovn-northd TERM INT
+          start-ovn-northd "${OVN_LOG_LEVEL}"
         env:
         - name: OVN_LOG_LEVEL
           value: info
         volumeMounts:
-        - mountPath: /etc/openvswitch/
+        - mountPath: /ovnkube-lib
+          name: ovnkube-script-lib
+        - mountPath: /etc/ovn
           name: etc-openvswitch
-        - mountPath: /var/lib/openvswitch/
-          name: var-lib-openvswitch
-        - mountPath: /run/openvswitch/
-          name: run-openvswitch
+        - mountPath: /var/log/ovn
+          name: node-log
         - mountPath: /run/ovn/
           name: run-ovn
         - mountPath: /env
           name: env-overrides
-        - mountPath: /ovn-cert # not needed, but useful when exec'ing in to pod.
-          name: ovn-cert
-        - mountPath: /ovn-ca
-          name: ovn-ca
         resources:
           requests:
             cpu: 10m
