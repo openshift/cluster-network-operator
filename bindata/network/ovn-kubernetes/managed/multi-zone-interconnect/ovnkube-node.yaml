@@ -399,8 +399,6 @@ spec:
               - |
                 set -x
                 rm -f /var/run/ovn/ovnnb_db.pid
-                #configure northd_probe_interval
-                OVN_NB_CTL="ovn-nbctl"
 
                 # retry an operation a number of times, sleeping 2 seconds between each try
                 retry() {
@@ -431,62 +429,33 @@ spec:
                   exit 1
                 fi
 
+                # set IC zone
                 echo "Setting the IC zone to ${K8S_NODE}"
-                retries=0
-                current_probe_interval=0
-                while [[ "${retries}" -lt 10 ]]; do
-                  current_probe_interval=$(${OVN_NB_CTL} set NB_Global . name="${K8S_NODE}" options:name="${K8S_NODE}")
-                  if [[ $? == 0 ]]; then
-                    current_probe_interval=$(echo ${current_probe_interval} | tr -d '\"')
-                    break
-                  else
-                    sleep 2
-                    (( retries += 1 ))
-                  fi
-                done
+                IC_OPTION="name=\"${K8S_NODE}\" options:name=\"${K8S_NODE}\""
 
+                # northd probe interval
                 northd_probe_interval=${OVN_NORTHD_PROBE_INTERVAL:-10000}
                 echo "Setting northd probe interval to ${northd_probe_interval} ms"
-                retries=0
-                current_probe_interval=0
-                while [[ "${retries}" -lt 10 ]]; do
-                  current_probe_interval=$(${OVN_NB_CTL} --if-exists get NB_GLOBAL . options:northd_probe_interval)
-                  if [[ $? == 0 ]]; then
-                    current_probe_interval=$(echo ${current_probe_interval} | tr -d '\"')
-                    break
-                  else
-                    sleep 2
-                    (( retries += 1 ))
-                  fi
-                done
+                NORTHD_PROBE_OPTION="options:northd_probe_interval=${northd_probe_interval}"
 
-                if [[ "${current_probe_interval}" != "${northd_probe_interval}" ]]; then
-                  retries=0
-                  while [[ "${retries}" -lt 10 ]]; do
-                    ${OVN_NB_CTL} set NB_GLOBAL . options:northd_probe_interval=${northd_probe_interval}
-                    if [[ $? != 0 ]]; then
-                      echo "Failed to set northd probe interval to ${northd_probe_interval}. retrying....."
-                      sleep 2
-                      (( retries += 1 ))
-                    else
-                      echo "Successfully set northd probe interval to ${northd_probe_interval} ms"
-                      break
-                    fi
-                  done
-                fi
+                # let northd sleep so it takes less CPU
+                NORTHD_SLEEP_OPTION="options:northd-backoff-interval-ms={{.OVN_NORTHD_BACKOFF_MS}}"
 
                 # Enable/disable IPsec
+                ipsec=false
+                ipsec_encapsulation=false
                 {{ if .OVNIPsecEnable }}
                 ipsec=true
-                {{ else }}
-                ipsec=false
-                {{ end }}
-                if ! retry 20 "ipsec" "${OVN_NB_CTL} set nb_global . ipsec=${ipsec}"; then
-                  exit 1
+                # IBMCloud does not forward ESP (IP proto 50)
+                # Instead, force IBMCloud IPsec to always use NAT-T
+                if [ "{{.PlatformType}}" == "IBMCloud" ]; then
+                    ipsec_encapsulation=true
                 fi
+                {{ end }}
+                IPSEC_OPTION="ipsec=${ipsec} options:ipsec_encapsulation=${ipsec_encapsulation}"
 
-                # Tell northd to sleep a bit so it takes less CPU
-                if ! retry 20 "northd-backoff" "${OVN_NB_CTL} set nb_global . options:northd-backoff-interval-ms={{.OVN_NORTHD_BACKOFF_MS}}"; then
+                # set all the NB_GLOBAL options
+                if ! retry 20 "nb-global options" "ovn-nbctl -t 5 set nb_global . ${IC_OPTION} ${NORTHD_PROBE_OPTION} ${NORTHD_SLEEP_OPTION} ${IPSEC_OPTION}"; then
                   exit 1
                 fi
         readinessProbe:
