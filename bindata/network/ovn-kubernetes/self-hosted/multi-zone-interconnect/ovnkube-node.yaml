@@ -422,8 +422,7 @@ spec:
           # end of quit
           trap quit TERM INT
 
-          OVN_ARGS="--no-monitor"
-          exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
+          exec /usr/share/ovn/scripts/ovn-ctl --no-monitor \
             --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
             run_nb_ovsdb &
 
@@ -623,8 +622,7 @@ spec:
           # end of quit
           trap quit TERM INT
 
-          OVN_ARGS="--no-monitor"
-          exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
+          exec /usr/share/ovn/scripts/ovn-ctl --no-monitor \
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
             run_sb_ovsdb &
 
