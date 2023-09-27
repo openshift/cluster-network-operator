@@ -422,7 +422,7 @@ spec:
           # end of quit
           trap quit TERM INT
 
-          exec /usr/share/ovn/scripts/ovn-ctl --no-monitor \
+          exec /usr/share/ovn/scripts/ovn-ctl --no-monitor --db-nb-sock=/var/run/ovn/ovnnb_db.sock \
             --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
             run_nb_ovsdb &
 
@@ -460,8 +460,8 @@ spec:
                   return 0
                 }
 
-                # set the connection and inactivity probe
-                if ! retry 60 "inactivity-probe" "ovn-nbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_NB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_NB_INACTIVITY_PROBE}}"; then
+                # set inactivity probe
+                if ! retry 60 "inactivity-probe" "ovn-nbctl -t 5 --inactivity-probe={{.OVN_NB_INACTIVITY_PROBE}} set-connection punix:/var/run/ovn/ovnnb_db.sock"; then
                   exit 1
                 fi
                 # set trim-on-compaction
@@ -607,7 +607,7 @@ spec:
           # end of quit
           trap quit TERM INT
 
-          exec /usr/share/ovn/scripts/ovn-ctl --no-monitor \
+          exec /usr/share/ovn/scripts/ovn-ctl --no-monitor --db-sb-sock=/var/run/ovn/ovnsb_db.sock \
             --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
             run_sb_ovsdb &
 
@@ -643,8 +643,8 @@ spec:
                   return 0
                 }
 
-                # set the connection and inactivity probe
-                if ! retry 60 "inactivity-probe" "ovn-sbctl --no-leader-only -t 5 set-connection pssl:{{.OVN_SB_PORT}}{{.LISTEN_DUAL_STACK}} -- set connection . inactivity_probe={{.OVN_CONTROLLER_INACTIVITY_PROBE}}"; then
+                # set inactivity probe
+                if ! retry 60 "inactivity-probe" "ovn-sbctl -t 5 --inactivity-probe={{.OVN_CONTROLLER_INACTIVITY_PROBE}} set-connection punix:/var/run/ovn/ovnsb_db.sock"; then
                   exit 1
                 fi
                 # set trim-on-compaction
