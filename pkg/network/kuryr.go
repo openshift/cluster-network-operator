@@ -262,10 +262,9 @@ func fillKuryrDefaults(conf, previous *operv1.NetworkSpec) {
 			previous.DefaultNetwork.KuryrConfig.MTU != nil {
 			mtu := *previous.DefaultNetwork.KuryrConfig.MTU
 			kc.MTU = &mtu
-		} else {
-			// if it wasn't set, let's make sure we set something
-			var mtu uint32 = 0
-			kc.MTU = &mtu
 		}
+		// if it wasn't set, let's make sure we set something
+		var mtu uint32 = 0
+		kc.MTU = &mtu
 	}
 }
