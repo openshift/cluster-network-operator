@@ -599,12 +599,6 @@ spec:
                 if ! retry 60 "trim-on-compaction" "ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on"; then
                   exit 1
                 fi
-
-                # Kill some time while the cluster converges by checking IPsec status
-                OVN_SB_CTL="ovn-sbctl"
-                if ! retry 20 "ipsec" "${OVN_SB_CTL} get sb_global . ipsec"; then
-                  exit 1
-                fi
         readinessProbe:
           initialDelaySeconds: 10
           timeoutSeconds: 5
