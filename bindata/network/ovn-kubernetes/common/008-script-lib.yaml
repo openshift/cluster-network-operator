@@ -150,3 +150,65 @@ data:
         sleep 30
       done
     }
+
+    wait-for-certs()
+    {
+      local detail=$1
+      local privkey=$2
+      local clientcert=$3
+
+      if [[ $# -ne 3 ]]; then
+        echo "Expected three arguments but got $#"
+        exit 1
+      fi
+
+      retries=0
+      TS=$(date +%s)
+      WARN_TS=$(( ${TS} + $(( 20 * 60)) ))
+      HAS_LOGGED_INFO=0
+      while [[ ! -f "${privkey}" ||  ! -f "${clientcert}" ]] ; do
+        CUR_TS=$(date +%s)
+        if [[ "${CUR_TS}" -gt "WARN_TS"  ]]; then
+          echo "$(date -Iseconds) WARN: ${detail} certs not mounted after 20 minutes."
+        elif [[ "${HAS_LOGGED_INFO}" -eq 0 ]] ; then
+          echo "$(date -Iseconds) INFO: ${detail} certs not mounted. Waiting one hour."
+          HAS_LOGGED_INFO=1
+        fi
+        sleep 5
+      done
+    }
+
+    # start-rbac-proxy() starts the kube-rbac-proxy to expose ovnkube metrics to
+    # Prometheus on the given listen_port, proxying from upstream_port. This
+    # function does not return.
+    #
+    # Requires the following volume mounts:
+    #   /etc/pki/tls/metrics-cert
+    start-rbac-proxy-node()
+    {
+      local detail=$1
+      local listen_port=$2
+      local upstream_port=$3
+      local privkey=$4
+      local clientcert=$5
+
+      if [[ $# -ne 5 ]]; then
+        echo "Expected five arguments but got $#"
+        exit 1
+      fi
+
+      # As the secret mount is optional we must wait for the files to be present.
+      # The service is created in monitor.yaml and this is created in sdn.yaml.
+      # If it isn't created there is probably an issue so we want to crashloop.
+      echo "$(date -Iseconds) INFO: waiting for ${detail} certs to be mounted"
+      wait-for-certs "${detail}" "${privkey}" "${clientcert}"
+
+      echo "$(date -Iseconds) INFO: ${detail} certs mounted, starting kube-rbac-proxy"
+      exec /usr/bin/kube-rbac-proxy \
+        --logtostderr \
+        --secure-listen-address=:${listen_port} \
+        --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 \
+        --upstream=http://127.0.0.1:${upstream_port}/ \
+        --tls-private-key-file=${privkey} \
+        --tls-cert-file=${clientcert}
+    }
