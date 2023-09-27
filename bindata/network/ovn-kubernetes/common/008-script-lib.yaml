@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ovnkube-script-lib
+  namespace: openshift-ovn-kubernetes
+  annotations:
+    kubernetes.io/description: |
+      This is a script used by the ovn-kubernetes daemonset
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+data:
+  ovnkube-lib.sh: |-
+    #!/bin/bash
+    set -x
+
+    # Add node-specific overrides if the container has mounted any
+    K8S_NODE=${K8S_NODE:-}
+    if [[ -n "${K8S_NODE}" && -f "/env/${K8S_NODE}" ]]; then
+      set -o allexport
+      source "/env/${K8S_NODE}"
+      set +o allexport
+    fi
+
+    controller_pidfile="/var/run/ovn/ovn-controller.pid"
+    vswitch_dbsock="/var/run/openvswitch/db.sock"
+
+    # start-ovn-controller() starts ovn-controller and does not return until
+    # ovn-controller exits
+    #
+    # Requires the following volume mounts:
+    #   /run/openvswitch
+    #   /run/ovn/
+    #   /etc/openvswitch
+    #   /etc/ovn/
+    #   /var/lib/openvswitch
+    #   /var/log/ovn/
+    #   /dev/log
+    start-ovn-controller()
+    {
+      local log_level=$1
+
+      echo "$(date -Iseconds) - starting ovn-controller"
+      exec ovn-controller \
+        unix:${vswitch_dbsock} \
+        -vfile:off \
+        --no-chdir \
+        --pidfile=${controller_pidfile} \
+        --syslog-method="{{.OVNPolicyAuditDestination}}" \
+        --log-file=/var/log/ovn/acl-audit-log.log \
+        -vFACILITY:"{{.OVNPolicyAuditSyslogFacility}}" \
+        -vconsole:"${log_level}" \
+        -vconsole:"acl_log:off" \
+        -vPATTERN:console:"{{.OVN_LOG_PATTERN_CONSOLE}}" \
+        -vsyslog:"acl_log:info" \
+        -vfile:"acl_log:info"
+    }
