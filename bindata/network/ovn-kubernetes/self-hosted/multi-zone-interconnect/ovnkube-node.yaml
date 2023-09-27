@@ -422,8 +422,6 @@ spec:
           # end of quit
           trap quit TERM INT
 
-          bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
-
           OVN_ARGS="--no-monitor"
           exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
             --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
@@ -624,8 +622,6 @@ spec:
           }
           # end of quit
           trap quit TERM INT
-
-          bracketify() { case "$1" in *:*) echo "[$1]" ;; *) echo "$1" ;; esac }
 
           OVN_ARGS="--no-monitor"
           exec /usr/share/ovn/scripts/ovn-ctl ${OVN_ARGS} \
