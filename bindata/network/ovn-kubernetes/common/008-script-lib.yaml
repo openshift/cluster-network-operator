@@ -24,6 +24,9 @@ data:
     controller_pidfile="/var/run/ovn/ovn-controller.pid"
     controller_logfile="/var/log/ovn/acl-audit-log.log"
     vswitch_dbsock="/var/run/openvswitch/db.sock"
+    nbdb_pidfile="/var/run/ovn/ovnnb_db.pid"
+    nbdb_sock="/var/run/ovn/ovnnb_db.sock"
+    nbdb_ctl="/var/run/ovn/ovnnb_db.ctl"
 
     # start-ovn-controller() starts ovn-controller and does not return until
     # ovn-controller exits
@@ -211,4 +214,136 @@ data:
         --upstream=http://127.0.0.1:${upstream_port}/ \
         --tls-private-key-file=${privkey} \
         --tls-cert-file=${clientcert}
+    }
+
+    # quit-nbdb() will cleanly shut down the northbound dbserver. It is intended
+    # to be run from a bash 'trap' like so:
+    #
+    #    trap quit-nbdb TERM INT
+    quit-nbdb()
+    {
+      echo "$(date -Iseconds) - stopping nbdb"
+      /usr/share/ovn/scripts/ovn-ctl stop_nb_ovsdb
+      echo "$(date -Iseconds) - nbdb stopped"
+      rm -f ${nbdb_pidfile}
+      exit 0
+    }
+
+    # start-nbdb() starts the OVN northbound database. This function does not
+    # return.
+    #
+    # Requires the following volume mounts:
+    #   /etc/ovn
+    #   /var/log/ovn
+    #   /run/ovn/
+    start-nbdb()
+    {
+      local log_level=$1
+
+      if [[ $# -ne 1 ]]; then
+        echo "Expected one argument but got $#"
+        exit 1
+      fi
+
+      exec /usr/share/ovn/scripts/ovn-ctl \
+        --no-monitor \
+        --db-nb-sock=${nbdb_sock} \
+        --ovn-nb-log="-vconsole:${log_level} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
+        run_nb_ovsdb &
+      wait $!
+    }
+
+    # retry() an operation a number of times, sleeping 2 seconds between each try
+    retry() {
+      local tries=${1}
+      local desc=${2}
+      local cmd=${3}
+
+      local retries=0
+      while ! ${cmd}; do
+        (( retries += 1 ))
+        if [[ "${retries}" -gt ${tries} ]]; then
+          echo "$(date -Iseconds) - ERROR - ${desc} - too many failed attempts, giving up"
+          return 1
+        fi
+        echo "$(date -Iseconds) - WARN - ${desc} - failed try ${retries}, retrying..."
+        sleep 2
+      done
+      echo "$(date -Iseconds) - INFO - ${desc} - success"
+      return 0
+    }
+
+    # nbdb-post-start() tweaks nbdb database server settings and sets a number
+    # of options in NB_Globals to configure OVN global settings
+    nbdb-post-start()
+    {
+      local northd_probe_interval=${1:-10000}
+
+      rm -f ${nbdb_pidfile}
+
+      # set inactivity probe
+      if ! retry 60 "inactivity-probe" "ovn-nbctl -t 5 --inactivity-probe={{.OVN_NB_INACTIVITY_PROBE}} set-connection punix:${nbdb_sock}"; then
+        exit 1
+      fi
+      # set trim-on-compaction
+      if ! retry 60 "trim-on-compaction" "ovn-appctl -t ${nbdb_ctl} --timeout=5 ovsdb-server/memory-trim-on-compaction on"; then
+        exit 1
+      fi
+
+      # set IC zone
+      echo "Setting the IC zone to ${K8S_NODE}"
+      IC_OPTION="name=\"${K8S_NODE}\" options:name=\"${K8S_NODE}\""
+
+      # northd probe interval
+      echo "Setting northd probe interval to ${northd_probe_interval} ms"
+      NORTHD_PROBE_OPTION="options:northd_probe_interval=${northd_probe_interval}"
+
+      # let northd sleep so it takes less CPU
+      NORTHD_SLEEP_OPTION="options:northd-backoff-interval-ms={{.OVN_NORTHD_BACKOFF_MS}}"
+
+      local ipsec=false
+      local ipsec_encapsulation=false
+{{ if .OVNIPsecEnable }}
+      ipsec=true
+      # IBMCloud does not forward ESP (IP proto 50)
+      # Instead, force IBMCloud IPsec to always use NAT-T
+      if [ "{{.PlatformType}}" == "IBMCloud" ]; then
+        ipsec_encapsulation=true
+      fi
+{{ end }}
+      IPSEC_OPTION="ipsec=${ipsec} options:ipsec_encapsulation=${ipsec_encapsulation}"
+
+      # set all the NB_GLOBAL options
+      if ! retry 20 "nb-global options" "ovn-nbctl -t 5 set nb_global . ${IC_OPTION} ${NORTHD_PROBE_OPTION} ${NORTHD_SLEEP_OPTION} ${IPSEC_OPTION}"; then
+        exit 1
+      fi
+    }
+
+    # ovndb-readiness-probe() checks if the the database is in the active state
+    # and if not, exits with an error code.
+    ovndb-readiness-probe()
+    {
+      # dbname should be 'sb' or 'nb'
+      local dbname=$1
+
+      if [[ $# -ne 1 ]]; then
+        echo "Expected one argument but got $#"
+        exit 1
+      fi
+
+      local ctlfile
+      if [[ "${dbname}" = "nb" ]]; then
+        ctlfile=${nbdb_ctl}
+      elif [[ "${dbname}" = "sb" ]]; then
+        ctlfile=${sbdb_ctl}
+      else
+        echo "unknown DB name ${dbname}"
+        exit 1
+      fi
+
+      status=$(/usr/bin/ovn-appctl -t ${ctlfile} --timeout=3 ovsdb-server/sync-status  2>/dev/null | { grep "state: active" || false; })
+      if [[ -z "${status}" ]]; then
+        echo "${dbname} DB is not running or active."
+        exit 1
+      fi
     }
