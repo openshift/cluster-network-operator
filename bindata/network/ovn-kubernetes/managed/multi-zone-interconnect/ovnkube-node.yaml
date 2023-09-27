@@ -250,23 +250,10 @@ spec:
             source /env/_master
             set +o allexport
           fi
+          . /ovnkube-lib/ovnkube-lib.sh || exit 1
 
-          quit() {
-            echo "$(date -Iseconds) - stopping nbdb"
-            /usr/share/ovn/scripts/ovn-ctl stop_nb_ovsdb
-            echo "$(date -Iseconds) - nbdb stopped"
-            rm -f /var/run/ovn/ovnnb_db.pid
-            exit 0
-          }
-          # end of quit
-          trap quit TERM INT
-
-          exec /usr/share/ovn/scripts/ovn-ctl --no-monitor --db-nb-sock=/var/run/ovn/ovnnb_db.sock \
-            --ovn-nb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-            run_nb_ovsdb &
-
-          wait $!
-
+          trap quit-nbdb TERM INT
+          start-nbdb ${OVN_LOG_LEVEL}
         lifecycle:
           postStart:
             exec:
@@ -275,66 +262,8 @@ spec:
               - -c
               - |
                 set -x
-                rm -f /var/run/ovn/ovnnb_db.pid
-
-                # retry an operation a number of times, sleeping 2 seconds between each try
-                retry() {
-                  local tries=${1}
-                  local desc=${2}
-                  local cmd=${3}
-
-                  local retries=0
-                  while ! ${cmd}; do
-                    (( retries += 1 ))
-                    if [[ "${retries}" -gt ${tries} ]]; then
-                      echo "$(date -Iseconds) - ERROR - nbdb ${desc} - too many failed attempts, giving up"
-                      return 1
-                    fi
-                    echo "$(date -Iseconds) - WARN - nbdb ${desc} - failed try ${retries}, retrying..."
-                    sleep 2
-                  done
-                  echo "$(date -Iseconds) - INFO - nbdb ${desc} - success"
-                  return 0
-                }
-
-                # set inactivity probe
-                if ! retry 60 "inactivity-probe" "ovn-nbctl -t 5 --inactivity-probe={{.OVN_NB_INACTIVITY_PROBE}} set-connection punix:/var/run/ovn/ovnnb_db.sock"; then
-                  exit 1
-                fi
-                # set trim-on-compaction
-                if ! retry 60 "trim-on-compaction" "ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on"; then
-                  exit 1
-                fi
-
-                # set IC zone
-                echo "Setting the IC zone to ${K8S_NODE}"
-                IC_OPTION="name=\"${K8S_NODE}\" options:name=\"${K8S_NODE}\""
-
-                # northd probe interval
-                northd_probe_interval=${OVN_NORTHD_PROBE_INTERVAL:-10000}
-                echo "Setting northd probe interval to ${northd_probe_interval} ms"
-                NORTHD_PROBE_OPTION="options:northd_probe_interval=${northd_probe_interval}"
-
-                # let northd sleep so it takes less CPU
-                NORTHD_SLEEP_OPTION="options:northd-backoff-interval-ms={{.OVN_NORTHD_BACKOFF_MS}}"
-
-                # Enable/disable IPsec
-                ipsec=false
-                ipsec_encapsulation=false
-                {{ if .OVNIPsecEnable }}
-                ipsec=true
-                # IBMCloud does not forward ESP (IP proto 50)
-                # Instead, force IBMCloud IPsec to always use NAT-T
-                if [ "{{.PlatformType}}" == "IBMCloud" ]; then
-                    ipsec_encapsulation=true
-                fi
-                {{ end }}
-                IPSEC_OPTION="ipsec=${ipsec} options:ipsec_encapsulation=${ipsec_encapsulation}"
-
-                # set all the NB_GLOBAL options
-                if ! retry 20 "nb-global options" "ovn-nbctl -t 5 set nb_global . ${IC_OPTION} ${NORTHD_PROBE_OPTION} ${NORTHD_SLEEP_OPTION} ${IPSEC_OPTION}"; then
-                  exit 1
-                fi
+                . /ovnkube-lib/ovnkube-lib.sh || exit 1
+                nbdb-post-start {{.OVN_NORTHD_PROBE_INTERVAL}}
         readinessProbe:
 {{ if not .IsSNO }}
           initialDelaySeconds: 10
@@ -346,22 +275,19 @@ spec:
             - -c
             - |
               set -xeo pipefail
-              status=$(/usr/bin/ovn-appctl -t /var/run/ovn/ovnnb_db.ctl --timeout=3 ovsdb-server/sync-status  2>/dev/null | { grep "state: active" || false; })
-              if [[  -z "${status}" ]]; then
-                echo "NB DB is not running or active."
-                exit 1
-              fi
+              . /ovnkube-lib/ovnkube-lib.sh || exit 1
+              ovndb-readiness-probe "nb"
         env:
         - name: OVN_LOG_LEVEL
           value: info
-        - name: OVN_NORTHD_PROBE_INTERVAL
-          value: "{{.OVN_NORTHD_PROBE_INTERVAL}}"
         - name: K8S_NODE
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
         volumeMounts:
-        - mountPath: /etc/ovn
+        - mountPath: /ovnkube-lib
+          name: ovnkube-script-lib
+        - mountPath: /etc/ovn/
           name: etc-openvswitch
         - mountPath: /var/log/ovn
           name: node-log
@@ -369,10 +295,6 @@ spec:
           name: run-ovn
         - mountPath: /env
           name: env-overrides
-        - mountPath: /ovn-cert
-          name: ovn-cert
-        - mountPath: /ovn-ca
-          name: ovn-ca
         resources:
           requests:
             cpu: 10m
