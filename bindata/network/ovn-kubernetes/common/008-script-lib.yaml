@@ -27,6 +27,9 @@ data:
     nbdb_pidfile="/var/run/ovn/ovnnb_db.pid"
     nbdb_sock="/var/run/ovn/ovnnb_db.sock"
     nbdb_ctl="/var/run/ovn/ovnnb_db.ctl"
+    sbdb_pidfile="/var/run/ovn/ovnsb_db.pid"
+    sbdb_sock="/var/run/ovn/ovnsb_db.sock"
+    sbdb_ctl="/var/run/ovn/ovnsb_db.ctl"
 
     # start-ovn-controller() starts ovn-controller and does not return until
     # ovn-controller exits
@@ -344,6 +347,58 @@ data:
       status=$(/usr/bin/ovn-appctl -t ${ctlfile} --timeout=3 ovsdb-server/sync-status  2>/dev/null | { grep "state: active" || false; })
       if [[ -z "${status}" ]]; then
         echo "${dbname} DB is not running or active."
+        exit 1
+      fi
+    }
+
+    # quit-sbdb() will cleanly shut down the southbound dbserver. It is intended
+    # to be run from a bash 'trap' like so:
+    #
+    #    trap quit-sbdb TERM INT
+    quit-sbdb()
+    {
+      echo "$(date -Iseconds) - stopping sbdb"
+      /usr/share/ovn/scripts/ovn-ctl stop_sb_ovsdb
+      echo "$(date -Iseconds) - sbdb stopped"
+      rm -f ${sbdb_pidfile}
+      exit 0
+    }
+
+    # start-sbdb() starts the OVN southbound database. This function does not
+    # return.
+    #
+    # Requires the following volume mounts:
+    #   /etc/ovn
+    #   /var/log/ovn
+    #   /run/ovn/
+    start-sbdb()
+    {
+      local log_level=$1
+
+      if [[ $# -ne 1 ]]; then
+        echo "Expected one argument but got $#"
+        exit 1
+      fi
+
+      exec /usr/share/ovn/scripts/ovn-ctl \
+        --no-monitor \
+        --db-sb-sock=${sbdb_sock} \
+        --ovn-sb-log="-vconsole:${log_level} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
+        run_sb_ovsdb &
+      wait $!
+    }
+
+    # sbdb-post-start() tweaks sbdb database server settings
+    sbdb-post-start()
+    {
+      rm -f ${sbdb_pidfile}
+
+      # set inactivity probe
+      if ! retry 60 "inactivity-probe" "ovn-sbctl -t 5 --inactivity-probe={{.OVN_CONTROLLER_INACTIVITY_PROBE}} set-connection punix:${sbdb_sock}"; then
+        exit 1
+      fi
+      # set trim-on-compaction
+      if ! retry 60 "trim-on-compaction" "ovn-appctl -t ${sbdb_ctl} --timeout=5 ovsdb-server/memory-trim-on-compaction on"; then
         exit 1
       fi
     }

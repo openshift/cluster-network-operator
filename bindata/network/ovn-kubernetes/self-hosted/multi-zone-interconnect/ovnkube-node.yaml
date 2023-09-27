@@ -348,23 +348,10 @@ spec:
             source /env/_master
             set +o allexport
           fi
+          . /ovnkube-lib/ovnkube-lib.sh || exit 1
 
-          quit() {
-            echo "$(date -Iseconds) - stopping sbdb"
-            /usr/share/ovn/scripts/ovn-ctl stop_sb_ovsdb
-            echo "$(date -Iseconds) - sbdb stopped"
-            rm -f /var/run/ovn/ovnsb_db.pid
-            exit 0
-          }
-          # end of quit
-          trap quit TERM INT
-
-          exec /usr/share/ovn/scripts/ovn-ctl --no-monitor --db-sb-sock=/var/run/ovn/ovnsb_db.sock \
-            --ovn-sb-log="-vconsole:${OVN_LOG_LEVEL} -vfile:off -vPATTERN:console:{{.OVN_LOG_PATTERN_CONSOLE}}" \
-            run_sb_ovsdb &
-
-          wait $!
-
+          trap quit-sbdb TERM INT
+          start-sbdb ${OVN_LOG_LEVEL}
         lifecycle:
           postStart:
             exec:
@@ -373,36 +360,8 @@ spec:
               - -c
               - |
                 set -x
-                rm -f /var/run/ovn/ovnsb_db.pid
-
-                # retry an operation a number of times, sleeping 2 seconds between each try
-                retry() {
-                  local tries=${1}
-                  local desc=${2}
-                  local cmd=${3}
-
-                  local retries=0
-                  while ! ${cmd}; do
-                    (( retries += 1 ))
-                    if [[ "${retries}" -gt ${tries} ]]; then
-                      echo "$(date -Iseconds) - ERROR - sbdb ${desc} - too many failed attempts, giving up"
-                      return 1
-                    fi
-                    echo "$(date -Iseconds) - WARN - sbdb ${desc} - failed try ${retries}, retrying..."
-                    sleep 2
-                  done
-                  echo "$(date -Iseconds) - INFO - sbdb ${desc} - success"
-                  return 0
-                }
-
-                # set inactivity probe
-                if ! retry 60 "inactivity-probe" "ovn-sbctl -t 5 --inactivity-probe={{.OVN_CONTROLLER_INACTIVITY_PROBE}} set-connection punix:/var/run/ovn/ovnsb_db.sock"; then
-                  exit 1
-                fi
-                # set trim-on-compaction
-                if ! retry 60 "trim-on-compaction" "ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=5 ovsdb-server/memory-trim-on-compaction on"; then
-                  exit 1
-                fi
+                . /ovnkube-lib/ovnkube-lib.sh || exit 1
+                sbdb-post-start
         readinessProbe:
 {{ if not .IsSNO }}
           initialDelaySeconds: 10
@@ -414,31 +373,22 @@ spec:
             - -c
             - |
               set -xeo pipefail
-              status=$(/usr/bin/ovn-appctl -t /var/run/ovn/ovnsb_db.ctl --timeout=3 ovsdb-server/sync-status  2>/dev/null | { grep "state: active" || false; })
-              if [[  -z "${status}" ]]; then
-                echo "SB DB is not running or active."
-                exit 1
-              fi
+              . /ovnkube-lib/ovnkube-lib.sh || exit 1
+              ovndb-readiness-probe "sb"
         env:
         - name: OVN_LOG_LEVEL
           value: info
         volumeMounts:
-        - mountPath: /etc/openvswitch/
-          name: etc-openvswitch
+        - mountPath: /ovnkube-lib
+          name: ovnkube-script-lib
         - mountPath: /etc/ovn/
           name: etc-openvswitch
-        - mountPath: /var/lib/openvswitch/
-          name: var-lib-openvswitch
-        - mountPath: /run/openvswitch/
-          name: run-openvswitch
         - mountPath: /run/ovn/
           name: run-ovn
+        - mountPath: /var/log/ovn
+          name: node-log
         - mountPath: /env
           name: env-overrides
-        - mountPath: /ovn-cert
-          name: ovn-cert
-        - mountPath: /ovn-ca
-          name: ovn-ca
         resources:
           requests:
             cpu: 10m
