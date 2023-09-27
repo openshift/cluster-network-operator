@@ -876,7 +876,7 @@ func checkOVNKubernetesPostStart(objects []*uns.Unstructured) error {
 		return fmt.Errorf("could not find nbdb postStart script in daemonset %s", ovnkubeNode.GetName())
 	}
 
-	expectedScriptSubStr := "Successfully set northd probe interval"
+	expectedScriptSubStr := "Setting the IC zone to"
 	if !strings.Contains(strings.Join(script, " "), expectedScriptSubStr) {
 		return fmt.Errorf("postStart script in daemonset %s does not contain %s: %s", ovnkubeNode.GetName(), expectedScriptSubStr, script)
 	}
