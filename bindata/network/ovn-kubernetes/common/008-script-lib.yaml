@@ -22,6 +22,7 @@ data:
 
     northd_pidfile="/var/run/ovn/ovn-northd.pid"
     controller_pidfile="/var/run/ovn/ovn-controller.pid"
+    controller_logfile="/var/log/ovn/acl-audit-log.log"
     vswitch_dbsock="/var/run/openvswitch/db.sock"
 
     # start-ovn-controller() starts ovn-controller and does not return until
@@ -51,7 +52,7 @@ data:
         --no-chdir \
         --pidfile=${controller_pidfile} \
         --syslog-method="{{.OVNPolicyAuditDestination}}" \
-        --log-file=/var/log/ovn/acl-audit-log.log \
+        --log-file=${controller_logfile} \
         -vFACILITY:"{{.OVNPolicyAuditSyslogFacility}}" \
         -vconsole:"${log_level}" \
         -vconsole:"acl_log:off" \
@@ -100,4 +101,52 @@ data:
         --pidfile ${northd_pidfile} \
         --n-threads={{.NorthdThreads}} &
       wait $!
+    }
+
+    # start-audit-log-rotation() continuously watches ovn-controller's audit
+    # log directory and deletes old logs to ensure the total size of the logs
+    # does not exceed a given threshold. This function does not return.
+    #
+    # Requires the following volume mounts:
+    #   /var/log/ovn/
+    #   /run/ovn/
+    start-audit-log-rotation()
+    {
+      # Rotate audit log files when then get to max size (in bytes)
+      MAXFILESIZE=$(( "{{.OVNPolicyAuditMaxFileSize}}"*1000000 ))
+      MAXLOGFILES="{{.OVNPolicyAuditMaxLogFiles}}"
+      LOGDIR=$(dirname ${controller_logfile})
+      CONTROLLERPID=$(cat ${controller_pidfile})
+
+      # Redirect err to null so no messages are shown upon rotation
+      tail -F ${controller_logfile} 2> /dev/null &
+
+      while true
+      do
+        # Make sure ovn-controller's logfile exists, and get current size in bytes
+        if [ -f "${controller_logfile}" ]; then
+          file_size=`du -b ${controller_logfile} | tr -s '\t' ' ' | cut -d' ' -f1`
+        else
+          ovs-appctl -t /var/run/ovn/ovn-controller.${CONTROLLERPID}.ctl vlog/reopen
+          file_size=`du -b ${controller_logfile} | tr -s '\t' ' ' | cut -d' ' -f1`
+        fi
+
+        if [ $file_size -gt $MAXFILESIZE ];then
+          echo "Rotating OVN ACL Log File"
+          timestamp=`date '+%Y-%m-%dT%H-%M-%S'`
+          mv ${controller_logfile} ${LOGDIR}/acl-audit-log.$timestamp.log
+          ovs-appctl -t /run/ovn/ovn-controller.${CONTROLLERPID}.ctl vlog/reopen
+          CONTROLLERPID=$(cat ${controller_pidfile})
+        fi
+
+        # Ensure total number of log files does not exceed the maximum configured from OVNPolicyAuditMaxLogFiles
+        num_files=$(ls -1 ${LOGDIR}/acl-audit-log* 2>/dev/null | wc -l)
+        if [ "$num_files" -gt "$MAXLOGFILES" ]; then
+          num_to_delete=$(( num_files - ${MAXLOGFILES} ))
+          ls -1t ${LOGDIR}/acl-audit-log* 2>/dev/null | tail -$num_to_delete | xargs -I {} rm {}
+        fi
+
+        # sleep for 30 seconds to avoid wasting CPU
+        sleep 30
+      done
     }
