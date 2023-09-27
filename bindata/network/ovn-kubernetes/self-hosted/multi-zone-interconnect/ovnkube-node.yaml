@@ -129,23 +129,8 @@ spec:
         - -c
         - |
           set -e
-          if [[ -f "/env/${K8S_NODE}" ]]; then
-            set -o allexport
-            source "/env/${K8S_NODE}"
-            set +o allexport
-          fi
-
-          echo "$(date -Iseconds) - starting ovn-controller"
-          exec ovn-controller unix:/var/run/openvswitch/db.sock -vfile:off \
-            --no-chdir --pidfile=/var/run/ovn/ovn-controller.pid \
-            --syslog-method="{{.OVNPolicyAuditDestination}}" \
-            --log-file=/var/log/ovn/acl-audit-log.log \
-            -vFACILITY:"{{.OVNPolicyAuditSyslogFacility}}" \
-            -p /ovn-cert/tls.key -c /ovn-cert/tls.crt -C /ovn-ca/ca-bundle.crt \
-            -vconsole:"${OVN_LOG_LEVEL}" -vconsole:"acl_log:off" \
-            -vPATTERN:console:"{{.OVN_LOG_PATTERN_CONSOLE}}" \
-            -vsyslog:"acl_log:info" \
-            -vfile:"acl_log:info"
+          . /ovnkube-lib/ovnkube-lib.sh || exit 1
+          start-ovn-controller ${OVN_LOG_LEVEL}
         securityContext:
           privileged: true
         env:
@@ -156,6 +141,8 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         volumeMounts:
+        - mountPath: /ovnkube-lib
+          name: ovnkube-script-lib
         - mountPath: /run/openvswitch
           name: run-openvswitch
         - mountPath: /run/ovn/
@@ -168,10 +155,6 @@ spec:
           name: var-lib-openvswitch
         - mountPath: /env
           name: env-overrides
-        - mountPath: /ovn-cert
-          name: ovn-cert
-        - mountPath: /ovn-ca
-          name: ovn-ca
         - mountPath: /var/log/ovn/
           name: node-log
         - mountPath: /dev/log
@@ -1107,5 +1090,9 @@ spec:
         secret:
           secretName: ovn-node-metrics-cert
           optional: true
+      - name: ovnkube-script-lib
+        configMap:
+          name: ovnkube-script-lib
+          defaultMode: 0744
       tolerations:
       - operator: "Exists"
