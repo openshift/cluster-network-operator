@@ -675,12 +675,6 @@ spec:
         configMap:
           name: env-overrides
           optional: true
-      - name: ovn-ca
-        configMap:
-          name: ovn-ca
-      - name: ovn-cert
-        secret:
-          secretName: ovn-cert
       - name: ovn-node-metrics-cert
         secret:
           secretName: ovn-node-metrics-cert
