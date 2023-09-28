@@ -11,13 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
+	netproxy "golang.org/x/net/proxy"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -232,9 +233,26 @@ func validateReadinessEndpointWithRetries(caBundle []*x509.Certificate, proxy, e
 // returns an error if a 2XX or 3XX http status code is not returned.
 // caBundle is used to authenticate endpoint if endpoint contains an
 // https scheme.
-func runReadinessProbe(caBundle []*x509.Certificate, proxy, endpoint *url.URL) error {
+func runReadinessProbe(caBundle []*x509.Certificate, proxyURL, endpoint *url.URL) error {
 	transport := &http.Transport{
-		Proxy: http.ProxyURL(proxy),
+		Proxy: http.ProxyURL(proxyURL),
+	}
+
+	if platform.NewHyperShiftConfig().Enabled {
+		hostedProxyURL, err := url.Parse(platform.HostedClusterLocalProxy)
+		if err != nil {
+			return fmt.Errorf("failed to parse hosted cluster proxy: %w", err)
+		}
+		hcpProxy, err := netproxy.FromURL(hostedProxyURL, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create hosted cluster proxy: %w", err)
+		}
+
+		hcpProxyCtx, ok := hcpProxy.(netproxy.ContextDialer)
+		if !ok {
+			return fmt.Errorf("proxy from %q does not implement proxy.ContextDialer", platform.HostedClusterLocalProxy)
+		}
+		transport.DialContext = hcpProxyCtx.DialContext
 	}
 
 	if endpoint.Scheme == schemeHTTPS {
@@ -252,13 +270,13 @@ func runReadinessProbe(caBundle []*x509.Certificate, proxy, endpoint *url.URL) e
 	request, err := http.NewRequest("GET", endpoint.String(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request for '%s' using proxy '%s': %v", endpoint.String(),
-			proxy.String(), err)
+			proxyURL.String(), err)
 	}
 
 	resp, err := client.Do(request)
 	if err != nil {
 		return fmt.Errorf("endpoint probe failed for endpoint '%s' using proxy '%s': %v",
-			endpoint.String(), proxy.String(), err)
+			endpoint.String(), proxyURL.String(), err)
 	}
 	defer resp.Body.Close()
 
@@ -267,5 +285,5 @@ func runReadinessProbe(caBundle []*x509.Certificate, proxy, endpoint *url.URL) e
 	}
 
 	return fmt.Errorf("endpoint probe failed with statuscode '%d' for endpoint '%s' using proxy '%s' ",
-		resp.StatusCode, endpoint.String(), proxy.String())
+		resp.StatusCode, endpoint.String(), proxyURL.String())
 }
