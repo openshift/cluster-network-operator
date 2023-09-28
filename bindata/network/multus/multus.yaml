@@ -126,7 +126,8 @@ data:
         "perNodeCertificate": {
           "enabled": true,
           "bootstrapKubeconfig": "/hostroot/var/lib/kubelet/kubeconfig",
-          "certDir": "/run/multus/certs"
+          "certDir": "/etc/cni/multus/certs",
+          "certDuration": "24h"
         },
 {{ end }}
         "cniConfigDir": "/host/etc/cni/net.d",
@@ -231,7 +232,7 @@ spec:
           mountPath: /etc/cni/net.d/multus.d
           readOnly: true
         - name: host-run-multus-certs
-          mountPath: /run/multus/certs
+          mountPath: /etc/cni/multus/certs
         env:
         - name: RHEL8_SOURCE_DIRECTORY
           value: "/usr/src/multus-cni/rhel8/bin/"
@@ -321,7 +322,7 @@ spec:
               path: daemon-config.json
         - name: host-run-multus-certs
           hostPath:
-            path: /run/multus_certs
+            path: /etc/cni/multus/certs
 ---
 kind: DaemonSet
 apiVersion: apps/v1
