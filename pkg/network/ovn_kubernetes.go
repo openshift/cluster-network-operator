@@ -1534,24 +1534,24 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		prepullerStatus.Progressing = daemonSetProgressing(prePullerDaemonSet, true)
 	}
 
-	ipsecDaemonSet := &appsv1.DaemonSet{
+	ipsecHostDaemonSet := &appsv1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
 	}
-	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec"}
-	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecDaemonSet); err != nil {
+	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec-host"}
+	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecHostDaemonSet); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Failed to retrieve existing ipsec DaemonSet: %w", err)
 		} else {
 			ipsecStatus = nil
 		}
 	} else {
-		ipsecStatus.Namespace = ipsecDaemonSet.Namespace
-		ipsecStatus.Name = ipsecDaemonSet.Name
-		ipsecStatus.IPFamilyMode = ipsecDaemonSet.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
-		ipsecStatus.Version = ipsecDaemonSet.GetAnnotations()["release.openshift.io/version"]
+		ipsecStatus.Namespace = ipsecHostDaemonSet.Namespace
+		ipsecStatus.Name = ipsecHostDaemonSet.Name
+		ipsecStatus.IPFamilyMode = ipsecHostDaemonSet.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+		ipsecStatus.Version = ipsecHostDaemonSet.GetAnnotations()["release.openshift.io/version"]
 	}
 
 	// If we are upgrading from 4.13 -> 4.14 set new API for IP Forwarding mode to Global.
