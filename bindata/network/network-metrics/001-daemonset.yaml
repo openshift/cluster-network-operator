@@ -38,7 +38,7 @@ spec:
                 operator: DoesNotExist
               - key: network.operator.openshift.io/dpu
                 operator: DoesNotExist
-      priorityClassName: "system-node-critical"
+      priorityClassName: "openshift-user-critical"
       tolerations:
         - operator: Exists
       containers:
