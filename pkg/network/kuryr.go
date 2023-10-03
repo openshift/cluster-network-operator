@@ -112,6 +112,7 @@ func renderKuryr(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapR
 
 	// Pods Network MTU
 	data.Data["PodsNetworkMTU"] = b.PodsNetworkMTU
+	c.MTU = &b.PodsNetworkMTU
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/kuryr"), &data)
 	if err != nil {
@@ -218,7 +219,7 @@ func isKuryrChangeSafe(prev, next *operv1.NetworkSpec) []error {
 		errs = append(errs, errors.Errorf("cannot change kuryr openStackServiceNetwork"))
 	}
 
-	if pn.MTU != nil && *pn.MTU != 0 && !reflect.DeepEqual(pn.MTU, nn.MTU) {
+	if !reflect.DeepEqual(pn.MTU, nn.MTU) {
 		errs = append(errs, errors.Errorf("cannot change mtu for the Pods Network"))
 	}
 
@@ -256,15 +257,11 @@ func fillKuryrDefaults(conf, previous *operv1.NetworkSpec) {
 		var batchPorts uint = 3
 		kc.PoolBatchPorts = &batchPorts
 	}
-	// MTU is currently the only field we pull from previous.
+	// MTU  is currently the only field we pull from previous.
 	if kc.MTU == nil {
 		if previous != nil && previous.DefaultNetwork.KuryrConfig != nil &&
 			previous.DefaultNetwork.KuryrConfig.MTU != nil {
 			mtu := *previous.DefaultNetwork.KuryrConfig.MTU
-			kc.MTU = &mtu
-		} else {
-			// if it wasn't set, let's make sure we set something
-			var mtu uint32 = 0
 			kc.MTU = &mtu
 		}
 	}
