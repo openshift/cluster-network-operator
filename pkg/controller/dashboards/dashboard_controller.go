@@ -110,12 +110,14 @@ func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Re
 	klog.Infof("Reconcile dashboards")
 	err := r.applyManifests(ctx)
 	if err != nil {
-		klog.Errorf("Failed to apply dashboard manifests: %v", err)
-		return reconcile.Result{}, err
+		err = fmt.Errorf("failed to apply dashboard manifests: %w", err)
+		klog.Error(err)
+		r.status.SetDegraded(statusmanager.DashboardConfig, "DashboardError", err.Error())
+		// Do not throw an error
+		return reconcile.Result{}, nil
 	}
 
-	// TODO: we might want to use r.status.SetDegraded / r.status.SetNotDegraded instead of throwing errors
-	// might need some guidance...
+	r.status.SetNotDegraded(statusmanager.DashboardConfig)
 
 	return reconcile.Result{}, nil
 }

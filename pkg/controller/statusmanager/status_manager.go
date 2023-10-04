@@ -52,6 +52,7 @@ const (
 	RolloutHung
 	CertificateSigner
 	InfrastructureConfig
+	DashboardConfig
 	maxStatusLevel
 )
 
