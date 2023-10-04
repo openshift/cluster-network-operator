@@ -9,6 +9,7 @@ metadata:
 {{- if .HyperShiftEnabled}}
     # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
     hypershift.openshift.io/hosted-control-plane: {{.AdmissionControllerNamespace}}
+    hypershift.openshift.io/control-plane: "true"
 {{- end }}
   annotations:
     kubernetes.io/description: |
@@ -42,6 +43,10 @@ spec:
       labels:
         app: multus-admission-controller
         namespace: {{.AdmissionControllerNamespace}}
+{{- if .HyperShiftEnabled}}
+        hypershift.openshift.io/hosted-control-plane: {{.AdmissionControllerNamespace}}
+        hypershift.openshift.io/control-plane: "true"
+{{- end }}
         component: network
         type: infra
         openshift.io/component: network

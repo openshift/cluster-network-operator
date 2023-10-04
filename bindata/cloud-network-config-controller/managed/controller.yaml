@@ -12,6 +12,7 @@ metadata:
   labels:
     # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
     hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+    hypershift.openshift.io/control-plane: "true"
 spec:
   selector:
     matchLabels:
@@ -27,6 +28,8 @@ spec:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: cloud-network-config-controller
+        hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+        hypershift.openshift.io/control-plane: "true"
         component: network
         type: infra
         openshift.io/component: network
