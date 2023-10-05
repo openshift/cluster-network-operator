@@ -76,8 +76,6 @@ spec:
         volumeMounts:
           - mountPath: /etc/webhook-cert/
             name: webhook-cert
-          - mountPath: /var/log/kube-apiserver
-            name: audit-dir
           - mountPath: /env
             name: env-overrides
       - name: approver
@@ -120,9 +118,6 @@ spec:
           configMap:
             name: env-overrides
             optional: true
-        - hostPath:
-            path: /var/log/kube-apiserver
-          name: audit-dir
       tolerations:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"
