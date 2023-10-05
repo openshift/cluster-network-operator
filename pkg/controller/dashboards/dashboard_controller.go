@@ -5,17 +5,19 @@ import (
 	_ "embed"
 	"fmt"
 
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	v1coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -26,7 +28,7 @@ import (
 )
 
 const (
-	manifestDir = "bindata/dashboards"
+	manifest = "bindata/dashboards/configmaps.yaml"
 )
 
 var (
@@ -78,16 +80,15 @@ func add(mgr manager.Manager, r *ReconcileDashboard) error {
 
 	r.client.Default().AddCustomInformer(cmInformer) // Tell the ClusterClient about this informer
 
-	// Initial rendering
-	err = r.applyManifests(context.Background())
-	if err != nil {
-		return err
-	}
-
+	firstRun := true
 	return c.Watch(&source.Informer{Informer: cmInformer},
 		&handler.EnqueueRequestForObject{},
 		predicate.ResourceVersionChangedPredicate{},
 		predicate.NewPredicateFuncs(func(object crclient.Object) bool {
+			if firstRun {
+				firstRun = false
+				return true
+			}
 			for _, ref := range dashboardRefs {
 				if object.GetName() == ref.name {
 					return true
@@ -108,7 +109,18 @@ type ReconcileDashboard struct {
 
 func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	klog.Infof("Reconcile dashboards")
-	err := r.applyManifests(ctx)
+
+	// Fetch the Network.operator.openshift.io instance to get Network Type
+	operConfig := &operv1.Network{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}}
+	err := r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, operConfig)
+	if err != nil {
+		err = fmt.Errorf("unable to retrieve Network.operator.openshift.io object: %w", err)
+		klog.Error(err)
+		r.status.SetDegraded(statusmanager.DashboardConfig, "DashboardError", err.Error())
+		return reconcile.Result{}, err
+	}
+
+	err = r.applyManifests(ctx, operConfig)
 	if err != nil {
 		err = fmt.Errorf("failed to apply dashboard manifests: %w", err)
 		klog.Error(err)
@@ -122,9 +134,9 @@ func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Re
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileDashboard) applyManifests(ctx context.Context) error {
+func (r *ReconcileDashboard) applyManifests(ctx context.Context, cfg *operv1.Network) error {
 	klog.Infof("Applying dashboards manifests")
-	manifests, err := renderManifests()
+	manifests, err := renderManifests(cfg)
 	if err != nil {
 		return fmt.Errorf("could not render dashboards manifests: %v", err)
 	}
@@ -136,12 +148,13 @@ func (r *ReconcileDashboard) applyManifests(ctx context.Context) error {
 	return nil
 }
 
-func renderManifests() ([]*unstructured.Unstructured, error) {
+func renderManifests(cfg *operv1.Network) ([]*unstructured.Unstructured, error) {
 	data := render.MakeRenderData()
 	data.Data["DashboardNamespace"] = names.DashboardNamespace
+	data.Data["IsOVN"] = cfg.Spec.DefaultNetwork.Type == operv1.NetworkTypeOVNKubernetes
 	for _, ref := range dashboardRefs {
 		data.Data["DashboardName"+ref.tplSuffix] = ref.name
 		data.Data["DashboardContent"+ref.tplSuffix] = ref.json
 	}
-	return render.RenderDir(manifestDir, &data)
+	return render.RenderTemplate(manifest, &data)
 }
