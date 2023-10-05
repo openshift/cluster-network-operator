@@ -84,6 +84,9 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 		data.Data["NO_PROXY"] = bootstrapResult.Infra.Proxy.NoProxy
 	}
 	data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = bootstrapResult.Infra.NetworkNodeIdentityEnabled
+	if bootstrapResult.Infra.NetworkNodeIdentityEnabled {
+		data.Data["KubeletKubeconfigPath"] = determineKubeConfigPath()
+	}
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus"), &data)
 	if err != nil {
@@ -120,4 +123,22 @@ func pluginCNIConfDir(conf *operv1.NetworkSpec) string {
 		return SystemCNIConfDir
 	}
 	return MultusCNIConfDir
+}
+
+// determineKubeConfigPath determines which kubeconfig path to use for certificate generation.
+// In some cases, specifically IBM Managed Openshift, the path differs.
+func determineKubeConfigPath() string {
+	var kubeletKubeconfigPaths = []string{
+		"/var/lib/kubelet/kubeconfig",        // Traditional OCP
+		"/etc/kubernetes/kubelet-kubeconfig", // IBM Managed OpenShift, see OCPBUGS-20064
+	}
+
+	for _, path := range kubeletKubeconfigPaths {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	// If none are found, we must assume the default traditional OCP path.
+	return kubeletKubeconfigPaths[0]
 }
