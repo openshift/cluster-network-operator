@@ -461,7 +461,7 @@ spec:
                   exit 1
                 fi
         readinessProbe:
-          initialDelaySeconds: 90
+          initialDelaySeconds: 10
           timeoutSeconds: 5
           exec:
             command:
@@ -747,7 +747,7 @@ spec:
                   exit 1
                 fi
         readinessProbe:
-          initialDelaySeconds: 90
+          initialDelaySeconds: 10
           timeoutSeconds: 5
           exec:
             command:
