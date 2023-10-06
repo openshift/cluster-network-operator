@@ -93,13 +93,6 @@ spec:
             -C /ovn-ca/ca-bundle.crt &
 
           wait $!
-        lifecycle:
-          preStop:
-            exec:
-              command:
-                - /bin/bash
-                - -c
-                - OVN_MANAGE_OVSDB=no /usr/share/ovn/scripts/ovn-ctl stop_northd
         env:
         - name: OVN_LOG_LEVEL
           value: info 
@@ -392,16 +385,6 @@ spec:
                 if ! retry 20 "ipsec" "${OVN_NB_CTL} set nb_global . ipsec=${ipsec} options:ipsec_encapsulation=${ipsec_encapsulation}"; then
                   exit 1
                 fi
-          preStop:
-            exec:
-              command:
-              - /bin/bash
-              - -c
-              - |
-                echo "$(date -Iseconds) - stopping nbdb"
-                /usr/share/ovn/scripts/ovn-ctl stop_nb_ovsdb
-                echo "$(date -Iseconds) - nbdb stopped"
-                rm -f /var/run/ovn/ovnnb_db.pid
         readinessProbe:
 {{ if not .IsSNO }}
           initialDelaySeconds: 90
@@ -744,16 +727,6 @@ spec:
                 if ! retry 20 "ipsec" "${OVN_SB_CTL} get sb_global . ipsec"; then
                   exit 1
                 fi
-          preStop:
-            exec:
-              command:
-              - /bin/bash
-              - -c
-              - |
-                echo "$(date -Iseconds) - stopping sbdb"
-                /usr/share/ovn/scripts/ovn-ctl stop_sb_ovsdb
-                echo "$(date -Iseconds) - sbdb stopped"
-                rm -f /var/run/ovn/ovnsb_db.pid
         readinessProbe:
 {{ if not .IsSNO }}
           initialDelaySeconds: 90
