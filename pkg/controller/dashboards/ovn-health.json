@@ -57,12 +57,12 @@
                     "seriesOverrides":[
                     ],
                     "spaceLength":10,
-                    "span":3,
+                    "span":4,
                     "stack":false,
                     "steppedLine":false,
                     "targets":[
                         {
-                            "expr":"sum(rate(ovnkube_master_pod_creation_latency_seconds_sum[2m])) / sum(rate(ovnkube_master_pod_creation_latency_seconds_count[2m]))",
+                            "expr":"histogram_quantile(0.99, sum by(le) (rate(ovnkube_node_cni_request_duration_seconds_bucket{command=\"ADD\"}[2m]))) > 0",
                             "format":"time_series",
                             "instant": true,
                             "intervalFactor":2,
@@ -72,7 +72,7 @@
                     "thresholds":[],
                     "timeFrom":null,
                     "timeShift":null,
-                    "title":"Pod Creation Latency (avg)",
+                    "title":"ADD Request Latency (P99)",
                     "tooltip":{
                         "shared":false,
                         "sort":2,
@@ -89,7 +89,7 @@
                     },
                     "yaxes":[
                         {
-                            "format":"s",
+                            "format":"seconds",
                             "label":null,
                             "logBase":1,
                             "max":null,
@@ -142,12 +142,97 @@
                     "seriesOverrides":[
                     ],
                     "spaceLength":10,
-                    "span":3,
+                    "span":4,
                     "stack":false,
                     "steppedLine":false,
                     "targets":[
                         {
-                            "expr":"histogram_quantile(0.99, sum by(le) (rate(ovnkube_master_pod_creation_latency_seconds_bucket[2m])))",
+                            "expr":"histogram_quantile(0.99, sum by(le) (rate(ovnkube_node_cni_request_duration_seconds_bucket{command=\"DEL\"}[2m]))) > 0",
+                            "format":"time_series",
+                            "instant": true,
+                            "intervalFactor":2,
+                            "refId":"A"
+                        }
+                    ],
+                    "thresholds":[],
+                    "timeFrom":null,
+                    "timeShift":null,
+                    "title":"DEL Request Latency (P99)",
+                    "tooltip":{
+                        "shared":false,
+                        "sort":2,
+                        "value_type":"individual"
+                    },
+                    "type":"singlestat",
+                    "xaxis":{
+                        "buckets":null,
+                        "mode":"time",
+                        "name":null,
+                        "show":true,
+                        "values":[
+                        ]
+                    },
+                    "yaxes":[
+                        {
+                            "format":"seconds",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":0,
+                            "show":true
+                        },
+                        {
+                            "format":"short",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":null,
+                            "show":false
+                        }
+                    ]
+                },
+                {
+                    "aliasColors":{
+                    },
+                    "bars":false,
+                    "dashLength":10,
+                    "dashes":false,
+                    "datasource":"prometheus",
+                    "fill":1,
+                    "format": "s",
+                    "id":1,
+                    "interval": "1m",
+                    "legend":{
+                        "alignAsTable":true,
+                        "avg":false,
+                        "current":false,
+                        "max":false,
+                        "min":false,
+                        "rightSide":true,
+                        "show":true,
+                        "sideWidth":null,
+                        "total":false,
+                        "values":false
+                    },
+                    "lines":true,
+                    "linewidth":1,
+                    "links":[
+                    ],
+                    "nullPointMode":"null",
+                    "percentage":false,
+                    "pointradius":5,
+                    "points":false,
+                    "renderer":"flot",
+                    "repeat":null,
+                    "seriesOverrides":[
+                    ],
+                    "spaceLength":10,
+                    "span":4,
+                    "stack":false,
+                    "steppedLine":false,
+                    "targets":[
+                        {
+                            "expr":"histogram_quantile(0.99, sum by(le) (rate(ovnkube_controller_pod_creation_latency_seconds_bucket[2m]))) > 0",
                             "format":"time_series",
                             "instant": true,
                             "intervalFactor":2,
@@ -174,7 +259,7 @@
                     },
                     "yaxes":[
                         {
-                            "format":"s",
+                            "format":"seconds",
                             "label":null,
                             "logBase":1,
                             "max":null,
@@ -206,7 +291,7 @@
                 {
                     "aliasColors":{
                     },
-                    "bars":true,
+                    "bars":false,
                     "dashLength":10,
                     "dashes":false,
                     "datasource":"prometheus",
@@ -240,26 +325,228 @@
                     "seriesOverrides":[
                     ],
                     "spaceLength":10,
-                    "span":6,
+                    "span":4,
                     "stack":false,
                     "steppedLine":false,
                     "targets":[
                         {
-                            "expr":"histogram_quantile(0.99, sum by(le) (rate(ovnkube_master_pod_creation_latency_seconds_bucket[2m])))",
+                            "expr":"histogram_quantile(0.99, sum(rate(ovnkube_node_cni_request_duration_seconds_bucket{command=\"ADD\"}[1m])) by (le)) > 0",
                             "format":"time_series",
                             "intervalFactor":2,
                             "legendFormat":"99th percentile",
                             "refId":"A"
                         },
                         {
-                            "expr":"histogram_quantile(0.9, sum by(le) (rate(ovnkube_master_pod_creation_latency_seconds_bucket[2m])))",
+                            "expr":"histogram_quantile(0.90, sum(rate(ovnkube_node_cni_request_duration_seconds_bucket{command=\"ADD\"}[1m])) by (le)) > 0",
                             "format":"time_series",
                             "intervalFactor":2,
                             "legendFormat":"90th percentile",
                             "refId":"B"
                         },
                         {
-                            "expr":"histogram_quantile(0.50, sum by(le) (rate(ovnkube_master_pod_creation_latency_seconds_bucket[2m])))",
+                            "expr":"histogram_quantile(0.50, sum(rate(ovnkube_node_cni_request_duration_seconds_bucket{command=\"ADD\"}[1m])) by (le)) > 0",
+                            "format":"time_series",
+                            "intervalFactor":2,
+                            "legendFormat":"50th percentile",
+                            "refId":"C"
+                        }
+                    ],
+                    "thresholds":[
+                    ],
+                    "timeFrom":null,
+                    "timeShift":null,
+                    "title":"ADD Requests Latency",
+                    "tooltip":{
+                        "shared":true,
+                        "sort":0,
+                        "value_type":"individual"
+                    },
+                    "type":"graph",
+                    "xaxis":{
+                        "buckets":null,
+                        "mode":"time",
+                        "name":null,
+                        "show":true,
+                        "values":[
+                        ]
+                    },
+                    "yaxes":[
+                        {
+                            "format":"seconds",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":null,
+                            "show":true
+                        },
+                        {
+                            "format":"seconds",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":null,
+                            "show":false
+                        }
+                    ]
+                },
+                {
+                    "aliasColors":{
+                    },
+                    "bars":false,
+                    "dashLength":10,
+                    "dashes":false,
+                    "datasource":"prometheus",
+                    "fill":10,
+                    "fillGradient":0,
+                    "gridPos":{
+                    },
+                    "id":1,
+                    "legend":{
+                        "alignAsTable":false,
+                        "avg":false,
+                        "current":false,
+                        "max":false,
+                        "min":false,
+                        "rightSide":false,
+                        "show":true,
+                        "sideWidth":null,
+                        "total":false,
+                        "values":false
+                    },
+                    "lines":true,
+                    "linewidth":1,
+                    "links":[
+                    ],
+                    "nullPointMode":"null",
+                    "percentage":false,
+                    "pointradius":5,
+                    "points":false,
+                    "renderer":"flot",
+                    "repeat":null,
+                    "seriesOverrides":[
+                    ],
+                    "spaceLength":10,
+                    "span":4,
+                    "stack":false,
+                    "steppedLine":false,
+                    "targets":[
+                        {
+                            "expr":"histogram_quantile(0.99, sum(rate(ovnkube_node_cni_request_duration_seconds_bucket{command=\"DEL\"}[1m])) by (le)) > 0",
+                            "format":"time_series",
+                            "intervalFactor":2,
+                            "legendFormat":"99th percentile",
+                            "refId":"A"
+                        },
+                        {
+                            "expr":"histogram_quantile(0.90, sum(rate(ovnkube_node_cni_request_duration_seconds_bucket{command=\"DEL\"}[1m])) by (le)) > 0",
+                            "format":"time_series",
+                            "intervalFactor":2,
+                            "legendFormat":"90th percentile",
+                            "refId":"B"
+                        },
+                        {
+                            "expr":"histogram_quantile(0.50, sum(rate(ovnkube_node_cni_request_duration_seconds_bucket{command=\"DEL\"}[1m])) by (le)) > 0",
+                            "format":"time_series",
+                            "intervalFactor":2,
+                            "legendFormat":"50th percentile",
+                            "refId":"C"
+                        }
+                    ],
+                    "thresholds":[
+                    ],
+                    "timeFrom":null,
+                    "timeShift":null,
+                    "title":"DEL Requests Latency",
+                    "tooltip":{
+                        "shared":true,
+                        "sort":0,
+                        "value_type":"individual"
+                    },
+                    "type":"graph",
+                    "xaxis":{
+                        "buckets":null,
+                        "mode":"time",
+                        "name":null,
+                        "show":true,
+                        "values":[
+                        ]
+                    },
+                    "yaxes":[
+                        {
+                            "format":"seconds",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":null,
+                            "show":true
+                        },
+                        {
+                            "format":"seconds",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":null,
+                            "show":false
+                        }
+                    ]
+                },
+                {
+                    "aliasColors":{
+                    },
+                    "bars":false,
+                    "dashLength":10,
+                    "dashes":false,
+                    "datasource":"prometheus",
+                    "fill":100,
+                    "fillGradient":0,
+                    "gridPos":{
+                    },
+                    "id":1,
+                    "legend":{
+                        "alignAsTable":false,
+                        "avg":false,
+                        "current":false,
+                        "max":false,
+                        "min":false,
+                        "rightSide":false,
+                        "show":true,
+                        "sideWidth":null,
+                        "total":false,
+                        "values":false
+                    },
+                    "lines":true,
+                    "linewidth":1,
+                    "links":[
+                    ],
+                    "nullPointMode":"null",
+                    "percentage":false,
+                    "pointradius":5,
+                    "points":false,
+                    "renderer":"flot",
+                    "repeat":null,
+                    "seriesOverrides":[
+                    ],
+                    "spaceLength":10,
+                    "span":4,
+                    "stack":false,
+                    "steppedLine":false,
+                    "targets":[
+                        {
+                            "expr":"histogram_quantile(0.99, sum by(le) (rate(ovnkube_controller_pod_creation_latency_seconds_bucket[2m]))) > 0",
+                            "format":"time_series",
+                            "intervalFactor":2,
+                            "legendFormat":"99th percentile",
+                            "refId":"A"
+                        },
+                        {
+                            "expr":"histogram_quantile(0.9, sum by(le) (rate(ovnkube_controller_pod_creation_latency_seconds_bucket[2m]))) > 0",
+                            "format":"time_series",
+                            "intervalFactor":2,
+                            "legendFormat":"90th percentile",
+                            "refId":"B"
+                        },
+                        {
+                            "expr":"histogram_quantile(0.50, sum by(le) (rate(ovnkube_controller_pod_creation_latency_seconds_bucket[2m]))) > 0",
                             "format":"time_series",
                             "intervalFactor":2,
                             "legendFormat":"50th percentile",
@@ -310,6 +597,378 @@
             "repeatRowId":null,
             "showTitle":true,
             "title":"Performance",
+            "titleSize":"h6"
+        },
+        {
+            "collapse":false,
+            "height":"250px",
+            "panels":[
+                {
+                    "aliasColors":{
+                    },
+                    "bars":true,
+                    "dashLength":10,
+                    "dashes":false,
+                    "datasource":"prometheus",
+                    "fill":10,
+                    "fillGradient":0,
+                    "gridPos":{
+                    },
+                    "id":1,
+                    "legend":{
+                        "alignAsTable":false,
+                        "avg":false,
+                        "current":false,
+                        "max":false,
+                        "min":false,
+                        "rightSide":false,
+                        "show":true,
+                        "sideWidth":null,
+                        "total":false,
+                        "values":false
+                    },
+                    "lines":true,
+                    "linewidth":1,
+                    "links":[
+                    ],
+                    "nullPointMode":"null",
+                    "percentage":false,
+                    "pointradius":5,
+                    "points":false,
+                    "renderer":"flot",
+                    "repeat":null,
+                    "seriesOverrides":[
+                    ],
+                    "spaceLength":10,
+                    "span":6,
+                    "stack":true,
+                    "steppedLine":false,
+                    "targets":[
+                        {
+                            "expr":"sum(irate(container_cpu_usage_seconds_total{pod=~\"ovnkube-master.*|ovnkube-control-plane-.*\",namespace=\"openshift-ovn-kubernetes\",container!~\"POD|\"}[1m])) by (pod) *100",
+                            "format":"time_series",
+                            "intervalFactor":2,
+                            "legendFormat": "{{pod}}",
+                            "refId":"A"
+                        }
+                    ],
+                    "thresholds":[
+                    ],
+                    "timeFrom":null,
+                    "timeShift":null,
+                    "title":"Control Plane CPU Usage",
+                    "tooltip":{
+                        "shared":true,
+                        "sort":0,
+                        "value_type":"individual"
+                    },
+                    "type":"graph",
+                    "xaxis":{
+                        "buckets":null,
+                        "mode":"time",
+                        "name":null,
+                        "show":true,
+                        "values":[
+                        ]
+                    },
+                    "yaxes":[
+                        {
+                            "format":"short",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":null,
+                            "show":true
+                        },
+                        {
+                            "format":"short",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":null,
+                            "show":false
+                        }
+                    ]
+                },
+                {
+                    "aliasColors":{
+                    },
+                    "bars":true,
+                    "dashLength":10,
+                    "dashes":false,
+                    "datasource":"prometheus",
+                    "fill":10,
+                    "fillGradient":0,
+                    "gridPos":{
+                    },
+                    "id":1,
+                    "legend":{
+                        "alignAsTable":false,
+                        "avg":false,
+                        "current":false,
+                        "max":false,
+                        "min":false,
+                        "rightSide":false,
+                        "show":true,
+                        "sideWidth":null,
+                        "total":false,
+                        "values":false
+                    },
+                    "lines":true,
+                    "linewidth":1,
+                    "links":[
+                    ],
+                    "nullPointMode":"null",
+                    "percentage":false,
+                    "pointradius":5,
+                    "points":false,
+                    "renderer":"flot",
+                    "repeat":null,
+                    "seriesOverrides":[
+                    ],
+                    "spaceLength":10,
+                    "span":6,
+                    "stack":true,
+                    "steppedLine":false,
+                    "targets":[
+                        {
+                            "expr":"sum(container_memory_rss{pod=~\"ovnkube-master-.*|ovnkube-control-plane-.*\",namespace=\"openshift-ovn-kubernetes\",container!~\"POD|\"}) by (pod)",
+                            "format":"time_series",
+                            "intervalFactor":2,
+                            "legendFormat":"{{pod}}",
+                            "refId":"A"
+                        }
+                    ],
+                    "thresholds":[
+                    ],
+                    "timeFrom":null,
+                    "timeShift":null,
+                    "title":"Control Plane RSS Memory Usage",
+                    "tooltip":{
+                        "shared":true,
+                        "sort":0,
+                        "value_type":"individual"
+                    },
+                    "type":"graph",
+                    "xaxis":{
+                        "buckets":null,
+                        "mode":"time",
+                        "name":null,
+                        "show":true,
+                        "values":[
+                        ]
+                    },
+                    "yaxes":[
+                        {
+                            "format":"bytes",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":null,
+                            "show":true
+                        },
+                        {
+                            "format":"short",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":null,
+                            "show":false
+                        }
+                    ]
+                }
+            ],
+            "repeat":null,
+            "repeatIteration":null,
+            "repeatRowId":null,
+            "showTitle":true,
+            "title":"Control Plane Resources",
+            "titleSize":"h6"
+        },
+        {
+            "collapse":false,
+            "height":"250px",
+            "panels":[
+                {
+                    "aliasColors":{
+                    },
+                    "bars":true,
+                    "dashLength":10,
+                    "dashes":false,
+                    "datasource":"prometheus",
+                    "fill":10,
+                    "fillGradient":0,
+                    "gridPos":{
+                    },
+                    "id":1,
+                    "legend":{
+                        "alignAsTable":false,
+                        "avg":false,
+                        "current":false,
+                        "max":false,
+                        "min":false,
+                        "rightSide":false,
+                        "show":true,
+                        "sideWidth":null,
+                        "total":false,
+                        "values":false
+                    },
+                    "lines":true,
+                    "linewidth":1,
+                    "links":[
+                    ],
+                    "nullPointMode":"null",
+                    "percentage":false,
+                    "pointradius":5,
+                    "points":false,
+                    "renderer":"flot",
+                    "repeat":null,
+                    "seriesOverrides":[
+                    ],
+                    "spaceLength":10,
+                    "span":6,
+                    "stack":true,
+                    "steppedLine":false,
+                    "targets":[
+                        {
+                            "expr":"topk(10, irate(container_cpu_usage_seconds_total{pod=~\"ovnkube-.*\",namespace=\"openshift-ovn-kubernetes\",container=\"ovn-controller\"}[1m])*100)",
+                            "format":"time_series",
+                            "intervalFactor":2,
+                            "legendFormat": "{{pod}}",
+                            "refId":"A"
+                        }
+                    ],
+                    "thresholds":[
+                    ],
+                    "timeFrom":null,
+                    "timeShift":null,
+                    "title":"Top 10 CPU Usage",
+                    "tooltip":{
+                        "shared":true,
+                        "sort":0,
+                        "value_type":"individual"
+                    },
+                    "type":"graph",
+                    "xaxis":{
+                        "buckets":null,
+                        "mode":"time",
+                        "name":null,
+                        "show":true,
+                        "values":[
+                        ]
+                    },
+                    "yaxes":[
+                        {
+                            "format":"short",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":null,
+                            "show":true
+                        },
+                        {
+                            "format":"short",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":null,
+                            "show":false
+                        }
+                    ]
+                },
+                {
+                    "aliasColors":{
+                    },
+                    "bars":true,
+                    "dashLength":10,
+                    "dashes":false,
+                    "datasource":"prometheus",
+                    "fill":10,
+                    "fillGradient":0,
+                    "gridPos":{
+                    },
+                    "id":1,
+                    "legend":{
+                        "alignAsTable":false,
+                        "avg":false,
+                        "current":false,
+                        "max":false,
+                        "min":false,
+                        "rightSide":false,
+                        "show":true,
+                        "sideWidth":null,
+                        "total":false,
+                        "values":false
+                    },
+                    "lines":true,
+                    "linewidth":1,
+                    "links":[
+                    ],
+                    "nullPointMode":"null",
+                    "percentage":false,
+                    "pointradius":5,
+                    "points":false,
+                    "renderer":"flot",
+                    "repeat":null,
+                    "seriesOverrides":[
+                    ],
+                    "spaceLength":10,
+                    "span":6,
+                    "stack":true,
+                    "steppedLine":false,
+                    "targets":[
+                        {
+                            "expr":"topk(10, sum(container_memory_rss{pod=~\"ovnkube-node-.*\",namespace=\"openshift-ovn-kubernetes\",container=\"ovn-controller\"}) by (pod))",
+                            "format":"time_series",
+                            "intervalFactor":2,
+                            "legendFormat": "{{pod}}",
+                            "refId":"A"
+                        }
+                    ],
+                    "thresholds":[
+                    ],
+                    "timeFrom":null,
+                    "timeShift":null,
+                    "title":"Top 10 RSS Memory Usage",
+                    "tooltip":{
+                        "shared":true,
+                        "sort":0,
+                        "value_type":"individual"
+                    },
+                    "type":"graph",
+                    "xaxis":{
+                        "buckets":null,
+                        "mode":"time",
+                        "name":null,
+                        "show":true,
+                        "values":[
+                        ]
+                    },
+                    "yaxes":[
+                        {
+                            "format": "bytes",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":null,
+                            "show":true
+                        },
+                        {
+                            "format":"short",
+                            "label":null,
+                            "logBase":1,
+                            "max":null,
+                            "min":null,
+                            "show":false
+                        }
+                    ]
+                }
+            ],
+            "repeat":null,
+            "repeatIteration":null,
+            "repeatRowId":null,
+            "showTitle":true,
+            "title":"Data Plane Resources",
             "titleSize":"h6"
         }
     ],
