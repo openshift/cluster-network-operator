@@ -1,29 +1,9 @@
 package bootstrap
 
 import (
-	"github.com/gophercloud/utils/openstack/clientconfig"
 	configv1 "github.com/openshift/api/config/v1"
 	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 )
-
-type KuryrBootstrapResult struct {
-	ServiceSubnet      string
-	PodSubnetpool      string
-	WorkerNodesRouter  string
-	WorkerNodesSubnets []string
-	PodsNetworkMTU     uint32
-	PodSecurityGroups  []string
-	ExternalNetwork    string
-	ClusterID          string
-	OctaviaProvider    string
-	OctaviaVersion     string
-	OpenStackCloud     clientconfig.Cloud
-	UserCACert         string
-	HttpsProxy         string
-	HttpProxy          string
-	NoProxy            string
-	ProjectID          string
-}
 
 type OVNHyperShiftBootstrapResult struct {
 	Enabled                   bool
@@ -84,7 +64,6 @@ type OVNBootstrapResult struct {
 }
 
 type BootstrapResult struct {
-	Kuryr KuryrBootstrapResult
 	OVN   OVNBootstrapResult
 	Infra InfraStatus
 }
