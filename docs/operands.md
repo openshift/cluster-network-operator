@@ -86,14 +86,13 @@ because they depend on other things that aren't ready yet).
 
 ## Network Plugins
 
-CNO renders (at most) one of `bindata/network/openshift-sdn`,
-`bindata/network/ovn-kubernetes`, or `bindata/network/kuryr`,
-depending on the `spec.defaultNetwork.type` of the
-`network.operator.openshift.io` configuration object (which in turn is
+CNO renders (at most) one of `bindata/network/openshift-sdn` or
+`bindata/network/ovn-kubernetes`, depending on the `spec.defaultNetwork.type`
+of the `network.operator.openshift.io` configuration object (which in turn is
 copied there from the `.spec.networkType` of the
 `network.config.openshift.io` configuration). If the specified network
-type is not one of "`OpenShiftSDN`", "`OVNKubernetes`", or "`Kuryr`",
-the CNO will not render any network plugin.
+type is not one of "`OpenShiftSDN`" or "`OVNKubernetes`", the CNO will not 
+render any network plugin.
 
 Note that the CRDs for the `network.openshift.io` types
 (`ClusterNetwork`, `HostSubnet`, `NetNamespace`, and

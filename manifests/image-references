@@ -54,14 +54,6 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-egress-router-cni:latest
-  - name: kuryr-cni
-    from:
-      kind: DockerImage
-      name: quay.io/openshift/origin-kuryr-cni:latest
-  - name: kuryr-controller
-    from:
-      kind: DockerImage
-      name: quay.io/openshift/origin-kuryr-controller:latest
   - name: network-metrics-daemon
     from:
       kind: DockerImage

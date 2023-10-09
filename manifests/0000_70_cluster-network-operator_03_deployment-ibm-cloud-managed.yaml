@@ -84,10 +84,6 @@ spec:
           value: "60000"
         - name: EGRESS_ROUTER_CNI_IMAGE
           value: quay.io/openshift/origin-egress-router-cni:latest
-        - name: KURYR_DAEMON_IMAGE
-          value: quay.io/openshift/origin-kuryr-cni:latest
-        - name: KURYR_CONTROLLER_IMAGE
-          value: quay.io/openshift/origin-kuryr-controller:latest
         - name: NETWORK_METRICS_DAEMON_IMAGE
           value: quay.io/openshift/origin-network-metrics-daemon:latest
         - name: NETWORK_CHECK_SOURCE_IMAGE
