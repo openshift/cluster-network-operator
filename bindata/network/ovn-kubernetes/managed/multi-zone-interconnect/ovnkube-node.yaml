@@ -627,6 +627,8 @@ spec:
         hostPath:
           path: /var/lib/openvswitch/data
       - name: etc-openvswitch
+        # used by cluster-node-tuning-operator to enable /etc/openvswitch/enable_dynamic_cpu_affinity.
+        # See OCPBUGS-18392. Notify cluster-node-tuning-operator when this changes.
         hostPath:
           path: /var/lib/ovn-ic/etc  # different path than 4.13 and single-zone 4.14 to avoid collision during upgrade
       - name: run-openvswitch
