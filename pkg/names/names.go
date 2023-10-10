@@ -87,13 +87,6 @@ const OVNRaftClusterInitiator = "networkoperator.openshift.io/ovn-cluster-initia
 // (i.e. DaemonSet or Deployment) is not making progress, unset otherwise.
 const RolloutHungAnnotation = "networkoperator.openshift.io/rollout-hung"
 
-// KuryrOctaviaProviderAnnotation is used to save latest Octavia provider that was configured in order to
-// prevent from reconfiguring it automatically when underlying Octavia changes.
-const KuryrOctaviaProviderAnnotation = "networkoperator.openshift.io/kuryr-octavia-provider"
-
-// KuryrOctaviaVersionAnnotation is used to save latest Octavia version detected
-const KuryrOctaviaVersionAnnotation = "networkoperator.openshift.io/kuryr-octavia-version"
-
 // CopyFromAnnotation is an annotation that allows copying resources from specified clusters
 // value format: cluster/namespace/name
 const CopyFromAnnotation = "network.operator.openshift.io/copy-from"

@@ -145,8 +145,6 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec, oldStatus *configv1.
 		// continue
 	case operv1.NetworkTypeOVNKubernetes:
 		// continue
-	case operv1.NetworkTypeKuryr:
-		// continue
 	default:
 		knownNetworkType = false
 		// Preserve any status fields set by the unknown network plugin
@@ -179,8 +177,6 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec, oldStatus *configv1.
 		status.ClusterNetworkMTU = int(*operConf.DefaultNetwork.OpenShiftSDNConfig.MTU)
 	case operv1.NetworkTypeOVNKubernetes:
 		status.ClusterNetworkMTU = int(*operConf.DefaultNetwork.OVNKubernetesConfig.MTU)
-	case operv1.NetworkTypeKuryr:
-		status.ClusterNetworkMTU = int(*operConf.DefaultNetwork.KuryrConfig.MTU)
 	}
 
 	// Set migration in the config status

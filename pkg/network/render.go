@@ -556,8 +556,6 @@ func validateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 		return validateOpenShiftSDN(conf)
 	case operv1.NetworkTypeOVNKubernetes:
 		return validateOVNKubernetes(conf)
-	case operv1.NetworkTypeKuryr:
-		return validateKuryr(conf)
 	default:
 		return nil
 	}
@@ -565,9 +563,6 @@ func validateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 
 // validateMigration validates if migration path is possible
 func validateMigration(conf *operv1.NetworkSpec) []error {
-	if conf.DefaultNetwork.Type == operv1.NetworkTypeKuryr && conf.Migration != nil && conf.Migration.NetworkType != string(operv1.NetworkTypeOVNKubernetes) {
-		return []error{errors.Errorf("when migrating from Kuryr only OVNKubernetes is supported as a target. Currently set %v", conf.Migration.NetworkType)}
-	}
 	return []error{}
 }
 
@@ -585,8 +580,6 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 		return renderOpenShiftSDN(conf, bootstrapResult, manifestDir)
 	case operv1.NetworkTypeOVNKubernetes:
 		return renderOVNKubernetes(conf, bootstrapResult, manifestDir, client, featureGates)
-	case operv1.NetworkTypeKuryr:
-		return renderKuryr(conf, bootstrapResult, manifestDir)
 	default:
 		log.Printf("NOTICE: Unknown network type %s, ignoring", dn.Type)
 		return nil, false, nil
@@ -597,8 +590,8 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 // and generates OVNKubernetes CRDs when default network is OpenShiftSDN.
 func renderCRDForMigration(conf *operv1.NetworkSpec, manifestDir string, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, error) {
 	switch conf.DefaultNetwork.Type {
-	case operv1.NetworkTypeOpenShiftSDN, operv1.NetworkTypeKuryr:
-		// When we migrate from SDN/Kuryr to OVNK, we must set the feature gate values so that
+	case operv1.NetworkTypeOpenShiftSDN:
+		// When we migrate from SDN to OVNK, we must set the feature gate values so that
 		// the CRD installation can happen according to whether the feature gate is enabled or not
 		// in the cluster
 		data := render.MakeRenderData()
@@ -626,8 +619,6 @@ func fillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int)
 		fillOpenShiftSDNDefaults(conf, previous, hostMTU)
 	case operv1.NetworkTypeOVNKubernetes:
 		fillOVNKubernetesDefaults(conf, previous, hostMTU)
-	case operv1.NetworkTypeKuryr:
-		fillKuryrDefaults(conf, previous)
 	default:
 	}
 }
@@ -650,8 +641,6 @@ func isDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 			return isOpenShiftSDNChangeSafe(prev, next)
 		case operv1.NetworkTypeOVNKubernetes:
 			return isOVNKubernetesChangeSafe(prev, next)
-		case operv1.NetworkTypeKuryr:
-			return isKuryrChangeSafe(prev, next)
 		default:
 			return nil
 		}

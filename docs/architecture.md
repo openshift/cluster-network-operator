@@ -126,7 +126,7 @@ it is also consumed by third-party network operators that replace the Network Co
 
 For more detailed documentation, see [operands.md](https://github.com/openshift/cluster-network-operator/blob/master/docs/operands.md).
 
-This is the "main" controller, in that it is responsible for rendering the core networking components (Openshift-SDN / OVN-Kubernetes / Kuryr, Multus, etc). It is broken down into stages:
+This is the "main" controller, in that it is responsible for rendering the core networking components (Openshift-SDN / OVN-Kubernetes, Multus, etc). It is broken down into stages:
 
 1. **Validate** - Check the supplied configuration.
 2. **Fill** - Determine any unsupplied default values.
