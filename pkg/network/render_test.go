@@ -95,7 +95,7 @@ func TestDisallowNetworkTypeChangeWithoutMigration(t *testing.T) {
 	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
 
 	// You can't change default network type when not doing migration.
-	next.DefaultNetwork.Type = "Kuryr"
+	next.DefaultNetwork.Type = "OVN-Kubernetes"
 	err := IsChangeSafe(prev, next, infra)
 	g.Expect(err).To(MatchError(ContainSubstring("cannot change default network type when not doing migration")))
 }
@@ -105,7 +105,7 @@ func TestDisallowNonTargetTypeForMigration(t *testing.T) {
 
 	// You can't change default network type to non-target migration network type.
 	prev.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
-	next.DefaultNetwork.Type = "Kuryr"
+	next.DefaultNetwork.Type = "Raw"
 	err := IsChangeSafe(prev, next, infra)
 	g.Expect(err).To(MatchError(ContainSubstring("can only change default network type to the target migration network type")))
 }
@@ -115,7 +115,7 @@ func TestDisallowMigrationTypeChangeWhenNotNull(t *testing.T) {
 
 	// You can't change the migration network type when it is not null.
 	next.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
-	prev.Migration = &operv1.NetworkMigration{NetworkType: "Kuryr"}
+	prev.Migration = &operv1.NetworkMigration{NetworkType: "OpenShiftSDN"}
 	err := IsChangeSafe(prev, next, infra)
 	g.Expect(err).To(MatchError(ContainSubstring("cannot change migration network type after migration has started")))
 }
