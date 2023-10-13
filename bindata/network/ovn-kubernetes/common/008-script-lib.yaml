@@ -122,7 +122,21 @@ data:
       MAXFILESIZE=$(( "{{.OVNPolicyAuditMaxFileSize}}"*1000000 ))
       MAXLOGFILES="{{.OVNPolicyAuditMaxLogFiles}}"
       LOGDIR=$(dirname ${controller_logfile})
-      CONTROLLERPID=$(cat ${controller_pidfile})
+
+      # wait a bit for ovn-controller to start
+      local retries=0
+      while [[ 30 -gt "${retries}" ]]; do
+        (( retries += 1 ))
+        CONTROLLERPID=$(cat ${controller_pidfile})
+        if [[ -n "${CONTROLLERPID}" ]]; then
+          break
+        fi
+        sleep 2
+      done
+      if [[ -z "${CONTROLLERPID}" ]]; then
+        echo "Timed out waiting for ${controller_pidfile}"
+        return 1
+      fi
 
       # Redirect err to null so no messages are shown upon rotation
       tail -F ${controller_logfile} 2> /dev/null &
