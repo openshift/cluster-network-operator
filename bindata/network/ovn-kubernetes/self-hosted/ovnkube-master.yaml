@@ -588,6 +588,7 @@ spec:
             exit 0
           fi
 
+          export OVSDB_SERVER_OPTIONS="--ssl-protocols=TLSv1.2"
           OVN_ARGS="--db-sb-cluster-local-port={{.OVN_SB_RAFT_PORT}} \
             --db-sb-cluster-local-addr=$(bracketify ${K8S_NODE_IP}) \
             --no-monitor \
