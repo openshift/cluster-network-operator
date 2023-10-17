@@ -16,6 +16,7 @@ approvers:
   - JacobTanenbaum
   - jcaamano
   - knobunc
+  - s1061123
   - trozet
 
 # Bugzilla info; "openshift-sdn" is wrong but there is no "generic networking" subcomponent
