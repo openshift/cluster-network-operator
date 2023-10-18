@@ -60,6 +60,7 @@ type ReconcileInfrastructureConfig struct {
 	scheme                  *runtime.Scheme
 	status                  *statusmanager.StatusManager
 	apiAndIngressVIPsSyncer vipsSynchronizer
+	specStatusSyncer        specStatusSynchronizer
 }
 
 // Reconcile watches Infrastructure.config.openshift.io/cluster and syncs the
@@ -104,6 +105,21 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 		}
 
 		log.Printf("Successfully synchronized API & Ingress VIPs in infrastructure config")
+	}
+
+	// Sync platform Spec and Status
+	updatedInfraConfig = r.specStatusSyncer.SpecStatusSynchronize(infraConfig)
+
+	if !reflect.DeepEqual(updatedInfraConfig.Status, infraConfig.Status) {
+		if err = r.updateInfrastructureConfigStatus(ctx, updatedInfraConfig); err != nil {
+			err = fmt.Errorf("Error while updating infrastructures.%s/cluster status: %w", configv1.GroupName, err)
+			log.Println(err)
+
+			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureStatus", err.Error())
+			return reconcile.Result{}, err
+		}
+
+		log.Printf("Successfully synchronized platform Spec and Status in infrastructure config")
 	}
 
 	r.status.SetNotDegraded(statusmanager.InfrastructureConfig)
