@@ -38,13 +38,15 @@ var (
 	ovnHealthContent string
 	dashboardRefs    []dashboardRef = []dashboardRef{
 		{
-			name:      "grafana-dashboard-network-stats",
-			json:      netstatsContent,
+			name: "grafana-dashboard-network-stats",
+			json: netstatsContent,
+			// Suffix used in configmap template; if modified, dashboards/configmaps.yaml should be changed accordingly
 			tplSuffix: "NetStats",
 		},
 		{
-			name:      "grafana-dashboard-ovn-health",
-			json:      ovnHealthContent,
+			name: "grafana-dashboard-ovn-health",
+			json: ovnHealthContent,
+			// Suffix used in configmap template; if modified, dashboards/configmaps.yaml should be changed accordingly
 			tplSuffix: "OVNHealth",
 		},
 	}
@@ -108,13 +110,13 @@ type ReconcileDashboard struct {
 }
 
 func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	klog.Infof("Reconcile dashboards")
+	klog.Info("Reconcile dashboards")
 
 	// Fetch the Network.operator.openshift.io instance to get Network Type
 	operConfig := &operv1.Network{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}}
 	err := r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, operConfig)
 	if err != nil {
-		err = fmt.Errorf("unable to retrieve Network.operator.openshift.io object: %w", err)
+		err = fmt.Errorf("Unable to retrieve Network.operator.openshift.io object: %w", err)
 		klog.Error(err)
 		r.status.SetDegraded(statusmanager.DashboardConfig, "DashboardError", err.Error())
 		return reconcile.Result{}, err
@@ -122,11 +124,10 @@ func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Re
 
 	err = r.applyManifests(ctx, operConfig)
 	if err != nil {
-		err = fmt.Errorf("failed to apply dashboard manifests: %w", err)
+		err = fmt.Errorf("Failed to apply dashboard manifests: %w", err)
 		klog.Error(err)
 		r.status.SetDegraded(statusmanager.DashboardConfig, "DashboardError", err.Error())
-		// Do not throw an error
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, err
 	}
 
 	r.status.SetNotDegraded(statusmanager.DashboardConfig)
@@ -135,7 +136,7 @@ func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Re
 }
 
 func (r *ReconcileDashboard) applyManifests(ctx context.Context, cfg *operv1.Network) error {
-	klog.Infof("Applying dashboards manifests")
+	klog.Info("Applying dashboards manifests")
 	manifests, err := renderManifests(cfg)
 	if err != nil {
 		return fmt.Errorf("could not render dashboards manifests: %v", err)

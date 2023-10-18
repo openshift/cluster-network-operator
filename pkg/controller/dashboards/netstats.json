@@ -600,7 +600,7 @@
                     ],
                     "timeFrom":null,
                     "timeShift":null,
-                    "title":"Bytes Received, by Device",
+                    "title":"Bytes Received, by Interface",
                     "tooltip":{
                         "shared":true,
                         "sort":0,
@@ -687,7 +687,7 @@
                     ],
                     "timeFrom":null,
                     "timeShift":null,
-                    "title":"Bytes Sent, by Device",
+                    "title":"Bytes Sent, by Interface",
                     "tooltip":{
                         "shared":true,
                         "sort":0,
@@ -960,7 +960,7 @@
                     ],
                     "timeFrom":null,
                     "timeShift":null,
-                    "title":"Packets Received Dropped, by Device",
+                    "title":"Packets Received Dropped, by Interface",
                     "tooltip":{
                         "shared":true,
                         "sort":0,
@@ -1047,7 +1047,7 @@
                     ],
                     "timeFrom":null,
                     "timeShift":null,
-                    "title":"Packets Sent Dropped, by Device",
+                    "title":"Packets Sent Dropped, by Interface",
                     "tooltip":{
                         "shared":true,
                         "sort":0,
@@ -1320,7 +1320,7 @@
                     ],
                     "timeFrom":null,
                     "timeShift":null,
-                    "title":"Packets Received, by Device",
+                    "title":"Packets Received, by Interface",
                     "tooltip":{
                         "shared":true,
                         "sort":0,
@@ -1407,7 +1407,7 @@
                     ],
                     "timeFrom":null,
                     "timeShift":null,
-                    "title":"Packets Sent, by Device",
+                    "title":"Packets Sent, by Interface",
                     "tooltip":{
                         "shared":true,
                         "sort":0,
@@ -1489,7 +1489,7 @@
         ]
     },
     "timezone":"browser",
-    "title":"Networking / Stats",
+    "title":"Networking / Interface Stats",
     "version":0
   }
   
