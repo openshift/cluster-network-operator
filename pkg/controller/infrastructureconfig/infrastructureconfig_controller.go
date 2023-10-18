@@ -32,7 +32,13 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.C
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) reconcile.Reconciler {
-	return &ReconcileInfrastructureConfig{client: c, scheme: mgr.GetScheme(), status: status, apiAndIngressVIPsSyncer: &apiAndIngressVipsSynchronizer{}}
+	return &ReconcileInfrastructureConfig{
+		client:                  c,
+		scheme:                  mgr.GetScheme(),
+		status:                  status,
+		apiAndIngressVIPsSyncer: &apiAndIngressVipsSynchronizer{},
+		specStatusSyncer:        &specStatusSunchronizer{},
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -60,11 +66,14 @@ type ReconcileInfrastructureConfig struct {
 	scheme                  *runtime.Scheme
 	status                  *statusmanager.StatusManager
 	apiAndIngressVIPsSyncer vipsSynchronizer
+	specStatusSyncer        specStatusSynchronizer
 }
 
-// Reconcile watches Infrastructure.config.openshift.io/cluster and syncs the
-// new and deprecated API & Ingress VIP fields to have consistent APIs between
-// versions.
+// Reconcile handles Infrastructure.config.openshift.io/cluster. It is responsible for allowing
+// modifications to the PlatformSpec that stores on-prem network configuration (e.g. VIPs).
+// It also syncs the new and deprecated API & Ingress VIP fields to have consistent APIs between
+// versions, something that has been introduced when dual-stack VIPs were implemented in the first
+// place.
 func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	log.Printf("Reconciling Infrastructure.config.openshift.io %s\n", request.Name)
@@ -91,32 +100,59 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 		return reconcile.Result{}, err
 	}
 
-	// Sync API & Ingress VIPs
+	// Synchronizing VIPs does not require error handling as it performs an automatic migration
+	// for a data structure introduced in OCP 4.12. The function does not operate on any
+	// user-provided input, thus errors can only be a result of unhealthy cluster state.
 	updatedInfraConfig := r.apiAndIngressVIPsSyncer.VipsSynchronize(infraConfig)
 
+	updatedInfraConfig, err = r.specStatusSyncer.SpecStatusSynchronize(updatedInfraConfig)
+	if err != nil {
+		err = fmt.Errorf("Error while synchronizing spec and status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
+		log.Println(err)
+
+		r.status.SetDegraded(statusmanager.InfrastructureConfig, "SyncInfrastructureSpecAndStatus", err.Error())
+		return reconcile.Result{}, err
+	}
+
+	// The "duplicated" logic below is a direct result of how server-side-apply works for this
+	// object. Where it would be natural that `apply.ApplyObject` updates both Spec and Status
+	// at the same time, in reality the first call only updates Spec and leaves Status with the
+	// old content. To fix that and have Status also updated, we are executing a second call with
+	// explicit marker that "status" subresource should be updated.
+	if !reflect.DeepEqual(updatedInfraConfig.Spec, infraConfig.Spec) {
+		if err = r.updateInfrastructureConfig(ctx, updatedInfraConfig); err != nil {
+			err = fmt.Errorf("Error while updating infrastructures.%s/cluster: %w", configv1.GroupName, err)
+			log.Println(err)
+
+			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureSpecOrStatus", err.Error())
+			return reconcile.Result{}, err
+		}
+		log.Printf("Successfully synchronized infrastructure config.")
+	}
+
 	if !reflect.DeepEqual(updatedInfraConfig.Status, infraConfig.Status) {
-		if err = r.updateInfrastructureConfigStatus(ctx, updatedInfraConfig); err != nil {
-			err = fmt.Errorf("Error while updating infrastructures.%s/cluster status: %w", configv1.GroupName, err)
+		if err = r.updateInfrastructureConfig(ctx, updatedInfraConfig, "status"); err != nil {
+			err = fmt.Errorf("Error while updating status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
 			log.Println(err)
 
 			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureStatus", err.Error())
 			return reconcile.Result{}, err
 		}
-
-		log.Printf("Successfully synchronized API & Ingress VIPs in infrastructure config")
+		log.Printf("Successfully synchronized infrastructure config status")
 	}
 
 	r.status.SetNotDegraded(statusmanager.InfrastructureConfig)
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileInfrastructureConfig) updateInfrastructureConfigStatus(ctx context.Context, infraConfig *configv1.Infrastructure) error {
+func (r *ReconcileInfrastructureConfig) updateInfrastructureConfig(ctx context.Context, infraConfig *configv1.Infrastructure, subresources ...string) error {
 	infraConfigToApply := &configv1.Infrastructure{
 		ObjectMeta: v1.ObjectMeta{
 			Name: infraConfig.Name,
 		},
 		Status: infraConfig.Status,
+		Spec:   infraConfig.Spec,
 	}
 
-	return apply.ApplyObject(ctx, r.client, infraConfigToApply, ControllerName, "status")
+	return apply.ApplyObject(ctx, r.client, infraConfigToApply, ControllerName, subresources...)
 }
