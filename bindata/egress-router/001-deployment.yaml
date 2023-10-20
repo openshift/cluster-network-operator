@@ -32,3 +32,6 @@ spec:
           image: "{{.EgressRouterPodImage}}"
           command: ['/bin/sh', '-c', 'sleep infinity']
           terminationMessagePolicy: FallbackToLogsOnError
+          resources:
+            requests:
+              cpu: 100m
