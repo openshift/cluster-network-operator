@@ -2,6 +2,8 @@ package network
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -407,9 +409,39 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = true
 	}
 
+	commonManifestDir := filepath.Join(manifestDir, "network/ovn-kubernetes/common")
+
+	cmPaths := []string{
+		filepath.Join(commonManifestDir, "008-script-lib.yaml"),
+	}
+
+	// Many ovnkube config options are stored in ConfigMaps; the ovnkube
+	// daemonsets need to know when those ConfigMaps change so they can
+	// restart with the new options. Render those ConfigMaps first and
+	// embed a hash of their data into the ovnkube-node daemonsets.
+	h := sha1.New()
+	for _, path := range cmPaths {
+		manifests, err := render.RenderTemplate(path, &data)
+		if err != nil {
+			return nil, progressing, errors.Wrapf(err, "failed to render ConfigMap template %q", path)
+		}
+
+		// Hash each rendered ConfigMap object's data
+		for _, m := range manifests {
+			bytes, err := json.Marshal(m)
+			if err != nil {
+				return nil, progressing, errors.Wrapf(err, "failed to marshal ConfigMap %q manifest", path)
+			}
+			if _, err := h.Write(bytes); err != nil {
+				return nil, progressing, errors.Wrapf(err, "failed to hash ConfigMap %q data", path)
+			}
+		}
+	}
+	data.Data["OVNKubeConfigHash"] = hex.EncodeToString(h.Sum(nil))
+
 	var manifestSubDir string
 	manifestDirs := make([]string, 0, 2)
-	manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "network/ovn-kubernetes/common"))
+	manifestDirs = append(manifestDirs, commonManifestDir)
 
 	productFlavor := "self-hosted"
 	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled {
@@ -467,7 +499,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		// "OVN_NODE_MODE" not set when render.RenderDir() called above,
 		// so render just the error-cni.yaml with "OVN_NODE_MODE" set.
 		data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_DPU
-		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/common/error-cni.yaml"), &data)
+		manifests, err = render.RenderTemplate(filepath.Join(commonManifestDir, "error-cni.yaml"), &data)
 		if err != nil {
 			return nil, progressing, errors.Wrap(err, "failed to render manifests for dpu")
 		}
