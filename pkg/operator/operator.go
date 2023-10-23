@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
@@ -19,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
@@ -61,9 +63,16 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// Without that the CNO running against the management cluster would pick the resources rendered by the hosted cluster CNO
 	cluster := names.StandAloneClusterName
 	if hcp := platform.NewHyperShiftConfig(); hcp.Enabled {
+		// retry every 5s up to 60s
+		var backoff = wait.Backoff{
+			Steps:    12,
+			Duration: 5 * time.Second,
+			Factor:   1.0,
+			Jitter:   0.1,
+		}
 		infraConfig := &configv1.Infrastructure{}
 
-		err := retry.OnError(retry.DefaultBackoff, func(error) bool { return true }, func() error {
+		err := retry.OnError(backoff, func(error) bool { return true }, func() error {
 			if err := o.client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
 				return fmt.Errorf("failed to get infrastructure 'cluster': %v", err)
 			}
