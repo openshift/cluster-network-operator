@@ -62,7 +62,6 @@ type OVNUpdateStatus struct {
 	IPFamilyMode         string
 	ClusterNetworkCIDRs  string
 	Progressing          bool
-	InterConnectEnabled  bool   // true if this ovnk component is running with --enable-interconnect
 	InterConnectZoneMode string // zone mode (singlezone, multizone) for this ovnk component
 }
 
