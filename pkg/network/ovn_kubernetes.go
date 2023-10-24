@@ -446,7 +446,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 	data.Data["OVNKubeConfigHash"] = hex.EncodeToString(h.Sum(nil))
 
-	var manifestSubDir string
 	manifestDirs := make([]string, 0, 2)
 	manifestDirs = append(manifestDirs, commonManifestDir)
 
@@ -454,12 +453,12 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled {
 		productFlavor = "managed"
 	}
-	manifestSubDirBasePath := filepath.Join("network/ovn-kubernetes", productFlavor)
+	manifestSubDirBasePath := filepath.Join(manifestDir, "network/ovn-kubernetes", productFlavor)
 
-	manifestDirs = append(manifestDirs, filepath.Join(manifestDir, manifestSubDirBasePath, "common"))
+	manifestDirs = append(manifestDirs, filepath.Join(manifestSubDirBasePath, "common"))
 
 	// choose the YAMLs based on the target zone mode (4.14 only) TODO: starting from 4.15, support multizone only
-	manifestSubDir = filepath.Join(manifestSubDirBasePath, "multi-zone-interconnect") // default is multizone
+	manifestSubDir := filepath.Join(manifestSubDirBasePath, "multi-zone-interconnect") // default is multizone
 	if targetZoneMode.zoneMode == zoneModeSingleZone {
 		// non-default, internal use only; this is selected in the first phase of an upgrade from a
 		// non-interconnect version (< 4.14) to an interconnect version (>= 4.14)
@@ -471,7 +470,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		manifestSubDir = filepath.Join(manifestSubDirBasePath, "multi-zone-interconnect-tmp")
 	}
 	klog.Infof("render YAMLs from %s folder", manifestSubDir)
-	manifestDirs = append(manifestDirs, filepath.Join(manifestDir, manifestSubDir))
+	manifestDirs = append(manifestDirs, manifestSubDir)
 
 	manifests, err := render.RenderDirs(manifestDirs, &data)
 	if err != nil {
@@ -486,7 +485,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	if len(bootstrapResult.OVN.OVNKubernetesConfig.SmartNicModeNodes) > 0 {
 		data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_SMART_NIC
-		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, manifestSubDir+"/ovnkube-node.yaml"), &data)
+		manifests, err = render.RenderTemplate(filepath.Join(manifestSubDir, "ovnkube-node.yaml"), &data)
 		if err != nil {
 			return nil, progressing, errors.Wrap(err, "failed to render manifests for smart-nic")
 		}
@@ -495,7 +494,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	if len(bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeNodes) > 0 {
 		data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_DPU_HOST
-		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, manifestSubDir+"/ovnkube-node.yaml"), &data)
+		manifests, err = render.RenderTemplate(filepath.Join(manifestSubDir, "ovnkube-node.yaml"), &data)
 		if err != nil {
 			return nil, progressing, errors.Wrap(err, "failed to render manifests for dpu-host")
 		}
