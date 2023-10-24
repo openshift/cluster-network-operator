@@ -1,0 +1,17 @@
+---
+# Following rules are applied to every pod with an MultiNetworkPolicy working on it, allowing 
+# a base networking that couldn't be expressed by the policy syntax.
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: multi-networkpolicy-custom-rules
+  namespace: openshift-multus
+data:
+  
+  custom-v6-rules.txt: |
+    # accept NDP
+    -p icmpv6 --icmpv6-type neighbor-solicitation -j ACCEPT
+    -p icmpv6 --icmpv6-type neighbor-advertisement -j ACCEPT
+    # accept RA/RS
+    -p icmpv6 --icmpv6-type router-solicitation -j ACCEPT
+    -p icmpv6 --icmpv6-type router-advertisement -j ACCEPT
