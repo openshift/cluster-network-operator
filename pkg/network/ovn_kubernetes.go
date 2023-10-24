@@ -409,8 +409,14 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = true
 	}
 
-	commonManifestDir := filepath.Join(manifestDir, "network/ovn-kubernetes/common")
+	//there only needs to be two cluster managers
+	clusterManagerReplicas := 2
+	if len(bootstrapResult.OVN.MasterAddresses) < 2 {
+		clusterManagerReplicas = len(bootstrapResult.OVN.MasterAddresses)
+	}
+	data.Data["ClusterManagerReplicas"] = clusterManagerReplicas
 
+	commonManifestDir := filepath.Join(manifestDir, "network/ovn-kubernetes/common")
 	cmPaths := []string{
 		filepath.Join(commonManifestDir, "008-script-lib.yaml"),
 	}
