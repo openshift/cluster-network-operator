@@ -1592,16 +1592,6 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		ipsecStatus.Version = ipsecHostDaemonSet.GetAnnotations()["release.openshift.io/version"]
 	}
 
-	// If we are upgrading from 4.13 -> 4.14 set new API for IP Forwarding mode to Global.
-	// This is to ensure backwards compatibility.
-	if masterStatus != nil {
-		klog.Infof("4.13 -> 4.14 upgrade detected. Will set IP Forwarding API to Global mode for backwards compatibility")
-		if conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig == nil {
-			conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig = &operv1.GatewayConfig{}
-		}
-		conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig.IPForwarding = operv1.IPForwardingGlobal
-	}
-
 	res := bootstrap.OVNBootstrapResult{
 		MasterAddresses:          ovnMasterAddresses,
 		ClusterInitiator:         clusterInitiator,
