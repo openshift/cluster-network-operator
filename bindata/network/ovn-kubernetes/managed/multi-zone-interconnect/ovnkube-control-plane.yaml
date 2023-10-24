@@ -19,8 +19,8 @@ spec:
   selector:
     matchLabels:
       app: ovnkube-control-plane
-  replicas: {{.OvnkubeMasterReplicas}}
-{{ if (gt .OvnkubeMasterReplicas 1)}}
+  replicas: {{.ClusterManagerReplicas}}
+{{ if (gt .ClusterManagerReplicas 1)}}
   strategy:
     type: RollingUpdate
     rollingUpdate:
