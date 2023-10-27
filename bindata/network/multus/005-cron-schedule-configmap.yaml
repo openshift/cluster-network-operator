@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{.CronSchedulerConfigmap}}
+  namespace: openshift-multus
+  annotations:
+    kubernetes.io/description: |
+      Configmap containing user customizable cronjob schedule
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+data:
+  cron_schedule: "30 4 * * *" 

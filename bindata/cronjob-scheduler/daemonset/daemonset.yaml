@@ -2,23 +2,28 @@
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: cni-sysctl-allowlist-ds
+  name: cron-scheduler-configmap-ds
   namespace: openshift-multus
 spec:
   selector:
     matchLabels:
-      app: cni-sysctl-allowlist-ds
+      app: cron-scheduler-configmap-ds
   template:
     metadata:
       labels:
-        app: cni-sysctl-allowlist-ds
-      annotations:
-        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        app: cron-scheduler-configmap-ds
     spec:
       containers:
-        - name: cni-sysctl-allowlist-pod
+        - name: cron-scheduler-configmap-pod
           image:  {{.MultusImage}}
-          command: ["/bin/bash", "-c", "cp /entrypoint/allowlist.conf /host/etc/cni/tuning/ && touch /ready/ready && sleep INF"]
+          command: ["/bin/bash", "-c"]
+          env:
+            # Define environment variables
+            - name: CRON_SCHEDULE
+              valueFrom:
+                configMapKeyRef: 
+                  name: cron-scheduler-configmap
+                  key: cron_schedule
           securityContext:
             privileged: true
           readinessProbe:
@@ -27,7 +32,7 @@ spec:
             initialDelaySeconds: 1
           volumeMounts:
             - mountPath: /entrypoint
-              name: cni-sysctl-allowlist
+              name: cron-scheduler-configmap
             - mountPath: /host/etc/cni/tuning/
               name: tuning-conf-dir
               readOnly: false
@@ -35,10 +40,13 @@ spec:
               name: ready
               readOnly: false
       volumes:
-        - name: cni-sysctl-allowlist
+        - name: cron-scheduler-configmap
           configMap:
-            name: {{.CniSysctlAllowlist}}
+            name: cron-scheduler-configmap
             namespace: openshift-multus
+            items: 
+            - key: "cron_schedule"
+              path: "cron_schedule"
           defaultMode: 0744
         - hostPath:
             path: /etc/cni/tuning/
@@ -46,4 +54,3 @@ spec:
           name: tuning-conf-dir
         - name: ready
           emptyDir: { }
-      priorityClassName: "openshift-user-critical"
