@@ -313,14 +313,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVNHybridOverlayVXLANPort"] = ""
 	}
 
-	// If IPsec is enabled for the first time, we start the daemonset. If it is
-	// disabled after that, we do not stop the daemonset but only stop IPsec.
-	//
-	// TODO: We need to do this as, by default, we maintain IPsec state on the
-	// node in order to maintain encrypted connectivity in the case of upgrades.
-	// If we only unrender the IPsec daemonset, we will be unable to cleanup
-	// the IPsec state on the node and the traffic will continue to be
-	// encrypted.
+	// When IPsec is configured to be disabled, then ensure ovnkube-node pods are rolled
+	// out first which configures OVN/OVS to disable IPsec. This would give enough room
+	// for OVS IPsec monitor script to disble IPsec on the dataplane. After this it is
+	// safe to remove IPsec daemonset pods.
+	var removeIPsecDaemonSet bool
 	if c.IPsecConfig != nil {
 		// IPsec is enabled
 		data.Data["OVNIPsecDaemonsetEnable"] = true
@@ -331,6 +328,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			// now it has been requested to be disabled
 			data.Data["OVNIPsecDaemonsetEnable"] = true
 			data.Data["OVNIPsecEnable"] = false
+			removeIPsecDaemonSet = true
 		} else {
 			// IPsec has never started
 			data.Data["OVNIPsecDaemonsetEnable"] = false
@@ -544,6 +542,37 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	renderPrePull := false
 	if updateNode {
 		updateNode, renderPrePull = shouldUpdateOVNKonPrepull(bootstrapResult.OVN, os.Getenv("RELEASE_VERSION"))
+	}
+
+	if removeIPsecDaemonSet && isNetworkRunning(bootstrapResult.OVN) {
+		kind := bootstrapResult.OVN.NodeUpdateStatus.Kind
+		namespace := bootstrapResult.OVN.NodeUpdateStatus.Namespace
+		name := bootstrapResult.OVN.NodeUpdateStatus.Name
+		if bootstrapResult.OVN.NodeUpdateStatus.IPsecMarkedForDeletion != "" {
+			// When ovnkube-node daemonset is seen with 'networkoperator.openshift.io/ipsec-ready-for-deletion' annotation,
+			// then go ahead with skip rendering IPsec daemonset and also remove annotation from ovnkube-node daemonset.
+			objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-host")
+			objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-containerized")
+			k8s.UpdateObjByGroupKindName(objs, "apps", kind, namespace, name, func(o *uns.Unstructured) {
+				anno := o.GetAnnotations()
+				if anno == nil {
+					anno = map[string]string{}
+				}
+				delete(anno, names.IPsecDeleteAnnotation)
+				o.SetAnnotations(anno)
+			})
+		} else {
+			// When OVN IPsec disable option is completely rolled out into ovnkube-node pods, then update ovnkube-node
+			// daemonset with 'networkoperator.openshift.io/ipsec-ready-for-deletion' annotation.
+			k8s.UpdateObjByGroupKindName(objs, "apps", kind, namespace, name, func(o *uns.Unstructured) {
+				anno := o.GetAnnotations()
+				if anno == nil {
+					anno = map[string]string{}
+				}
+				anno[names.IPsecDeleteAnnotation] = "true"
+				o.SetAnnotations(anno)
+			})
+		}
 	}
 
 	klog.Infof("ovnk components: ovnkube-node: isRunning=%t, update=%t; ovnkube-master: isRunning=%t, update=%t; ovnkube-control-plane: isRunning=%t, update=%t",
@@ -1545,9 +1574,10 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		nodeStatus.Progressing = daemonSetProgressing(nodeDaemonSet, true)
 		nodeStatus.InterConnectEnabled = isInterConnectEnabledOnNodeDaemonset(nodeDaemonSet)
 		nodeStatus.InterConnectZoneMode = string(getInterConnectZoneModeForNodeDaemonSet(nodeDaemonSet))
+		nodeStatus.IPsecMarkedForDeletion = nodeDaemonSet.GetAnnotations()[names.IPsecDeleteAnnotation]
 
-		klog.Infof("ovnkube-node DaemonSet status: IC=%t,  zone-mode=%s, progressing=%t",
-			nodeStatus.InterConnectEnabled, nodeStatus.InterConnectZoneMode, nodeStatus.Progressing)
+		klog.Infof("ovnkube-node DaemonSet status: IC=%t,  zone-mode=%s, ipsec-ready-for-deletion=%s, progressing=%t",
+			nodeStatus.InterConnectEnabled, nodeStatus.InterConnectZoneMode, nodeStatus.IPsecMarkedForDeletion, nodeStatus.Progressing)
 
 	}
 
@@ -1590,6 +1620,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		ipsecStatus.Name = ipsecHostDaemonSet.Name
 		ipsecStatus.IPFamilyMode = ipsecHostDaemonSet.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
 		ipsecStatus.Version = ipsecHostDaemonSet.GetAnnotations()["release.openshift.io/version"]
+		ipsecStatus.IPsecMarkedForDeletion = ipsecHostDaemonSet.GetAnnotations()[names.IPsecDeleteAnnotation]
 	}
 
 	// If we are upgrading from 4.13 -> 4.14 set new API for IP Forwarding mode to Global.
@@ -2557,6 +2588,14 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 	}
 	return nil
 
+}
+
+// isNetworkRunning returns true if all ovn-kube control-plane/master and node pods are running,
+// otherwise returns false.
+func isNetworkRunning(ovn bootstrap.OVNBootstrapResult) bool {
+	return ((ovn.MasterUpdateStatus != nil && !ovn.MasterUpdateStatus.Progressing) ||
+		(ovn.ControlPlaneUpdateStatus != nil && !ovn.ControlPlaneUpdateStatus.Progressing)) &&
+		ovn.NodeUpdateStatus != nil && !ovn.NodeUpdateStatus.Progressing
 }
 
 // hack to trigger pod status update so that cno status reports new version at the very end of the upgrade to interconnect
