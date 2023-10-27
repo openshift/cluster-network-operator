@@ -1,8 +1,9 @@
-package allowlist
+package cronjob_scheduler
 
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -24,7 +25,6 @@ import (
 	v1coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -35,22 +35,22 @@ import (
 )
 
 const (
-	allowlistDsName      = "cni-sysctl-allowlist-ds"
-	allowlistAnnotation  = "app=cni-sysctl-allowlist-ds"
-	manifestDir          = "bindata/allowlist/daemonset"
-	allowlistManifestDir = "bindata/network/multus/004-sysctl-configmap.yaml"
+	manifestDir              = "bindata/cronjob-scheduler/daemonset"
+	cronConfigmapDsName      = "cron-scheduler-configmap-ds"
+	cronConfigmapManifestDir = "bindata/cronjob-scheduler/config/configmap.yaml"
+	cronAnnotation           = "app=cron-scheduler-configmap-ds"
 )
 
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) error {
 	return add(mgr, newReconciler(mgr, status, c))
 }
 
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) *ReconcileAllowlist {
-	return &ReconcileAllowlist{client: c, scheme: mgr.GetScheme(), status: status}
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) *ReconcileCronjobScheduler {
+	return &ReconcileCronjobScheduler{client: c, scheme: mgr.GetScheme(), status: status}
 }
 
-func add(mgr manager.Manager, r *ReconcileAllowlist) error {
-	c, err := controller.New("allowlist-controller", mgr, controller.Options{Reconciler: r})
+func add(mgr manager.Manager, r *ReconcileCronjobScheduler) error {
+	c, err := controller.New("cronjob-scheduler-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -68,39 +68,37 @@ func add(mgr manager.Manager, r *ReconcileAllowlist) error {
 		&handler.EnqueueRequestForObject{},
 		predicate.ResourceVersionChangedPredicate{},
 		predicate.NewPredicateFuncs(func(object crclient.Object) bool {
-			// Only care about cni-sysctl-allowlist, but also watching for default-cni-sysctl-allowlist
-			// as a trigger for creating cni-sysctl-allowlist if it doesn't exist
-			return (strings.Contains(object.GetName(), names.ALLOWLIST_CONFIG_NAME))
-
+			return (strings.Contains(object.GetName(), names.CRON_SCHEDULER_CONFIG_NAME))
 		}),
 	)
 }
 
-var _ reconcile.Reconciler = &ReconcileAllowlist{}
-
-type ReconcileAllowlist struct {
+type ReconcileCronjobScheduler struct {
 	client cnoclient.Client
 	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
 }
 
-func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileCronjobScheduler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
+
+	log.Printf("Reconciling Network.operator.openshift.io %s\n", request.Name)
+
 	if exists, err := daemonsetConfigExists(ctx, r.client); !exists {
-		err = createObjects(ctx, r.client, allowlistManifestDir)
+		err = createObjects(ctx, r.client, cronConfigmapManifestDir)
 		if err != nil {
-			klog.Errorf("Failed to create allowlist config map: %v", err)
+			klog.Errorf("Failed to create cronjob scheduler config map: %v", err)
 			return reconcile.Result{}, err
 		}
 	} else if err != nil {
-		klog.Errorf("Failed to look up allowlist config map: %v", err)
+		klog.Errorf("Failed to look up cronjob scheduler config map: %v", err)
 		return reconcile.Result{}, err
 	}
 
-	if request.Name != names.ALLOWLIST_CONFIG_NAME {
+	if request.Namespace != names.MULTUS_NAMESPACE || request.Name != names.CRON_SCHEDULER_CONFIG_NAME {
 		return reconcile.Result{}, nil
 	}
-	klog.Infof("Reconcile allowlist for %s/%s", request.Namespace, request.Name)
+	klog.Infof("Reconcile cronjob scheduler for %s/%s", request.Namespace, request.Name)
 
 	configMap, err := getConfig(ctx, r.client, request.NamespacedName)
 	if err != nil {
@@ -108,7 +106,7 @@ func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	// No action to be taken if user deletes the config map. The sysctl's will stay unmodified until config map is recreated
+	// No action to be taken if user deletes the config map. The cron_schedule value will stay unmodified until config map is recreated
 	if configMap == nil {
 		return reconcile.Result{}, nil
 	}
@@ -118,17 +116,17 @@ func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Re
 	// If daemonset still exists, delete it and reconcile again
 	ds, err := getDaemonSet(ctx, r.client)
 	if err != nil {
-		klog.Errorf("Failed to look up allowlist daemonset: %v", err)
+		klog.Errorf("Failed to look up cronjob scheduler daemonset: %v", err)
 		return reconcile.Result{}, err
 	}
 	if ds != nil {
-		klog.Errorln("Allowlist daemonset already exists: deleting and retrying")
+		klog.Errorln("Cronjob scheduler daemonset already exists: deleting and retrying")
 		return reconcile.Result{}, errors.New("retrying")
 	}
 
 	err = createObjects(ctx, r.client, manifestDir)
 	if err != nil {
-		klog.Errorf("Failed to create allowlist daemonset: %v", err)
+		klog.Errorf("Failed to create cronjob scheduler daemonset: %v", err)
 		return reconcile.Result{}, err
 	}
 
@@ -139,19 +137,20 @@ func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Re
 	// https://issues.redhat.com/browse/OCPBUGS-15818
 	err = checkDsPodsReady(ctx, r.client)
 	if err != nil {
-		klog.Errorf("Failed to verify ready status on allowlist daemonset pods: %v", err)
+		klog.Errorf("Failed to verify ready status on cronjob scheduler daemonset pods: %v", err)
 		return reconcile.Result{}, nil
 	}
 
-	klog.Infoln("Successfully updated sysctl allowlist")
+	klog.Infoln("Successfully updated cronjob scheduler configmap")
 	return reconcile.Result{}, nil
 }
 
 func createObjects(ctx context.Context, client cnoclient.Client, manifestDir string) error {
 	data := render.MakeRenderData()
 	data.Data["MultusImage"] = os.Getenv("MULTUS_IMAGE")
-	data.Data["CniSysctlAllowlist"] = names.ALLOWLIST_CONFIG_NAME
+	data.Data["CronSchedulerConfigmap"] = names.CRON_SCHEDULER_CONFIG_NAME
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
+	data.Data["UserEditableCronSchedulerConfigmap"] = names.USER_EDITABLE_CRON_SCHEDULER_CONFIGMAP
 	manifests, err := render.RenderDir(manifestDir, &data)
 	if err != nil {
 		return err
@@ -197,7 +196,7 @@ func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
 		}
 
 		podList, err := client.Default().Kubernetes().CoreV1().Pods(names.MULTUS_NAMESPACE).List(
-			ctx, metav1.ListOptions{LabelSelector: allowlistAnnotation})
+			ctx, metav1.ListOptions{LabelSelector: cronAnnotation})
 		if err != nil {
 			return false, err
 		}
@@ -223,20 +222,20 @@ func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
 func cleanup(ctx context.Context, client cnoclient.Client) {
 	ds, err := getDaemonSet(ctx, client)
 	if err != nil {
-		klog.Errorf("Error looking up allowlist daemonset : %+v", err)
+		klog.Errorf("Error looking up cron scheduler daemonset : %+v", err)
 		return
 	}
 	if ds != nil {
 		err = deleteDaemonSet(ctx, client)
 		if err != nil {
-			klog.Errorf("Error cleaning up allow list daemonset: %+v", err)
+			klog.Errorf("Error cleaning up cron scheduler list daemonset: %+v", err)
 		}
 	}
 }
 
 func deleteDaemonSet(ctx context.Context, client cnoclient.Client) error {
 	err := client.Default().Kubernetes().AppsV1().DaemonSets(names.MULTUS_NAMESPACE).Delete(
-		ctx, allowlistDsName, metav1.DeleteOptions{})
+		ctx, cronConfigmapDsName, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
@@ -245,7 +244,7 @@ func deleteDaemonSet(ctx context.Context, client cnoclient.Client) error {
 
 func getDaemonSet(ctx context.Context, client cnoclient.Client) (*appsv1.DaemonSet, error) {
 	ds, err := client.Default().Kubernetes().AppsV1().DaemonSets(names.MULTUS_NAMESPACE).Get(
-		ctx, allowlistDsName, metav1.GetOptions{})
+		ctx, cronConfigmapDsName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil
@@ -257,7 +256,7 @@ func getDaemonSet(ctx context.Context, client cnoclient.Client) (*appsv1.DaemonS
 
 func daemonsetConfigExists(ctx context.Context, client cnoclient.Client) (bool, error) {
 	cm, err := client.Default().Kubernetes().CoreV1().ConfigMaps(names.MULTUS_NAMESPACE).Get(
-		ctx, names.ALLOWLIST_CONFIG_NAME, metav1.GetOptions{})
+		ctx, names.CRON_SCHEDULER_CONFIG_NAME, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return false, nil

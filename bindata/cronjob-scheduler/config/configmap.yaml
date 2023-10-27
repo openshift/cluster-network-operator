@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cron-scheduler-configmap
+  namespace: openshift-multus
+  annotations:
+    kubernetes.io/description: |
+      Configmap containing user customizable cronjob schedule
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+data:
+  cron_schedule: "30 4 * * *" # Default schedule is once per day at 4:30am. Users may configure this value to their liking.
