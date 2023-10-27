@@ -121,6 +121,7 @@ spec:
       nodeSelector:
         node-role.kubernetes.io/master: ""
       priorityClassName: "system-cluster-critical"
+      serviceAccountName: cluster-network-operator
       volumes:
         - name: host-etc-kube
           hostPath:
