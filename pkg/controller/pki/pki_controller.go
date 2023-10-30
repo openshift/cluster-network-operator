@@ -227,7 +227,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			Client:        clientset.CoreV1(),
 			EventRecorder: &eventrecorder.LoggingRecorder{},
 		},
-		nil, // no operatorclient needed
+		&eventrecorder.LoggingRecorder{}, // no operatorclient needed
 		&eventrecorder.LoggingRecorder{},
 	)
 

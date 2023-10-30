@@ -26,6 +26,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	op_netopv1 "github.com/openshift/api/networkoperator/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
@@ -45,6 +46,7 @@ func init() {
 	utilruntime.Must(netopv1.Install(scheme.Scheme))
 	utilruntime.Must(machineapi.AddToScheme(scheme.Scheme))
 	utilruntime.Must(op_netopv1.Install(scheme.Scheme))
+	utilruntime.Must(machineconfigv1.Install(scheme.Scheme))
 }
 
 // OperatorClusterClient is a bag of holding for object clients & informers.

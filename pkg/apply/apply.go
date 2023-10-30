@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-	utilpointer "k8s.io/utils/pointer"
+	utilpointer "k8s.io/utils/ptr"
 )
 
 type Object interface {
@@ -116,7 +116,7 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 	// Use server-side apply to merge the desired object with the object on disk
 	patchOptions := metav1.PatchOptions{
 		// It is considered best-practice for controllers to force
-		Force:        utilpointer.Bool(true),
+		Force:        utilpointer.To(true),
 		FieldManager: fieldManager,
 	}
 	// Send the full object to be applied on the server side.

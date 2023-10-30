@@ -6,6 +6,7 @@ import (
 	"os"
 
 	configv1 "github.com/openshift/api/config/v1"
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -21,6 +22,11 @@ var cloudProviderConfig = types.NamespacedName{
 	Namespace: "openshift-config-managed",
 	Name:      "kube-cloud-config",
 }
+
+var (
+	MasterMCOIPSecExtensionName = "80-master-extensions"
+	WorkerMCOIPSecExtensionName = "80-worker-extensions"
+)
 
 // isNetworkNodeIdentityEnabled determines if network node identity should be enabled.
 // It checks the `enabled` key in the network-node-identity/openshift-network-operator configmap.
@@ -122,6 +128,46 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		return nil, fmt.Errorf("failed to determine if network node identity should be enabled: %w", err)
 	}
 	res.NetworkNodeIdentityEnabled = netIDEnabled
+
+	masterIPsecMachineConfig := &machineconfigv1.MachineConfig{}
+	if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: MasterMCOIPSecExtensionName}, masterIPsecMachineConfig); err != nil {
+		if apierrors.IsNotFound(err) {
+			res.MasterIPsecMachineConfig = nil
+		} else {
+			return nil, fmt.Errorf("failed to get ipsec machine config for master: %v", err)
+		}
+	} else {
+		res.MasterIPsecMachineConfig = masterIPsecMachineConfig
+	}
+
+	workerIPsecMachineConfig := &machineconfigv1.MachineConfig{}
+	if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: WorkerMCOIPSecExtensionName}, workerIPsecMachineConfig); err != nil {
+		if apierrors.IsNotFound(err) {
+			res.WorkerIPsecMachineConfig = nil
+		} else {
+			return nil, fmt.Errorf("failed to get ipsec machine config for worker: %v", err)
+		}
+	} else {
+		res.WorkerIPsecMachineConfig = workerIPsecMachineConfig
+	}
+
+	mcpMaster := &machineconfigv1.MachineConfigPool{}
+	if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "master"}, mcpMaster); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to get machine config pool for master: %v", err)
+		}
+	}
+	klog.Infof("****machine config pool for master: %v", mcpMaster.Status)
+	res.MasterMCPStatus = mcpMaster.Status
+
+	mcpWorker := &machineconfigv1.MachineConfigPool{}
+	if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "worker"}, mcpWorker); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to get machine config pool for worker: %v", err)
+		}
+	}
+	klog.Infof("****machine config pool for worker: %v", mcpWorker.Status)
+	res.WorkerMCPStatus = mcpWorker.Status
 
 	return res, nil
 }

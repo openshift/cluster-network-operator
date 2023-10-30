@@ -20,6 +20,7 @@ import (
 
 	yaml "github.com/ghodss/yaml"
 	configv1 "github.com/openshift/api/config/v1"
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
@@ -319,16 +320,20 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// If we only unrender the IPsec daemonset, we will be unable to cleanup
 	// the IPsec state on the node and the traffic will continue to be
 	// encrypted.
+	var renderIPsecDaemonSet bool
 	if c.IPsecConfig != nil {
 		// IPsec is enabled
 		data.Data["OVNIPsecDaemonsetEnable"] = true
-		data.Data["OVNIPsecEnable"] = true
+		// Enable OVNIPsecEnable on when infra is ready for IPsec configuration.
+		data.Data["OVNIPsecEnable"] = canRenderIPsecConfig(bootstrapResult.Infra)
+		renderIPsecDaemonSet = true
 	} else {
 		if bootstrapResult.OVN.IPsecUpdateStatus != nil {
 			// IPsec has previously started and
 			// now it has been requested to be disabled
 			data.Data["OVNIPsecDaemonsetEnable"] = true
 			data.Data["OVNIPsecEnable"] = false
+			renderIPsecDaemonSet = true
 		} else {
 			// IPsec has never started
 			data.Data["OVNIPsecDaemonsetEnable"] = false
@@ -524,6 +529,40 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	renderPrePull := false
 	if updateNode {
 		updateNode, renderPrePull = shouldUpdateOVNKonPrepull(bootstrapResult.OVN, os.Getenv("RELEASE_VERSION"))
+	}
+
+	var renderMachineConfig bool
+	if renderIPsecDaemonSet {
+		renderIPsecDaemonSet, renderMachineConfig = shouldUpdateIPSecAndMachineConfig(bootstrapResult.Infra)
+		klog.Infof("****enableIPSec %t, renderMachineConfig %t", renderIPsecDaemonSet, renderMachineConfig)
+		if !renderIPsecDaemonSet && bootstrapResult.OVN.IPsecUpdateStatus != nil {
+			// This is the upgrade scenario. Both master and worker machine config pool are not ready.
+			// Hence continue to use existing ipsec daemonset until mcp is ready.
+			updateNode, updateMaster, updateControlPlane = false, false, false
+			klog.Infof("****annotate local copy of ovn-ipsec-host DaemonSet with create-only")
+			kind := bootstrapResult.OVN.IPsecUpdateStatus.Kind
+			namespace := bootstrapResult.OVN.IPsecUpdateStatus.Namespace
+			name := bootstrapResult.OVN.IPsecUpdateStatus.Name
+			k8s.UpdateObjByGroupKindName(objs, "apps", kind, namespace, name, func(o *uns.Unstructured) {
+				anno := o.GetAnnotations()
+				if anno == nil {
+					anno = map[string]string{}
+				}
+				anno[names.CreateOnlyAnnotation] = "true" // skip if annotated and object exists already
+				o.SetAnnotations(anno)
+			})
+		} else if !renderIPsecDaemonSet {
+			// This is a fresh cluster install, so skip rendering ipsec daemonset until master and worker
+			// machine config pool are ready.
+			klog.Infof("****skip rendering ipsec daemonset config")
+			objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-host")
+		}
+	}
+
+	if !renderMachineConfig {
+		klog.Infof("****skip rendering ipsec machine config")
+		objs = k8s.RemoveObjByGroupKindName(objs, "machineconfiguration.openshift.io", "MachineConfig", "", platform.MasterMCOIPSecExtensionName)
+		objs = k8s.RemoveObjByGroupKindName(objs, "machineconfiguration.openshift.io", "MachineConfig", "", platform.WorkerMCOIPSecExtensionName)
 	}
 
 	klog.Infof("ovnk components: ovnkube-node: isRunning=%t, update=%t; ovnkube-master: isRunning=%t, update=%t; ovnkube-control-plane: isRunning=%t, update=%t",
@@ -1567,6 +1606,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 			ipsecStatus = nil
 		}
 	} else {
+		ipsecStatus.Kind = "DaemonSet"
 		ipsecStatus.Namespace = ipsecHostDaemonSet.Namespace
 		ipsecStatus.Name = ipsecHostDaemonSet.Name
 		ipsecStatus.IPFamilyMode = ipsecHostDaemonSet.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
@@ -1912,6 +1952,42 @@ func shouldUpdateOVNKonPrepull(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 
 	klog.Infof("OVN-Kube upgrades-prepuller daemonset rollout complete, now starting node rollouts")
 	return true, false
+}
+
+// shouldUpdateIPSecAndMachineConfig checks if both master and worker's machine config pool are ready with
+// ipsec machine config extension rolled out. If that is the case, both enableIPSec and renderMachineConfig
+// are returned with true.
+// If the cluster is in upgraded state, but not installed with ipsec extension (or) ipsec extension rollout
+// is in progress then enableIPSec and renderMachineConfig are returned with false and true respectively.
+// For other cases, both enableIPSec and renderMachineConfig are returned with false.
+func shouldUpdateIPSecAndMachineConfig(infra bootstrap.InfraStatus) (enableIPSec, renderMachineConfig bool) {
+	if canRenderIPsecConfig(infra) {
+		return true, true
+	} else if (infra.MasterMCPStatus.MachineCount == infra.MasterMCPStatus.ReadyMachineCount &&
+		infra.WorkerMCPStatus.MachineCount == infra.WorkerMCPStatus.ReadyMachineCount) ||
+		(infra.MasterIPsecMachineConfig != nil && infra.WorkerIPsecMachineConfig != nil) {
+		return false, true
+	}
+	return false, false
+}
+
+func canRenderIPsecConfig(infra bootstrap.InfraStatus) bool {
+	ipSecPluginOnMasterNodes := hasIPSecExtensionInMachineConfigStatus(infra.MasterMCPStatus, platform.MasterMCOIPSecExtensionName)
+	klog.Infof("Is ipsec plugin available on master nodes, %v: %t", infra.MasterMCPStatus, ipSecPluginOnMasterNodes)
+	ipSecPluginOnWorkerNodes := hasIPSecExtensionInMachineConfigStatus(infra.WorkerMCPStatus, platform.WorkerMCOIPSecExtensionName)
+	klog.Infof("Is ipsec plugin available on worker nodes, %v:%t", infra.WorkerMCPStatus, ipSecPluginOnWorkerNodes)
+	return infra.MasterMCPStatus.MachineCount == infra.MasterMCPStatus.ReadyMachineCount &&
+		infra.WorkerMCPStatus.MachineCount == infra.WorkerMCPStatus.ReadyMachineCount &&
+		ipSecPluginOnMasterNodes && ipSecPluginOnWorkerNodes
+}
+
+func hasIPSecExtensionInMachineConfigStatus(machineConfigStatus machineconfigv1.MachineConfigPoolStatus, ipsecExtension string) bool {
+	for _, source := range machineConfigStatus.Configuration.Source {
+		if source.Name == ipsecExtension {
+			return true
+		}
+	}
+	return false
 }
 
 // shouldUpdateOVNKonUpgrade determines if we should roll out changes to

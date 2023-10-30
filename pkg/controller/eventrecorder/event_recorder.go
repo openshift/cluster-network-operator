@@ -46,3 +46,7 @@ func (r *LoggingRecorder) Shutdown() {
 func (r *LoggingRecorder) WithContext(_ context.Context) events.Recorder {
 	return r
 }
+
+func (r *LoggingRecorder) Report(ctx context.Context, syncErr error) (updated bool, updateErr error) {
+	return true, nil
+}
