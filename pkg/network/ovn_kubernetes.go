@@ -1991,13 +1991,21 @@ func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResu
 
 		} else if ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) {
 			// Second step, node is already multizone: add control plane only if node DaemonSet is done progressing
-			if ovn.NodeUpdateStatus.Progressing {
+			// *********** TODO this might be problematic for other updates: CNO would be thinking that we're updating
+			// the zone mode, while we're not ************
+
+			// TODO: TRY OUT the new condition below
+			// we're really migrating to multizone and stuck in phase 1 (node is rolling out) if also control plane is NOT running yet
+			// and master is running
+			// TODO you might also add: master is NOT progressing... to try out!!
+			if ovn.NodeUpdateStatus.Progressing && ovn.ControlPlaneUpdateStatus == nil && ovn.MasterUpdateStatus != nil && !ovn.MasterUpdateStatus.Progressing {
 				klog.Infof("target=multizone: wait for multizone ovnkube-node to roll out before rolling "+
 					"out ovnkube-control-plane (%s)", getProgressingState(ovn))
 				return true, false, false
 			}
-			klog.Infof("target=multizone: ovnkube-node is already multizone, add ovnkube-control-plane " +
-				"if not already present")
+			if ovn.ControlPlaneUpdateStatus == nil || ovn.ControlPlaneUpdateStatus.Progressing {
+				klog.Infof("target=multizone: ovnkube-node is already multizone, add ovnkube-control-plane")
+			}
 			return true, true, true
 		} else {
 			klog.Warningf("target=multizone: undefined zone mode for ovnkube-node")
@@ -2010,7 +2018,9 @@ func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResu
 
 		// Node is already single zone, nothing to do.
 		if ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeSingleZone) {
-			klog.Infof("target=singlezone: ovnkube-node DaemonSet is already single zone")
+			if ovn.NodeUpdateStatus.Progressing {
+				klog.Infof("target=singlezone: ovnkube-node DaemonSet is progressing in single zone mode")
+			}
 			return true, true, true
 
 		} else if ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) {
