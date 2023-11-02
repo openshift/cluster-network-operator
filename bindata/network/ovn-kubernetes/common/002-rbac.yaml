@@ -125,7 +125,6 @@ rules:
   verbs:
     - create
     - get
-    - update
     - list
 
 ---
