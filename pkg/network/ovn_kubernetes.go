@@ -324,7 +324,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	if c.IPsecConfig != nil {
 		// IPsec is enabled
 		data.Data["OVNIPsecDaemonsetEnable"] = true
-		// Enable OVNIPsecEnable on when infra is ready for IPsec configuration.
+		// Enable OVNIPsecEnable only when infra is ready for IPsec configuration.
 		data.Data["OVNIPsecEnable"] = canRenderIPsecConfig(bootstrapResult.Infra)
 		renderIPsecDaemonSet = true
 	} else {
@@ -535,27 +535,50 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	if renderIPsecDaemonSet {
 		renderIPsecDaemonSet, renderMachineConfig = shouldUpdateIPSecAndMachineConfig(bootstrapResult.Infra)
 		klog.Infof("****enableIPSec %t, renderMachineConfig %t", renderIPsecDaemonSet, renderMachineConfig)
-		if !renderIPsecDaemonSet && bootstrapResult.OVN.IPsecUpdateStatus != nil {
+		if renderIPsecDaemonSet {
+			// The cluster is ready IPsec config rollout, so it's enough to render only ipsec host
+			// daemonset for cluster version >= 4.15, skip rendering other ipsec daemonset versions.
+			klog.Infof("****render only ipsec host daemonset config")
+			objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-containerized")
+			objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec")
+		} else if bootstrapResult.OVN.IPsecUpdateStatus != nil {
 			// This is the upgrade scenario. Both master and worker machine config pool are not ready.
-			// Hence continue to use existing ipsec daemonset until mcp is ready.
+			// Hence continue to use existing ipsec daemonset until machine config pool are ready.
 			updateNode, updateMaster, updateControlPlane = false, false, false
-			klog.Infof("****annotate local copy of ovn-ipsec-host DaemonSet with create-only")
+			klog.Infof("****annotate local copy of ipsec DaemonSets with create-only")
 			kind := bootstrapResult.OVN.IPsecUpdateStatus.Kind
 			namespace := bootstrapResult.OVN.IPsecUpdateStatus.Namespace
-			name := bootstrapResult.OVN.IPsecUpdateStatus.Name
-			k8s.UpdateObjByGroupKindName(objs, "apps", kind, namespace, name, func(o *uns.Unstructured) {
+			k8s.UpdateObjByGroupKindName(objs, "apps", kind, namespace, "ovn-ipsec-host", func(o *uns.Unstructured) {
 				anno := o.GetAnnotations()
 				if anno == nil {
 					anno = map[string]string{}
 				}
-				anno[names.CreateOnlyAnnotation] = "true" // skip if annotated and object exists already
+				anno[names.CreateOnlyAnnotation] = "true"
 				o.SetAnnotations(anno)
 			})
-		} else if !renderIPsecDaemonSet {
+			k8s.UpdateObjByGroupKindName(objs, "apps", kind, namespace, "ovn-ipsec-containerized", func(o *uns.Unstructured) {
+				anno := o.GetAnnotations()
+				if anno == nil {
+					anno = map[string]string{}
+				}
+				anno[names.CreateOnlyAnnotation] = "true"
+				o.SetAnnotations(anno)
+			})
+			k8s.UpdateObjByGroupKindName(objs, "apps", kind, namespace, "ovn-ipsec", func(o *uns.Unstructured) {
+				anno := o.GetAnnotations()
+				if anno == nil {
+					anno = map[string]string{}
+				}
+				anno[names.CreateOnlyAnnotation] = "true"
+				o.SetAnnotations(anno)
+			})
+		} else {
 			// This is a fresh cluster install, so skip rendering ipsec daemonset until master and worker
 			// machine config pool are ready.
-			klog.Infof("****skip rendering ipsec daemonset config")
+			klog.Infof("****skip rendering ipsec daemonset configs")
 			objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-host")
+			objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-containerized")
+			objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec")
 		}
 	}
 
@@ -1592,14 +1615,14 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		prepullerStatus.Progressing = daemonSetProgressing(prePullerDaemonSet, true)
 	}
 
-	ipsecHostDaemonSet := &appsv1.DaemonSet{
+	ipsecDaemonSet := &appsv1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
 	}
 	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec-host"}
-	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecHostDaemonSet); err != nil {
+	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecDaemonSet); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("Failed to retrieve existing ipsec DaemonSet: %w", err)
 		} else {
@@ -1607,10 +1630,28 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		}
 	} else {
 		ipsecStatus.Kind = "DaemonSet"
-		ipsecStatus.Namespace = ipsecHostDaemonSet.Namespace
-		ipsecStatus.Name = ipsecHostDaemonSet.Name
-		ipsecStatus.IPFamilyMode = ipsecHostDaemonSet.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
-		ipsecStatus.Version = ipsecHostDaemonSet.GetAnnotations()["release.openshift.io/version"]
+		ipsecStatus.Namespace = ipsecDaemonSet.Namespace
+		ipsecStatus.Name = ipsecDaemonSet.Name
+		ipsecStatus.IPFamilyMode = ipsecDaemonSet.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+		ipsecStatus.Version = ipsecDaemonSet.GetAnnotations()["release.openshift.io/version"]
+	}
+
+	// The IPsec daemonset name is ovn-ipsec if we are upgrading from <= 4.13.
+	if ipsecStatus == nil {
+		nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec"}
+		if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecDaemonSet); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("Failed to retrieve existing pre-4.14 ipsec DaemonSet: %w", err)
+			} else {
+				ipsecStatus = nil
+			}
+		} else {
+			ipsecStatus.Kind = "DaemonSet"
+			ipsecStatus.Namespace = ipsecDaemonSet.Namespace
+			ipsecStatus.Name = ipsecDaemonSet.Name
+			ipsecStatus.IPFamilyMode = ipsecDaemonSet.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+			ipsecStatus.Version = ipsecDaemonSet.GetAnnotations()["release.openshift.io/version"]
+		}
 	}
 
 	/*
