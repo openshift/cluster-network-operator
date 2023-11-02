@@ -336,6 +336,16 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		}
 	}
 
+	if c.IPSecExternConfig != nil {
+		data.Data["OVNIPsecDaemonsetEnable"] = true
+		//TODO: Remove
+		klog.Infof("DBG-Josh: IPsec NS enabled: %t", data.Data["OVNIPsecDaemonsetEnable"])
+	} else {
+		// Intentionally kept empty in case it was enebled before
+	}
+
+	klog.Infof("IPSec: IPSecEnabe [%t], IPSecDaemonsetEnable [%t]", data.Data["OVNIPsecEnable"], data.Data["OVNIPsecDaemonsetEnable"])
+
 	if c.GatewayConfig != nil && c.GatewayConfig.RoutingViaHost {
 		data.Data["OVN_GATEWAY_MODE"] = OVN_LOCAL_GW_MODE
 	} else {

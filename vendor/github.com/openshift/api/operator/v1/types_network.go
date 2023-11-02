@@ -440,6 +440,10 @@ type OVNKubernetesConfig struct {
 	// cluster.
 	// +optional
 	IPsecConfig *IPsecConfig `json:"ipsecConfig,omitempty"`
+	// ipsecExternConfig enables and configures NS IPsec for the host on the
+	// host network with external peers.
+	// +optional
+	IPSecExternConfig *IPSecExternConfig `json:"ipsecExternConfig,omitempty"`
 	// policyAuditConfig is the configuration for network policy audit events. If unset,
 	// reported defaults are used.
 	// +optional
@@ -478,6 +482,9 @@ type HybridOverlayConfig struct {
 }
 
 type IPsecConfig struct {
+}
+
+type IPSecExternConfig struct {
 }
 
 type IPForwardingMode string
