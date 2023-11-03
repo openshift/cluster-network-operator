@@ -13,12 +13,18 @@ github.com/Masterminds/sprig/v3
 # github.com/NYTimes/gziphandler v1.1.1
 ## explicit; go 1.11
 github.com/NYTimes/gziphandler
+# github.com/ajeddeloh/go-json v0.0.0-20200220154158-5ae607161559
+## explicit
+github.com/ajeddeloh/go-json
 # github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df
 ## explicit; go 1.18
 github.com/antlr/antlr4/runtime/Go/antlr/v4
 # github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 ## explicit; go 1.13
 github.com/asaskevich/govalidator
+# github.com/aws/aws-sdk-go v1.44.204
+## explicit; go 1.11
+github.com/aws/aws-sdk-go/aws/arn
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -31,17 +37,89 @@ github.com/cenkalti/backoff/v4
 # github.com/cespare/xxhash/v2 v2.2.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
+# github.com/clarketm/json v1.17.1
+## explicit
+github.com/clarketm/json
 # github.com/containernetworking/cni v0.8.0
 ## explicit
 github.com/containernetworking/cni/pkg/types
+# github.com/coreos/fcct v0.5.0
+## explicit; go 1.12
+github.com/coreos/fcct/base/v0_1
+github.com/coreos/fcct/translate
+# github.com/coreos/go-json v0.0.0-20230131223807-18775e0fb4fb
+## explicit; go 1.18
+github.com/coreos/go-json
 # github.com/coreos/go-semver v0.3.1
 ## explicit; go 1.8
 github.com/coreos/go-semver/semver
+# github.com/coreos/go-systemd v0.0.0-20190719114852-fd7a80b32e1f
+## explicit
+github.com/coreos/go-systemd/unit
 # github.com/coreos/go-systemd/v22 v22.5.0
 ## explicit; go 1.12
 github.com/coreos/go-systemd/v22/daemon
 github.com/coreos/go-systemd/v22/journal
-# github.com/davecgh/go-spew v1.1.1
+github.com/coreos/go-systemd/v22/unit
+# github.com/coreos/ign-converter v0.0.0-20230417193809-cee89ea7d8ff
+## explicit; go 1.18
+github.com/coreos/ign-converter/translate/v23tov30
+github.com/coreos/ign-converter/translate/v32tov22
+github.com/coreos/ign-converter/translate/v32tov31
+github.com/coreos/ign-converter/translate/v33tov32
+github.com/coreos/ign-converter/translate/v34tov33
+github.com/coreos/ign-converter/util
+# github.com/coreos/ignition v0.35.0
+## explicit
+github.com/coreos/ignition/config/shared/errors
+github.com/coreos/ignition/config/shared/validations
+github.com/coreos/ignition/config/util
+github.com/coreos/ignition/config/v1
+github.com/coreos/ignition/config/v1/types
+github.com/coreos/ignition/config/v2_0
+github.com/coreos/ignition/config/v2_0/types
+github.com/coreos/ignition/config/v2_1
+github.com/coreos/ignition/config/v2_1/types
+github.com/coreos/ignition/config/v2_2
+github.com/coreos/ignition/config/v2_2/types
+github.com/coreos/ignition/config/v2_3
+github.com/coreos/ignition/config/v2_3/types
+github.com/coreos/ignition/config/v2_5_experimental/types
+github.com/coreos/ignition/config/validate
+github.com/coreos/ignition/config/validate/astjson
+github.com/coreos/ignition/config/validate/astnode
+github.com/coreos/ignition/config/validate/report
+# github.com/coreos/ignition/v2 v2.15.0
+## explicit; go 1.18
+github.com/coreos/ignition/v2/config/merge
+github.com/coreos/ignition/v2/config/shared/errors
+github.com/coreos/ignition/v2/config/shared/parse
+github.com/coreos/ignition/v2/config/shared/validations
+github.com/coreos/ignition/v2/config/translate
+github.com/coreos/ignition/v2/config/util
+github.com/coreos/ignition/v2/config/v3_0
+github.com/coreos/ignition/v2/config/v3_0/types
+github.com/coreos/ignition/v2/config/v3_1
+github.com/coreos/ignition/v2/config/v3_1/translate
+github.com/coreos/ignition/v2/config/v3_1/types
+github.com/coreos/ignition/v2/config/v3_2
+github.com/coreos/ignition/v2/config/v3_2/translate
+github.com/coreos/ignition/v2/config/v3_2/types
+github.com/coreos/ignition/v2/config/v3_3
+github.com/coreos/ignition/v2/config/v3_3/translate
+github.com/coreos/ignition/v2/config/v3_3/types
+github.com/coreos/ignition/v2/config/v3_4
+github.com/coreos/ignition/v2/config/v3_4/translate
+github.com/coreos/ignition/v2/config/v3_4/types
+github.com/coreos/ignition/v2/config/validate
+# github.com/coreos/vcontext v0.0.0-20230201181013-d72178a18687
+## explicit; go 1.18
+github.com/coreos/vcontext/json
+github.com/coreos/vcontext/path
+github.com/coreos/vcontext/report
+github.com/coreos/vcontext/tree
+github.com/coreos/vcontext/validate
+# github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
 # github.com/emicklei/go-restful/v3 v3.10.2
@@ -287,6 +365,11 @@ github.com/openshift/build-machinery-go/make/targets/openshift/operator
 github.com/openshift/build-machinery-go/scripts
 # github.com/openshift/client-go v0.0.0-20230926161409-848405da69e1
 ## explicit; go 1.20
+github.com/openshift/client-go/build/applyconfigurations/build/v1
+github.com/openshift/client-go/build/applyconfigurations/internal
+github.com/openshift/client-go/build/clientset/versioned
+github.com/openshift/client-go/build/clientset/versioned/scheme
+github.com/openshift/client-go/build/clientset/versioned/typed/build/v1
 github.com/openshift/client-go/config/applyconfigurations/config/v1
 github.com/openshift/client-go/config/applyconfigurations/config/v1alpha1
 github.com/openshift/client-go/config/applyconfigurations/internal
@@ -301,6 +384,11 @@ github.com/openshift/client-go/config/informers/externalversions/config/v1alpha1
 github.com/openshift/client-go/config/informers/externalversions/internalinterfaces
 github.com/openshift/client-go/config/listers/config/v1
 github.com/openshift/client-go/config/listers/config/v1alpha1
+github.com/openshift/client-go/image/applyconfigurations/image/v1
+github.com/openshift/client-go/image/applyconfigurations/internal
+github.com/openshift/client-go/image/clientset/versioned
+github.com/openshift/client-go/image/clientset/versioned/scheme
+github.com/openshift/client-go/image/clientset/versioned/typed/image/v1
 github.com/openshift/client-go/operator/applyconfigurations/internal
 github.com/openshift/client-go/operator/applyconfigurations/operator/v1
 github.com/openshift/client-go/operator/applyconfigurations/operator/v1alpha1
@@ -359,6 +447,21 @@ github.com/openshift/library-go/pkg/operator/resourcesynccontroller
 github.com/openshift/library-go/pkg/operator/status
 github.com/openshift/library-go/pkg/operator/v1helpers
 github.com/openshift/library-go/pkg/serviceability
+# github.com/openshift/machine-config-operator v0.0.1-0.20231002195040-a2469941c0dc
+## explicit; go 1.20
+github.com/openshift/machine-config-operator/internal/clients
+github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1
+github.com/openshift/machine-config-operator/pkg/controller/common
+github.com/openshift/machine-config-operator/pkg/daemon/constants
+github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned
+github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/scheme
+github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/typed/machineconfiguration.openshift.io/v1
+github.com/openshift/machine-config-operator/pkg/generated/informers/externalversions
+github.com/openshift/machine-config-operator/pkg/generated/informers/externalversions/internalinterfaces
+github.com/openshift/machine-config-operator/pkg/generated/informers/externalversions/machineconfiguration.openshift.io
+github.com/openshift/machine-config-operator/pkg/generated/informers/externalversions/machineconfiguration.openshift.io/v1
+github.com/openshift/machine-config-operator/pkg/generated/listers/machineconfiguration.openshift.io/v1
+github.com/openshift/machine-config-operator/pkg/version
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
@@ -395,7 +498,7 @@ github.com/robfig/cron
 # github.com/shopspring/decimal v1.3.1
 ## explicit; go 1.13
 github.com/shopspring/decimal
-# github.com/sirupsen/logrus v1.9.0
+# github.com/sirupsen/logrus v1.9.3
 ## explicit; go 1.13
 github.com/sirupsen/logrus
 # github.com/spf13/cast v1.5.1
@@ -404,15 +507,18 @@ github.com/spf13/cast
 # github.com/spf13/cobra v1.7.0
 ## explicit; go 1.15
 github.com/spf13/cobra
-# github.com/spf13/pflag v1.0.5
+# github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace
 ## explicit; go 1.12
 github.com/spf13/pflag
 # github.com/stoewer/go-strcase v1.3.0
 ## explicit; go 1.11
 github.com/stoewer/go-strcase
-# github.com/stretchr/testify v1.8.2
-## explicit; go 1.13
+# github.com/stretchr/testify v1.8.4
+## explicit; go 1.20
 github.com/stretchr/testify/assert
+# github.com/vincent-petithory/dataurl v1.0.0
+## explicit
+github.com/vincent-petithory/dataurl
 # github.com/vishvananda/netlink v1.1.0
 ## explicit; go 1.12
 github.com/vishvananda/netlink
@@ -517,6 +623,9 @@ go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
 go.uber.org/zap/zapgrpc
+# go4.org v0.0.0-20201209231011-d4a079459e60
+## explicit; go 1.13
+go4.org/errorutil
 # golang.org/x/crypto v0.14.0
 ## explicit; go 1.17
 golang.org/x/crypto/bcrypt
@@ -606,7 +715,7 @@ golang.org/x/text/width
 # golang.org/x/time v0.3.0
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.9.1
+# golang.org/x/tools v0.9.3
 ## explicit; go 1.18
 golang.org/x/tools/go/ast/astutil
 golang.org/x/tools/imports
@@ -614,6 +723,7 @@ golang.org/x/tools/internal/event
 golang.org/x/tools/internal/event/core
 golang.org/x/tools/internal/event/keys
 golang.org/x/tools/internal/event/label
+golang.org/x/tools/internal/event/tag
 golang.org/x/tools/internal/fastwalk
 golang.org/x/tools/internal/gocommand
 golang.org/x/tools/internal/gopathwalk

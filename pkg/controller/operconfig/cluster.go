@@ -14,6 +14,7 @@ import (
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,7 +32,10 @@ func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig
 		}
 		return err
 	}
-
+	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok && r.featureGates.Enabled(configv1.FeatureGateNetworkLiveMigration) {
+		// During network type live migration, all the update to network.operator shall only be handled by the clusterconfig controller
+		return nil
+	}
 	// Validate cluster config
 	// If invalid just warn and proceed.
 	if err := network.ValidateClusterConfig(clusterConfig.Spec, r.client); err != nil {
@@ -46,7 +50,6 @@ func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig
 	if reflect.DeepEqual(operConfig.Spec, oldOperConfig.Spec) {
 		return nil
 	}
-
 	// If there are changes to the "downstream" networkconfig, commit it back
 	// to the apiserver
 	log.Println("WARNING: Network.operator.openshift.io has fields being overwritten by Network.config.openshift.io configuration")
@@ -92,9 +95,30 @@ func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConf
 
 	// Update the cluster config status
 	status := network.StatusFromOperatorConfig(&operConfig.Spec, &clusterConfig.Status)
-	if status == nil || reflect.DeepEqual(*status, clusterConfig.Status) {
+	if status == nil {
 		return nil, nil
 	}
+	// Sync status.conditions when live migration is processing
+	clusterConfigWithConditions := clusterConfig.DeepCopy()
+	nowTimestamp := metav1.Now()
+	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok && r.featureGates.Enabled(configv1.FeatureGateNetworkLiveMigration) {
+		if meta.IsStatusConditionPresentAndEqual(clusterConfig.Status.Conditions, names.NetworkTypeMigrationInProgress, metav1.ConditionTrue) {
+			err = r.syncNetworkTypeMigrationConditions(ctx, operConfig, clusterConfigWithConditions)
+			if err != nil {
+				return nil, err
+			}
+		} else if clusterConfig.Spec.NetworkType != clusterConfig.Status.NetworkType {
+			initMigrationConditions(&clusterConfigWithConditions.Status.Conditions, nowTimestamp)
+		} else {
+			resetMigrationConditions(&clusterConfigWithConditions.Status.Conditions, nowTimestamp)
+		}
+	}
+
+	status.Conditions = clusterConfigWithConditions.Status.Conditions
+	if reflect.DeepEqual(*status, clusterConfig.Status) {
+		return nil, nil
+	}
+
 	clusterConfig.Status = *status
 	clusterConfig.TypeMeta = metav1.TypeMeta{APIVersion: configv1.GroupVersion.String(), Kind: "Network"}
 
