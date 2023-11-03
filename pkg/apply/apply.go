@@ -95,6 +95,11 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 		}
 	}
 
+	// If no-op is specified, ignore the object.
+	if _, ok := obj.GetAnnotations()[names.IgnoreObjectAnnotation]; ok {
+		return nil
+	}
+
 	merge := getMergeForUpdate(obj)
 	if merge != nil {
 		// this object requires some of the existing data merged into the

@@ -44,6 +44,14 @@ const IgnoreObjectErrorAnnotation = "networkoperator.openshift.io/ignore-errors"
 // tells the CNO reconciliation engine to ignore this object if it already exists.
 const CreateOnlyAnnotation = "networkoperator.openshift.io/create-only"
 
+// IgnoreObjectAnnotation is an annotation on all objects that tells the CNO
+// reconciliation engine to ignore creating or updating this object.
+const IgnoreObjectAnnotation = "networkoperator.openshift.io/no-op"
+
+// IPsecDeleteAnnotation is an annotation which indicates IPsec daemonset is going to be removed sooner
+// by network operator reconcile loop.
+const IPsecDeleteAnnotation = "networkoperator.openshift.io/ipsec-ready-for-deletion"
+
 // CreateWaitAnnotation is an annotation on all objects that
 // tells the CNO reconciliation engine to ignore creating this object until conditions are met.
 const CreateWaitAnnotation = "networkoperator.openshift.io/create-wait"

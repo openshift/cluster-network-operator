@@ -157,7 +157,6 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 			return nil, fmt.Errorf("failed to get machine config pool for master: %v", err)
 		}
 	}
-	klog.Infof("****machine config pool for master: %v", mcpMaster.Status)
 	res.MasterMCPStatus = mcpMaster.Status
 
 	mcpWorker := &machineconfigv1.MachineConfigPool{}
@@ -166,7 +165,6 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 			return nil, fmt.Errorf("failed to get machine config pool for worker: %v", err)
 		}
 	}
-	klog.Infof("****machine config pool for worker: %v", mcpWorker.Status)
 	res.WorkerMCPStatus = mcpWorker.Status
 
 	return res, nil
