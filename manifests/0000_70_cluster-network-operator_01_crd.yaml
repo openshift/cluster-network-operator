@@ -384,6 +384,10 @@ spec:
                         description: ipsecConfig enables and configures IPsec for
                           pods on the pod network within the cluster.
                         type: object
+                      ipsecExternConfig:
+                        description: ipsecExternConfig enables NS IPsec on the 
+                          host for the network between the cluster and the oustide world.
+                        type: object
                       mtu:
                         description: mtu is the MTU to use for the tunnel interface.
                           This must be 100 bytes smaller than the uplink mtu. Default
