@@ -49,15 +49,9 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const OVN_NB_PORT = "9641"
-const OVN_SB_PORT = "9642"
-const OVN_NB_RAFT_PORT = "9643"
-const OVN_SB_RAFT_PORT = "9644"
 const CLUSTER_CONFIG_NAME = "cluster-config-v1"
 const CLUSTER_CONFIG_NAMESPACE = "kube-system"
 const OVN_CERT_CN = "ovn"
-const OVN_MASTER_DISCOVERY_POLL = 5
-const OVN_MASTER_DISCOVERY_BACKOFF = 120
 const OVN_LOCAL_GW_MODE = "local"
 const OVN_SHARED_GW_MODE = "shared"
 const OVN_LOG_PATTERN_CONSOLE = "%D{%Y-%m-%dT%H:%M:%S.###Z}|%05N|%c%T|%p|%m"
@@ -72,8 +66,6 @@ const OVN_NODE_IDENTITY_CERT_DURATION = "24h"
 
 // gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
-
-var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
 const (
 	// TODO: get this from the route Status
@@ -165,12 +157,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["DpuModeLabel"] = bootstrapResult.OVN.OVNKubernetesConfig.DpuModeLabel
 	data.Data["SmartNicModeLabel"] = bootstrapResult.OVN.OVNKubernetesConfig.SmartNicModeLabel
 	data.Data["MgmtPortResourceName"] = bootstrapResult.OVN.OVNKubernetesConfig.MgmtPortResourceName
-	data.Data["OVN_NB_PORT"] = OVN_NB_PORT
-	data.Data["OVN_SB_PORT"] = OVN_SB_PORT
-	data.Data["OVN_NB_RAFT_PORT"] = OVN_NB_RAFT_PORT
-	data.Data["OVN_SB_RAFT_PORT"] = OVN_SB_RAFT_PORT
-	data.Data["OVN_NB_RAFT_ELECTION_TIMER"] = os.Getenv("OVN_NB_RAFT_ELECTION_TIMER")
-	data.Data["OVN_SB_RAFT_ELECTION_TIMER"] = os.Getenv("OVN_SB_RAFT_ELECTION_TIMER")
 	data.Data["OVN_CONTROLLER_INACTIVITY_PROBE"] = os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
 	controller_inactivity_probe := os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
 	if len(controller_inactivity_probe) == 0 {
@@ -243,11 +229,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	data.Data["OVN_NB_INACTIVITY_PROBE"] = nb_inactivity_probe
-	data.Data["OVN_NB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterAddresses, OVN_NB_PORT)
-	data.Data["OVN_SB_DB_LIST"] = dbList(bootstrapResult.OVN.MasterAddresses, OVN_SB_PORT)
-	data.Data["OVN_DB_CLUSTER_INITIATOR"] = bootstrapResult.OVN.ClusterInitiator
-	data.Data["OVN_MIN_AVAILABLE"] = len(bootstrapResult.OVN.MasterAddresses)/2 + 1
-	data.Data["LISTEN_DUAL_STACK"] = listenDualStack(bootstrapResult.OVN.MasterAddresses[0])
 	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
 	data.Data["OVN_NORTHD_PROBE_INTERVAL"] = os.Getenv("OVN_NORTHD_PROBE_INTERVAL")
 	data.Data["NetFlowCollectors"] = ""
@@ -374,7 +355,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		}
 	}
 	renderOVNFlowsConfig(bootstrapResult, &data)
-	if len(bootstrapResult.OVN.MasterAddresses) == 1 {
+	if bootstrapResult.OVN.ControlPlaneReplicaCount == 1 {
 		data.Data["IsSNO"] = true
 		data.Data["NorthdThreads"] = 1
 	} else {
@@ -398,8 +379,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	//there only needs to be two cluster managers
 	clusterManagerReplicas := 2
-	if len(bootstrapResult.OVN.MasterAddresses) < 2 {
-		clusterManagerReplicas = len(bootstrapResult.OVN.MasterAddresses)
+	if bootstrapResult.OVN.ControlPlaneReplicaCount < 2 {
+		clusterManagerReplicas = bootstrapResult.OVN.ControlPlaneReplicaCount
 	}
 	data.Data["ClusterManagerReplicas"] = clusterManagerReplicas
 
@@ -1123,104 +1104,6 @@ func bootstrapOVNGatewayConfig(conf *operv1.Network, kubeClient crclient.Client)
 	klog.Infof("Gateway mode is %s", modeOverride)
 }
 
-type nodeInfo struct {
-	address string
-	created time.Time
-}
-
-type nodeInfoList []nodeInfo
-
-func (l nodeInfoList) Len() int {
-	return len(l)
-}
-
-func (l nodeInfoList) Swap(i, j int) {
-	l[i], l[j] = l[j], l[i]
-}
-
-func (l nodeInfoList) Less(i, j int) bool {
-	return l[i].created.Before(l[j].created)
-}
-
-// getMasterAddresses determines the addresses (IP or DNS names) of the ovn-kubernetes
-// control plane nodes. It returns the list of addresses and an updated timeout,
-// or an error.
-func getMasterAddresses(kubeClient crclient.Client, controlPlaneReplicaCount int, hypershift bool, timeout int) ([]string, int, error) {
-	var heartBeat int
-	masterNodeList := &corev1.NodeList{}
-	ovnMasterAddresses := make([]string, 0, controlPlaneReplicaCount)
-
-	if hypershift {
-		for i := 0; i < controlPlaneReplicaCount; i++ {
-			ovnMasterAddresses = append(ovnMasterAddresses, fmt.Sprintf("ovnkube-master-%d.ovnkube-master-internal.%s.svc.cluster.local", i, os.Getenv("HOSTED_CLUSTER_NAMESPACE")))
-		}
-		sort.Strings(ovnMasterAddresses)
-		return ovnMasterAddresses, timeout, nil
-	}
-
-	// Not Hypershift... find all master nodes by label
-	err := wait.PollUntilContextTimeout(context.TODO(), OVN_MASTER_DISCOVERY_POLL*time.Second, time.Duration(timeout)*time.Second, true, func(ctx context.Context) (bool, error) {
-		matchingLabels := &crclient.MatchingLabels{"node-role.kubernetes.io/master": ""}
-		if err := kubeClient.List(ctx, masterNodeList, matchingLabels); err != nil {
-			return false, err
-		}
-		if len(masterNodeList.Items) != 0 && controlPlaneReplicaCount == len(masterNodeList.Items) {
-			return true, nil
-		}
-
-		heartBeat++
-		if heartBeat%3 == 0 {
-			klog.V(2).Infof("Waiting to complete OVN bootstrap: found (%d) master nodes out of (%d) expected: timing out in %d seconds",
-				len(masterNodeList.Items), controlPlaneReplicaCount, timeout-OVN_MASTER_DISCOVERY_POLL*heartBeat)
-		}
-		return false, nil
-	})
-	if wait.Interrupted(err) {
-		klog.Warningf("Timeout exceeded while bootstraping OVN, expected amount of control plane nodes (%v) do not match found (%v): continuing deployment with found replicas",
-			controlPlaneReplicaCount, len(masterNodeList.Items))
-		// On certain types of cluster this condition will never be met (assisted installer, for example)
-		// As to not hold the reconciliation loop for too long on such clusters: dynamically modify the timeout
-		// to a shorter and shorter value. Never reach 0 however as that will result in a `PollInfinity`.
-		// Right now we'll do:
-		// - First reconciliation 250 second timeout
-		// - Second reconciliation 130 second timeout
-		// - >= Third reconciliation 10 second timeout
-		if timeout-OVN_MASTER_DISCOVERY_BACKOFF > 0 {
-			timeout = timeout - OVN_MASTER_DISCOVERY_BACKOFF
-		}
-	} else if err != nil {
-		return nil, timeout, fmt.Errorf("unable to bootstrap OVN, err: %v", err)
-	}
-
-	nodeList := make(nodeInfoList, 0, len(masterNodeList.Items))
-	for _, node := range masterNodeList.Items {
-		ni := nodeInfo{created: node.CreationTimestamp.Time}
-		for _, address := range node.Status.Addresses {
-			if address.Type == corev1.NodeInternalIP {
-				ni.address = address.Address
-				break
-			}
-		}
-		if ni.address == "" {
-			return nil, timeout, fmt.Errorf("no InternalIP found on master node '%s'", node.Name)
-		}
-
-		nodeList = append(nodeList, ni)
-	}
-
-	// Take the oldest masters up to the expected number of replicas
-	sort.Stable(nodeList)
-	for i, ni := range nodeList {
-		if i >= controlPlaneReplicaCount {
-			break
-		}
-		ovnMasterAddresses = append(ovnMasterAddresses, ni.address)
-	}
-	klog.V(2).Infof("Preferring %s for database clusters", ovnMasterAddresses)
-
-	return ovnMasterAddresses, timeout, nil
-}
-
 func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNBootstrapResult, error) {
 	clusterConfig := &corev1.ConfigMap{}
 	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
@@ -1245,33 +1128,6 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		controlPlaneReplicaCount = ovnConfigResult.HyperShiftConfig.ControlPlaneReplicas
 	} else {
 		controlPlaneReplicaCount, _ = strconv.Atoi(rcD.ControlPlane.Replicas)
-	}
-
-	ovnMasterAddresses, newTimeout, err := getMasterAddresses(kubeClient.ClientFor("").CRClient(), controlPlaneReplicaCount, hc.Enabled, OVN_MASTER_DISCOVERY_TIMEOUT)
-	if err != nil {
-		return nil, err
-	}
-	OVN_MASTER_DISCOVERY_TIMEOUT = newTimeout
-
-	// clusterInitiator is used to avoid a split-brain scenario for the OVN NB/SB DBs. We want to consistently initialize
-	// any OVN cluster which is bootstrapped here, to the same initiator (should it still exist), hence we annotate the
-	// network.operator.openshift.io CRD with this information and always try to re-use the same member for the OVN RAFT
-	// cluster initialization
-	// This part is only needed in single-zone mode, will be removed in 4.16.
-	var clusterInitiator string
-	currentAnnotation := conf.GetAnnotations()
-	if cInitiator, ok := currentAnnotation[names.OVNRaftClusterInitiator]; ok && currentInitiatorExists(ovnMasterAddresses, cInitiator) {
-		clusterInitiator = cInitiator
-	} else {
-		clusterInitiator = ovnMasterAddresses[0]
-		if currentAnnotation == nil {
-			currentAnnotation = map[string]string{
-				names.OVNRaftClusterInitiator: clusterInitiator,
-			}
-		} else {
-			currentAnnotation[names.OVNRaftClusterInitiator] = clusterInitiator
-		}
-		conf.SetAnnotations(currentAnnotation)
 	}
 
 	// Retrieve existing daemonset and deployment status - used for deciding if upgrades should happen
@@ -1387,8 +1243,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	}
 
 	res := bootstrap.OVNBootstrapResult{
-		MasterAddresses:          ovnMasterAddresses,
-		ClusterInitiator:         clusterInitiator,
+		ControlPlaneReplicaCount: controlPlaneReplicaCount,
 		ControlPlaneUpdateStatus: controlPlaneStatus,
 		NodeUpdateStatus:         nodeStatus,
 		IPsecUpdateStatus:        ipsecStatus,
@@ -1465,33 +1320,6 @@ func bootstrapFlowsConfig(cl crclient.Reader) *bootstrap.FlowsConfig {
 	return &fc
 }
 
-func currentInitiatorExists(ovnMasterAddresses []string, configInitiator string) bool {
-	for _, masterIP := range ovnMasterAddresses {
-		if masterIP == configInitiator {
-			return true
-		}
-	}
-	return false
-}
-
-func dbList(masterIPs []string, port string) string {
-	addrs := make([]string, len(masterIPs))
-	for i, ip := range masterIPs {
-		addrs[i] = "ssl:" + net.JoinHostPort(ip, port)
-	}
-	return strings.Join(addrs, ",")
-}
-
-func listenDualStack(masterIP string) string {
-	if strings.Contains(masterIP, ":") {
-		// IPv6 master, make the databases listen dual-stack
-		return ":[::]"
-	} else {
-		// IPv4 master, be IPv4-only for backward-compatibility
-		return ""
-	}
-}
-
 func getClusterCIDRsFromConfig(conf *operv1.NetworkSpec) string {
 	// pretty print the clusterNetwork CIDR (possibly only one) in its annotation
 	var clusterNetworkCIDRs []string
@@ -1513,9 +1341,8 @@ func handleIPFamilyAnnotationAndIPFamilyChange(conf *operv1.NetworkSpec, ovn boo
 		ipFamilyModeFromConfig = names.IPFamilyDualStack
 	}
 	ipFamilyMode := ipFamilyModeFromConfig
-	var clusterNetworkCIDRs string
+	clusterNetworkCIDRs := getClusterCIDRsFromConfig(conf)
 
-	clusterNetworkCIDRs = getClusterCIDRsFromConfig(conf)
 	// check if the IP family mode has changed and control the conversion process.
 	updateNode, updateControlPlane := shouldUpdateOVNKonIPFamilyChange(ovn, ovn.ControlPlaneUpdateStatus, ipFamilyMode)
 	klog.Infof("IP family change: updateNode=%t, updateControlPlane=%t", updateNode, updateControlPlane)
@@ -1703,23 +1530,6 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 	klog.Warningf("OVN-Kubernetes daemonset versions inconsistent. node: %s, control-plane: %s, release: %s",
 		nodeVersion, controlPlaneVersion, releaseVersion)
 	return true, true
-}
-
-func getProgressingState(ovn bootstrap.OVNBootstrapResult) string {
-	var node, controlPlane string
-
-	node = "nil"
-	if ovn.NodeUpdateStatus != nil {
-		node = fmt.Sprintf("%t", ovn.NodeUpdateStatus.Progressing)
-	}
-
-	controlPlane = "nil"
-	if ovn.ControlPlaneUpdateStatus != nil {
-		controlPlane = fmt.Sprintf("%t", ovn.ControlPlaneUpdateStatus.Progressing)
-	}
-
-	return fmt.Sprintf("progressing: %s=%s, %s=%s",
-		util.OVN_NODE, node, util.OVN_CONTROL_PLANE, controlPlane)
 }
 
 // daemonSetProgressing returns true if a daemonset is rolling out a change.

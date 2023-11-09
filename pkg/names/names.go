@@ -79,10 +79,6 @@ const ClusterNetworkCIDRsAnnotation = "networkoperator.openshift.io/cluster-netw
 // to indicate the current state of of the Hybrid overlay on the cluster: "enabled" or "disabled"
 const NetworkHybridOverlayAnnotation = "networkoperator.openshift.io/hybrid-overlay-status"
 
-// OVNRaftClusterInitiator is an annotation on the networks.operator.openshift.io CR to indicate
-// which node IP was the raft cluster initiator. The NB and SB DB will be initialized by the same member.
-const OVNRaftClusterInitiator = "networkoperator.openshift.io/ovn-cluster-initiator"
-
 // RolloutHungAnnotation is set to "" if it is detected that a rollout
 // (i.e. DaemonSet or Deployment) is not making progress, unset otherwise.
 const RolloutHungAnnotation = "networkoperator.openshift.io/rollout-hung"
