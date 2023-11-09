@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/gomega"
@@ -23,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
-	crfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
@@ -76,7 +73,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 
 	bootstrapResult := fakeBootstrapResult()
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
-		MasterAddresses: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+		ControlPlaneReplicaCount: 3,
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
 			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
@@ -134,7 +131,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 
 	bootstrapResult := fakeBootstrapResult()
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
-		MasterAddresses: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+		ControlPlaneReplicaCount: 3,
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
 			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
@@ -155,7 +152,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 
 	bootstrapResult = fakeBootstrapResult()
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
-		MasterAddresses: []string{"fd01::1", "fd01::2", "fd01::3"},
+		ControlPlaneReplicaCount: 3,
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
 			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
@@ -175,17 +172,17 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 
 func TestRenderedOVNKubernetesConfig(t *testing.T) {
 	type testcase struct {
-		desc                   string
-		expected               string
-		hybridOverlayConfig    *operv1.HybridOverlayConfig
-		gatewayConfig          *operv1.GatewayConfig
-		egressIPConfig         *operv1.EgressIPConfig
-		masterIPs              []string
-		v4InternalSubnet       string
-		disableGRO             bool
-		disableMultiNet        bool
-		enableMultiNetPolicies bool
-		enableAdminNetPolicies bool
+		desc                     string
+		expected                 string
+		hybridOverlayConfig      *operv1.HybridOverlayConfig
+		gatewayConfig            *operv1.GatewayConfig
+		egressIPConfig           *operv1.EgressIPConfig
+		controlPlaneReplicaCount int
+		v4InternalSubnet         string
+		disableGRO               bool
+		disableMultiNet          bool
+		enableMultiNetPolicies   bool
+		enableAdminNetPolicies   bool
 	}
 	testcases := []testcase{
 		{
@@ -226,7 +223,7 @@ libovsdblogfile=/var/log/ovnkube/libovsdb.log
 logfile-maxsize=100
 logfile-maxbackups=5
 logfile-maxage=0`,
-			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
+			controlPlaneReplicaCount: 2,
 		},
 		{
 			desc: "custom join subnet",
@@ -267,8 +264,8 @@ libovsdblogfile=/var/log/ovnkube/libovsdb.log
 logfile-maxsize=100
 logfile-maxbackups=5
 logfile-maxage=0`,
-			v4InternalSubnet: "100.99.0.0/16",
-			masterIPs:        []string{"1.2.3.4", "2.3.4.5"},
+			v4InternalSubnet:         "100.99.0.0/16",
+			controlPlaneReplicaCount: 2,
 		},
 		{
 			desc: "HybridOverlay",
@@ -322,7 +319,7 @@ cluster-subnets="10.132.0.0/14"`,
 				RoutingViaHost: true,
 			},
 
-			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
+			controlPlaneReplicaCount: 2,
 		},
 		{
 			desc: "EgressIPConfig",
@@ -379,7 +376,7 @@ cluster-subnets="10.132.0.0/14"`,
 			egressIPConfig: &operv1.EgressIPConfig{
 				ReachabilityTotalTimeoutSeconds: ptrToUint32(3),
 			},
-			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
+			controlPlaneReplicaCount: 2,
 		},
 		{
 			desc: "EgressIPConfig with disable reachability check",
@@ -436,7 +433,7 @@ cluster-subnets="10.132.0.0/14"`,
 			egressIPConfig: &operv1.EgressIPConfig{
 				ReachabilityTotalTimeoutSeconds: ptrToUint32(0),
 			},
-			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
+			controlPlaneReplicaCount: 2,
 		},
 		{
 			desc: "HybridOverlay with custom VXLAN port",
@@ -492,7 +489,7 @@ hybrid-overlay-vxlan-port="9000"`,
 			gatewayConfig: &operv1.GatewayConfig{
 				RoutingViaHost: true,
 			},
-			masterIPs: []string{"1.2.3.4", "2.3.4.5"},
+			controlPlaneReplicaCount: 2,
 		},
 		{
 			desc: "HybridOverlay enabled with no ClusterNetworkEntry",
@@ -537,8 +534,8 @@ logfile-maxage=0
 [hybridoverlay]
 enabled=true`,
 
-			hybridOverlayConfig: &operv1.HybridOverlayConfig{},
-			masterIPs:           []string{"1.2.3.4", "2.3.4.5"},
+			hybridOverlayConfig:      &operv1.HybridOverlayConfig{},
+			controlPlaneReplicaCount: 2,
 		},
 		{
 			desc: "Single Node OpenShift should contain SNO specific leader election settings",
@@ -583,7 +580,7 @@ logfile-maxage=0
 election-lease-duration=137
 election-renew-deadline=107
 election-retry-period=26`,
-			masterIPs: []string{"1.2.3.4"},
+			controlPlaneReplicaCount: 1,
 			gatewayConfig: &operv1.GatewayConfig{
 				RoutingViaHost: false,
 			},
@@ -626,8 +623,8 @@ libovsdblogfile=/var/log/ovnkube/libovsdb.log
 logfile-maxsize=100
 logfile-maxbackups=5
 logfile-maxage=0`,
-			masterIPs:  []string{"1.2.3.4", "2.3.4.5"},
-			disableGRO: true,
+			controlPlaneReplicaCount: 2,
+			disableGRO:               true,
 		},
 		{
 			desc: "disabled multi-network",
@@ -666,7 +663,8 @@ libovsdblogfile=/var/log/ovnkube/libovsdb.log
 logfile-maxsize=100
 logfile-maxbackups=5
 logfile-maxage=0`,
-			masterIPs:       []string{"1.2.3.4", "2.3.4.5"},
+			controlPlaneReplicaCount: 2,
+
 			disableMultiNet: true,
 		},
 		{
@@ -709,7 +707,8 @@ libovsdblogfile=/var/log/ovnkube/libovsdb.log
 logfile-maxsize=100
 logfile-maxbackups=5
 logfile-maxage=0`,
-			masterIPs:              []string{"1.2.3.4", "2.3.4.5"},
+			controlPlaneReplicaCount: 2,
+
 			enableMultiNetPolicies: true,
 			enableAdminNetPolicies: true,
 		},
@@ -751,10 +750,10 @@ libovsdblogfile=/var/log/ovnkube/libovsdb.log
 logfile-maxsize=100
 logfile-maxbackups=5
 logfile-maxage=0`,
-			masterIPs:              []string{"1.2.3.4", "2.3.4.5"},
-			disableMultiNet:        true,
-			enableMultiNetPolicies: true,
-			enableAdminNetPolicies: true,
+			controlPlaneReplicaCount: 2,
+			disableMultiNet:          true,
+			enableMultiNetPolicies:   true,
+			enableAdminNetPolicies:   true,
 		},
 	}
 	g := NewGomegaWithT(t)
@@ -790,7 +789,7 @@ logfile-maxage=0`,
 
 			bootstrapResult := fakeBootstrapResult()
 			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
-				MasterAddresses: tc.masterIPs,
+				ControlPlaneReplicaCount: tc.controlPlaneReplicaCount,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 					DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
 					DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
@@ -1807,7 +1806,7 @@ metadata:
 
 			bootstrapResult := fakeBootstrapResult()
 			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
-				MasterAddresses:          []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+				ControlPlaneReplicaCount: 3,
 				ControlPlaneUpdateStatus: controlPlaneStatus,
 				NodeUpdateStatus:         nodeStatus,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
@@ -1845,7 +1844,7 @@ metadata:
 				checkDaemonSetImagePullPolicy(g, renderedPrePuller)
 			}
 
-			updateNode, updateControlPlane := shouldUpdateOVNKonUpgrade(bootstrapResult.OVN, controlPlaneStatus, tc.rv)
+			updateNode, updateControlPlane := shouldUpdateOVNKonUpgrade(bootstrapResult.OVN, tc.rv)
 			g.Expect(updateControlPlane).To(Equal(tc.expectControlPlane), "Check controlPlane")
 			if updateNode {
 				var updatePrePuller bool
@@ -2101,7 +2100,7 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 	// the current cluster is single-stack and has version 1.9.9
 	bootstrapResult := fakeBootstrapResult()
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
-		MasterAddresses: []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"},
+		ControlPlaneReplicaCount: 3,
 		ControlPlaneUpdateStatus: &bootstrap.OVNUpdateStatus{
 			Kind:         "Deployment",
 			Namespace:    "openshift-ovn-kubernetes",
@@ -2215,7 +2214,7 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 			g := NewGomegaWithT(t)
 			bootstrapResult := fakeBootstrapResult()
 			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
-				MasterAddresses: []string{"1.2.3.4"},
+				ControlPlaneReplicaCount: 1,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
 					GatewayMode: "shared",
 					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
@@ -2344,117 +2343,6 @@ func Test_getDisableUDPAggregation(t *testing.T) {
 		},
 	})
 	assert.Equal(t, true, disable, "with configmap that sets 'disable-udp-aggregation' to 'true'")
-}
-
-func makeNodes(ips ...string) []*v1.Node {
-	nodes := make([]*v1.Node, 0, len(ips))
-	created := time.Now()
-	for i, ip := range ips {
-		ipStr := strings.ReplaceAll(ip, ".", "")
-		ipStr = strings.ReplaceAll(ipStr, ":", "")
-		nodeName := fmt.Sprintf("node-%d-%s", i, ipStr)
-
-		created = created.Add(1 * time.Minute)
-		node := &v1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              nodeName,
-				Labels:            map[string]string{"node-role.kubernetes.io/master": ""},
-				CreationTimestamp: metav1.NewTime(created),
-			},
-			Status: v1.NodeStatus{
-				Addresses: []v1.NodeAddress{},
-			},
-		}
-		if ip != "" {
-			node.Status.Addresses = []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: ip}}
-		}
-		nodes = append(nodes, node)
-	}
-	return nodes
-}
-
-func TestGetMasterAddresses(t *testing.T) {
-	testCases := []struct {
-		Description  string
-		ReplicaCount int
-		Nodes        []*v1.Node
-		HypershiftNS string
-		Expected     []string
-		Err          bool
-	}{
-		{
-			Description:  "Three masters",
-			ReplicaCount: 3,
-			Nodes:        makeNodes("1.2.3.4", "1.2.3.5", "1.2.3.6"),
-			Expected:     []string{"1.2.3.4", "1.2.3.5", "1.2.3.6"},
-		},
-		{
-			Description:  "Too many masters",
-			ReplicaCount: 3,
-			Nodes:        makeNodes("1.2.3.4", "1.2.3.5", "1.2.3.6", "1.2.3.7"),
-			Expected:     []string{"1.2.3.4", "1.2.3.5", "1.2.3.6"},
-		},
-		{
-			Description:  "Three IPv6 masters",
-			ReplicaCount: 3,
-			Nodes:        makeNodes("fd01::1", "fd01::2", "fd01::3"),
-			Expected:     []string{"fd01::1", "fd01::2", "fd01::3"},
-		},
-		{
-			Description:  "Too many IPv6 masters",
-			ReplicaCount: 3,
-			Nodes:        makeNodes("fd01::4", "fd01::5", "fd01::6", "fd01::7"),
-			Expected:     []string{"fd01::4", "fd01::5", "fd01::6"},
-		},
-		{
-			Description:  "Master without address",
-			ReplicaCount: 3,
-			Nodes:        makeNodes("1.2.3.4", "1.2.3.5", ""),
-			Err:          true,
-		},
-		{
-			Description:  "Timeout because fewer masters than expected",
-			ReplicaCount: 3,
-			Nodes:        makeNodes("1.2.3.4", "1.2.3.5"),
-			Expected:     []string{"1.2.3.4", "1.2.3.5"},
-		},
-		{
-			Description:  "Only one master",
-			ReplicaCount: 1,
-			Nodes:        makeNodes("1.2.3.4"),
-			Expected:     []string{"1.2.3.4"},
-		},
-		{
-			Description:  "Hypershift",
-			ReplicaCount: 1,
-			HypershiftNS: "blahblah",
-			Expected:     []string{"ovnkube-master-0.ovnkube-master-internal.blahblah.svc.cluster.local"},
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.Description, func(t *testing.T) {
-			t.Cleanup(func() {
-				os.Unsetenv("HOSTED_CLUSTER_NAMESPACE")
-			})
-			if tc.HypershiftNS != "" {
-				os.Setenv("HOSTED_CLUSTER_NAMESPACE", tc.HypershiftNS)
-			}
-
-			objects := make([]crclient.Object, 0, len(tc.Nodes))
-			for _, node := range tc.Nodes {
-				objects = append(objects, node)
-			}
-
-			client := crfake.NewClientBuilder().WithObjects(objects...).Build()
-			foundAddrs, _, err := getMasterAddresses(client, tc.ReplicaCount, tc.HypershiftNS != "", 5)
-			if tc.Err {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.ElementsMatch(t, foundAddrs, tc.Expected)
-			}
-		})
-	}
 }
 
 type fakeClientReader struct {
