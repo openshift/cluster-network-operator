@@ -57,6 +57,8 @@ type OVNBootstrapResult struct {
 	NodeUpdateStatus *OVNUpdateStatus
 	// IPsecUpdateStatus is the status of ovn-ipsec daemonset
 	IPsecUpdateStatus *OVNUpdateStatus
+	//ExternIPsecUpdateStatus is the status of ovn-external-ipsec machineconfig
+	ExternIPsecUpdateStatus *OVNUpdateStatus
 	// PrePullerUpdateStatus is the status of ovnkube-upgrades-prepuller daemonset
 	PrePullerUpdateStatus *OVNUpdateStatus
 	OVNKubernetesConfig   *OVNConfigBoostrapResult

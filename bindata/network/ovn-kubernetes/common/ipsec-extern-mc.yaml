@@ -1,0 +1,69 @@
+{{ if .OVNIPsecMCExists}}
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: ovn-extern-ipsec-host-svc-master
+spec:
+  config:
+    ignition:
+      version: 3.4.0
+    systemd:
+      units:
+        - contents: |
+{{ if .OVNIPsecExternEnable }}
+            [Service]
+            Type=oneshot
+            ExecStart=systemctl enable --now ipsec.service
+
+            [Install]
+            WantedBy=multi-user.target
+          enabled: true
+{{ else }}
+            [Service]
+            Type=oneshot
+            ExecStart=systemctl disable --now ipsec.service
+
+            [Install]
+            WantedBy=multi-user.target
+          enabled: false
+{{ end }}
+          name: ipsecenabler.service
+  extensions:
+    - ipsec
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: ovn-extern-ipsec-host-svc-worker
+spec:
+  config:
+    ignition:
+      version: 3.4.0
+    systemd:
+      units:
+        - contents: |
+{{ if .OVNIPsecExternEnable }}
+            [Service]
+            Type=oneshot
+            ExecStart=systemctl enable --now ipsec.service
+
+            [Install]
+            WantedBy=multi-user.target
+          enabled: true
+{{ else }}
+            [Service]
+            Type=oneshot
+            ExecStart=systemctl disable --now ipsec.service
+
+            [Install]
+            WantedBy=multi-user.target
+          enabled: false
+{{ end }}
+          name: ipsecenabler.service
+  extensions:
+    - ipsec
+{{ end }}

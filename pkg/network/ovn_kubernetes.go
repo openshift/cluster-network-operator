@@ -336,15 +336,23 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		}
 	}
 
+	// If extern (NS) IPsec is enabled for the first time we create the service.
+	// If it is disabled after that, we disable the service on the host.
 	if c.IPSecExternConfig != nil {
-		data.Data["OVNIPsecDaemonsetEnable"] = true
-		//TODO: Remove
-		klog.Infof("DBG-Josh: IPsec NS enabled: %t", data.Data["OVNIPsecDaemonsetEnable"])
+		data.Data["OVNIPsecExternEnable"] = true
+		data.Data["OVNIPsecMCExists"] = true
 	} else {
-		// Intentionally kept empty in case it was enebled before
+		data.Data["OVNIPsecExternEnable"] = false
+		if bootstrapResult.OVN.ExternIPsecUpdateStatus != nil {
+			data.Data["OVNIPsecMCExists"] = true
+		} else {
+			data.Data["OVNIPsecMCExists"] = false
+		}
 	}
 
-	klog.Infof("IPSec: IPSecEnabe [%t], IPSecDaemonsetEnable [%t]", data.Data["OVNIPsecEnable"], data.Data["OVNIPsecDaemonsetEnable"])
+	klog.Infof("IPSec: EW-Enabe [%t], NS-Enable [%t], DaemonsetEnable [%t], MCExists [%t]",
+		data.Data["OVNIPsecEnable"], data.Data["OVNIPsecExternEnable"],
+		data.Data["OVNIPsecDaemonsetEnable"], data.Data["OVNIPsecMCExists"])
 
 	if c.GatewayConfig != nil && c.GatewayConfig.RoutingViaHost {
 		data.Data["OVN_GATEWAY_MODE"] = OVN_LOCAL_GW_MODE
@@ -1384,6 +1392,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	masterStatus := &bootstrap.OVNUpdateStatus{}       // for interconnect single zone (necessary for upgrades 4.13 -> 4.14)
 	controlPlaneStatus := &bootstrap.OVNUpdateStatus{} // for interconnect multizone (default)
 	ipsecStatus := &bootstrap.OVNUpdateStatus{}
+	extenIPsecStatus := &bootstrap.OVNUpdateStatus{}
 	prepullerStatus := &bootstrap.OVNUpdateStatus{}
 
 	namespaceForControlPlane := util.OVN_NAMESPACE
@@ -1564,6 +1573,27 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		ipsecStatus.Version = ipsecHostDaemonSet.GetAnnotations()["release.openshift.io/version"]
 	}
 
+	ipsecExternMC := &appsv1.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "MachineConfig",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
+	}
+	// checking only the -master mc since the -master and -worker mc are created together
+	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-extern-ipsec-host-svc-master"}
+	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecExternMC); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to retrieve existing ipsec MachineConfig: %w", err)
+		} else {
+			ipsecStatus = nil
+		}
+	} else {
+		extenIPsecStatus.Namespace = ipsecExternMC.Namespace
+		extenIPsecStatus.Name = ipsecExternMC.Name
+		//extenIPsecStatus.IPFamilyMode = ipsecExternMC.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+		//extenIPsecStatus.Version = ipsecExternMC.GetAnnotations()["release.openshift.io/version"]
+	}
+
 	// If we are upgrading from 4.13 -> 4.14 set new API for IP Forwarding mode to Global.
 	// This is to ensure backwards compatibility.
 	if masterStatus != nil {
@@ -1581,6 +1611,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		MasterUpdateStatus:       masterStatus, // TODO to be removed in 4.15, after making 4.13->4.14 upgrade required
 		NodeUpdateStatus:         nodeStatus,
 		IPsecUpdateStatus:        ipsecStatus,
+		ExternIPsecUpdateStatus:  extenIPsecStatus,
 		PrePullerUpdateStatus:    prepullerStatus,
 		OVNKubernetesConfig:      ovnConfigResult,
 		FlowsConfig:              bootstrapFlowsConfig(kubeClient.ClientFor("").CRClient()),
