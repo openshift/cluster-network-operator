@@ -10,12 +10,10 @@ import (
 	"math"
 	"math/big"
 	"net"
-	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -23,9 +21,9 @@ import (
 	yaml "github.com/ghodss/yaml"
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
-	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -40,10 +38,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -68,11 +63,8 @@ const OVN_NODE_IDENTITY_CERT_DURATION = "24h"
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
 
 const (
-	// TODO: get this from the route Status
-	OVN_SB_DB_ROUTE_PORT       = "443"
-	OVN_SB_DB_ROUTE_LOCAL_PORT = "9645"
-	OVSFlowsConfigMapName      = "ovs-flows-config"
-	OVSFlowsConfigNamespace    = names.APPLIED_NAMESPACE
+	OVSFlowsConfigMapName   = "ovs-flows-config"
+	OVSFlowsConfigNamespace = names.APPLIED_NAMESPACE
 )
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
@@ -177,57 +169,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["HostedClusterNamespace"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Namespace
 	data.Data["ReleaseImage"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ReleaseImage
 	data.Data["ClusterID"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ClusterID
-	data.Data["ClusterIDLabel"] = platform.ClusterIDLabel
-	data.Data["OVNDbServiceType"] = corev1.ServiceTypeClusterIP
-	data.Data["OVNSbDbRouteHost"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost
-	data.Data["OVNSbDbRouteLabels"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteLabels
+	data.Data["ClusterIDLabel"] = hypershift.ClusterIDLabel
 	data.Data["HCPNodeSelector"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.HCPNodeSelector
-	data.Data["OVN_SB_NODE_PORT"] = nil
-	data.Data["OVN_NB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
-	data.Data["OVN_SB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
-	pubStrategy := bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ServicePublishingStrategy
-	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost == "" && pubStrategy != nil && pubStrategy.Type == hyperv1.Route && pubStrategy.Route != nil && pubStrategy.Route.Hostname != "" {
-		data.Data["OVNSbDbRouteHost"] = pubStrategy.Route.Hostname
-	} else if pubStrategy != nil && pubStrategy.Type == hyperv1.NodePort {
-		data.Data["OVNDbServiceType"] = corev1.ServiceTypeNodePort
-		data.Data["OVN_SB_NODE_PORT"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort
-		data.Data["OVN_NB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%d", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort)
-		data.Data["OVN_SB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%d", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort)
-	}
-
-	// Hypershift proxy
-	// proxy should not be used for internal routes
-	if bootstrapResult.Infra.Proxy.HTTPProxy == "" ||
-		bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteLabels[platform.HyperShiftInternalRouteLabel] == "true" {
-		data.Data["ENABLE_OVN_NODE_PROXY"] = false
-	} else {
-		data.Data["ENABLE_OVN_NODE_PROXY"] = true
-		u, err := url.Parse(bootstrapResult.Infra.Proxy.HTTPProxy)
-		if err != nil {
-			return nil, progressing, errors.Wrap(err, "failed to parse http proxy")
-		}
-		host, port, err := net.SplitHostPort(u.Host)
-		if err != nil {
-			return nil, progressing, errors.Wrap(err, "failed to split http proxy host")
-		}
-		data.Data["HTTP_PROXY_IP"] = host
-		data.Data["HTTP_PROXY_PORT"] = port
-		data.Data["OVN_SB_DB_ROUTE_LOCAL_PORT"] = OVN_SB_DB_ROUTE_LOCAL_PORT
-		data.Data["OVN_NB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s",
-			bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_LOCAL_PORT)
-		data.Data["OVN_SB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s",
-			bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_LOCAL_PORT)
-		data.Data["OVN_SB_DB_ROUTE_HOST"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost
-
-		var routePort string
-		if pubStrategy != nil && pubStrategy.Type == hyperv1.NodePort {
-			routePort = strconv.Itoa(int(bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort))
-		} else {
-			routePort = OVN_SB_DB_ROUTE_PORT
-		}
-		data.Data["OVN_SB_DB_ROUTE_PORT"] = routePort
-	}
-
 	data.Data["OVN_NB_INACTIVITY_PROBE"] = nb_inactivity_probe
 	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
 	data.Data["OVN_NORTHD_PROBE_INTERVAL"] = os.Getenv("OVN_NORTHD_PROBE_INTERVAL")
@@ -529,25 +472,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovnkube-upgrades-prepuller")
 	}
 
-	// In hypershift, if we're pushing the route (single-zone only) don't create ovnkube node if the route isn't up yet
-	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled &&
-		k8s.CheckObjByGroupKindName(
-			objs, "apps", "Route",
-			bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Namespace,
-			"ovnkube-sbdb") &&
-		bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost == "" {
-
-		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, util.OVN_NODE, func(o *uns.Unstructured) {
-			anno := o.GetAnnotations()
-			if anno == nil {
-				anno = map[string]string{}
-			}
-			anno[names.CreateWaitAnnotation] = "true"
-			o.SetAnnotations(anno)
-		})
-		progressing = true
-	}
-
 	return objs, progressing, nil
 }
 
@@ -581,12 +505,10 @@ func renderOVNFlowsConfig(bootstrapResult *bootstrap.BootstrapResult, data *rend
 
 func bootstrapOVNHyperShiftConfig(hc *platform.HyperShiftConfig, kubeClient cnoclient.Client, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNHyperShiftBootstrapResult, error) {
 	ovnHypershiftResult := &bootstrap.OVNHyperShiftBootstrapResult{
-		Enabled:            hc.Enabled,
-		Namespace:          hc.Namespace,
-		OVNSbDbRouteHost:   hc.OVNSbDbRouteHost,
-		OVNSbDbRouteLabels: hc.OVNSbDbRouteLabels,
-		ReleaseImage:       hc.ReleaseImage,
-		ControlPlaneImage:  hc.ControlPlaneImage,
+		Enabled:           hc.Enabled,
+		Namespace:         hc.Namespace,
+		ReleaseImage:      hc.ReleaseImage,
+		ControlPlaneImage: hc.ControlPlaneImage,
 	}
 
 	if !hc.Enabled {
@@ -602,86 +524,6 @@ func bootstrapOVNHyperShiftConfig(hc *platform.HyperShiftConfig, kubeClient cnoc
 		ovnHypershiftResult.ControlPlaneReplicas = 3
 	default:
 		ovnHypershiftResult.ControlPlaneReplicas = 1
-	}
-	for _, svc := range hcp.Spec.Services {
-		// TODO: instead of the hardcoded string use ServiceType hyperv1.OVNSbDb once the API is updated
-		if svc.Service == "OVNSbDb" {
-			s := svc.ServicePublishingStrategy
-			ovnHypershiftResult.ServicePublishingStrategy = &s
-		}
-	}
-	if ovnHypershiftResult.ServicePublishingStrategy == nil {
-		klog.Warningf("service publishing strategy for OVN southbound database does not exist in hyperv1.HostedControlPlane %s/%s. Defaulting to route", hc.Name, hc.Namespace)
-		ovnHypershiftResult.ServicePublishingStrategy = &hyperv1.ServicePublishingStrategy{
-			Type: hyperv1.Route,
-		}
-	}
-
-	if ovnHypershiftResult.OVNSbDbRouteHost != "" {
-		return ovnHypershiftResult, nil
-	}
-
-	switch ovnHypershiftResult.ServicePublishingStrategy.Type {
-	case hyperv1.Route:
-		{
-			route := &routev1.Route{}
-			gvr := schema.GroupVersionResource{
-				Group:    "route.openshift.io",
-				Version:  "v1",
-				Resource: "routes",
-			}
-			clusterClient := kubeClient.ClientFor(names.ManagementClusterName)
-			routeObj, err := clusterClient.Dynamic().Resource(gvr).Namespace(hc.Namespace).Get(context.TODO(), "ovnkube-sbdb", metav1.GetOptions{})
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					klog.Infof("Did not find ovnkube-sbdb route")
-				} else {
-					return nil, fmt.Errorf("could not get ovnkube-sbdb route: %v", err)
-				}
-			} else {
-				err := runtime.DefaultUnstructuredConverter.FromUnstructured(routeObj.UnstructuredContent(), route)
-				if err != nil {
-					return nil, err
-				}
-				if (len(route.Status.Ingress) < 1 || route.Status.Ingress[0].Host == "") && route.Spec.Host == "" {
-					return ovnHypershiftResult, nil
-				}
-				if len(route.Status.Ingress) >= 1 && route.Status.Ingress[0].Host != "" {
-					ovnHypershiftResult.OVNSbDbRouteHost = route.Status.Ingress[0].Host
-				} else if route.Spec.Host != "" {
-					ovnHypershiftResult.OVNSbDbRouteHost = route.Spec.Host
-				}
-				klog.Infof("Overriding OVN configuration route to %s", ovnHypershiftResult.OVNSbDbRouteHost)
-			}
-		}
-	case hyperv1.NodePort:
-		{
-			svc := &corev1.Service{}
-			clusterClient := kubeClient.ClientFor(names.ManagementClusterName)
-			err := clusterClient.CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: "ovnkube-master-external"}, svc)
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					klog.Infof("Did not find ovnkube-master service")
-					return ovnHypershiftResult, nil
-				} else {
-					return nil, fmt.Errorf("could not get ovnkube-master service: %v", err)
-				}
-			}
-			var sbDbPort int32
-			for _, p := range svc.Spec.Ports {
-				if p.Name == "south" {
-					sbDbPort = p.NodePort
-				}
-			}
-			if sbDbPort > 0 {
-				ovnHypershiftResult.OVNSbDbRouteHost = ovnHypershiftResult.ServicePublishingStrategy.NodePort.Address
-				ovnHypershiftResult.OVNSbDbRouteNodePort = sbDbPort
-			} else {
-				klog.Infof("Node port not defined for ovnkube-master service")
-			}
-		}
-	default:
-		return nil, fmt.Errorf("unsupported service publishing strategy type: %s", ovnHypershiftResult.ServicePublishingStrategy.Type)
 	}
 	return ovnHypershiftResult, nil
 }
