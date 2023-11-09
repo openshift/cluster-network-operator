@@ -6,17 +6,13 @@ import (
 )
 
 type OVNHyperShiftBootstrapResult struct {
-	Enabled                   bool
-	ClusterID                 string
-	Namespace                 string
-	ServicePublishingStrategy *hypershift.ServicePublishingStrategy
-	OVNSbDbRouteHost          string
-	OVNSbDbRouteNodePort      int32
-	OVNSbDbRouteLabels        map[string]string
-	HCPNodeSelector           map[string]string
-	ControlPlaneReplicas      int
-	ReleaseImage              string
-	ControlPlaneImage         string
+	Enabled              bool
+	ClusterID            string
+	Namespace            string
+	HCPNodeSelector      map[string]string
+	ControlPlaneReplicas int
+	ReleaseImage         string
+	ControlPlaneImage    string
 }
 
 type OVNConfigBoostrapResult struct {
