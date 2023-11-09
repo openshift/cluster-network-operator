@@ -45,8 +45,8 @@ type OVNUpdateStatus struct {
 }
 
 type OVNBootstrapResult struct {
-	MasterAddresses  []string
-	ClusterInitiator string
+	// ControlPlaneReplicaCount represents the number of control plane nodes in the cluster
+	ControlPlaneReplicaCount int
 	// ControlPlaneUpdateStatus is the status of ovnkube-control-plane deployment
 	ControlPlaneUpdateStatus *OVNUpdateStatus
 	// NodeUpdateStatus is the status of ovnkube-node daemonset
