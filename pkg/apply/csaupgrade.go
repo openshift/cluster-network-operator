@@ -1,108 +1,34 @@
-/*
-Copyright 2022 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package csaupgrade
+package apply
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"reflect"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
-// Finds all managed fields owners of the given operation type which owns all of
-// the fields in the given set
-//
-// If there is an error decoding one of the fieldsets for any reason, it is ignored
-// and assumed not to match the query.
-func FindFieldsOwners(
-	managedFields []metav1.ManagedFieldsEntry,
-	operation metav1.ManagedFieldsOperationType,
-	fields *fieldpath.Set,
-) []metav1.ManagedFieldsEntry {
-	var result []metav1.ManagedFieldsEntry
-	for _, entry := range managedFields {
-		if entry.Operation != operation {
-			continue
-		}
+/*
+this is taken from k8s.io/client-go/util/csaupgrade
+which was not introduced until k8s.io/client-go v0.26.2 but for
+openshift release-4.12 this is based off of v0.25.2. In order
+to back-port the changes required to "Deprecate legacy field manager"
+that was first made in 4.14 [0] we need to create a local copy
+of the csaupgrade utils. That is the only purpose of this new
+sub-module.
 
-		fieldSet, err := decodeManagedFieldsEntrySet(entry)
-		if err != nil {
-			continue
-		}
+This module is identical to it's v0.26.2 copy with one exception.
+csaManagerNames type is converted from sets.Set to map[string]struct{}.
+sets.Set is not available from the apimachinery version we are stuck
+to iin 4.12 (v0.25.2) as it was first introduced in v0.26.0 [1].
 
-		if fields.Difference(&fieldSet).Empty() {
-			result = append(result, entry)
-		}
-	}
-	return result
-}
-
-// Upgrades the Manager information for fields managed with client-side-apply (CSA)
-// Prepares fields owned by `csaManager` for 'Update' operations for use now
-// with the given `ssaManager` for `Apply` operations.
-//
-// This transformation should be performed on an object if it has been previously
-// managed using client-side-apply to prepare it for future use with
-// server-side-apply.
-//
-// Caveats:
-//  1. This operation is not reversible. Information about which fields the client
-//     owned will be lost in this operation.
-//  2. Supports being performed either before or after initial server-side apply.
-//  3. Client-side apply tends to own more fields (including fields that are defaulted),
-//     this will possibly remove this defaults, they will be re-defaulted, that's fine.
-//  4. Care must be taken to not overwrite the managed fields on the server if they
-//     have changed before sending a patch.
-//
-// obj - Target of the operation which has been managed with CSA in the past
-// csaManagerNames - Names of FieldManagers to merge into ssaManagerName
-// ssaManagerName - Name of FieldManager to be used for `Apply` operations
-func UpgradeManagedFields(
-	obj runtime.Object,
-	csaManagerNames sets.Set[string],
-	ssaManagerName string,
-) error {
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return err
-	}
-
-	filteredManagers := accessor.GetManagedFields()
-
-	for csaManagerName := range csaManagerNames {
-		filteredManagers, err = upgradedManagedFields(
-			filteredManagers, csaManagerName, ssaManagerName)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	// Commit changes to object
-	accessor.SetManagedFields(filteredManagers)
-	return nil
-}
+[0] https://github.com/openshift/cluster-network-operator/pull/1763
+[1] https://pkg.go.dev/k8s.io/apimachinery/pkg/util/sets#Set
+*/
 
 // Calculates a minimal JSON Patch to send to upgrade managed fields
 // See `UpgradeManagedFields` for more information.
@@ -113,9 +39,9 @@ func UpgradeManagedFields(
 //
 // Returns non-nil error if there was an error, a JSON patch, or nil bytes if
 // there is no work to be done.
-func UpgradeManagedFieldsPatch(
+func upgradeManagedFieldsPatch(
 	obj runtime.Object,
-	csaManagerNames sets.Set[string],
+	csaManagerNames map[string]struct{},
 	ssaManagerName string) ([]byte, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {

@@ -3,7 +3,6 @@ package apply
 import (
 	"context"
 	"fmt"
-
 	"github.com/openshift/cluster-network-operator/pkg/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,9 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/client-go/util/csaupgrade"
 )
 
 // mergeManager merges field manager ownership of fields from field manager named 'fromManager' to 'intoManager'.
@@ -29,7 +26,7 @@ func mergeManager(ctx context.Context, clusterClient client.ClusterClient, us *u
 			continue
 		}
 		if m.Operation == metav1.ManagedFieldsOperationUpdate {
-			patch, err = csaupgrade.UpgradeManagedFieldsPatch(us, map[string]sets.Empty{fromManager: {}}, intoManager)
+			patch, err = upgradeManagedFieldsPatch(us, map[string]struct{}{fromManager: {}}, intoManager)
 			patchType = types.JSONPatchType
 		} else if m.Operation == metav1.ManagedFieldsOperationApply {
 			patch, err = runtime.Encode(unstructured.UnstructuredJSONScheme, getEmptyUS(us.GetAPIVersion(), us.GetKind(),
