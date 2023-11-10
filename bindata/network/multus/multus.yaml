@@ -537,14 +537,21 @@ spec:
       name: whereabouts-reconciler
   updateStrategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
   template:
     metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: whereabouts-reconciler
         name: whereabouts-reconciler
     spec:
       hostNetwork: true      
+      nodeSelector:
+        kubernetes.io/os: linux
       serviceAccountName: multus
+      priorityClassName: "system-node-critical"
       tolerations:
       - operator: Exists
         effect: NoSchedule
@@ -565,9 +572,6 @@ spec:
           requests:
             cpu: "50m"
             memory: "50Mi"
-          limits:
-            cpu: "50m"
-            memory: "100Mi"
         volumeMounts:
           - name: cni-net-dir
             mountPath: /host/etc/cni/net.d
