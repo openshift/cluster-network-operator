@@ -1573,15 +1573,26 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		ipsecStatus.Version = ipsecHostDaemonSet.GetAnnotations()["release.openshift.io/version"]
 	}
 
-	ipsecExternMC := &appsv1.DaemonSet{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "MachineConfig",
-			APIVersion: appsv1.SchemeGroupVersion.String(),
-		},
+	/*
+		route := &routev1.Route{}
+		gvr := schema.GroupVersionResource{
+			Group:    "route.openshift.io",
+			Version:  "v1",
+			Resource: "routes",
+		}
+		clusterClient := kubeClient.ClientFor(names.ManagementClusterName)
+		routeObj, err := clusterClient.Dynamic().Resource(gvr).Namespace(hc.Namespace).Get(context.TODO(), "ovnkube-sbdb", metav1.GetOptions{})
+
+	*/
+	ipsecExternMC := schema.GroupVersionResource{
+		Group:    "machineconfiguration.openshift.io",
+		Version:  "v1",
+		Resource: "machineconfigs",
 	}
 	// checking only the -master mc since the -master and -worker mc are created together
-	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-extern-ipsec-host-svc-master"}
-	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecExternMC); err != nil {
+	const mcName = "ovn-extern-ipsec-host-svc-master"
+	//nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-extern-ipsec-host-svc-master"}
+	if _, err := kubeClient.ClientFor("").Dynamic().Resource(ipsecExternMC).Get(context.TODO(), mcName, metav1.GetOptions{}); err != nil {
 		if !apierrors.IsNotFound(err) {
 			klog.Infof("==>Josh: Failed to retrieve existing ipsec MachineConfig: %w", err)
 			return nil, fmt.Errorf("Failed to retrieve existing ipsec MachineConfig: %w", err)
@@ -1590,9 +1601,9 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 			extenIPsecStatus = nil
 		}
 	} else {
-		klog.Infof("==>Josh: ipsec MachineConfig %s found, ns %s", ipsecExternMC.Name, ipsecExternMC.Namespace)
-		extenIPsecStatus.Namespace = ipsecExternMC.Namespace
-		extenIPsecStatus.Name = ipsecExternMC.Name
+		klog.Infof("==>Josh: ipsec MachineConfig %s found", mcName)
+		extenIPsecStatus.Namespace = "" // MachineConfig is not namespaced
+		extenIPsecStatus.Name = mcName
 		//extenIPsecStatus.IPFamilyMode = ipsecExternMC.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
 		//extenIPsecStatus.Version = ipsecExternMC.GetAnnotations()["release.openshift.io/version"]
 	}
