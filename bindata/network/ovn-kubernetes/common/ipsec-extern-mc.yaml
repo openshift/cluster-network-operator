@@ -1,4 +1,4 @@
-{{ if .OVNIPsecMCExists}}
+{{if .OVNIPsecMCExists}}
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -11,8 +11,8 @@ spec:
       version: 3.4.0
     systemd:
       units:
-        - contents: |
-{{ if .OVNIPsecExternEnable }}
+        - contents: | 
+{{if .OVNIPsecExternEnable}}
             [Service]
             Type=oneshot
             ExecStart=systemctl enable --now ipsec.service
@@ -20,7 +20,7 @@ spec:
             [Install]
             WantedBy=multi-user.target
           enabled: true
-{{ else }}
+{{else}}
             [Service]
             Type=oneshot
             ExecStart=systemctl disable --now ipsec.service
@@ -28,10 +28,11 @@ spec:
             [Install]
             WantedBy=multi-user.target
           enabled: false
-{{ end }}
+{{end}}
           name: ipsecenabler.service
   extensions:
     - ipsec
+
 ---
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
@@ -46,7 +47,7 @@ spec:
     systemd:
       units:
         - contents: |
-{{ if .OVNIPsecExternEnable }}
+{{if .OVNIPsecExternEnable}}
             [Service]
             Type=oneshot
             ExecStart=systemctl enable --now ipsec.service
@@ -54,7 +55,7 @@ spec:
             [Install]
             WantedBy=multi-user.target
           enabled: true
-{{ else }}
+{{else}}
             [Service]
             Type=oneshot
             ExecStart=systemctl disable --now ipsec.service
@@ -62,8 +63,8 @@ spec:
             [Install]
             WantedBy=multi-user.target
           enabled: false
-{{ end }}
+{{end}}
           name: ipsecenabler.service
   extensions:
     - ipsec
-{{ end }}
+{{end}}

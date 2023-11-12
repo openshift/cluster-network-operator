@@ -1583,11 +1583,14 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-extern-ipsec-host-svc-master"}
 	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecExternMC); err != nil {
 		if !apierrors.IsNotFound(err) {
+			klog.Infof("==>Josh: Failed to retrieve existing ipsec MachineConfig: %w", err)
 			return nil, fmt.Errorf("Failed to retrieve existing ipsec MachineConfig: %w", err)
 		} else {
-			ipsecStatus = nil
+			klog.Infof("==>Josh: ipsec MachineConfig not found")
+			extenIPsecStatus = nil
 		}
 	} else {
+		klog.Infof("==>Josh: ipsec MachineConfig %s found, ns %s", ipsecExternMC.Name, ipsecExternMC.Namespace)
 		extenIPsecStatus.Namespace = ipsecExternMC.Namespace
 		extenIPsecStatus.Name = ipsecExternMC.Name
 		//extenIPsecStatus.IPFamilyMode = ipsecExternMC.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
