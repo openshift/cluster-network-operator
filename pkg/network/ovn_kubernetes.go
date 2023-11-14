@@ -548,7 +548,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		kind := bootstrapResult.OVN.NodeUpdateStatus.Kind
 		namespace := bootstrapResult.OVN.NodeUpdateStatus.Namespace
 		name := bootstrapResult.OVN.NodeUpdateStatus.Name
-		if bootstrapResult.OVN.NodeUpdateStatus.IPsecMarkedForDeletion != "" {
+		if bootstrapResult.OVN.IPsecUpdateStatus.IPsecMarkedForDeletion != "" {
 			// When ovnkube-node daemonset is seen with 'networkoperator.openshift.io/ipsec-ready-for-deletion' annotation,
 			// then go ahead with skip rendering IPsec daemonset and also remove annotation from ovnkube-node daemonset.
 			objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-host")
