@@ -4,3 +4,5 @@
     include.release.openshift.io/ibm-cloud-managed: "true"
 - op: remove
   path: /spec/template/spec/nodeSelector
+- op: remove
+  path: /spec/template/metadata/annotations/target.workload.openshift.io~1management
