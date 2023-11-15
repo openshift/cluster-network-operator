@@ -125,14 +125,14 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 		log.Printf("could not encode %s for apply", objDesc)
 		return fmt.Errorf("could not encode for patching: %w", err)
 	}
-	us, err := clusterClient.Dynamic().Resource(rm.Resource).Namespace(namespace).Patch(ctx, name, types.ApplyPatchType, data, patchOptions, subresources...)
-	if err != nil {
-		return fmt.Errorf("failed to apply / update %s: %w", objDesc, err)
-	}
-
 	// consider removing in OCP 4.18 when we know field manager 'cluster-network-operator' no longer possibly
 	// exists in any object from all upgrade paths
-	if isDepFieldManagerCleanupNeeded(subcontroller) {
+	// Retrieve the current state of the resource
+	us, err := clusterClient.Dynamic().Resource(rm.Resource).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to get current state of %s: %w", objDesc, err)
+	}
+	if us != nil && isDepFieldManagerCleanupNeeded(subcontroller) {
 		us.SetGroupVersionKind(gvk)
 
 		if doesManagerOpExist(us.GetManagedFields(), depreciatedFieldManager, metav1.ManagedFieldsOperationUpdate,
@@ -148,6 +148,12 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 			}
 		}
 	}
+
+	_, err = clusterClient.Dynamic().Resource(rm.Resource).Namespace(namespace).Patch(ctx, name, types.ApplyPatchType, data, patchOptions, subresources...)
+	if err != nil {
+		return fmt.Errorf("failed to apply / update %s: %w", objDesc, err)
+	}
+
 	log.Printf("Apply / Create of %s was successful", objDesc)
 	return nil
 }
