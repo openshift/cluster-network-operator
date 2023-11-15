@@ -89,6 +89,7 @@ spec:
           volumeMounts:
             - mountPath: /var/run/secrets/hosted_cluster
               name: hosted-cluster-api-access
+      automountServiceAccountToken: false
       containers:
       - name: webhook
         image: "{{.NetworkNodeIdentityImage}}"
