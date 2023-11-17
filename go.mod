@@ -150,18 +150,10 @@ require (
 	k8s.io/apiserver v0.27.2 // indirect
 	k8s.io/kms v0.27.2 // indirect
 	k8s.io/kube-aggregator v0.26.1 // indirect
-	sigs.k8s.io/cluster-api-provider-aws/v2 v2.0.2 // indirect
-	sigs.k8s.io/cluster-api-provider-ibmcloud v0.2.4 // indirect
+	
 )
 
 replace (
-	github.com/openshift/hypershift/api => github.com/openshift/hypershift v0.0.0-20220323152148-c356b8b72d66
 	k8s.io/client-go => k8s.io/client-go v0.27.2
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230515203736-54b630e78af5
-	// for Hypershift
-	kubevirt.io/containerized-data-importer-api => github.com/kubevirt/containerized-data-importer-api v1.41.1-0.20211201033752-05520fb9f18d
-	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.4.0-beta.2.0.20230601082946-9be885caa39f
-	sigs.k8s.io/cluster-api-provider-aws/v2 => sigs.k8s.io/cluster-api-provider-aws/v2 v2.0.0-20230403133355-646934ede0c4 // remove when downstream syns with upstream
-	sigs.k8s.io/cluster-api-provider-kubevirt => github.com/openshift/cluster-api-provider-kubevirt v0.0.0-20211223062810-ef64d5ff1cde
-	sigs.k8s.io/cluster-api-provider-openstack => github.com/openshift/cluster-api-provider-openstack v0.0.0-20220209101310-a384cbe0dfa0
 )

@@ -16,7 +16,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
-	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

@@ -32,7 +32,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/util"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
-	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
