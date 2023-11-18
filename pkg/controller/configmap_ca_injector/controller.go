@@ -174,7 +174,8 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 
 	for _, configMap := range configMapsToChange {
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			if existing, ok := configMap.Data[names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY]; ok && existing == string(trustedCAbundleData) {
+			needsOwner := len(configMap.Annotations[names.OpenShiftComponent]) == 0
+			if existing, ok := configMap.Data[names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY]; !needsOwner && ok && existing == string(trustedCAbundleData) {
 				// Nothing to update the new and old configmap object would be the same.
 				log.Printf("ConfigMap %s/%s %s unchanged, skipping", configMap.Namespace, configMap.Name, names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY)
 				return nil
@@ -186,10 +187,17 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: configMap.Namespace,
 					Name:      configMap.Name,
+					Annotations: map[string]string{
+						names.OpenShiftComponent: configMap.Annotations[names.OpenShiftComponent],
+					},
 				},
 				Data: map[string]string{
 					names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY: string(trustedCAbundleData),
 				},
+			}
+			// this lets a configmap writer to claim ownership
+			if needsOwner {
+				configMapToUpdate.Annotations[names.OpenShiftComponent] = trustedCAbundleConfigMap.Annotations[names.OpenShiftComponent]
 			}
 
 			err = apply.ApplyObject(ctx, r.client, configMapToUpdate, "configmap_ca")

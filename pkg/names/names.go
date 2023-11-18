@@ -127,6 +127,13 @@ const TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL = "config.openshift.io/inject-trusted-ca
 // the system trust bundle.
 const SYSTEM_TRUST_BUNDLE = "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
 
+// OpenShiftComponent mirrors https://github.com/openshift/api/blob/master/annotations/annotations.go#L33 but a zero-diff
+// tidy and vendor result in a non-building project, so working from a copy here until the next dep update.
+const OpenShiftComponent = "openshift.io/owning-component"
+
+// ClusterNetworkOperatorJiraComponent is the jira component name for the cluster-network-operator
+const ClusterNetworkOperatorJiraComponent = "Networking / cluster-network-operator"
+
 // Proxy returns the namespaced name "cluster" in the
 // default namespace.
 func Proxy() types.NamespacedName {
