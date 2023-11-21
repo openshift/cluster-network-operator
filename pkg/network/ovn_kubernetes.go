@@ -2280,7 +2280,7 @@ func isInterConnectEnabledOnDaemonset(ds *appsv1.DaemonSet, containerName string
 	for _, container := range ds.Spec.Template.Spec.Containers {
 		if container.Name == containerName {
 			for _, c := range container.Command {
-				if strings.Contains(c, "--enable-interconnect") {
+				if strings.Contains(c, "--enable-interconnect") || strings.Contains(c, "ovnkube-lib.sh") {
 					return true
 				}
 			}
