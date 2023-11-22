@@ -625,8 +625,8 @@ github.com/openshift/cluster-api-provider-openstack v0.0.0-20220209101310-a384cb
 github.com/openshift/cluster-api-provider-openstack v0.0.0-20220209101310-a384cbe0dfa0/go.mod h1:DuIbIAxTRFBNHV3LSOUBiivzDpjw6MEgVkK2dhKo48A=
 github.com/openshift/hypershift v0.0.0-20220525174911-c7c2b57c98ca h1:th0xr36Wm2TbPTKCPzI9VV7MmIO35PeiBULN+NOadl4=
 github.com/openshift/hypershift v0.0.0-20220525174911-c7c2b57c98ca/go.mod h1:KnMQOHXBL5w3B4PIynpX4a9sU4RgN9ZWcjRMyXCcd40=
-github.com/openshift/library-go v0.0.0-20220525173854-9b950a41acdc h1:j+upvKc1uLzuL+q/JXie8+IMohOooTCaEC9w+4d1Ztk=
-github.com/openshift/library-go v0.0.0-20220525173854-9b950a41acdc/go.mod h1:AMZwYwSdbvALDl3QobEzcJ2IeDO7DYLsr42izKzh524=
+github.com/openshift/library-go v0.0.0-20231120144800-32bd122b8f04 h1:lSVzkXU2d5qBFt4BfX4R33sj14WwQfBPI/6p265r+m8=
+github.com/openshift/library-go v0.0.0-20231120144800-32bd122b8f04/go.mod h1:AMZwYwSdbvALDl3QobEzcJ2IeDO7DYLsr42izKzh524=
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pborman/uuid v1.2.0/go.mod h1:X/NO0urCmaxf9VXbdlT7C2Yzkj2IKimNn4k+gtPdI/k=
