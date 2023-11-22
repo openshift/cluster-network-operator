@@ -312,6 +312,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVNHybridOverlayVXLANPort"] = ""
 	}
 
+	klog.Infof("IPSec: startgit l")
+
 	// When IPsec is configured to be disabled, then ensure ovnkube-node pods are rolled
 	// out first which configures OVN/OVS to disable IPsec. This would give enough room
 	// for OVS IPsec monitor script to disble IPsec on the dataplane. After this it is

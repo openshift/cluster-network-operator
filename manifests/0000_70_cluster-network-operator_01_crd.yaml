@@ -384,9 +384,14 @@ spec:
                         description: ipsecConfig enables and configures IPsec for
                           pods on the pod network within the cluster.
                         type: object
-                      ipsecExternConfig:
+                      ipsecExternal:
                         description: ipsecExternConfig enables NS IPsec on the 
                           host for the network between the cluster and the oustide world.
+                        properties:
+                          state:
+                            description: bla bla 
+                            default: Disabled
+                            type: string
                         type: object
                       mtu:
                         description: mtu is the MTU to use for the tunnel interface.
