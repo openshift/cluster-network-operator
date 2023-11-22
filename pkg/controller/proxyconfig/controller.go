@@ -384,6 +384,9 @@ func (r *ReconcileProxyConfig) mergeTrustBundlesToConfigMap(additionalData, syst
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      names.TRUSTED_CA_BUNDLE_CONFIGMAP,
 			Namespace: names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS,
+			Annotations: map[string]string{
+				names.OpenShiftComponent: names.ClusterNetworkOperatorJiraComponent,
+			},
 		},
 		Data: map[string]string{
 			names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY: string(combinedTrustData),
@@ -427,6 +430,9 @@ func (r *ReconcileProxyConfig) syncTrustedCABundle(trustedCABundle *corev1.Confi
 // configMapsEqual compares the data key values between
 // a and b ConfigMaps, returning true if they are equal.
 func configMapsEqual(key string, a, b *corev1.ConfigMap) bool {
+	if a.Annotations[names.OpenShiftComponent] != b.Annotations[names.OpenShiftComponent] {
+		return false
+	}
 	return a.Data[key] == b.Data[key]
 }
 
@@ -445,6 +451,9 @@ func (r *ReconcileProxyConfig) generateSystemTrustBundle() (*corev1.ConfigMap, e
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      names.TRUSTED_CA_BUNDLE_CONFIGMAP,
 			Namespace: names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS,
+			Annotations: map[string]string{
+				names.OpenShiftComponent: names.ClusterNetworkOperatorJiraComponent,
+			},
 		},
 		Data: map[string]string{
 			names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY: string(bundleData),

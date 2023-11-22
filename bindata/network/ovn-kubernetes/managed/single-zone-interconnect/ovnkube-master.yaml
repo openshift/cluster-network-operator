@@ -29,6 +29,7 @@ metadata:
   labels:
     # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
     hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+    hypershift.openshift.io/control-plane: "true"
 spec:
   podManagementPolicy: Parallel
   selector:
@@ -61,6 +62,8 @@ spec:
         type: infra
         openshift.io/component: network
         hypershift.openshift.io/control-plane-component: ovnkube-master
+        hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+        hypershift.openshift.io/control-plane: "true"
         kubernetes.io/os: "linux"
     spec:
       affinity:
@@ -888,6 +891,10 @@ spec:
             --enable-multi-external-gateway=true
         volumeMounts:
         - mountPath: /etc/ovn
+          name: datadir
+        # gives write access to libovsdb logs until moving to multi-zone
+        # https://issues.redhat.com//browse/OCPBUGS-20472
+        - mountPath: /var/log/ovnkube/
           name: datadir
         - mountPath: /var/run/ovn
           name: datadir

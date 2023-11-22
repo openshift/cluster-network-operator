@@ -34,6 +34,7 @@ spec:
           fi
 
           exec openshift-sdn-controller \
+           --node-name ${K8S_NODE_NAME} \
            --platform-type {{.PlatformType}} \
            --v=${OPENSHIFT_SDN_LOG_LEVEL:-2}
         resources:
@@ -58,6 +59,10 @@ spec:
         - name: "NO_PROXY"
           value: "{{ .NO_PROXY}}"
 {{ end }}
+        - name: K8S_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /env

@@ -462,6 +462,11 @@ spec:
           iptables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
           ip6tables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
           ip6tables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
+          {{- if .OVNHybridOverlayVXLANPort}}
+          echo "I$(date "+%m%d %H:%M:%S.%N") - disable conntrack on hybrid overlay VXLAN port"
+          iptables -t raw -A PREROUTING -p udp --dport {{.OVNHybridOverlayVXLANPort}} -j NOTRACK
+          iptables -t raw -A OUTPUT -p udp --dport {{.OVNHybridOverlayVXLANPort}} -j NOTRACK
+          {{- end}}
           retries=0
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node db_ip ${db_ip}"
@@ -658,6 +663,10 @@ spec:
           name: host-var-lib-cni-networks-ovn-kubernetes
         - mountPath: /run/openvswitch
           name: run-openvswitch
+        # gives write access to libovsdb logs until moving to multi-zone
+        # https://issues.redhat.com//browse/OCPBUGS-20472
+        - mountPath: /var/log/ovnkube/
+          name: etc-openvswitch
         - mountPath: /run/ovn/
           name: run-ovn
         - mountPath: /etc/openvswitch

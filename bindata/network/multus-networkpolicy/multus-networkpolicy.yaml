@@ -35,6 +35,8 @@ spec:
         - "--container-runtime-endpoint=/run/crio/crio.sock"
         - "--pod-iptables=/var/lib/multi-networkpolicy/iptables"
         - "--network-plugins=macvlan,sriov"
+        - "--custom-v6-ingress-rule-file=/etc/multi-networkpolicy/rules/custom-v6-rules.txt"
+        - "--custom-v6-egress-rule-file=/etc/multi-networkpolicy/rules/custom-v6-rules.txt"
         resources:
           requests:
             cpu: "100m"
@@ -48,6 +50,9 @@ spec:
           mountPath: /host
         - name: var-lib-multinetworkpolicy
           mountPath: /var/lib/multi-networkpolicy
+        - name: multi-networkpolicy-custom-rules
+          mountPath: /etc/multi-networkpolicy/rules
+          readOnly: true
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
@@ -63,3 +68,6 @@ spec:
         - name: var-lib-multinetworkpolicy
           hostPath:
             path: /var/lib/multi-networkpolicy
+        - name: multi-networkpolicy-custom-rules
+          configMap:
+            name: multi-networkpolicy-custom-rules
