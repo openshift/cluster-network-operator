@@ -135,7 +135,7 @@ func TestStatusManager_set(t *testing.T) {
 	set(t, client, no)
 
 	condUpdate := operv1.OperatorCondition{
-		Type:   operv1.OperatorStatusTypeUpgradeable,
+		Type:   string(configv1.OperatorUpgradeable),
 		Status: operv1.ConditionTrue,
 	}
 
@@ -253,6 +253,59 @@ func TestStatusManager_set(t *testing.T) {
 	}
 }
 
+func TestStatusManager_set_kuryr(t *testing.T) {
+	client := fake.NewFakeClient()
+	status := New(client, "testing", "")
+
+	// make the network.operator object
+	log.Print("Creating Network Operator Config")
+	no := &operv1.Network{
+		ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+		Spec: operv1.NetworkSpec{
+			DefaultNetwork: operv1.DefaultNetworkDefinition{
+				Type: operv1.NetworkTypeKuryr,
+			},
+		},
+	}
+
+	set(t, client, no)
+
+	condNoProgress := operv1.OperatorCondition{
+		Type:   operv1.OperatorStatusTypeProgressing,
+		Status: operv1.ConditionFalse,
+	}
+	condAvailable := operv1.OperatorCondition{
+		Type:   operv1.OperatorStatusTypeAvailable,
+		Status: operv1.ConditionTrue,
+	}
+
+	// Check if Kuryr will make operator non-upgradable
+	no.Spec = operv1.NetworkSpec{
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeKuryr,
+		},
+	}
+	set(t, client, no)
+
+	condUpdateBlocked := operv1.OperatorCondition{
+		Type:   string(configv1.OperatorUpgradeable),
+		Status: operv1.ConditionFalse,
+		Reason: "KuryrConfigured",
+		Message: "Cluster is configured with Kuryr SDN, which is not supported in the next version. Please " +
+			"follow the documented steps to migrate from Kuryr to ovn-kubernetes in order to be able to upgrade. " +
+			"https://docs.openshift.com/container-platform/4.14/networking/ovn_kubernetes_network_provider/migrate-from-kuryr-sdn.html",
+	}
+	status.set(true, condNoProgress, condAvailable)
+
+	oc, err := getOC(client)
+	if err != nil {
+		t.Fatalf("error getting network.operator: %v", err)
+	}
+	if !conditionsEqual(oc.Status.Conditions, []operv1.OperatorCondition{condAvailable, condUpdateBlocked, condNoProgress}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+}
+
 func TestStatusManagerSetDegraded(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", "")
@@ -265,7 +318,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	set(t, client, no)
 
 	condUpdate := operv1.OperatorCondition{
-		Type:   operv1.OperatorStatusTypeUpgradeable,
+		Type:   string(configv1.OperatorUpgradeable),
 		Status: operv1.ConditionTrue,
 	}
 	condFailCluster := operv1.OperatorCondition{
@@ -409,7 +462,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Reason: "Deploying",
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -459,7 +512,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 				Status: operv1.ConditionTrue,
 			},
 			{
-				Type:   operv1.OperatorStatusTypeUpgradeable,
+				Type:   string(configv1.OperatorUpgradeable),
 				Status: operv1.ConditionTrue,
 			},
 			{
@@ -517,7 +570,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Status: operv1.ConditionFalse,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -561,7 +614,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Status: operv1.ConditionTrue,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -602,7 +655,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Status: operv1.ConditionTrue,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -642,7 +695,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Status: operv1.ConditionTrue,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -686,7 +739,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Status: operv1.ConditionTrue,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -747,7 +800,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Status: operv1.ConditionTrue,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -799,7 +852,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Status: operv1.ConditionFalse,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -856,7 +909,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Status: operv1.ConditionTrue,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -896,7 +949,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Status: operv1.ConditionTrue,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -932,7 +985,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Status: operv1.ConditionFalse,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -994,7 +1047,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 			Reason: "Deploying",
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -1031,7 +1084,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 			Status: operv1.ConditionFalse,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -1090,7 +1143,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 			Status: operv1.ConditionTrue,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -1154,7 +1207,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 			Status: operv1.ConditionTrue,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -1196,7 +1249,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 			Status: operv1.ConditionTrue,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -1236,7 +1289,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 			Status: operv1.ConditionFalse,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -1431,7 +1484,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 			Status: operv1.ConditionTrue,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{
@@ -1523,7 +1576,7 @@ func TestStatusManagerHyperShift(t *testing.T) {
 			Status: operv1.ConditionFalse,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 	}
@@ -1576,7 +1629,7 @@ func TestStatusManagerHyperShift(t *testing.T) {
 			Status: operv1.ConditionFalse,
 		},
 		{
-			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Type:   string(configv1.OperatorUpgradeable),
 			Status: operv1.ConditionTrue,
 		},
 		{

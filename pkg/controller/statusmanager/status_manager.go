@@ -399,12 +399,27 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 			)
 		}
 
-		v1helpers.SetOperatorCondition(&oc.Status.Conditions,
-			operv1.OperatorCondition{
-				Type:   operv1.OperatorStatusTypeUpgradeable,
-				Status: operv1.ConditionTrue,
-			},
-		)
+		if oc.Spec.DefaultNetwork.Type == operv1.NetworkTypeKuryr {
+			// Kuryr is removed in 4.15, so block the upgrade if we have Kuryr in the spec. We should probably
+			// block if an SDN migration is happening too, but that's something out of scope here.
+			v1helpers.SetOperatorCondition(&oc.Status.Conditions,
+				operv1.OperatorCondition{
+					Type:   string(configv1.OperatorUpgradeable),
+					Status: operv1.ConditionFalse,
+					Reason: "KuryrConfigured",
+					Message: "Cluster is configured with Kuryr SDN, which is not supported in the next version. Please " +
+						"follow the documented steps to migrate from Kuryr to ovn-kubernetes in order to be able to upgrade. " +
+						"https://docs.openshift.com/container-platform/4.14/networking/ovn_kubernetes_network_provider/migrate-from-kuryr-sdn.html",
+				},
+			)
+		} else {
+			v1helpers.SetOperatorCondition(&oc.Status.Conditions,
+				operv1.OperatorCondition{
+					Type:   string(configv1.OperatorUpgradeable),
+					Status: operv1.ConditionTrue,
+				},
+			)
+		}
 
 		operStatus = &oc.Status
 
