@@ -2,5 +2,7 @@
     "go.lintTool": "golangci-lint",
     "go.lintFlags": [
         "--modules-download-mode=vendor"
-    ]
+],
+"workbench.preferredDarkColorTheme": "Default Light Modern",
+"workbench.colorTheme": "Default Light+"
 }

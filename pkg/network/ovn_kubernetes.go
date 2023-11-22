@@ -312,7 +312,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVNHybridOverlayVXLANPort"] = ""
 	}
 
-	klog.Infof("IPSec: startgit l")
+	klog.Infof("IPSec: starting...")
 
 	// When IPsec is configured to be disabled, then ensure ovnkube-node pods are rolled
 	// out first which configures OVN/OVS to disable IPsec. This would give enough room
@@ -368,6 +368,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	klog.Infof("IPSec: EW-Enabe [%t], NS-Enable [%t], DaemonsetEnable [%t], MCExists [%t]",
 		data.Data["OVNIPsecEnable"], data.Data["OVNIPsecExternEnable"],
 		data.Data["OVNIPsecDaemonsetEnable"], data.Data["OVNIPsecMCExists"])
+	klog.Flush()
 
 	if c.GatewayConfig != nil && c.GatewayConfig.RoutingViaHost {
 		data.Data["OVN_GATEWAY_MODE"] = OVN_LOCAL_GW_MODE
