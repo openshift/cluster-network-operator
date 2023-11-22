@@ -443,7 +443,7 @@ type OVNKubernetesConfig struct {
 	// ipsecExternConfig enables and configures NS IPsec for the host on the
 	// host network with external peers.
 	// +optional
-	IPSecExternConfig *IPSecExternConfig `json:"ipsecExternConfig,omitempty"`
+	IPSecExternal IPSecExternal `json:"ipsecExternal"`
 	// policyAuditConfig is the configuration for network policy audit events. If unset,
 	// reported defaults are used.
 	// +optional
@@ -484,7 +484,12 @@ type HybridOverlayConfig struct {
 type IPsecConfig struct {
 }
 
-type IPSecExternConfig struct {
+type IPSecExternal struct {
+	// State controls the node's external (aka NS) ipsec service state.
+	// +kubebuilder:default=Disabled
+	// +kubebuilder:validation:Enum=Enabled;Disabled
+	// +optional
+	State IPSecExternalState `json:"state"`
 }
 
 type IPForwardingMode string
@@ -749,4 +754,13 @@ const (
 	IPAMTypeDHCP IPAMType = "DHCP"
 	// IPAMTypeStatic uses static IP
 	IPAMTypeStatic IPAMType = "Static"
+)
+
+type IPSecExternalState string
+
+const (
+	// IPSecExternalStateEnabled enables IPsec for external traffic
+	IPSecExternalStateEnabled IPSecExternalState = "Enabled"
+	// IPSecExternalStateDisabled disables IPsec for external traffic
+	IPSecExternalStateDisabled IPSecExternalState = "Disabled"
 )
