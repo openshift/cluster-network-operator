@@ -23,7 +23,7 @@ spec:
               valueFrom:
                 configMapKeyRef: 
                   name: cron-scheduler-configmap
-                  key: cron_schedule
+                  key: reconciler_cron_file
           securityContext:
             privileged: true
           readinessProbe:
@@ -45,8 +45,8 @@ spec:
             name: cron-scheduler-configmap
             namespace: openshift-multus
             items: 
-            - key: "cron_schedule"
-              path: "cron_schedule"
+            - key: "reconciler_cron_file"
+              path: "reconciler_cron_file"
           defaultMode: 0744
         - hostPath:
             path: /etc/cni/tuning/

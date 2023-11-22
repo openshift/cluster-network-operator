@@ -8,4 +8,4 @@ metadata:
       Configmap containing user customizable cronjob schedule
     release.openshift.io/version: "{{.ReleaseVersion}}"
 data:
-  cron_schedule: "30 4 * * *" 
+  reconciler_cron_file: "30 4 * * *" 

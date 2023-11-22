@@ -106,7 +106,7 @@ func (r *ReconcileCronjobScheduler) Reconcile(ctx context.Context, request recon
 		return reconcile.Result{}, err
 	}
 
-	// No action to be taken if user deletes the config map. The cron_schedule value will stay unmodified until config map is recreated
+	// No action to be taken if user deletes the config map. The reconciler_cron_file value will stay unmodified until config map is recreated
 	if configMap == nil {
 		return reconcile.Result{}, nil
 	}
