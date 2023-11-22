@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 )
@@ -115,6 +116,14 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 			return nil, fmt.Errorf("failed to retrieve HostedControlPlane %s: %v", types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, err)
 		}
 		res.HostedControlPlane = hcp
+
+		hcpUns := &unstructured.Unstructured{}
+		hcpUns.SetGroupVersionKind(hcp.GetObjectKind().GroupVersionKind()) // Replace with hardcoded gvk
+		err = client.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, hcpUns)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve HostedControlPlane %s: %v", types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, err)
+		}
+		klog.Infof("DEBUG: HyperShift unstructured obj object: %+v", hcpUns)
 	}
 
 	netIDEnabled, err := isNetworkNodeIdentityEnabled(client)
