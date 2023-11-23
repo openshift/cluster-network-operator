@@ -385,14 +385,17 @@ spec:
                           pods on the pod network within the cluster.
                         type: object
                       ipsecExternal:
-                        description: ipsecExternConfig enables NS IPsec on the 
-                          host for the network between the cluster and the oustide world.
+                        description: ipsecExtern enables external (North-South). This will only install IPsec and enable it's service. The actuall NS IPsec policies should be specified by users. This can be done with k8s-nmstate operator. ipsecExternal and ipsecConfig can be enabled together
+                        type: object
+                        required:
+                          - state
                         properties:
                           state:
-                            description: bla bla 
-                            default: Disabled
+                            description: State controls the node's external (aka NS) ipsec service state.
                             type: string
-                        type: object
+                            enum:
+                              - Enabled
+                              - Disabled
                       mtu:
                         description: mtu is the MTU to use for the tunnel interface.
                           This must be 100 bytes smaller than the uplink mtu. Default
