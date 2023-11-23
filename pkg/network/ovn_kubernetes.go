@@ -349,10 +349,13 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	// If extern (NS) IPsec is enabled for the first time we create the service.
 	// If it is disabled after that, we disable the service on the host.
-	if c.IPSecExternal.State == "Enabled" {
+	if c.IPSecExternal.State == operv1.IPSecExternalStateEnabled {
 		data.Data["OVNIPsecExternEnable"] = true
 		data.Data["OVNIPsecMCExists"] = true
-	} else if c.IPSecExternal.State == "Disabled" {
+	} else if c.IPSecExternal.State == operv1.IPSecExternalStateDisabled || c.IPSecExternal.State == "" {
+		if c.IPSecExternal.State == "" {
+
+		}
 		data.Data["OVNIPsecExternEnable"] = false
 		if bootstrapResult.OVN.ExternIPsecUpdateStatus != nil {
 			data.Data["OVNIPsecMCExists"] = true
