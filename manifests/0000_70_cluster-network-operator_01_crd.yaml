@@ -433,6 +433,7 @@ spec:
                             type: string
                             default: Disabled
                             enum:
+                              - ""
                               - Enabled
                               - Disabled
                       mtu:
