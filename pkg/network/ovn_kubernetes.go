@@ -346,6 +346,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	data.Data["IP_FORWARDING_MODE"] = operv1.IPForwardingRestricted
 	if c.GatewayConfig != nil {
+		if err := validateIPForwarding(c.GatewayConfig.IPForwarding); err != nil {
+			return nil, progressing, err
+		}
 		data.Data["IP_FORWARDING_MODE"] = c.GatewayConfig.IPForwarding
 	}
 
@@ -2575,4 +2578,19 @@ func annotateNodeDaemonset(kubeClient kubernetes.Interface) error {
 		return err
 	}
 	return nil
+}
+
+// validateIPForwarding checks if the provided IPForwarding mode is valid. If not, it will return an error message.
+func validateIPForwarding(ipForwarding operv1.IPForwardingMode) error {
+	if ipForwarding == "" {
+		return nil
+	}
+	if ipForwarding == operv1.IPForwardingRestricted {
+		return nil
+	}
+	if ipForwarding == operv1.IPForwardingGlobal {
+		return nil
+	}
+	return fmt.Errorf("Invalid ipForwarding %q. Valid values are \"\", %q, %q ",
+		ipForwarding, operv1.IPForwardingRestricted, operv1.IPForwardingGlobal)
 }
