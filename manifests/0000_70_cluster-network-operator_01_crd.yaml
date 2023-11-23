@@ -431,7 +431,6 @@ spec:
                           state:
                             description: State controls the node's external (aka NS) ipsec service state.
                             type: string
-                            default: Disabled
                             enum:
                               - ""
                               - Enabled

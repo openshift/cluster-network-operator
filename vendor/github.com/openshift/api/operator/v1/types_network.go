@@ -759,8 +759,6 @@ const (
 type IPSecExternalState string
 
 const (
-	// IPSecExternalStateEmoty is equivalent to IPSecExternalStateDisabled
-	IPSecExternalStateEmpty IPSecExternalState = ""
 	// IPSecExternalStateEnabled enables IPsec for external traffic
 	IPSecExternalStateEnabled IPSecExternalState = "Enabled"
 	// IPSecExternalStateDisabled disables IPsec for external traffic
