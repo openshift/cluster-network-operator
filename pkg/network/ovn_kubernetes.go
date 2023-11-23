@@ -32,7 +32,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/util"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
-	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -213,9 +212,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_NB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
 	data.Data["OVN_SB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%s", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, OVN_SB_DB_ROUTE_PORT)
 	pubStrategy := bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ServicePublishingStrategy
-	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost == "" && pubStrategy != nil && pubStrategy.Type == hyperv1.Route && pubStrategy.Route != nil && pubStrategy.Route.Hostname != "" {
+	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost == "" && pubStrategy != nil && pubStrategy.Type == hypershift.Route && pubStrategy.Route != nil && pubStrategy.Route.Hostname != "" {
 		data.Data["OVNSbDbRouteHost"] = pubStrategy.Route.Hostname
-	} else if pubStrategy != nil && pubStrategy.Type == hyperv1.NodePort {
+	} else if pubStrategy != nil && pubStrategy.Type == hypershift.NodePort {
 		data.Data["OVNDbServiceType"] = corev1.ServiceTypeNodePort
 		data.Data["OVN_SB_NODE_PORT"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort
 		data.Data["OVN_NB_DB_ENDPOINT"] = fmt.Sprintf("ssl:%s:%d", bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost, bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort)
@@ -247,7 +246,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVN_SB_DB_ROUTE_HOST"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteHost
 
 		var routePort string
-		if pubStrategy != nil && pubStrategy.Type == hyperv1.NodePort {
+		if pubStrategy != nil && pubStrategy.Type == hypershift.NodePort {
 			routePort = strconv.Itoa(int(bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNSbDbRouteNodePort))
 		} else {
 			routePort = OVN_SB_DB_ROUTE_PORT
@@ -679,25 +678,24 @@ func bootstrapOVNHyperShiftConfig(hc *hypershift.HyperShiftConfig, kubeClient cn
 
 	hcp := infraStatus.HostedControlPlane
 
-	ovnHypershiftResult.ClusterID = hcp.Spec.ClusterID
-	ovnHypershiftResult.HCPNodeSelector = hcp.Spec.NodeSelector
-	switch hcp.Spec.ControllerAvailabilityPolicy {
-	case hyperv1.HighlyAvailable:
+	ovnHypershiftResult.ClusterID = hcp.ClusterID
+	ovnHypershiftResult.HCPNodeSelector = hcp.NodeSelector
+	switch hcp.ControllerAvailabilityPolicy {
+	case hypershift.HighlyAvailable:
 		ovnHypershiftResult.ControlPlaneReplicas = 3
 	default:
 		ovnHypershiftResult.ControlPlaneReplicas = 1
 	}
-	for _, svc := range hcp.Spec.Services {
-		// TODO: instead of the hardcoded string use ServiceType hyperv1.OVNSbDb once the API is updated
+	for _, svc := range hcp.Services {
 		if svc.Service == "OVNSbDb" {
 			s := svc.ServicePublishingStrategy
 			ovnHypershiftResult.ServicePublishingStrategy = &s
 		}
 	}
 	if ovnHypershiftResult.ServicePublishingStrategy == nil {
-		klog.Warningf("service publishing strategy for OVN southbound database does not exist in hyperv1.HostedControlPlane %s/%s. Defaulting to route", hc.Name, hc.Namespace)
-		ovnHypershiftResult.ServicePublishingStrategy = &hyperv1.ServicePublishingStrategy{
-			Type: hyperv1.Route,
+		klog.Warningf("service publishing strategy for OVN southbound database does not exist in HostedControlPlane %s/%s. Defaulting to route", hc.Name, hc.Namespace)
+		ovnHypershiftResult.ServicePublishingStrategy = &hypershift.ServicePublishingStrategy{
+			Type: hypershift.Route,
 		}
 	}
 
@@ -706,7 +704,7 @@ func bootstrapOVNHyperShiftConfig(hc *hypershift.HyperShiftConfig, kubeClient cn
 	}
 
 	switch ovnHypershiftResult.ServicePublishingStrategy.Type {
-	case hyperv1.Route:
+	case hypershift.Route:
 		{
 			route := &routev1.Route{}
 			gvr := schema.GroupVersionResource{
@@ -738,7 +736,7 @@ func bootstrapOVNHyperShiftConfig(hc *hypershift.HyperShiftConfig, kubeClient cn
 				klog.Infof("Overriding OVN configuration route to %s", ovnHypershiftResult.OVNSbDbRouteHost)
 			}
 		}
-	case hyperv1.NodePort:
+	case hypershift.NodePort:
 		{
 			svc := &corev1.Service{}
 			clusterClient := kubeClient.ClientFor(names.ManagementClusterName)

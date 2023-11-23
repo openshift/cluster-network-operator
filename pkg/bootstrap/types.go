@@ -2,14 +2,14 @@ package bootstrap
 
 import (
 	configv1 "github.com/openshift/api/config/v1"
-	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 )
 
 type OVNHyperShiftBootstrapResult struct {
 	Enabled                   bool
 	ClusterID                 string
 	Namespace                 string
-	ServicePublishingStrategy *hyperv1.ServicePublishingStrategy
+	ServicePublishingStrategy *hypershift.ServicePublishingStrategy
 	OVNSbDbRouteHost          string
 	OVNSbDbRouteNodePort      int32
 	OVNSbDbRouteLabels        map[string]string
@@ -86,7 +86,7 @@ type InfraStatus struct {
 	Proxy configv1.ProxyStatus
 
 	// HostedControlPlane defines the hosted control plane, only used in HyperShift
-	HostedControlPlane *hyperv1.HostedControlPlane
+	HostedControlPlane *hypershift.HostedControlPlane
 
 	// NetworkNodeIdentityEnabled define if the network node identity feature should be enabled
 	NetworkNodeIdentityEnabled bool

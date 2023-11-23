@@ -29,7 +29,6 @@ import (
 	op_netopv1 "github.com/openshift/api/networkoperator/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
-	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -40,7 +39,6 @@ const (
 
 func init() {
 	utilruntime.Must(operv1.Install(scheme.Scheme))
-	utilruntime.Must(hyperv1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(configv1.Install(scheme.Scheme))
 	utilruntime.Must(netopv1.Install(scheme.Scheme))
 	utilruntime.Must(machineapi.AddToScheme(scheme.Scheme))

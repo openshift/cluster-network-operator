@@ -97,8 +97,8 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 		data.Data["ManagementServiceCABundle"] = base64.URLEncoding.EncodeToString([]byte(ca))
 
 		data.Data["ClusterIDLabel"] = hypershift.ClusterIDLabel
-		data.Data["ClusterID"] = bootstrapResult.Infra.HostedControlPlane.Spec.ClusterID
-		data.Data["HCPNodeSelector"] = bootstrapResult.Infra.HostedControlPlane.Spec.NodeSelector
+		data.Data["ClusterID"] = bootstrapResult.Infra.HostedControlPlane.ClusterID
+		data.Data["HCPNodeSelector"] = bootstrapResult.Infra.HostedControlPlane.NodeSelector
 
 		data.Data["ReleaseImage"] = hsc.ReleaseImage
 	}
