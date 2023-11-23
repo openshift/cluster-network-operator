@@ -65,6 +65,12 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
+logging:
+  flushFrequency: 0
+  options:
+    json:
+      infoBufferSize: "0"
+  verbosity: 0
 metricsBindAddress: 0.0.0.0:9102
 mode: iptables
 nodePortAddresses: null
@@ -128,6 +134,12 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
+logging:
+  flushFrequency: 0
+  options:
+    json:
+      infoBufferSize: "0"
+  verbosity: 0
 metricsBindAddress: 5.6.7.8:9999
 mode: userspace
 nodePortAddresses: null
@@ -187,6 +199,12 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
+logging:
+  flushFrequency: 0
+  options:
+    json:
+      infoBufferSize: "0"
+  verbosity: 0
 metricsBindAddress: 5.6.7.8:9102
 mode: iptables
 nodePortAddresses: null
@@ -246,6 +264,12 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
+logging:
+  flushFrequency: 0
+  options:
+    json:
+      infoBufferSize: "0"
+  verbosity: 0
 metricsBindAddress: 0.0.0.0:9999
 mode: iptables
 nodePortAddresses: null
@@ -310,6 +334,12 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
+logging:
+  flushFrequency: 0
+  options:
+    json:
+      infoBufferSize: "0"
+  verbosity: 0
 metricsBindAddress: 0.0.0.0:9102
 mode: iptables
 nodePortAddresses: null
