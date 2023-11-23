@@ -11,8 +11,8 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
@@ -78,7 +78,7 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 
 	webhookReady := false
 	// HyperShift specific
-	if hcpCfg := platform.NewHyperShiftConfig(); hcpCfg.Enabled {
+	if hcpCfg := hypershift.NewHyperShiftConfig(); hcpCfg.Enabled {
 		webhookCAClient = client.ClientFor(names.ManagementClusterName)
 		webhookCALookup = types.NamespacedName{Name: "openshift-service-ca.crt", Namespace: hcpCfg.Namespace}
 		caKey = "service-ca.crt"

@@ -10,13 +10,13 @@ import (
 	"sync"
 
 	"github.com/ghodss/yaml"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/platform"
 	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 	cohelpers "github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
 	operstatus "github.com/openshift/library-go/pkg/operator/status"
@@ -84,7 +84,7 @@ type StatusManager struct {
 
 	client           cnoclient.Client
 	name             string
-	hyperShiftConfig *platform.HyperShiftConfig
+	hyperShiftConfig *hypershift.HyperShiftConfig
 
 	failing         [maxStatusLevel]*operv1.OperatorCondition
 	installComplete bool
@@ -112,7 +112,7 @@ func New(client cnoclient.Client, name, cluster string) *StatusManager {
 	status := &StatusManager{
 		client:           client,
 		name:             name,
-		hyperShiftConfig: platform.NewHyperShiftConfig(),
+		hyperShiftConfig: hypershift.NewHyperShiftConfig(),
 
 		dsInformers:  map[string]cache.SharedIndexInformer{},
 		dsListers:    map[string]DaemonSetLister{},
@@ -140,10 +140,10 @@ func (status *StatusManager) setClusterOperAnnotation(obj *configv1.ClusterOpera
 }
 
 // getClusterOperAnnotation gets an annotation from the clusterOperator network object
-func (status *StatusManager) getClusterOperAnnotation(obj *configv1.ClusterOperator) ([]platform.RelatedObject, error) {
+func (status *StatusManager) getClusterOperAnnotation(obj *configv1.ClusterOperator) ([]hypershift.RelatedObject, error) {
 	new := obj.DeepCopy()
 	anno := new.GetAnnotations()
-	objs := []platform.RelatedObject{}
+	objs := []hypershift.RelatedObject{}
 
 	value, set := anno[names.RelatedClusterObjectsAnnotation]
 	if !set || value == "" {
@@ -159,7 +159,7 @@ func (status *StatusManager) getClusterOperAnnotation(obj *configv1.ClusterOpera
 			return objs, fmt.Errorf("'%s' annotation is invalid, expected: ClusterName/Group/Resource/Namespace/Name, got: %s",
 				names.RelatedClusterObjectsAnnotation, res)
 		}
-		objs = append(objs, platform.RelatedObject{
+		objs = append(objs, hypershift.RelatedObject{
 			ClusterName: parts[0],
 			ObjectReference: configv1.ObjectReference{
 				Group:     parts[1],
@@ -314,7 +314,7 @@ func (status *StatusManager) writeHypershiftStatus(operStatus *operv1.NetworkSta
 				}
 
 				newCondition := metav1.Condition{
-					Type:    platform.HyperShiftConditionTypePrefix + cond.Type,
+					Type:    hypershift.HyperShiftConditionTypePrefix + cond.Type,
 					Status:  metav1.ConditionStatus(cond.Status),
 					Reason:  reason,
 					Message: cond.Message,
@@ -605,7 +605,7 @@ func (status *StatusManager) SetRelatedObjects(relatedObjects []configv1.ObjectR
 	status.relatedObjects = relatedObjects
 }
 
-func (status *StatusManager) SetRelatedClusterObjects(relatedObjects []platform.RelatedObject) {
+func (status *StatusManager) SetRelatedClusterObjects(relatedObjects []hypershift.RelatedObject) {
 	status.Lock()
 	defer status.Unlock()
 	status.hyperShiftConfig.RelatedObjects = relatedObjects
