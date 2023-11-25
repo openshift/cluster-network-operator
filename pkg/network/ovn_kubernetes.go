@@ -2591,6 +2591,9 @@ func validateIPForwarding(ipForwarding operv1.IPForwardingMode) error {
 	if ipForwarding == operv1.IPForwardingGlobal {
 		return nil
 	}
-	return fmt.Errorf("Invalid ipForwarding %q. Valid values are \"\", %q, %q ",
-		ipForwarding, operv1.IPForwardingRestricted, operv1.IPForwardingGlobal)
+	if ipForwarding == "RestrictedPhysical" {
+		return nil
+	}
+	return fmt.Errorf("Invalid ipForwarding %q. Valid values are \"\", %q, %q, %q ",
+		ipForwarding, operv1.IPForwardingRestricted, operv1.IPForwardingGlobal, "RestrictedPhysical")
 }

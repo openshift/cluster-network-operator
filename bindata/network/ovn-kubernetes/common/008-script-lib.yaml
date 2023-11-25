@@ -562,6 +562,10 @@ data:
       if [ "{{.IP_FORWARDING_MODE}}" == "Global" ]; then
         sysctl -w net.ipv4.ip_forward=1
         sysctl -w net.ipv6.conf.all.forwarding=1
+      elif [ "{{.IP_FORWARDING_MODE}}" == "RestrictedPhysical" ]; then
+        sysctl -w net.ipv4.ip_forward=1
+        sysctl -w net.ipv6.conf.all.forwarding=1
+        ip_forwarding_flag="--disable-forwarding"
       else
         ip_forwarding_flag="--disable-forwarding"
       fi
