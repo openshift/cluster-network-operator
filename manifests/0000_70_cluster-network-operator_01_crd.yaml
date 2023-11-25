@@ -425,15 +425,12 @@ spec:
                       ipsecExternal:
                         description: ipsecExtern enables external (North-South). This will only install IPsec and enable it's service. The actuall NS IPsec policies should be specified by users. This can be done with k8s-nmstate operator. ipsecExternal and ipsecConfig can be enabled together
                         type: object
-                        required:
-                          - state
                         properties:
                           state:
                             description: State controls the node's external (aka NS) ipsec service state.
                             type: string
                             default: Disabled
                             enum:
-                              - ""
                               - Enabled
                               - Disabled
                       mtu:
