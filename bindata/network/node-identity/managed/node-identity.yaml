@@ -11,6 +11,7 @@ metadata:
   labels:
     # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
     hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+    hypershift.openshift.io/control-plane: "true"
 spec:
   replicas: {{.NetworkNodeIdentityReplicas}}
 {{ if (gt .NetworkNodeIdentityReplicas 1)}}
@@ -34,6 +35,8 @@ spec:
         type: infra
         openshift.io/component: network
         hypershift.openshift.io/control-plane-component: network-node-identity
+        hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+        hypershift.openshift.io/control-plane: "true"
         kubernetes.io/os: "linux"
     spec:
       affinity:
@@ -100,7 +103,7 @@ spec:
               source "/env/_master"
               set +o allexport
             fi
-            
+
             retries=0
             while [ ! -f /var/run/secrets/hosted_cluster/token ]; do
               (( retries += 1 ))
@@ -163,7 +166,7 @@ spec:
               source "/env/_master"
               set +o allexport
             fi
-            
+
             retries=0
             while [ ! -f /var/run/secrets/hosted_cluster/token ]; do
               (( retries += 1 ))

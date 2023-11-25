@@ -15,6 +15,7 @@ metadata:
   labels:
     # used by PodAffinity to prefer co-locating pods that belong to the same hosted cluster.
     hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
+    hypershift.openshift.io/control-plane: "true"
 spec:
   selector:
     matchLabels:
@@ -38,6 +39,8 @@ spec:
         type: infra
         openshift.io/component: network
         hypershift.openshift.io/control-plane-component: ovnkube-control-plane
+        hypershift.openshift.io/control-plane: "true"
+        hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
         kubernetes.io/os: "linux"
     spec:
       affinity:
