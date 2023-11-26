@@ -487,11 +487,11 @@ type IPsecConfig struct {
 type IPSecExternal struct {
 	// State controls the node's external (aka NS) ipsec service state.
 	// +kubebuilder:default=Disabled
-	// +default=Disabled
+	// +default="Disabled"
 	// +kubebuilder:validation:Enum=Enabled;Disabled
 	// +kubebuilder:validation:optional
 	// +optional
-	State IPSecExternalState `json:"state",omitempty`
+	State IPSecExternalState `json:"state,omitempty"`
 }
 
 type IPForwardingMode string
