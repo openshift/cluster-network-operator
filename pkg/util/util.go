@@ -22,6 +22,7 @@ const OVN_CONTROLLER = "ovnkube-controller"
 const SDN_NAMESPACE = "openshift-sdn"
 const MTU_CM_NAMESPACE = "openshift-network-operator"
 const MTU_CM_NAME = "mtu"
+const OVN_NBDB = "nbdb"
 
 func GetInterConnectConfigMap(kubeClient kubernetes.Interface) (*corev1.ConfigMap, error) {
 	return kubeClient.CoreV1().ConfigMaps(OVN_NAMESPACE).Get(context.TODO(), OVN_INTERCONNECT_CONFIGMAP_NAME, metav1.GetOptions{})
