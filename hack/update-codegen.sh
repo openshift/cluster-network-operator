@@ -27,7 +27,7 @@ if ( ! ( command -v controller-gen > /dev/null )  || test "$(controller-gen --ve
   fi
 fi
 
-bash "${SCRIPT_ROOT}/vendor/k8s.io/code-generator/generate-groups.sh" deepcopy \
+bash "${SCRIPT_ROOT}/vendor/k8s.io/code-generator/kube_codegen.sh" deepcopy \
   github.com/openshift/openshift-network-operator/pkg/generated github.com/openshift/cluster-network-operator/pkg/apis \
   "network:v1" \
   --go-header-file "${SCRIPT_ROOT}/hack/custom-boilerplate.go.txt"
