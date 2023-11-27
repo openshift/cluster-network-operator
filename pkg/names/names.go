@@ -79,6 +79,10 @@ const ClusterNetworkCIDRsAnnotation = "networkoperator.openshift.io/cluster-netw
 // to indicate the current state of of the Hybrid overlay on the cluster: "enabled" or "disabled"
 const NetworkHybridOverlayAnnotation = "networkoperator.openshift.io/hybrid-overlay-status"
 
+// IPsecEnableAnnotation is an annotation on the OVN networks.operator.openshift.io
+// daemonsets to indicate if ipsec is enabled for the OVN networks.
+const IPsecEnableAnnotation = "networkoperator.openshift.io/ipsec-enabled"
+
 // RolloutHungAnnotation is set to "" if it is detected that a rollout
 // (i.e. DaemonSet or Deployment) is not making progress, unset otherwise.
 const RolloutHungAnnotation = "networkoperator.openshift.io/rollout-hung"

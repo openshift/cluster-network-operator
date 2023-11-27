@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	configv1 "github.com/openshift/api/config/v1"
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 )
 
@@ -38,6 +39,8 @@ type OVNUpdateStatus struct {
 	IPFamilyMode        string
 	ClusterNetworkCIDRs string
 	Progressing         bool
+	LegacyIPsecUpgrade  bool // true if IPsec in 4.14 or Pre-4.14 cluster is upgraded to latest version
+	OVNIPsecActive      bool // set to true unless we are sure it is not.
 }
 
 type OVNBootstrapResult struct {
@@ -82,6 +85,18 @@ type InfraStatus struct {
 
 	// NetworkNodeIdentityEnabled define if the network node identity feature should be enabled
 	NetworkNodeIdentityEnabled bool
+
+	// MasterIPsecMachineConfig contains ipsec machine config object of master nodes.
+	MasterIPsecMachineConfig *machineconfigv1.MachineConfig
+
+	// WorkerIPsecMachineConfig contains ipsec machine config object of worker nodes.
+	WorkerIPsecMachineConfig *machineconfigv1.MachineConfig
+
+	// MasterMCPStatus contains machine config pool status of master nodes.
+	MasterMCPStatus machineconfigv1.MachineConfigPoolStatus
+
+	// WorkerMCPStatus contains machine config pool status of worker nodes.
+	WorkerMCPStatus machineconfigv1.MachineConfigPoolStatus
 }
 
 // APIServer is the hostname & port of a given APIServer. (This is the
