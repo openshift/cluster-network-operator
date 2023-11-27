@@ -8,11 +8,11 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 )
@@ -108,13 +108,18 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		}
 	}
 
-	if hc := NewHyperShiftConfig(); hc.Enabled {
-		hcp := &hyperv1.HostedControlPlane{ObjectMeta: metav1.ObjectMeta{Name: hc.Name}}
+	if hc := hypershift.NewHyperShiftConfig(); hc.Enabled {
+		hcp := &unstructured.Unstructured{}
+		hcp.SetGroupVersionKind(hypershift.HostedControlPlaneGVK)
 		err := client.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, hcp)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve HostedControlPlane %s: %v", types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, err)
 		}
-		res.HostedControlPlane = hcp
+
+		res.HostedControlPlane, err = hypershift.ParseHostedControlPlane(hcp)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parsing HostedControlPlane %s: %v", types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, err)
+		}
 	}
 
 	netIDEnabled, err := isNetworkNodeIdentityEnabled(client)

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/pkg/errors"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -375,8 +376,8 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	objs = append([]*uns.Unstructured{app}, objs...)
 
 	relatedObjects := []configv1.ObjectReference{}
-	relatedClusterObjects := []platform.RelatedObject{}
-	hcpCfg := platform.NewHyperShiftConfig()
+	relatedClusterObjects := []hypershift.RelatedObject{}
+	hcpCfg := hypershift.NewHyperShiftConfig()
 	for _, obj := range objs {
 		// Label all DaemonSets, Deployments, and StatefulSets with the label that generates Status.
 		if obj.GetAPIVersion() == "apps/v1" && (obj.GetKind() == "DaemonSet" || obj.GetKind() == "Deployment" || obj.GetKind() == "StatefulSet") {
@@ -400,7 +401,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			continue
 		}
 		if apply.GetClusterName(obj) != "" {
-			relatedClusterObjects = append(relatedClusterObjects, platform.RelatedObject{
+			relatedClusterObjects = append(relatedClusterObjects, hypershift.RelatedObject{
 				ObjectReference: configv1.ObjectReference{
 					Group:     obj.GetObjectKind().GroupVersionKind().Group,
 					Resource:  restMapping.Resource.Resource,

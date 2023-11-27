@@ -10,21 +10,19 @@ import (
 	"sync"
 
 	"github.com/ghodss/yaml"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/platform"
-	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 	cohelpers "github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
 	operstatus "github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -56,8 +54,7 @@ const (
 )
 
 const (
-	ClusteredNameSeparator                 = '/'
-	statusManagerAsExpectedConditionReason = "AsExpected"
+	ClusteredNameSeparator = '/'
 )
 
 type ClusteredName struct {
@@ -84,7 +81,7 @@ type StatusManager struct {
 
 	client           cnoclient.Client
 	name             string
-	hyperShiftConfig *platform.HyperShiftConfig
+	hyperShiftConfig *hypershift.HyperShiftConfig
 
 	failing         [maxStatusLevel]*operv1.OperatorCondition
 	installComplete bool
@@ -112,7 +109,7 @@ func New(client cnoclient.Client, name, cluster string) *StatusManager {
 	status := &StatusManager{
 		client:           client,
 		name:             name,
-		hyperShiftConfig: platform.NewHyperShiftConfig(),
+		hyperShiftConfig: hypershift.NewHyperShiftConfig(),
 
 		dsInformers:  map[string]cache.SharedIndexInformer{},
 		dsListers:    map[string]DaemonSetLister{},
@@ -140,10 +137,10 @@ func (status *StatusManager) setClusterOperAnnotation(obj *configv1.ClusterOpera
 }
 
 // getClusterOperAnnotation gets an annotation from the clusterOperator network object
-func (status *StatusManager) getClusterOperAnnotation(obj *configv1.ClusterOperator) ([]platform.RelatedObject, error) {
+func (status *StatusManager) getClusterOperAnnotation(obj *configv1.ClusterOperator) ([]hypershift.RelatedObject, error) {
 	new := obj.DeepCopy()
 	anno := new.GetAnnotations()
-	objs := []platform.RelatedObject{}
+	objs := []hypershift.RelatedObject{}
 
 	value, set := anno[names.RelatedClusterObjectsAnnotation]
 	if !set || value == "" {
@@ -159,7 +156,7 @@ func (status *StatusManager) getClusterOperAnnotation(obj *configv1.ClusterOpera
 			return objs, fmt.Errorf("'%s' annotation is invalid, expected: ClusterName/Group/Resource/Namespace/Name, got: %s",
 				names.RelatedClusterObjectsAnnotation, res)
 		}
-		objs = append(objs, platform.RelatedObject{
+		objs = append(objs, hypershift.RelatedObject{
 			ClusterName: parts[0],
 			ObjectReference: configv1.ObjectReference{
 				Group:     parts[1],
@@ -287,55 +284,27 @@ func (status *StatusManager) writeHypershiftStatus(operStatus *operv1.NetworkSta
 		return
 	}
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		hcp := &hyperv1.HostedControlPlane{ObjectMeta: metav1.ObjectMeta{Name: status.hyperShiftConfig.Name}}
-		err := status.client.ClientFor(names.ManagementClusterName).CRClient().Get(
-			context.TODO(), types.NamespacedName{Namespace: status.hyperShiftConfig.Namespace, Name: status.hyperShiftConfig.Name}, hcp)
+
+		hcp := &uns.Unstructured{}
+		hcp.SetGroupVersionKind(hypershift.HostedControlPlaneGVK)
+		err := status.client.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: status.hyperShiftConfig.Namespace, Name: status.hyperShiftConfig.Name}, hcp)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				log.Printf("Did not find hostedControlPlane")
-			} else {
-				return err
-			}
+			return err
 		}
 
-		oldStatus := hcp.Status.DeepCopy()
-		if operStatus == nil {
-			meta.SetStatusCondition(&hcp.Status.Conditions, metav1.Condition{
-				Type:    "NetworkOperatorAvailable",
-				Status:  metav1.ConditionUnknown,
-				Reason:  "NoNetworkOperConfig",
-				Message: "No networks.operator.openshift.io cluster found",
-			})
-		} else {
-			for _, cond := range operStatus.Conditions {
-				reason := statusManagerAsExpectedConditionReason
-				if cond.Reason != "" {
-					reason = cond.Reason
-				}
-
-				newCondition := metav1.Condition{
-					Type:    platform.HyperShiftConditionTypePrefix + cond.Type,
-					Status:  metav1.ConditionStatus(cond.Status),
-					Reason:  reason,
-					Message: cond.Message,
-				}
-				meta.SetStatusCondition(&hcp.Status.Conditions, newCondition)
-			}
+		updatedConditions, err := hypershift.SetHostedControlPlaneConditions(hcp, operStatus)
+		if err != nil {
+			return fmt.Errorf("failed to set HostedControlPlane conditions: %v", err)
 		}
-
-		if reflect.DeepEqual(*oldStatus, hcp.Status) {
+		if len(updatedConditions) == 0 {
+			// nothing changed, return
 			return nil
-		}
-
-		buf, err := yaml.Marshal(hcp.Status.Conditions)
-		if err != nil {
-			buf = []byte(fmt.Sprintf("(failed to convert to YAML: %s)", err))
 		}
 
 		if err := status.client.ClientFor(names.ManagementClusterName).CRClient().Status().Update(context.TODO(), hcp); err != nil {
 			return err
 		}
-		log.Printf("Set HostedControlPlane conditions:\n%s", buf)
+		log.Printf("Set HostedControlPlane conditions:\n%v", updatedConditions)
 		return nil
 	})
 	if err != nil {
@@ -605,7 +574,7 @@ func (status *StatusManager) SetRelatedObjects(relatedObjects []configv1.ObjectR
 	status.relatedObjects = relatedObjects
 }
 
-func (status *StatusManager) SetRelatedClusterObjects(relatedObjects []platform.RelatedObject) {
+func (status *StatusManager) SetRelatedClusterObjects(relatedObjects []hypershift.RelatedObject) {
 	status.Lock()
 	defer status.Unlock()
 	status.hyperShiftConfig.RelatedObjects = relatedObjects
