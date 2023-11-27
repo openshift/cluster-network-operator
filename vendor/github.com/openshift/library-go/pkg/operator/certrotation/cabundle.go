@@ -28,6 +28,8 @@ type CABundleConfigMap struct {
 	Namespace string
 	// Name is the name of the ConfigMap to maintain.
 	Name string
+	// Owner is an optional reference to add to the secret that this rotator creates.
+	Owner *metav1.OwnerReference
 
 	// Plumbing:
 	Informer      corev1informers.ConfigMapInformer
@@ -47,6 +49,9 @@ func (c CABundleConfigMap) ensureConfigMapCABundle(ctx context.Context, signingC
 	if apierrors.IsNotFound(err) {
 		// create an empty one
 		caBundleConfigMap = &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: c.Namespace, Name: c.Name}}
+	}
+	if c.Owner != nil {
+		ensureOwnerReference(&caBundleConfigMap.ObjectMeta, c.Owner)
 	}
 	updatedCerts, err := manageCABundleConfigMap(caBundleConfigMap, signingCertKeyPair.Config.Certs[0])
 	if err != nil {
