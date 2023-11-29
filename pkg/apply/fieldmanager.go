@@ -51,43 +51,9 @@ func mergeManager(ctx context.Context, clusterClient client.ClusterClient, us *u
 			if err != nil {
 				return fmt.Errorf("failed to patch (type %s) for object %s %s: %v", patchType, objGVR.String(), us.GetName(), err)
 			}
-			// remove the old manager
-			removeManagerPatch, err := createRemoveManagerPatch(us, fromManager)
-			if err != nil {
-				return fmt.Errorf("failed to create remove manager patch for object %s %s: %v", objGVR.String(), us.GetName(), err)
-			}
-
-			if len(removeManagerPatch) > 0 {
-				_, err = clusterClient.Dynamic().Resource(objGVR).Namespace(us.GetNamespace()).Patch(ctx, us.GetName(), types.JSONPatchType,
-					removeManagerPatch, metav1.PatchOptions{})
-				if err != nil {
-					return fmt.Errorf("failed to apply remove manager patch for object %s %s: %v", objGVR.String(), us.GetName(), err)
-				}
-			}
 		}
 	}
 	return nil
-}
-
-// createRemoveManagerPatch creates a JSON patch to remove the entries of a specified manager
-func createRemoveManagerPatch(us *unstructured.Unstructured, manager string) ([]byte, error) {
-	var newManagedFields []metav1.ManagedFieldsEntry
-	for _, m := range us.GetManagedFields() {
-		if m.Manager != manager {
-			newManagedFields = append(newManagedFields, m)
-		}
-	}
-
-	// Generate the patch to update the managedFields
-	patch := []map[string]interface{}{
-		{
-			"op":    "replace",
-			"path":  "/metadata/managedFields",
-			"value": newManagedFields,
-		},
-	}
-
-	return json.Marshal(patch)
 }
 
 func doesManagerOpExist(mfs []metav1.ManagedFieldsEntry, managerName string, ops ...metav1.ManagedFieldsOperationType) bool {
