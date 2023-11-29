@@ -125,6 +125,9 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 		log.Printf("could not encode %s for apply", objDesc)
 		return fmt.Errorf("could not encode for patching: %w", err)
 	}
+	if strings.Contains(objDesc, "operator.openshift.io/v1") {
+		log.Printf("DEBUG: Applying: %s", string(data))
+	}
 	us, err := clusterClient.Dynamic().Resource(rm.Resource).Namespace(namespace).Patch(ctx, name, types.ApplyPatchType, data, patchOptions, subresources...)
 	if err != nil {
 		return fmt.Errorf("failed to apply / update %s: %w", objDesc, err)
