@@ -1054,6 +1054,22 @@ type ContainerLoggingDestinationParameters struct {
 }
 
 // LoggingDestination describes a destination for log messages.
+// + ---
+// + We added the spec.logging.access.destination.container and
+// + spec.logging.access.destination.syslog fields in OpenShift 4.5 without any
+// + validation rules to prevent the user from specifying both fields at the
+// + same time.  Adding such validation rules in a subsequent release would
+// + break API compatibility between releases.
+// +
+// + We added the spec.logging.access.destination.container.maxLength field in
+// + OpenShift 4.14, and we added the following validation rules in the same
+// + release, so they do not break compatibility between releases.  Note that
+// + API defaulting requires us to allow the default value for
+// + container.maxLength if container is non-null even when type is Syslog.
+// +
+// +kubebuilder:validation:XValidation:rule=`!has(self.type) || self.type == "Container" || !has(self.container) || !has(self.container.maxLength) || self.container.maxLength == 1024`,message="container cannot be specified unless type is Container"
+// +kubebuilder:validation:XValidation:rule=`!has(self.container) || !has(self.container.maxLength) || self.container.maxLength == 1024 || !has(self.syslog)`,message="container and syslog cannot both be specified at the same time"
+//
 // +union
 type LoggingDestination struct {
 	// type is the type of destination for logs.  It must be one of the
@@ -1473,11 +1489,11 @@ type IngressControllerHTTPHeader struct {
 	// The name must consist only of alphanumeric and the following special characters, "-!#$%&'*+.^_`".
 	// The following header names are reserved and may not be modified via this API:
 	// Strict-Transport-Security, Proxy, Host, Cookie, Set-Cookie.
-	// It must be no more than 1024 characters in length.
+	// It must be no more than 255 characters in length.
 	// Header name must be unique.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=1024
+	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:Pattern="^[-!#$%&'*+.0-9A-Z^_`a-z|~]+$"
 	// +kubebuilder:validation:XValidation:rule="self.lowerAscii() != 'strict-transport-security'",message="strict-transport-security header may not be modified via header actions"
 	// +kubebuilder:validation:XValidation:rule="self.lowerAscii() != 'proxy'",message="proxy header may not be modified via header actions"

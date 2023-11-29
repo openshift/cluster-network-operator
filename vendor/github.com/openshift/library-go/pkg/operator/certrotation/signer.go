@@ -37,6 +37,13 @@ type RotatedSigningCASecret struct {
 	// rotation on expiration only, but not interfere with the ordinary rotation controller.
 	RefreshOnlyWhenExpired bool
 
+	// Owner is an optional reference to add to the secret that this rotator creates. Use this when downstream
+	// consumers of the signer CA need to be aware of changes to the object.
+	// WARNING: be careful when using this option, as deletion of the owning object will cascade into deletion
+	// of the signer. If the lifetime of the owning object is not a superset of the lifetime in which the signer
+	// is used, early deletion will be catastrophic.
+	Owner *metav1.OwnerReference
+
 	// Plumbing:
 	Informer      corev1informers.SecretInformer
 	Lister        corev1listers.SecretLister
@@ -55,6 +62,10 @@ func (c RotatedSigningCASecret) ensureSigningCertKeyPair(ctx context.Context) (*
 		signingCertKeyPairSecret = &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: c.Namespace, Name: c.Name}}
 	}
 	signingCertKeyPairSecret.Type = corev1.SecretTypeTLS
+
+	if c.Owner != nil {
+		ensureOwnerReference(&signingCertKeyPairSecret.ObjectMeta, c.Owner)
+	}
 
 	if needed, reason := needNewSigningCertKeyPair(signingCertKeyPairSecret.Annotations, c.Refresh, c.RefreshOnlyWhenExpired); needed {
 		c.EventRecorder.Eventf("SignerUpdateRequired", "%q in %q requires a new signing cert/key pair: %v", c.Name, c.Namespace, reason)
@@ -77,6 +88,20 @@ func (c RotatedSigningCASecret) ensureSigningCertKeyPair(ctx context.Context) (*
 	}
 
 	return signingCertKeyPair, nil
+}
+
+// ensureOwnerReference adds the owner to the list of owner references in meta, if necessary
+func ensureOwnerReference(meta *metav1.ObjectMeta, owner *metav1.OwnerReference) {
+	var found bool
+	for _, ref := range meta.OwnerReferences {
+		if ref == *owner {
+			found = true
+			break
+		}
+	}
+	if !found {
+		meta.OwnerReferences = append(meta.OwnerReferences, *owner)
+	}
 }
 
 func needNewSigningCertKeyPair(annotations map[string]string, refresh time.Duration, refreshOnlyWhenExpired bool) (bool, string) {
