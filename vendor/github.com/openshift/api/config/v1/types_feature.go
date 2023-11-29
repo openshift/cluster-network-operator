@@ -163,23 +163,31 @@ var FeatureSets = map[FeatureSet]*FeatureGateEnabledDisabled{
 		Disabled: []FeatureGateDescription{},
 	},
 	TechPreviewNoUpgrade: newDefaultFeatures().
-		without(validatingAdmissionPolicy).
+		with(validatingAdmissionPolicy).
 		with(csiDriverSharedResource).
 		with(nodeSwap).
 		with(machineAPIProviderOpenStack).
 		with(insightsConfigAPI).
-		with(retroactiveDefaultStorageClass).
 		with(dynamicResourceAllocation).
 		with(gateGatewayAPI).
 		with(maxUnavailableStatefulSet).
 		without(eventedPleg).
 		with(sigstoreImageVerification).
 		with(gcpLabelsTags).
+		with(gcpClusterHostedDNS).
 		with(vSphereStaticIPs).
 		with(routeExternalCertificate).
 		with(automatedEtcdBackup).
+		with(vSphereControlPlaneMachineset).
 		without(machineAPIOperatorDisableMachineHealthCheckController).
 		with(adminNetworkPolicy).
+		with(dnsNameResolver).
+		with(machineConfigNodes).
+		with(metricsServer).
+		with(installAlternateInfrastructureAWS).
+		without(clusterAPIInstall).
+		with(sdnLiveMigration).
+		with(mixedCPUsAllocation).
 		toFeatures(defaultFeatures),
 	LatencySensitive: newDefaultFeatures().
 		toFeatures(defaultFeatures),
@@ -198,9 +206,7 @@ var defaultFeatures = &FeatureGateEnabledDisabled{
 		privateHostedZoneAWS,
 		buildCSIVolumes,
 	},
-	Disabled: []FeatureGateDescription{
-		retroactiveDefaultStorageClass,
-	},
+	Disabled: []FeatureGateDescription{},
 }
 
 type featureSetBuilder struct {
