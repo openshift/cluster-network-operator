@@ -163,8 +163,6 @@ spec:
                   x-kubernetes-list-type: set
                 status:
                   type: string
-              required:
-                - messages
               type: object
           required:
             - spec
@@ -725,9 +723,6 @@ spec:
                 description: A concise indication of whether the AdminPolicyBasedRoute
                   resource is applied with success
                 type: string
-            required:
-            - lastTransitionTime
-            - messages
             type: object
         required:
         - spec

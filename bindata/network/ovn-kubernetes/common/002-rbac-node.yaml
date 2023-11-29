@@ -138,6 +138,7 @@ rules:
   resources:
   - adminpolicybasedexternalroutes
   - egressfirewalls
+  - egressfirewalls/status
   - egressips
   - egressqoses
   - egressservices
