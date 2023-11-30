@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -34,7 +35,7 @@ import (
 
 var labelSelector = labels.Set{names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL: "true"}
 
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, _ featuregates.FeatureGate) error {
 	reconciler := newReconciler(mgr, status, c)
 	if reconciler == nil {
 		return fmt.Errorf("failed to create reconciler")

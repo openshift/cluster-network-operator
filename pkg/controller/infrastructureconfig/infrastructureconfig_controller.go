@@ -11,6 +11,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -26,7 +27,7 @@ import (
 const ControllerName = "infrastructureconfig"
 
 // Add attaches our control loop to the manager and watches for infrastructure objects
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, _ featuregates.FeatureGate) error {
 	return add(mgr, newReconciler(mgr, status, c))
 }
 

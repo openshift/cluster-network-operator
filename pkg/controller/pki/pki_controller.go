@@ -19,6 +19,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/eventrecorder"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/crypto"
@@ -42,7 +43,7 @@ const (
 )
 
 // Add attaches our control loop to the manager and watches for PKI objects
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client, _ featuregates.FeatureGate) error {
 	r, err := newPKIReconciler(mgr, status)
 	if err != nil {
 		return err

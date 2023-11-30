@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -14,8 +13,6 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
-	configclient "github.com/openshift/client-go/config/clientset/versioned"
-	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
@@ -23,8 +20,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/network"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-	"github.com/openshift/library-go/pkg/operator/events"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,10 +27,8 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	v1coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -58,8 +51,8 @@ var ManifestPath = "./bindata"
 
 // Add creates a new OperConfig Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) error {
-	rc, err := newReconciler(mgr, status, c)
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, featureGates featuregates.FeatureGate) error {
+	rc, err := newReconciler(mgr, status, c, featureGates)
 	if err != nil {
 		return err
 	}
@@ -69,52 +62,7 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.C
 const ControllerName = "operconfig"
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) (*ReconcileOperConfig, error) {
-	kubeConfig := c.Default().Config()
-	kubeClient := c.Default().Kubernetes()
-	configClient, err := configclient.NewForConfig(kubeConfig)
-	if err != nil {
-		return nil, err
-	}
-	configInformers := configinformers.NewSharedInformerFactory(configClient, 10*time.Minute)
-	desiredVersion := os.Getenv("RELEASE_VERSION")
-	missingVersion := "0.0.1-snapshot"
-
-	eventRecorder := events.NewKubeRecorder(kubeClient.CoreV1().Events("openshift-network-operator"), "cluster-network-operator", &corev1.ObjectReference{
-		APIVersion: "apps/v1",
-		Kind:       "Deployment",
-		Namespace:  "openshift-network-operator",
-		Name:       "network-operator",
-	})
-
-	// By default, this will exit(0) the process if the featuregates ever change to a different set of values.
-	featureGateAccessor := featuregates.NewFeatureGateAccess(
-		desiredVersion, missingVersion,
-		configInformers.Config().V1().ClusterVersions(), configInformers.Config().V1().FeatureGates(),
-		eventRecorder,
-	)
-	// TODO: 1) If other controllers in CNO also want to use featureGates then we should move this code to outside
-	// operconfig-controller 2) For now we pass the neverStop channel; FIXME: use c.Default().AddCustomInformer and
-	// change this to pass a proper stop channel and context which are closed and cancelled properly upon exit.
-	go featureGateAccessor.Run(context.TODO())
-	go configInformers.Start(wait.NeverStop)
-	klog.Infof("Waiting for feature gates initialization...")
-	select {
-	case <-featureGateAccessor.InitialFeatureGatesObserved():
-		featureGates, err := featureGateAccessor.CurrentFeatureGates()
-		if err != nil {
-			return nil, err
-		} else {
-			klog.Infof("FeatureGates initialized: knownFeatureGates=%v", featureGates.KnownFeatures())
-		}
-	case <-time.After(1 * time.Minute):
-		return nil, fmt.Errorf("timed out waiting for FeatureGate detection")
-	}
-
-	featureGates, err := featureGateAccessor.CurrentFeatureGates()
-	if err != nil {
-		return nil, err
-	}
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, featureGates featuregates.FeatureGate) (*ReconcileOperConfig, error) {
 	return &ReconcileOperConfig{
 		client:       c,
 		status:       status,

@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller"
 	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
@@ -14,9 +17,12 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
+	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -86,6 +92,15 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		}
 		cluster = infraConfig.Status.InfrastructureName
 	}
+	klog.Infof("Creating feature gate accessor")
+	featureGateAccessor, err := setupFeatureGateAccessor(ctx, o.client.Default())
+	if err != nil {
+		return fmt.Errorf("failed to setup featuregate accessor: %w", err)
+	}
+	featureGates, err := featureGateAccessor.CurrentFeatureGates()
+	if err != nil {
+		return fmt.Errorf("failed to get current featuregates: %w", err)
+	}
 
 	klog.Infof("Creating status manager for %s cluster", cluster)
 	o.StatusManager = statusmanager.New(o.client, "network", cluster)
@@ -93,7 +108,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	// Add controller-runtime controllers
 	klog.Info("Adding controller-runtime controllers")
-	if err := controller.AddToManager(o.manager, o.StatusManager, o.client); err != nil {
+	if err := controller.AddToManager(o.manager, o.StatusManager, o.client, featureGates); err != nil {
 		return fmt.Errorf("failed to add controllers to manager: %w", err)
 	}
 
@@ -132,4 +147,47 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	<-ctx.Done()
 
 	return nil
+}
+
+// setupFeatureGateAccessor creates and starts a new feature gate accessor.
+// If the featuregates change at runtime, the process will exit(0)
+func setupFeatureGateAccessor(ctx context.Context, c cnoclient.ClusterClient) (featuregates.FeatureGateAccess, error) {
+	configClient, err := configclient.NewForConfig(c.Config())
+	if err != nil {
+		return nil, err
+	}
+	configInformers := configinformers.NewSharedInformerFactory(configClient, 10*time.Minute)
+	desiredVersion := os.Getenv("RELEASE_VERSION")
+	missingVersion := "0.0.1-snapshot"
+
+	eventRecorder := events.NewKubeRecorder(c.Kubernetes().CoreV1().Events("openshift-network-operator"), "cluster-network-operator", &corev1.ObjectReference{
+		APIVersion: "apps/v1",
+		Kind:       "Deployment",
+		Namespace:  "openshift-network-operator",
+		Name:       "network-operator",
+	})
+
+	// By default, this will exit(0) the process if the featuregates ever change to a different set of values.
+	featureGateAccessor := featuregates.NewFeatureGateAccess(
+		desiredVersion, missingVersion,
+		configInformers.Config().V1().ClusterVersions(), configInformers.Config().V1().FeatureGates(),
+		eventRecorder,
+	)
+
+	go featureGateAccessor.Run(ctx)
+	go configInformers.Start(ctx.Done())
+	klog.Infof("Waiting for feature gates initialization...")
+	select {
+	case <-featureGateAccessor.InitialFeatureGatesObserved():
+		featureGates, err := featureGateAccessor.CurrentFeatureGates()
+		if err != nil {
+			return nil, err
+		} else {
+			klog.Infof("FeatureGates initialized: knownFeatureGates=%v", featureGates.KnownFeatures())
+		}
+	case <-time.After(1 * time.Minute):
+		return nil, fmt.Errorf("timed out waiting for FeatureGate detection")
+	}
+
+	return featureGateAccessor, nil
 }

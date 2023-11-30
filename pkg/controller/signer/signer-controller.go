@@ -8,6 +8,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/library-go/pkg/crypto"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	csrv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -30,7 +31,7 @@ import (
 const signerName = "network.openshift.io/signer"
 
 // Add controller and start it when the Manager is started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client, _ featuregates.FeatureGate) error {
 	reconciler, err := newReconciler(mgr, status)
 	if err != nil {
 		return err

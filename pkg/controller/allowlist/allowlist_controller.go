@@ -11,6 +11,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -41,7 +42,7 @@ const (
 	allowlistManifestDir = "../../bindata/network/multus/004-sysctl-configmap.yaml"
 )
 
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, _ featuregates.FeatureGate) error {
 	return add(mgr, newReconciler(mgr, status, c))
 }
 

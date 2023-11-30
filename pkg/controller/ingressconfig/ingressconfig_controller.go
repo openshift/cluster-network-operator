@@ -9,6 +9,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,7 +36,7 @@ var ManifestPath = "./bindata"
 
 // Add creates a new ingressConfig controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client, _ featuregates.FeatureGate) error {
 
 	return add(mgr, newIngressConfigReconciler(mgr.GetClient(), status))
 }
