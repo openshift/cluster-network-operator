@@ -54,6 +54,10 @@ func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig
 }
 
 func (r *ReconcileOperConfig) UpdateOperConfig(ctx context.Context, operConfig *operv1.Network) error {
+	// OperConfig controller should not take the ownership of spec.migration
+	// as this is set only by the user or cluster config operator
+	operConfig.Spec.Migration = nil
+
 	operConfig.TypeMeta = metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}
 	us, err := k8sutil.ToUnstructured(operConfig)
 	if err != nil {
