@@ -230,6 +230,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVNHybridOverlayVXLANPort"] = ""
 	}
 
+	isIpsecUpgrade := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.LegacyIPsecUpgrade
 	IPsecMachineConfigEnable, OVNIPsecDaemonsetEnable, OVNIPsecEnable, renderIPsecHostDaemonSet, renderIPsecContainerizedDaemonSet,
 		renderIPsecDaemonSetAsCreateWaitOnly := shouldRenderIPsec(c, bootstrapResult)
 	data.Data["IPsecMachineConfigEnable"] = IPsecMachineConfigEnable
@@ -426,6 +427,28 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// Skip rendering ovn-ipsec-containerized daemonset when renderIPsecContainerizedDaemonSet flag is not set.
 	if !renderIPsecContainerizedDaemonSet {
 		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-containerized")
+	}
+
+	// The legacy ovn-ipsec deployment is only rendered during upgrades until we
+	// are ready to remove it.
+	if OVNIPsecDaemonsetEnable && isIpsecUpgrade {
+		ovnIPsecLegacyDS := &appsv1.DaemonSet{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "DaemonSet",
+				APIVersion: appsv1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ovn-ipsec",
+				Namespace: util.OVN_NAMESPACE,
+				// We never update the legacy ovn-ipsec daemonset.
+				Annotations: map[string]string{names.CreateWaitAnnotation: "true"},
+			},
+		}
+		obj, err := k8s.ToUnstructured(ovnIPsecLegacyDS)
+		if err != nil {
+			return nil, progressing, fmt.Errorf("unable to render legacy ovn-ipsec daemonset: %w", err)
+		}
+		objs = append(objs, obj)
 	}
 
 	// When upgrading a legacy IPsec deployment, avoid any updates until OVN IPsec is disabled after which
@@ -1058,7 +1081,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	var nsn types.NamespacedName
 	nodeStatus := &bootstrap.OVNUpdateStatus{}
 	controlPlaneStatus := &bootstrap.OVNUpdateStatus{}
-	ipsecStatus := &bootstrap.OVNUpdateStatus{}
+	ovnIPsecStatus := &bootstrap.OVNIPsecStatus{}
 	prepullerStatus := &bootstrap.OVNUpdateStatus{}
 
 	namespaceForControlPlane := util.OVN_NAMESPACE
@@ -1121,7 +1144,9 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		nodeStatus.ClusterNetworkCIDRs = nodeDaemonSet.GetAnnotations()[names.ClusterNetworkCIDRsAnnotation]
 		nodeStatus.Version = nodeDaemonSet.GetAnnotations()["release.openshift.io/version"]
 		nodeStatus.Progressing = daemonSetProgressing(nodeDaemonSet, true)
-		nodeStatus.OVNIPsecActive = !isOVNIPsecNotActiveInDaemonSet(nodeDaemonSet)
+		// Retrieve OVN IPsec status from ovnkube-node daemonset as this is being used to rollout IPsec
+		// config from 4.14.
+		ovnIPsecStatus.OVNIPsecActive = !isOVNIPsecNotActiveInDaemonSet(nodeDaemonSet)
 		klog.Infof("ovnkube-node DaemonSet status: progressing=%t", nodeStatus.Progressing)
 
 	}
@@ -1147,45 +1172,70 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		prepullerStatus.Progressing = daemonSetProgressing(prePullerDaemonSet, true)
 	}
 
-	ipsecContainerizedDaemonSet := &appsv1.DaemonSet{
+	ipsecDaemonSet := &appsv1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
 	}
-	ipsecHostDaemonSet := &appsv1.DaemonSet{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "DaemonSet",
-			APIVersion: appsv1.SchemeGroupVersion.String(),
-		},
-	}
-	// Retrieve container based IPsec daemonset with name ovn-ipsec-containerized.
-	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec-containerized"}
-	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecContainerizedDaemonSet); err != nil {
+
+	ipsecStatus := &bootstrap.OVNIPsecStatus{}
+
+	// The IPsec daemonset name is ovn-ipsec if we are upgrading from <= 4.13.
+	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec"}
+	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecDaemonSet); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("Failed to retrieve existing ipsec containerized DaemonSet: %w", err)
+			return nil, fmt.Errorf("Failed to retrieve existing pre-4.14 ipsec DaemonSet: %w", err)
 		} else {
-			ipsecContainerizedDaemonSet = nil
+			ipsecStatus = nil
 		}
-	}
-	// Retrieve host based IPsec daemonset with name ovn-ipsec-host
-	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec-host"}
-	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecHostDaemonSet); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("Failed to retrieve existing ipsec host DaemonSet: %w", err)
-		} else {
-			ipsecHostDaemonSet = nil
-		}
-	}
-	if ipsecContainerizedDaemonSet != nil && ipsecHostDaemonSet != nil {
-		// Both IPsec daemonset versions exist, so this is an upgrade from 4.14.
+	} else {
 		ipsecStatus.LegacyIPsecUpgrade = true
-	} else if ipsecContainerizedDaemonSet == nil && ipsecHostDaemonSet == nil {
-		// None of the IPsec daemonset present, set ipsecStatus to nil
-		ipsecStatus = nil
 	}
-	if ipsecStatus != nil && nodeStatus != nil {
-		ipsecStatus.OVNIPsecActive = nodeStatus.OVNIPsecActive
+
+	if ipsecStatus == nil {
+		ipsecStatus = &bootstrap.OVNIPsecStatus{}
+		ipsecContainerizedDaemonSet := &appsv1.DaemonSet{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "DaemonSet",
+				APIVersion: appsv1.SchemeGroupVersion.String(),
+			},
+		}
+		ipsecHostDaemonSet := &appsv1.DaemonSet{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "DaemonSet",
+				APIVersion: appsv1.SchemeGroupVersion.String(),
+			},
+		}
+		// Retrieve container based IPsec daemonset with name ovn-ipsec-containerized.
+		nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec-containerized"}
+		if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecContainerizedDaemonSet); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("Failed to retrieve existing ipsec containerized DaemonSet: %w", err)
+			} else {
+				ipsecContainerizedDaemonSet = nil
+			}
+		}
+		// Retrieve host based IPsec daemonset with name ovn-ipsec-host
+		nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec-host"}
+		if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecHostDaemonSet); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("Failed to retrieve existing ipsec host DaemonSet: %w", err)
+			} else {
+				ipsecHostDaemonSet = nil
+			}
+		}
+		if ipsecContainerizedDaemonSet != nil && ipsecHostDaemonSet != nil {
+			// Both IPsec daemonset versions exist, so this is an upgrade from 4.14.
+			ipsecStatus.LegacyIPsecUpgrade = true
+		} else if ipsecContainerizedDaemonSet == nil && ipsecHostDaemonSet == nil {
+			ipsecStatus = nil
+		}
+	}
+
+	// set OVN IPsec status into ipsecStatus only when IPsec daemonset(s) exists in the cluster.
+	if ipsecStatus != nil {
+		ipsecStatus.OVNIPsecActive = ovnIPsecStatus.OVNIPsecActive
 	}
 
 	res := bootstrap.OVNBootstrapResult{

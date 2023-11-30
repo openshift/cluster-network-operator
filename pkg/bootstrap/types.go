@@ -39,8 +39,13 @@ type OVNUpdateStatus struct {
 	IPFamilyMode        string
 	ClusterNetworkCIDRs string
 	Progressing         bool
-	LegacyIPsecUpgrade  bool // true if IPsec in 4.14 or Pre-4.14 cluster is upgraded to latest version
-	OVNIPsecActive      bool // set to true unless we are sure it is not.
+}
+
+// OVNIPsecStatus contains status of current IPsec configuration
+// in the cluster.
+type OVNIPsecStatus struct {
+	LegacyIPsecUpgrade bool // true if IPsec in 4.14 or Pre-4.14 cluster is upgraded to latest version
+	OVNIPsecActive     bool // set to true unless we are sure it is not.
 }
 
 type OVNBootstrapResult struct {
@@ -50,8 +55,8 @@ type OVNBootstrapResult struct {
 	ControlPlaneUpdateStatus *OVNUpdateStatus
 	// NodeUpdateStatus is the status of ovnkube-node daemonset
 	NodeUpdateStatus *OVNUpdateStatus
-	// IPsecUpdateStatus is the status of ovn-ipsec daemonset
-	IPsecUpdateStatus *OVNUpdateStatus
+	// IPsecUpdateStatus is the status of ovn-ipsec config
+	IPsecUpdateStatus *OVNIPsecStatus
 	// PrePullerUpdateStatus is the status of ovnkube-upgrades-prepuller daemonset
 	PrePullerUpdateStatus *OVNUpdateStatus
 	OVNKubernetesConfig   *OVNConfigBoostrapResult
