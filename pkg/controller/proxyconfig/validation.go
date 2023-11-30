@@ -15,6 +15,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
+	"github.com/openshift/library-go/pkg/crypto"
 	netproxy "golang.org/x/net/proxy"
 
 	corev1 "k8s.io/api/core/v1"
@@ -179,7 +180,7 @@ func (r *ReconcileProxyConfig) validateSystemTrustBundle(trustBundle string) ([]
 	if err != nil {
 		return nil, err
 	}
-	if _, _, err := validation.CertificateData(bundleData); err != nil {
+	if _, err := crypto.CertsFromPEM(bundleData); err != nil {
 		return nil, err
 	}
 
