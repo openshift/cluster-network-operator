@@ -54,8 +54,15 @@ func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig
 }
 
 func (r *ReconcileOperConfig) UpdateOperConfig(ctx context.Context, operConfig *operv1.Network) error {
-	operConfig.TypeMeta = metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}
-	us, err := k8sutil.ToUnstructured(operConfig)
+	config := operConfig.DeepCopy()
+	// Since ApplyObject uses server side apply operconfig controller
+	// takes ownership of all fields set in operConfig.
+	// It shouldn't own .Spec.Migration as it is not modifying it anywhere.
+	// Setting the value to nil will ensure that the value of that field will stay unchanged (including the fieldManager).
+	config.Spec.Migration = nil
+
+	config.TypeMeta = metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}
+	us, err := k8sutil.ToUnstructured(config)
 	if err != nil {
 		return fmt.Errorf("failed to transmute operator config, err: %v", err)
 	}
