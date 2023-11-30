@@ -234,11 +234,13 @@ spec:
         - name: admin-kubeconfig
           secret:
             secretName: service-network-admin-kubeconfig
+            defaultMode: 0640
         - name: hosted-cluster-api-access
           emptyDir: {}
         - name: hosted-ca-cert
           secret:
             secretName: root-ca
+            defaultMode: 0640
             items:
               - key: ca.crt
                 path: ca.crt
