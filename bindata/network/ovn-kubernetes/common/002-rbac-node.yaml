@@ -137,6 +137,7 @@ rules:
 - apiGroups: ["k8s.ovn.org"]
   resources:
   - adminpolicybasedexternalroutes
+  - adminpolicybasedexternalroutes/status
   - egressfirewalls
   - egressips
   - egressqoses
