@@ -2,6 +2,8 @@ module github.com/openshift/cluster-network-operator
 
 go 1.20
 
+replace github.com/openshift/api => github.com/andreaskaris/api-definitions v0.0.0-20231201113203-6517882b3bc4
+
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/sprig/v3 v3.2.3
