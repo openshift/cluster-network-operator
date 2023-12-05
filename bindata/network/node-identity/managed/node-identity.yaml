@@ -134,6 +134,22 @@ spec:
         env:
           - name: LOGLEVEL
             value: "2"
+        livenessProbe:
+          tcpSocket:
+            port: {{.NetworkNodeIdentityPort}}
+          failureThreshold: 5
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          tcpSocket:
+            port: {{.NetworkNodeIdentityPort}}
+          failureThreshold: 5
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
         resources:
           requests:
             cpu: 10m
