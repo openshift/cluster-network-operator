@@ -254,8 +254,15 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVN_GATEWAY_MODE"] = OVN_SHARED_GW_MODE
 	}
 
-	data.Data["IP_FORWARDING_MODE"] = operv1.IPForwardingRestricted
-	if c.GatewayConfig != nil {
+	// We accept 3 valid inputs:
+	// c.GatewayConfig.IPForwarding not set --> defaults to "".
+	// c.GatewayConfig.IPForwarding set to "Restricted".
+	// c.GatewayConfig.IPForwarding set to "Global".
+	// For "" and "Restricted" (which behave the exact same) and any invalid value, the ConfigMap's .IP_FORWARDING_MODE
+	// shall always be "".
+	// For "Global", the ConfigMap's .IP_FORWARDING_MODE shall be "Global".
+	data.Data["IP_FORWARDING_MODE"] = ""
+	if c.GatewayConfig != nil && c.GatewayConfig.IPForwarding == operv1.IPForwardingGlobal {
 		data.Data["IP_FORWARDING_MODE"] = c.GatewayConfig.IPForwarding
 	}
 
