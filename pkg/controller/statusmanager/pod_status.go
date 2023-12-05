@@ -256,15 +256,14 @@ func (status *StatusManager) SetFromPods() {
 	if status.isOVNKubernetes != nil && *status.isOVNKubernetes {
 		// hack for 2-phase upgrade from non-IC to IC ovnk:
 		// don't update the version field until phase 2 is over
-		if icConfigMap, err := util.GetInterConnectConfigMap(status.client.ClientFor("").Kubernetes()); err == nil {
-			// When an upgrade from <= 4.13 is ongoing, the IC configmap exists and exhibits ongoing-upgrade=''.
-			// When multizone control-plane and node have been rolled out (end of phase 2), the configmap is deleted.
-			if _, ok := icConfigMap.Data["ongoing-upgrade"]; ok {
-				reachedAvailableLevel = false
-			}
+		if _, err := util.GetInterConnectConfigMap(status.client.ClientFor("").Kubernetes()); err == nil {
+			// When an upgrade from <= 4.13 is ongoing, CNO has pushed an IC configmap to track it.
+			// The configmap is deleted when multizone control-plane and node have been rolled out (end of phase 2).
+			reachedAvailableLevel = false
+
 		} else if !apierrors.IsNotFound(err) {
 			log.Printf("Failed to retrieve interconnect configmap: %v", err)
-			// don't risk reporting new version during zone mode migration until configmap retrieval is successful
+			// don't risk reporting the new version during the upgrade to IC until the configmap retrieval is successful
 			reachedAvailableLevel = false
 		}
 	}
