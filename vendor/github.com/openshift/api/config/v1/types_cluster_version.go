@@ -249,7 +249,7 @@ const (
 )
 
 // ClusterVersionCapability enumerates optional, core cluster components.
-// +kubebuilder:validation:Enum=openshift-samples;baremetal;marketplace;Console;Insights;Storage;CSISnapshot;NodeTuning;MachineAPI;Build;DeploymentConfig;ImageRegistry;OperatorLifecycleManager
+// +kubebuilder:validation:Enum=openshift-samples;baremetal;marketplace;Console;Insights;Storage;CSISnapshot;NodeTuning;MachineAPI;Build;DeploymentConfig;ImageRegistry;OperatorLifecycleManager;CloudCredential
 type ClusterVersionCapability string
 
 const (
@@ -343,6 +343,10 @@ const (
 	// ClusterVersionCapabilityOperatorLifecycleManager manages the Operator Lifecycle Manager
 	// which itself manages the lifecycle of operators
 	ClusterVersionCapabilityOperatorLifecycleManager ClusterVersionCapability = "OperatorLifecycleManager"
+
+	// ClusterVersionCapabilityCloudCredential manages credentials for cloud providers
+	// in openshift cluster
+	ClusterVersionCapabilityCloudCredential ClusterVersionCapability = "CloudCredential"
 )
 
 // KnownClusterVersionCapabilities includes all known optional, core cluster components.
@@ -360,10 +364,11 @@ var KnownClusterVersionCapabilities = []ClusterVersionCapability{
 	ClusterVersionCapabilityDeploymentConfig,
 	ClusterVersionCapabilityImageRegistry,
 	ClusterVersionCapabilityOperatorLifecycleManager,
+	ClusterVersionCapabilityCloudCredential,
 }
 
 // ClusterVersionCapabilitySet defines sets of cluster version capabilities.
-// +kubebuilder:validation:Enum=None;v4.11;v4.12;v4.13;v4.14;vCurrent
+// +kubebuilder:validation:Enum=None;v4.11;v4.12;v4.13;v4.14;v4.15;vCurrent
 type ClusterVersionCapabilitySet string
 
 const (
@@ -394,6 +399,12 @@ const (
 	// OpenShift.  This list will remain the same no matter which
 	// version of OpenShift is installed.
 	ClusterVersionCapabilitySet4_14 ClusterVersionCapabilitySet = "v4.14"
+
+	// ClusterVersionCapabilitySet4_15 is the recommended set of
+	// optional capabilities to enable for the 4.15 version of
+	// OpenShift.  This list will remain the same no matter which
+	// version of OpenShift is installed.
+	ClusterVersionCapabilitySet4_15 ClusterVersionCapabilitySet = "v4.15"
 
 	// ClusterVersionCapabilitySetCurrent is the recommended set
 	// of optional capabilities to enable for the cluster's
@@ -445,6 +456,22 @@ var ClusterVersionCapabilitySets = map[ClusterVersionCapabilitySet][]ClusterVers
 		ClusterVersionCapabilityDeploymentConfig,
 		ClusterVersionCapabilityImageRegistry,
 	},
+	ClusterVersionCapabilitySet4_15: {
+		ClusterVersionCapabilityBaremetal,
+		ClusterVersionCapabilityConsole,
+		ClusterVersionCapabilityInsights,
+		ClusterVersionCapabilityMarketplace,
+		ClusterVersionCapabilityStorage,
+		ClusterVersionCapabilityOpenShiftSamples,
+		ClusterVersionCapabilityCSISnapshot,
+		ClusterVersionCapabilityNodeTuning,
+		ClusterVersionCapabilityMachineAPI,
+		ClusterVersionCapabilityBuild,
+		ClusterVersionCapabilityDeploymentConfig,
+		ClusterVersionCapabilityImageRegistry,
+		ClusterVersionCapabilityOperatorLifecycleManager,
+		ClusterVersionCapabilityCloudCredential,
+	},
 	ClusterVersionCapabilitySetCurrent: {
 		ClusterVersionCapabilityBaremetal,
 		ClusterVersionCapabilityConsole,
@@ -459,6 +486,7 @@ var ClusterVersionCapabilitySets = map[ClusterVersionCapabilitySet][]ClusterVers
 		ClusterVersionCapabilityDeploymentConfig,
 		ClusterVersionCapabilityImageRegistry,
 		ClusterVersionCapabilityOperatorLifecycleManager,
+		ClusterVersionCapabilityCloudCredential,
 	},
 }
 
