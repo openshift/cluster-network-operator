@@ -602,7 +602,6 @@ data:
         --enable-interconnect \
         --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}" \
         ${gw_interface_flag} \
-        --enable-multi-external-gateway=true \
         ${ip_forwarding_flag} \
         ${NETWORK_NODE_IDENTITY_ENABLE}
     }

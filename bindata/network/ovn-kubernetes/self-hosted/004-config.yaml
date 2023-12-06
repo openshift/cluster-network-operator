@@ -51,6 +51,7 @@ data:
 {{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
     enable-admin-network-policy=true
 {{- end }}
+    enable-multi-external-gateway=true
 
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
