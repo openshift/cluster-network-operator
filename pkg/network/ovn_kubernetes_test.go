@@ -2244,6 +2244,9 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 	if renderedIPsec == nil {
 		t.Errorf("ovn-ipsec-host DaemonSet must exist, but it's not available")
 	}
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; ok {
+		t.Errorf("ovn-ipsec-host DaemonSet should not have create-wait annotation, but it does")
+	}
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec != nil {
 		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
@@ -2334,6 +2337,9 @@ func TestRenderOVNKubernetesEnableIPsecForHostedControlPlane(t *testing.T) {
 	if renderedIPsec == nil {
 		t.Errorf("ovn-ipsec-containerized DaemonSet must exist, but it's not available")
 	}
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; ok {
+		t.Errorf("ovn-ipsec-containerized DaemonSet should not have create-wait annotation, but it does")
+	}
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec != nil {
 		t.Errorf("ovn-ipsec-host DaemonSet must not exist, but it's available")
@@ -2423,7 +2429,7 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 		},
 	}
 
-	// Start the upgrade and it's going to disable IPsec in OVN first without any changes into
+	// Start the upgrade and it's going rollout only ovn-ipsec-host DS without any changes into
 	// installed IPsec MachineConfigs.
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MasterIPsecMachineConfig = &mcfgv1.MachineConfig{}
@@ -2436,6 +2442,7 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}
 	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
 	fakeClient := cnofake.NewFakeClient()
+
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -2449,92 +2456,23 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 	if renderedWorkerIPsecExtension != nil {
 		t.Errorf("The MachineConfig %s must not exist, but it's available", workerMachineConfigIPsecExtName)
 	}
-	// Ensure ipsec daemonset exists with create wait annotation.
+	// Ensure only ipsec host daemonset exists now.
 	renderedIPsec := findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec == nil {
 		t.Errorf("ovn-ipsec-host DaemonSet must exist, but it's not available")
 	}
-	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
-		t.Errorf("ovn-ipsec-host DaemonSet should have create-only annotation, does not")
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; ok {
+		t.Errorf("ovn-ipsec-host DaemonSet should not have create-wait annotation, but it does")
 	}
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec == nil {
-		t.Errorf("ovn-ipsec-containerized DaemonSet must exist, but it's not available")
-	}
-	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
-		t.Errorf("ovn-ipsec-containerized DaemonSet should have create-only annotation, does not")
+	if renderedIPsec != nil {
+		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
 	}
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec == nil {
-		t.Errorf("ovn-ipsec DaemonSet must exist, but it's not available")
-	}
-	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
-		t.Errorf("ovn-ipsec DaemonSet should have create-only annotation, does not")
+	if renderedIPsec != nil {
+		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
 	}
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
-	if renderedNode == nil {
-		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
-	}
-	if _, ok := renderedNode.GetAnnotations()[names.IPsecEnableAnnotation]; ok {
-		t.Errorf("ovn-ipsec DaemonSet shouldn't have ipsec-enable annotation, but it does")
-	}
-
-	// The above step deactivated IPsec in OVN and now it's going to remove old IPsec daemonsets,
-	bootstrapResult.OVN.IPsecUpdateStatus.OVNIPsecActive = false
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	// Ensure ipsec daemonset do not exist.
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec-host DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
-	}
-	renderedNode = findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
-	if renderedNode == nil {
-		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
-	}
-	if _, ok := renderedNode.GetAnnotations()[names.IPsecEnableAnnotation]; ok {
-		t.Errorf("ovn-ipsec DaemonSet shouldn't have ipsec-enable annotation, but it does")
-	}
-
-	// Now it's going to get enable IPsec config and rolls out ovn-ipsec-host DS
-	bootstrapResult.OVN.IPsecUpdateStatus = nil
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	// Ensure renderOVNKubernetes doesn't roll out its own MachineConfigs
-	renderedMasterIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
-	if renderedMasterIPsecExtension != nil {
-		t.Errorf("The MachineConfig %s must not exist, but it's available", masterMachineConfigIPsecExtName)
-	}
-	renderedWorkerIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", workerMachineConfigIPsecExtName, "", objs)
-	if renderedWorkerIPsecExtension != nil {
-		t.Errorf("The MachineConfig %s must not exist, but it's available", workerMachineConfigIPsecExtName)
-	}
-	// Ensure only ipsec host daemonset exists now.
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec == nil {
-		t.Errorf("ovn-ipsec-host DaemonSet must exist, but it's not available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
-	}
-	renderedNode = findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 	if renderedNode == nil {
 		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
 	}
@@ -2606,114 +2544,54 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 		},
 	}
 
-	// Upgrade starts and it's going to disable OVN IPsec first.
+	// Upgrade starts and it's going to rollout IPsec Machine Configs without making any changes into existing IPsec configs.
 	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
 	fakeClient := cnofake.NewFakeClient()
+	// Now it's going to rollout IPsec Machine Configs.
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	// Ensure renderOVNKubernetes must not roll out its own MachineConfigs when OVN ipsec disable in progress.
 	renderedMasterIPsecExtension := findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
-	if renderedMasterIPsecExtension != nil {
-		t.Errorf("The MachineConfig %s must not exist, but it's available", masterMachineConfigIPsecExtName)
+	if renderedMasterIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's not available", masterMachineConfigIPsecExtName)
 	}
 	renderedWorkerIPsecExtension := findInObjs("machineconfiguration.openshift.io", "MachineConfig", workerMachineConfigIPsecExtName, "", objs)
-	if renderedWorkerIPsecExtension != nil {
-		t.Errorf("The MachineConfig %s must not exist, but it's available", workerMachineConfigIPsecExtName)
+	if renderedWorkerIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's not available", workerMachineConfigIPsecExtName)
 	}
-	// Ensure ipsec daemonset exists with create wait annotation.
+	// Make sure IPsec DaemonSets are set with create-wait annotation.
 	renderedIPsec := findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec == nil {
 		t.Errorf("ovn-ipsec-host DaemonSet must exist, but it's not available")
 	}
 	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
-		t.Errorf("ovn-ipsec-host DaemonSet should have create-only annotation, does not")
+		t.Errorf("ovn-ipsec-host DaemonSet should have create-wait annotation, does not")
 	}
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec == nil {
 		t.Errorf("ovn-ipsec-containerized DaemonSet must exist, but it's not available")
 	}
 	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
-		t.Errorf("ovn-ipsec-containerized DaemonSet should have create-only annotation, does not")
+		t.Errorf("ovn-ipsec-containerized DaemonSet should have create-wait annotation, does not")
 	}
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec == nil {
 		t.Errorf("ovn-ipsec DaemonSet must exist, but it's not available")
 	}
 	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
-		t.Errorf("ovn-ipsec DaemonSet should have create-only annotation, does not")
+		t.Errorf("ovn-ipsec DaemonSet should have create-wait annotation, does not")
 	}
+	// The ovnkube-node must set with ipsec-enabled annotation.
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 	if renderedNode == nil {
 		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
 	}
-	if _, ok := renderedNode.GetAnnotations()[names.IPsecEnableAnnotation]; ok {
-		t.Errorf("ovn-ipsec DaemonSet shouldn't have ipsec-enable annotation, but it does")
+	if _, ok := renderedNode.GetAnnotations()[names.IPsecEnableAnnotation]; !ok {
+		t.Errorf("ovn-ipsec DaemonSet should have ipsec-enable annotation, but it doesn't")
 	}
 
-	// The above step deactivated IPsec in OVN and now it's going to remove old IPsec daemonsets,
-	bootstrapResult.OVN.IPsecUpdateStatus.OVNIPsecActive = false
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	// Ensure ipsec daemonset do not exist.
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec-host DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
-	}
-	renderedNode = findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
-	if renderedNode == nil {
-		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
-	}
-	if _, ok := renderedNode.GetAnnotations()[names.IPsecEnableAnnotation]; ok {
-		t.Errorf("ovn-ipsec DaemonSet shouldn't have ipsec-enable annotation, but it does")
-	}
-
-	// Now it's going to rollout IPsec Machine Configs.
-	bootstrapResult.OVN.IPsecUpdateStatus = nil
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec-host DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
-	}
-	renderedMasterIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
-	if renderedMasterIPsecExtension == nil {
-		t.Errorf("The MachineConfig %s must exist, but it's not available", masterMachineConfigIPsecExtName)
-	}
-	renderedWorkerIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", workerMachineConfigIPsecExtName, "", objs)
-	if renderedWorkerIPsecExtension == nil {
-		t.Errorf("The MachineConfig %s must exist, but it's not available", workerMachineConfigIPsecExtName)
-	}
-	renderedNode = findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
-	if renderedNode == nil {
-		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
-	}
-	if _, ok := renderedNode.GetAnnotations()[names.IPsecEnableAnnotation]; ok {
-		t.Errorf("ovn-ipsec DaemonSet shouldn't have ipsec-enable annotation, but it does")
-	}
-
-	// Now it's going roll out IPsec config into OVN and get IPsec host daemonset.
+	// After IPsec Machine Configs rollout is complete, it must have only ovn-ipsec-host DS.
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MasterIPsecMachineConfig = &mcfgv1.MachineConfig{}
 	bootstrapResult.Infra.MasterIPsecMachineConfig.Name = masterMachineConfigIPsecExtName
@@ -2742,6 +2620,9 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec == nil {
 		t.Errorf("ovn-ipsec-host DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; ok {
+		t.Errorf("ovn-ipsec-host DaemonSet should not have create-wait annotation, but it does")
 	}
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec != nil {
@@ -2826,14 +2707,15 @@ func TestRenderOVNKubernetesIPsecUpgradeWithHypershiftHostedCluster(t *testing.T
 	// Set it as Hypershift cluster.
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.HostedControlPlane = &hypershift.HostedControlPlane{}
-	// Upgrade starts and it's going to disable OVN IPsec first.
+	// Upgrade starts and it's going to get only ovn-ipsec-containerized DS.
 	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
 	fakeClient := cnofake.NewFakeClient()
+	// Now it must get IPsec containerized daemonset without MachineConfigs.
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	// Ensure renderOVNKubernetes must not roll out Machine Configs.
+	// Ensure renderOVNKubernetes doesn't roll out it own MachineConfigs
 	renderedMasterIPsecExtension := findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
 	if renderedMasterIPsecExtension != nil {
 		t.Errorf("The MachineConfig %s must not exist, but it's available", masterMachineConfigIPsecExtName)
@@ -2842,96 +2724,23 @@ func TestRenderOVNKubernetesIPsecUpgradeWithHypershiftHostedCluster(t *testing.T
 	if renderedWorkerIPsecExtension != nil {
 		t.Errorf("The MachineConfig %s must not exist, but it's available", workerMachineConfigIPsecExtName)
 	}
-	// Ensure ipsec daemonsets exists with create wait annotation and ovnkube-node DS
-	// is not set with ipsec-enabled annotation.
+	// Ensure only ovn-ipsec-containerized daemonset exists.
 	renderedIPsec := findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec == nil {
 		t.Errorf("ovn-ipsec-containerized DaemonSet must exist, but it's not available")
 	}
-	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
-		t.Errorf("ovn-ipsec-containerized DaemonSet should have create-only annotation, does not")
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; ok {
+		t.Errorf("ovn-ipsec-host DaemonSet should not have create-wait annotation, but it does")
+	}
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec != nil {
+		t.Errorf("ovn-ipsec-host DaemonSet must not exist, but it's available")
 	}
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec == nil {
-		t.Errorf("ovn-ipsec DaemonSet must exist, but it's not available")
-	}
-	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
-		t.Errorf("ovn-ipsec DaemonSet should have create-only annotation, does not")
+	if renderedIPsec != nil {
+		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
 	}
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
-	if renderedNode == nil {
-		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
-	}
-	if _, ok := renderedNode.GetAnnotations()[names.IPsecEnableAnnotation]; ok {
-		t.Errorf("ovn-ipsec DaemonSet shouldn't have ipsec-enable annotation, but it does")
-	}
-
-	// The above step deactivated IPsec in OVN and now it's going to remove old IPsec daemonsets,
-	bootstrapResult.OVN.IPsecUpdateStatus.OVNIPsecActive = false
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	// Ensure ipsec daemonset do not exist.
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec-host DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
-	}
-	renderedNode = findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
-	if renderedNode == nil {
-		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
-	}
-	if _, ok := renderedNode.GetAnnotations()[names.IPsecEnableAnnotation]; ok {
-
-		t.Errorf("ovn-ipsec DaemonSet shouldn't have ipsec-enable annotation, but it does")
-	}
-	// Ensure Machine Configs are not rolled out.
-	renderedMasterIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
-	if renderedMasterIPsecExtension != nil {
-		t.Errorf("The MachineConfig %s must not exist, but it's available", masterMachineConfigIPsecExtName)
-	}
-	renderedWorkerIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", workerMachineConfigIPsecExtName, "", objs)
-	if renderedWorkerIPsecExtension != nil {
-		t.Errorf("The MachineConfig %s must not exist, but it's available", workerMachineConfigIPsecExtName)
-	}
-
-	// Now it must get IPsec containerized daemonset without MachineConfigs.
-	bootstrapResult.OVN.IPsecUpdateStatus = nil
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	// Ensure renderOVNKubernetes doesn't roll out it own MachineConfigs
-	renderedMasterIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
-	if renderedMasterIPsecExtension != nil {
-		t.Errorf("The MachineConfig %s must not exist, but it's available", masterMachineConfigIPsecExtName)
-	}
-	renderedWorkerIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", workerMachineConfigIPsecExtName, "", objs)
-	if renderedWorkerIPsecExtension != nil {
-		t.Errorf("The MachineConfig %s must not exist, but it's available", workerMachineConfigIPsecExtName)
-	}
-	// Ensure only ovn-ipsec-containerized daemonset exists.
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec == nil {
-		t.Errorf("ovn-ipsec-containerized DaemonSet must exist, but it's not available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec-host DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
-	}
-	renderedNode = findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 	if renderedNode == nil {
 		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
 	}
@@ -3034,7 +2843,7 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 		t.Errorf("ovn-ipsec-host DaemonSet must exist, but it's not available")
 	}
 	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
-		t.Errorf("node DaemonSet should have create-only annotation, does not")
+		t.Errorf("node DaemonSet should have create-wait annotation, does not")
 	}
 	// Ensure ovnkube-node DS is not set with ipsec-enabled annotation.
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
@@ -3165,7 +2974,7 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 		t.Errorf("ovn-ipsec-host DaemonSet must exist, but it's not available")
 	}
 	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
-		t.Errorf("node DaemonSet should have create-only annotation, does not")
+		t.Errorf("node DaemonSet should have create-wait annotation, does not")
 	}
 	// Ensure ovnkube-node DS is not set with ipsec-enabled annotation.
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
@@ -3277,7 +3086,7 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 
 	// the node has to be the same
 	if _, ok := renderedNode.GetAnnotations()[names.CreateOnlyAnnotation]; !ok {
-		t.Errorf("node DaemonSet should have create-only annotation, does not")
+		t.Errorf("node DaemonSet should have create-wait annotation, does not")
 	}
 	// the controlPlane has to use the new annotations for dual-stack so it has to be mutated
 	if _, ok := renderedControlPlane.GetAnnotations()[names.CreateOnlyAnnotation]; ok {

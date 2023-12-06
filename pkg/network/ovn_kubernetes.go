@@ -230,7 +230,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVNHybridOverlayVXLANPort"] = ""
 	}
 
-	isIpsecUpgrade := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.LegacyIPsecUpgrade
 	IPsecMachineConfigEnable, OVNIPsecDaemonsetEnable, OVNIPsecEnable, renderIPsecHostDaemonSet, renderIPsecContainerizedDaemonSet,
 		renderIPsecDaemonSetAsCreateWaitOnly := shouldRenderIPsec(c, bootstrapResult)
 	data.Data["IPsecMachineConfigEnable"] = IPsecMachineConfigEnable
@@ -429,30 +428,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-containerized")
 	}
 
-	// The legacy ovn-ipsec deployment is only rendered during upgrades until we
-	// are ready to remove it.
-	if OVNIPsecDaemonsetEnable && isIpsecUpgrade {
-		ovnIPsecLegacyDS := &appsv1.DaemonSet{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "DaemonSet",
-				APIVersion: appsv1.SchemeGroupVersion.String(),
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ovn-ipsec",
-				Namespace: util.OVN_NAMESPACE,
-				// We never update the legacy ovn-ipsec daemonset.
-				Annotations: map[string]string{names.CreateWaitAnnotation: "true"},
-			},
-		}
-		obj, err := k8s.ToUnstructured(ovnIPsecLegacyDS)
-		if err != nil {
-			return nil, progressing, fmt.Errorf("unable to render legacy ovn-ipsec daemonset: %w", err)
-		}
-		objs = append(objs, obj)
-	}
-
-	// When upgrading a legacy IPsec deployment, avoid any updates until OVN IPsec is disabled after which
-	// the legacy IPsec deployment will be disabled as well.
+	// When upgrading a legacy IPsec deployment, avoid any updates until IPsec MachineConfigs
+	// are active.
 	if renderIPsecDaemonSetAsCreateWaitOnly {
 		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-host", func(o *uns.Unstructured) {
 			anno := o.GetAnnotations()
@@ -471,6 +448,25 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			anno[names.CreateWaitAnnotation] = "true"
 			o.SetAnnotations(anno)
 		})
+		// The legacy ovn-ipsec deployment is only rendered during upgrades until we
+		// are ready to remove it.
+		ovnIPsecLegacyDS := &appsv1.DaemonSet{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "DaemonSet",
+				APIVersion: appsv1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ovn-ipsec",
+				Namespace: util.OVN_NAMESPACE,
+				// We never update the legacy ovn-ipsec daemonset.
+				Annotations: map[string]string{names.CreateWaitAnnotation: "true"},
+			},
+		}
+		obj, err := k8s.ToUnstructured(ovnIPsecLegacyDS)
+		if err != nil {
+			return nil, progressing, fmt.Errorf("unable to render legacy ovn-ipsec daemonset: %w", err)
+		}
+		objs = append(objs, obj)
 	}
 
 	klog.Infof("ovnk components: ovnkube-node: isRunning=%t, update=%t; ovnkube-control-plane: isRunning=%t, update=%t",
@@ -533,9 +529,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 // When pre-4.14 cluster is Hypershift cluster running with ipsecConfig set, then just render ovn-ipsec-containerized daemonset as
 // MachineConfig kind is not supported there.
 // All Other cases are not supported in pre-4.14 deployments.
-// The following considerations need to be made for all the procedures:
-// - IPsec must be disabled in OVN before the IPsec daemon sets are disabled.
-// - IPsec legacy daemon sets need to be disabled before enabling the updated IPsec daemons sets
 func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootstrap.BootstrapResult) (renderIPsecMachineConfig, renderIPsecDaemonSet,
 	renderIPsecOVN, renderIPsecHostDaemonSet, renderIPsecContainerizedDaemonSet, renderIPsecDaemonSetAsCreateWaitOnly bool) {
 	isHypershiftHostedCluster := bootstrapResult.Infra.HostedControlPlane != nil
@@ -543,39 +536,41 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	isIpsecUpgrade := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.LegacyIPsecUpgrade
 	isOVNIPsecActive := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.OVNIPsecActive
 
-	// on upgrade, we will just remove any existing ipsec deployment without making any
-	// change to them. So just assume that the MachineConfig ipsec extensions are present
-	// and active.
-	isUserIPsecMachineConfigPresent := isUserIPsecMachineConfigPresent(bootstrapResult.Infra) || isIpsecUpgrade
-	isIpsecMachineConfigActive := isIPsecMachineConfigActive(bootstrapResult.Infra) || isIpsecUpgrade
+	// On upgrade, we will just remove any existing ipsec deployment without making any
+	// change to them. So during upgrade, we must keep track if IPsec MachineConfigs are
+	// active or not for non Hybrid hosted cluster.
+	isUserIPsecMachineConfigPresent := isUserIPsecMachineConfigPresent(bootstrapResult.Infra)
+	isIpsecMachineConfigActive := isIPsecMachineConfigActive(bootstrapResult.Infra)
+	isIPsecMachineConfigNotActiveOnUpgrade := isIpsecUpgrade && !isIpsecMachineConfigActive && !isHypershiftHostedCluster
 
-	// We render the ipsec deployment if enabled unless we are upgrading the
-	// legacy ipsec deployment for which we need do disable it first but only after
-	// OVN ipsec has been disabled as well.
-	renderIPsecDaemonSet = isOVNIPsecActive || (!isIpsecUpgrade && isIPsecEnabled)
+	// We render the ipsec deployment if IPsec is already active in OVN
+	// or if IPsec config is enabled.
+	renderIPsecDaemonSet = isOVNIPsecActive || isIPsecEnabled
 
 	// If ipsec is enabled, we render the host ipsec deployment except for
-	// hypershift hosted clusters. We need to wait for the ipsec MachineConfig
-	// extensions to be active first.
-	renderIPsecHostDaemonSet = renderIPsecDaemonSet && isIpsecMachineConfigActive && !isHypershiftHostedCluster
+	// hypershift hosted clusters and we need to wait for the ipsec MachineConfig
+	// extensions to be active first. We must also render host ipsec deployment
+	// at the time of upgrade though user created IPsec Machine Config is not
+	// present/active.
+	renderIPsecHostDaemonSet = (renderIPsecDaemonSet && isIpsecMachineConfigActive && !isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnUpgrade
 
 	// The containerized ipsec deployment is only rendered during upgrades or
-	// for hypershift hosted clusters
-	renderIPsecContainerizedDaemonSet = renderIPsecDaemonSet && (isIpsecUpgrade || isHypershiftHostedCluster)
+	// for hypershift hosted clusters.
+	renderIPsecContainerizedDaemonSet = (renderIPsecDaemonSet && isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnUpgrade
 
 	// MachineConfig IPsec extensions are needed for the ipsec deployment except
 	// when the containerized deployment is used in hypershift hosted clusters.
 	// We will rollout unless the user has rolled out its own.
 	renderIPsecMachineConfig = renderIPsecDaemonSet && !isUserIPsecMachineConfigPresent && !isHypershiftHostedCluster
 
-	// We render OVN IPsec if IP sec is enabled but not if we are upgrading
-	// a legacy IPsec deployment for which we need it temporarily disabled.
+	// We render OVN IPsec if IPsec is enabled or it's upgrade is in progress.
 	// If NS IPsec is enabled as well, we need to wait to IPsec MachineConfig
-	// to be active when it's not a hypershift hosted cluster.
-	renderIPsecOVN = (renderIPsecHostDaemonSet || renderIPsecContainerizedDaemonSet) && !isIpsecUpgrade && isIPsecEnabled
+	// to be active if it's not an upgrade and not a hypershift hosted cluster.
+	renderIPsecOVN = (renderIPsecHostDaemonSet || renderIPsecContainerizedDaemonSet) && isIPsecEnabled
 
-	// While OVN ipsec is being disabled or upgraded, the ipsec deployment is not updated.
-	renderIPsecDaemonSetAsCreateWaitOnly = isIpsecUpgrade || (isOVNIPsecActive && !renderIPsecOVN)
+	// While OVN ipsec is being upgraded and IPsec MachineConfigs deployment is in progress
+	// (or) IPsec config in OVN is being disabled, then ipsec deployment is not updated.
+	renderIPsecDaemonSetAsCreateWaitOnly = isIPsecMachineConfigNotActiveOnUpgrade || (isOVNIPsecActive && !renderIPsecOVN)
 
 	return
 }
