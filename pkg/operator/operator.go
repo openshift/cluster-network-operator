@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 
+	ctlog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctmanager "sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -39,10 +40,17 @@ type Operator struct {
 	StatusManager *statusmanager.StatusManager
 }
 
+var logger = klog.NewKlogr()
+
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, inClusterClientName string, extraClusters map[string]string) error {
 	o := &Operator{}
 
 	var err error
+
+	// Call SetLogger before adding controller-runtime client to prevent controller-runtime
+	// complaining about it after 30 seconds of binaries lifetime
+	// https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/log/log.go#L54
+	ctlog.SetLogger(logger)
 	if o.client, err = cnoclient.NewClient(controllerConfig.KubeConfig, controllerConfig.ProtoKubeConfig, inClusterClientName, extraClusters); err != nil {
 		return err
 	}
