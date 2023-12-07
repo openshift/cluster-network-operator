@@ -1085,6 +1085,13 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		namespaceForControlPlane = hc.Namespace
 	}
 
+	masterDaemonSet := &appsv1.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
+	}
+
 	// Retrieve status of OVN IPsec from ovnkube-master because this is what is being
 	// used to roll out ipsec config in pre-4.14.
 	ovnIPsecStatus.OVNIPsecActive = !isOVNIPsecNotActiveInDaemonSet(masterDaemonSet)
@@ -1141,7 +1148,6 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		nodeStatus.ClusterNetworkCIDRs = nodeDaemonSet.GetAnnotations()[names.ClusterNetworkCIDRsAnnotation]
 		nodeStatus.Version = nodeDaemonSet.GetAnnotations()["release.openshift.io/version"]
 		nodeStatus.Progressing = daemonSetProgressing(nodeDaemonSet, true)
-		nodeStatus.OVNIPsecActive = !isOVNIPsecNotActiveInDaemonSet(nodeDaemonSet)
 		// Retrieve OVN IPsec status from ovnkube-node daemonset as this is being used to rollout IPsec
 		// config from 4.14.
 		if !ovnIPsecStatus.OVNIPsecActive {
@@ -1603,6 +1609,30 @@ func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 			klog.Warningf("daemonset %s/%s rollout seems to have hung with %d/%d behind, force-continuing", ds.Namespace, ds.Name, numBehind, status.DesiredNumberScheduled)
 			return false
 		}
+	}
+
+	return true
+}
+
+// statefulSetProgressing returns true if a statefulset is rolling out a change.
+func statefulSetProgressing(ss *appsv1.StatefulSet) bool {
+	status := ss.Status
+
+	progressing := status.UpdatedReplicas < status.Replicas ||
+		status.AvailableReplicas < status.Replicas ||
+		ss.Generation > status.ObservedGeneration
+
+	s := "progressing"
+	if !progressing {
+		s = "complete"
+	}
+	klog.V(2).Infof("statefulset %s/%s rollout %s; %d/%d scheduled; %d available; generation %d -> %d",
+		ss.Namespace, ss.Name, s, status.ReadyReplicas, status.Replicas,
+		status.AvailableReplicas, ss.Generation, status.ObservedGeneration)
+
+	if !progressing {
+		klog.V(2).Infof("statefulset %s/%s rollout complete", ss.Namespace, ss.Name)
+		return false
 	}
 
 	return true
