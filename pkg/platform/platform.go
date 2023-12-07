@@ -10,11 +10,15 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var cloudProviderConfig = types.NamespacedName{
@@ -128,5 +132,68 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	}
 	res.NetworkNodeIdentityEnabled = netIDEnabled
 
+	// Skip retrieving IPsec MachineConfig and MachineConfigPool if it's a hypershift cluster because
+	// those object kinds are not supported there.
+	if res.HostedControlPlane != nil {
+		return res, nil
+	}
+
+	// As per instructions given in the following links:
+	// https://github.com/openshift/cluster-network-operator/blob/master/docs/enabling_ns_ipsec.md#prerequsits
+	// https://docs.openshift.com/container-platform/4.14/networking/ovn_kubernetes_network_provider/configuring-ipsec-ovn.html#nw-ovn-ipsec-north-south-enable_configuring-ipsec-ovn
+	// The IPsecMachineConfig in 4.14 is created by user and can be created with any name and also is not managed by network operator, so find it by using the label
+	// and looking for the extension.
+
+	masterIPsecMachineConfig, err := findIPsecMachineConfigWithLabel(client, "machineconfiguration.openshift.io/role=master")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ipsec machine config for master: %v", err)
+	}
+	res.MasterIPsecMachineConfig = masterIPsecMachineConfig
+
+	workerIPsecMachineConfig, err := findIPsecMachineConfigWithLabel(client, "machineconfiguration.openshift.io/role=worker")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ipsec machine config for worker: %v", err)
+	}
+	res.WorkerIPsecMachineConfig = workerIPsecMachineConfig
+
+	if res.MasterIPsecMachineConfig != nil {
+		mcpMaster := &mcfgv1.MachineConfigPool{}
+		if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "master"}, mcpMaster); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("failed to get machine config pool for master: %v", err)
+			}
+		}
+		res.MasterMCPStatus = mcpMaster.Status
+	}
+
+	if res.WorkerIPsecMachineConfig != nil {
+		mcpWorker := &mcfgv1.MachineConfigPool{}
+		if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "worker"}, mcpWorker); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("failed to get machine config pool for worker: %v", err)
+			}
+		}
+		res.WorkerMCPStatus = mcpWorker.Status
+	}
+
 	return res, nil
+}
+
+func findIPsecMachineConfigWithLabel(client cnoclient.Client, selector string) (*mcfgv1.MachineConfig, error) {
+	lSelector, err := labels.Parse(selector)
+	if err != nil {
+		return nil, err
+	}
+	machineConfigs := &mcfgv1.MachineConfigList{}
+	err = client.Default().CRClient().List(context.TODO(), machineConfigs, &crclient.ListOptions{LabelSelector: lSelector})
+	if err != nil {
+		return nil, err
+	}
+	var ipsecMachineConfig *mcfgv1.MachineConfig
+	for i, machineConfig := range machineConfigs.Items {
+		if sets.New(machineConfig.Spec.Extensions...).Has("ipsec") {
+			ipsecMachineConfig = &machineConfigs.Items[i]
+		}
+	}
+	return ipsecMachineConfig, nil
 }

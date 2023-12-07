@@ -44,7 +44,7 @@ func init() {
 	utilruntime.Must(netopv1.Install(scheme.Scheme))
 	utilruntime.Must(machineapi.AddToScheme(scheme.Scheme))
 	utilruntime.Must(op_netopv1.Install(scheme.Scheme))
-	utilruntime.Must(mcfgv1.AddToScheme(scheme.Scheme))
+	utilruntime.Must(mcfgv1.Install(scheme.Scheme))
 }
 
 // OperatorClusterClient is a bag of holding for object clients & informers.
