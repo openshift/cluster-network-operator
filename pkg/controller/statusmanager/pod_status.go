@@ -14,7 +14,6 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/util"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -250,22 +249,6 @@ func (status *StatusManager) SetFromPods() {
 		}
 		if err := status.setAnnotation(context.TODO(), dep, names.RolloutHungAnnotation, depHung); err != nil {
 			log.Printf("Error setting Deployment %q annotation: %v", depName, err)
-		}
-	}
-
-	if status.isOVNKubernetes != nil && *status.isOVNKubernetes {
-		// hack for 2-phase upgrade from non-IC to IC ovnk:
-		// don't update the version field until phase 2 is over
-		if icConfigMap, err := util.GetInterConnectConfigMap(status.client.ClientFor("").Kubernetes()); err == nil {
-			// When an upgrade from <= 4.13 is ongoing, the IC configmap exists and exhibits ongoing-upgrade=''.
-			// When multizone control-plane and node have been rolled out (end of phase 2), the configmap is deleted.
-			if _, ok := icConfigMap.Data["ongoing-upgrade"]; ok {
-				reachedAvailableLevel = false
-			}
-		} else if !apierrors.IsNotFound(err) {
-			log.Printf("Failed to retrieve interconnect configmap: %v", err)
-			// don't risk reporting new version during zone mode migration until configmap retrieval is successful
-			reachedAvailableLevel = false
 		}
 	}
 

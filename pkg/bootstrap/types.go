@@ -6,17 +6,13 @@ import (
 )
 
 type OVNHyperShiftBootstrapResult struct {
-	Enabled                   bool
-	ClusterID                 string
-	Namespace                 string
-	ServicePublishingStrategy *hypershift.ServicePublishingStrategy
-	OVNSbDbRouteHost          string
-	OVNSbDbRouteNodePort      int32
-	OVNSbDbRouteLabels        map[string]string
-	HCPNodeSelector           map[string]string
-	ControlPlaneReplicas      int
-	ReleaseImage              string
-	ControlPlaneImage         string
+	Enabled              bool
+	ClusterID            string
+	Namespace            string
+	HCPNodeSelector      map[string]string
+	ControlPlaneReplicas int
+	ReleaseImage         string
+	ControlPlaneImage    string
 }
 
 type OVNConfigBoostrapResult struct {
@@ -33,26 +29,22 @@ type OVNConfigBoostrapResult struct {
 }
 
 // OVNUpdateStatus contains the status of existing daemonset
-// or statefulset that are maily used by upgrade process
+// or deployment that are maily used by the upgrade logic
 type OVNUpdateStatus struct {
-	Kind                 string
-	Namespace            string
-	Name                 string
-	Version              string
-	IPFamilyMode         string
-	ClusterNetworkCIDRs  string
-	Progressing          bool
-	InterConnectEnabled  bool   // true if this ovnk component is running with --enable-interconnect
-	InterConnectZoneMode string // zone mode (singlezone, multizone) for this ovnk component
+	Kind                string
+	Namespace           string
+	Name                string
+	Version             string
+	IPFamilyMode        string
+	ClusterNetworkCIDRs string
+	Progressing         bool
 }
 
 type OVNBootstrapResult struct {
-	MasterAddresses  []string
-	ClusterInitiator string
+	// ControlPlaneReplicaCount represents the number of control plane nodes in the cluster
+	ControlPlaneReplicaCount int
 	// ControlPlaneUpdateStatus is the status of ovnkube-control-plane deployment
 	ControlPlaneUpdateStatus *OVNUpdateStatus
-	// MasterUpdateStatus is the status of ovnkube-master daemonset or statefulset (when hypershift is enabled)
-	MasterUpdateStatus *OVNUpdateStatus
 	// NodeUpdateStatus is the status of ovnkube-node daemonset
 	NodeUpdateStatus *OVNUpdateStatus
 	// IPsecUpdateStatus is the status of ovn-ipsec daemonset

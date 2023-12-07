@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"strings"
 	"sync"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -16,29 +15,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const HyperShiftInternalRouteLabel = "hypershift.openshift.io/internal-route"
 const HostedClusterLocalProxy = "socks5://127.0.0.1:8090"
-
-func init() {
-	for _, label := range strings.Split(routeLabelsRaw, ",") {
-		if label == "" {
-			continue
-		}
-		key, value, found := strings.Cut(label, "=")
-		if !found {
-			panic(fmt.Sprintf("label %q can not be parsed as key value pair", label))
-		}
-		routeLabels[key] = value
-	}
-}
 
 var (
 	enabled           = os.Getenv("HYPERSHIFT")
 	name              = os.Getenv("HOSTED_CLUSTER_NAME")
 	namespace         = os.Getenv("HOSTED_CLUSTER_NAMESPACE")
-	routeHost         = os.Getenv("OVN_SBDB_ROUTE_HOST")
-	routeLabels       = map[string]string{}
-	routeLabelsRaw    = os.Getenv("OVN_SBDB_ROUTE_LABELS")
 	runAsUser         = os.Getenv("RUN_AS_USER")
 	releaseImage      = os.Getenv("OPENSHIFT_RELEASE_IMAGE")
 	controlPlaneImage = os.Getenv("OVN_CONTROL_PLANE_IMAGE")
@@ -67,7 +49,6 @@ type HostedControlPlane struct {
 	ClusterID                    string
 	ControllerAvailabilityPolicy AvailabilityPolicy
 	NodeSelector                 map[string]string
-	Services                     []ServicePublishingStrategyMapping
 }
 
 // AvailabilityPolicy specifies a high level availability policy for components.
@@ -87,101 +68,6 @@ const (
 	SingleReplica AvailabilityPolicy = "SingleReplica"
 )
 
-// ServiceType defines what control plane services can be exposed from the
-// management control plane.
-type ServiceType string
-
-var (
-	// APIServer is the control plane API server.
-	APIServer ServiceType = "APIServer"
-
-	// Konnectivity is the control plane Konnectivity networking service.
-	Konnectivity ServiceType = "Konnectivity"
-
-	// OAuthServer is the control plane OAuth service.
-	OAuthServer ServiceType = "OAuthServer"
-
-	// OIDC is the control plane OIDC service.
-	OIDC ServiceType = "OIDC"
-
-	// Ignition is the control plane ignition service for nodes.
-	Ignition ServiceType = "Ignition"
-
-	// OVNSbDb is the optional control plane ovn southbound database service used by OVNKubernetes CNI.
-	OVNSbDb ServiceType = "OVNSbDb"
-)
-
-// NodePortPublishingStrategy specifies a NodePort used to expose a service.
-type NodePortPublishingStrategy struct {
-	// Address is the host/ip that the NodePort service is exposed over.
-	Address string `json:"address"`
-
-	// Port is the port of the NodePort service. If <=0, the port is dynamically
-	// assigned when the service is created.
-	Port int32 `json:"port,omitempty"`
-}
-
-// LoadBalancerPublishingStrategy specifies setting used to expose a service as a LoadBalancer.
-type LoadBalancerPublishingStrategy struct {
-	// Hostname is the name of the DNS record that will be created pointing to the LoadBalancer.
-	// +optional
-	Hostname string `json:"hostname,omitempty"`
-}
-
-// RoutePublishingStrategy specifies options for exposing a service as a Route.
-type RoutePublishingStrategy struct {
-	// Hostname is the name of the DNS record that will be created pointing to the Route.
-	// +optional
-	Hostname string `json:"hostname,omitempty"`
-}
-
-// ServicePublishingStrategyMapping specifies how individual control plane
-// services are published from the hosting cluster of a control plane.
-type ServicePublishingStrategyMapping struct {
-	// Service identifies the type of service being published.
-	//
-	// +kubebuilder:validation:Enum=APIServer;OAuthServer;OIDC;Konnectivity;Ignition;OVNSbDb
-	// +immutable
-	Service ServiceType `json:"service"`
-
-	// ServicePublishingStrategy specifies how to publish Service.
-	ServicePublishingStrategy `json:"servicePublishingStrategy"`
-}
-
-// ServicePublishingStrategy specfies how to publish a ServiceType.
-type ServicePublishingStrategy struct {
-	// Type is the publishing strategy used for the service.
-	//
-	// +kubebuilder:validation:Enum=LoadBalancer;NodePort;Route;None;S3
-	// +immutable
-	Type PublishingStrategyType `json:"type"`
-
-	// NodePort configures exposing a service using a NodePort.
-	NodePort *NodePortPublishingStrategy `json:"nodePort,omitempty"`
-
-	// LoadBalancer configures exposing a service using a LoadBalancer.
-	LoadBalancer *LoadBalancerPublishingStrategy `json:"loadBalancer,omitempty"`
-
-	// Route configures exposing a service using a Route.
-	Route *RoutePublishingStrategy `json:"route,omitempty"`
-}
-
-// PublishingStrategyType defines publishing strategies for services.
-type PublishingStrategyType string
-
-var (
-	// LoadBalancer exposes a service with a LoadBalancer kube service.
-	LoadBalancer PublishingStrategyType = "LoadBalancer"
-	// NodePort exposes a service with a NodePort kube service.
-	NodePort PublishingStrategyType = "NodePort"
-	// Route exposes services with a Route + ClusterIP kube service.
-	Route PublishingStrategyType = "Route"
-	// S3 exposes a service through an S3 bucket
-	S3 PublishingStrategyType = "S3"
-	// None disables exposing the service
-	None PublishingStrategyType = "None"
-)
-
 // HostedControlPlaneGVK GroupVersionKind for HostedControlPlane
 // Based on https://github.com/openshift/hypershift/blob/27316d734d806a29d63f65ddf746cafd4409a1de/api/hypershift/v1beta1/hosted_controlplane.go#L19
 var HostedControlPlaneGVK = schema.GroupVersionKind{
@@ -192,27 +78,23 @@ var HostedControlPlaneGVK = schema.GroupVersionKind{
 
 type HyperShiftConfig struct {
 	sync.Mutex
-	Enabled            bool
-	Name               string
-	Namespace          string
-	OVNSbDbRouteHost   string
-	RunAsUser          string
-	OVNSbDbRouteLabels map[string]string
-	RelatedObjects     []RelatedObject
-	ReleaseImage       string
-	ControlPlaneImage  string
+	Enabled           bool
+	Name              string
+	Namespace         string
+	RunAsUser         string
+	RelatedObjects    []RelatedObject
+	ReleaseImage      string
+	ControlPlaneImage string
 }
 
 func NewHyperShiftConfig() *HyperShiftConfig {
 	return &HyperShiftConfig{
-		Enabled:            hyperShiftEnabled(),
-		Name:               name,
-		Namespace:          namespace,
-		RunAsUser:          runAsUser,
-		OVNSbDbRouteHost:   routeHost,
-		OVNSbDbRouteLabels: routeLabels,
-		ReleaseImage:       releaseImage,
-		ControlPlaneImage:  controlPlaneImage,
+		Enabled:           hyperShiftEnabled(),
+		Name:              name,
+		Namespace:         namespace,
+		RunAsUser:         runAsUser,
+		ReleaseImage:      releaseImage,
+		ControlPlaneImage: controlPlaneImage,
 	}
 }
 
@@ -243,26 +125,10 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 		return nil, fmt.Errorf("failed extract nodeSelector: %v", err)
 	}
 
-	servicesRaw, _, err := unstructured.NestedSlice(hcp.UnstructuredContent(), "spec", "services")
-	if err != nil {
-		return nil, fmt.Errorf("failed extract services: %v", err)
-	}
-
-	var services []ServicePublishingStrategyMapping
-	jsonData, err := json.Marshal(servicesRaw)
-	if err != nil {
-		return nil, fmt.Errorf("error marshalling JSON: %v\n", err)
-	}
-	err = json.Unmarshal(jsonData, &services)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling JSON: %v\n", err)
-	}
-
 	return &HostedControlPlane{
 		ControllerAvailabilityPolicy: AvailabilityPolicy(controllerAvailabilityPolicy),
 		ClusterID:                    clusterID,
 		NodeSelector:                 nodeSelector,
-		Services:                     services,
 	}, nil
 }
 
