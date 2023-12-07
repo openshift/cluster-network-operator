@@ -280,6 +280,12 @@ spec:
         - -c
         - |
           set -xem
+{{- if .IsNetworkTypeLiveMigration }}
+          if ! ip link show br-ex; then
+            # clean up the OVN dbs if the node is running with OpenShiftSDN
+            rm -f /etc/ovn/ovnnb_db.db /etc/ovn/ovnsb_db.db
+          fi
+{{- end }}
           if [[ -f /env/_master ]]; then
             set -o allexport
             source /env/_master
@@ -297,6 +303,11 @@ spec:
               - -c
               - |
                 set -x
+{{- if .IsNetworkTypeLiveMigration }}
+                if ! ip link show br-ex; then
+                  exit 0
+                fi
+{{- end }}
                 . /ovnkube-lib/ovnkube-lib.sh || exit 1
                 nbdb-post-start {{.OVN_NORTHD_PROBE_INTERVAL}}
         readinessProbe:
@@ -309,6 +320,11 @@ spec:
             - /bin/bash
             - -c
             - |
+{{- if .IsNetworkTypeLiveMigration }}
+              if ! ip link show br-ex; then
+                exit 0
+              fi
+{{- end }}
               set -xeo pipefail
               . /ovnkube-lib/ovnkube-lib.sh || exit 1
               ovndb-readiness-probe "nb"
@@ -361,6 +377,11 @@ spec:
               - -c
               - |
                 set -x
+{{- if .IsNetworkTypeLiveMigration }}
+                if ! ip link show br-ex; then
+                  exit 0
+                fi
+{{- end }}
                 . /ovnkube-lib/ovnkube-lib.sh || exit 1
                 sbdb-post-start
         readinessProbe:
@@ -374,6 +395,11 @@ spec:
             - -c
             - |
               set -xeo pipefail
+{{- if .IsNetworkTypeLiveMigration }}
+              if ! ip link show br-ex; then
+                exit 0
+              fi
+{{- end }}
               . /ovnkube-lib/ovnkube-lib.sh || exit 1
               ovndb-readiness-probe "sb"
         env:
@@ -404,6 +430,64 @@ spec:
         - -c
         - |
           set -xe
+{{- if .IsNetworkTypeLiveMigration }}
+          # In case of rollback, ovnkube need to reuse the host subnet used by openshift-sdn, so we need to create the node subnets annotations for the local node if it doesn't exist.
+          # retry loop
+          RETRY_INTERVAL=3
+          MAX_RETRIES=10
+          for ((retry_count=1; retry_count<=MAX_RETRIES; retry_count++)); do
+              # Get SDN subnet
+              SDN_SUBNET=$(kubectl get hostsubnet ${K8S_NODE} -o jsonpath="{.subnet}"||true)
+
+              # Get OVN subnet
+              OVN_SUBNET=$(kubectl get node ${K8S_NODE} -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/node-subnets}' | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,3}'||true)
+
+              if [ -n "${SDN_SUBNET}" ] && [ -z "${OVN_SUBNET}" ]; then
+                  echo "OVN_SUBNET is empty, create the node-subnets annotation with the SDN_SUBNET ${SDN_SUBNET}"
+                  SUBNET=${SDN_SUBNET}
+                  break
+              elif [ -z "${SDN_SUBNET}" ] && [ -n "${OVN_SUBNET}" ]; then
+                  echo "OVN_SUBNET is ${OVN_SUBNET}"
+                  break
+              elif [ -n "${SDN_SUBNET}" ] && [ -n "${OVN_SUBNET}" ] && [ "${SDN_SUBNET}" == "${OVN_SUBNET}" ]; then
+                  echo "Subnets matched! SDN_SUBNET: ${SDN_SUBNET}, OVN_SUBNET: ${OVN_SUBNET}"
+                  SUBNET=${SDN_SUBNET}
+                  break
+              elif [ -n "${SDN_SUBNET}" ] && [ -n "${OVN_SUBNET}" ] && ! [ "${SDN_SUBNET}" == "${OVN_SUBNET}" ]; then
+                  echo "Subnets don't match! SDN_SUBNET: ${SDN_SUBNET}, OVN_SUBNET: ${OVN_SUBNET}"
+                  exit 1
+              else
+                  echo "Round ${retry_count}/${MAX_RETRIES} - Retrying... SDN_SUBNET: ${SDN_SUBNET}, OVN_SUBNET: ${OVN_SUBNET}"
+                  sleep $RETRY_INTERVAL
+              fi
+          done
+          if [ ${retry_count} -gt ${MAX_RETRIES} ]; then
+              echo "All retries failed. Exiting."
+              exit 1
+          fi
+
+          kubectl annotate node ${K8S_NODE} --overwrite k8s.ovn.org/node-subnets={\"default\":[\"${SUBNET}\"]}
+          kubectl annotate node ${K8S_NODE} --overwrite k8s.ovn.org/hybrid-overlay-node-subnet=${SUBNET}
+          if ip link show br-ex; then
+            echo "br-ex exists, run ovnkube"
+            kubectl label node --overwrite ${K8S_NODE} migration.network.openshift.io/plugin-
+          else
+            echo "br-ex doesn't exist"
+            kubectl label node --overwrite ${K8S_NODE} migration.network.openshift.io/plugin=
+            echo "run hybrid-overlay-node"
+            NETWORK_NODE_IDENTITY_ENABLE=
+            if [[ "{{.NETWORK_NODE_IDENTITY_ENABLE}}" == "true" ]]; then
+              NETWORK_NODE_IDENTITY_ENABLE="
+                --bootstrap-kubeconfig=/var/lib/kubelet/kubeconfig
+                --cert-dir=/etc/ovn/ovnkube-node-certs
+                --cert-duration={{.NodeIdentityCertDuration}}
+              "
+            fi
+            exec /usr/bin/hybrid-overlay-node --node "${K8S_NODE}" \
+              --config-file=/run/ovnkube-config/ovnkube.conf \
+              ${NETWORK_NODE_IDENTITY_ENABLE}
+          fi
+{{- end }}
           . /ovnkube-lib/ovnkube-lib.sh || exit 1
           start-ovnkube-node ${OVN_KUBE_LOG_LEVEL} 29103 29105
         env:
@@ -529,7 +613,17 @@ spec:
               command: ["rm","-f","/etc/cni/net.d/10-ovn-kubernetes.conf"]
         readinessProbe:
           exec:
-            command: ["test", "-f", "/etc/cni/net.d/10-ovn-kubernetes.conf"]
+            command:
+            - /bin/bash
+            - -c
+            - |
+              #!/bin/bash
+{{- if .IsNetworkTypeLiveMigration }}
+              if ! ip link show br-ex; then
+                exit 0
+              fi
+{{- end }}
+              test -f /etc/cni/net.d/10-ovn-kubernetes.conf
           initialDelaySeconds: 5
           periodSeconds: 30
       {{- if .OVNPlatformAzure}}
@@ -556,6 +650,15 @@ spec:
           export KUBECONFIG=/etc/ovn/kubeconfig
 {{ end }}
 
+{{- if .IsNetworkTypeLiveMigration }}
+          if ip link show br-ex; then
+            echo "br-ex exists, run"
+          else
+            echo "br-ex doesn't exist, sleep..."
+            trap : TERM INT; sleep infinity & wait
+            exit
+          fi
+{{- end }}
           touch /var/run/ovn/add_iptables.sh
           chmod 0755 /var/run/ovn/add_iptables.sh
           cat <<'EOF' > /var/run/ovn/add_iptables.sh

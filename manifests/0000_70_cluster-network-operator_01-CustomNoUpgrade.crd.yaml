@@ -6,6 +6,7 @@ metadata:
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
     include.release.openshift.io/single-node-developer: "true"
+    release.openshift.io/feature-set: CustomNoUpgrade
   name: networks.operator.openshift.io
 spec:
   group: operator.openshift.io
@@ -181,85 +182,6 @@ spec:
                 description: defaultNetwork is the "default" network that all pods
                   will receive
                 properties:
-                  kuryrConfig:
-                    description: KuryrConfig configures the kuryr plugin
-                    properties:
-                      controllerProbesPort:
-                        description: The port kuryr-controller will listen for readiness
-                          and liveness requests.
-                        format: int32
-                        minimum: 0
-                        type: integer
-                      daemonProbesPort:
-                        description: The port kuryr-daemon will listen for readiness
-                          and liveness requests.
-                        format: int32
-                        minimum: 0
-                        type: integer
-                      enablePortPoolsPrepopulation:
-                        description: enablePortPoolsPrepopulation when true will make
-                          Kuryr prepopulate each newly created port pool with a minimum
-                          number of ports. Kuryr uses Neutron port pooling to fight
-                          the fact that it takes a significant amount of time to create
-                          one. It creates a number of ports when the first pod that
-                          is configured to use the dedicated network for pods is created
-                          in a namespace, and keeps them ready to be attached to pods.
-                          Port prepopulation is disabled by default.
-                        type: boolean
-                      mtu:
-                        description: mtu is the MTU that Kuryr should use when creating
-                          pod networks in Neutron. The value has to be lower or equal
-                          to the MTU of the nodes network and Neutron has to allow
-                          creation of tenant networks with such MTU. If unset Pod
-                          networks will be created with the same MTU as the nodes
-                          network has. This also affects the services network created
-                          by cluster-network-operator.
-                        format: int32
-                        minimum: 0
-                        type: integer
-                      openStackServiceNetwork:
-                        description: openStackServiceNetwork contains the CIDR of
-                          network from which to allocate IPs for OpenStack Octavia's
-                          Amphora VMs. Please note that with Amphora driver Octavia
-                          uses two IPs from that network for each loadbalancer - one
-                          given by OpenShift and second for VRRP connections. As the
-                          first one is managed by OpenShift's and second by Neutron's
-                          IPAMs, those need to come from different pools. Therefore
-                          `openStackServiceNetwork` needs to be at least twice the
-                          size of `serviceNetwork`, and whole `serviceNetwork` must
-                          be overlapping with `openStackServiceNetwork`. cluster-network-operator
-                          will then make sure VRRP IPs are taken from the ranges inside
-                          `openStackServiceNetwork` that are not overlapping with
-                          `serviceNetwork`, effectivly preventing conflicts. If not
-                          set cluster-network-operator will use `serviceNetwork` expanded
-                          by decrementing the prefix size by 1.
-                        type: string
-                      poolBatchPorts:
-                        description: poolBatchPorts sets a number of ports that should
-                          be created in a single batch request to extend the port
-                          pool. The default is 3. For more information about port
-                          pools see enablePortPoolsPrepopulation setting.
-                        minimum: 0
-                        type: integer
-                      poolMaxPorts:
-                        description: poolMaxPorts sets a maximum number of free ports
-                          that are being kept in a port pool. If the number of ports
-                          exceeds this setting, free ports will get deleted. Setting
-                          0 will disable this upper bound, effectively preventing
-                          pools from shrinking and this is the default value. For
-                          more information about port pools see enablePortPoolsPrepopulation
-                          setting.
-                        minimum: 0
-                        type: integer
-                      poolMinPorts:
-                        description: poolMinPorts sets a minimum number of free ports
-                          that should be kept in a port pool. If the number of ports
-                          is lower than this setting, new ports will get created and
-                          added to pool. The default is 1. For more information about
-                          port pools see enablePortPoolsPrepopulation setting.
-                        minimum: 1
-                        type: integer
-                    type: object
                   openshiftSDNConfig:
                     description: openShiftSDNConfig configures the openshift-sdn plugin
                     properties:
@@ -420,57 +342,57 @@ spec:
                                     on segment 1
                                   rule: 'self.split(''/'')[0].split('':'').size()
                                     >=1 ? [self.split(''/'')[0].split('':'', 8)[0]].all(x,
-                                    x == '''' || x.matches(''[0-9A-Fa-f]{1,4}''))
-                                    : true'
+                                    x == '''' || (x.matches(''^[0-9A-Fa-f]{1,4}$''))
+                                    && size(x)<5 ) : true'
                                 - message: each segment of an IPv6 address must be
                                     a hexadecimal number between 0 and FFFF, failed
                                     on segment 2
                                   rule: 'self.split(''/'')[0].split('':'').size()
                                     >=2 ? [self.split(''/'')[0].split('':'', 8)[1]].all(x,
-                                    x == '''' || x.matches(''[0-9A-Fa-f]{1,4}''))
-                                    : true'
+                                    x == '''' || (x.matches(''^[0-9A-Fa-f]{1,4}$''))
+                                    && size(x)<5 ) : true'
                                 - message: each segment of an IPv6 address must be
                                     a hexadecimal number between 0 and FFFF, failed
                                     on segment 3
                                   rule: 'self.split(''/'')[0].split('':'').size()
                                     >=3 ? [self.split(''/'')[0].split('':'', 8)[2]].all(x,
-                                    x == '''' || x.matches(''[0-9A-Fa-f]{1,4}''))
-                                    : true'
+                                    x == '''' || (x.matches(''^[0-9A-Fa-f]{1,4}$''))
+                                    && size(x)<5 ) : true'
                                 - message: each segment of an IPv6 address must be
                                     a hexadecimal number between 0 and FFFF, failed
                                     on segment 4
                                   rule: 'self.split(''/'')[0].split('':'').size()
                                     >=4 ? [self.split(''/'')[0].split('':'', 8)[3]].all(x,
-                                    x == '''' || x.matches(''[0-9A-Fa-f]{1,4}''))
-                                    : true'
+                                    x == '''' || (x.matches(''^[0-9A-Fa-f]{1,4}$''))
+                                    && size(x)<5 ) : true'
                                 - message: each segment of an IPv6 address must be
                                     a hexadecimal number between 0 and FFFF, failed
                                     on segment 5
                                   rule: 'self.split(''/'')[0].split('':'').size()
                                     >=5 ? [self.split(''/'')[0].split('':'', 8)[4]].all(x,
-                                    x == '''' || x.matches(''[0-9A-Fa-f]{1,4}''))
-                                    : true'
+                                    x == '''' || (x.matches(''^[0-9A-Fa-f]{1,4}$''))
+                                    && size(x)<5 ) : true'
                                 - message: each segment of an IPv6 address must be
                                     a hexadecimal number between 0 and FFFF, failed
                                     on segment 6
                                   rule: 'self.split(''/'')[0].split('':'').size()
                                     >=6 ? [self.split(''/'')[0].split('':'', 8)[5]].all(x,
-                                    x == '''' || x.matches(''[0-9A-Fa-f]{1,4}''))
-                                    : true'
+                                    x == '''' || (x.matches(''^[0-9A-Fa-f]{1,4}$''))
+                                    && size(x)<5 ) : true'
                                 - message: each segment of an IPv6 address must be
                                     a hexadecimal number between 0 and FFFF, failed
                                     on segment 7
                                   rule: 'self.split(''/'')[0].split('':'').size()
                                     >=7 ? [self.split(''/'')[0].split('':'', 8)[6]].all(x,
-                                    x == '''' || x.matches(''[0-9A-Fa-f]{1,4}''))
-                                    : true'
+                                    x == '''' || (x.matches(''^[0-9A-Fa-f]{1,4}$''))
+                                    && size(x)<5 ) : true'
                                 - message: each segment of an IPv6 address must be
                                     a hexadecimal number between 0 and FFFF, failed
                                     on segment 8
                                   rule: 'self.split(''/'')[0].split('':'').size()
                                     >=8 ? [self.split(''/'')[0].split('':'', 8)[7]].all(x,
-                                    x == '''' || x.matches(''[0-9A-Fa-f]{1,4}''))
-                                    : true'
+                                    x == '''' || (x.matches(''^[0-9A-Fa-f]{1,4}$''))
+                                    && size(x)<5 ) : true'
                                 - message: IPv6 dual addresses are not permitted,
                                     value should not contain `.` characters
                                   rule: '!self.contains(''.'')'
@@ -749,6 +671,23 @@ spec:
                           defaults to 'true' and multicast configure is migrated.
                         type: boolean
                     type: object
+                  mode:
+                    description: mode indicates the mode of network migration. The
+                      supported values are "Live", "Offline" and omitted. A "Live"
+                      migration operation will not cause service interruption by migrating
+                      the CNI of each node one by one. The cluster network will work
+                      as normal during the network migration. An "Offline" migration
+                      operation will cause service interruption. During an "Offline"
+                      migration, two rounds of node reboots are required. The cluster
+                      network will be malfunctioning during the network migration.
+                      When omitted, this means no opinion and the platform is left
+                      to choose a reasonable default which is subject to change over
+                      time. The current default value is "Offline".
+                    enum:
+                    - Live
+                    - Offline
+                    - ""
+                    type: string
                   mtu:
                     description: mtu contains the MTU migration configuration. Set
                       this to allow changing the MTU values for the default network.
@@ -798,6 +737,11 @@ spec:
                       OVNKubernetes
                     type: string
                 type: object
+                x-kubernetes-validations:
+                - message: networkType migration in mode other than 'Live' may not
+                    be configured at the same time as mtu migration
+                  rule: '!has(self.mtu) || !has(self.networkType) || self.networkType
+                    == '''' || has(self.mode) && self.mode == ''Live'''
               observedConfig:
                 description: observedConfig holds a sparse config that controller
                   has observed from the cluster state.  It exists in spec because

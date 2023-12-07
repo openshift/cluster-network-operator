@@ -55,7 +55,15 @@ oc annotate --local -o yaml \
 oc annotate --local -o yaml --overwrite \
   "${RELEASE_PROFILE}" \
   "${ROKS_PROFILE}" \
-  -f vendor/github.com/openshift/api/operator/v1/0000_70_cluster-network-operator_01.crd.yaml > manifests/0000_70_cluster-network-operator_01_crd.yaml
+  -f vendor/github.com/openshift/api/operator/v1/0000_70_cluster-network-operator_01-Default.crd.yaml > manifests/0000_70_cluster-network-operator_01-Default.crd.yaml
+oc annotate --local -o yaml --overwrite \
+  "${RELEASE_PROFILE}" \
+  "${ROKS_PROFILE}" \
+  -f vendor/github.com/openshift/api/operator/v1/0000_70_cluster-network-operator_01-CustomNoUpgrade.crd.yaml > manifests/0000_70_cluster-network-operator_01-CustomNoUpgrade.crd.yaml
+oc annotate --local -o yaml --overwrite \
+  "${RELEASE_PROFILE}" \
+  "${ROKS_PROFILE}" \
+  -f vendor/github.com/openshift/api/operator/v1/0000_70_cluster-network-operator_01-TechPreviewNoUpgrade.crd.yaml > manifests/0000_70_cluster-network-operator_01-TechPreviewNoUpgrade.crd.yaml
 
 echo "${HEADER}" > manifests/0000_70_cluster-network-operator_01_egr_crd.yaml
 oc annotate --local -o yaml --overwrite \
