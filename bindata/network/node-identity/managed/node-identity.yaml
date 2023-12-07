@@ -13,6 +13,7 @@ metadata:
     hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
     hypershift.openshift.io/control-plane: "true"
 spec:
+  minReadySeconds: 15
   replicas: {{.NetworkNodeIdentityReplicas}}
 {{ if (gt .NetworkNodeIdentityReplicas 1)}}
   strategy:
