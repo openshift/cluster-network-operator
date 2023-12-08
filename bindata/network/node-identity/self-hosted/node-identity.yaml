@@ -132,11 +132,4 @@ spec:
               - key: additional-pod-admission-cond.json
                 path: additional-pod-admission-cond.json
       tolerations:
-      - key: "node-role.kubernetes.io/master"
-        operator: "Exists"
-      - key: "node.kubernetes.io/not-ready"
-        operator: "Exists"
-      - key: "node.kubernetes.io/unreachable"
-        operator: "Exists"
-      - key: "node.kubernetes.io/network-unavailable"
-        operator: "Exists"
+      - operator: "Exists"
