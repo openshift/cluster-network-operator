@@ -128,23 +128,25 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 	// consider removing in OCP 4.18 when we know field manager 'cluster-network-operator' no longer possibly
 	// exists in any object from all upgrade paths
 	// Retrieve the current state of the resource
-	us, err := clusterClient.Dynamic().Resource(rm.Resource).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to get current state of %s: %w", objDesc, err)
-	}
-	if us != nil && isDepFieldManagerCleanupNeeded(subcontroller) {
-		us.SetGroupVersionKind(gvk)
+	if isDepFieldManagerCleanupNeeded(subcontroller) {
+		us, err := clusterClient.Dynamic().Resource(rm.Resource).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to get current state of %s: %w", objDesc, err)
+		}
+		if us != nil {
+			us.SetGroupVersionKind(gvk)
 
-		if doesManagerOpExist(us.GetManagedFields(), depreciatedFieldManager, metav1.ManagedFieldsOperationUpdate,
-			metav1.ManagedFieldsOperationApply) {
+			if doesManagerOpExist(us.GetManagedFields(), depreciatedFieldManager, metav1.ManagedFieldsOperationUpdate,
+				metav1.ManagedFieldsOperationApply) {
 
-			us.SetGroupVersionKind(obj.GetObjectKind().GroupVersionKind())
-			if err = mergeManager(ctx, clusterClient, us, depreciatedFieldManager, fieldManager, rm.Resource); err != nil {
-				klog.Errorf("Failed to merge field managers %q for object %q %s %s: %v", depreciatedFieldManager,
-					gvk.String(), obj.GetNamespace(), obj.GetName(), err)
-			} else {
-				klog.Infof("Depreciated field manager %s for object %q %s %s", depreciatedFieldManager,
-					gvk.String(), obj.GetNamespace(), obj.GetName())
+				us.SetGroupVersionKind(obj.GetObjectKind().GroupVersionKind())
+				if err = mergeManager(ctx, clusterClient, us, depreciatedFieldManager, fieldManager, rm.Resource); err != nil {
+					klog.Errorf("Failed to merge field managers %q for object %q %s %s: %v", depreciatedFieldManager,
+						gvk.String(), obj.GetNamespace(), obj.GetName(), err)
+				} else {
+					klog.Infof("Depreciated field manager %s for object %q %s %s", depreciatedFieldManager,
+						gvk.String(), obj.GetNamespace(), obj.GetName())
+				}
 			}
 		}
 	}
