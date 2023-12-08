@@ -380,9 +380,41 @@ func (StatuspageProvider) SwaggerDoc() map[string]string {
 	return map_StatuspageProvider
 }
 
+var map_AWSCSIDriverConfigSpec = map[string]string{
+	"":          "AWSCSIDriverConfigSpec defines properties that can be configured for the AWS CSI driver.",
+	"kmsKeyARN": "kmsKeyARN sets the cluster default storage class to encrypt volumes with a user-defined KMS key, rather than the default KMS key used by AWS. The value may be either the ARN or Alias ARN of a KMS key.",
+}
+
+func (AWSCSIDriverConfigSpec) SwaggerDoc() map[string]string {
+	return map_AWSCSIDriverConfigSpec
+}
+
+var map_AzureCSIDriverConfigSpec = map[string]string{
+	"":                  "AzureCSIDriverConfigSpec defines properties that can be configured for the Azure CSI driver.",
+	"diskEncryptionSet": "diskEncryptionSet sets the cluster default storage class to encrypt volumes with a customer-managed encryption set, rather than the default platform-managed keys.",
+}
+
+func (AzureCSIDriverConfigSpec) SwaggerDoc() map[string]string {
+	return map_AzureCSIDriverConfigSpec
+}
+
+var map_AzureDiskEncryptionSet = map[string]string{
+	"":               "AzureDiskEncryptionSet defines the configuration for a disk encryption set.",
+	"subscriptionID": "subscriptionID defines the Azure subscription that contains the disk encryption set. The value should meet the following conditions: 1. It should be a 128-bit number. 2. It should be 36 characters (32 hexadecimal characters and 4 hyphens) long. 3. It should be displayed in five groups separated by hyphens (-). 4. The first group should be 8 characters long. 5. The second, third, and fourth groups should be 4 characters long. 6. The fifth group should be 12 characters long. An Example SubscrionID: f2007bbf-f802-4a47-9336-cf7c6b89b378",
+	"resourceGroup":  "resourceGroup defines the Azure resource group that contains the disk encryption set. The value should consist of only alphanumberic characters, underscores (_), parentheses, hyphens and periods. The value should not end in a period and be at most 90 characters in length.",
+	"name":           "name is the name of the disk encryption set that will be set on the default storage class. The value should consist of only alphanumberic characters, underscores (_), hyphens, and be at most 80 characters in length.",
+}
+
+func (AzureDiskEncryptionSet) SwaggerDoc() map[string]string {
+	return map_AzureDiskEncryptionSet
+}
+
 var map_CSIDriverConfigSpec = map[string]string{
 	"":           "CSIDriverConfigSpec defines configuration spec that can be used to optionally configure a specific CSI Driver.",
-	"driverType": "driverType indicates type of CSI driver for which the driverConfig is being applied to.\n\nValid values are:\n\n* vSphere\n\nAllows configuration of vsphere CSI driver topology.",
+	"driverType": "driverType indicates type of CSI driver for which the driverConfig is being applied to. Valid values are: AWS, Azure, GCP, vSphere and omitted. Consumers should treat unknown values as a NO-OP.",
+	"aws":        "aws is used to configure the AWS CSI driver.",
+	"azure":      "azure is used to configure the Azure CSI driver.",
+	"gcp":        "gcp is used to configure the GCP CSI driver.",
 	"vSphere":    "vsphere is used to configure the vsphere CSI driver.",
 }
 
@@ -424,6 +456,27 @@ var map_ClusterCSIDriverStatus = map[string]string{
 
 func (ClusterCSIDriverStatus) SwaggerDoc() map[string]string {
 	return map_ClusterCSIDriverStatus
+}
+
+var map_GCPCSIDriverConfigSpec = map[string]string{
+	"":       "GCPCSIDriverConfigSpec defines properties that can be configured for the GCP CSI driver.",
+	"kmsKey": "kmsKey sets the cluster default storage class to encrypt volumes with customer-supplied encryption keys, rather than the default keys managed by GCP.",
+}
+
+func (GCPCSIDriverConfigSpec) SwaggerDoc() map[string]string {
+	return map_GCPCSIDriverConfigSpec
+}
+
+var map_GCPKMSKeyReference = map[string]string{
+	"":          "GCPKMSKeyReference gathers required fields for looking up a GCP KMS Key",
+	"name":      "name is the name of the customer-managed encryption key to be used for disk encryption. The value should correspond to an existing KMS key and should consist of only alphanumeric characters, hyphens (-) and underscores (_), and be at most 63 characters in length.",
+	"keyRing":   "keyRing is the name of the KMS Key Ring which the KMS Key belongs to. The value should correspond to an existing KMS key ring and should consist of only alphanumeric characters, hyphens (-) and underscores (_), and be at most 63 characters in length.",
+	"projectID": "projectID is the ID of the Project in which the KMS Key Ring exists. It must be 6 to 30 lowercase letters, digits, or hyphens. It must start with a letter. Trailing hyphens are prohibited.",
+	"location":  "location is the GCP location in which the Key Ring exists. The value must match an existing GCP location, or \"global\". Defaults to global, if not set.",
+}
+
+func (GCPKMSKeyReference) SwaggerDoc() map[string]string {
+	return map_GCPKMSKeyReference
 }
 
 var map_VSphereCSIDriverConfigSpec = map[string]string{
@@ -554,10 +607,11 @@ func (DNSTransportConfig) SwaggerDoc() map[string]string {
 }
 
 var map_ForwardPlugin = map[string]string{
-	"":                "ForwardPlugin defines a schema for configuring the CoreDNS forward plugin.",
-	"upstreams":       "upstreams is a list of resolvers to forward name queries for subdomains of Zones. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy. Each upstream is represented by an IP address or IP:port if the upstream listens on a port other than 53.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin.",
-	"policy":          "policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Random\"",
-	"transportConfig": "transportConfig is used to configure the transport type, server name, and optional custom CA or CA bundle to use when forwarding DNS requests to an upstream resolver.\n\nThe default value is \"\" (empty) which results in a standard cleartext connection being used when forwarding DNS requests to an upstream resolver.",
+	"":                 "ForwardPlugin defines a schema for configuring the CoreDNS forward plugin.",
+	"upstreams":        "upstreams is a list of resolvers to forward name queries for subdomains of Zones. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy. Each upstream is represented by an IP address or IP:port if the upstream listens on a port other than 53.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin.",
+	"policy":           "policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Random\"",
+	"transportConfig":  "transportConfig is used to configure the transport type, server name, and optional custom CA or CA bundle to use when forwarding DNS requests to an upstream resolver.\n\nThe default value is \"\" (empty) which results in a standard cleartext connection being used when forwarding DNS requests to an upstream resolver.",
+	"protocolStrategy": "protocolStrategy specifies the protocol to use for upstream DNS requests. Valid values for protocolStrategy are \"TCP\" and omitted. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is to use the protocol of the original client request. \"TCP\" specifies that the platform should use TCP for all upstream DNS requests, even if the client request uses UDP. \"TCP\" is useful for UDP-specific issues such as those created by non-compliant upstream resolvers, but may consume more bandwidth or increase DNS response time. Note that protocolStrategy only affects the protocol of DNS requests that CoreDNS makes to upstream resolvers. It does not affect the protocol of DNS requests between clients and CoreDNS.",
 }
 
 func (ForwardPlugin) SwaggerDoc() map[string]string {
@@ -587,10 +641,11 @@ func (Upstream) SwaggerDoc() map[string]string {
 }
 
 var map_UpstreamResolvers = map[string]string{
-	"":                "UpstreamResolvers defines a schema for configuring the CoreDNS forward plugin in the specific case of the default (\".\") server. It defers from ForwardPlugin in the default values it accepts: * At least one upstream should be specified. * the default policy is Sequential",
-	"upstreams":       "Upstreams is a list of resolvers to forward name queries for the \".\" domain. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin. If no Upstreams are specified, /etc/resolv.conf is used by default",
-	"policy":          "Policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Sequential\"",
-	"transportConfig": "transportConfig is used to configure the transport type, server name, and optional custom CA or CA bundle to use when forwarding DNS requests to an upstream resolver.\n\nThe default value is \"\" (empty) which results in a standard cleartext connection being used when forwarding DNS requests to an upstream resolver.",
+	"":                 "UpstreamResolvers defines a schema for configuring the CoreDNS forward plugin in the specific case of the default (\".\") server. It defers from ForwardPlugin in the default values it accepts: * At least one upstream should be specified. * the default policy is Sequential",
+	"upstreams":        "Upstreams is a list of resolvers to forward name queries for the \".\" domain. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin. If no Upstreams are specified, /etc/resolv.conf is used by default",
+	"policy":           "Policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Sequential\"",
+	"transportConfig":  "transportConfig is used to configure the transport type, server name, and optional custom CA or CA bundle to use when forwarding DNS requests to an upstream resolver.\n\nThe default value is \"\" (empty) which results in a standard cleartext connection being used when forwarding DNS requests to an upstream resolver.",
+	"protocolStrategy": "protocolStrategy specifies the protocol to use for upstream DNS requests. Valid values for protocolStrategy are \"TCP\" and omitted. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is to use the protocol of the original client request. \"TCP\" specifies that the platform should use TCP for all upstream DNS requests, even if the client request uses UDP. \"TCP\" is useful for UDP-specific issues such as those created by non-compliant upstream resolvers, but may consume more bandwidth or increase DNS response time. Note that protocolStrategy only affects the protocol of DNS requests that CoreDNS makes to upstream resolvers. It does not affect the protocol of DNS requests between clients and CoreDNS.",
 }
 
 func (UpstreamResolvers) SwaggerDoc() map[string]string {
@@ -715,6 +770,15 @@ var map_HostNetworkStrategy = map[string]string{
 
 func (HostNetworkStrategy) SwaggerDoc() map[string]string {
 	return map_HostNetworkStrategy
+}
+
+var map_IBMLoadBalancerParameters = map[string]string{
+	"":         "IBMLoadBalancerParameters provides configuration settings that are specific to IBM Cloud load balancers.",
+	"protocol": "protocol specifies whether the load balancer uses PROXY protocol to forward connections to the IngressController. See \"service.kubernetes.io/ibm-load-balancer-cloud-provider-enable-features: \"proxy-protocol\"\" at https://cloud.ibm.com/docs/containers?topic=containers-vpc-lbaas\"\n\nPROXY protocol can be used with load balancers that support it to communicate the source addresses of client connections when forwarding those connections to the IngressController.  Using PROXY protocol enables the IngressController to report those source addresses instead of reporting the load balancer's address in HTTP headers and logs.  Note that enabling PROXY protocol on the IngressController will cause connections to fail if you are not using a load balancer that uses PROXY protocol to forward connections to the IngressController.  See http://www.haproxy.org/download/2.2/doc/proxy-protocol.txt for information about PROXY protocol.\n\nValid values for protocol are TCP, PROXY and omitted. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is TCP, without the proxy protocol enabled.",
+}
+
+func (IBMLoadBalancerParameters) SwaggerDoc() map[string]string {
+	return map_IBMLoadBalancerParameters
 }
 
 var map_IngressController = map[string]string{
@@ -920,9 +984,10 @@ func (PrivateStrategy) SwaggerDoc() map[string]string {
 
 var map_ProviderLoadBalancerParameters = map[string]string{
 	"":     "ProviderLoadBalancerParameters holds desired load balancer information specific to the underlying infrastructure provider.",
-	"type": "type is the underlying infrastructure provider for the load balancer. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Nutanix\", \"OpenStack\", and \"VSphere\".",
+	"type": "type is the underlying infrastructure provider for the load balancer. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"IBM\", \"Nutanix\", \"OpenStack\", and \"VSphere\".",
 	"aws":  "aws provides configuration settings that are specific to AWS load balancers.\n\nIf empty, defaults will be applied. See specific aws fields for details about their defaults.",
 	"gcp":  "gcp provides configuration settings that are specific to GCP load balancers.\n\nIf empty, defaults will be applied. See specific gcp fields for details about their defaults.",
+	"ibm":  "ibm provides configuration settings that are specific to IBM Cloud load balancers.\n\nIf empty, defaults will be applied. See specific ibm fields for details about their defaults.",
 }
 
 func (ProviderLoadBalancerParameters) SwaggerDoc() map[string]string {
@@ -1209,7 +1274,7 @@ var map_KuryrConfig = map[string]string{
 	"poolMaxPorts":                 "poolMaxPorts sets a maximum number of free ports that are being kept in a port pool. If the number of ports exceeds this setting, free ports will get deleted. Setting 0 will disable this upper bound, effectively preventing pools from shrinking and this is the default value. For more information about port pools see enablePortPoolsPrepopulation setting.",
 	"poolMinPorts":                 "poolMinPorts sets a minimum number of free ports that should be kept in a port pool. If the number of ports is lower than this setting, new ports will get created and added to pool. The default is 1. For more information about port pools see enablePortPoolsPrepopulation setting.",
 	"poolBatchPorts":               "poolBatchPorts sets a number of ports that should be created in a single batch request to extend the port pool. The default is 3. For more information about port pools see enablePortPoolsPrepopulation setting.",
-	"mtu":                          "mtu is the MTU that Kuryr should use when creating pod networks in Neutron. The value has to be lower or equal to the MTU of the nodes network and Neutron has to allow creation of tenant networks with such MTU. If unset Pod networks will be created with the same MTU as the nodes network has.",
+	"mtu":                          "mtu is the MTU that Kuryr should use when creating pod networks in Neutron. The value has to be lower or equal to the MTU of the nodes network and Neutron has to allow creation of tenant networks with such MTU. If unset Pod networks will be created with the same MTU as the nodes network has. This also affects the services network created by cluster-network-operator.",
 }
 
 func (KuryrConfig) SwaggerDoc() map[string]string {
@@ -1331,6 +1396,7 @@ func (OpenShiftSDNConfig) SwaggerDoc() map[string]string {
 var map_PolicyAuditConfig = map[string]string{
 	"rateLimit":      "rateLimit is the approximate maximum number of messages to generate per-second per-node. If unset the default of 20 msg/sec is used.",
 	"maxFileSize":    "maxFilesSize is the max size an ACL_audit log file is allowed to reach before rotation occurs Units are in MB and the Default is 50MB",
+	"maxLogFiles":    "maxLogFiles specifies the maximum number of ACL_audit log files that can be present.",
 	"destination":    "destination is the location for policy log messages. Regardless of this config, persistent logs will always be dumped to the host at /var/log/ovn/ however Additionally syslog output may be configured as follows. Valid values are: - \"libc\" -> to use the libc syslog() function of the host node's journdald process - \"udp:host:port\" -> for sending syslog over UDP - \"unix:file\" -> for using the UNIX domain socket directly - \"null\" -> to discard all messages logged to syslog The default is \"null\"",
 	"syslogFacility": "syslogFacility the RFC5424 facility for generated messages, e.g. \"kern\". Default is \"local0\"",
 }
@@ -1547,7 +1613,8 @@ func (StorageList) SwaggerDoc() map[string]string {
 }
 
 var map_StorageSpec = map[string]string{
-	"": "StorageSpec is the specification of the desired behavior of the cluster storage operator.",
+	"":                     "StorageSpec is the specification of the desired behavior of the cluster storage operator.",
+	"vsphereStorageDriver": "VSphereStorageDriver indicates the storage driver to use on VSphere clusters. Once this field is set to CSIWithMigrationDriver, it can not be changed. If this is empty, the platform will choose a good default, which may change over time without notice. The current default is LegacyDeprecatedInTreeDriver. DEPRECATED: This field will be removed in a future release.",
 }
 
 func (StorageSpec) SwaggerDoc() map[string]string {
