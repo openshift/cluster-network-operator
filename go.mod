@@ -19,12 +19,12 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
-	golang.org/x/net v0.14.0
+	golang.org/x/net v0.17.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.27.3
-	k8s.io/apimachinery v0.27.3
-	k8s.io/code-generator v0.27.2
-	k8s.io/component-base v0.27.2
+	k8s.io/api v0.27.4
+	k8s.io/apimachinery v0.27.4
+	k8s.io/code-generator v0.27.4
+	k8s.io/component-base v0.27.4
 	k8s.io/klog/v2 v2.100.1
 	k8s.io/kube-proxy v0.27.2
 	k8s.io/utils v0.0.0-20230711102312-30195339c3c7
@@ -89,13 +89,13 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/crypto v0.12.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sync v0.2.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
-	golang.org/x/term v0.11.0 // indirect
-	golang.org/x/text v0.12.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/term v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.9.1 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
@@ -111,17 +111,17 @@ require (
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2 // indirect
 	sigs.k8s.io/cluster-api v1.3.5 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
-	sigs.k8s.io/kube-storage-version-migrator v0.0.4 // indirect
+	sigs.k8s.io/kube-storage-version-migrator v0.0.6-0.20230721195810-5c8923c5ff96 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.3.0 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
 require (
-	github.com/openshift/api v0.0.0-20230804173756-26b8597c4de2
+	github.com/openshift/api v0.0.0-20230807132801-600991d550ac
 	github.com/openshift/client-go v0.0.0-20230718165156-6014fb98e86a
 	github.com/openshift/hypershift v0.1.6
-	github.com/openshift/library-go v0.0.0-20230503144409-4cb26a344c37
-	k8s.io/apiextensions-apiserver v0.27.2
+	github.com/openshift/library-go v0.0.0-20231103161458-0ec67489d123
+	k8s.io/apiextensions-apiserver v0.27.4
 	k8s.io/client-go v12.0.0+incompatible
 	sigs.k8s.io/cluster-api-provider-openstack v0.0.0-00010101000000-000000000000
 )
@@ -147,9 +147,9 @@ require (
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230530153820-e85fd2cbaebc // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230530153820-e85fd2cbaebc // indirect
-	k8s.io/apiserver v0.27.2 // indirect
-	k8s.io/kms v0.27.2 // indirect
-	k8s.io/kube-aggregator v0.26.1 // indirect
+	k8s.io/apiserver v0.27.4 // indirect
+	k8s.io/kms v0.27.4 // indirect
+	k8s.io/kube-aggregator v0.27.4 // indirect
 	sigs.k8s.io/cluster-api-provider-aws/v2 v2.0.2 // indirect
 	sigs.k8s.io/cluster-api-provider-ibmcloud v0.2.4 // indirect
 )
