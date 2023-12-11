@@ -358,7 +358,7 @@ github.com/openshift/client-go/operatorcontrolplane/listers/operatorcontrolplane
 ## explicit; go 1.18
 github.com/openshift/hypershift/api/util/ipnet
 github.com/openshift/hypershift/api/v1beta1
-# github.com/openshift/library-go v0.0.0-20230130232623-47904dd9ff5a
+# github.com/openshift/library-go v0.0.0-20231115094609-5e510a6e9a52
 ## explicit; go 1.19
 github.com/openshift/library-go/pkg/authorization/hardcodedauthorizer
 github.com/openshift/library-go/pkg/certs

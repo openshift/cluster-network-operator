@@ -479,8 +479,8 @@ github.com/openshift/cluster-api-provider-openstack v0.0.0-20220209101310-a384cb
 github.com/openshift/cluster-api-provider-openstack v0.0.0-20220209101310-a384cbe0dfa0/go.mod h1:DuIbIAxTRFBNHV3LSOUBiivzDpjw6MEgVkK2dhKo48A=
 github.com/openshift/hypershift v0.1.2 h1:uUv9KX82rWYOCuVNn3J8MEKtqEzDaarHOPIx9+XxYaY=
 github.com/openshift/hypershift v0.1.2/go.mod h1:XwedrZu6dC/NBSyRJW7NwldtP4n6Q+YD6vm5dyFy9hg=
-github.com/openshift/library-go v0.0.0-20230130232623-47904dd9ff5a h1:OzF7I7mAzO4SBo5eO5CWoCTgMDydN/Tf2/Rq8YbMpT0=
-github.com/openshift/library-go v0.0.0-20230130232623-47904dd9ff5a/go.mod h1:xO4nAf0qa56dgvEJWVD1WuwSJ8JWPU1TYLBQrlutWnE=
+github.com/openshift/library-go v0.0.0-20231115094609-5e510a6e9a52 h1:qP0GMFLjUeviPIjLaynal3LYfKQUMpvsQnRYFNputIU=
+github.com/openshift/library-go v0.0.0-20231115094609-5e510a6e9a52/go.mod h1:tedJaJsajpyrlPVNoSfjOst6w2HHvvR4VPqKWeZzrbY=
 github.com/pborman/uuid v1.2.0/go.mod h1:X/NO0urCmaxf9VXbdlT7C2Yzkj2IKimNn4k+gtPdI/k=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/peterbourgon/diskv v2.0.1+incompatible/go.mod h1:uqqh8zWWbv1HBMNONnaR/tNboyR3/BZd58JJSHlUSCU=
