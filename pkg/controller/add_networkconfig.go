@@ -5,6 +5,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/clusterconfig"
 	configmapcainjector "github.com/openshift/cluster-network-operator/pkg/controller/configmap_ca_injector"
 	"github.com/openshift/cluster-network-operator/pkg/controller/cronjob_scheduler"
+	"github.com/openshift/cluster-network-operator/pkg/controller/dashboards"
 	"github.com/openshift/cluster-network-operator/pkg/controller/egress_router"
 	"github.com/openshift/cluster-network-operator/pkg/controller/infrastructureconfig"
 	"github.com/openshift/cluster-network-operator/pkg/controller/ingressconfig"
@@ -28,5 +29,6 @@ func init() {
 		infrastructureconfig.Add,
 		allowlist.Add,
 		cronjob_scheduler.Add,
+		dashboards.Add,
 	)
 }

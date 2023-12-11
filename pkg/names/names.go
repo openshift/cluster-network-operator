@@ -84,9 +84,9 @@ const ClusterNetworkCIDRsAnnotation = "networkoperator.openshift.io/cluster-netw
 // to indicate the current state of of the Hybrid overlay on the cluster: "enabled" or "disabled"
 const NetworkHybridOverlayAnnotation = "networkoperator.openshift.io/hybrid-overlay-status"
 
-// OVNRaftClusterInitiator is an annotation on the networks.operator.openshift.io CR to indicate
-// which node IP was the raft cluster initiator. The NB and SB DB will be initialized by the same member.
-const OVNRaftClusterInitiator = "networkoperator.openshift.io/ovn-cluster-initiator"
+// IPsecEnableAnnotation is an annotation on the OVN networks.operator.openshift.io
+// daemonsets to indicate if ipsec is enabled for the OVN networks.
+const IPsecEnableAnnotation = "networkoperator.openshift.io/ipsec-enabled"
 
 // RolloutHungAnnotation is set to "" if it is detected that a rollout
 // (i.e. DaemonSet or Deployment) is not making progress, unset otherwise.
@@ -138,6 +138,33 @@ const OpenShiftComponent = "openshift.io/owning-component"
 
 // ClusterNetworkOperatorJiraComponent is the jira component name for the cluster-network-operator
 const ClusterNetworkOperatorJiraComponent = "Networking / cluster-network-operator"
+
+// NetworkTypeMigrationAnnotation is an annotation on the OVN networks.operator.openshift.io CR to indicate
+// that executing network type live migration
+const NetworkTypeMigrationAnnotation = "network.openshift.io/live-migration"
+
+// MachineConfigPoolsUpdating is the reason string NetworkTypeMigrationTargetCNIInUse and NetworkTypeMigrationMTUReady
+// conditions to indicate if MCP is updating
+const MachineConfigPoolsUpdating string = "MachineConfigPoolsUpdating"
+
+// Status condition types of network.config for live migration
+const (
+	// NetworkTypeMigrationInProgress is the condition type for network type live migration to indicate if the migration
+	// is in progress
+	NetworkTypeMigrationInProgress string = "NetworkTypeMigrationInProgress"
+	// NetworkTypeMigrationTargetCNIAvailable is the condition type for network type live migration to indicate if
+	// target CNI is available
+	NetworkTypeMigrationTargetCNIAvailable string = "NetworkTypeMigrationTargetCNIAvailable"
+	// NetworkTypeMigrationTargetCNIInUse is the condition type for network type live migration to indicate if the
+	// target CNI in use
+	NetworkTypeMigrationTargetCNIInUse string = "NetworkTypeMigrationTargetCNIInUse"
+	// NetworkTypeMigrationOriginalCNIPurged is the condition type for network type live migration to indicate if the
+	// original CNI has been purged
+	NetworkTypeMigrationOriginalCNIPurged string = "NetworkTypeMigrationOriginalCNIPurged"
+	// NetworkTypeMigrationMTUReady is the condition type for network type live migration to indicate if the routable
+	// MTU is set
+	NetworkTypeMigrationMTUReady string = "NetworkTypeMigrationMTUReady"
+)
 
 // Proxy returns the namespaced name "cluster" in the
 // default namespace.
@@ -195,3 +222,6 @@ const ManagementClusterName = "management"
 
 // DefaultClusterName provides the name of the default cluster, for use with Hypershift (or non-Hypershift)
 const DefaultClusterName = "default"
+
+// DashboardNamespace is the namespace where dashboards are created
+const DashboardNamespace = "openshift-config-managed"

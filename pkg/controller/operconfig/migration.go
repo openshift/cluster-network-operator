@@ -4,18 +4,31 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"reflect"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/util"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 )
 
 const defaultEgressFirewallName = "default"
@@ -24,6 +37,14 @@ const egressIPNodeConfig = "cloud.network.openshift.io/egress-ipconfig"
 const egressAssignable = "k8s.ovn.org/egress-assignable"
 const multicastEnabledSDN = "netnamespace.network.openshift.io/multicast-enabled"
 const multicastEnabledOVN = "k8s.ovn.org/multicast-enabled"
+const ovnAnnotationPrefix = "k8s.ovn.org"
+
+var networkTypeMigrationConditionTypes = []string{
+	names.NetworkTypeMigrationMTUReady,
+	names.NetworkTypeMigrationTargetCNIAvailable,
+	names.NetworkTypeMigrationTargetCNIInUse,
+	names.NetworkTypeMigrationOriginalCNIPurged,
+}
 
 var gvrEgressFirewall = schema.GroupVersionResource{Group: "k8s.ovn.org", Version: "v1", Resource: "egressfirewalls"}
 var gvrEgressNetworkPolicy = schema.GroupVersionResource{Group: "network.openshift.io", Version: "v1", Resource: "egressnetworkpolicies"}
@@ -41,6 +62,8 @@ type NodeEgressIpConfig struct {
 type OVNMigrationNodeAnnotation struct {
 	EgressCIDRs []string
 }
+
+type match func([]byte, string) bool
 
 func migrateMulticastEnablement(ctx context.Context, operConfig *operv1.Network, client cnoclient.Client) error {
 	switch operConfig.Spec.Migration.NetworkType {
@@ -178,7 +201,7 @@ func convertEgressNetworkPolicyToEgressFirewall(ctx context.Context, client cnoc
 		return err
 	}
 	for _, enp := range egressNetworkPolicyList {
-		log.Printf("Convert EgressNetworkPolicy %s/%s", enp.GetNamespace(), enp.GetName())
+		klog.Infof("Convert EgressNetworkPolicy %s/%s", enp.GetNamespace(), enp.GetName())
 		spec, ok := enp.Object["spec"]
 		if !ok {
 			return fmt.Errorf("fail to retrieve spec from EgressNetworkPolicy %s/%s", enp.GetNamespace(), enp.GetName())
@@ -209,7 +232,7 @@ func convertEgressFirewallToEgressNetworkPolicy(ctx context.Context, client cnoc
 		return err
 	}
 	for _, ef := range egressFirewallList {
-		log.Printf("Convert EgressNetworkPolicy %s/%s", ef.GetNamespace(), ef.GetName())
+		klog.Infof("Convert EgressNetworkPolicy %s/%s", ef.GetNamespace(), ef.GetName())
 		spec, ok := ef.Object["spec"]
 		if !ok {
 			return fmt.Errorf("fail to retrieve spec from EgressFirewall %s/%s", ef.GetNamespace(), ef.GetName())
@@ -217,7 +240,7 @@ func convertEgressFirewallToEgressNetworkPolicy(ctx context.Context, client cnoc
 
 		specText, _ := json.Marshal(spec)
 		if strings.Contains(string(specText), "ports") {
-			log.Println("\"ports\" is not supported in EgressNetworkPolicy, this field will be ignored.")
+			klog.Infof("\"ports\" is not supported in EgressNetworkPolicy, this field will be ignored.")
 		}
 
 		egressNetworkPolicy := &uns.Unstructured{
@@ -267,15 +290,15 @@ func convertSdnEgressIpToOvnEgressIp(ctx context.Context, client cnoclient.Clien
 		}
 
 		if hostSubnetHasEgressIpConfigManual {
-			log.Printf("Manual configuration of SDN egressIP detected and is unsupported for migration; OVN egressIPs will be generated but will not maintain individual node assignments from SDN hostsubnets")
+			klog.Infof("Manual configuration of SDN egressIP detected and is unsupported for migration; OVN egressIPs will be generated but will not maintain individual node assignments from SDN hostsubnets")
 		}
 	}
 
 	if !hostSubnetFound {
-		log.Printf("did not find a hostsubnet object with egressIP configured, quitting process early")
+		klog.Infof("did not find a hostsubnet object with egressIP configured, quitting process early")
 		return nil, nil, nil
 	} else {
-		log.Printf("found hostsubnet object with egressIP configured, continuing...")
+		klog.Infof("found hostsubnet object with egressIP configured, continuing...")
 	}
 
 	// 3. iterate through netnamespaces
@@ -615,4 +638,325 @@ func unstructuredEgressIpObject(egressIpName string, egressIps []interface{}, ne
 			},
 		},
 	}
+}
+
+func (r *ReconcileOperConfig) syncNetworkTypeMigrationConditions(ctx context.Context, operConfig *operv1.Network, clusterConfig *configv1.Network) error {
+	if v1helpers.IsOperatorConditionTrue(operConfig.Status.Conditions, operv1.OperatorStatusTypeProgressing) {
+		return nil
+	}
+	// sync conditions when the operator is converged.
+	nowTimestamp := metav1.Now()
+	clusterConfigUpdated := clusterConfig.DeepCopy()
+
+	targetMachineConfigApplied, _, err := r.ensureMachineConfigPools(ctx, clusterConfigUpdated, names.NetworkTypeMigrationTargetCNIInUse, ovsConfigurationUnitMatch, nowTimestamp)
+	if err != nil {
+		return err
+	}
+
+	_, inProgress, err := r.ensureMachineConfigPools(ctx, clusterConfigUpdated, names.NetworkTypeMigrationMTUReady, routebleMtuUnitMatch, nowTimestamp)
+	if err != nil {
+		return err
+	}
+
+	if inProgress {
+		// MCP updating is in progress, skip conditions sync
+		klog.Infof("network type migration is in progress")
+	} else {
+		targetCNIReady, err := r.isMigrationCNIReady(ctx, operConfig, clusterConfigUpdated, nowTimestamp)
+		if err != nil {
+			return err
+		}
+
+		originalCNIPurged, err := r.isOriginalCNIPurged(ctx, clusterConfigUpdated, nowTimestamp)
+		if err != nil {
+			return err
+		}
+
+		if originalCNIPurged && targetMachineConfigApplied && targetCNIReady {
+			klog.Infof("network type migration is completed")
+			resetMigrationConditions(&clusterConfigUpdated.Status.Conditions, nowTimestamp)
+		}
+	}
+
+	if !reflect.DeepEqual(clusterConfig.Status.Conditions, clusterConfigUpdated.Status.Conditions) {
+		clusterConfig.Status.Conditions = clusterConfigUpdated.Status.Conditions
+	}
+	return nil
+}
+
+func resetMigrationConditions(conditions *[]metav1.Condition, nowTimestamp metav1.Time) {
+	for _, liveMigrationConditionType := range networkTypeMigrationConditionTypes {
+		meta.SetStatusCondition(conditions, metav1.Condition{
+			Type:               liveMigrationConditionType,
+			Status:             metav1.ConditionUnknown,
+			Reason:             "NetworkTypeMigrationNotInProgress",
+			Message:            "Network type migration is not in progress",
+			LastTransitionTime: nowTimestamp,
+		})
+	}
+	meta.SetStatusCondition(conditions, metav1.Condition{
+		Type:               names.NetworkTypeMigrationInProgress,
+		Status:             metav1.ConditionFalse,
+		Reason:             "NetworkTypeMigrationCompleted",
+		Message:            "Network type migration is completed",
+		LastTransitionTime: nowTimestamp,
+	})
+}
+
+func initMigrationConditions(conditions *[]metav1.Condition, nowTimestamp metav1.Time) {
+	for _, conditionType := range networkTypeMigrationConditionTypes {
+		klog.Infof("Initialize the network type migration condition: ConditionType %s", conditionType)
+		meta.SetStatusCondition(conditions, metav1.Condition{
+			Type:               conditionType,
+			Status:             metav1.ConditionFalse,
+			Reason:             "NetworkTypeMigrationInitialized",
+			Message:            "network operator initialize network type migration status",
+			LastTransitionTime: nowTimestamp,
+		})
+	}
+	meta.SetStatusCondition(conditions, metav1.Condition{
+		Type:               names.NetworkTypeMigrationInProgress,
+		Status:             metav1.ConditionTrue,
+		Reason:             "NetworkTypeMigrationStarted",
+		Message:            "Network type migration is started",
+		LastTransitionTime: nowTimestamp,
+	})
+}
+
+func syncNetworkTypeMigrationCondition(ctx context.Context, clusterConfig *configv1.Network, cond *metav1.Condition) {
+	current := meta.FindStatusCondition(clusterConfig.Status.Conditions, cond.Type)
+	if current == nil || current.Status != cond.Status || current.Reason != cond.Reason || current.Message != cond.Message {
+		meta.SetStatusCondition(&clusterConfig.Status.Conditions, *cond)
+	}
+}
+
+func (r *ReconcileOperConfig) isMigrationCNIReady(ctx context.Context, operConfig *operv1.Network, clusterConfig *configv1.Network, nowTimestamp metav1.Time) (bool, error) {
+	condition := &metav1.Condition{}
+	defer syncNetworkTypeMigrationCondition(ctx, clusterConfig, condition)
+
+	cniNamespaces := []string{util.OVN_NAMESPACE, util.SDN_NAMESPACE}
+	if operConfig.Spec.Migration == nil || operConfig.Spec.Migration.NetworkType == "" {
+		if clusterConfig.Spec.NetworkType == string(operv1.NetworkTypeOVNKubernetes) {
+			cniNamespaces = []string{util.OVN_NAMESPACE}
+		} else if clusterConfig.Spec.NetworkType == string(operv1.NetworkTypeOpenShiftSDN) {
+			cniNamespaces = []string{util.SDN_NAMESPACE}
+		}
+	}
+
+	for _, ns := range cniNamespaces {
+		dsList := &appsv1.DaemonSetList{}
+		if err := r.client.Default().CRClient().List(ctx, dsList, &client.ListOptions{Namespace: ns}); err != nil {
+			*condition = metav1.Condition{
+				Type:               names.NetworkTypeMigrationTargetCNIAvailable,
+				Status:             metav1.ConditionFalse,
+				Reason:             "Error",
+				Message:            fmt.Sprintf("Failed to communicate with API server, %v", err),
+				LastTransitionTime: nowTimestamp,
+			}
+			return false, nil
+		}
+		if len(dsList.Items) == 0 {
+			*condition = metav1.Condition{
+				Type:               names.NetworkTypeMigrationTargetCNIAvailable,
+				Status:             metav1.ConditionFalse,
+				Reason:             "TargetCNINotDeployed",
+				Message:            fmt.Sprintf("No daemonSet running in the namespace %s", ns),
+				LastTransitionTime: nowTimestamp,
+			}
+			return false, nil
+		}
+		for _, ds := range dsList.Items {
+			if ds.Status.CurrentNumberScheduled != ds.Status.DesiredNumberScheduled ||
+				ds.Status.CurrentNumberScheduled != ds.Status.NumberAvailable ||
+				ds.Status.CurrentNumberScheduled != ds.Status.NumberReady ||
+				ds.Status.CurrentNumberScheduled != ds.Status.UpdatedNumberScheduled {
+				*condition = metav1.Condition{
+					Type:               names.NetworkTypeMigrationTargetCNIAvailable,
+					Status:             metav1.ConditionFalse,
+					Reason:             "TargetCNINotReady",
+					Message:            fmt.Sprintf("DaemonSet %s is not ready", ds.Name),
+					LastTransitionTime: nowTimestamp,
+				}
+				return false, nil
+			}
+		}
+	}
+
+	*condition = metav1.Condition{
+		Type:               names.NetworkTypeMigrationTargetCNIAvailable,
+		Status:             metav1.ConditionTrue,
+		Reason:             "TargetCNIDeployed",
+		Message:            fmt.Sprintf("%s is deployed", clusterConfig.Spec.NetworkType),
+		LastTransitionTime: nowTimestamp,
+	}
+	return true, nil
+}
+
+func (r *ReconcileOperConfig) isOriginalCNIPurged(ctx context.Context, clusterConfig *configv1.Network, nowTimestamp metav1.Time) (bool, error) {
+	condition := &metav1.Condition{}
+	defer syncNetworkTypeMigrationCondition(ctx, clusterConfig, condition)
+
+	var ns string
+	if clusterConfig.Spec.NetworkType == string(operv1.NetworkTypeOVNKubernetes) {
+		ns = util.SDN_NAMESPACE
+	} else if clusterConfig.Spec.NetworkType == string(operv1.NetworkTypeOpenShiftSDN) {
+		ns = util.OVN_NAMESPACE
+	}
+
+	dsList := &appsv1.DaemonSetList{}
+	if err := r.client.Default().CRClient().List(ctx, dsList, &client.ListOptions{Namespace: ns}); err != nil {
+		*condition = metav1.Condition{
+			Type:               names.NetworkTypeMigrationOriginalCNIPurged,
+			Status:             metav1.ConditionFalse,
+			Reason:             "Error",
+			Message:            fmt.Sprintf("Failed to communicate with API server, %v", err),
+			LastTransitionTime: nowTimestamp,
+		}
+		return false, err
+	}
+	if len(dsList.Items) == 0 {
+		if clusterConfig.Spec.NetworkType == string(operv1.NetworkTypeOpenShiftSDN) {
+			if err := r.cleanOVNKubernetesNodeAnnotations(ctx); err != nil {
+				*condition = metav1.Condition{
+					Type:               names.NetworkTypeMigrationOriginalCNIPurged,
+					Status:             metav1.ConditionFalse,
+					Reason:             "Error",
+					Message:            fmt.Sprintf("Failed to clean OVNKubernetes Node annotations, %v", err),
+					LastTransitionTime: nowTimestamp,
+				}
+				return false, err
+			}
+		}
+
+		*condition = metav1.Condition{
+			Type:               names.NetworkTypeMigrationOriginalCNIPurged,
+			Status:             metav1.ConditionTrue,
+			Reason:             "OriginalCNIPurged",
+			Message:            fmt.Sprintf("No daemonSet running in the namespace %s", ns),
+			LastTransitionTime: nowTimestamp,
+		}
+		return true, nil
+	}
+
+	*condition = metav1.Condition{
+		Type:               names.NetworkTypeMigrationOriginalCNIPurged,
+		Status:             metav1.ConditionFalse,
+		Reason:             "OriginalCNINotPurged",
+		Message:            "The original CNI plugin is running in the cluster",
+		LastTransitionTime: nowTimestamp,
+	}
+	return false, nil
+}
+
+func (r *ReconcileOperConfig) cleanOVNKubernetesNodeAnnotations(ctx context.Context) error {
+	nodeList := &corev1.NodeList{}
+	if err := r.client.Default().CRClient().List(ctx, nodeList, &client.ListOptions{}); err != nil {
+		return err
+	}
+	for _, node := range nodeList.Items {
+		for k := range node.Annotations {
+			if strings.HasPrefix(k, ovnAnnotationPrefix) {
+				delete(node.Annotations, k)
+				if err := r.client.Default().CRClient().Update(ctx, &node); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// ensureMachineConfigPools ensures the machine configuration pools are in the desired state. It returns
+// whether the MCPs are in the desired state, and whether the MCPs are in progress.
+func (r *ReconcileOperConfig) ensureMachineConfigPools(ctx context.Context, clusterConfig *configv1.Network, condType string, isMatch match, nowTimestamp metav1.Time) (bool, bool, error) {
+	mc := &mcfgv1.MachineConfig{}
+	pools := &mcfgv1.MachineConfigPoolList{}
+	networkType := clusterConfig.Spec.NetworkType
+
+	condition := &metav1.Condition{}
+	defer syncNetworkTypeMigrationCondition(ctx, clusterConfig, condition)
+
+	if err := r.client.Default().CRClient().List(ctx, pools); err != nil {
+		return false, false, err
+	}
+	for _, pool := range pools.Items {
+		if mcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolUpdating) {
+			// Not update conditions when MCPs are not converged
+			*condition = metav1.Condition{
+				Type:               condType,
+				Status:             metav1.ConditionFalse,
+				Reason:             names.MachineConfigPoolsUpdating,
+				Message:            "MachineConfigPools are updating",
+				LastTransitionTime: nowTimestamp,
+			}
+			return false, true, nil
+		}
+		if mcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolDegraded) {
+			*condition = metav1.Condition{
+				Type:               condType,
+				Status:             metav1.ConditionFalse,
+				Reason:             "MachineConfigPoolDegraded",
+				Message:            fmt.Sprintf("MachineConfig Pool %s is Degraded", pool.Name),
+				LastTransitionTime: nowTimestamp,
+			}
+			return false, false, nil
+		}
+
+		mcName := pool.Status.Configuration.Name
+		if err := r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: mcName}, mc); err != nil {
+			return false, false, err
+		}
+		if !isMatch(mc.Spec.Config.Raw, networkType) {
+			klog.Infof("machine config pool %s is not updated", pool.Name)
+			*condition = metav1.Condition{
+				Type:               condType,
+				Status:             metav1.ConditionFalse,
+				Reason:             "MachineConfigNotApplied",
+				Message:            "The desired MachineConfig is not applied to cluster",
+				LastTransitionTime: nowTimestamp,
+			}
+			return false, false, nil
+		}
+	}
+
+	*condition = metav1.Condition{
+		Type:               condType,
+		Status:             metav1.ConditionTrue,
+		Reason:             "MachineConfigApplied",
+		Message:            "The desired MachineConfig is applied to cluster",
+		LastTransitionTime: nowTimestamp,
+	}
+	return true, false, nil
+}
+
+func routebleMtuUnitMatch(rawConfig []byte, networkType string) bool {
+	mergedIgn, err := ctrlcommon.ParseAndConvertConfig(rawConfig)
+	if err != nil {
+		klog.Errorf("cannot parse ignition config %s", err)
+		return false
+	}
+	for _, unit := range mergedIgn.Systemd.Units {
+		if unit.Name == "mtu-migration.service" && *unit.Enabled {
+			return true
+		}
+	}
+	return false
+}
+
+func ovsConfigurationUnitMatch(rawConfig []byte, networkType string) bool {
+	mergedIgn, err := ctrlcommon.ParseAndConvertConfig(rawConfig)
+	if err != nil {
+		klog.Errorf("cannot parse ignition config %s", err)
+		return false
+	}
+	var ovs, mtu bool
+	for _, unit := range mergedIgn.Systemd.Units {
+		if unit.Name == "ovs-configuration.service" && *unit.Enabled && strings.Contains(*unit.Contents, fmt.Sprintf("ExecStart=/usr/local/bin/configure-ovs.sh %s", networkType)) {
+			ovs = true
+		}
+		if unit.Name == "mtu-migration.service" {
+			mtu = true
+		}
+	}
+	return ovs && !mtu
 }

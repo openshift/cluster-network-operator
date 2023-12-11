@@ -575,6 +575,19 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 		return nil, false, errors.Errorf("invalid Default Network configuration: %v", errs)
 	}
 
+	if conf.Migration != nil && conf.Migration.Mode == operv1.LiveNetworkMigrationMode {
+		log.Printf("Render both CNIs for live migration")
+		ovnObjs, ovnProgressing, err := renderOVNKubernetes(conf, bootstrapResult, manifestDir, client, featureGates)
+		if err != nil {
+			return nil, false, err
+		}
+		objs, sdnProgressing, err := renderOpenShiftSDN(conf, bootstrapResult, manifestDir)
+		if err != nil {
+			return nil, false, err
+		}
+		return append(objs, ovnObjs...), sdnProgressing || ovnProgressing, nil
+	}
+
 	switch dn.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		return renderOpenShiftSDN(conf, bootstrapResult, manifestDir)
@@ -614,11 +627,19 @@ func renderCRDForMigration(conf *operv1.NetworkSpec, manifestDir string, feature
 }
 
 func fillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
+	if conf.Migration != nil && conf.Migration.Mode == operv1.LiveNetworkMigrationMode {
+		log.Printf("fill default for both sdn and ovnkube during live migration")
+		fillOpenShiftSDNDefaults(conf, previous, hostMTU)
+		fillOVNKubernetesDefaults(conf, previous, hostMTU)
+		return
+	}
 	switch conf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		fillOpenShiftSDNDefaults(conf, previous, hostMTU)
+		conf.DefaultNetwork.OVNKubernetesConfig = nil
 	case operv1.NetworkTypeOVNKubernetes:
 		fillOVNKubernetesDefaults(conf, previous, hostMTU)
+		conf.DefaultNetwork.OpenShiftSDNConfig = nil
 	default:
 	}
 }
@@ -649,7 +670,7 @@ func isDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 }
 
 func isMigrationChangeSafe(prev, next *operv1.NetworkSpec) []error {
-	if prev.Migration != nil && next.Migration != nil && prev.Migration.NetworkType != next.Migration.NetworkType {
+	if prev.Migration != nil && next.Migration != nil && prev.Migration.NetworkType != next.Migration.NetworkType && next.Migration.Mode != operv1.LiveNetworkMigrationMode {
 		return []error{errors.Errorf("cannot change migration network type after migration has started")}
 	}
 	return nil

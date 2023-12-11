@@ -2,21 +2,18 @@ package bootstrap
 
 import (
 	configv1 "github.com/openshift/api/config/v1"
-	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 type OVNHyperShiftBootstrapResult struct {
-	Enabled                   bool
-	ClusterID                 string
-	Namespace                 string
-	ServicePublishingStrategy *hyperv1.ServicePublishingStrategy
-	OVNSbDbRouteHost          string
-	OVNSbDbRouteNodePort      int32
-	OVNSbDbRouteLabels        map[string]string
-	HCPNodeSelector           map[string]string
-	ControlPlaneReplicas      int
-	ReleaseImage              string
-	ControlPlaneImage         string
+	Enabled              bool
+	ClusterID            string
+	Namespace            string
+	HCPNodeSelector      map[string]string
+	ControlPlaneReplicas int
+	ReleaseImage         string
+	ControlPlaneImage    string
 }
 
 type OVNConfigBoostrapResult struct {
@@ -33,30 +30,33 @@ type OVNConfigBoostrapResult struct {
 }
 
 // OVNUpdateStatus contains the status of existing daemonset
-// or statefulset that are maily used by upgrade process
+// or deployment that are maily used by the upgrade logic
 type OVNUpdateStatus struct {
-	Kind                 string
-	Namespace            string
-	Name                 string
-	Version              string
-	IPFamilyMode         string
-	ClusterNetworkCIDRs  string
-	Progressing          bool
-	InterConnectEnabled  bool   // true if this ovnk component is running with --enable-interconnect
-	InterConnectZoneMode string // zone mode (singlezone, multizone) for this ovnk component
+	Kind                string
+	Namespace           string
+	Name                string
+	Version             string
+	IPFamilyMode        string
+	ClusterNetworkCIDRs string
+	Progressing         bool
+}
+
+// OVNIPsecStatus contains status of current IPsec configuration
+// in the cluster.
+type OVNIPsecStatus struct {
+	LegacyIPsecUpgrade bool // true if IPsec in 4.14 or Pre-4.14 cluster is upgraded to latest version
+	OVNIPsecActive     bool // set to true unless we are sure it is not.
 }
 
 type OVNBootstrapResult struct {
-	MasterAddresses  []string
-	ClusterInitiator string
+	// ControlPlaneReplicaCount represents the number of control plane nodes in the cluster
+	ControlPlaneReplicaCount int
 	// ControlPlaneUpdateStatus is the status of ovnkube-control-plane deployment
 	ControlPlaneUpdateStatus *OVNUpdateStatus
-	// MasterUpdateStatus is the status of ovnkube-master daemonset or statefulset (when hypershift is enabled)
-	MasterUpdateStatus *OVNUpdateStatus
 	// NodeUpdateStatus is the status of ovnkube-node daemonset
 	NodeUpdateStatus *OVNUpdateStatus
-	// IPsecUpdateStatus is the status of ovn-ipsec daemonset
-	IPsecUpdateStatus *OVNUpdateStatus
+	// IPsecUpdateStatus is the status of ovn-ipsec config
+	IPsecUpdateStatus *OVNIPsecStatus
 	// PrePullerUpdateStatus is the status of ovnkube-upgrades-prepuller daemonset
 	PrePullerUpdateStatus *OVNUpdateStatus
 	OVNKubernetesConfig   *OVNConfigBoostrapResult
@@ -86,10 +86,22 @@ type InfraStatus struct {
 	Proxy configv1.ProxyStatus
 
 	// HostedControlPlane defines the hosted control plane, only used in HyperShift
-	HostedControlPlane *hyperv1.HostedControlPlane
+	HostedControlPlane *hypershift.HostedControlPlane
 
 	// NetworkNodeIdentityEnabled define if the network node identity feature should be enabled
 	NetworkNodeIdentityEnabled bool
+
+	// MasterIPsecMachineConfig contains ipsec machine config object of master nodes.
+	MasterIPsecMachineConfig *mcfgv1.MachineConfig
+
+	// WorkerIPsecMachineConfig contains ipsec machine config object of worker nodes.
+	WorkerIPsecMachineConfig *mcfgv1.MachineConfig
+
+	// MasterMCPStatus contains machine config pool status of master nodes.
+	MasterMCPStatus mcfgv1.MachineConfigPoolStatus
+
+	// WorkerMCPStatus contains machine config pool status of worker nodes.
+	WorkerMCPStatus mcfgv1.MachineConfigPoolStatus
 }
 
 // APIServer is the hostname & port of a given APIServer. (This is the

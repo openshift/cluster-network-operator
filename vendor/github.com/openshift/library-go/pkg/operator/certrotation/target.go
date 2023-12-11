@@ -50,6 +50,13 @@ type RotatedSelfSignedCertKeySecret struct {
 	// rotation on expiration only, but not interfere with the ordinary rotation controller.
 	RefreshOnlyWhenExpired bool
 
+	// Owner is an optional reference to add to the secret that this rotator creates. Use this when downstream
+	// consumers of the certificate need to be aware of changes to the object.
+	// WARNING: be careful when using this option, as deletion of the owning object will cascade into deletion
+	// of the certificate. If the lifetime of the owning object is not a superset of the lifetime in which the
+	// certificate is used, early deletion will be catastrophic.
+	Owner *metav1.OwnerReference
+
 	// CertCreator does the actual cert generation.
 	CertCreator TargetCertCreator
 
@@ -90,6 +97,10 @@ func (c RotatedSelfSignedCertKeySecret) ensureTargetCertKeyPair(ctx context.Cont
 		targetCertKeyPairSecret = &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: c.Namespace, Name: c.Name}}
 	}
 	targetCertKeyPairSecret.Type = corev1.SecretTypeTLS
+
+	if c.Owner != nil {
+		ensureOwnerReference(&targetCertKeyPairSecret.ObjectMeta, c.Owner)
+	}
 
 	if reason := needNewTargetCertKeyPair(targetCertKeyPairSecret.Annotations, signingCertKeyPair, caBundleCerts, c.Refresh, c.RefreshOnlyWhenExpired); len(reason) > 0 {
 		c.EventRecorder.Eventf("TargetUpdateRequired", "%q in %q requires a new target cert/key pair: %v", c.Name, c.Namespace, reason)

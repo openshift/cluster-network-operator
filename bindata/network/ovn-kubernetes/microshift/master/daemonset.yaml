@@ -88,7 +88,7 @@ spec:
             memory: 10Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
-      # nbdb: the northbound, or logical network object DB. In raft mode
+      # nbdb: the northbound, or logical network object DB.
       - name: nbdb
         image: {{ .ReleaseImage.ovn_kubernetes_microshift }}
         command:
@@ -208,7 +208,7 @@ spec:
             memory: 10Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
-      # sbdb: The southbound, or flow DB. In raft mode
+      # sbdb: The southbound, or flow DB.
       - name: sbdb
         image: {{ .ReleaseImage.ovn_kubernetes_microshift }}
         command:

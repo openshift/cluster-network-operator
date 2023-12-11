@@ -521,6 +521,12 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
+logging:
+  flushFrequency: 0
+  options:
+    json:
+      infoBufferSize: "0"
+  verbosity: 0
 metricsBindAddress: 127.0.0.1:29101
 mode: unidling+iptables
 nodePortAddresses: null
@@ -580,6 +586,12 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
+logging:
+  flushFrequency: 0
+  options:
+    json:
+      infoBufferSize: "0"
+  verbosity: 0
 metricsBindAddress: 127.0.0.1:29101
 mode: iptables
 nodePortAddresses: null

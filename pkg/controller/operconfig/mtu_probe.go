@@ -4,20 +4,18 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	"github.com/openshift/cluster-network-operator/pkg/util"
 
 	configv1 "github.com/openshift/api/config/v1"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 
@@ -26,10 +24,8 @@ import (
 )
 
 const (
-	cmNamespace = "openshift-network-operator"
-	cmName      = "mtu"
-	awsMTU      = 9001
-	azureMTU    = 1500
+	awsMTU   = 9001
+	azureMTU = 1500
 )
 
 // probeMTU executes the MTU prober job, if the result configmap
@@ -49,7 +45,7 @@ func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, 
 			return azureMTU, nil
 		}
 	}
-	mtu, err := r.readMTUConfigMap(ctx)
+	mtu, err := util.ReadMTUConfigMap(ctx, r.client)
 	if err == nil {
 		_ = r.deleteMTUProber(ctx, infra)
 		return mtu, nil
@@ -68,7 +64,7 @@ func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, 
 	// wait up to 100 seconds for Job to report back.
 	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 100*time.Second, false, func(ctx context.Context) (bool, error) {
 		var err error
-		mtu, err = r.readMTUConfigMap(ctx)
+		mtu, err = util.ReadMTUConfigMap(ctx, r.client)
 		if err == nil {
 			return true, nil
 		} else if apierrors.IsNotFound(err) {
@@ -88,22 +84,6 @@ func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, 
 	}
 
 	return 0, fmt.Errorf("timed out getting result from MTU prober %v", err)
-}
-
-func (r *ReconcileOperConfig) readMTUConfigMap(ctx context.Context) (int, error) {
-	klog.V(4).Infof("Looking for ConfigMap %s/%s", cmNamespace, cmName)
-	cm := &corev1.ConfigMap{}
-	err := r.client.Default().CRClient().Get(ctx, types.NamespacedName{Namespace: cmNamespace, Name: cmName}, cm)
-	if err != nil {
-		return 0, err
-	}
-	mtu, err := strconv.Atoi(cm.Data["mtu"])
-	if err != nil || mtu == 0 {
-		return 0, fmt.Errorf("format error")
-	}
-
-	klog.V(2).Infof("Found mtu %d", mtu)
-	return mtu, nil
 }
 
 func (r *ReconcileOperConfig) deployMTUProber(ctx context.Context, owner metav1.Object, infra *bootstrap.InfraStatus) error {
@@ -153,8 +133,8 @@ func renderMTUProber(infra *bootstrap.InfraStatus) ([]*uns.Unstructured, error) 
 	data.Data["CNOImage"] = os.Getenv("NETWORK_CHECK_TARGET_IMAGE")
 	data.Data["KUBERNETES_SERVICE_HOST"] = infra.APIServers[bootstrap.APIServerDefault].Host
 	data.Data["KUBERNETES_SERVICE_PORT"] = infra.APIServers[bootstrap.APIServerDefault].Port
-	data.Data["DestNS"] = cmNamespace
-	data.Data["DestName"] = cmName
+	data.Data["DestNS"] = util.MTU_CM_NAMESPACE
+	data.Data["DestName"] = util.MTU_CM_NAME
 	data.Data["HTTP_PROXY"] = ""
 	data.Data["HTTPS_PROXY"] = ""
 	data.Data["NO_PROXY"] = ""

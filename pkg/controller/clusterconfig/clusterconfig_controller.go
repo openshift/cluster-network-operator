@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 
@@ -105,6 +106,22 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 		ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
 	}
 	network.MergeClusterConfig(&operConfig.Spec, clusterConfig.Spec)
+
+	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok {
+		if hcp := hypershift.NewHyperShiftConfig(); hcp.Enabled {
+			err := fmt.Errorf("network type live migration is not supported on HyperShift clusters")
+			r.status.SetDegraded(statusmanager.ClusterConfig, "NetworkTypeMigrationFailed",
+				fmt.Sprintf("Failed to process network type live migration (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))
+			return reconcile.Result{}, err
+		}
+		// https://github.com/openshift/enhancements/blob/master/enhancements/network/sdn-live-migration.md#api
+		if err := r.processNetworkTypeLiveMigration(ctx, request, clusterConfig, operConfig); err != nil {
+			log.Printf("Failed to process SDN live migration: %v", err)
+			r.status.SetDegraded(statusmanager.ClusterConfig, "NetworkTypeMigrationFailed",
+				fmt.Sprintf("Failed to process SDN live migration (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))
+			return reconcile.Result{}, err
+		}
+	}
 
 	if err := apply.ApplyObject(ctx, r.client, operConfig, "clusterconfig"); err != nil {
 		r.status.SetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",

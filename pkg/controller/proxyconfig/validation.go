@@ -12,8 +12,8 @@ import (
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
 	netproxy "golang.org/x/net/proxy"
 
@@ -238,8 +238,8 @@ func runReadinessProbe(caBundle []*x509.Certificate, proxyURL, endpoint *url.URL
 		Proxy: http.ProxyURL(proxyURL),
 	}
 
-	if platform.NewHyperShiftConfig().Enabled {
-		hostedProxyURL, err := url.Parse(platform.HostedClusterLocalProxy)
+	if hypershift.NewHyperShiftConfig().Enabled {
+		hostedProxyURL, err := url.Parse(hypershift.HostedClusterLocalProxy)
 		if err != nil {
 			return fmt.Errorf("failed to parse hosted cluster proxy: %w", err)
 		}
@@ -250,7 +250,7 @@ func runReadinessProbe(caBundle []*x509.Certificate, proxyURL, endpoint *url.URL
 
 		hcpProxyCtx, ok := hcpProxy.(netproxy.ContextDialer)
 		if !ok {
-			return fmt.Errorf("proxy from %q does not implement proxy.ContextDialer", platform.HostedClusterLocalProxy)
+			return fmt.Errorf("proxy from %q does not implement proxy.ContextDialer", hypershift.HostedClusterLocalProxy)
 		}
 		transport.DialContext = hcpProxyCtx.DialContext
 	}

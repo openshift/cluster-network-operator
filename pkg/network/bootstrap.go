@@ -18,8 +18,7 @@ func Bootstrap(conf *operv1.Network, client cnoclient.Client) (*bootstrap.Bootst
 	}
 	out.Infra = *infraStatus
 
-	switch conf.Spec.DefaultNetwork.Type {
-	case operv1.NetworkTypeOVNKubernetes:
+	if conf.Spec.DefaultNetwork.Type == operv1.NetworkTypeOVNKubernetes || (conf.Spec.Migration != nil && conf.Spec.Migration.Mode == operv1.LiveNetworkMigrationMode) {
 		o, err := bootstrapOVN(conf, client, infraStatus)
 		if err != nil {
 			return nil, err

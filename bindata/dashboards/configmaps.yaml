@@ -1,0 +1,23 @@
+{{ if .IsOVN }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{.DashboardNameOVNHealth}}
+  namespace: {{.DashboardNamespace}}
+  labels:
+    console.openshift.io/dashboard: "true"
+data:
+  "dashboard.json": |-
+{{.DashboardContentOVNHealth | indent 4}}
+---
+{{ end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{.DashboardNameNetStats}}
+  namespace: {{.DashboardNamespace}}
+  labels:
+    console.openshift.io/dashboard: "true"
+data:
+  "dashboard.json": |-
+{{.DashboardContentNetStats | indent 4}}

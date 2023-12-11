@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/pkg/errors"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -305,16 +306,17 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if prev != nil {
 		network.FillDefaults(prev, prev, mtu)
 	}
-
+	// Reserve operConfig for the DeepEqual check before UpdateOperConfig
+	newOperConfig := operConfig.DeepCopy()
 	// Fill all defaults explicitly
-	network.FillDefaults(&operConfig.Spec, prev, mtu)
+	network.FillDefaults(&newOperConfig.Spec, prev, mtu)
 
 	// Compare against previous applied configuration to see if this change
 	// is safe.
 	if prev != nil {
 		// We may need to fill defaults here -- sort of as a poor-man's
 		// upconversion scheme -- if we add additional fields to the config.
-		err = network.IsChangeSafe(prev, &operConfig.Spec, infraStatus)
+		err = network.IsChangeSafe(prev, &newOperConfig.Spec, infraStatus)
 		if err != nil {
 			log.Printf("Not applying unsafe change: %v", err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
@@ -322,8 +324,6 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{}, err
 		}
 	}
-
-	newOperConfig := operConfig.DeepCopy()
 
 	// Bootstrap any resources
 	bootstrapResult, err := network.Bootstrap(newOperConfig, r.client)
@@ -375,8 +375,8 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	objs = append([]*uns.Unstructured{app}, objs...)
 
 	relatedObjects := []configv1.ObjectReference{}
-	relatedClusterObjects := []platform.RelatedObject{}
-	hcpCfg := platform.NewHyperShiftConfig()
+	relatedClusterObjects := []hypershift.RelatedObject{}
+	hcpCfg := hypershift.NewHyperShiftConfig()
 	for _, obj := range objs {
 		// Label all DaemonSets, Deployments, and StatefulSets with the label that generates Status.
 		if obj.GetAPIVersion() == "apps/v1" && (obj.GetKind() == "DaemonSet" || obj.GetKind() == "Deployment" || obj.GetKind() == "StatefulSet") {
@@ -400,7 +400,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			continue
 		}
 		if apply.GetClusterName(obj) != "" {
-			relatedClusterObjects = append(relatedClusterObjects, platform.RelatedObject{
+			relatedClusterObjects = append(relatedClusterObjects, hypershift.RelatedObject{
 				ObjectReference: configv1.ObjectReference{
 					Group:     obj.GetObjectKind().GroupVersionKind().Group,
 					Resource:  restMapping.Resource.Resource,

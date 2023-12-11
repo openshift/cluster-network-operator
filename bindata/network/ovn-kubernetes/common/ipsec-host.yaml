@@ -247,6 +247,9 @@ spec:
           ip x s flush
           ip x p flush
 
+          # since pluto is on the host, we need to restart it after the flush
+          chroot /proc/1/root ipsec restart
+
           # Workaround for https://github.com/libreswan/libreswan/issues/373
           ulimit -n 1024
 

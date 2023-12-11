@@ -11,8 +11,8 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller"
 	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 
+	ctlog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctmanager "sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -39,10 +40,17 @@ type Operator struct {
 	StatusManager *statusmanager.StatusManager
 }
 
+var logger = klog.NewKlogr()
+
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, inClusterClientName string, extraClusters map[string]string) error {
 	o := &Operator{}
 
 	var err error
+
+	// Call SetLogger before adding controller-runtime client to prevent controller-runtime
+	// complaining about it after 30 seconds of binaries lifetime
+	// https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/log/log.go#L54
+	ctlog.SetLogger(logger)
 	if o.client, err = cnoclient.NewClient(controllerConfig.KubeConfig, controllerConfig.ProtoKubeConfig, inClusterClientName, extraClusters); err != nil {
 		return err
 	}
@@ -54,6 +62,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			return o.client.Default().RESTMapper(), nil
 		},
 		MetricsBindAddress: "0",
+		Logger:             klog.Background(),
 	})
 	if err != nil {
 		return err
@@ -62,7 +71,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// In HyperShift use the infrastructure name to differentiate between resources deployed by the management cluster CNO and CNO deployed in the hosted clusters control plane namespace
 	// Without that the CNO running against the management cluster would pick the resources rendered by the hosted cluster CNO
 	cluster := names.StandAloneClusterName
-	if hcp := platform.NewHyperShiftConfig(); hcp.Enabled {
+	if hcp := hypershift.NewHyperShiftConfig(); hcp.Enabled {
 		// retry every 5s up to 60s
 		var backoff = wait.Backoff{
 			Steps:    12,

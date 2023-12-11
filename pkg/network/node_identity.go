@@ -11,12 +11,11 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
-	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -78,7 +77,7 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 
 	webhookReady := false
 	// HyperShift specific
-	if hcpCfg := platform.NewHyperShiftConfig(); hcpCfg.Enabled {
+	if hcpCfg := hypershift.NewHyperShiftConfig(); hcpCfg.Enabled {
 		webhookCAClient = client.ClientFor(names.ManagementClusterName)
 		webhookCALookup = types.NamespacedName{Name: "openshift-service-ca.crt", Namespace: hcpCfg.Namespace}
 		caKey = "service-ca.crt"
@@ -86,14 +85,14 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 		data.Data["HostedClusterNamespace"] = hcpCfg.Namespace
 		data.Data["ManagementClusterName"] = names.ManagementClusterName
 		data.Data["NetworkNodeIdentityReplicas"] = 1
-		if bootstrapResult.Infra.HostedControlPlane.Spec.ControllerAvailabilityPolicy == hyperv1.HighlyAvailable {
+		if bootstrapResult.Infra.HostedControlPlane.ControllerAvailabilityPolicy == hypershift.HighlyAvailable {
 			data.Data["NetworkNodeIdentityReplicas"] = 3
 		}
 		data.Data["ReleaseImage"] = hcpCfg.ReleaseImage
 		data.Data["CLIImage"] = os.Getenv("CLI_IMAGE")
 		data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
 		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
-		data.Data["HCPNodeSelector"] = bootstrapResult.Infra.HostedControlPlane.Spec.NodeSelector
+		data.Data["HCPNodeSelector"] = bootstrapResult.Infra.HostedControlPlane.NodeSelector
 		data.Data["NetworkNodeIdentityImage"] = hcpCfg.ControlPlaneImage // OVN_CONTROL_PLANE_IMAGE
 		localAPIServer := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal]
 		data.Data["K8S_LOCAL_APISERVER"] = "https://" + net.JoinHostPort(localAPIServer.Host, localAPIServer.Port)
