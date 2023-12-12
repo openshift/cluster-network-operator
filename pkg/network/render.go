@@ -15,6 +15,7 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
@@ -737,7 +738,7 @@ func renderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 func getMultusAdmissionControllerReplicas(bootstrapResult *bootstrap.BootstrapResult) int {
 	replicas := 2
 	if bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode {
-		if bootstrapResult.Infra.InfrastructureTopology == configv1.SingleReplicaTopologyMode {
+		if bootstrapResult.Infra.HostedControlPlane.ControllerAvailabilityPolicy == hypershift.SingleReplica {
 			replicas = 1
 		}
 	} else if bootstrapResult.Infra.ControlPlaneTopology == configv1.SingleReplicaTopologyMode {
