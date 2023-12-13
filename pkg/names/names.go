@@ -36,7 +36,7 @@ const MULTUS_NAMESPACE = "openshift-multus"
 const ALLOWLIST_CONFIG_NAME = "cni-sysctl-allowlist"
 
 // CRON_SCHEDULER_CONFIG_NAME is the name of the cronjob schedule configmap
-const CRON_SCHEDULER_CONFIG_NAME = "cron-scheduler-configmap"
+const CRON_SCHEDULER_CONFIG_NAME = "whereabouts-reconciler-scheduler-configmap"
 
 const USER_EDITABLE_CRON_SCHEDULER_CONFIGMAP = "cron-scheduler-configmap"
 

@@ -677,7 +677,7 @@ spec:
         volumeMounts:
           - name: cni-net-dir
             mountPath: /host/etc/cni/net.d
-          - name: cron-scheduler-configmap
+          - name: whereabouts-reconciler-scheduler-configmap
             mountPath: /cron-schedule
         env:
         - name: NODENAME
@@ -693,8 +693,8 @@ spec:
         - name: cni-net-dir
           hostPath:
             path: {{ .SystemCNIConfDir }}
-        - name: cron-scheduler-configmap
+        - name: whereabouts-reconciler-scheduler-configmap
           configMap:
-            name: {{.UserEditableCronSchedulerConfigmap}}
+            name: {{.CronSchedulerConfigmap}}
             defaultMode: 0744
 {{- end}}

@@ -36,9 +36,9 @@ import (
 
 const (
 	manifestDir              = "bindata/cronjob-scheduler/daemonset"
-	cronConfigmapDsName      = "cron-scheduler-configmap-ds"
+	cronConfigmapDsName      = "whereabouts-reconciler-scheduler-configmap-ds"
 	cronConfigmapManifestDir = "bindata/cronjob-scheduler/config/configmap.yaml"
-	cronAnnotation           = "app=cron-scheduler-configmap-ds"
+	cronAnnotation           = "app=whereabouts-reconciler-scheduler-configmap-ds"
 )
 
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) error {

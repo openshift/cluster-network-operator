@@ -75,8 +75,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 	data.Data["MultusSocketParentDir"] = MultusSocketParentDir
 	data.Data["CNIBinDir"] = CNIBinDir
 	data.Data["CniSysctlAllowlist"] = "default-cni-sysctl-allowlist"
-	data.Data["CronSchedulerConfigmap"] = "default-cron-scheduler-configmap"
-	data.Data["UserEditableCronSchedulerConfigmap"] = "cron-scheduler-configmap"
+	data.Data["CronSchedulerConfigmap"] = "default-whereabouts-reconciler-scheduler-configmap"
 	data.Data["HTTP_PROXY"] = ""
 	data.Data["HTTPS_PROXY"] = ""
 	data.Data["NO_PROXY"] = ""

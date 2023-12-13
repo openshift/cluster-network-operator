@@ -16,7 +16,7 @@ spec:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
     spec:
       containers:
-        - name: cni-sysctl-allowlist-pod
+        - name: kube-multus-additional-cni-plugins
           image:  {{.MultusImage}}
           command: ["/bin/bash", "-c", "cp /entrypoint/allowlist.conf /host/etc/cni/tuning/ && touch /ready/ready && sleep INF"]
           securityContext:

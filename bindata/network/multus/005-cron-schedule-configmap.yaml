@@ -5,7 +5,7 @@ metadata:
   namespace: openshift-multus
   annotations:
     kubernetes.io/description: |
-      Configmap containing user customizable cronjob schedule
+      Configmap containing user customizable schedule for the Whereabouts ip reconciler using a cron expression
     release.openshift.io/version: "{{.ReleaseVersion}}"
 data:
   reconciler_cron_file: "30 4 * * *" 

@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: cron-scheduler-configmap
+  name: whereabouts-reconciler-scheduler-configmap
   namespace: openshift-multus
   annotations:
     kubernetes.io/description: |
-      Configmap containing user customizable cronjob schedule
+      Configmap containing user customizable schedule for the Whereabouts ip reconciler using a cron expression
     release.openshift.io/version: "{{.ReleaseVersion}}"
 data:
   reconciler_cron_file: "30 4 * * *" # Default schedule is once per day at 4:30am. Users may configure this value to their liking.
