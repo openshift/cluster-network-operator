@@ -1432,13 +1432,10 @@ func shouldUpdateOVNKonPrepull(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 }
 
 // isUserIPsecMachineConfigPresent returns true if user owned MachineConfigs for IPsec plugin
-// are already present in master and worker nodes, otherwise returns false.
+// are already present either in master or worker nodes, otherwise returns false.
 func isUserIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
-	if infra.MasterIPsecMachineConfig == nil && infra.WorkerIPsecMachineConfig == nil {
-		return false
-	}
-	return !containsNetworkOwnerRef(infra.MasterIPsecMachineConfig.OwnerReferences) ||
-		!containsNetworkOwnerRef(infra.WorkerIPsecMachineConfig.OwnerReferences)
+	return (infra.MasterIPsecMachineConfig != nil && !containsNetworkOwnerRef(infra.MasterIPsecMachineConfig.OwnerReferences)) ||
+		(infra.WorkerIPsecMachineConfig != nil && !containsNetworkOwnerRef(infra.WorkerIPsecMachineConfig.OwnerReferences))
 }
 
 func containsNetworkOwnerRef(ownerRefs []metav1.OwnerReference) bool {
@@ -1460,9 +1457,7 @@ func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
 	}
 	ipSecPluginOnMasterNodes := hasSourceInMachineConfigStatus(infra.MasterMCPStatus, infra.MasterIPsecMachineConfig.Name)
 	ipSecPluginOnWorkerNodes := hasSourceInMachineConfigStatus(infra.WorkerMCPStatus, infra.WorkerIPsecMachineConfig.Name)
-	return infra.MasterMCPStatus.MachineCount == infra.MasterMCPStatus.ReadyMachineCount &&
-		infra.WorkerMCPStatus.MachineCount == infra.WorkerMCPStatus.ReadyMachineCount &&
-		ipSecPluginOnMasterNodes && ipSecPluginOnWorkerNodes
+	return ipSecPluginOnMasterNodes && ipSecPluginOnWorkerNodes
 }
 
 func hasSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPoolStatus, sourceName string) bool {

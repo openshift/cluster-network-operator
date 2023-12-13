@@ -2206,9 +2206,9 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 
 	// At the 2nd pass, test render logic while MC extension rollout is in progress.
 	bootstrapResult.Infra.MasterMCPStatus = mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 0,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}
 	bootstrapResult.Infra.WorkerMCPStatus = mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}
 	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
