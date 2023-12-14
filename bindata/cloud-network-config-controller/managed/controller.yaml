@@ -34,6 +34,7 @@ spec:
         type: infra
         openshift.io/component: network
     spec:
+      automountServiceAccountToken: false
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
