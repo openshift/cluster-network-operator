@@ -48,6 +48,7 @@ data:
 {{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
     enable-admin-network-policy=true
 {{- end }}
+    enable-multi-external-gateway=true
 
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
@@ -132,6 +133,7 @@ data:
 {{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
     enable-multi-networkpolicy=true
 {{- end }}
+    enable-multi-external-gateway=true
 
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}

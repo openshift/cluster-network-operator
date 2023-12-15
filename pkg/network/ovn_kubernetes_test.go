@@ -220,6 +220,7 @@ enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
@@ -260,6 +261,7 @@ enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
@@ -303,6 +305,7 @@ enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=local
@@ -358,6 +361,7 @@ enable-egress-service=true
 egressip-reachability-total-timeout=3
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=local
@@ -415,6 +419,7 @@ enable-egress-service=true
 egressip-reachability-total-timeout=0
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=local
@@ -471,6 +476,7 @@ enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=local
@@ -527,6 +533,7 @@ enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
@@ -572,6 +579,7 @@ enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
@@ -620,6 +628,7 @@ enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
@@ -660,6 +669,7 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
@@ -704,6 +714,7 @@ egressip-node-healthcheck-port=9107
 enable-multi-network=true
 enable-multi-networkpolicy=true
 enable-admin-network-policy=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
@@ -747,6 +758,7 @@ enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
 enable-admin-network-policy=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
