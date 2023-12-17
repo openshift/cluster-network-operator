@@ -236,6 +236,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNIPsecDaemonsetEnable"] = OVNIPsecDaemonsetEnable
 	data.Data["OVNIPsecEnable"] = OVNIPsecEnable
 
+	//TO-REMOVE debug log msg
+	klog.Infof("IPsec: MC (NS || EW): %v, DS (EW): %v", data.Data["IPsecMachineConfigEnable"], data.Data["OVNIPsecDaemonsetEnable"])
+
 	if c.GatewayConfig != nil && c.GatewayConfig.RoutingViaHost {
 		data.Data["OVN_GATEWAY_MODE"] = OVN_LOCAL_GW_MODE
 	} else {
@@ -532,9 +535,32 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootstrap.BootstrapResult) (renderIPsecMachineConfig, renderIPsecDaemonSet,
 	renderIPsecOVN, renderIPsecHostDaemonSet, renderIPsecContainerizedDaemonSet, renderIPsecDaemonSetAsCreateWaitOnly bool) {
 	isHypershiftHostedCluster := bootstrapResult.Infra.HostedControlPlane != nil
-	isIPsecEnabled := conf.IPsecConfig != nil
 	isIpsecUpgrade := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.LegacyIPsecUpgrade
 	isOVNIPsecActive := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.OVNIPsecActive
+
+	// Find the IPsec mode from Ipsec.config
+	// Ipsec.config == nil (bw compatibility) || ipsecConfig == Off ==> ipsec is disabled
+	// ipsecConfig.mode == "" (bw compatibility) || ipsec.Config == Full ==> ipsec is enabled for NS and EW
+	// ipsecConfig.mode == External ==> ipsec is enabled for NS only
+
+	mode := operv1.IPsecModeDisabled // Sould stay so if conf.IPsecConfig == nil
+	klog.Infof("IPsec:  Lopoking at ipsecConfig = %+v", conf.IPsecConfig)
+	if conf.IPsecConfig != nil {
+		klog.Infof("IPsec ipsecConfig = %+v", conf.IPsecConfig)
+		if conf.IPsecConfig.Mode != "" {
+			mode = conf.IPsecConfig.Mode
+		} else {
+			mode = operv1.IPsecModeFull // BW compatiniglity with existing configs
+			//TO-REMOVE debug log msg
+			klog.Infof("IPsec mode is not set in ipsecConfig. Assuming upgrade: setting IPsec mode to Full")
+			// For upgrade only - update the object to a valid value
+			conf.IPsecConfig.Mode = operv1.IPsecModeFull
+		}
+	}
+	isIPsecEnabled := mode != operv1.IPsecModeDisabled
+	isIPsecFull := mode == operv1.IPsecModeFull	// Full mode is for NS+EW
+	//TO-REMOVE debug log msg
+	klog.Infof("IPsec mode: %s, isIPsecEnabled: %v", mode, isIPsecEnabled)
 
 	// On upgrade, we will just remove any existing ipsec deployment without making any
 	// change to them. So during upgrade, we must keep track if IPsec MachineConfigs are
@@ -544,8 +570,8 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	isIPsecMachineConfigNotActiveOnUpgrade := isIpsecUpgrade && !isIpsecMachineConfigActive && !isHypershiftHostedCluster
 
 	// We render the ipsec deployment if IPsec is already active in OVN
-	// or if IPsec config is enabled.
-	renderIPsecDaemonSet = isOVNIPsecActive || isIPsecEnabled
+	// or if EW IPsec config is enabled.
+	renderIPsecDaemonSet = isOVNIPsecActive || isIPsecFull
 
 	// If ipsec is enabled, we render the host ipsec deployment except for
 	// hypershift hosted clusters and we need to wait for the ipsec MachineConfig
@@ -561,12 +587,12 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// MachineConfig IPsec extensions are needed for the ipsec deployment except
 	// when the containerized deployment is used in hypershift hosted clusters.
 	// We will rollout unless the user has rolled out its own.
-	renderIPsecMachineConfig = renderIPsecDaemonSet && !isUserIPsecMachineConfigPresent && !isHypershiftHostedCluster
+	renderIPsecMachineConfig = (isIPsecEnabled || renderIPsecDaemonSet) && !isUserIPsecMachineConfigPresent && !isHypershiftHostedCluster
 
 	// We render OVN IPsec if IPsec is enabled or it's upgrade is in progress.
 	// If NS IPsec is enabled as well, we need to wait to IPsec MachineConfig
 	// to be active if it's not an upgrade and not a hypershift hosted cluster.
-	renderIPsecOVN = (renderIPsecHostDaemonSet || renderIPsecContainerizedDaemonSet) && isIPsecEnabled
+	renderIPsecOVN = (renderIPsecHostDaemonSet || renderIPsecContainerizedDaemonSet) && isIPsecFull
 
 	// While OVN ipsec is being upgraded and IPsec MachineConfigs deployment is in progress
 	// (or) IPsec config in OVN is being disabled, then ipsec deployment is not updated.
