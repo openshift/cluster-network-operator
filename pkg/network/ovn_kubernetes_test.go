@@ -947,7 +947,7 @@ func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
 
 	crd := OVNKubernetesConfig.DeepCopy()
 	conf := &crd.Spec
-	conf.DefaultNetwork.OVNKubernetesConfig.IPsecConfig = &operv1.IPsecConfig{}
+	conf.DefaultNetwork.OVNKubernetesConfig.IPsecConfig = &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}
 
 	expected := operv1.NetworkSpec{
 		ServiceNetwork: []string{"172.30.0.0/16"},
@@ -966,7 +966,7 @@ func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
 				MTU:         ptrToUint32(8854),
 				GenevePort:  ptrToUint32(8061),
-				IPsecConfig: &operv1.IPsecConfig{},
+				IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull},
 				PolicyAuditConfig: &operv1.PolicyAuditConfig{
 					RateLimit:      ptrToUint32(20),
 					MaxFileSize:    ptrToUint32(50),
@@ -2102,7 +2102,7 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
 				GenevePort:  ptrToUint32(8061),
-				IPsecConfig: &operv1.IPsecConfig{},
+				IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull},
 			},
 		},
 	}
@@ -2322,7 +2322,7 @@ func TestRenderOVNKubernetesEnableIPsecForHostedControlPlane(t *testing.T) {
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
 				GenevePort:  ptrToUint32(8061),
-				IPsecConfig: &operv1.IPsecConfig{},
+				IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull},
 			},
 		},
 	}
@@ -2701,7 +2701,7 @@ func TestRenderOVNKubernetesIPsecUpgradeWithHypershiftHostedCluster(t *testing.T
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
 				GenevePort:  ptrToUint32(8061),
-				IPsecConfig: &operv1.IPsecConfig{},
+				IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull},
 			},
 		},
 	}
