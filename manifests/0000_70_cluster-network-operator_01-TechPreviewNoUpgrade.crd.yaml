@@ -445,9 +445,19 @@ spec:
                             type: integer
                         type: object
                       ipsecConfig:
-                        description: ipsecConfig enables and configures IPsec for
-                          pods on the pod network within the cluster.
+                        description: ipsecConfig enables and configures IPsec for pods on the pod network within the cluster.
                         type: object
+                        default:
+                          mode: Disabled
+                        properties:
+                          mode:
+                            description: Mode defines the ipsec configuration level, 'Off' disable ipsec on the node level, 'External' enables ipsec on the node level but requires the user to configure it (mostly for externl communication), and 'Full' enables ipsec on the node level and configures it for secure communciation between pods in the cluster (the user needs to configure it for external secure communciation).
+                            type: string
+                            default: Disabled
+                            enum:
+                              - Disabled
+                              - External
+                              - Full
                       mtu:
                         description: mtu is the MTU to use for the tunnel interface.
                           This must be 100 bytes smaller than the uplink mtu. Default
