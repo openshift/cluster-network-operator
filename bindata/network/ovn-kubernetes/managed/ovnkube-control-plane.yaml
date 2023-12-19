@@ -104,7 +104,7 @@ spec:
         command: ["/usr/bin/control-plane-operator", "token-minter"]
         args:
         - --service-account-namespace=openshift-ovn-kubernetes
-        - --service-account-name=ovn-kubernetes-controller
+        - --service-account-name=ovn-kubernetes-control-plane
         - --token-audience={{.TokenAudience}}
         - --token-file=/var/run/secrets/hosted_cluster/token
         - --kubeconfig=/etc/kubernetes/kubeconfig
