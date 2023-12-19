@@ -141,8 +141,6 @@ rules:
   - egressfirewalls
   - egressfirewalls/status
   - egressqoses
-  - egressservices
-  - egressservices/status
   verbs:
   - get
   - list
@@ -152,6 +150,7 @@ rules:
 - apiGroups: ["k8s.ovn.org"]
   resources:
     - egressips
+    - egressservices
   verbs:
     - get
     - list
