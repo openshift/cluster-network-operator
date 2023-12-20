@@ -10,6 +10,7 @@ import (
 )
 
 const HyperShiftInternalRouteLabel = "hypershift.openshift.io/internal-route"
+const HostedClusterLocalProxy = "socks5://127.0.0.1:8090"
 
 func init() {
 	for _, label := range strings.Split(routeLabelsRaw, ",") {
