@@ -943,11 +943,6 @@ func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 			errs = append(errs, errors.Errorf("cannot edit a running hybrid overlay network"))
 		}
 	}
-	if pn.IPsecConfig != nil && nn.IPsecConfig != nil {
-		if !reflect.DeepEqual(pn.IPsecConfig, nn.IPsecConfig) {
-			errs = append(errs, errors.Errorf("cannot edit IPsec configuration at runtime"))
-		}
-	}
 
 	return errs
 }
