@@ -12,7 +12,7 @@ spec:
   names:
     kind: Network
     listKind: NetworkList
-    plural: networks
+    plural: networks-new
     singular: network
   scope: Cluster
   versions:
