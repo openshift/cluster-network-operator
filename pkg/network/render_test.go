@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"k8s.io/client-go/kubernetes/scheme"
 
@@ -421,8 +422,10 @@ func Test_getMultusAdmissionControllerReplicas(t *testing.T) {
 			args: args{
 				bootstrapResult: &bootstrap.BootstrapResult{
 					Infra: bootstrap.InfraStatus{
-						ControlPlaneTopology:   configv1.ExternalTopologyMode,
-						InfrastructureTopology: configv1.HighlyAvailableTopologyMode,
+						ControlPlaneTopology: configv1.ExternalTopologyMode,
+						HostedControlPlane: &hypershift.HostedControlPlane{
+							ControllerAvailabilityPolicy: hypershift.HighlyAvailable,
+						},
 					},
 				},
 			},
@@ -433,8 +436,10 @@ func Test_getMultusAdmissionControllerReplicas(t *testing.T) {
 			args: args{
 				bootstrapResult: &bootstrap.BootstrapResult{
 					Infra: bootstrap.InfraStatus{
-						ControlPlaneTopology:   configv1.ExternalTopologyMode,
-						InfrastructureTopology: configv1.SingleReplicaTopologyMode,
+						ControlPlaneTopology: configv1.ExternalTopologyMode,
+						HostedControlPlane: &hypershift.HostedControlPlane{
+							ControllerAvailabilityPolicy: hypershift.SingleReplica,
+						},
 					},
 				},
 			},
