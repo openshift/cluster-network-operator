@@ -143,7 +143,7 @@ const ClusterNetworkOperatorJiraComponent = "Networking / cluster-network-operat
 
 // NetworkTypeMigrationAnnotation is an annotation on the OVN networks.operator.openshift.io CR to indicate
 // that executing network type live migration
-const NetworkTypeMigrationAnnotation = "network.openshift.io/live-migration"
+const NetworkTypeMigrationAnnotation = "network.openshift.io/network-type-migration"
 
 // MachineConfigPoolsUpdating is the reason string NetworkTypeMigrationTargetCNIInUse and NetworkTypeMigrationMTUReady
 // conditions to indicate if MCP is updating
