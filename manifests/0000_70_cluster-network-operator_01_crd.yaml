@@ -212,7 +212,8 @@ spec:
                           to the MTU of the nodes network and Neutron has to allow
                           creation of tenant networks with such MTU. If unset Pod
                           networks will be created with the same MTU as the nodes
-                          network has.
+                          network has. This also affects the services network created
+                          by cluster-network-operator.
                         format: int32
                         minimum: 0
                         type: integer
@@ -401,6 +402,13 @@ spec:
                             description: maxFilesSize is the max size an ACL_audit
                               log file is allowed to reach before rotation occurs
                               Units are in MB and the Default is 50MB
+                            format: int32
+                            minimum: 1
+                            type: integer
+                          maxLogFiles:
+                            default: 5
+                            description: maxLogFiles specifies the maximum number
+                              of ACL_audit log files that can be present.
                             format: int32
                             minimum: 1
                             type: integer
