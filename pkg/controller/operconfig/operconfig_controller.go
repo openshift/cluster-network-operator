@@ -311,12 +311,6 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// Fill all defaults explicitly
 	network.FillDefaults(&newOperConfig.Spec, prev, mtu)
 
-	klog.Infof("IPsec: bootstrap: ipsecConfig: %v", newOperConfig.Spec.DefaultNetwork.OVNKubernetesConfig.IPsecConfig)
-	klog.Infof("IPsec: bootstrap: prev: %v", prev.DefaultNetwork.OVNKubernetesConfig.IPsecConfig)
-
-	if (prev != nil && prev.DefaultNetwork.OVNKubernetesConfig.IPsecConfig != nil) {
-		newOperConfig.Spec.DefaultNetwork.OVNKubernetesConfig.IPsecConfig = prev.DefaultNetwork.OVNKubernetesConfig.IPsecConfig //operv1.IPsecModeFull
-	}
 	// Compare against previous applied configuration to see if this change
 	// is safe.
 	if prev != nil {
