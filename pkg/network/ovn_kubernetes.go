@@ -554,7 +554,7 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 			//TO-REMOVE debug log msg
 			klog.Infof("IPsec mode is not set in ipsecConfig. Assuming upgrade: setting IPsec mode to Full")
 			// For upgrade only - update the object to a valid value
-			conf.IPsecConfig.Mode = operv1.IPsecModeFull
+			//conf.IPsecConfig.Mode = operv1.IPsecModeFull
 		}
 	}
 	isIPsecEnabled := mode != operv1.IPsecModeDisabled
