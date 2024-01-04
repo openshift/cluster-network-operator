@@ -42,6 +42,7 @@ spec:
         hypershift.openshift.io/control-plane: "true"
         hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
         kubernetes.io/os: "linux"
+        hypershfit.openshift.io/need-management-kas-access: "true"
     spec:
       affinity:
         nodeAffinity:
