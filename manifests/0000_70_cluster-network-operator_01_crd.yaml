@@ -404,6 +404,13 @@ spec:
                             format: int32
                             minimum: 1
                             type: integer
+                          maxLogFiles:
+                            default: 5
+                            description: maxLogFiles specifies the maximum number
+                              of ACL_audit log files that can be present.
+                            format: int32
+                            minimum: 1
+                            type: integer
                           rateLimit:
                             default: 20
                             description: rateLimit is the approximate maximum number

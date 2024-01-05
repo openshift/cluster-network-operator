@@ -3,11 +3,10 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.2
+    controller-gen.kubebuilder.io/version: v0.13.0
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
     include.release.openshift.io/single-node-developer: "true"
-  creationTimestamp: null
   name: operatorpkis.network.operator.openshift.io
 spec:
   group: network.operator.openshift.io
@@ -25,11 +24,11 @@ spec:
           for external use - rather, it is internal to the network operator. The CNO
           creates a CA and a certificate signed by that CA. The certificate has both
           ClientAuth and ServerAuth extended usages enabled. \n More specifically,
-          given an OperatorPKI with <name>, the CNO will manage: - A Secret called
+          given an OperatorPKI with <name>, the CNO will manage: \n - A Secret called
           <name>-ca with two data keys: - tls.key - the private key - tls.crt - the
-          CA certificate - A ConfigMap called <name>-ca with a single data key: -
-          cabundle.crt - the CA certificate(s) - A Secret called <name>-cert with
-          two data keys: - tls.key - the private key - tls.crt - the certificate,
+          CA certificate \n - A ConfigMap called <name>-ca with a single data key:
+          - cabundle.crt - the CA certificate(s) \n - A Secret called <name>-cert
+          with two data keys: - tls.key - the private key - tls.crt - the certificate,
           signed by the CA \n The CA certificate will have a validity of 10 years,
           rotated after 9. The target certificate will have a validity of 6 months,
           rotated after 3 \n The CA certificate will have a CommonName of \"<namespace>_<name>-ca@<timestamp>\",
