@@ -550,7 +550,7 @@ func getIPsecMode(conf *operv1.OVNKubernetesConfig) operv1.IPsecMode {
 // When pre-4.14 cluster is Hypershift cluster running with ipsecConfig set, then just render ovn-ipsec-containerized daemonset as
 // MachineConfig kind is not supported there.
 // All Other cases are not supported in pre-4.14 deployments.
-func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootstrap.BootstrapResult) (renderIPsecMachineConfig, renderIPsecDaemonSet,
+func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootstrap.BootstrapResult) (renderCNOIPsecMachineConfig, renderIPsecDaemonSet,
 	renderIPsecOVN, renderIPsecHostDaemonSet, renderIPsecContainerizedDaemonSet, renderIPsecDaemonSetAsCreateWaitOnly bool) {
 	isHypershiftHostedCluster := bootstrapResult.Infra.HostedControlPlane != nil
 	isIpsecUpgrade := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.LegacyIPsecUpgrade
@@ -564,6 +564,8 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	isUserIPsecMachineConfigPresent := isUserIPsecMachineConfigPresent(bootstrapResult.Infra)
 	isIpsecMachineConfigActive := isIPsecMachineConfigActive(bootstrapResult.Infra)
 	isIPsecMachineConfigNotActiveOnUpgrade := isIpsecUpgrade && !isIpsecMachineConfigActive && !isHypershiftHostedCluster
+	isMachineConfigClusterOperatorReady := bootstrapResult.Infra.MachineConfigClusterOperatorReady
+	isCNOIPsecMachineConfigPresent := isIPsecMachineConfigPresent(bootstrapResult.Infra) && !isUserIPsecMachineConfigPresent
 
 	// We render the ipsec deployment if IPsec is already active in OVN
 	// or if EW IPsec config is enabled.
@@ -583,10 +585,12 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// MachineConfig IPsec extensions rollout is needed for the ipsec enablement and are used in both External and Full modes.
 	// except  when the containerized deployment is used in hypershift hosted clusters.
 	// We will rollout unless the user has rolled out its own.
-	renderIPsecMachineConfig = (mode != operv1.IPsecModeDisabled ||
+	renderCNOIPsecMachineConfig = (mode != operv1.IPsecModeDisabled ||
 		renderIPsecDaemonSet) &&
 		!isUserIPsecMachineConfigPresent &&
 		!isHypershiftHostedCluster
+	// Wait for MCO to be ready unless we had already rendered the IPsec MachineConfig
+	renderCNOIPsecMachineConfig = renderCNOIPsecMachineConfig && (isCNOIPsecMachineConfigPresent || isMachineConfigClusterOperatorReady)
 
 	// We render OVN IPsec if East-West IPsec is enabled or it's upgrade is in progress.
 	// If NS IPsec is enabled as well, we need to wait to IPsec MachineConfig
@@ -1487,6 +1491,10 @@ func hasSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPool
 		}
 	}
 	return false
+}
+
+func isIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
+	return infra.MasterIPsecMachineConfig != nil && infra.WorkerIPsecMachineConfig != nil
 }
 
 // shouldUpdateOVNKonUpgrade determines if we should roll out changes to
