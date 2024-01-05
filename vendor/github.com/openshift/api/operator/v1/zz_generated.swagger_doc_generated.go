@@ -312,10 +312,8 @@ func (DeveloperConsoleCatalogTypes) SwaggerDoc() map[string]string {
 }
 
 var map_Perspective = map[string]string{
-	"":                "Perspective defines a perspective that cluster admins want to show/hide in the perspective switcher dropdown",
-	"id":              "id defines the id of the perspective. Example: \"dev\", \"admin\". The available perspective ids can be found in the code snippet section next to the yaml editor. Incorrect or unknown ids will be ignored.",
-	"visibility":      "visibility defines the state of perspective along with access review checks if needed for that perspective.",
-	"pinnedResources": "pinnedResources defines the list of default pinned resources that users will see on the perspective navigation if they have not customized these pinned resources themselves. The list of available Kubernetes resources could be read via `kubectl api-resources`. The console will also provide a configuration UI and a YAML snippet that will list the available resources that can be pinned to the navigation. Incorrect or unknown resources will be ignored.",
+	"id":         "id defines the id of the perspective. Example: \"dev\", \"admin\". The available perspective ids can be found in the code snippet section next to the yaml editor. Incorrect or unknown ids will be ignored.",
+	"visibility": "visibility defines the state of perspective along with access review checks if needed for that perspective.",
 }
 
 func (Perspective) SwaggerDoc() map[string]string {
@@ -330,17 +328,6 @@ var map_PerspectiveVisibility = map[string]string{
 
 func (PerspectiveVisibility) SwaggerDoc() map[string]string {
 	return map_PerspectiveVisibility
-}
-
-var map_PinnedResourceReference = map[string]string{
-	"":         "PinnedResourceReference includes the group, version and type of resource",
-	"group":    "group is the API Group of the Resource. Enter empty string for the core group. This value should consist of only lowercase alphanumeric characters, hyphens and periods. Example: \"\", \"apps\", \"build.openshift.io\", etc.",
-	"version":  "version is the API Version of the Resource. This value should consist of only lowercase alphanumeric characters. Example: \"v1\", \"v1beta1\", etc.",
-	"resource": "resource is the type that is being referenced. It is normally the plural form of the resource kind in lowercase. This value should consist of only lowercase alphanumeric characters and hyphens. Example: \"deployments\", \"deploymentconfigs\", \"pods\", etc.",
-}
-
-func (PinnedResourceReference) SwaggerDoc() map[string]string {
-	return map_PinnedResourceReference
 }
 
 var map_ProjectAccess = map[string]string{
@@ -554,10 +541,11 @@ func (DNSTransportConfig) SwaggerDoc() map[string]string {
 }
 
 var map_ForwardPlugin = map[string]string{
-	"":                "ForwardPlugin defines a schema for configuring the CoreDNS forward plugin.",
-	"upstreams":       "upstreams is a list of resolvers to forward name queries for subdomains of Zones. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy. Each upstream is represented by an IP address or IP:port if the upstream listens on a port other than 53.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin.",
-	"policy":          "policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Random\"",
-	"transportConfig": "transportConfig is used to configure the transport type, server name, and optional custom CA or CA bundle to use when forwarding DNS requests to an upstream resolver.\n\nThe default value is \"\" (empty) which results in a standard cleartext connection being used when forwarding DNS requests to an upstream resolver.",
+	"":                 "ForwardPlugin defines a schema for configuring the CoreDNS forward plugin.",
+	"upstreams":        "upstreams is a list of resolvers to forward name queries for subdomains of Zones. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy. Each upstream is represented by an IP address or IP:port if the upstream listens on a port other than 53.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin.",
+	"policy":           "policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Random\"",
+	"transportConfig":  "transportConfig is used to configure the transport type, server name, and optional custom CA or CA bundle to use when forwarding DNS requests to an upstream resolver.\n\nThe default value is \"\" (empty) which results in a standard cleartext connection being used when forwarding DNS requests to an upstream resolver.",
+	"protocolStrategy": "protocolStrategy specifies the protocol to use for upstream DNS requests. Valid values for protocolStrategy are \"TCP\" and omitted. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is to use the protocol of the original client request. \"TCP\" specifies that the platform should use TCP for all upstream DNS requests, even if the client request uses UDP. \"TCP\" is useful for UDP-specific issues such as those created by non-compliant upstream resolvers, but may consume more bandwidth or increase DNS response time. Note that protocolStrategy only affects the protocol of DNS requests that CoreDNS makes to upstream resolvers. It does not affect the protocol of DNS requests between clients and CoreDNS.",
 }
 
 func (ForwardPlugin) SwaggerDoc() map[string]string {
@@ -587,10 +575,11 @@ func (Upstream) SwaggerDoc() map[string]string {
 }
 
 var map_UpstreamResolvers = map[string]string{
-	"":                "UpstreamResolvers defines a schema for configuring the CoreDNS forward plugin in the specific case of the default (\".\") server. It defers from ForwardPlugin in the default values it accepts: * At least one upstream should be specified. * the default policy is Sequential",
-	"upstreams":       "Upstreams is a list of resolvers to forward name queries for the \".\" domain. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin. If no Upstreams are specified, /etc/resolv.conf is used by default",
-	"policy":          "Policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Sequential\"",
-	"transportConfig": "transportConfig is used to configure the transport type, server name, and optional custom CA or CA bundle to use when forwarding DNS requests to an upstream resolver.\n\nThe default value is \"\" (empty) which results in a standard cleartext connection being used when forwarding DNS requests to an upstream resolver.",
+	"":                 "UpstreamResolvers defines a schema for configuring the CoreDNS forward plugin in the specific case of the default (\".\") server. It defers from ForwardPlugin in the default values it accepts: * At least one upstream should be specified. * the default policy is Sequential",
+	"upstreams":        "Upstreams is a list of resolvers to forward name queries for the \".\" domain. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin. If no Upstreams are specified, /etc/resolv.conf is used by default",
+	"policy":           "Policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Sequential\"",
+	"transportConfig":  "transportConfig is used to configure the transport type, server name, and optional custom CA or CA bundle to use when forwarding DNS requests to an upstream resolver.\n\nThe default value is \"\" (empty) which results in a standard cleartext connection being used when forwarding DNS requests to an upstream resolver.",
+	"protocolStrategy": "protocolStrategy specifies the protocol to use for upstream DNS requests. Valid values for protocolStrategy are \"TCP\" and omitted. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is to use the protocol of the original client request. \"TCP\" specifies that the platform should use TCP for all upstream DNS requests, even if the client request uses UDP. \"TCP\" is useful for UDP-specific issues such as those created by non-compliant upstream resolvers, but may consume more bandwidth or increase DNS response time. Note that protocolStrategy only affects the protocol of DNS requests that CoreDNS makes to upstream resolvers. It does not affect the protocol of DNS requests between clients and CoreDNS.",
 }
 
 func (UpstreamResolvers) SwaggerDoc() map[string]string {
@@ -892,7 +881,7 @@ func (LoggingDestination) SwaggerDoc() map[string]string {
 
 var map_NodePlacement = map[string]string{
 	"":             "NodePlacement describes node scheduling configuration for an ingress controller.",
-	"nodeSelector": "nodeSelector is the node selector applied to ingress controller deployments.\n\nIf set, the specified selector is used and replaces the default.\n\nIf unset, the default depends on the value of the defaultPlacement field in the cluster config.openshift.io/v1/ingresses status.\n\nWhen defaultPlacement is Workers, the default is:\n\n  kubernetes.io/os: linux\n  node-role.kubernetes.io/worker: ''\n\nWhen defaultPlacement is ControlPlane, the default is:\n\n  kubernetes.io/os: linux\n  node-role.kubernetes.io/master: ''\n\nThese defaults are subject to change.\n\nNote that using nodeSelector.matchExpressions is not supported.  Only nodeSelector.matchLabels may be used.  This is a limitation of the Kubernetes API: the pod spec does not allow complex expressions for node selectors.",
+	"nodeSelector": "nodeSelector is the node selector applied to ingress controller deployments.\n\nIf set, the specified selector is used and replaces the default.\n\nIf unset, the default depends on the value of the defaultPlacement field in the cluster config.openshift.io/v1/ingresses status.\n\nWhen defaultPlacement is Workers, the default is:\n\n  kubernetes.io/os: linux\n  node-role.kubernetes.io/worker: ''\n\nWhen defaultPlacement is ControlPlane, the default is:\n\n  kubernetes.io/os: linux\n  node-role.kubernetes.io/master: ''\n\nThese defaults are subject to change.",
 	"tolerations":  "tolerations is a list of tolerations applied to ingress controller deployments.\n\nThe default is an empty list.\n\nSee https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/",
 }
 
@@ -1014,7 +1003,6 @@ func (InsightsOperatorStatus) SwaggerDoc() map[string]string {
 
 var map_InsightsReport = map[string]string{
 	"":             "insightsReport provides Insights health check report based on the most recently sent Insights data.",
-	"downloadedAt": "downloadedAt is the time when the last Insights report was downloaded. An empty value means that there has not been any Insights report downloaded yet and it usually appears in disconnected clusters (or clusters when the Insights data gathering is disabled).",
 	"healthChecks": "healthChecks provides basic information about active Insights health checks in a cluster.",
 }
 
@@ -1331,6 +1319,7 @@ func (OpenShiftSDNConfig) SwaggerDoc() map[string]string {
 var map_PolicyAuditConfig = map[string]string{
 	"rateLimit":      "rateLimit is the approximate maximum number of messages to generate per-second per-node. If unset the default of 20 msg/sec is used.",
 	"maxFileSize":    "maxFilesSize is the max size an ACL_audit log file is allowed to reach before rotation occurs Units are in MB and the Default is 50MB",
+	"maxLogFiles":    "maxLogFiles specifies the maximum number of ACL_audit log files that can be present.",
 	"destination":    "destination is the location for policy log messages. Regardless of this config, persistent logs will always be dumped to the host at /var/log/ovn/ however Additionally syslog output may be configured as follows. Valid values are: - \"libc\" -> to use the libc syslog() function of the host node's journdald process - \"udp:host:port\" -> for sending syslog over UDP - \"unix:file\" -> for using the UNIX domain socket directly - \"null\" -> to discard all messages logged to syslog The default is \"null\"",
 	"syslogFacility": "syslogFacility the RFC5424 facility for generated messages, e.g. \"kern\". Default is \"local0\"",
 }
