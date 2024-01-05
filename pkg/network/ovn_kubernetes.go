@@ -562,6 +562,12 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// when the containerized deployment is used in hypershift hosted clusters.
 	// We will rollout unless the user has rolled out its own.
 	renderIPsecMachineConfig = renderIPsecDaemonSet && !isUserIPsecMachineConfigPresent && !isHypershiftHostedCluster
+	// When IPsec MachineConfig is rendered for the first time, check machine config cluster operator is in ready state. This
+	// ensures cluster is settled with Machine Configs present during install time. If the operator is not ready, then do not
+	// render IPsec MachineConfig.
+	if renderIPsecMachineConfig && !isIPsecMachineConfigPresent(bootstrapResult.Infra) && !bootstrapResult.Infra.MachineConfigClusterOperatorReady {
+		renderIPsecMachineConfig = false
+	}
 
 	// We render OVN IPsec if IPsec is enabled or it's upgrade is in progress.
 	// If NS IPsec is enabled as well, we need to wait to IPsec MachineConfig
@@ -1467,6 +1473,10 @@ func hasSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPool
 		}
 	}
 	return false
+}
+
+func isIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
+	return infra.MasterIPsecMachineConfig != nil && infra.WorkerIPsecMachineConfig != nil
 }
 
 // shouldUpdateOVNKonUpgrade determines if we should roll out changes to
