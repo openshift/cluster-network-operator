@@ -544,17 +544,16 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// ipsecConfig.mode == External ==> ipsec is enabled for NS only
 
 	mode := operv1.IPsecModeDisabled // Sould stay so if conf.IPsecConfig == nil
-	klog.Infof("IPsec:  Lopoking at ipsecConfig = %+v", conf.IPsecConfig)
+	/*TO-REMOVE*/ klog.Infof("IPsec:  Looking at ipsecConfig = %+v", conf.IPsecConfig)
 	if conf.IPsecConfig != nil {
-		klog.Infof("IPsec ipsecConfig = %+v", conf.IPsecConfig)
+		/*TO-REMOVE*/ klog.Infof("IPsec ipsecConfig = %+v", conf.IPsecConfig)
 		if conf.IPsecConfig.Mode != "" {
 			mode = conf.IPsecConfig.Mode
 		} else {
-			mode = operv1.IPsecModeFull // BW compatiniglity with existing configs
+			mode = operv1.IPsecModeFull // BW compatibility with existing configs  
 			//TO-REMOVE debug log msg
-			klog.Infof("IPsec mode is not set in ipsecConfig. Assuming upgrade: setting IPsec mode to Full")
-			// For upgrade only - update the object to a valid value
-			conf.IPsecConfig.Mode = operv1.IPsecModeFull
+			klog.Infof("IPsec mode is not set in ipsecConfig. Assuming upgrade, setting functionality to \"Full\"")
+			//TO-REMOVE conf.IPsecConfig.Mode = &{}
 		}
 	}
 	isIPsecEnabled := mode != operv1.IPsecModeDisabled
