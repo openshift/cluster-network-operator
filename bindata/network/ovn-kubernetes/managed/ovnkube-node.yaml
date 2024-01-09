@@ -299,7 +299,7 @@ spec:
           exec /usr/bin/kube-rbac-proxy \
             --logtostderr \
             --secure-listen-address=:9103 \
-            --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
+            --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 \
             --upstream=http://127.0.0.1:29103/ \
             --tls-private-key-file=${TLS_PK} \
             --tls-cert-file=${TLS_CERT}
@@ -351,7 +351,7 @@ spec:
           exec /usr/bin/kube-rbac-proxy \
             --logtostderr \
             --secure-listen-address=:9105 \
-            --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 \
+            --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 \
             --upstream=http://127.0.0.1:29105/ \
             --tls-private-key-file=${TLS_PK} \
             --tls-cert-file=${TLS_CERT}
