@@ -40,8 +40,11 @@ configSyncPeriod: 0s
 conntrack:
   maxPerCore: null
   min: null
+  tcpBeLiberal: false
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+  udpStreamTimeout: 0s
+  udpTimeout: 0s
 detectLocal:
   bridgeInterface: ""
   interfaceNamePrefix: ""
@@ -73,6 +76,11 @@ logging:
   verbosity: 0
 metricsBindAddress: 0.0.0.0:9102
 mode: iptables
+nftables:
+  masqueradeAll: false
+  masqueradeBit: null
+  minSyncPeriod: 0s
+  syncPeriod: 0s
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
@@ -109,8 +117,11 @@ configSyncPeriod: 0s
 conntrack:
   maxPerCore: null
   min: null
+  tcpBeLiberal: false
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+  udpStreamTimeout: 0s
+  udpTimeout: 0s
 detectLocal:
   bridgeInterface: ""
   interfaceNamePrefix: ""
@@ -142,6 +153,11 @@ logging:
   verbosity: 0
 metricsBindAddress: 5.6.7.8:9999
 mode: userspace
+nftables:
+  masqueradeAll: false
+  masqueradeBit: null
+  minSyncPeriod: 0s
+  syncPeriod: 0s
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
@@ -174,8 +190,11 @@ configSyncPeriod: 0s
 conntrack:
   maxPerCore: null
   min: null
+  tcpBeLiberal: false
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+  udpStreamTimeout: 0s
+  udpTimeout: 0s
 detectLocal:
   bridgeInterface: ""
   interfaceNamePrefix: ""
@@ -207,6 +226,11 @@ logging:
   verbosity: 0
 metricsBindAddress: 5.6.7.8:9102
 mode: iptables
+nftables:
+  masqueradeAll: false
+  masqueradeBit: null
+  minSyncPeriod: 0s
+  syncPeriod: 0s
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
@@ -239,8 +263,11 @@ configSyncPeriod: 0s
 conntrack:
   maxPerCore: null
   min: null
+  tcpBeLiberal: false
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+  udpStreamTimeout: 0s
+  udpTimeout: 0s
 detectLocal:
   bridgeInterface: ""
   interfaceNamePrefix: ""
@@ -272,6 +299,11 @@ logging:
   verbosity: 0
 metricsBindAddress: 0.0.0.0:9999
 mode: iptables
+nftables:
+  masqueradeAll: false
+  masqueradeBit: null
+  minSyncPeriod: 0s
+  syncPeriod: 0s
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: ""
@@ -307,8 +339,11 @@ configSyncPeriod: 0s
 conntrack:
   maxPerCore: null
   min: null
+  tcpBeLiberal: false
   tcpCloseWaitTimeout: null
   tcpEstablishedTimeout: null
+  udpStreamTimeout: 0s
+  udpTimeout: 0s
 detectLocal:
   bridgeInterface: ""
   interfaceNamePrefix: ""
@@ -342,6 +377,11 @@ logging:
   verbosity: 0
 metricsBindAddress: 0.0.0.0:9102
 mode: iptables
+nftables:
+  masqueradeAll: false
+  masqueradeBit: null
+  minSyncPeriod: 0s
+  syncPeriod: 0s
 nodePortAddresses: null
 oomScoreAdj: null
 portRange: 1000+10
