@@ -591,7 +591,7 @@ logfile-maxsize=100
 logfile-maxbackups=5
 logfile-maxage=0
 
-[masterha]
+[clustermgrha]
 election-lease-duration=137
 election-renew-deadline=107
 election-retry-period=26`,

@@ -84,7 +84,7 @@ data:
 {{- end  }}
 {{- if .IsSNO }}
 
-    [masterha]
+    [clustermgrha]
     {{- /* 
     Even in case of SNO there will be only one ovn-master, we set dedicated values for leader election 
     durations in SNO, as disabling it can cause issues on scaling out SNO again. 
