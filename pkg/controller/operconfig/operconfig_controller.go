@@ -261,8 +261,11 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// This will also commit the change back to the apiserver.
 	if err := r.MergeClusterConfig(ctx, operConfig); err != nil {
 		log.Printf("Failed to merge the cluster configuration: %v", err)
-		r.status.SetDegraded(statusmanager.OperatorConfig, "MergeClusterConfig",
-			fmt.Sprintf("Internal error while merging cluster configuration and operator configuration: %v", err))
+		// not set degraded if the err is a version conflict, but return a reconcile err for retry.
+		if !apierrors.IsConflict(err) {
+			r.status.SetDegraded(statusmanager.OperatorConfig, "MergeClusterConfig",
+				fmt.Sprintf("Internal error while merging cluster configuration and operator configuration: %v", err))
+		}
 		return reconcile.Result{}, err
 	}
 
@@ -342,8 +345,11 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if !reflect.DeepEqual(operConfig, newOperConfig) {
 		if err := r.UpdateOperConfig(ctx, newOperConfig); err != nil {
 			log.Printf("Failed to update the operator configuration: %v", err)
-			r.status.SetDegraded(statusmanager.OperatorConfig, "UpdateOperatorConfig",
-				fmt.Sprintf("Internal error while updating operator configuration: %v", err))
+			// not set degraded if the err is a version conflict, but return a reconcile err for retry.
+			if !apierrors.IsConflict(err) {
+				r.status.SetDegraded(statusmanager.OperatorConfig, "UpdateOperatorConfig",
+					fmt.Sprintf("Internal error while updating operator configuration: %v", err))
+			}
 			return reconcile.Result{}, err
 		}
 	}
