@@ -29,7 +29,7 @@ spec:
     subjects:
     - kind: ServiceAccount
       serviceAccount:
-        name: ovn-kubernetes-controller
+        name: ovn-kubernetes-control-plane
         namespace: openshift-ovn-kubernetes
     - kind: ServiceAccount
       serviceAccount:
