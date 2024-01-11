@@ -124,8 +124,11 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	}
 
 	if err := apply.ApplyObject(ctx, r.client, operConfig, "clusterconfig"); err != nil {
-		r.status.SetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",
-			fmt.Sprintf("Error while trying to update operator configuration: %v", err))
+		// not set degraded if the err is a version conflict, but return a reconcile err for retry.
+		if !apierrors.IsConflict(err) {
+			r.status.SetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",
+				fmt.Sprintf("Error while trying to update operator configuration: %v", err))
+		}
 		log.Printf("Could not propagate configuration from network.config.openshift.io to network.operator.openshift.io: %v", err)
 		return reconcile.Result{}, fmt.Errorf("could not apply updated operator configuration: %w", err)
 	}
