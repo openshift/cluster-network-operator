@@ -77,7 +77,7 @@ func TestPrepareOperatorConfigForNetworkTypeMigration(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster",
 					Annotations: map[string]string{
-						"network.openshift.io/live-migration": "",
+						names.NetworkTypeMigrationAnnotation: "",
 					},
 				},
 				Spec: configv1.NetworkSpec{
@@ -120,7 +120,7 @@ func TestPrepareOperatorConfigForNetworkTypeMigration(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster",
 					Annotations: map[string]string{
-						"network.openshift.io/live-migration": "",
+						names.NetworkTypeMigrationAnnotation: "",
 					},
 				},
 				Spec: configv1.NetworkSpec{
@@ -173,7 +173,7 @@ func TestPrepareOperatorConfigForNetworkTypeMigration(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster",
 					Annotations: map[string]string{
-						"network.openshift.io/live-migration": "",
+						names.NetworkTypeMigrationAnnotation: "",
 					},
 				},
 				Spec: configv1.NetworkSpec{
@@ -226,7 +226,7 @@ func TestPrepareOperatorConfigForNetworkTypeMigration(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster",
 					Annotations: map[string]string{
-						"network.openshift.io/live-migration": "",
+						names.NetworkTypeMigrationAnnotation: "",
 					},
 				},
 				Spec: configv1.NetworkSpec{
@@ -283,7 +283,7 @@ func TestPrepareOperatorConfigForNetworkTypeMigration(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster",
 					Annotations: map[string]string{
-						"network.openshift.io/live-migration": "",
+						names.NetworkTypeMigrationAnnotation: "",
 					},
 				},
 				Spec: configv1.NetworkSpec{
@@ -331,7 +331,7 @@ func TestPrepareOperatorConfigForNetworkTypeMigration(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster",
 					Annotations: map[string]string{
-						"network.openshift.io/live-migration": "",
+						names.NetworkTypeMigrationAnnotation: "",
 					},
 				},
 				Spec: configv1.NetworkSpec{
@@ -375,7 +375,7 @@ func TestPrepareOperatorConfigForNetworkTypeMigration(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster",
 					Annotations: map[string]string{
-						"network.openshift.io/live-migration": "",
+						names.NetworkTypeMigrationAnnotation: "",
 					},
 				},
 				Spec: configv1.NetworkSpec{
