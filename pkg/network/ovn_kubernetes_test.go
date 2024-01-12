@@ -2118,6 +2118,8 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 	// bootstrap also represents current status
 	// the current cluster is single-stack and has version 1.9.9
 	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.Infra = bootstrap.InfraStatus{}
+	bootstrapResult.Infra.MachineConfigClusterOperatorReady = true
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		ControlPlaneUpdateStatus: &bootstrap.OVNUpdateStatus{
 			Kind:         "Deployment",
@@ -2172,7 +2174,6 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 		t.Errorf("The MachineConfig %s must exist, but it's not available", workerMachineConfigIPsecExtName)
 	}
 
-	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MasterIPsecMachineConfig = &mcfgv1.MachineConfig{}
 	bootstrapResult.Infra.MasterIPsecMachineConfig.Name = masterMachineConfigIPsecExtName
 	bootstrapResult.Infra.MasterIPsecMachineConfig.OwnerReferences = networkOwnerRef()
@@ -2444,6 +2445,7 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 	// Start the upgrade and it's going rollout only ovn-ipsec-host DS without any changes into
 	// installed IPsec MachineConfigs.
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
+	bootstrapResult.Infra.MachineConfigClusterOperatorReady = true
 	bootstrapResult.Infra.MasterIPsecMachineConfig = &mcfgv1.MachineConfig{}
 	bootstrapResult.Infra.MasterIPsecMachineConfig.Name = masterMachineConfigIPsecExtName
 	bootstrapResult.Infra.WorkerIPsecMachineConfig = &mcfgv1.MachineConfig{}
@@ -2526,6 +2528,8 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 	// bootstrap also represents current status
 	// the current cluster is single-stack and has version 1.9.9
 	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.Infra = bootstrap.InfraStatus{}
+	bootstrapResult.Infra.MachineConfigClusterOperatorReady = true
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		ControlPlaneUpdateStatus: &bootstrap.OVNUpdateStatus{
 			Kind:         "Deployment",
@@ -2604,7 +2608,6 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 	}
 
 	// After IPsec Machine Configs rollout is complete, it must have only ovn-ipsec-host DS.
-	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MasterIPsecMachineConfig = &mcfgv1.MachineConfig{}
 	bootstrapResult.Infra.MasterIPsecMachineConfig.Name = masterMachineConfigIPsecExtName
 	bootstrapResult.Infra.MasterIPsecMachineConfig.OwnerReferences = networkOwnerRef()
@@ -2826,6 +2829,7 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 
 	fakeClient := cnofake.NewFakeClient()
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
+	bootstrapResult.Infra.MachineConfigClusterOperatorReady = true
 	bootstrapResult.Infra.MasterIPsecMachineConfig = &mcfgv1.MachineConfig{}
 	bootstrapResult.Infra.MasterIPsecMachineConfig.Name = masterMachineConfigIPsecExtName
 	bootstrapResult.Infra.MasterIPsecMachineConfig.OwnerReferences = networkOwnerRef()

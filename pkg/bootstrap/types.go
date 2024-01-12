@@ -102,6 +102,9 @@ type InfraStatus struct {
 
 	// WorkerMCPStatus contains machine config pool status of worker nodes.
 	WorkerMCPStatus mcfgv1.MachineConfigPoolStatus
+
+	// MachineConfigClusterOperatorReady set to true when Machine Config cluster operator is in ready state.
+	MachineConfigClusterOperatorReady bool
 }
 
 // APIServer is the hostname & port of a given APIServer. (This is the
