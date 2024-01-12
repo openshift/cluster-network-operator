@@ -176,6 +176,12 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		res.WorkerMCPStatus = mcpWorker.Status
 	}
 
+	machineConfigClusterOperatorReady, err := isMachineConfigClusterOperatorReady(client)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to get machine config cluster operator: %v", err)
+	}
+	res.MachineConfigClusterOperatorReady = machineConfigClusterOperatorReady
+
 	return res, nil
 }
 
@@ -196,4 +202,25 @@ func findIPsecMachineConfigWithLabel(client cnoclient.Client, selector string) (
 		}
 	}
 	return ipsecMachineConfig, nil
+}
+
+func isMachineConfigClusterOperatorReady(client cnoclient.Client) (bool, error) {
+	machineConfigClusterOperator := &configv1.ClusterOperator{}
+	if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "machine-config"}, machineConfigClusterOperator); err != nil {
+		return false, err
+	}
+	available, degraded, progressing := false, true, true
+	for _, condition := range machineConfigClusterOperator.Status.Conditions {
+		isConditionTrue := condition.Status == configv1.ConditionTrue
+		switch condition.Type {
+		case configv1.OperatorAvailable:
+			available = isConditionTrue
+		case configv1.OperatorDegraded:
+			degraded = isConditionTrue
+		case configv1.OperatorProgressing:
+			progressing = isConditionTrue
+		}
+	}
+	machineConfigClusterOperatorReady := available && !degraded && !progressing
+	return machineConfigClusterOperatorReady, nil
 }
