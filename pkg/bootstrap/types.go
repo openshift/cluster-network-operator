@@ -91,11 +91,11 @@ type InfraStatus struct {
 	// NetworkNodeIdentityEnabled define if the network node identity feature should be enabled
 	NetworkNodeIdentityEnabled bool
 
-	// MasterIPsecMachineConfig contains ipsec machine config object of master nodes.
-	MasterIPsecMachineConfig *mcfgv1.MachineConfig
+	// MasterIPsecMachineConfigs contains ipsec machine config objects of master nodes.
+	MasterIPsecMachineConfigs []*mcfgv1.MachineConfig
 
-	// WorkerIPsecMachineConfig contains ipsec machine config object of worker nodes.
-	WorkerIPsecMachineConfig *mcfgv1.MachineConfig
+	// WorkerIPsecMachineConfigs contains ipsec machine config objects of worker nodes.
+	WorkerIPsecMachineConfigs []*mcfgv1.MachineConfig
 
 	// MasterMCPStatus contains machine config pool status of master nodes.
 	MasterMCPStatus mcfgv1.MachineConfigPoolStatus
