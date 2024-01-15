@@ -2200,12 +2200,12 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 		t.Errorf("The MachineConfig %s must exist, but it's not available", workerMachineConfigIPsecExtName)
 	}
 
-	bootstrapResult.Infra.MasterIPsecMachineConfig = &mcfgv1.MachineConfig{}
-	bootstrapResult.Infra.MasterIPsecMachineConfig.Name = masterMachineConfigIPsecExtName
-	bootstrapResult.Infra.MasterIPsecMachineConfig.OwnerReferences = networkOwnerRef()
-	bootstrapResult.Infra.WorkerIPsecMachineConfig = &mcfgv1.MachineConfig{}
-	bootstrapResult.Infra.WorkerIPsecMachineConfig.Name = workerMachineConfigIPsecExtName
-	bootstrapResult.Infra.WorkerIPsecMachineConfig.OwnerReferences = networkOwnerRef()
+	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
+	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
+	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].OwnerReferences = networkOwnerRef()
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].OwnerReferences = networkOwnerRef()
 	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -2470,14 +2470,13 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 		},
 	}
 
-	// Start the upgrade and it's going rollout only ovn-ipsec-host DS without any changes into
-	// installed IPsec MachineConfigs.
+	// Start the upgrade and it's going rollout ovn-ipsec-host DS with CNO IPsec MachineConfigs.
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MachineConfigClusterOperatorReady = true
-	bootstrapResult.Infra.MasterIPsecMachineConfig = &mcfgv1.MachineConfig{}
-	bootstrapResult.Infra.MasterIPsecMachineConfig.Name = masterMachineConfigIPsecExtName
-	bootstrapResult.Infra.WorkerIPsecMachineConfig = &mcfgv1.MachineConfig{}
-	bootstrapResult.Infra.WorkerIPsecMachineConfig.Name = workerMachineConfigIPsecExtName
+	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
+	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
 	bootstrapResult.Infra.MasterMCPStatus = mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}
 	bootstrapResult.Infra.WorkerMCPStatus = mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1,
@@ -2491,12 +2490,12 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 	}
 	// Ensure renderOVNKubernetes doesn't roll out its own MachineConfigs
 	renderedMasterIPsecExtension := findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
-	if renderedMasterIPsecExtension != nil {
-		t.Errorf("The MachineConfig %s must not exist, but it's available", masterMachineConfigIPsecExtName)
+	if renderedMasterIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's not available", masterMachineConfigIPsecExtName)
 	}
 	renderedWorkerIPsecExtension := findInObjs("machineconfiguration.openshift.io", "MachineConfig", workerMachineConfigIPsecExtName, "", objs)
-	if renderedWorkerIPsecExtension != nil {
-		t.Errorf("The MachineConfig %s must not exist, but it's available", workerMachineConfigIPsecExtName)
+	if renderedWorkerIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's  not available", workerMachineConfigIPsecExtName)
 	}
 	// Ensure only ipsec host daemonset exists now.
 	renderedIPsec := findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
@@ -2636,12 +2635,12 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 	}
 
 	// After IPsec Machine Configs rollout is complete, it must have only ovn-ipsec-host DS.
-	bootstrapResult.Infra.MasterIPsecMachineConfig = &mcfgv1.MachineConfig{}
-	bootstrapResult.Infra.MasterIPsecMachineConfig.Name = masterMachineConfigIPsecExtName
-	bootstrapResult.Infra.MasterIPsecMachineConfig.OwnerReferences = networkOwnerRef()
-	bootstrapResult.Infra.WorkerIPsecMachineConfig = &mcfgv1.MachineConfig{}
-	bootstrapResult.Infra.WorkerIPsecMachineConfig.OwnerReferences = networkOwnerRef()
-	bootstrapResult.Infra.WorkerIPsecMachineConfig.Name = workerMachineConfigIPsecExtName
+	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
+	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
+	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].OwnerReferences = networkOwnerRef()
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].OwnerReferences = networkOwnerRef()
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
 	bootstrapResult.Infra.MasterMCPStatus = mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}
 	bootstrapResult.Infra.WorkerMCPStatus = mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1,
@@ -2858,12 +2857,12 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 	fakeClient := cnofake.NewFakeClient()
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MachineConfigClusterOperatorReady = true
-	bootstrapResult.Infra.MasterIPsecMachineConfig = &mcfgv1.MachineConfig{}
-	bootstrapResult.Infra.MasterIPsecMachineConfig.Name = masterMachineConfigIPsecExtName
-	bootstrapResult.Infra.MasterIPsecMachineConfig.OwnerReferences = networkOwnerRef()
-	bootstrapResult.Infra.WorkerIPsecMachineConfig = &mcfgv1.MachineConfig{}
-	bootstrapResult.Infra.WorkerIPsecMachineConfig.Name = workerMachineConfigIPsecExtName
-	bootstrapResult.Infra.WorkerIPsecMachineConfig.OwnerReferences = networkOwnerRef()
+	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
+	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
+	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].OwnerReferences = networkOwnerRef()
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].OwnerReferences = networkOwnerRef()
 	bootstrapResult.Infra.MasterMCPStatus = mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}
 	bootstrapResult.Infra.WorkerMCPStatus = mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1,
@@ -2991,10 +2990,10 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 
 	fakeClient := cnofake.NewFakeClient()
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
-	bootstrapResult.Infra.MasterIPsecMachineConfig = &mcfgv1.MachineConfig{}
-	bootstrapResult.Infra.MasterIPsecMachineConfig.Name = masterMachineConfigIPsecExtName
-	bootstrapResult.Infra.WorkerIPsecMachineConfig = &mcfgv1.MachineConfig{}
-	bootstrapResult.Infra.WorkerIPsecMachineConfig.Name = workerMachineConfigIPsecExtName
+	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
+	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
 	bootstrapResult.Infra.MasterMCPStatus = mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}
 	bootstrapResult.Infra.WorkerMCPStatus = mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1,

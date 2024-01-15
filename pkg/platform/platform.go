@@ -144,19 +144,19 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	// The IPsecMachineConfig in 4.14 is created by user and can be created with any name and also is not managed by network operator, so find it by using the label
 	// and looking for the extension.
 
-	masterIPsecMachineConfig, err := findIPsecMachineConfigWithLabel(client, "machineconfiguration.openshift.io/role=master")
+	masterIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, "machineconfiguration.openshift.io/role=master")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ipsec machine config for master: %v", err)
+		return nil, fmt.Errorf("failed to get ipsec machine configs for master: %v", err)
 	}
-	res.MasterIPsecMachineConfig = masterIPsecMachineConfig
+	res.MasterIPsecMachineConfigs = masterIPsecMachineConfigs
 
-	workerIPsecMachineConfig, err := findIPsecMachineConfigWithLabel(client, "machineconfiguration.openshift.io/role=worker")
+	workerIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, "machineconfiguration.openshift.io/role=worker")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ipsec machine config for worker: %v", err)
+		return nil, fmt.Errorf("failed to get ipsec machine configs for worker: %v", err)
 	}
-	res.WorkerIPsecMachineConfig = workerIPsecMachineConfig
+	res.WorkerIPsecMachineConfigs = workerIPsecMachineConfigs
 
-	if res.MasterIPsecMachineConfig != nil {
+	if res.MasterIPsecMachineConfigs != nil {
 		mcpMaster := &mcfgv1.MachineConfigPool{}
 		if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "master"}, mcpMaster); err != nil {
 			if !apierrors.IsNotFound(err) {
@@ -166,7 +166,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		res.MasterMCPStatus = mcpMaster.Status
 	}
 
-	if res.WorkerIPsecMachineConfig != nil {
+	if res.WorkerIPsecMachineConfigs != nil {
 		mcpWorker := &mcfgv1.MachineConfigPool{}
 		if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "worker"}, mcpWorker); err != nil {
 			if !apierrors.IsNotFound(err) {
@@ -185,7 +185,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	return res, nil
 }
 
-func findIPsecMachineConfigWithLabel(client cnoclient.Client, selector string) (*mcfgv1.MachineConfig, error) {
+func findIPsecMachineConfigsWithLabel(client cnoclient.Client, selector string) ([]*mcfgv1.MachineConfig, error) {
 	lSelector, err := labels.Parse(selector)
 	if err != nil {
 		return nil, err
@@ -195,13 +195,13 @@ func findIPsecMachineConfigWithLabel(client cnoclient.Client, selector string) (
 	if err != nil {
 		return nil, err
 	}
-	var ipsecMachineConfig *mcfgv1.MachineConfig
+	var ipsecMachineConfigs []*mcfgv1.MachineConfig
 	for i, machineConfig := range machineConfigs.Items {
 		if sets.New(machineConfig.Spec.Extensions...).Has("ipsec") {
-			ipsecMachineConfig = &machineConfigs.Items[i]
+			ipsecMachineConfigs = append(ipsecMachineConfigs, &machineConfigs.Items[i])
 		}
 	}
-	return ipsecMachineConfig, nil
+	return ipsecMachineConfigs, nil
 }
 
 func isMachineConfigClusterOperatorReady(client cnoclient.Client) (bool, error) {
