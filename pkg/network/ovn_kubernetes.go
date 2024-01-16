@@ -2121,7 +2121,7 @@ func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 	}
 	klog.V(2).Infof("daemonset %s/%s rollout %s; %d/%d scheduled; %d unavailable; %d available; generation %d -> %d",
 		ds.Namespace, ds.Name, s, status.UpdatedNumberScheduled, status.DesiredNumberScheduled,
-		status.NumberUnavailable, status.NumberAvailable, ds.Generation, status.ObservedGeneration)
+		status.NumberUnavailable, status.NumberAvailable, status.ObservedGeneration, ds.Generation)
 
 	if !progressing {
 		klog.V(2).Infof("daemonset %s/%s rollout complete", ds.Namespace, ds.Name)
@@ -2180,7 +2180,7 @@ func deploymentProgressing(d *appsv1.Deployment) bool {
 	}
 	klog.V(2).Infof("deployment %s/%s rollout %s; %d/%d scheduled; %d available; generation %d -> %d",
 		d.Namespace, d.Name, s, status.ReadyReplicas, status.Replicas,
-		status.AvailableReplicas, d.Generation, status.ObservedGeneration)
+		status.AvailableReplicas, status.ObservedGeneration, d.Generation)
 
 	if !progressing {
 		klog.V(2).Infof("deployment %s/%s rollout complete", d.Namespace, d.Name)
