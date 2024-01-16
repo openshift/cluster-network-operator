@@ -25,7 +25,7 @@ func (v versionChange) String() string {
 	case versionUnknown:
 		return "unknown"
 	}
-	klog.Warningf("unhandled versionChange value %v", v)
+	klog.Warningf("unhandled versionChange value %d", v)
 	return "UNHANDLED"
 }
 

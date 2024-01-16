@@ -236,6 +236,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNIPsecDaemonsetEnable"] = OVNIPsecDaemonsetEnable
 	data.Data["OVNIPsecEnable"] = OVNIPsecEnable
 
+	klog.V(5).Infof("IPsec: is MachineConfig enabled: %v, is East-West DaemonSet enabled: %v", data.Data["IPsecMachineConfigEnable"], data.Data["OVNIPsecDaemonsetEnable"])
+
 	if c.GatewayConfig != nil && c.GatewayConfig.RoutingViaHost {
 		data.Data["OVN_GATEWAY_MODE"] = OVN_LOCAL_GW_MODE
 	} else {
@@ -514,6 +516,25 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	return objs, progressing, nil
 }
 
+// getIPsecMode return the ipsec mode accounting for upgrade scenarios
+// Find the IPsec mode from Ipsec.config
+// Ipsec.config == nil (bw compatibility) || ipsecConfig == Off ==> ipsec is disabled
+// ipsecConfig.mode == "" (bw compatibility) || ipsec.Config == Full ==> ipsec is enabled for NS and EW
+// ipsecConfig.mode == External ==> ipsec is enabled for NS only
+func getIPsecMode(conf *operv1.OVNKubernetesConfig) operv1.IPsecMode {
+	mode := operv1.IPsecModeDisabled // Should stay so if conf.IPsecConfig == nil
+	if conf.IPsecConfig != nil {
+		if conf.IPsecConfig.Mode != "" {
+			mode = conf.IPsecConfig.Mode
+		} else {
+			mode = operv1.IPsecModeFull // Backward compatibility with existing configs
+		}
+	}
+
+	klog.V(5).Infof("IPsec: after looking at %+v, ipsec mode=%s", conf.IPsecConfig, mode)
+	return mode
+}
+
 // shouldRenderIPsec method ensures the have following IPsec states for upgrade path from 4.14 to 4.15 or later versions:
 // When 4.14 cluster is already installed with MachineConfig for IPsec extension and ipsecConfig is set in network operator
 // config (i.e. IPsec for NS+EW), then reuse the installed MC extension and render ipsec-host daemonset.
@@ -532,9 +553,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootstrap.BootstrapResult) (renderCNOIPsecMachineConfig, renderIPsecDaemonSet,
 	renderIPsecOVN, renderIPsecHostDaemonSet, renderIPsecContainerizedDaemonSet, renderIPsecDaemonSetAsCreateWaitOnly bool) {
 	isHypershiftHostedCluster := bootstrapResult.Infra.HostedControlPlane != nil
-	isIPsecEnabled := conf.IPsecConfig != nil
 	isIpsecUpgrade := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.LegacyIPsecUpgrade
 	isOVNIPsecActive := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.OVNIPsecActive
+
+	mode := getIPsecMode(conf)
 
 	// On upgrade, we will just remove any existing ipsec deployment without making any
 	// change to them. So during upgrade, we must keep track if IPsec MachineConfigs are
@@ -546,8 +568,8 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	isCNOIPsecMachineConfigPresent := isIPsecMachineConfigPresent(bootstrapResult.Infra) && !isUserIPsecMachineConfigPresent
 
 	// We render the ipsec deployment if IPsec is already active in OVN
-	// or if IPsec config is enabled.
-	renderIPsecDaemonSet = isOVNIPsecActive || isIPsecEnabled
+	// or if EW IPsec config is enabled.
+	renderIPsecDaemonSet = isOVNIPsecActive || mode == operv1.IPsecModeFull
 
 	// If ipsec is enabled, we render the host ipsec deployment except for
 	// hypershift hosted clusters and we need to wait for the ipsec MachineConfig
@@ -560,17 +582,20 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// for hypershift hosted clusters.
 	renderIPsecContainerizedDaemonSet = (renderIPsecDaemonSet && isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnUpgrade
 
-	// MachineConfig IPsec extensions are needed for the ipsec deployment except
-	// when the containerized deployment is used in hypershift hosted clusters.
+	// MachineConfig IPsec extensions rollout is needed for the ipsec enablement and are used in both External and Full modes.
+	// except  when the containerized deployment is used in hypershift hosted clusters.
 	// We will rollout unless the user has rolled out its own.
-	renderCNOIPsecMachineConfig = renderIPsecDaemonSet && !isUserIPsecMachineConfigPresent && !isHypershiftHostedCluster
+	renderCNOIPsecMachineConfig = (mode != operv1.IPsecModeDisabled ||
+		renderIPsecDaemonSet) &&
+		!isUserIPsecMachineConfigPresent &&
+		!isHypershiftHostedCluster
 	// Wait for MCO to be ready unless we had already rendered the IPsec MachineConfig
 	renderCNOIPsecMachineConfig = renderCNOIPsecMachineConfig && (isCNOIPsecMachineConfigPresent || isMachineConfigClusterOperatorReady)
 
-	// We render OVN IPsec if IPsec is enabled or it's upgrade is in progress.
+	// We render OVN IPsec if East-West IPsec is enabled or it's upgrade is in progress.
 	// If NS IPsec is enabled as well, we need to wait to IPsec MachineConfig
 	// to be active if it's not an upgrade and not a hypershift hosted cluster.
-	renderIPsecOVN = (renderIPsecHostDaemonSet || renderIPsecContainerizedDaemonSet) && isIPsecEnabled
+	renderIPsecOVN = (renderIPsecHostDaemonSet || renderIPsecContainerizedDaemonSet) && mode == operv1.IPsecModeFull
 
 	// While OVN ipsec is being upgraded and IPsec MachineConfigs deployment is in progress
 	// (or) IPsec config in OVN is being disabled, then ipsec deployment is not updated.
@@ -881,12 +906,12 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 
 	return out
 }
-
 func getOVNEncapOverhead(conf *operv1.NetworkSpec) uint32 {
 	const geneveOverhead = 100
 	const ipsecOverhead = 46 // Transport mode, AES-GCM
 	var encapOverhead uint32 = geneveOverhead
-	if conf.DefaultNetwork.OVNKubernetesConfig.IPsecConfig != nil {
+	mode := getIPsecMode(conf.DefaultNetwork.OVNKubernetesConfig)
+	if mode == operv1.IPsecModeFull {
 		encapOverhead += ipsecOverhead
 	}
 	return encapOverhead
@@ -945,11 +970,6 @@ func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	if pn.HybridOverlayConfig != nil && nn.HybridOverlayConfig != nil {
 		if !reflect.DeepEqual(pn.HybridOverlayConfig, nn.HybridOverlayConfig) {
 			errs = append(errs, errors.Errorf("cannot edit a running hybrid overlay network"))
-		}
-	}
-	if pn.IPsecConfig != nil && nn.IPsecConfig != nil {
-		if !reflect.DeepEqual(pn.IPsecConfig, nn.IPsecConfig) {
-			errs = append(errs, errors.Errorf("cannot edit IPsec configuration at runtime"))
 		}
 	}
 
