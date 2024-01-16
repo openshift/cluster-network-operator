@@ -2340,9 +2340,9 @@ func isMigrationToMultiZoneOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneM
 		ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) && // can be progressing or not
 
 		ovn.MasterUpdateStatus != nil &&
-		ovn.MasterUpdateStatus.InterConnectEnabled &&
-		(ovn.ControlPlaneUpdateStatus == nil ||
-			ovn.ControlPlaneUpdateStatus.Progressing && !ovn.NodeUpdateStatus.Progressing)
+		ovn.MasterUpdateStatus.InterConnectEnabled && // can be progressing or not
+
+		(ovn.ControlPlaneUpdateStatus == nil || ovn.ControlPlaneUpdateStatus.Progressing)
 }
 
 // migration from single zone to multizone is complete if:
