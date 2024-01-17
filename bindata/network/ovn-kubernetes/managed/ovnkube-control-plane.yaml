@@ -152,7 +152,7 @@ spec:
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --k8s-token-file=/var/run/secrets/hosted_cluster/token \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            --metrics-bind-address "127.0.0.1:9108" \
+            --metrics-bind-address "0.0.0.0:9108" \
             --metrics-enable-pprof \
             --metrics-enable-config-duration \
             --node-server-privkey ${TLS_PK} \
