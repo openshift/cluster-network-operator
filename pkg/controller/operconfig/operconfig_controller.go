@@ -183,8 +183,13 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 		CreateFunc: func(_ event.CreateEvent) bool {
 			return true
 		},
-		UpdateFunc: func(_ event.UpdateEvent) bool {
-			return true
+		UpdateFunc: func(ev event.UpdateEvent) bool {
+			// Node conditions change *a lot* and we don't care. We only care
+			// about updates when the labels change.
+			return !reflect.DeepEqual(
+				ev.ObjectOld.GetLabels(),
+				ev.ObjectNew.GetLabels(),
+			)
 		},
 		DeleteFunc: func(_ event.DeleteEvent) bool {
 			return true
