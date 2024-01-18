@@ -1,4 +1,4 @@
-package network
+package version
 
 import (
 	"github.com/Masterminds/semver"
@@ -8,21 +8,21 @@ import (
 type versionChange int
 
 const (
-	versionUpgrade   versionChange = -1
-	versionSame      versionChange = 0
-	versionDowngrade versionChange = 1
-	versionUnknown   versionChange = 2
+	VersionUpgrade   versionChange = -1
+	VersionSame      versionChange = 0
+	VersionDowngrade versionChange = 1
+	VersionUnknown   versionChange = 2
 )
 
 func (v versionChange) String() string {
 	switch v {
-	case versionUpgrade:
+	case VersionUpgrade:
 		return "upgrade"
-	case versionSame:
+	case VersionSame:
 		return "same"
-	case versionDowngrade:
+	case VersionDowngrade:
 		return "downgrade"
-	case versionUnknown:
+	case VersionUnknown:
 		return "unknown"
 	}
 	klog.Warningf("unhandled versionChange value %d", v)
@@ -32,25 +32,25 @@ func (v versionChange) String() string {
 // compareVersions compares two semver versions
 // if fromVersion is older than toVersion, returns versionOlder
 // likewise, if fromVersion is newer, returns versionNewer
-func compareVersions(fromVersion, toVersion string) versionChange {
+func CompareVersions(fromVersion, toVersion string) versionChange {
 	if fromVersion == toVersion {
-		return versionSame
+		return VersionSame
 	}
 
 	v1, err := semver.NewVersion(fromVersion)
 	if err != nil {
-		return versionUnknown
+		return VersionUnknown
 	}
 
 	v2, err := semver.NewVersion(toVersion)
 	if err != nil {
-		return versionUnknown
+		return VersionUnknown
 	}
 
 	return versionChange(v1.Compare(v2))
 }
 
-func isVersionGreaterThanOrEqualTo(version string, major int, minor int) bool {
+func IsVersionGreaterThanOrEqualTo(version string, major int, minor int) bool {
 	v, err := semver.NewVersion(version)
 	if err != nil {
 		klog.Errorf("failed to parse version %s: %v", version, err)

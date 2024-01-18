@@ -29,6 +29,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/util"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
+	"github.com/openshift/cluster-network-operator/pkg/version"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
@@ -1518,10 +1519,10 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 
 	// compute version delta
 	// versionUpgrade means the existing daemonSet needs an upgrade.
-	controlPlaneDelta := compareVersions(controlPlaneVersion, releaseVersion)
-	nodeDelta := compareVersions(nodeVersion, releaseVersion)
+	controlPlaneDelta := version.CompareVersions(controlPlaneVersion, releaseVersion)
+	nodeDelta := version.CompareVersions(nodeVersion, releaseVersion)
 
-	if controlPlaneDelta == versionUnknown || nodeDelta == versionUnknown {
+	if controlPlaneDelta == version.VersionUnknown || nodeDelta == version.VersionUnknown {
 		klog.Warningf("could not determine ovn-kubernetes daemonset update directions; node: %s, control-plane: %s, release: %s",
 			nodeVersion, controlPlaneVersion, releaseVersion)
 		return true, true
@@ -1545,14 +1546,14 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 
 	// both older (than CNO)
 	// Update node only.
-	if controlPlaneDelta == versionUpgrade && nodeDelta == versionUpgrade {
+	if controlPlaneDelta == version.VersionUpgrade && nodeDelta == version.VersionUpgrade {
 		klog.V(2).Infof("Upgrading OVN-Kubernetes node before control-plane")
 		return true, false
 	}
 
 	// control plane older, node updated
 	// update control plane if node is rolled out
-	if controlPlaneDelta == versionUpgrade && nodeDelta == versionSame {
+	if controlPlaneDelta == version.VersionUpgrade && nodeDelta == version.VersionSame {
 		if ovn.NodeUpdateStatus.Progressing {
 			klog.V(2).Infof("Waiting for OVN-Kubernetes node update to roll out before updating control-plane")
 			return true, false
@@ -1563,14 +1564,14 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 
 	// both newer
 	// downgrade control plane before node
-	if controlPlaneDelta == versionDowngrade && nodeDelta == versionDowngrade {
+	if controlPlaneDelta == version.VersionDowngrade && nodeDelta == version.VersionDowngrade {
 		klog.V(2).Infof("Downgrading OVN-Kubernetes control-plane before node")
 		return false, true
 	}
 
 	// control plane same, node needs downgrade
 	// wait for control plane rollout
-	if controlPlaneDelta == versionSame && nodeDelta == versionDowngrade {
+	if controlPlaneDelta == version.VersionSame && nodeDelta == version.VersionDowngrade {
 		if ovn.ControlPlaneUpdateStatus.Progressing {
 			klog.V(2).Infof("Waiting for OVN-Kubernetes control-plane downgrade to roll out before downgrading node")
 			return false, true
@@ -1580,7 +1581,7 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 	}
 
 	// unlikely, should be caught above
-	if controlPlaneDelta == versionSame && nodeDelta == versionSame {
+	if controlPlaneDelta == version.VersionSame && nodeDelta == version.VersionSame {
 		return true, true
 	}
 
@@ -1735,7 +1736,7 @@ func isOVNIPsecNotActiveInDaemonSet(ds *appsv1.DaemonSet) bool {
 		return false
 	}
 	// If IPsec is running with older version and ipsec=true is found from nbdb container, then return false.
-	if !isVersionGreaterThanOrEqualTo(annotations["release.openshift.io/version"], 4, 15) &&
+	if !version.IsVersionGreaterThanOrEqualTo(annotations["release.openshift.io/version"], 4, 15) &&
 		isIPSecEnabledInPod(ds.Spec.Template, util.OVN_NBDB) {
 		return false
 	}

@@ -10,6 +10,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/version"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -222,5 +223,11 @@ func isMachineConfigClusterOperatorReady(client cnoclient.Client) (bool, error) 
 		}
 	}
 	machineConfigClusterOperatorReady := available && !degraded && !progressing
-	return machineConfigClusterOperatorReady, nil
+	for _, mcoVersion := range machineConfigClusterOperator.Status.Versions {
+		if mcoVersion.Name == "operator" {
+			return version.IsVersionGreaterThanOrEqualTo(mcoVersion.Version, 4, 15) &&
+				machineConfigClusterOperatorReady, nil
+		}
+	}
+	return false, nil
 }
