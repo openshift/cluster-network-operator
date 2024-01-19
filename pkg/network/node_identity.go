@@ -105,7 +105,7 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 			},
 		}
 		nsn := types.NamespacedName{Namespace: hcpCfg.Namespace, Name: "network-node-identity"}
-		if err := client.Default().CRClient().Get(context.TODO(), nsn, webhookDeployment); err != nil {
+		if err := client.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(), nsn, webhookDeployment); err != nil {
 			if !apierrors.IsNotFound(err) {
 				return nil, fmt.Errorf("failed to retrieve existing network-node-identity deployment: %w", err)
 			} else {

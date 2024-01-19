@@ -133,7 +133,7 @@ spec:
                 --loglevel="${LOGLEVEL}"
         env:
           - name: LOGLEVEL
-            value: "5"
+            value: "2"
         resources:
           requests:
             cpu: 10m
