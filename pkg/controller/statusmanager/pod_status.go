@@ -111,7 +111,9 @@ func (status *StatusManager) SetFromPods() {
 			dsProgressing = true
 		}
 
-		if ds.Annotations["release.openshift.io/version"] != targetLevel {
+		if ds.Annotations["release.openshift.io/version"] != targetLevel &&
+			ds.Name != "ovn-ipsec-containerized" &&
+			ds.Name != "ovn-ipsec-host" {
 			reachedAvailableLevel = false
 		}
 
