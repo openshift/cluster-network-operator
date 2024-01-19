@@ -18,6 +18,5 @@ approvers:
   - knobunc
   - trozet
 
-# Bugzilla info; "openshift-sdn" is wrong but there is no "generic networking" subcomponent
 component: Networking
-subcomponent: openshift-sdn
+subcomponent: cluster-network-operator
