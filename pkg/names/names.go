@@ -142,6 +142,10 @@ const NetworkTypeMigrationAnnotation = "network.openshift.io/network-type-migrat
 // conditions to indicate if MCP is updating
 const MachineConfigPoolsUpdating string = "MachineConfigPoolsUpdating"
 
+// MachineConfigPoolDegraded is the reason string NetworkTypeMigrationTargetCNIInUse and NetworkTypeMigrationMTUReady
+// conditions to indicate if MCP is degraded
+const MachineConfigPoolDegraded string = "MachineConfigPoolDegraded"
+
 // Status condition types of network.config for live migration
 const (
 	// NetworkTypeMigrationInProgress is the condition type for network type live migration to indicate if the migration
