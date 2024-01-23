@@ -67,6 +67,9 @@ func (r *ReconcileClusterConfig) prepareOperatorConfigForNetworkTypeMigration(ct
 	if mcpCondition == nil {
 		return fmt.Errorf("condition %q not found", names.NetworkTypeMigrationMTUReady)
 	}
+	if mcpCondition.Reason == names.MachineConfigPoolDegraded {
+		return fmt.Errorf("MCP is degraded, network type migration cannot proceed")
+	}
 	if mcpCondition.Reason == names.MachineConfigPoolsUpdating {
 		klog.Infof("MCP is updating, so we don't modify the operator config")
 		return nil
