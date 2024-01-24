@@ -1,6 +1,6 @@
 # Cluster Network Operator
 
-The Cluster Network Operator installs and upgrades the networking components on an OpenShift Kubernetes cluster.
+The Cluster Network Operator installs and upgrades the networking components on an OpenShift Kubernetes cluster. 
 
 It follows the [Controller pattern](https://godoc.org/github.com/kubernetes-sigs/controller-runtime/pkg#hdr-Controller): it reconciles the state of the cluster against a desired configuration. The configuration specified by a CustomResourceDefinition called `Network.config.openshift.io/v1`, which has a corresponding [type](https://github.com/openshift/api/blob/master/operator/v1/types_network.go).
 
