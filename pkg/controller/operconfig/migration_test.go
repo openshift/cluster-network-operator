@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+	configv1 "github.com/openshift/api/config/v1"
 	v1 "github.com/openshift/api/network/v1"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -18,6 +20,7 @@ import (
 
 const testMigrationNamespace = "openshift-multus"
 const testMigrationHost = "egressip-test-host"
+const fakeMcName = "fakeMC"
 
 func init() {
 	utilruntime.Must(v1.AddToScheme(scheme.Scheme))
@@ -591,6 +594,141 @@ func TestMulticastMigrationRollback(t *testing.T) {
 				t.Errorf("expected multicast-enabled annotation to be set to \"true\"")
 			}
 		})
+	}
+}
+
+func TestEnsureMachineConfigPools(t *testing.T) {
+	type expectedResult struct {
+		isDesired, isStable bool
+		err                 error
+	}
+	testCases := []struct {
+		name    string
+		isMatch func([]byte, string) bool
+		result  expectedResult
+		objects []crclient.Object
+	}{
+		{
+			name:    "All machineconfigpools are stable and in desired state",
+			isMatch: func([]byte, string) bool { return true },
+			result:  expectedResult{isDesired: true, isStable: true, err: nil},
+			objects: []crclient.Object{
+				newMCP("master", corev1.ConditionFalse, corev1.ConditionFalse),
+				newMCP("worker", corev1.ConditionFalse, corev1.ConditionFalse),
+				&mcfgv1.MachineConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "master" + fakeMcName,
+					},
+				},
+				&mcfgv1.MachineConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "worker" + fakeMcName,
+					},
+				},
+			},
+		},
+		{
+			name:    "All machineconfigpools are stable but one is not in desired state",
+			isMatch: func([]byte, string) bool { return false },
+			result:  expectedResult{isDesired: false, isStable: true, err: nil},
+			objects: []crclient.Object{
+				newMCP("master", corev1.ConditionFalse, corev1.ConditionFalse),
+				newMCP("worker", corev1.ConditionFalse, corev1.ConditionFalse),
+				&mcfgv1.MachineConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "master" + fakeMcName,
+					},
+				},
+				&mcfgv1.MachineConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "worker" + fakeMcName,
+					},
+				},
+			},
+		},
+		{
+			name:    "One machineconfigpool is updating",
+			isMatch: func([]byte, string) bool { return false },
+			result:  expectedResult{isDesired: false, isStable: false, err: nil},
+			objects: []crclient.Object{
+				newMCP("master", corev1.ConditionFalse, corev1.ConditionFalse),
+				newMCP("worker", corev1.ConditionTrue, corev1.ConditionFalse),
+				&mcfgv1.MachineConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "master" + fakeMcName,
+					},
+				},
+				&mcfgv1.MachineConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "worker" + fakeMcName,
+					},
+				},
+			},
+		},
+		{
+			name:    "One machineconfigpool is degraded",
+			isMatch: func([]byte, string) bool { return false },
+			result:  expectedResult{isDesired: false, isStable: false, err: nil},
+			objects: []crclient.Object{
+				newMCP("master", corev1.ConditionFalse, corev1.ConditionTrue),
+				newMCP("worker", corev1.ConditionFalse, corev1.ConditionFalse),
+				&mcfgv1.MachineConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "master" + fakeMcName,
+					},
+				},
+				&mcfgv1.MachineConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "worker" + fakeMcName,
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+
+			r := &ReconcileOperConfig{
+				client: fake.NewFakeClient(tc.objects...),
+			}
+			clusterConfig := &configv1.Network{}
+			condType := "sampleConditionType"
+			nowTimestamp := metav1.Now()
+			// call the ensureMachineConfigPools method
+			isDesired, isStable, err := r.ensureMachineConfigPools(context.Background(), clusterConfig, condType, tc.isMatch, nowTimestamp)
+
+			g.Expect(err).To(BeNil())
+			g.Expect(isDesired).To(Equal(tc.result.isDesired))
+			g.Expect(isStable).To(Equal(tc.result.isStable))
+		})
+	}
+
+}
+
+func newMCP(name string, updating, degraded corev1.ConditionStatus) *mcfgv1.MachineConfigPool {
+	return &mcfgv1.MachineConfigPool{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Status: mcfgv1.MachineConfigPoolStatus{
+			Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
+				ObjectReference: corev1.ObjectReference{
+					Name: name + fakeMcName,
+				},
+			},
+			Conditions: []mcfgv1.MachineConfigPoolCondition{
+				{
+					Type:   mcfgv1.MachineConfigPoolUpdating,
+					Status: updating,
+				},
+				{
+					Type:   mcfgv1.MachineConfigPoolDegraded,
+					Status: degraded,
+				},
+			},
+		},
 	}
 }
 
