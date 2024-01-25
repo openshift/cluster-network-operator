@@ -653,15 +653,13 @@ func (r *ReconcileOperConfig) syncNetworkTypeMigrationConditions(ctx context.Con
 		return err
 	}
 
-	_, inProgress, err := r.ensureMachineConfigPools(ctx, clusterConfigUpdated, names.NetworkTypeMigrationMTUReady, routebleMtuUnitMatch, nowTimestamp)
+	_, mcpIsStable, err := r.ensureMachineConfigPools(ctx, clusterConfigUpdated, names.NetworkTypeMigrationMTUReady, routebleMtuUnitMatch, nowTimestamp)
 	if err != nil {
 		return err
 	}
 
-	if inProgress {
-		// MCP updating is in progress, skip conditions sync
-		klog.Infof("network type migration is in progress")
-	} else {
+	// MCP is not stable , skip updating other conditions
+	if mcpIsStable {
 		targetCNIReady, err := r.isMigrationCNIReady(ctx, operConfig, clusterConfigUpdated, nowTimestamp)
 		if err != nil {
 			return err
@@ -867,8 +865,8 @@ func (r *ReconcileOperConfig) cleanOVNKubernetesNodeAnnotations(ctx context.Cont
 }
 
 // ensureMachineConfigPools ensures the machine configuration pools are in the desired state. It returns
-// whether the MCPs are in the desired state, and whether the MCPs are in progress.
-func (r *ReconcileOperConfig) ensureMachineConfigPools(ctx context.Context, clusterConfig *configv1.Network, condType string, isMatch match, nowTimestamp metav1.Time) (bool, bool, error) {
+// whether the MCPs are in the desired state, and whether the MCPs are not in progress or degraded.
+func (r *ReconcileOperConfig) ensureMachineConfigPools(ctx context.Context, clusterConfig *configv1.Network, condType string, isMatch match, nowTimestamp metav1.Time) (isDesired, isStable bool, err error) {
 	mc := &mcfgv1.MachineConfig{}
 	pools := &mcfgv1.MachineConfigPoolList{}
 	networkType := clusterConfig.Spec.NetworkType
@@ -876,38 +874,41 @@ func (r *ReconcileOperConfig) ensureMachineConfigPools(ctx context.Context, clus
 	condition := &metav1.Condition{}
 	defer syncNetworkTypeMigrationCondition(ctx, clusterConfig, condition)
 
-	if err := r.client.Default().CRClient().List(ctx, pools); err != nil {
-		return false, false, err
+	if err = r.client.Default().CRClient().List(ctx, pools); err != nil {
+		return
 	}
 	for _, pool := range pools.Items {
-		if mcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolUpdating) {
-			// Not update conditions when MCPs are not converged
-			*condition = metav1.Condition{
-				Type:               condType,
-				Status:             metav1.ConditionFalse,
-				Reason:             names.MachineConfigPoolsUpdating,
-				Message:            "MachineConfigPools are updating",
-				LastTransitionTime: nowTimestamp,
-			}
-			return false, true, nil
-		}
 		if mcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolDegraded) {
 			*condition = metav1.Condition{
 				Type:               condType,
 				Status:             metav1.ConditionFalse,
-				Reason:             "MachineConfigPoolDegraded",
-				Message:            fmt.Sprintf("MachineConfig Pool %s is Degraded", pool.Name),
+				Reason:             names.MachineConfigPoolDegraded,
+				Message:            fmt.Sprintf("MachineConfig Pool %s is degraded", pool.Name),
 				LastTransitionTime: nowTimestamp,
 			}
-			return false, false, nil
+			return
 		}
-
+	}
+	for _, pool := range pools.Items {
+		if mcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolUpdating) {
+			*condition = metav1.Condition{
+				Type:               condType,
+				Status:             metav1.ConditionFalse,
+				Reason:             names.MachineConfigPoolsUpdating,
+				Message:            fmt.Sprintf("MachineConfigPools %s is updating", pool.Name),
+				LastTransitionTime: nowTimestamp,
+			}
+			return
+		}
+	}
+	isStable = true
+	for _, pool := range pools.Items {
 		mcName := pool.Status.Configuration.Name
-		if err := r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: mcName}, mc); err != nil {
-			return false, false, err
+		if err = r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: mcName}, mc); err != nil {
+			return
 		}
 		if !isMatch(mc.Spec.Config.Raw, networkType) {
-			klog.Infof("machine config pool %s is not updated", pool.Name)
+			klog.Infof("The desired MachineConfig is not applied to %s pool", pool.Name)
 			*condition = metav1.Condition{
 				Type:               condType,
 				Status:             metav1.ConditionFalse,
@@ -915,10 +916,11 @@ func (r *ReconcileOperConfig) ensureMachineConfigPools(ctx context.Context, clus
 				Message:            "The desired MachineConfig is not applied to cluster",
 				LastTransitionTime: nowTimestamp,
 			}
-			return false, false, nil
+			return
 		}
 	}
 
+	isDesired = true
 	*condition = metav1.Condition{
 		Type:               condType,
 		Status:             metav1.ConditionTrue,
@@ -926,7 +928,7 @@ func (r *ReconcileOperConfig) ensureMachineConfigPools(ctx context.Context, clus
 		Message:            "The desired MachineConfig is applied to cluster",
 		LastTransitionTime: nowTimestamp,
 	}
-	return true, false, nil
+	return
 }
 
 func routebleMtuUnitMatch(rawConfig []byte, networkType string) bool {
