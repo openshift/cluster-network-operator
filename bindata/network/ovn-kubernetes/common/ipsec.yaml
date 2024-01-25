@@ -124,7 +124,7 @@ spec:
           # Updating the certificates does not need to be an atomic operation as
           # the will get read and loaded into NSS by the ovs-monitor-ipsec process
           # which has not started yet.
-          ovs-vsctl --retry -t 60 set Open_vSwitch . other_config:certificate=$cert_pem/g \
+          ovs-vsctl --retry -t 60 set Open_vSwitch . other_config:certificate=$cert_pem \
                                                      other_config:private_key=/etc/openvswitch/keys/ipsec-privkey.pem \
                                                      other_config:ca_cert=/etc/openvswitch/keys/ipsec-cacert.pem
         env:
