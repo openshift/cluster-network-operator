@@ -431,6 +431,7 @@ spec:
       - name: egress-router-binary-copy
         image: {{.EgressRouterImage}}
         command: ["/entrypoint/cnibincopy.sh"]
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /entrypoint
           name: cni-binary-copy
@@ -449,6 +450,7 @@ spec:
       - name: cni-plugins
         image: {{.CNIPluginsImage}}
         command: ["/bin/bash", "-c", "/entrypoint/cnibincopy.sh && cp -n /sysctls/allowlist.conf /host/etc/cni/tuning/"]
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /entrypoint
           name: cni-binary-copy
@@ -472,6 +474,7 @@ spec:
       - name: bond-cni-plugin
         image: {{.BondCNIPluginImage}}
         command: ["/entrypoint/cnibincopy.sh"]
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /entrypoint
           name: cni-binary-copy
@@ -490,6 +493,7 @@ spec:
       - name: routeoverride-cni
         image: {{.RouteOverrideImage}}
         command: ["/entrypoint/cnibincopy.sh"]
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /entrypoint
           name: cni-binary-copy
@@ -512,6 +516,7 @@ spec:
           requests:
             cpu: 10m
             memory: 10Mi
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /entrypoint
           name: cni-binary-copy
@@ -632,6 +637,7 @@ spec:
           requests:
             cpu: 10m
             memory: 10Mi
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /host/opt/cni/bin
           name: cnibin
@@ -663,6 +669,7 @@ spec:
             memory: 10Mi
         securityContext:
           privileged: true
+        terminationMessagePolicy: FallbackToLogsOnError
       terminationGracePeriodSeconds: 10
       volumes:
         - name: system-cni-dir
@@ -735,6 +742,7 @@ spec:
           requests:
             cpu: "50m"
             memory: "50Mi"
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
           - name: cni-net-dir
             mountPath: /host/etc/cni/net.d

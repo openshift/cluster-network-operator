@@ -113,6 +113,7 @@ spec:
                     client-certificate: /etc/ovn/ovnkube-node-certs/ovnkube-client-current.pem
                     client-key: /etc/ovn/ovnkube-node-certs/ovnkube-client-current.pem
               EOF
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - mountPath: /etc/ovn/
               name: etc-openvswitch
