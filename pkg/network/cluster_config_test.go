@@ -1,16 +1,21 @@
 package network
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
+	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/util"
 
 	. "github.com/onsi/gomega"
 )
@@ -51,12 +56,12 @@ func TestValidateClusterConfig(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 
 	cc := *ClusterConfig.DeepCopy()
-	err = ValidateClusterConfig(cc, client)
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	haveError := func(cfg configv1.NetworkSpec, substr string) {
 		t.Helper()
-		err = ValidateClusterConfig(cc, client)
+		err = ValidateClusterConfig(&configv1.Network{Spec: cfg}, client)
 		g.Expect(err).To(MatchError(ContainSubstring(substr)))
 	}
 
@@ -82,7 +87,7 @@ func TestValidateClusterConfig(t *testing.T) {
 
 	cc = *ClusterConfig.DeepCopy()
 	cc.ClusterNetwork[1].HostPrefix = 0
-	res := ValidateClusterConfig(cc, client)
+	res := ValidateClusterConfig(&configv1.Network{Spec: cc}, client)
 	// Since the NetworkType is None, and the hostprefix is unset we don't validate it
 	g.Expect(res).Should(BeNil())
 
@@ -99,6 +104,102 @@ func TestValidateClusterConfig(t *testing.T) {
 	cc = *ClusterConfig.DeepCopy()
 	cc.NetworkType = ""
 	haveError(cc, "spec.networkType is required")
+}
+
+func TestValidClusterConfigLiveMigration(t *testing.T) {
+	g := NewGomegaWithT(t)
+	tests := []struct {
+		name              string
+		managedCluster    bool
+		hypershiftCluster bool
+		annotation        bool
+		expectErr         bool
+	}{
+		{
+			"no error when standalone managed cluster and migration label applied",
+			true,
+			false,
+			true,
+			false,
+		},
+		{
+			"error when self managed cluster and migration label applied",
+			false,
+			false,
+			true,
+			true,
+		},
+		{
+
+			"no error when standalone managed cluster and migration label not applied",
+			true,
+			false,
+			false,
+			false,
+		},
+		{
+
+			"no error when self managed cluster and migration label not applied",
+			false,
+			false,
+			false,
+			false,
+		},
+		{
+
+			"error when HyperShift and migration label applied",
+			true,
+			true,
+			true,
+			true,
+		},
+	}
+
+	// restore env var flag post test if its set
+	hcpEnvVarEnabled := os.Getenv("HYPERSHIFT") != ""
+	defer func() {
+		if hcpEnvVarEnabled {
+			os.Setenv("HYPERSHIFT", "")
+		}
+	}()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cc := *ClusterConfig.DeepCopy()
+			net := &configv1.Network{Spec: cc}
+			infrastructure := &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{},
+				},
+			}
+			client := fake.NewFakeClient(infrastructure)
+			err := createProxy(client)
+			g.Expect(err).NotTo(HaveOccurred())
+			if tt.hypershiftCluster {
+				// HyperShift is detected if an env var is set
+				os.Setenv("HYPERSHIFT", "")
+			} else {
+				os.Unsetenv("HYPERSHIFT")
+			}
+			if tt.annotation {
+				net.Annotations = map[string]string{names.NetworkTypeMigrationAnnotation: ""}
+			}
+			if tt.managedCluster && !tt.hypershiftCluster {
+				err := client.Default().CRClient().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: util.STANDALONE_MANAGED_CLUSTER_NAMESPACE}})
+				if err != nil {
+					t.Errorf("failed to create test namespace %q: %v", util.STANDALONE_MANAGED_CLUSTER_NAMESPACE, err)
+				}
+			}
+			err = ValidateClusterConfig(net, client)
+			if tt.expectErr && err == nil {
+				t.Errorf("expected error but got nil")
+			}
+			if !tt.expectErr && err != nil {
+				t.Errorf("expected no err but got error: %v", err)
+			}
+		})
+	}
 }
 
 func TestValidateClusterConfigDualStack(t *testing.T) {
@@ -121,12 +222,12 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 
 	cc := *ClusterConfig.DeepCopy()
-	err = ValidateClusterConfig(cc, client)
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	haveError := func(cfg configv1.NetworkSpec, substr string) {
 		t.Helper()
-		err = ValidateClusterConfig(cc, client)
+		err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client)
 		g.Expect(err).To(MatchError(ContainSubstring(substr)))
 	}
 
@@ -166,7 +267,7 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 		CIDR:       "fd01::/48",
 		HostPrefix: 64,
 	})
-	err = ValidateClusterConfig(cc, client)
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// You can't use dual-stack if this is anything else but BareMetal or NonePlatformType

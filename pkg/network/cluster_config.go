@@ -7,6 +7,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 
@@ -20,14 +21,14 @@ import (
 var pluginsUsingHostPrefix = sets.NewString(string(operv1.NetworkTypeOpenShiftSDN), string(operv1.NetworkTypeOVNKubernetes))
 
 // ValidateClusterConfig ensures the cluster config is valid.
-func ValidateClusterConfig(clusterConfig configv1.NetworkSpec, client cnoclient.Client) error {
+func ValidateClusterConfig(clusterConfig *configv1.Network, client cnoclient.Client) error {
 	// Check all networks for overlaps
 	pool := iputil.IPPool{}
 
 	var ipv4Service, ipv6Service, ipv4Cluster, ipv6Cluster bool
 
 	// Validate ServiceNetwork values
-	for _, snet := range clusterConfig.ServiceNetwork {
+	for _, snet := range clusterConfig.Spec.ServiceNetwork {
 		_, cidr, err := net.ParseCIDR(snet)
 		if err != nil {
 			return errors.Wrapf(err, "could not parse spec.serviceNetwork %s", snet)
@@ -43,11 +44,11 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec, client cnoclient.
 	}
 
 	// Validate count / dual-stack-ness
-	if len(clusterConfig.ServiceNetwork) == 0 {
+	if len(clusterConfig.Spec.ServiceNetwork) == 0 {
 		return errors.Errorf("spec.serviceNetwork must have at least 1 entry")
-	} else if len(clusterConfig.ServiceNetwork) == 2 && !(ipv4Service && ipv6Service) {
+	} else if len(clusterConfig.Spec.ServiceNetwork) == 2 && !(ipv4Service && ipv6Service) {
 		return errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network")
-	} else if len(clusterConfig.ServiceNetwork) > 2 {
+	} else if len(clusterConfig.Spec.ServiceNetwork) > 2 {
 		return errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network")
 	}
 
@@ -56,7 +57,7 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec, client cnoclient.
 	// - it is a valid ip
 	// - has a reasonable cidr
 	// - they do not overlap and do not overlap with the service cidr
-	for _, cnet := range clusterConfig.ClusterNetwork {
+	for _, cnet := range clusterConfig.Spec.ClusterNetwork {
 		_, cidr, err := net.ParseCIDR(cnet.CIDR)
 		if err != nil {
 			return errors.Errorf("could not parse spec.clusterNetwork %s", cnet.CIDR)
@@ -67,7 +68,7 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec, client cnoclient.
 			ipv4Cluster = true
 		}
 		// ignore hostPrefix if the plugin does not use it and has it unset
-		if pluginsUsingHostPrefix.Has(clusterConfig.NetworkType) || (cnet.HostPrefix != 0) {
+		if pluginsUsingHostPrefix.Has(clusterConfig.Spec.NetworkType) || (cnet.HostPrefix != 0) {
 			ones, bits := cidr.Mask.Size()
 			// The comparison is inverted; smaller number is larger block
 			if cnet.HostPrefix < uint32(ones) {
@@ -84,14 +85,14 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec, client cnoclient.
 		}
 	}
 
-	if len(clusterConfig.ClusterNetwork) < 1 {
+	if len(clusterConfig.Spec.ClusterNetwork) < 1 {
 		return errors.Errorf("spec.clusterNetwork must have at least 1 entry")
 	}
 	if ipv4Cluster != ipv4Service || ipv6Cluster != ipv6Service {
 		return errors.Errorf("spec.clusterNetwork and spec.serviceNetwork must either both be IPv4-only, both be IPv6-only, or both be dual-stack")
 	}
 
-	if clusterConfig.NetworkType == "" {
+	if clusterConfig.Spec.NetworkType == "" {
 		return errors.Errorf("spec.networkType is required")
 	}
 
@@ -107,6 +108,16 @@ func ValidateClusterConfig(clusterConfig configv1.NetworkSpec, client cnoclient.
 		if !isSupportedDualStackPlatform(infraRes.PlatformType) {
 			return errors.Errorf("%s is not one of the supported platforms for dual stack (%s)", infraRes.PlatformType,
 				strings.Join(dualStackPlatforms.List(), ", "))
+		}
+	}
+
+	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok {
+		// HostedControlPlane is not nil if in a HyperShift env
+		if infraRes.HostedControlPlane != nil {
+			return errors.Errorf("network type live migration is not supported on HyperShift clusters")
+		}
+		if !infraRes.StandaloneManagedCluster {
+			return errors.Errorf("network type live migration is not supported on self managed clusters")
 		}
 	}
 
