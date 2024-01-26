@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
+	"github.com/openshift/cluster-network-operator/pkg/util"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/library-go/pkg/operator/events"
 
@@ -255,6 +256,18 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if operConfig.Spec.ManagementState == operv1.Unmanaged {
 		log.Printf("Operator configuration state is %s - skipping operconfig reconciliation", operConfig.Spec.ManagementState)
 		return reconcile.Result{}, nil
+	}
+
+	// Only allows live migration on SD managed clusters
+	inManagedCluster, err := util.IsRunningInManagedCluster(ctx, r.client)
+	if err != nil {
+		log.Println(err)
+		return reconcile.Result{}, err
+	}
+	if !inManagedCluster && operConfig.Spec.Migration != nil && operConfig.Spec.Migration.Mode == operv1.LiveNetworkMigrationMode {
+		r.status.SetDegraded(statusmanager.OperatorConfig, "MergeClusterConfig",
+			"invalid configuration: network type live migration is not supported on self-managed clusters. Use 'oc edit network.operator.openshift.io cluster' to fix.")
+		return reconcile.Result{}, err
 	}
 
 	// Merge in the cluster configuration, in case the administrator has updated some "downstream" fields

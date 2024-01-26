@@ -13,6 +13,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
+	"github.com/openshift/cluster-network-operator/pkg/util"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,6 +109,18 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	network.MergeClusterConfig(&operConfig.Spec, clusterConfig.Spec)
 
 	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok {
+		// Only allows live migration on SD managed clusters
+		inManagedCluster, err := util.IsRunningInManagedCluster(ctx, r.client)
+		if err != nil {
+			log.Println(err)
+			return reconcile.Result{}, err
+		}
+		if !inManagedCluster {
+			err := fmt.Errorf("Network type live migration is not supported on self-managed clusters")
+			r.status.SetDegraded(statusmanager.ClusterConfig, "NetworkTypeMigrationFailed",
+				fmt.Sprintf("Failed to process network type live migration (%v).Use 'oc edit network.config.openshift.io cluster' to fix.", err))
+			return reconcile.Result{}, err
+		}
 		if hcp := hypershift.NewHyperShiftConfig(); hcp.Enabled {
 			err := fmt.Errorf("network type live migration is not supported on HyperShift clusters")
 			r.status.SetDegraded(statusmanager.ClusterConfig, "NetworkTypeMigrationFailed",

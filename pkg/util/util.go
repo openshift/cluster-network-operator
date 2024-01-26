@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -23,6 +24,7 @@ const SDN_NAMESPACE = "openshift-sdn"
 const MTU_CM_NAMESPACE = "openshift-network-operator"
 const MTU_CM_NAME = "mtu"
 const OVN_NBDB = "nbdb"
+const MANAGED_CLUSTER_NAMESPACE = "dedicated-admin"
 
 func GetInterConnectConfigMap(kubeClient kubernetes.Interface) (*corev1.ConfigMap, error) {
 	return kubeClient.CoreV1().ConfigMaps(OVN_NAMESPACE).Get(context.TODO(), OVN_INTERCONNECT_CONFIGMAP_NAME, metav1.GetOptions{})
@@ -42,4 +44,17 @@ func ReadMTUConfigMap(ctx context.Context, client cnoclient.Client) (int, error)
 
 	klog.V(2).Infof("Found mtu %d", mtu)
 	return mtu, nil
+}
+
+// IsRunningInManagedCluster returns true if the operator is running in a managed cluster.
+// It checks for the existence of the dedicated-admin namespace
+func IsRunningInManagedCluster(ctx context.Context, client cnoclient.Client) (bool, error) {
+	err := client.Default().CRClient().Get(ctx, types.NamespacedName{Name: MANAGED_CLUSTER_NAMESPACE}, &corev1.Namespace{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
