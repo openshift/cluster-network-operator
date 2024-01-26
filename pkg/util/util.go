@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -26,6 +27,8 @@ const OVN_IPSEC_CONTAINERIZED = "ovn-ipsec-containerized" // 4.14 ipsec daemonse
 const SDN_NAMESPACE = "openshift-sdn"
 const MTU_CM_NAMESPACE = "openshift-network-operator"
 const MTU_CM_NAME = "mtu"
+const OVN_NBDB = "nbdb"
+const STANDALONE_MANAGED_CLUSTER_NAMESPACE = "dedicated-admin" // namespace required for standalone managed clusters (excluding hypershift)
 
 func GetInterConnectConfigMap(kubeClient kubernetes.Interface) (*corev1.ConfigMap, error) {
 	return kubeClient.CoreV1().ConfigMaps(OVN_NAMESPACE).Get(context.TODO(), OVN_INTERCONNECT_CONFIGMAP_NAME, metav1.GetOptions{})
@@ -45,4 +48,19 @@ func ReadMTUConfigMap(ctx context.Context, client cnoclient.Client) (int, error)
 
 	klog.V(2).Infof("Found mtu %d", mtu)
 	return mtu, nil
+}
+
+// IsStandaloneManagedCluster returns true if the operator is running in a managed cluster that isn't managed by HyperShift.
+// It checks for the existence of the dedicated-admin namespace.
+func IsStandaloneManagedCluster(ctx context.Context, client cnoclient.Client) (bool, error) {
+	// TODO(martinkennelly): replace detection of a standalone managed cluster with a metric instead of a namespace when that metric
+	// becomes available.
+	err := client.Default().CRClient().Get(ctx, types.NamespacedName{Name: STANDALONE_MANAGED_CLUSTER_NAMESPACE}, &corev1.Namespace{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }

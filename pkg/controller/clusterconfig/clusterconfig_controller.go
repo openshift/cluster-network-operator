@@ -12,7 +12,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -91,8 +90,8 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	}
 
 	// Validate the cluster config
-	if err := network.ValidateClusterConfig(clusterConfig.Spec, r.client); err != nil {
-		log.Printf("Failed to validate Network.Spec: %v", err)
+	if err := network.ValidateClusterConfig(clusterConfig, r.client); err != nil {
+		log.Printf("Failed to validate Network CR: %v", err)
 		r.status.SetDegraded(statusmanager.ClusterConfig, "InvalidClusterConfig",
 			fmt.Sprintf("The cluster configuration is invalid (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))
 		return reconcile.Result{}, err
