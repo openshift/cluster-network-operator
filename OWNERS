@@ -5,6 +5,7 @@ reviewers:
   - dougbtv
   - JacobTanenbaum
   - jcaamano
+  - kyrtapz
   - trozet
   - tssurya
 approvers:
@@ -16,6 +17,7 @@ approvers:
   - JacobTanenbaum
   - jcaamano
   - knobunc
+  - kyrtapz
   - trozet
 
 component: Networking
