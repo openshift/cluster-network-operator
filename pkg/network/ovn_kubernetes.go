@@ -39,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -537,7 +538,7 @@ func getIPsecMode(conf *operv1.OVNKubernetesConfig) operv1.IPsecMode {
 
 // shouldRenderIPsec method ensures the have following IPsec states for upgrade path from 4.14 to 4.15 or later versions:
 // When 4.14 cluster is already installed with MachineConfig for IPsec extension and ipsecConfig is set in network operator
-// config (i.e. IPsec for NS+EW), then reuse the installed MC extension and render ipsec-host daemonset.
+// config (i.e. IPsec for NS+EW), then render CNO's IPsec MC extension and ipsec-host daemonset.
 // When 4.14 cluster is just running with ipsecConfig set in network operator config (i.e. IPsec for EW only), then activate
 // IPsec MachineConfig and render ipsec-host daemonset.
 // When 4.14 cluster is just installed with MachineConfig for IPsec extension (i.e. IPsec for NS only), then just keep MachineConfig
@@ -561,11 +562,10 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// On upgrade, we will just remove any existing ipsec deployment without making any
 	// change to them. So during upgrade, we must keep track if IPsec MachineConfigs are
 	// active or not for non Hybrid hosted cluster.
-	isUserIPsecMachineConfigPresent := isUserIPsecMachineConfigPresent(bootstrapResult.Infra)
-	isIpsecMachineConfigActive := isIPsecMachineConfigActive(bootstrapResult.Infra)
-	isIPsecMachineConfigNotActiveOnUpgrade := isIpsecUpgrade && !isIpsecMachineConfigActive && !isHypershiftHostedCluster
+	isIPsecMachineConfigActive := isIPsecMachineConfigActive(bootstrapResult.Infra)
+	isIPsecMachineConfigNotActiveOnUpgrade := isIpsecUpgrade && !isIPsecMachineConfigActive && !isHypershiftHostedCluster
 	isMachineConfigClusterOperatorReady := bootstrapResult.Infra.MachineConfigClusterOperatorReady
-	isCNOIPsecMachineConfigPresent := isIPsecMachineConfigPresent(bootstrapResult.Infra) && !isUserIPsecMachineConfigPresent
+	isCNOIPsecMachineConfigPresent := isCNOIPsecMachineConfigPresent(bootstrapResult.Infra)
 
 	// We render the ipsec deployment if IPsec is already active in OVN
 	// or if EW IPsec config is enabled.
@@ -576,7 +576,7 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// extensions to be active first. We must also render host ipsec deployment
 	// at the time of upgrade though user created IPsec Machine Config is not
 	// present/active.
-	renderIPsecHostDaemonSet = (renderIPsecDaemonSet && isIpsecMachineConfigActive && !isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnUpgrade
+	renderIPsecHostDaemonSet = (renderIPsecDaemonSet && isIPsecMachineConfigActive && !isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnUpgrade
 
 	// The containerized ipsec deployment is only rendered during upgrades or
 	// for hypershift hosted clusters.
@@ -584,11 +584,7 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 
 	// MachineConfig IPsec extensions rollout is needed for the ipsec enablement and are used in both External and Full modes.
 	// except  when the containerized deployment is used in hypershift hosted clusters.
-	// We will rollout unless the user has rolled out its own.
-	renderCNOIPsecMachineConfig = (mode != operv1.IPsecModeDisabled ||
-		renderIPsecDaemonSet) &&
-		!isUserIPsecMachineConfigPresent &&
-		!isHypershiftHostedCluster
+	renderCNOIPsecMachineConfig = (mode != operv1.IPsecModeDisabled || renderIPsecDaemonSet) && !isHypershiftHostedCluster
 	// Wait for MCO to be ready unless we had already rendered the IPsec MachineConfig
 	renderCNOIPsecMachineConfig = renderCNOIPsecMachineConfig && (isCNOIPsecMachineConfigPresent || isMachineConfigClusterOperatorReady)
 
@@ -1455,11 +1451,19 @@ func shouldUpdateOVNKonPrepull(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 	return true, false
 }
 
-// isUserIPsecMachineConfigPresent returns true if user owned MachineConfigs for IPsec plugin
-// are already present either in master or worker nodes, otherwise returns false.
-func isUserIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
-	return (infra.MasterIPsecMachineConfig != nil && !containsNetworkOwnerRef(infra.MasterIPsecMachineConfig.OwnerReferences)) ||
-		(infra.WorkerIPsecMachineConfig != nil && !containsNetworkOwnerRef(infra.WorkerIPsecMachineConfig.OwnerReferences))
+// isCNOIPsecMachineConfigPresent returns true if CNO owned MachineConfigs for IPsec plugin
+// are already present in both master and worker nodes, otherwise returns false.
+func isCNOIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
+	isCNOIPsecMachineConfigPresentIn := func(mcs []*mcfgv1.MachineConfig) bool {
+		for _, mc := range mcs {
+			if containsNetworkOwnerRef(mc.OwnerReferences) {
+				return true
+			}
+		}
+		return false
+	}
+	return isCNOIPsecMachineConfigPresentIn(infra.MasterIPsecMachineConfigs) &&
+		isCNOIPsecMachineConfigPresentIn(infra.WorkerIPsecMachineConfigs)
 }
 
 func containsNetworkOwnerRef(ownerRefs []metav1.OwnerReference) bool {
@@ -1475,26 +1479,26 @@ func containsNetworkOwnerRef(ownerRefs []metav1.OwnerReference) bool {
 // isIPsecMachineConfigActive returns true if both master and worker's machine config pool are ready with
 // ipsec machine config extension rolled out, otherwise returns false.
 func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
-	if infra.MasterIPsecMachineConfig == nil || infra.WorkerIPsecMachineConfig == nil {
+	if infra.MasterIPsecMachineConfigs == nil || infra.WorkerIPsecMachineConfigs == nil {
 		// One of the IPsec MachineConfig is not created yet, so return false.
 		return false
 	}
-	ipSecPluginOnMasterNodes := hasSourceInMachineConfigStatus(infra.MasterMCPStatus, infra.MasterIPsecMachineConfig.Name)
-	ipSecPluginOnWorkerNodes := hasSourceInMachineConfigStatus(infra.WorkerMCPStatus, infra.WorkerIPsecMachineConfig.Name)
+	ipSecPluginOnMasterNodes := hasSourceInMachineConfigStatus(infra.MasterMCPStatus, infra.MasterIPsecMachineConfigs)
+	ipSecPluginOnWorkerNodes := hasSourceInMachineConfigStatus(infra.WorkerMCPStatus, infra.WorkerIPsecMachineConfigs)
 	return ipSecPluginOnMasterNodes && ipSecPluginOnWorkerNodes
 }
 
-func hasSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPoolStatus, sourceName string) bool {
+func hasSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
+	sourceNames := sets.New[string]()
+	for _, machineConfig := range machineConfigs {
+		sourceNames.Insert(machineConfig.Name)
+	}
 	for _, source := range machineConfigStatus.Configuration.Source {
-		if source.Name == sourceName {
+		if sourceNames.Has(source.Name) {
 			return true
 		}
 	}
 	return false
-}
-
-func isIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
-	return infra.MasterIPsecMachineConfig != nil && infra.WorkerIPsecMachineConfig != nil
 }
 
 // shouldUpdateOVNKonUpgrade determines if we should roll out changes to
