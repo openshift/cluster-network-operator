@@ -42,7 +42,7 @@ spec:
           Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
           implemented while there are no OVN Kubernetes pods.
       expr: |
-        absent(up{job="ovnkube-control-plane", namespace="openshift-ovn-kubernetes"} == 1)
+        absent(up{job="ovnkube-control-plane", namespace="{{.HostedClusterNamespace}}"} == 1)
       for: 5m
       labels:
         namespace: {{.HostedClusterNamespace}}
