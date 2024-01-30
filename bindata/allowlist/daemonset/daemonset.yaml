@@ -15,6 +15,7 @@ spec:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
     spec:
+      hostNetwork: true
       containers:
         - name: kube-multus-additional-cni-plugins
           image:  {{.MultusImage}}
