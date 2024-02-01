@@ -59,8 +59,6 @@ rules:
 - apiGroups: ["k8s.ovn.org"]
   resources:
   - egressips
-  - egressservices
-  - egressservices/status
   - adminpolicybasedexternalroutes
   - adminpolicybasedexternalroutes/status
   - egressfirewalls
@@ -71,6 +69,18 @@ rules:
   - patch
   - update
   - watch
+- apiGroups: ["k8s.ovn.org"]
+  resources:
+    - egressservices
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups: ["k8s.ovn.org"]
+  resources:
+    - egressservices/status
+  verbs:
+    - update
 - apiGroups: ["cloud.network.openshift.io"]
   resources:
   - cloudprivateipconfigs
