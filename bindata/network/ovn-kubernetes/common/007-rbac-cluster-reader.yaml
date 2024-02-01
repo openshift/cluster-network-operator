@@ -17,6 +17,15 @@ rules:
   - get
   - list
   - watch
+{{- if .DNS_NAME_RESOLVER_ENABLE }}
+- apiGroups: ["network.openshift.io"]
+  resources:
+  - dnsnameresolvers
+  verbs:
+  - get
+  - list
+  - watch
+{{- end }}
 - apiGroups: ["policy.networking.k8s.io"]
   resources:
   - adminnetworkpolicies
