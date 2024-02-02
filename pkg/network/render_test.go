@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"k8s.io/client-go/kubernetes/scheme"
 
@@ -108,6 +109,22 @@ func TestDisallowNonTargetTypeForMigration(t *testing.T) {
 	next.DefaultNetwork.Type = "Raw"
 	err := IsChangeSafe(prev, next, infra)
 	g.Expect(err).To(MatchError(ContainSubstring("can only change default network type to the target migration network type")))
+}
+
+func TestDisallowLiveMigrationHyperShiftCluster(t *testing.T) {
+	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
+	// fake that we are in HyperShift hosted cluster
+	infra.HostedControlPlane = &hypershift.HostedControlPlane{}
+	next.Migration = &operv1.NetworkMigration{Mode: operv1.LiveNetworkMigrationMode}
+	err := IsChangeSafe(prev, next, infra)
+	g.Expect(err).To(MatchError(ContainSubstring("live migration is unsupported in a HyperShift environment")))
+}
+
+func TestDisallowLiveMigrationSelfManagedCluster(t *testing.T) {
+	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
+	next.Migration = &operv1.NetworkMigration{Mode: operv1.LiveNetworkMigrationMode}
+	err := IsChangeSafe(prev, next, infra)
+	g.Expect(err).To(MatchError(ContainSubstring("live migration is unsupported on a self managed cluster")))
 }
 
 func TestDisallowMigrationTypeChangeWhenNotNull(t *testing.T) {
