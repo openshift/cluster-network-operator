@@ -101,6 +101,7 @@ spec:
               kubectl --kubeconfig $kc config set contexts.default.user admin
               kubectl --kubeconfig $kc config set contexts.default.namespace openshift-multus
               kubectl --kubeconfig $kc config use-context default
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - mountPath: /var/run/secrets/hosted_cluster
               name: hosted-cluster-api-access
@@ -128,6 +129,7 @@ spec:
           requests:
             cpu: 10m
             memory: 30Mi
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
           - mountPath: /etc/kubernetes
             name: admin-kubeconfig
@@ -165,6 +167,7 @@ spec:
 {{- end }}
             -alsologtostderr=true \
             -ignore-namespaces=openshift-etcd,openshift-console,openshift-ingress-canary,{{.IgnoredNamespace}}
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - name: webhook-certs
           mountPath: /etc/webhook

@@ -25,6 +25,7 @@ spec:
             exec:
               command: ["/bin/bash", "-c", "test -f /ready/ready"]
             initialDelaySeconds: 1
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - mountPath: /entrypoint
               name: cni-sysctl-allowlist
