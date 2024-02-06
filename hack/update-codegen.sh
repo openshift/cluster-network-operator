@@ -72,5 +72,5 @@ oc annotate --local -o yaml --overwrite \
   "${SINGLE_NODE_DEV_PROFILE}" \
   -f vendor/github.com/openshift/api/networkoperator/v1/001-egressrouter.crd.yaml >> manifests/0000_70_cluster-network-operator_01_egr_crd.yaml
 
-echo "${HEADER}" > bindata/cloud-network-config-controller/001-crd.yaml
-cat vendor/github.com/openshift/api/cloudnetwork/v1/001-cloudprivateipconfig.crd.yaml >> bindata/cloud-network-config-controller/001-crd.yaml
+echo "${HEADER}" > bindata/cloud-network-config-controller/common/001-crd.yaml
+cat vendor/github.com/openshift/api/cloudnetwork/v1/001-cloudprivateipconfig.crd.yaml >> bindata/cloud-network-config-controller/common/001-crd.yaml
