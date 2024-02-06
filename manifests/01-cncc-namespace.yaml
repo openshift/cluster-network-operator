@@ -7,6 +7,9 @@ metadata:
   name: openshift-cloud-network-config-controller
   labels:
     openshift.io/cluster-monitoring: "true"
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
   annotations:
     include.release.openshift.io/self-managed-high-availability: "true"
     include.release.openshift.io/ibm-cloud-managed: "true"

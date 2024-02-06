@@ -4,6 +4,9 @@ metadata:
   name: openshift-network-diagnostics
   labels:
     openshift.io/cluster-monitoring: "true"
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
   annotations:
     openshift.io/node-selector: "" #override default node selector
     workload.openshift.io/allowed: "management"
