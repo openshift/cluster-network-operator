@@ -310,10 +310,6 @@ data:
       if ! retry 60 "inactivity-probe" "ovn-nbctl -t 5 --inactivity-probe={{.OVN_NB_INACTIVITY_PROBE}} set-connection punix:${nbdb_sock}"; then
         exit 1
       fi
-      # set trim-on-compaction
-      if ! retry 60 "trim-on-compaction" "ovn-appctl -t ${nbdb_ctl} --timeout=5 ovsdb-server/memory-trim-on-compaction on"; then
-        exit 1
-      fi
 
       # set IC zone
       echo "Setting the IC zone to ${K8S_NODE}"
@@ -417,10 +413,6 @@ data:
 
       # set inactivity probe
       if ! retry 60 "inactivity-probe" "ovn-sbctl -t 5 --inactivity-probe={{.OVN_CONTROLLER_INACTIVITY_PROBE}} set-connection punix:${sbdb_sock}"; then
-        exit 1
-      fi
-      # set trim-on-compaction
-      if ! retry 60 "trim-on-compaction" "ovn-appctl -t ${sbdb_ctl} --timeout=5 ovsdb-server/memory-trim-on-compaction on"; then
         exit 1
       fi
     }
