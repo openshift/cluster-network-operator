@@ -24,16 +24,27 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+  # the name change is required to ensure that both bindings exist during upgrade to avoid disruptions
+  name: openshift-ovn-kubernetes-nodes-identity-limited
+{{ else }}
   name: openshift-ovn-kubernetes-node
+{{ end }}
   namespace: openshift-ovn-kubernetes
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: openshift-ovn-kubernetes-node
 subjects:
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+- kind: Group
+  name: system:ovn-nodes
+  apiGroup: rbac.authorization.k8s.io
+{{ else }}
 - kind: ServiceAccount
   name: ovn-kubernetes-node
   namespace: openshift-ovn-kubernetes
+{{ end }}
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -115,12 +126,6 @@ rules:
     - get
     - list
     - watch
-- apiGroups: ['authentication.k8s.io']
-  resources: ['tokenreviews']
-  verbs: ['create']
-- apiGroups: ['authorization.k8s.io']
-  resources: ['subjectaccessreviews']
-  verbs: ['create']
 - apiGroups: [certificates.k8s.io]
   resources: ['certificatesigningrequests']
   verbs:
@@ -132,11 +137,51 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+  # the name change is required to ensure that both bindings exist during upgrade to avoid disruptions
+  name: openshift-ovn-kubernetes-node-identity-limited
+{{ else }}
   name: openshift-ovn-kubernetes-node
+{{ end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: openshift-ovn-kubernetes-node
+subjects:
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+- kind: Group
+  name: system:ovn-nodes
+  apiGroup: rbac.authorization.k8s.io
+{{ else }}
+- kind: ServiceAccount
+  name: ovn-kubernetes-node
+  namespace: openshift-ovn-kubernetes
+{{ end }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openshift-ovn-kubernetes-kube-rbac-proxy
+rules:
+  - apiGroups: ['authentication.k8s.io']
+    resources: ['tokenreviews']
+    verbs: ['create']
+  - apiGroups: ['authorization.k8s.io']
+    resources: ['subjectaccessreviews']
+    verbs: ['create']
+
+---
+# openshift-ovn-kubernetes-kube-rbac-proxy cluster role is bound to ovn-kubernetes-node service account even if NETWORK_NODE_IDENTITY_ENABLE is true.
+# The kube-rbac-proxy-node container continues to use the service account instead of the per-node certificates.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openshift-ovn-kubernetes-node-kube-rbac-proxy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openshift-ovn-kubernetes-kube-rbac-proxy
 subjects:
 - kind: ServiceAccount
   name: ovn-kubernetes-node
