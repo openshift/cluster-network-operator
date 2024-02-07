@@ -240,6 +240,9 @@ spec:
           # Workaround for https://github.com/libreswan/libreswan/issues/373
           ulimit -n 1024
 
+          # Create nss db directory which gets used by ipsec script.
+          mkdir -p /var/lib/ipsec/nss
+
           /usr/libexec/ipsec/addconn --config /etc/ipsec.conf --checkconfig
           # Check kernel modules
           /usr/libexec/ipsec/_stackmanager start
