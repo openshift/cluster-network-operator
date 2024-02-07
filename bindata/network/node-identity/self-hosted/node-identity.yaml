@@ -1,0 +1,134 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: network-node-identity
+  namespace: openshift-network-node-identity
+  annotations:
+    kubernetes.io/description: |
+      This daemonset launches the network-node-identity networking components.
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+    matchLabels:
+      app: network-node-identity
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 0
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: network-node-identity
+        component: network
+        type: infra
+        openshift.io/component: network
+        kubernetes.io/os: "linux"
+    spec:
+      serviceAccountName: network-node-identity
+      hostNetwork: true
+      dnsPolicy: Default
+      priorityClassName: "system-node-critical"
+      containers:
+      - name: webhook
+        image: "{{.NetworkNodeIdentityImage}}"
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -xe
+            if [[ -f "/env/_master" ]]; then
+              set -o allexport
+              source "/env/_master"
+              set +o allexport
+            fi
+
+            ho_enable=
+{{- if .OVNHybridOverlayEnable }}
+            ho_enable="--enable-hybrid-overlay"
+{{ end }}
+            echo "I$(date "+%m%d %H:%M:%S.%N") - network-node-identity - start webhook"
+            # extra-allowed-user: service account `ovn-kubernetes-control-plane`
+            # sets pod annotations in multi-homing layer3 network controller (cluster-manager)
+            exec /usr/bin/ovnkube-identity  --k8s-apiserver={{.K8S_APISERVER}} \
+                --webhook-cert-dir="/etc/webhook-cert" \
+                --webhook-host={{.NetworkNodeIdentityAddress}} \
+                --webhook-port={{.NetworkNodeIdentityPort}} \
+                ${ho_enable} \
+                --disable-approver \
+                --extra-allowed-user="system:serviceaccount:openshift-ovn-kubernetes:ovn-kubernetes-control-plane" \
+                --wait-for-kubernetes-api={{.NetworkNodeIdentityTerminationDurationSeconds}}s \
+                --loglevel="${LOGLEVEL}"
+        env:
+          - name: LOGLEVEL
+            value: "2"
+          - name: KUBERNETES_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+          - mountPath: /etc/webhook-cert/
+            name: webhook-cert
+          - mountPath: /var/log/kube-apiserver
+            name: audit-dir
+          - mountPath: /env
+            name: env-overrides
+      - name: approver
+        image: "{{.NetworkNodeIdentityImage}}"
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -xe
+            if [[ -f "/env/_master" ]]; then
+              set -o allexport
+              source "/env/_master"
+              set +o allexport
+            fi
+
+            echo "I$(date "+%m%d %H:%M:%S.%N") - network-node-identity - start approver"
+            exec /usr/bin/ovnkube-identity  --k8s-apiserver={{.K8S_APISERVER}} \
+                --disable-webhook \
+                --loglevel="${LOGLEVEL}"
+        env:
+          - name: LOGLEVEL
+            value: "4"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+          - mountPath: /env
+            name: env-overrides
+      terminationGracePeriodSeconds: {{.NetworkNodeIdentityTerminationDurationSeconds}}
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+        beta.kubernetes.io/os: "linux"
+      volumes:
+        - name: webhook-cert
+          secret:
+            secretName: network-node-identity-cert
+        - name: env-overrides
+          configMap:
+            name: env-overrides
+            optional: true
+        - hostPath:
+            path: /var/log/kube-apiserver
+          name: audit-dir
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+      - key: "node.kubernetes.io/network-unavailable"
+        operator: "Exists"
