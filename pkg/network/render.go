@@ -735,10 +735,15 @@ func renderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 	return out, nil
 }
 
-func getMultusAdmissionControllerReplicas(bootstrapResult *bootstrap.BootstrapResult) int {
+func getMultusAdmissionControllerReplicas(bootstrapResult *bootstrap.BootstrapResult, hyperShiftEnabled bool) int {
 	replicas := 2
 	if bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode {
-		if bootstrapResult.Infra.HostedControlPlane.ControllerAvailabilityPolicy == hypershift.SingleReplica {
+		// In HyperShift check HostedControlPlane.ControllerAvailabilityPolicy, otherwise rely on Infra.InfrastructureTopology
+		if hyperShiftEnabled {
+			if bootstrapResult.Infra.HostedControlPlane.ControllerAvailabilityPolicy == hypershift.SingleReplica {
+				replicas = 1
+			}
+		} else if bootstrapResult.Infra.InfrastructureTopology == configv1.SingleReplicaTopologyMode {
 			replicas = 1
 		}
 	} else if bootstrapResult.Infra.ControlPlaneTopology == configv1.SingleReplicaTopologyMode {
