@@ -139,6 +139,7 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 			if doesManagerOpExist(us.GetManagedFields(), depreciatedFieldManager, metav1.ManagedFieldsOperationUpdate,
 				metav1.ManagedFieldsOperationApply) {
 
+				klog.Infof("Found deprecated field manager in %+v", us.GetManagedFields())
 				us.SetGroupVersionKind(obj.GetObjectKind().GroupVersionKind())
 				if err = mergeManager(ctx, clusterClient, us, depreciatedFieldManager, fieldManager, rm.Resource); err != nil {
 					klog.Errorf("Failed to merge field managers %q for object %q %s %s: %v", depreciatedFieldManager,
