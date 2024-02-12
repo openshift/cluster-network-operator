@@ -136,8 +136,6 @@ rules:
   - privileged
 - apiGroups: ["k8s.ovn.org"]
   resources:
-  - egressfirewalls
-  - egressfirewalls/status
   - egressqoses
   verbs:
   - get
@@ -148,6 +146,7 @@ rules:
 - apiGroups: ["k8s.ovn.org"]
   resources:
     - adminpolicybasedexternalroutes
+    - egressfirewalls
     - egressips
     - egressservices
   verbs:
@@ -157,6 +156,7 @@ rules:
 - apiGroups: ["k8s.ovn.org"]
   resources:
   - adminpolicybasedexternalroutes/status
+  - egressfirewalls/status
   verbs:
   - patch
 {{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}

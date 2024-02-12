@@ -59,8 +59,6 @@ rules:
 - apiGroups: ["k8s.ovn.org"]
   resources:
   - egressips
-  - egressfirewalls
-  - egressfirewalls/status
   verbs:
   - get
   - list
@@ -70,6 +68,7 @@ rules:
 - apiGroups: ["k8s.ovn.org"]
   resources:
     - adminpolicybasedexternalroutes
+    - egressfirewalls
     - egressservices
   verbs:
     - get
@@ -78,6 +77,7 @@ rules:
 - apiGroups: ["k8s.ovn.org"]
   resources:
   - adminpolicybasedexternalroutes/status
+  - egressfirewalls/status
   verbs:
   - patch
 - apiGroups: ["k8s.ovn.org"]
