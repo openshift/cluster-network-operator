@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
+	ipsecTelemetry "github.com/openshift/cluster-network-operator/pkg/util/ipsec"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/library-go/pkg/operator/events"
 
@@ -348,6 +349,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
+	UpdateIpsecTelemetry(&newOperConfig.Spec)
 	// once updated, use the new config
 	operConfig = newOperConfig
 
@@ -548,6 +550,23 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// so we can reconcile state again.
 	log.Printf("Operconfig Controller complete")
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
+}
+
+func UpdateIpsecTelemetry(newOperConfigSpec *operv1.NetworkSpec) {
+	klog.V(5).Infof("IPsec: >> UpdateIpsecTelemetry new: %v", newOperConfigSpec)
+
+	if newOperConfigSpec == nil || newOperConfigSpec.DefaultNetwork.OVNKubernetesConfig == nil {
+		klog.V(5).Infof("IPsec: << UpdateIpsecTelemetry, new spec is nil, skipping")
+		return
+	}
+
+	newIPsecConfig := newOperConfigSpec.DefaultNetwork.OVNKubernetesConfig.IPsecConfig
+
+	klog.V(5).Infof("IPsec: calling UpdateIpsecTelemetry, %v", newIPsecConfig)
+	ipsecTelemetry.UpdateIpsecTelemetry(newIPsecConfig)
+
+	klog.V(5).Infof("IPsec: << UpdateIpsecTelemetry")
+	// Don't record telemetry when the IPsecConfig hasn't changed
 }
 
 func reconcileOperConfig(ctx context.Context, obj crclient.Object) []reconcile.Request {
