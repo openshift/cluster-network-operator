@@ -136,18 +136,10 @@ rules:
   - privileged
 - apiGroups: ["k8s.ovn.org"]
   resources:
-  - egressqoses
-  verbs:
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups: ["k8s.ovn.org"]
-  resources:
     - adminpolicybasedexternalroutes
     - egressfirewalls
     - egressips
+    - egressqoses
     - egressservices
   verbs:
     - get
