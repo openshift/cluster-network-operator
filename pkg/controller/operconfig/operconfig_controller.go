@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
+	ipsecMetrics "github.com/openshift/cluster-network-operator/pkg/util/ipsec"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/library-go/pkg/operator/events"
 
@@ -348,6 +349,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
+	updateIPsecMetric(&newOperConfig.Spec)
 	// once updated, use the new config
 	operConfig = newOperConfig
 
@@ -548,6 +550,23 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// so we can reconcile state again.
 	log.Printf("Operconfig Controller complete")
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
+}
+
+func updateIPsecMetric(newOperConfigSpec *operv1.NetworkSpec) {
+	if newOperConfigSpec == nil {
+		// spec is not initilized yet
+		klog.V(5).Infof("IPsec: << updateIPsecTelemetry, new spec is nil, skipping")
+	} else if newOperConfigSpec.DefaultNetwork.OVNKubernetesConfig == nil {
+		// non ovn-k network, ipsec is not supported
+		ipsecMetrics.UpdateIPsecMetricNA()
+	} else {
+		// ovn-k network, ipsec is supported, update the ipsec state metric
+		newOVNKubeConfig := newOperConfigSpec.DefaultNetwork.OVNKubernetesConfig
+		mode := string(network.GetIPsecMode(newOVNKubeConfig))
+		legacyAPI := network.IsIPsecLegacyAPI(newOVNKubeConfig)
+
+		ipsecMetrics.UpdateIPsecMetric(mode, legacyAPI)
+	}
 }
 
 func reconcileOperConfig(ctx context.Context, obj crclient.Object) []reconcile.Request {

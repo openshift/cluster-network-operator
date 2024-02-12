@@ -518,12 +518,12 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	return objs, progressing, nil
 }
 
-// getIPsecMode return the ipsec mode accounting for upgrade scenarios
+// GetIPsecMode return the ipsec mode accounting for upgrade scenarios
 // Find the IPsec mode from Ipsec.config
 // Ipsec.config == nil (bw compatibility) || ipsecConfig == Off ==> ipsec is disabled
 // ipsecConfig.mode == "" (bw compatibility) || ipsec.Config == Full ==> ipsec is enabled for NS and EW
 // ipsecConfig.mode == External ==> ipsec is enabled for NS only
-func getIPsecMode(conf *operv1.OVNKubernetesConfig) operv1.IPsecMode {
+func GetIPsecMode(conf *operv1.OVNKubernetesConfig) operv1.IPsecMode {
 	mode := operv1.IPsecModeDisabled // Should stay so if conf.IPsecConfig == nil
 	if conf.IPsecConfig != nil {
 		if conf.IPsecConfig.Mode != "" {
@@ -535,6 +535,11 @@ func getIPsecMode(conf *operv1.OVNKubernetesConfig) operv1.IPsecMode {
 
 	klog.V(5).Infof("IPsec: after looking at %+v, ipsec mode=%s", conf.IPsecConfig, mode)
 	return mode
+}
+
+// IsIPsecLegacyAPI returns true if the old (pre 4.15) IPsec API is used, and false otherwise.
+func IsIPsecLegacyAPI(conf *operv1.OVNKubernetesConfig) bool {
+	return conf.IPsecConfig == nil || conf.IPsecConfig.Mode == ""
 }
 
 // shouldRenderIPsec method ensures the have following IPsec states for upgrade path from 4.14 to 4.15 or later versions:
@@ -558,7 +563,7 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	isIpsecUpgrade := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.LegacyIPsecUpgrade
 	isOVNIPsecActive := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.OVNIPsecActive
 
-	mode := getIPsecMode(conf)
+	mode := GetIPsecMode(conf)
 
 	// On upgrade, we will just remove any existing ipsec deployment without making any
 	// change to them. So during upgrade, we must keep track if IPsec MachineConfigs are
@@ -975,7 +980,7 @@ func getOVNEncapOverhead(conf *operv1.NetworkSpec) uint32 {
 	const geneveOverhead = 100
 	const ipsecOverhead = 46 // Transport mode, AES-GCM
 	var encapOverhead uint32 = geneveOverhead
-	mode := getIPsecMode(conf.DefaultNetwork.OVNKubernetesConfig)
+	mode := GetIPsecMode(conf.DefaultNetwork.OVNKubernetesConfig)
 	if mode == operv1.IPsecModeFull {
 		encapOverhead += ipsecOverhead
 	}
