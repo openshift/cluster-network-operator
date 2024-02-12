@@ -19,6 +19,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/eventrecorder"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/crypto"
@@ -194,6 +195,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 		certrotation.RotatedSigningCASecret{
 			Namespace:     config.Namespace,
 			Name:          config.Name + "-ca",
+			JiraComponent: names.ClusterNetworkOperatorJiraComponent,
 			Validity:      10 * OneYear,
 			Refresh:       9 * OneYear,
 			Informer:      inf.Core().V1().Secrets(),
@@ -204,16 +206,18 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 		certrotation.CABundleConfigMap{
 			Namespace:     config.Namespace,
 			Name:          config.Name + "-ca",
+			JiraComponent: names.ClusterNetworkOperatorJiraComponent,
 			Lister:        inf.Core().V1().ConfigMaps().Lister(),
 			Informer:      inf.Core().V1().ConfigMaps(),
 			Client:        clientset.CoreV1(),
 			EventRecorder: &eventrecorder.LoggingRecorder{},
 		},
 		certrotation.RotatedSelfSignedCertKeySecret{
-			Namespace: config.Namespace,
-			Name:      config.Name + "-cert",
-			Validity:  OneYear / 2,
-			Refresh:   OneYear / 4,
+			Namespace:     config.Namespace,
+			Name:          config.Name + "-cert",
+			JiraComponent: names.ClusterNetworkOperatorJiraComponent,
+			Validity:      OneYear / 2,
+			Refresh:       OneYear / 4,
 			CertCreator: &certrotation.ServingRotation{
 				Hostnames: func() []string { return []string{spec.TargetCert.CommonName} },
 

@@ -8,6 +8,7 @@ metadata:
   annotations:
     network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
     network.operator.openshift.io/copy-from: "default/openshift-ovn-kubernetes/ovn-cert"
+    openshift.io/owning-component: "Networking / cluster-network-operator"
 data: {}
 
 ---
@@ -20,4 +21,5 @@ metadata:
   annotations:
     network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
     network.operator.openshift.io/copy-from: "default/openshift-ovn-kubernetes/ovn-ca"
+    openshift.io/owning-component: "Networking / cluster-network-operator"
 data: {}
