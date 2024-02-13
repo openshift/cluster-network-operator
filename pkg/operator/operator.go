@@ -57,12 +57,10 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	// initialize the controller-runtime environment
 	o.manager, err = manager.New(o.client.Default().Config(), manager.Options{
-		Namespace: "",
 		MapperProvider: func(cfg *rest.Config, httpClient *http.Client) (meta.RESTMapper, error) {
 			return o.client.Default().RESTMapper(), nil
 		},
-		MetricsBindAddress: "0",
-		Logger:             klog.Background(),
+		Logger: klog.Background(),
 	})
 	if err != nil {
 		return err
