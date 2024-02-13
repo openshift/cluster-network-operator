@@ -139,5 +139,7 @@ func (r *ReconcileIngressConfigs) updatePolicyGroupLabelOnNamespace(ctx context.
 
 	newNamespace.SetLabels(existingLabels)
 
-	return r.client.Patch(context.TODO(), newNamespace, crclient.MergeFrom(namespace))
+	return r.client.Patch(context.TODO(), newNamespace, crclient.MergeFrom(namespace), &crclient.PatchOptions{
+		FieldManager: "cluster-network-operator/ingress_controller",
+	})
 }
