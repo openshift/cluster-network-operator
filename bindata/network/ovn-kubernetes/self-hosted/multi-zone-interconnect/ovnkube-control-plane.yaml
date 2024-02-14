@@ -9,7 +9,7 @@ metadata:
       This deployment launches the ovn-kubernetes controller (control-plane) networking components.
     release.openshift.io/version: "{{.ReleaseVersion}}"
 spec:
-  replicas: {{.OvnkubeMasterReplicas}}
+  replicas: {{.ClusterManagerReplicas}}
   selector:
     matchLabels:
       app: ovnkube-control-plane
