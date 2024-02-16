@@ -849,7 +849,7 @@ func Test_SpecStatusSynchronizer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := &specStatusSunchronizer{}
+			a := &synchronizer{}
 			gotInfra, err := a.SpecStatusSynchronize(&tt.givenInfra)
 
 			if tt.wantedErr == "" {

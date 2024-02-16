@@ -7,13 +7,7 @@ import (
 	"log"
 )
 
-type specStatusSynchronizer interface {
-	SpecStatusSynchronize(*configv1.Infrastructure) (*configv1.Infrastructure, error)
-}
-
-type specStatusSunchronizer struct{}
-
-func (*specStatusSunchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure) (*configv1.Infrastructure, error) {
+func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure) (*configv1.Infrastructure, error) {
 	updatedInfraConfig := infraConfig.DeepCopy()
 
 	var (

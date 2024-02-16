@@ -9,17 +9,18 @@ import (
 	utilslice "k8s.io/utils/strings/slices"
 )
 
-type vipsSynchronizer interface {
+type fieldSynchronizer interface {
 	VipsSynchronize(*configv1.Infrastructure) *configv1.Infrastructure
+	SpecStatusSynchronize(*configv1.Infrastructure) (*configv1.Infrastructure, error)
 }
 
-type apiAndIngressVipsSynchronizer struct{}
+type synchronizer struct{}
 
 // VipsSynchronize synchronizes new API & Ingress VIPs with old fields.
 // It returns if the status was updated and the updated infrastructure object.
 //
 //nolint:staticcheck
-func (*apiAndIngressVipsSynchronizer) VipsSynchronize(infraConfig *configv1.Infrastructure) *configv1.Infrastructure {
+func (*synchronizer) VipsSynchronize(infraConfig *configv1.Infrastructure) *configv1.Infrastructure {
 	var apiVIPs, ingressVIPs *[]string // new fields
 	var apiVIP, ingressVIP *string     // old/deprecated fields
 

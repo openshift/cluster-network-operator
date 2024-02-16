@@ -33,11 +33,10 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.C
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) reconcile.Reconciler {
 	return &ReconcileInfrastructureConfig{
-		client:                  c,
-		scheme:                  mgr.GetScheme(),
-		status:                  status,
-		apiAndIngressVIPsSyncer: &apiAndIngressVipsSynchronizer{},
-		specStatusSyncer:        &specStatusSunchronizer{},
+		client:      c,
+		scheme:      mgr.GetScheme(),
+		status:      status,
+		fieldSyncer: &synchronizer{},
 	}
 }
 
@@ -62,11 +61,10 @@ var _ reconcile.Reconciler = &ReconcileInfrastructureConfig{}
 
 // ReconcileInfrastructureConfig reconciles a cluster Infrastructure object
 type ReconcileInfrastructureConfig struct {
-	client                  cnoclient.Client
-	scheme                  *runtime.Scheme
-	status                  *statusmanager.StatusManager
-	apiAndIngressVIPsSyncer vipsSynchronizer
-	specStatusSyncer        specStatusSynchronizer
+	client      cnoclient.Client
+	scheme      *runtime.Scheme
+	status      *statusmanager.StatusManager
+	fieldSyncer fieldSynchronizer
 }
 
 // Reconcile handles Infrastructure.config.openshift.io/cluster. It is responsible for allowing
@@ -103,9 +101,9 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 	// Synchronizing VIPs does not require error handling as it performs an automatic migration
 	// for a data structure introduced in OCP 4.12. The function does not operate on any
 	// user-provided input, thus errors can only be a result of unhealthy cluster state.
-	updatedInfraConfig := r.apiAndIngressVIPsSyncer.VipsSynchronize(infraConfig)
+	updatedInfraConfig := r.fieldSyncer.VipsSynchronize(infraConfig)
 
-	updatedInfraConfig, err = r.specStatusSyncer.SpecStatusSynchronize(updatedInfraConfig)
+	updatedInfraConfig, err = r.fieldSyncer.SpecStatusSynchronize(updatedInfraConfig)
 	if err != nil {
 		err = fmt.Errorf("Error while synchronizing spec and status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
 		log.Println(err)
