@@ -462,10 +462,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		// non-default, internal use only; this is selected in the first phase of an upgrade from a
 		// non-interconnect version (< 4.14) to an interconnect version (>= 4.14)
 		manifestSubDir = filepath.Join(manifestSubDirBasePath, "single-zone-interconnect")
-	} else if isMigrationToMultiZoneAboutToStartOrOngoing(bootstrapResult.OVN, &targetZoneMode) {
+	} else if !targetZoneMode.fastForwardToMultiZone && isMigrationToMultiZoneAboutToStartOrOngoing(bootstrapResult.OVN, &targetZoneMode) {
 		// intermediate step when converting from single zone to multizone; this is selected
 		// in the second phase of an upgrade from a non-interconnect version (< 4.14)
-		// to an interconnect version (>= 4.14)
+		// to an interconnect version (>= 4.14). Skipped when fastForwardToMultiZone is set.
 		manifestSubDir = filepath.Join(manifestSubDirBasePath, "multi-zone-interconnect-tmp")
 	}
 	klog.Infof("render YAMLs from %s folder", manifestSubDir)
@@ -1293,18 +1293,19 @@ const (
 )
 
 type targetZoneModeType struct {
-	// zoneMode indicates the target zone mode that CNO is supposed to converge to.
+	// zoneMode indicates the target zone mode that CNO is supposed to converge to. It defaults
+	// multizone.
 	zoneMode InterConnectZoneMode
-	// "temporary", if true, indicates that the target zone mode is only temporary;
-	// it is used along with zoneMode=singlezone in order to temporarily switch to single-zone mode when upgrading
-	// from versions with no interconnect support (<=4.13). It has no effect if zoneMode=multizone.
-	temporary bool
-	// "configMapFound" indicates whether the interconnect configmap was found; when not found,
-	// the zone mode defaults to multizone.
+	// "configMapFound" indicates whether the interconnect configmap was found. The configmap
+	// is created by CNO itself during a 4.13->4.14 upgrade and deleted once the upgrade is over.
 	configMapFound bool
-	// ongoingUpgrade is true when the configmap was pushed by CNO itself; it is used by status manager
-	// to know it has to keep reporting the old version when this parameter is set.
-	ongoingUpgrade bool
+	// fastForwardToMultiZone can be manually set by the cluster admin through the interconnect configmap
+	// in order to force CNO to deploy multizone OVNK regardless of the current status of OVNK components
+	// during an upgrade to interconnect. This would effectively get the cluster out of phase 1 and phase 2
+	// and make OVNK jump to the YAMLs in the multi-zone-interconnect folder.
+	// This can be useful in case of problems during  upgrades, if ever the logic in prepareUpgradeToInterconnect
+	// is not moving forward (e.g. one or more nodes are down and ovnkube-node is considered as "progressing")
+	fastForwardToMultiZone bool
 }
 
 // getTargetInterConnectZoneMode determines the desired interconnect zone mode for the cluster.
@@ -1339,15 +1340,15 @@ func getTargetInterConnectZoneMode(kubeClient cnoclient.Client) (targetZoneModeT
 		targetZoneMode.zoneMode = zoneModeMultiZone
 	}
 
-	if temporaryFromConfigMap, ok := interConnectConfigMap.Data["temporary"]; ok {
-		targetZoneMode.temporary = strings.ToLower(temporaryFromConfigMap) == "true"
+	if _, ok := interConnectConfigMap.Data["fast-forward-to-multizone"]; ok {
+		targetZoneMode.fastForwardToMultiZone = true
+		if targetZoneMode.zoneMode != zoneModeMultiZone {
+			klog.Warningf("Forcing interconnect zone mode to multizone due to 'fast-forward-to-multizone' being set")
+			targetZoneMode.zoneMode = zoneModeMultiZone
+		}
 	}
 
-	if _, ok := interConnectConfigMap.Data["ongoing-upgrade"]; ok {
-		targetZoneMode.ongoingUpgrade = true
-	}
-
-	klog.Infof("target zone mode: %+v", targetZoneMode)
+	klog.Infof("interconnect target zone mode: %+v", targetZoneMode)
 
 	return targetZoneMode, nil
 }
@@ -2426,7 +2427,7 @@ func doesVersionEnableInterConnect(string) bool {
 // If we're upgrading from a 4.13 cluster, which has no OVN InterConnect support, three phases are necessary.
 // Phase 1:
 //
-//	a) prepareUpgradeToInterConnect pushes a configMap with zone-mode=singlezone, temporary=true;
+//	a) prepareUpgradeToInterConnect pushes a configMap with zone-mode=singlezone;
 //	b) renderOVNKubernetes selects the YAMLs from the single-zone folder
 //	   (node DaemonSet, master DaemonSet [StatefulSet for hypershift], ovnkube-sbdb route [hypershift]);
 //	c) shouldUpdateOVNKonUpgrade rolls out first node DaemonSet then master DaemonSet/StatefulSet in single-zone mode
@@ -2435,7 +2436,7 @@ func doesVersionEnableInterConnect(string) bool {
 // Phase 2tmp:
 //
 //	a) Master and Node DaemonSet/StatefulSet are now single zone, so prepareUpgradeToInterConnect overrides the configMap
-//	   with zone-mode=multizone, temporary=false;
+//	   with zone-mode=multizone;
 //	b) renderOVNKubernetes selects the YAMLs from the multi-zone-tmp folder (node DaemonSet, master DaemonSet/StatefulSet,
 //	   control plane deployment, ovnkube-sbdb route [hypershift]);
 //	c) shouldUpdateOVNKonInterConnectZoneModeChange applies a zone mode change (single->multi) by rolling out
@@ -2456,8 +2457,8 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 
 	// [start of phase 1]
 	// if node and master DaemonSets are <= 4.13 (no IC support) and we're upgrading to >= 4.14 (IC),
-	// go through an intermediate step with IC single-zone DaemonSets. Track this temporary state
-	// by pushing a configmap.
+	// go through an intermediate step with IC single-zone DaemonSets. Track that the upgrade is ongoing
+	// by pushing a configmap with the zone mode that CNO is converging to.
 	if ovn.NodeUpdateStatus != nil && ovn.MasterUpdateStatus != nil && ovn.ControlPlaneUpdateStatus == nil &&
 		!ovn.NodeUpdateStatus.InterConnectEnabled &&
 		!ovn.MasterUpdateStatus.InterConnectEnabled &&
@@ -2473,11 +2474,6 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 			},
 			Data: map[string]string{
 				"zone-mode": fmt.Sprint(zoneModeSingleZone),
-				"temporary": "true",
-				// we lookup ongoing-upgrade in SetFromPods (pod_status.go) to distinguish a
-				// configmap pushed during a non-IC-> IC upgrade from one that is added
-				// outside of an upgrade by a cluster admin to change the zone mode.
-				"ongoing-upgrade": "",
 			},
 		}
 		if err := client.ClientFor("").CRClient().Create(context.TODO(), configMap); err != nil {
@@ -2485,12 +2481,11 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 		}
 		targetZoneMode.configMapFound = true
 		targetZoneMode.zoneMode = zoneModeSingleZone
-		targetZoneMode.temporary = true
 
-	} else if isMigrationToMultiZoneAboutToStart(ovn, targetZoneMode, true) && targetZoneMode.temporary && targetZoneMode.ongoingUpgrade {
+	} else if isMigrationToMultiZoneAboutToStart(ovn, targetZoneMode, true) && targetZoneMode.configMapFound && !targetZoneMode.fastForwardToMultiZone {
 		// [start of phase 2]
 		// if node and master DaemonSets have already upgraded to >= 4.14 single zone and
-		// we previously pushed a configmap for temporary single zone,
+		// we previously pushed a configmap for single zone,
 		// patch the configmap and proceed with the migration to multizone.
 		klog.Infof("Upgrade to interconnect, start of phase2: patching IC configmap for multizone")
 
@@ -2499,11 +2494,6 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 				"op":    "replace",
 				"path":  "/data/zone-mode",
 				"value": fmt.Sprint(zoneModeMultiZone),
-			},
-			{
-				"op":    "replace",
-				"path":  "/data/temporary",
-				"value": "false",
 			},
 		}
 
@@ -2518,9 +2508,8 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 		}
 
 		targetZoneMode.zoneMode = zoneModeMultiZone
-		targetZoneMode.temporary = false
 
-	} else if isMigrationToMultiZoneComplete(ovn, targetZoneMode) && !targetZoneMode.temporary && targetZoneMode.ongoingUpgrade {
+	} else if isMigrationToMultiZoneComplete(ovn, targetZoneMode) && targetZoneMode.configMapFound {
 		// [after completion of phase 2]
 		// daemonsets have rolled out in multizone mode
 		// Remove the configmap: this won't trigger any further roll out, but along with the annotation
@@ -2534,7 +2523,6 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 				return fmt.Errorf("upgrade to interconnect, end of phase2: could not delete interconnect configmap: %w", err)
 			}
 		}
-		targetZoneMode.ongoingUpgrade = false
 		targetZoneMode.configMapFound = false
 
 		// HACK Once we're here, there are no more updates to the DaemonSets and CNO won't update
@@ -2543,13 +2531,13 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 	}
 
 	// Print IC upgrade status when phase 1 or phase 2 are ongoing
-	if targetZoneMode.ongoingUpgrade {
-		if targetZoneMode.zoneMode == zoneModeSingleZone && targetZoneMode.temporary &&
+	if targetZoneMode.configMapFound {
+		if targetZoneMode.zoneMode == zoneModeSingleZone &&
 			ovn.NodeUpdateStatus != nil && ovn.MasterUpdateStatus != nil && ovn.ControlPlaneUpdateStatus == nil &&
 			(ovn.NodeUpdateStatus.Progressing || ovn.MasterUpdateStatus.Progressing) {
 			klog.Warningf("Upgrade to interconnect, phase1 is ongoing")
 
-		} else if isMigrationToMultiZoneOngoing(ovn, targetZoneMode) && !targetZoneMode.temporary {
+		} else if isMigrationToMultiZoneOngoing(ovn, targetZoneMode) {
 			klog.Warningf("Upgrade to interconnect, phase2 is ongoing")
 		}
 
