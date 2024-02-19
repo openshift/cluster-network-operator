@@ -426,7 +426,8 @@ func TestRenderUnknownNetwork(t *testing.T) {
 
 func Test_getMultusAdmissionControllerReplicas(t *testing.T) {
 	type args struct {
-		bootstrapResult *bootstrap.BootstrapResult
+		bootstrapResult   *bootstrap.BootstrapResult
+		hypershiftEnabled bool
 	}
 	tests := []struct {
 		name string
@@ -434,7 +435,7 @@ func Test_getMultusAdmissionControllerReplicas(t *testing.T) {
 		want int
 	}{
 		{
-			name: "External control plane, highly available infra",
+			name: "External control plane, HyperShift,  highly available infra",
 			args: args{
 				bootstrapResult: &bootstrap.BootstrapResult{
 					Infra: bootstrap.InfraStatus{
@@ -442,6 +443,34 @@ func Test_getMultusAdmissionControllerReplicas(t *testing.T) {
 						HostedControlPlane: &hypershift.HostedControlPlane{
 							ControllerAvailabilityPolicy: hypershift.HighlyAvailable,
 						},
+					},
+				},
+				hypershiftEnabled: true,
+			},
+			want: 2,
+		},
+		{
+			name: "External control plane, HyperShift, single-replica infra",
+			args: args{
+				bootstrapResult: &bootstrap.BootstrapResult{
+					Infra: bootstrap.InfraStatus{
+						ControlPlaneTopology: configv1.ExternalTopologyMode,
+						HostedControlPlane: &hypershift.HostedControlPlane{
+							ControllerAvailabilityPolicy: hypershift.SingleReplica,
+						},
+					},
+				},
+				hypershiftEnabled: true,
+			},
+			want: 1,
+		},
+		{
+			name: "External control plane, highly available infra",
+			args: args{
+				bootstrapResult: &bootstrap.BootstrapResult{
+					Infra: bootstrap.InfraStatus{
+						ControlPlaneTopology:   configv1.ExternalTopologyMode,
+						InfrastructureTopology: configv1.HighlyAvailableTopologyMode,
 					},
 				},
 			},
@@ -452,10 +481,8 @@ func Test_getMultusAdmissionControllerReplicas(t *testing.T) {
 			args: args{
 				bootstrapResult: &bootstrap.BootstrapResult{
 					Infra: bootstrap.InfraStatus{
-						ControlPlaneTopology: configv1.ExternalTopologyMode,
-						HostedControlPlane: &hypershift.HostedControlPlane{
-							ControllerAvailabilityPolicy: hypershift.SingleReplica,
-						},
+						ControlPlaneTopology:   configv1.ExternalTopologyMode,
+						InfrastructureTopology: configv1.SingleReplicaTopologyMode,
 					},
 				},
 			},
@@ -512,7 +539,7 @@ func Test_getMultusAdmissionControllerReplicas(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getMultusAdmissionControllerReplicas(tt.args.bootstrapResult); got != tt.want {
+			if got := getMultusAdmissionControllerReplicas(tt.args.bootstrapResult, tt.args.hypershiftEnabled); got != tt.want {
 				t.Errorf("getMultusAdmissionControllerReplicas() = %v, want %v", got, tt.want)
 			}
 		})
