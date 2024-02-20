@@ -31,6 +31,7 @@ spec:
         kubernetes.io/os: linux
       tolerations:
       - operator: Exists
+      priorityClassName: "system-node-critical"
       initContainers:
       - name: dhcp-daemon-initialization
         image: {{.CNIPluginsImage}}
