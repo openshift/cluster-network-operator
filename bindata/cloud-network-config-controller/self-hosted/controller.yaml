@@ -19,6 +19,7 @@ spec:
       name: cloud-network-config-controller
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        openshift.io/required-scc: restricted-v2
       labels:
         app: cloud-network-config-controller
         component: network
