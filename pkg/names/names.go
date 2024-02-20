@@ -224,3 +224,6 @@ const DefaultClusterName = "default"
 
 // DashboardNamespace is the namespace where dashboards are created
 const DashboardNamespace = "openshift-config-managed"
+
+// DefaultFieldManagerPrefix is the default field manager prefix set on the managed fields.
+const DefaultFieldManagerPrefix = "network-operator"

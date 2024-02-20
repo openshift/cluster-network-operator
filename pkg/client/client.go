@@ -7,6 +7,7 @@ import (
 
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
+	"github.com/openshift/cluster-network-operator/pkg/version"
 	clientConfig "github.com/openshift/library-go/pkg/config/client"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -159,33 +160,39 @@ func (c *OperatorClient) Clients() map[string]ClusterClient {
 }
 
 func NewClusterClient(cfg, protocfg *rest.Config) (*OperatorClusterClient, error) {
+	cfgCopy := rest.CopyConfig(cfg)
+	protoCfgCopy := rest.CopyConfig(protocfg)
+	userAgent := buildUserAgent(names.DefaultFieldManagerPrefix, version.Get().String())
+	cfgCopy.UserAgent = userAgent
+	protoCfgCopy.UserAgent = userAgent
+
 	c := OperatorClusterClient{
-		cfg:      cfg,
-		protocfg: protocfg,
+		cfg:      cfgCopy,
+		protocfg: protoCfgCopy,
 	}
 	var err error
 
-	if c.kClient, err = kubernetes.NewForConfig(protocfg); err != nil {
+	if c.kClient, err = kubernetes.NewForConfig(protoCfgCopy); err != nil {
 		return nil, err
 	}
 	c.kFactory = kinformer.NewSharedInformerFactory(c.kClient, defaultResyncPeriod)
 
-	if c.osOperClient, err = osoperclient.NewForConfig(cfg); err != nil {
+	if c.osOperClient, err = osoperclient.NewForConfig(cfgCopy); err != nil {
 		return nil, err
 	}
 	c.osOperFactory = osoperinformer.NewSharedInformerFactory(c.osOperClient, defaultResyncPeriod)
 
 	// Initialize the client-go dynamic client
-	c.dynclient, err = dynamic.NewForConfig(cfg)
+	c.dynclient, err = dynamic.NewForConfig(cfgCopy)
 	if err != nil {
 		return nil, err
 	}
 	// And the DynamicRESTMapper (which handles on-the-fly CRD creation)
-	if c.restMapper, err = k8s.NewDynamicRESTMapper(cfg); err != nil {
+	if c.restMapper, err = k8s.NewDynamicRESTMapper(cfgCopy); err != nil {
 		return nil, err
 	}
 	// And the controller-runtime client, which is similar to the client-go dynamic client.
-	if c.crclient, err = crclient.New(cfg, crclient.Options{Mapper: c.restMapper}); err != nil {
+	if c.crclient, err = crclient.New(cfgCopy, crclient.Options{Mapper: c.restMapper}); err != nil {
 		return nil, err
 	}
 
@@ -316,4 +323,8 @@ func (c *OperatorClusterClient) HostPort() (string, string) {
 		port = "443"
 	}
 	return host, port
+}
+
+func buildUserAgent(cmd, version string) string {
+	return fmt.Sprintf("%s/%s", cmd, version)
 }
