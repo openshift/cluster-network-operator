@@ -186,3 +186,6 @@ const ManagementClusterName = "management"
 
 // DefaultClusterName provides the name of the default cluster, for use with Hypershift (or non-Hypershift)
 const DefaultClusterName = "default"
+
+// DefaultUserAgent is the default UserAgent set on the clients
+const DefaultUserAgent = "network-operator"
