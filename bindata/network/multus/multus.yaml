@@ -561,9 +561,6 @@ spec:
           requests:
             cpu: "50m"
             memory: "50Mi"
-          limits:
-            cpu: "50m"
-            memory: "100Mi"
         volumeMounts:
           - name: cni-net-dir
             mountPath: /host/etc/cni/net.d
