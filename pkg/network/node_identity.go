@@ -110,7 +110,7 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "network/node-identity/managed"))
 	} else {
 		// self-hosted specific
-		data.Data["NetworkNodeIdentityImage"] = os.Getenv("OVN_IMAGE")
+		data.Data["NetworkNodeIdentityImage"] = "quay.io/jtanenba/openshift-ovn:admission"
 
 		// NetworkNodeIdentityTerminationDurationSeconds holds the allowed termination duration
 		// During node reboot, the webhook has to wait for the API server to terminate first to avoid disruptions
