@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"k8s.io/klog/v2"
 	"log"
 	"math"
 	"math/big"
@@ -15,7 +16,6 @@ import (
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -43,8 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -1240,16 +1238,6 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		ipsecStatus.Name = ipsecHostDaemonSet.Name
 		ipsecStatus.IPFamilyMode = ipsecHostDaemonSet.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
 		ipsecStatus.Version = ipsecHostDaemonSet.GetAnnotations()["release.openshift.io/version"]
-	}
-
-	// If we are upgrading from 4.13 -> 4.14 set new API for IP Forwarding mode to Global.
-	// This is to ensure backwards compatibility.
-	if masterStatus != nil {
-		klog.Infof("4.13 -> 4.14 upgrade detected. Will set IP Forwarding API to Global mode for backwards compatibility")
-		if conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig == nil {
-			conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig = &operv1.GatewayConfig{}
-		}
-		conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig.IPForwarding = operv1.IPForwardingGlobal
 	}
 
 	res := bootstrap.OVNBootstrapResult{
