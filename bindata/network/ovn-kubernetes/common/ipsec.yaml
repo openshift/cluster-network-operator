@@ -62,7 +62,7 @@ spec:
 
           # If the certificate does not exist or it will expire in the next 6 months
           # (15770000 seconds), we will generate a new one.
-          if ! openssl x509 -noout -dates -checkedn 15770000 -in $cert_pem; then
+          if ! openssl x509 -noout -dates -checkend 15770000 -in $cert_pem; then
             # We use the system-id as the CN for our certificate signing request. This
             # is a requirement by OVN.
             cn=$(ovs-vsctl --retry -t 60 get Open_vSwitch . external-ids:system-id | tr -d "\"")
