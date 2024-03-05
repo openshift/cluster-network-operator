@@ -45,10 +45,6 @@ spec:
               set +o allexport
             fi
 
-            ho_enable=
-{{- if .OVNHybridOverlayEnable }}
-            ho_enable="--enable-hybrid-overlay"
-{{ end }}
             echo "I$(date "+%m%d %H:%M:%S.%N") - network-node-identity - start webhook"
             # extra-allowed-user: service account `ovn-kubernetes-control-plane`
             # sets pod annotations in multi-homing layer3 network controller (cluster-manager)
@@ -56,7 +52,6 @@ spec:
                 --webhook-cert-dir="/etc/webhook-cert" \
                 --webhook-host={{.NetworkNodeIdentityAddress}} \
                 --webhook-port={{.NetworkNodeIdentityPort}} \
-                ${ho_enable} \
                 --disable-approver \
                 --extra-allowed-user="system:serviceaccount:openshift-ovn-kubernetes:ovn-kubernetes-control-plane" \
                 --wait-for-kubernetes-api={{.NetworkNodeIdentityTerminationDurationSeconds}}s \
