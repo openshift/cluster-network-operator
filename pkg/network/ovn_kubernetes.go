@@ -71,6 +71,9 @@ const OVN_NODE_SELECTOR_DEFAULT_DPU_HOST = "network.operator.openshift.io/dpu-ho
 const OVN_NODE_SELECTOR_DEFAULT_DPU = "network.operator.openshift.io/dpu"
 const OVN_NODE_SELECTOR_DEFAULT_SMART_NIC = "network.operator.openshift.io/smart-nic"
 const OVN_NODE_IDENTITY_CERT_DURATION = "24h"
+const SINGLEZONE_FOLDER = "single-zone-interconnect"
+const MULTIZONE_FOLDER = "multi-zone-interconnect"
+const MULTIZONE_FOLDER_TMP = MULTIZONE_FOLDER + "-tmp"
 
 // gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
@@ -459,18 +462,18 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	ongoingMigrationFromSingleToMultiZone := (!targetZoneMode.fastForwardToMultiZone &&
 		isMigrationToMultiZoneAboutToStartOrOngoing(bootstrapResult.OVN, &targetZoneMode))
 	// choose the YAMLs based on the target zone mode (4.14 only)
-	manifestSubDir := filepath.Join(manifestSubDirBasePath, "multi-zone-interconnect") // default is multizone
+	manifestSubDir := filepath.Join(manifestSubDirBasePath, MULTIZONE_FOLDER) // default is multizone
 	if targetZoneMode.zoneMode == zoneModeSingleZone {
 		// non-default, internal use only; this is selected in the first phase of an upgrade from a
 		// non-interconnect version (< 4.14) to an interconnect version (>= 4.14)
-		manifestSubDir = filepath.Join(manifestSubDirBasePath, "single-zone-interconnect")
+		manifestSubDir = filepath.Join(manifestSubDirBasePath, SINGLEZONE_FOLDER)
 	} else if ongoingMigrationFromSingleToMultiZone {
 		// intermediate step when converting from single zone to multizone; this is selected
 		// in the second phase of an upgrade from a non-interconnect version (< 4.14)
 		// to an interconnect version (>= 4.14). Skipped when fastForwardToMultiZone is set.
-		manifestSubDir = filepath.Join(manifestSubDirBasePath, "multi-zone-interconnect-tmp")
+		manifestSubDir = filepath.Join(manifestSubDirBasePath, MULTIZONE_FOLDER_TMP)
 	}
-	ongoingUpgradeToInterconnect := manifestSubDir != filepath.Join(manifestSubDirBasePath, "multi-zone-interconnect")
+	ongoingUpgradeToInterconnect := manifestSubDir != filepath.Join(manifestSubDirBasePath, MULTIZONE_FOLDER)
 	klog.Infof("render YAMLs from %s folder", manifestSubDir)
 	manifestDirs = append(manifestDirs, manifestSubDir)
 
