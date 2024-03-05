@@ -1725,23 +1725,26 @@ func getIPFamilyAndClusterCIDRsAnnotationOrConfig(conf *operv1.NetworkSpec, ovn 
 		IPFamilyMode = ovn.NodeUpdateStatus.IPFamilyMode
 		clusterNetworkCIDRs = ovn.NodeUpdateStatus.ClusterNetworkCIDRs
 		source = util.OVN_NODE
-
+		klog.Infof("OCPBUGS-27925: A: IPFamilyMode: %s clusterNetworkCIDRs: %s source: %s", IPFamilyMode, clusterNetworkCIDRs, source)
 	} else if ovn.MasterUpdateStatus != nil && ovn.MasterUpdateStatus.IPFamilyMode != "" && ovn.MasterUpdateStatus.IPFamilyMode != configValue {
 		IPFamilyMode = ovn.MasterUpdateStatus.IPFamilyMode
 		clusterNetworkCIDRs = ovn.MasterUpdateStatus.ClusterNetworkCIDRs
 		source = util.OVN_MASTER
-
+		klog.Infof("OCPBUGS-27925: B: IPFamilyMode: %s clusterNetworkCIDRs: %s source: %s", IPFamilyMode, clusterNetworkCIDRs, source)
 	} else if ovn.ControlPlaneUpdateStatus != nil && ovn.ControlPlaneUpdateStatus.IPFamilyMode != "" && ovn.ControlPlaneUpdateStatus.IPFamilyMode != configValue {
 		IPFamilyMode = ovn.ControlPlaneUpdateStatus.IPFamilyMode
 		clusterNetworkCIDRs = ovn.ControlPlaneUpdateStatus.ClusterNetworkCIDRs
 		source = util.OVN_CONTROL_PLANE
+		klog.Infof("OCPBUGS-27925: C: IPFamilyMode: %s clusterNetworkCIDRs: %s source: %s", IPFamilyMode, clusterNetworkCIDRs, source)
 	} else {
 		IPFamilyMode = configValue
 		clusterNetworkCIDRs = getClusterCIDRsFromConfig(conf)
 		source = "config"
+		klog.Infof("OCPBUGS-27925: D: IPFamilyMode: %s clusterNetworkCIDRs: %s source: %s", IPFamilyMode, clusterNetworkCIDRs, source)
 	}
 
 	klog.Infof("Got IPFamily=%s and ClusterNetworkCIDRs=%s from %s", IPFamilyMode, clusterNetworkCIDRs, source)
+	klog.Infof("OCPBUGS-27925: Got IPFamily=%s and ClusterNetworkCIDRs=%s from %s", IPFamilyMode, clusterNetworkCIDRs, source)
 	return IPFamilyMode, clusterNetworkCIDRs
 }
 
@@ -1767,6 +1770,16 @@ func handleOVNKUpdateUponOpenshiftUpgrade(conf *operv1.NetworkSpec, ovn bootstra
 func handleIPFamilyAnnotationAndIPFamilyChange(conf *operv1.NetworkSpec, ovn bootstrap.OVNBootstrapResult, objs *[]*uns.Unstructured,
 	zoneModeMigrationIsOngoing, updateNode, updateMaster, updateControlPlane bool) (bool, bool, bool, error) {
 
+	klog.Infof("OCPBUGS-27925: handleIPFamilyAnnotationAndIPFamilyChange called with parameters: conf: %+v, ovn: %+v, objs len: %d, zoneModeMigrationIsOngoing: %t, updateNode: %t, updateMaster: %t, updateControlPlane: %t",
+		conf,
+		ovn,
+		len(*objs),
+		zoneModeMigrationIsOngoing,
+		updateNode,
+		updateMaster,
+		updateControlPlane,
+	)
+
 	newUpdateNode, newUpdateMaster, newUpdateControlPlane := updateNode, updateMaster, updateControlPlane
 
 	// obtain the new IP family mode from config: single or dual stack
@@ -1777,8 +1790,9 @@ func handleIPFamilyAnnotationAndIPFamilyChange(conf *operv1.NetworkSpec, ovn boo
 	ipFamilyMode := ipFamilyModeFromConfig
 	var clusterNetworkCIDRs string
 
-	if !zoneModeMigrationIsOngoing && updateNode && updateMaster && updateControlPlane {
+	if !zoneModeMigrationIsOngoing && (updateNode || updateMaster || updateControlPlane) {
 		clusterNetworkCIDRs = getClusterCIDRsFromConfig(conf)
+		klog.Infof("OCPBUGS-27925: looks like !zoneModeMigrationIsOngoing && updateNode && updateMaster && updateControlPlane and clusterNetworkCIDRs is %s", clusterNetworkCIDRs)
 
 		var updateMasterOrControlPlane bool
 		masterOrControlPlaneStatus := ovn.ControlPlaneUpdateStatus // in multizone
@@ -1791,22 +1805,35 @@ func handleIPFamilyAnnotationAndIPFamilyChange(conf *operv1.NetworkSpec, ovn boo
 
 		newUpdateMaster = updateMasterOrControlPlane
 		newUpdateControlPlane = updateMasterOrControlPlane
+		klog.Infof("OCPBUGS-27925: masterOrControlPlaneStatus=%+v, newUpdateNode=%t, updateMasterOrControlPlane=%t, newUpdateMaster=%t, newUpdateControlPlane=%t, ovn.ControlPlaneUpdateStatus=%+v, ovn.MasterUpdateStatus=%+v, ipFamilyMode=%+v",
+			masterOrControlPlaneStatus,
+			newUpdateNode,
+			updateMasterOrControlPlane,
+			newUpdateMaster,
+			newUpdateControlPlane,
+			ovn.ControlPlaneUpdateStatus,
+			ovn.MasterUpdateStatus,
+			ipFamilyMode,
+		)
 
 	} else {
 		// skip IP family migration if we're already switching zone mode
 		// Annotate DaemonSet/StatefulSet/deployment with old value: get to new value once zone migration is over
 		klog.Infof("IP family migration (if any) is post-poned until zone migration is complete")
 		ipFamilyMode, clusterNetworkCIDRs = getIPFamilyAndClusterCIDRsAnnotationOrConfig(conf, ovn, ipFamilyMode)
-
+		klog.Infof("OCPBUGS-27925: ipFamilyMode: %s, clusterNetworkCIDRs: %s", ipFamilyMode, clusterNetworkCIDRs)
 	}
 	// (always) annotate the daemonset and the daemonset template with the current IP family mode.
 	// This triggers a daemonset restart if there are changes.
 	err := setOVNObjectAnnotation(*objs, names.NetworkIPFamilyModeAnnotation, ipFamilyMode)
+	klog.Infof("OCPBUGS-27925: just tried to setOVNObjectAnnotation() with objs length: %d, annotation: %s, ipFamilyMode: %s, error: %v", len(*objs), names.NetworkIPFamilyModeAnnotation, ipFamilyMode, err)
 	if err != nil {
 		return true, true, true, errors.Wrapf(err, "failed to set IP family %s annotation on daemonsets or statefulsets", ipFamilyMode)
 	}
 
 	err = setOVNObjectAnnotation(*objs, names.ClusterNetworkCIDRsAnnotation, clusterNetworkCIDRs)
+	klog.Infof("OCPBUGS-27925: just tried to setOVNObjectAnnotation() with objs length: %d, annotation: %s, ipFamilyMode: %s, error: %v", len(*objs), names.ClusterNetworkCIDRsAnnotation, clusterNetworkCIDRs, err)
+
 	if err != nil {
 		return true, true, true, errors.Wrapf(err, "failed to set %s annotation on daemonsets/statefulsets/deployments", clusterNetworkCIDRs)
 	}
@@ -1814,6 +1841,17 @@ func handleIPFamilyAnnotationAndIPFamilyChange(conf *operv1.NetworkSpec, ovn boo
 	updateNode = newUpdateNode && updateNode
 	updateMaster = newUpdateMaster && updateMaster
 	updateControlPlane = newUpdateControlPlane && updateControlPlane
+	klog.Infof("OCPBUGS-27925: updateNode=%t, updateMaster=%t, updateControlPlane=%t, previous updateNode=%t, newUpdateNode=%t, previous updateMaster=%t, newUpdateMaster=%t, previous updateControlPlane=%t, newUpdateControlPlane=%t",
+		updateNode,
+		updateMaster,
+		updateControlPlane,
+		updateNode && !newUpdateNode,
+		newUpdateNode,
+		updateMaster && !newUpdateMaster,
+		newUpdateMaster,
+		updateControlPlane && !newUpdateControlPlane,
+		newUpdateControlPlane,
+	)
 
 	return updateNode, updateMaster, updateControlPlane, nil
 }
