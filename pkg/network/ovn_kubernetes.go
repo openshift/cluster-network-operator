@@ -2061,13 +2061,14 @@ func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResu
 
 		} else if ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) {
 			// Second step, node is already multizone: leave master as is and add control plane only if node DaemonSet is done progressing
-			if ovn.NodeUpdateStatus.Progressing {
+			if ovn.NodeUpdateStatus.Progressing && ovn.ControlPlaneUpdateStatus == nil && ovn.MasterUpdateStatus != nil && !ovn.MasterUpdateStatus.Progressing {
 				klog.Infof("target=multizone: wait for multizone ovnkube-node to roll out before rolling "+
 					"out ovnkube-control-plane (%s)", getProgressingState(ovn))
 				return true, false, false
 			}
-			klog.Infof("target=multizone: ovnkube-node is already multizone, add ovnkube-control-plane " +
-				"if not already present (and do a no-op update on ovnkube-master)")
+			if ovn.ControlPlaneUpdateStatus == nil || ovn.ControlPlaneUpdateStatus.Progressing {
+				klog.Infof("target=multizone: ovnkube-node is already multizone, add ovnkube-control-plane")
+			}
 			return true, true, true
 		} else {
 			klog.Warningf("target=multizone: undefined zone mode for ovnkube-node")
@@ -2086,13 +2087,13 @@ func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResu
 
 		} else if ovn.NodeUpdateStatus.InterConnectZoneMode == string(zoneModeMultiZone) {
 			// node is still multizone: update node only if master and control plane (if any) are done progressing
-			if ovn.MasterUpdateStatus != nil && ovn.MasterUpdateStatus.Progressing ||
-				ovn.ControlPlaneUpdateStatus != nil && ovn.ControlPlaneUpdateStatus.Progressing {
-				klog.Infof("target=singlezone: wait for ovnkube-master and ovnkube-control-plane to roll out before rolling "+
+			// node is still multizone: update node only if master is done progressing
+			if ovn.MasterUpdateStatus != nil && ovn.MasterUpdateStatus.Progressing {
+				klog.Infof("target=singlezone: wait for ovnkube-master to roll out before rolling "+
 					"out single-zone ovnkube-node (%s)", getProgressingState(ovn))
 				return false, true, true
 			}
-			klog.Infof("target=singlezone: ovnkube-master and ovnkube-control-plane have rolled out, update node to single zone")
+			klog.Infof("target=singlezone: ovnkube-master has rolled out, update ovnkube-node to single zone")
 			return true, true, true
 
 		}
