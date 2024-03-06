@@ -528,16 +528,28 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	// process zone mode change (single zone -> multizone or multizone -> single zone)
 	updateNode, updateMaster, updateControlPlane := shouldUpdateOVNKonInterConnectZoneModeChange(bootstrapResult.OVN, targetZoneMode.zoneMode)
+	klog.Infof("rravaiol: [shouldUpdateOVNKonInterConnectZoneModeChange] ovnk components: ovnkube-node: isRunning=%t, update=%t; ovnkube-master: isRunning=%t, update=%t; ovnkube-control-plane: isRunning=%t, update=%t",
+		bootstrapResult.OVN.NodeUpdateStatus != nil, updateNode,
+		bootstrapResult.OVN.MasterUpdateStatus != nil, updateMaster,
+		bootstrapResult.OVN.ControlPlaneUpdateStatus != nil, updateControlPlane)
 
 	updateNode, updateMaster, updateControlPlane, err = handleIPFamilyAnnotationAndIPFamilyChange(
 		conf, bootstrapResult.OVN, &objs, zoneModeMigrationIsOngoing, updateNode, updateMaster, updateControlPlane)
 	if err != nil {
 		return nil, progressing, fmt.Errorf("unable to render OVN: failed to handle IP family annotation or change: %w", err)
 	}
+	klog.Infof("rravaiol: [handleIPFamilyAnnotationAndIPFamilyChange] ovnk components: ovnkube-node: isRunning=%t, update=%t; ovnkube-master: isRunning=%t, update=%t; ovnkube-control-plane: isRunning=%t, update=%t",
+		bootstrapResult.OVN.NodeUpdateStatus != nil, updateNode,
+		bootstrapResult.OVN.MasterUpdateStatus != nil, updateMaster,
+		bootstrapResult.OVN.ControlPlaneUpdateStatus != nil, updateControlPlane)
 
 	// process upgrades only if we aren't handling a zone mode migration or an IP family migration
 	if !zoneModeMigrationIsOngoing && updateNode && updateMaster && updateControlPlane {
 		updateNode, updateMaster, updateControlPlane = handleOVNKUpdateUponOpenshiftUpgrade(conf, bootstrapResult.OVN)
+		klog.Infof("rravaiol: [handleOVNKUpdateUponOpenshiftUpgrade] ovnk components: ovnkube-node: isRunning=%t, update=%t; ovnkube-master: isRunning=%t, update=%t; ovnkube-control-plane: isRunning=%t, update=%t",
+			bootstrapResult.OVN.NodeUpdateStatus != nil, updateNode,
+			bootstrapResult.OVN.MasterUpdateStatus != nil, updateMaster,
+			bootstrapResult.OVN.ControlPlaneUpdateStatus != nil, updateControlPlane)
 	}
 
 	renderPrePull := false
@@ -545,7 +557,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		updateNode, renderPrePull = shouldUpdateOVNKonPrepull(bootstrapResult.OVN, os.Getenv("RELEASE_VERSION"))
 	}
 
-	klog.Infof("ovnk components: ovnkube-node: isRunning=%t, update=%t; ovnkube-master: isRunning=%t, update=%t; ovnkube-control-plane: isRunning=%t, update=%t",
+	klog.Infof("rravaiol: [final] ovnk components: ovnkube-node: isRunning=%t, update=%t; ovnkube-master: isRunning=%t, update=%t; ovnkube-control-plane: isRunning=%t, update=%t",
 		bootstrapResult.OVN.NodeUpdateStatus != nil, updateNode,
 		bootstrapResult.OVN.MasterUpdateStatus != nil, updateMaster,
 		bootstrapResult.OVN.ControlPlaneUpdateStatus != nil, updateControlPlane)
@@ -1862,7 +1874,7 @@ func shouldUpdateOVNKonIPFamilyChange(ovn bootstrap.OVNBootstrapResult, masterOr
 func shouldUpdateOVNKonPrepull(ovn bootstrap.OVNBootstrapResult, releaseVersion string) (updateNode, renderPrepull bool) {
 	// Fresh cluster - full steam ahead! No need to wait for pre-puller.
 	if ovn.NodeUpdateStatus == nil {
-		klog.V(3).Infof("Fresh cluster, no need for prepuller")
+		klog.V(3).Infof("rravaiol: Fresh cluster, no need for prepuller")
 		return true, false
 	}
 
@@ -1870,13 +1882,13 @@ func shouldUpdateOVNKonPrepull(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 	// Return true so that we reconcile any changes that somehow could have happened.
 	existingNodeVersion := ovn.NodeUpdateStatus.Version
 	if existingNodeVersion == releaseVersion {
-		klog.V(3).Infof("OVN-Kubernetes node is already in the expected release.")
+		klog.V(3).Infof("rravaiol: OVN-Kubernetes node is already in the expected release.")
 		return true, false
 	}
 
 	// at this point, we've determined we need an upgrade
 	if ovn.PrePullerUpdateStatus == nil {
-		klog.Infof("Rolling out the no-op prepuller daemonset...")
+		klog.Infof("rravaiol: Rolling out the no-op prepuller daemonset...")
 		return false, true
 	}
 
@@ -1884,16 +1896,16 @@ func shouldUpdateOVNKonPrepull(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 	// downgrade immediately, we might wanna make prepuller pull the downgrade image.
 	existingPrePullerVersion := ovn.PrePullerUpdateStatus.Version
 	if existingPrePullerVersion != releaseVersion {
-		klog.Infof("Rendering prepuller daemonset to update its image...")
+		klog.Infof("rravaiol: Rendering prepuller daemonset to update its image...")
 		return false, true
 	}
 
 	if ovn.PrePullerUpdateStatus.Progressing {
-		klog.Infof("Waiting for ovnkube-upgrades-prepuller daemonset to finish pulling the image before updating node")
+		klog.Infof("rravaiol: Waiting for ovnkube-upgrades-prepuller daemonset to finish pulling the image before updating node")
 		return false, true
 	}
 
-	klog.Infof("OVN-Kube upgrades-prepuller daemonset rollout complete, now starting node rollouts")
+	klog.Infof("rravaiol: OVN-Kube upgrades-prepuller daemonset rollout complete, now starting node rollouts")
 	return true, false
 }
 
