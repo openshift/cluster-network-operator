@@ -527,7 +527,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	// process zone mode change (single zone -> multizone or multizone -> single zone)
-	updateNode, updateMaster, updateControlPlane := shouldUpdateOVNKonInterConnectZoneModeChange(bootstrapResult.OVN, targetZoneMode.zoneMode)
+	updateNode, updateMaster, updateControlPlane := shouldUpdateOVNKonInterConnectZoneModeChange(bootstrapResult.OVN, targetZoneMode)
 
 	updateNode, updateMaster, updateControlPlane, err = handleIPFamilyAnnotationAndIPFamilyChange(
 		conf, bootstrapResult.OVN, &objs, zoneModeMigrationIsOngoing, updateNode, updateMaster, updateControlPlane)
@@ -2068,7 +2068,7 @@ func getProgressingState(ovn bootstrap.OVNBootstrapResult) string {
 // To sum up:
 // - single zone -> multizone:   first roll out node,   then master+control plane; finally, remove master.
 // - multizone   -> single zone: first roll out master + control plane, then node; finally, remove control plane.
-func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResult, targetZoneMode InterConnectZoneMode) (updateNode, updateMaster, addControlPlane bool) {
+func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResult, targetZoneMode targetZoneModeType) (updateNode, updateMaster, addControlPlane bool) {
 
 	if ovn.NodeUpdateStatus == nil || ovn.MasterUpdateStatus == nil && ovn.ControlPlaneUpdateStatus == nil {
 		// Fresh cluster - full steam ahead!
@@ -2087,7 +2087,7 @@ func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResu
 	// - ovnkube-control-plane can only be multizone, since it doesn't exist in single zone
 	// - ovnkube-master can only be single zone, since it doesn't exist in multizone
 
-	if targetZoneMode == zoneModeMultiZone {
+	if targetZoneMode.configMapFound && targetZoneMode.zoneMode == zoneModeMultiZone {
 
 		// First step, node is still in single zone: update it to multizone,
 		// leave master as is (no update anyway) and don't add control plane yet
@@ -2112,7 +2112,7 @@ func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResu
 			return true, true, true
 		}
 
-	} else if targetZoneMode == zoneModeSingleZone {
+	} else if targetZoneMode.zoneMode == zoneModeSingleZone {
 		// Multizone -> single zone
 		// First roll out master + control plane, then node; then remove control plane
 
