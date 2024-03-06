@@ -134,7 +134,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	res.NetworkNodeIdentityEnabled = netIDEnabled
 
 	// standalone managed clusters is a set managed clusters (excl HyperShift clusters).
-	isStandaloneManagedCluster, err := util.IsStandaloneManagedCluster(context.TODO(), client)
+	isStandaloneManagedCluster, err := util.IsStandaloneManagedCluster(context.TODO(), client, res.PlatformType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect if standalone managed cluster: %v", err)
 	}
