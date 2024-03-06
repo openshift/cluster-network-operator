@@ -528,7 +528,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	// Process phase 2 of the upgrade to IC (4.14 single zone  -> 4.14 multizone)
-	updateNode, updateMaster, updateControlPlane := shouldUpdateOVNKonInterConnectZoneModeChange(bootstrapResult.OVN, targetZoneMode.zoneMode)
+	updateNode, updateMaster, updateControlPlane := shouldUpdateOVNKonInterConnectZoneModeChange(bootstrapResult.OVN, targetZoneMode)
 
 	// Process any update in IP family if the cluster is not migrating from single zone to multizone;
 	// annotate ovnkube with IP family (single/dual stack) and cluster CIDR
@@ -2034,7 +2034,7 @@ func getProgressingState(ovn bootstrap.OVNBootstrapResult) string {
 //
 // To sum up:
 // - single zone -> multizone:   first roll out node,   then master+control plane; finally, remove master.
-func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResult, targetZoneMode InterConnectZoneMode) (updateNode, updateMaster, addControlPlane bool) {
+func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResult, targetZoneMode targetZoneModeType) (updateNode, updateMaster, addControlPlane bool) {
 
 	if ovn.NodeUpdateStatus == nil || ovn.MasterUpdateStatus == nil && ovn.ControlPlaneUpdateStatus == nil {
 		// Fresh cluster - full steam ahead!
@@ -2053,7 +2053,7 @@ func shouldUpdateOVNKonInterConnectZoneModeChange(ovn bootstrap.OVNBootstrapResu
 	// - ovnkube-control-plane can only be multizone, since it doesn't exist in single zone
 	// - ovnkube-master can only be single zone, since it doesn't exist in multizone
 
-	if targetZoneMode == zoneModeMultiZone {
+	if targetZoneMode.configMapFound && targetZoneMode.zoneMode == zoneModeMultiZone {
 
 		// First step, node is still in single zone: update it to multizone,
 		// leave master as is (no update anyway) and don't add control plane yet
