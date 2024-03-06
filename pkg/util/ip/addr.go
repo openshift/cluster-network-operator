@@ -1,6 +1,7 @@
 package ip
 
 import (
+	configv1 "github.com/openshift/api/config/v1"
 	"net"
 
 	"github.com/pkg/errors"
@@ -42,4 +43,22 @@ func lastIP(subnet net.IPNet) net.IP {
 		end = append(end, subnet.IP[i]|^subnet.Mask[i])
 	}
 	return end
+}
+
+// IPsToStrings converts IP addresses from configv1.IP type to a simple String
+func IPsToStrings(ips []configv1.IP) []string {
+	res := make([]string, len(ips))
+	for i, ip := range ips {
+		res[i] = string(ip)
+	}
+	return res
+}
+
+// StringsToIPs converts IP addresses from a String type to configv1.IP
+func StringsToIPs(ips []string) []configv1.IP {
+	res := make([]configv1.IP, len(ips))
+	for i, ip := range ips {
+		res[i] = configv1.IP(ip)
+	}
+	return res
 }
