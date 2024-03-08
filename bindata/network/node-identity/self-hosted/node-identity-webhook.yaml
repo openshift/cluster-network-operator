@@ -15,15 +15,16 @@ webhooks:
         apiVersions: ["*"]
         resources: ["nodes/status"]
         scope: "*"
-  - name: pod.network-node-identity.openshift.io
-    clientConfig:
-      url: https://{{.NetworkNodeIdentityAddress}}:{{.NetworkNodeIdentityPort}}/pod
-      caBundle: {{.NetworkNodeIdentityCABundle}}
-    admissionReviewVersions: ['v1']
-    sideEffects: None
-    rules:
-      - operations: [ "UPDATE" ]
-        apiGroups: ["*"]
-        apiVersions: ["*"]
-        resources: ["pods/status"]
-        scope: "*"
+### ONCE THE pod-admission work is backported to multus we can work on adding the pod-admission
+#  - name: pod.network-node-identity.openshift.io
+#    clientConfig:
+#      url: https://{{.NetworkNodeIdentityAddress}}:{{.NetworkNodeIdentityPort}}/pod
+#      caBundle: {{.NetworkNodeIdentityCABundle}}
+#    admissionReviewVersions: ['v1']
+#    sideEffects: None
+#    rules:
+#      - operations: [ "UPDATE" ]
+#        apiGroups: ["*"]
+#        apiVersions: ["*"]
+#        resources: ["pods/status"]
+#        scope: "*"
