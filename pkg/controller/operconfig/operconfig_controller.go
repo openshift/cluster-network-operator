@@ -134,18 +134,18 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 	// Watch for changes to primary resource Network (as long as the spec changes)
 	err = c.Watch(source.Kind(mgr.GetCache(), &operv1.Network{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		UpdateFunc: func(evt event.UpdateEvent) bool {
-			old, ok := evt.ObjectOld.(*operv1.Network)
+			_, ok := evt.ObjectOld.(*operv1.Network)
 			if !ok {
 				return true
 			}
-			new, ok := evt.ObjectNew.(*operv1.Network)
+			_, ok = evt.ObjectNew.(*operv1.Network)
 			if !ok {
 				return true
 			}
-			if reflect.DeepEqual(old.Spec, new.Spec) {
-				log.Printf("Skipping reconcile of Network.operator.openshift.io: spec unchanged")
-				return false
-			}
+			//if reflect.DeepEqual(old.Spec, new.Spec) {
+			//	log.Printf("Skipping reconcile of Network.operator.openshift.io: spec unchanged")
+			//	return false
+			//}
 			return true
 		},
 	})
@@ -257,9 +257,17 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, nil
 	}
 
+	// Fetch the Network.config.openshift.io instance
+	clusterConfig := &configv1.Network{}
+	err = r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, clusterConfig)
+	if err != nil {
+		log.Printf("Unable to retrieve Network.operator.openshift.io object: %v", err)
+		return reconcile.Result{}, err
+	}
+
 	// Merge in the cluster configuration, in case the administrator has updated some "downstream" fields
 	// This will also commit the change back to the apiserver.
-	if err := r.MergeClusterConfig(ctx, operConfig); err != nil {
+	if err := r.MergeClusterConfig(ctx, clusterConfig, operConfig); err != nil {
 		log.Printf("Failed to merge the cluster configuration: %v", err)
 		// not set degraded if the err is a version conflict, but return a reconcile err for retry.
 		if !apierrors.IsConflict(err) {
@@ -360,7 +368,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// Generate the objects.
 	// Note that Render might have side effects in the passed in operConfig that
 	// will be reflected later on in the updated status.
-	objs, progressing, err := network.Render(&operConfig.Spec, bootstrapResult, ManifestPath, r.client, r.featureGates)
+	objs, progressing, err := network.Render(&operConfig.Spec, &clusterConfig.Spec, bootstrapResult, ManifestPath, r.client, r.featureGates)
 	if err != nil {
 		log.Printf("Failed to render: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "RenderError",

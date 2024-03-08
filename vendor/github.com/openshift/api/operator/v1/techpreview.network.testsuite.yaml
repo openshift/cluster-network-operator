@@ -72,6 +72,49 @@ tests:
               to: 1400
           mode: Offline
     expectedError: "networkType migration in mode other than 'Live' may not be configured at the same time as mtu migration"
+  - name: Should throw an error network diagnostics are disabled and networkDiagnostics is specified
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Network
+      spec:
+        disableNetworkDiagnostics: true
+        networkDiagnostics:
+          sourceDeploymentNodePlacement:
+            nodeSelector:
+              kubernetes.io/os: linux
+    expectedError: "network diagnostics config cannot be specified when network diagnostics are disabled"
+  - name: Should allow setting networkDiagnostics
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Network
+      spec:
+        networkDiagnostics:
+          sourceDeploymentNodePlacement:
+            nodeSelector:
+              kubernetes.io/os: linux
+              node-role.kubernetes.io/infra: ""
+          targetDaemonsetNodePlacement:
+            nodeSelector:
+              kubernetes.io/os: linux
+            tolerations:
+              - operator: Exists
+    expected: |
+      apiVersion: operator.openshift.io/v1
+      kind: Network
+      spec:
+        disableNetworkDiagnostics: false
+        logLevel: Normal
+        operatorLogLevel: Normal
+        networkDiagnostics:
+          sourceDeploymentNodePlacement:
+            nodeSelector:
+              kubernetes.io/os: linux
+              node-role.kubernetes.io/infra: ""
+          targetDaemonsetNodePlacement:
+            nodeSelector:
+              kubernetes.io/os: linux
+            tolerations:
+              - operator: Exists
   - name: Should be able to create mtu and networkType migration in live migration mode
     initial: |
       apiVersion: operator.openshift.io/v1

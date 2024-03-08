@@ -64,9 +64,18 @@ spec:
           requests:
             memory: 40Mi
             cpu: 10m
+      {{ if .NetworkCheckSourceNodeSelector }}
       nodeSelector:
-        kubernetes.io/os: "linux"
-
+        {{ range $key, $value := .NetworkCheckSourceNodeSelector }}
+        "{{$key}}": "{{$value}}"
+        {{ end }}
+      {{ end }}
+      {{ if .NetworkCheckSourceTolerations }}
+      tolerations:
+        {{ range .NetworkCheckSourceTolerations }}
+        - operator: "{{.Operator}}"
+        {{ end }}
+      {{ end }}
 ---
 apiVersion: v1
 kind: Service

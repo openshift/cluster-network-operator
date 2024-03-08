@@ -22,16 +22,7 @@ import (
 
 // MergeClusterConfig merges in the existing cluster config in to the
 // operator config, overwriting any changes to the managed fields.
-func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig *operv1.Network) error {
-	// fetch the cluster config
-	clusterConfig := &configv1.Network{}
-	err := r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, clusterConfig)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
+func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, clusterConfig *configv1.Network, operConfig *operv1.Network) error {
 	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok && r.featureGates.Enabled(configv1.FeatureGateNetworkLiveMigration) {
 		// During network type live migration, all the update to network.operator shall only be handled by the clusterconfig controller
 		return nil

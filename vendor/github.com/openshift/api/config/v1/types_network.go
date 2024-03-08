@@ -1,6 +1,9 @@
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // +genclient
 // +genclient:nonNamespaced
@@ -66,6 +69,11 @@ type NetworkSpec struct {
 	// installed.
 	// +kubebuilder:validation:Pattern=`^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])-([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$`
 	ServiceNodePortRange string `json:"serviceNodePortRange,omitempty"`
+
+	// networkDiagnostics defines network diagnostics configuration.
+	// +optional
+	// +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
+	NetworkDiagnostics NetworkDiagnostics `json:"networkDiagnostics"`
 }
 
 // NetworkStatus is the current network configuration.
@@ -191,4 +199,61 @@ type MTUMigrationValues struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	From *uint32 `json:"from,omitempty"`
+}
+
+// NetworkDiagnosticsMode is an enumeration of the available network diagnostics modes
+// Valid values are "All", "Disabled".
+// +kubebuilder:validation:Enum:=All;Disabled
+type NetworkDiagnosticsMode string
+
+const (
+	// NetworkDiagnosticsAll meants that all network diagnostics checks are enabled
+	NetworkDiagnosticsAll NetworkDiagnosticsMode = "All"
+	// NetworkDiagnosticsDisabled means that network diagnostics is disabled
+	NetworkDiagnosticsDisabled NetworkDiagnosticsMode = "Disabled"
+)
+
+// NetworkDiagnostics defines network diagnostics configuration
+type NetworkDiagnostics struct {
+	// mode controls the network diagnostics mode
+	//
+	// By default the value is set to All.
+	//
+	// +optional
+	// +kubebuilder:default=All
+	Mode NetworkDiagnosticsMode `json:"mode"`
+
+	// sourceDeploymentNodePlacement controls the scheduling of network diagnostics source deployment
+	//
+	// See NetworkDiagnosticsNodePlacement for more details about default values.
+	//
+	// +optional
+	SourceDeploymentNodePlacement NetworkDiagnosticsNodePlacement `json:"sourceDeploymentNodePlacement"`
+
+	// targetDaemonsetNodePlacement controls the scheduling of network diagnostics target daemonset
+	//
+	// See NetworkDiagnosticsNodePlacement for more details about default values.
+	//
+	// +optional
+	TargetDaemonsetNodePlacement NetworkDiagnosticsNodePlacement `json:"targetDaemonsetNodePlacement"`
+}
+
+// NetworkDiagnosticsNodePlacement defines node scheduling configuration network diagnostics components
+type NetworkDiagnosticsNodePlacement struct {
+	// nodeSelector is the node selector applied to network diagnostics components
+	//
+	// By default this is set to `kubernetes.io/os: linux`
+	//
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector"`
+
+	// tolerations is a list of tolerations applied to network diagnostics components
+	//
+	// For SourceDeploymentNodePlacement, this is set to an empty list by default.
+	//
+	// For TargetDaemonsetNodePlacement, this is set to `- operator: "Exists"` by default.
+	// It means that it tolerates all taints.
+	//
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations"`
 }

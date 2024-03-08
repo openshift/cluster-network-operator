@@ -61,10 +61,18 @@ spec:
               fieldPath: spec.nodeName
       serviceAccount: default
       terminationGracePeriodSeconds: 10
+      {{ if .NetworkCheckTargetTolerations }}
       tolerations:
-      - operator: "Exists"
+        {{ range .NetworkCheckTargetTolerations }}
+        - operator: "{{.Operator}}"
+        {{ end }}
+      {{ end }}
+      {{ if .NetworkCheckTargetNodeSelector }}
       nodeSelector:
-        kubernetes.io/os: "linux"
+        {{ range $key, $value := .NetworkCheckTargetNodeSelector }}
+        "{{$key}}": "{{$value}}"
+        {{ end }}
+      {{ end }}
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
