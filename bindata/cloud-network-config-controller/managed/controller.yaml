@@ -62,6 +62,9 @@ spec:
                 topologyKey: kubernetes.io/hostname
       priorityClassName: hypershift-control-plane
       securityContext:
+{{- if not (eq .RunAsUser "")}}
+        runAsUser: {{.RunAsUser}}
+{{- end }}
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
