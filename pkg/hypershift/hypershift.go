@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -16,6 +17,10 @@ import (
 )
 
 const HostedClusterLocalProxy = "socks5://127.0.0.1:8090"
+const HostedClusterDefaultAdvertiseAddressIPV4 = "172.20.0.1"
+const HostedClusterDefaultAdvertiseAddressIPV6 = "fd00::1"
+
+const HostedClusterDefaultAdvertisePort = int64(6443)
 
 var (
 	enabled           = os.Getenv("HYPERSHIFT")
@@ -49,6 +54,8 @@ type HostedControlPlane struct {
 	ClusterID                    string
 	ControllerAvailabilityPolicy AvailabilityPolicy
 	NodeSelector                 map[string]string
+	AdvertiseAddress             string
+	AdvertisePort                int
 }
 
 // AvailabilityPolicy specifies a high level availability policy for components.
@@ -125,10 +132,48 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 		return nil, fmt.Errorf("failed extract nodeSelector: %v", err)
 	}
 
+	advertiseAddress, valueFound, err := unstructured.NestedString(hcp.UnstructuredContent(), "spec", "networking", "apiServer", "advertiseAddress")
+	if err != nil {
+		return nil, fmt.Errorf("failed extract advertiseAddress: %v", err)
+	}
+	if !valueFound {
+		// default to ipv4 unless we can prove it is a ipv6 cluster
+		advertiseAddress = HostedClusterDefaultAdvertiseAddressIPV4
+		cidrArray, cidrArrayValueFound, err := unstructured.NestedFieldCopy(hcp.UnstructuredContent(), "spec", "networking", "serviceNetwork")
+		if err != nil {
+			return nil, fmt.Errorf("failed extract serviceNetwork: %v", err)
+		}
+		if cidrArrayValueFound {
+			cidrArrayConverted, hasConverted := cidrArray.([]interface{})
+			if hasConverted {
+				sampleCidrVal := cidrArrayConverted[0]
+				sampleCidrValConverted, sampleCidrHasConverted := sampleCidrVal.(map[string]interface{})
+				if sampleCidrHasConverted {
+					cidrRawVal, hasCidrKey := sampleCidrValConverted["cidr"]
+					if hasCidrKey {
+						cidrString, isString := cidrRawVal.(string)
+						if isString && strings.Count(cidrString, ":") >= 2 {
+							advertiseAddress = HostedClusterDefaultAdvertiseAddressIPV6
+						}
+					}
+				}
+			}
+		}
+	}
+	advertisePort, valueFound, err := unstructured.NestedInt64(hcp.UnstructuredContent(), "spec", "networking", "apiServer", "port")
+	if err != nil {
+		return nil, fmt.Errorf("failed extract advertisePort: %v", err)
+	}
+	if !valueFound {
+		advertisePort = HostedClusterDefaultAdvertisePort
+	}
+
 	return &HostedControlPlane{
 		ControllerAvailabilityPolicy: AvailabilityPolicy(controllerAvailabilityPolicy),
 		ClusterID:                    clusterID,
 		NodeSelector:                 nodeSelector,
+		AdvertiseAddress:             advertiseAddress,
+		AdvertisePort:                int(advertisePort),
 	}, nil
 }
 
