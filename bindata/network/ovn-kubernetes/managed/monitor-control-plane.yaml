@@ -56,7 +56,11 @@ metadata:
   namespace: {{.HostedClusterNamespace}}
   annotations:
     network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
+# If the default CAConfigMap 'openshift-service-ca.crt' was used then the HostedCluster isn't reconciling the secret, so
+# we need to add the annotation so service-ca creates the secret
+{{- if eq .CAConfigMap "openshift-service-ca.crt"}}
     service.beta.openshift.io/serving-cert-secret-name: ovn-control-plane-metrics-cert
+{{- end}}
   labels:
     app: ovnkube-control-plane
 spec:
