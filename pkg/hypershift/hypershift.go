@@ -29,6 +29,8 @@ var (
 	runAsUser         = os.Getenv("RUN_AS_USER")
 	releaseImage      = os.Getenv("OPENSHIFT_RELEASE_IMAGE")
 	controlPlaneImage = os.Getenv("OVN_CONTROL_PLANE_IMAGE")
+	caConfigMap       = os.Getenv("CA_CONFIG_MAP")
+	caConfigMapKey    = os.Getenv("CA_CONFIG_MAP_KEY")
 )
 
 const (
@@ -92,9 +94,19 @@ type HyperShiftConfig struct {
 	RelatedObjects    []RelatedObject
 	ReleaseImage      string
 	ControlPlaneImage string
+	CAConfigMap       string
+	CAConfigMapKey    string
 }
 
 func NewHyperShiftConfig() *HyperShiftConfig {
+	if caConfigMap == "" {
+		caConfigMap = "openshift-service-ca.crt"
+	}
+
+	if caConfigMapKey == "" {
+		caConfigMapKey = "service-ca.crt"
+	}
+
 	return &HyperShiftConfig{
 		Enabled:           hyperShiftEnabled(),
 		Name:              name,
@@ -102,6 +114,8 @@ func NewHyperShiftConfig() *HyperShiftConfig {
 		RunAsUser:         runAsUser,
 		ReleaseImage:      releaseImage,
 		ControlPlaneImage: controlPlaneImage,
+		CAConfigMap:       caConfigMap,
+		CAConfigMapKey:    caConfigMapKey,
 	}
 }
 
