@@ -1,15 +1,16 @@
 package network
 
 import (
-	"os"
-	"path/filepath"
-
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/pkg/errors"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"os"
+	"path/filepath"
+	"strconv"
 )
 
 const (
@@ -65,8 +66,14 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 	data.Data["WhereaboutsImage"] = os.Getenv("WHEREABOUTS_CNI_IMAGE")
 	data.Data["EgressRouterImage"] = os.Getenv("EGRESS_ROUTER_CNI_IMAGE")
 	data.Data["RouteOverrideImage"] = os.Getenv("ROUTE_OVERRRIDE_CNI_IMAGE")
-	data.Data["KUBERNETES_SERVICE_HOST"] = apihost
-	data.Data["KUBERNETES_SERVICE_PORT"] = apiport
+	hsc := platform.NewHyperShiftConfig()
+	if hsc.Enabled && bootstrapResult.Infra.PlatformType == configv1.IBMCloudPlatformType {
+		data.Data["KUBERNETES_SERVICE_HOST"] = *bootstrapResult.Infra.HostedControlPlane.Spec.Networking.APIServer.AdvertiseAddress
+		data.Data["KUBERNETES_SERVICE_PORT"] = strconv.Itoa(int(*bootstrapResult.Infra.HostedControlPlane.Spec.Networking.APIServer.Port))
+	} else {
+		data.Data["KUBERNETES_SERVICE_HOST"] = apihost
+		data.Data["KUBERNETES_SERVICE_PORT"] = apiport
+	}
 	data.Data["RenderDHCP"] = useDHCP
 	data.Data["RenderIpReconciler"] = useWhereabouts
 	data.Data["MultusCNIConfDir"] = MultusCNIConfDir
