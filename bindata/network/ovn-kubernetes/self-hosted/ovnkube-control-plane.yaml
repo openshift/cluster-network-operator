@@ -107,10 +107,18 @@ spec:
           fi
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
+          echo "InternalJoinSubnetV4: {{.InternalJoinSubnetV4}}"
+          echo "InternalJoinSubnetV6: {{.InternalJoinSubnetV6}}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
             --init-cluster-manager "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
+{{- if not (eq .InternalTransitSwitchSubnetV4 "")}}
+            --cluster-manager-v4-transit-switch-subnet="{{.InternalTransitSwitchSubnetV4}}" \
+{{- end }}
+{{- if not (eq .InternalTransitSwitchSubnetV6 "")}}
+            --cluster-manager-v6-transit-switch-subnet="{{.InternalTransitSwitchSubnetV6}}" \
+{{- end }}
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --metrics-bind-address "127.0.0.1:29108" \
             --metrics-enable-pprof \
