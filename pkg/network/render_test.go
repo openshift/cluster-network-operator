@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
+	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"k8s.io/client-go/kubernetes/scheme"
 
@@ -409,13 +410,48 @@ func TestRenderUnknownNetwork(t *testing.T) {
 
 func Test_getMultusAdmissionControllerReplicas(t *testing.T) {
 	type args struct {
-		bootstrapResult *bootstrap.BootstrapResult
+		bootstrapResult   *bootstrap.BootstrapResult
+		hypershiftEnabled bool
 	}
 	tests := []struct {
 		name string
 		args args
 		want int
 	}{
+		{
+			name: "External control plane, HyperShift,  highly available infra",
+			args: args{
+				bootstrapResult: &bootstrap.BootstrapResult{
+					Infra: bootstrap.InfraStatus{
+						ControlPlaneTopology: configv1.ExternalTopologyMode,
+						HostedControlPlane: &hyperv1.HostedControlPlane{
+							Spec: hyperv1.HostedControlPlaneSpec{
+								ControllerAvailabilityPolicy: hyperv1.HighlyAvailable,
+							},
+						},
+					},
+				},
+				hypershiftEnabled: true,
+			},
+			want: 2,
+		},
+		{
+			name: "External control plane, HyperShift, single-replica infra",
+			args: args{
+				bootstrapResult: &bootstrap.BootstrapResult{
+					Infra: bootstrap.InfraStatus{
+						ControlPlaneTopology: configv1.ExternalTopologyMode,
+						HostedControlPlane: &hyperv1.HostedControlPlane{
+							Spec: hyperv1.HostedControlPlaneSpec{
+								ControllerAvailabilityPolicy: hyperv1.SingleReplica,
+							},
+						},
+					},
+				},
+				hypershiftEnabled: true,
+			},
+			want: 1,
+		},
 		{
 			name: "External control plane, highly available infra",
 			args: args{
@@ -491,7 +527,7 @@ func Test_getMultusAdmissionControllerReplicas(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getMultusAdmissionControllerReplicas(tt.args.bootstrapResult); got != tt.want {
+			if got := getMultusAdmissionControllerReplicas(tt.args.bootstrapResult, tt.args.hypershiftEnabled); got != tt.want {
 				t.Errorf("getMultusAdmissionControllerReplicas() = %v, want %v", got, tt.want)
 			}
 		})

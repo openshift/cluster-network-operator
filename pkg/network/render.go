@@ -17,6 +17,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
+	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -724,10 +725,15 @@ func renderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 	return out, nil
 }
 
-func getMultusAdmissionControllerReplicas(bootstrapResult *bootstrap.BootstrapResult) int {
+func getMultusAdmissionControllerReplicas(bootstrapResult *bootstrap.BootstrapResult, hyperShiftEnabled bool) int {
 	replicas := 2
 	if bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode {
-		if bootstrapResult.Infra.InfrastructureTopology == configv1.SingleReplicaTopologyMode {
+		// In HyperShift check HostedControlPlane.ControllerAvailabilityPolicy, otherwise rely on Infra.InfrastructureTopology
+		if hyperShiftEnabled {
+			if bootstrapResult.Infra.HostedControlPlane.Spec.ControllerAvailabilityPolicy == hyperv1.SingleReplica {
+				replicas = 1
+			}
+		} else if bootstrapResult.Infra.InfrastructureTopology == configv1.SingleReplicaTopologyMode {
 			replicas = 1
 		}
 	} else if bootstrapResult.Infra.ControlPlaneTopology == configv1.SingleReplicaTopologyMode {

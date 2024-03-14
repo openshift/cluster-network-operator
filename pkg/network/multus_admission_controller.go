@@ -50,7 +50,8 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	objs := []*uns.Unstructured{}
 	var err error
 
-	replicas := getMultusAdmissionControllerReplicas(bootstrapResult)
+	hsc := platform.NewHyperShiftConfig()
+	replicas := getMultusAdmissionControllerReplicas(bootstrapResult, hsc.Enabled)
 	if ignoredNamespaces == "" {
 		ignoredNamespaces, err = getOpenshiftNamespaces(client)
 		if err != nil {
@@ -68,7 +69,6 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	data.Data["ExternalControlPlane"] = externalControlPlane
 	data.Data["Replicas"] = replicas
 	// Hypershift
-	hsc := platform.NewHyperShiftConfig()
 	data.Data["HyperShiftEnabled"] = hsc.Enabled
 	data.Data["ManagementClusterName"] = names.ManagementClusterName
 	data.Data["AdmissionControllerNamespace"] = "openshift-multus"
