@@ -1,7 +1,6 @@
 package network
 
 import (
-	v1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"net"
 	"os"
@@ -210,9 +209,7 @@ func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, bootstrapResult *bootst
 	data.Data["KubeProxyImage"] = os.Getenv("KUBE_PROXY_IMAGE")
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 	hsc := hypershift.NewHyperShiftConfig()
-	//TODO (relyt0925): when hypershift appropriately signs kube-apiserver certificate with node local
-	//address it is my recommendation to move to using the node local loadbalancer for all workload
-	if hsc.Enabled && bootstrapResult.Infra.PlatformType == v1.IBMCloudPlatformType {
+	if hsc.Enabled {
 		data.Data["KUBERNETES_SERVICE_HOST"] = bootstrapResult.Infra.HostedControlPlane.AdvertiseAddress
 		data.Data["KUBERNETES_SERVICE_PORT"] = strconv.Itoa(bootstrapResult.Infra.HostedControlPlane.AdvertisePort)
 	} else {

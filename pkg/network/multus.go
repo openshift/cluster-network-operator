@@ -71,9 +71,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 	data.Data["EgressRouterImage"] = os.Getenv("EGRESS_ROUTER_CNI_IMAGE")
 	data.Data["RouteOverrideImage"] = os.Getenv("ROUTE_OVERRRIDE_CNI_IMAGE")
 	hsc := hypershift.NewHyperShiftConfig()
-	//TODO (relyt0925): when hypershift appropriately signs kube-apiserver certificate with node local
-	//address it is my recommendation to move to using the node local loadbalancer for all workload
-	if hsc.Enabled && bootstrapResult.Infra.PlatformType == configv1.IBMCloudPlatformType {
+	if hsc.Enabled {
 		data.Data["KUBERNETES_SERVICE_HOST"] = bootstrapResult.Infra.HostedControlPlane.AdvertiseAddress
 		data.Data["KUBERNETES_SERVICE_PORT"] = strconv.Itoa(bootstrapResult.Infra.HostedControlPlane.AdvertisePort)
 	} else {
