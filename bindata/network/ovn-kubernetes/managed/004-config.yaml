@@ -59,6 +59,16 @@ data:
 {{- if (index . "V6JoinSubnet") }}
     v6-join-subnet="{{.V6JoinSubnet}}"
 {{- end }}
+{{- if or (index . "V4TransitSwitchSubnet") (index . "V6TransitSwitchSubnet")}}
+
+    [clustermanager]
+    {{- if (index . "V4TransitSwitchSubnet")}}
+    v4-transit-switch-subnet="{{.V4TransitSwitchSubnet}}"
+    {{- end }}
+    {{- if (index . "V6TransitSwitchSubnet")}}
+    v6-transit-switch-subnet="{{.V6TransitSwitchSubnet}}"
+    {{- end }}
+{{- end  }}
 {{- if .OVNHybridOverlayEnable }}
 
     [hybridoverlay]
@@ -150,7 +160,16 @@ data:
 {{- if (index . "V6InternalMasqueradeSubnet")}}
     v6-internal-masquerade-subnet="{{.V6InternalMasqueradeSubnet}}"
 {{- end }}
+{{- if or (index . "V4TransitSwitchSubnet") (index . "V6TransitSwitchSubnet")}}
 
+    [clustermanager]
+    {{- if (index . "V4TransitSwitchSubnet")}}
+    v4-transit-switch-subnet="{{.V4TransitSwitchSubnet}}"
+    {{- end }}
+    {{- if (index . "V6TransitSwitchSubnet")}}
+    v6-transit-switch-subnet="{{.V6TransitSwitchSubnet}}"
+    {{- end }}
+{{- end  }}
 
     [logging]
     libovsdblogfile=/var/log/ovnkube/libovsdb.log

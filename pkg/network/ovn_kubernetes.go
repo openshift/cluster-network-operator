@@ -27,7 +27,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/cluster-network-operator/pkg/util"
-	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -124,6 +123,22 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// TODO: this field is being deprecated and will turn into c.GatewayConfig.IPv4/6.InternalJoinSubnet when we introduce the transit switch config into the api
 	data.Data["V4JoinSubnet"] = c.V4InternalSubnet
 	data.Data["V6JoinSubnet"] = c.V6InternalSubnet
+	if c.IPv4 != nil {
+		if c.IPv4.InternalJoinSubnet != "" {
+			data.Data["V4JoinSubnet"] = c.IPv4.InternalJoinSubnet
+		}
+		if c.IPv4.InternalTransitSwitchSubnet != "" {
+			data.Data["V4TransitSwitchSubnet"] = c.IPv4.InternalTransitSwitchSubnet
+		}
+	}
+	if c.IPv6 != nil {
+		if c.IPv6.InternalJoinSubnet != "" {
+			data.Data["V6JoinSubnet"] = c.IPv6.InternalJoinSubnet
+		}
+		if c.IPv6.InternalTransitSwitchSubnet != "" {
+			data.Data["V6TransitSwitchSubnet"] = c.IPv6.InternalTransitSwitchSubnet
+		}
+	}
 	// v4 and v6InternalMasqueradeSubnet are used when the user wants to use the addresses that we reserve in ovn-k for ip masquerading
 	if c.GatewayConfig != nil && c.GatewayConfig.IPv4.InternalMasqueradeSubnet != "" {
 		data.Data["V4InternalMasqueradeSubnet"] = c.GatewayConfig.IPv4.InternalMasqueradeSubnet
@@ -846,131 +861,133 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 		if oc.GenevePort != nil && (*oc.GenevePort < 1 || *oc.GenevePort > 65535) {
 			out = append(out, errors.Errorf("invalid GenevePort %d", *oc.GenevePort))
 		}
-		var v4JoinNet, v6JoinNet, v4MasqNet, v6MasqNet *net.IPNet
+
 		var err error
+		// Validate whether join and transit switch CIDRs are from same IP family
+		// as clusterNetwork. Also validate whether provided CIDRs have enough IPs to
+		// allocate to all nodes scheduleable as per cluterNetwork CIDR and hostPrefix.
+		// Note: oc.V4InternalSubnet will be deprecated in future as per k8s guidelines
 		if oc.V4InternalSubnet != "" {
 			if !cnHasIPv4 {
 				out = append(out, errors.Errorf("v4InternalSubnet %s and ClusterNetwork must have matching IP families", oc.V4InternalSubnet))
 			}
-			_, v4JoinNet, err = net.ParseCIDR(oc.V4InternalSubnet)
+			_, _, err = net.ParseCIDR(oc.V4InternalSubnet)
 			if err != nil {
 				out = append(out, errors.Errorf("v4InternalSubnet is invalid: %s", err))
-			} else if !isV4InternalSubnetLargeEnough(conf) {
+			} else if !isV4SubnetLargeEnough(conf, oc.V4InternalSubnet) {
 				out = append(out, errors.Errorf("v4InternalSubnet %s is not large enough for the maximum number of nodes which can be supported by ClusterNetwork", oc.V4InternalSubnet))
 			}
-			if v4JoinNet != nil {
-				for _, cn := range conf.ClusterNetwork {
-					if utilnet.IsIPv4CIDRString(cn.CIDR) {
-						_, v4ClusterNet, _ := net.ParseCIDR(cn.CIDR)
-						if iputil.NetsOverlap(*v4JoinNet, *v4ClusterNet) {
-							out = append(out, errors.Errorf("v4InternalSubnet %s overlaps with ClusterNetwork %s", oc.V4InternalSubnet, cn.CIDR))
-						}
-					}
-				}
-				for _, sn := range conf.ServiceNetwork {
-					if utilnet.IsIPv4CIDRString(sn) {
-						_, v4ServiceNet, _ := net.ParseCIDR(sn)
-						if iputil.NetsOverlap(*v4JoinNet, *v4ServiceNet) {
-							out = append(out, errors.Errorf("v4InternalSubnet %s overlaps with ServiceNetwork %s", oc.V4InternalSubnet, sn))
-						}
-					}
-				}
-			}
 		}
+		// Note: oc.V6InternalSubnet will be deprecated in future as per k8s guidelines
 		if oc.V6InternalSubnet != "" {
 			if !cnHasIPv6 {
 				out = append(out, errors.Errorf("v6InternalSubnet %s and ClusterNetwork must have matching IP families", oc.V6InternalSubnet))
 			}
-			_, v6JoinNet, err = net.ParseCIDR(oc.V6InternalSubnet)
+			_, _, err = net.ParseCIDR(oc.V6InternalSubnet)
 			if err != nil {
 				out = append(out, errors.Errorf("v6InternalSubnet is invalid: %s", err))
-			} else if !isV6InternalSubnetLargeEnough(conf) {
+			} else if !isV6SubnetLargeEnough(conf, oc.V6InternalSubnet) {
 				out = append(out, errors.Errorf("v6InternalSubnet %s is not large enough for the maximum number of nodes which can be supported by ClusterNetwork", oc.V6InternalSubnet))
 			}
-			if v6JoinNet != nil {
-				for _, cn := range conf.ClusterNetwork {
-					if utilnet.IsIPv6CIDRString(cn.CIDR) {
-						_, v6ClusterNet, _ := net.ParseCIDR(cn.CIDR)
-						if iputil.NetsOverlap(*v6JoinNet, *v6ClusterNet) {
-							out = append(out, errors.Errorf("v6InternalSubnet %s overlaps with ClusterNetwork %s", oc.V6InternalSubnet, cn.CIDR))
-						}
-					}
+		}
+
+		if oc.IPv4 != nil {
+			if oc.IPv4.InternalJoinSubnet != "" {
+				if !cnHasIPv4 {
+					out = append(out, errors.Errorf("v4InternalJoinSubnet %s and ClusterNetwork must have matching IP families", oc.IPv4.InternalJoinSubnet))
 				}
-				for _, sn := range conf.ServiceNetwork {
-					if utilnet.IsIPv6CIDRString(sn) {
-						_, v6ServiceNet, _ := net.ParseCIDR(sn)
-						if iputil.NetsOverlap(*v6JoinNet, *v6ServiceNet) {
-							out = append(out, errors.Errorf("v6InternalSubnet %s overlaps with ServiceNetwork %s", oc.V6InternalSubnet, sn))
-						}
-					}
+				_, _, err = net.ParseCIDR(oc.IPv4.InternalJoinSubnet)
+				if err != nil {
+					out = append(out, errors.Errorf("v4InternalJoinSubnet is invalid: %s", err))
+				} else if !isV4SubnetLargeEnough(conf, oc.IPv4.InternalJoinSubnet) {
+					out = append(out, errors.Errorf("v4InternalJoinSubnet %s is not large enough for the maximum number of nodes which can be supported by ClusterNetwork", oc.IPv4.InternalJoinSubnet))
+				}
+			}
+
+			if oc.IPv4.InternalTransitSwitchSubnet != "" {
+				if !cnHasIPv4 {
+					out = append(out, errors.Errorf("v4InternalTransitSwitchSubnet %s and ClusterNetwork must have matching IP families", oc.IPv4.InternalTransitSwitchSubnet))
+				}
+				_, _, err = net.ParseCIDR(oc.IPv4.InternalTransitSwitchSubnet)
+				if err != nil {
+					out = append(out, errors.Errorf("v4InternalTransitSwitchSubnet is invalid: %s", err))
+				} else if !isV4SubnetLargeEnough(conf, oc.IPv4.InternalTransitSwitchSubnet) {
+					out = append(out, errors.Errorf("v4InternalTransitSwitchSubnet %s is not large enough for the maximum number of nodes which can be supported by ClusterNetwork", oc.IPv4.InternalTransitSwitchSubnet))
 				}
 			}
 		}
 
+		if oc.IPv6 != nil {
+			if oc.IPv6.InternalJoinSubnet != "" {
+				if !cnHasIPv6 {
+					out = append(out, errors.Errorf("v6InternalJoinSubnet %s and ClusterNetwork must have matching IP families", oc.IPv6.InternalJoinSubnet))
+				}
+				_, _, err = net.ParseCIDR(oc.IPv6.InternalJoinSubnet)
+				if err != nil {
+					out = append(out, errors.Errorf("v6InternalJoinSubnet is invalid: %s", err))
+				} else if !isV6SubnetLargeEnough(conf, oc.IPv6.InternalJoinSubnet) {
+					out = append(out, errors.Errorf("v6InternalJoinSubnet %s is not large enough for the maximum number of nodes which can be supported by ClusterNetwork", oc.IPv6.InternalJoinSubnet))
+				}
+			}
+
+			if oc.IPv6.InternalTransitSwitchSubnet != "" {
+				if !cnHasIPv6 {
+					out = append(out, errors.Errorf("v6InternalTransitSwitchSubnet %s and ClusterNetwork must have matching IP families", oc.IPv6.InternalTransitSwitchSubnet))
+				}
+				_, _, err = net.ParseCIDR(oc.IPv6.InternalTransitSwitchSubnet)
+				if err != nil {
+					out = append(out, errors.Errorf("v6InternalTransitSwitchSubnet is invalid: %s", err))
+				} else if !isV6SubnetLargeEnough(conf, oc.IPv6.InternalTransitSwitchSubnet) {
+					out = append(out, errors.Errorf("v6InternalTransitSwitchSubnet %s is not large enough for the maximum number of nodes which can be supported by ClusterNetwork", oc.IPv6.InternalTransitSwitchSubnet))
+				}
+			}
+		}
+
+		// oc.V4InternalSubnet and oc.IPv4.InternalJoinSubnet both must be same if present
+		if oc.V4InternalSubnet != "" && oc.IPv4 != nil {
+			if oc.V4InternalSubnet != oc.IPv4.InternalJoinSubnet {
+				out = append(out, errors.Errorf("v4InternalSubnet will be deprecated soon, until then it must be same as v4InternalJoinSubnet %s ", oc.IPv4.InternalJoinSubnet))
+			}
+		} else if oc.V4InternalSubnet != "" && oc.IPv4 == nil {
+			out = append(out, errors.Errorf("value of v4InternalSubnet needs to be same as v4InternalJoinSubnet"))
+		} else if oc.V4InternalSubnet == "" && oc.IPv4 != nil {
+			if oc.IPv4.InternalJoinSubnet != "" {
+				out = append(out, errors.Errorf("value of v4InternalSubnet needs to be same as v4InternalJoinSubnet"))
+			}
+		}
+
+		// oc.V6InternalSubnet and oc.IPv6.InternalJoinSubnet both must be same if present
+		if oc.V6InternalSubnet != "" && oc.IPv6 != nil {
+			if oc.V6InternalSubnet != oc.IPv6.InternalJoinSubnet {
+				out = append(out, errors.Errorf("v6InternalSubnet will be deprecated soon, until then it must be same as v6InternalJoinSubnet %s ", oc.IPv6.InternalJoinSubnet))
+			}
+		} else if oc.V6InternalSubnet != "" && oc.IPv6 == nil {
+			out = append(out, errors.Errorf("value of v6InternalSubnet needs to be same as v6InternalJoinSubnet"))
+		} else if oc.V6InternalSubnet == "" && oc.IPv6 != nil {
+			if oc.IPv6.InternalJoinSubnet != "" {
+				out = append(out, errors.Errorf("value of v6InternalSubnet needs to be same as v6InternalJoinSubnet"))
+			}
+		}
+
 		// Gateway Configurable Subnet Checks
+		//Validate whether masquerade CIDR is from same IP family as clusterNetwork.
 		if oc.GatewayConfig != nil {
 			if oc.GatewayConfig.IPv4.InternalMasqueradeSubnet != "" {
 				if !cnHasIPv4 {
 					out = append(out, errors.Errorf("v4InternalMasqueradeSubnet %s and ClusterNetwork must have matching IP families", oc.GatewayConfig.IPv4.InternalMasqueradeSubnet))
 				}
-				_, v4MasqNet, err = net.ParseCIDR(oc.GatewayConfig.IPv4.InternalMasqueradeSubnet)
+				_, _, err = net.ParseCIDR(oc.GatewayConfig.IPv4.InternalMasqueradeSubnet)
 				if err != nil {
 					out = append(out, errors.Errorf("v4InternalMasqueradeSubnet is invalid: %s", err))
 				}
-				if v4MasqNet != nil {
-					for _, cn := range conf.ClusterNetwork {
-						if utilnet.IsIPv4CIDRString(cn.CIDR) {
-							_, v4ClusterNet, _ := net.ParseCIDR(cn.CIDR)
-							if iputil.NetsOverlap(*v4MasqNet, *v4ClusterNet) {
-								out = append(out, errors.Errorf("v4InternalMasqueradeSubnet %s overlaps with ClusterNetwork %s", oc.GatewayConfig.IPv4.InternalMasqueradeSubnet, cn.CIDR))
-							}
-						}
-					}
-					for _, sn := range conf.ServiceNetwork {
-						if utilnet.IsIPv4CIDRString(sn) {
-							_, v4ServiceNet, _ := net.ParseCIDR(sn)
-							if iputil.NetsOverlap(*v4MasqNet, *v4ServiceNet) {
-								out = append(out, errors.Errorf("v4InternalMasqueradeSubnet %s overlaps with ServiceNetwork %s", oc.GatewayConfig.IPv4.InternalMasqueradeSubnet, sn))
-							}
-						}
-					}
-					if oc.V4InternalSubnet != "" && v4JoinNet != nil {
-						if iputil.NetsOverlap(*v4JoinNet, *v4MasqNet) {
-							out = append(out, errors.Errorf("v4InternalMasqueradeSubnet %s overlaps with v4InternalSubnet %s", oc.GatewayConfig.IPv4.InternalMasqueradeSubnet, oc.V4InternalSubnet))
-						}
-					}
-				} //TODO: ADD a utility to check for overlap between ovn-k configured subnets i.e. masq subnet, join subnet, and upcoming transit switch subnet
 			}
 			if oc.GatewayConfig.IPv6.InternalMasqueradeSubnet != "" {
 				if !cnHasIPv6 {
 					out = append(out, errors.Errorf("v6InternalMasqueradeSubnet %s and ClusterNetwork must have matching IP families", oc.GatewayConfig.IPv6.InternalMasqueradeSubnet))
 				}
-				_, v6MasqNet, err = net.ParseCIDR(oc.GatewayConfig.IPv6.InternalMasqueradeSubnet)
+				_, _, err = net.ParseCIDR(oc.GatewayConfig.IPv6.InternalMasqueradeSubnet)
 				if err != nil {
 					out = append(out, errors.Errorf("v6InternalMasqueradeSubnet is invalid: %s", err))
-				}
-				if v6MasqNet != nil {
-					for _, cn := range conf.ClusterNetwork {
-						if utilnet.IsIPv6CIDRString(cn.CIDR) {
-							_, v6ClusterNet, _ := net.ParseCIDR(cn.CIDR)
-							if iputil.NetsOverlap(*v6MasqNet, *v6ClusterNet) {
-								out = append(out, errors.Errorf("v6InternalMasqueradeSubnet %s overlaps with ClusterNetwork %s", oc.GatewayConfig.IPv6.InternalMasqueradeSubnet, cn.CIDR))
-							}
-						}
-					}
-					for _, sn := range conf.ServiceNetwork {
-						if utilnet.IsIPv6CIDRString(sn) {
-							_, v6ServiceNet, _ := net.ParseCIDR(sn)
-							if iputil.NetsOverlap(*v6MasqNet, *v6ServiceNet) {
-								out = append(out, errors.Errorf("v6InternalMasqueradeSubnet %s overlaps with ServiceNetwork %s", oc.GatewayConfig.IPv6.InternalMasqueradeSubnet, sn))
-							}
-						}
-					}
-					if v6JoinNet != nil {
-						if iputil.NetsOverlap(*v6JoinNet, *v6MasqNet) {
-							out = append(out, errors.Errorf("v6InternalMasqueradeSubnet %s overlaps with v6InternalSubnet %s", oc.GatewayConfig.IPv6.InternalMasqueradeSubnet, oc.V6InternalSubnet))
-						}
-					}
 				}
 			}
 		}
@@ -1761,9 +1778,8 @@ func setOVNObjectAnnotation(objs []*uns.Unstructured, key, value string) error {
 	return nil
 }
 
-func isV4InternalSubnetLargeEnough(conf *operv1.NetworkSpec) bool {
+func isV4SubnetLargeEnough(conf *operv1.NetworkSpec, subnet string) bool {
 	var maxNodesNum int
-	subnet := conf.DefaultNetwork.OVNKubernetesConfig.V4InternalSubnet
 	addrLen := 32
 	for _, n := range conf.ClusterNetwork {
 		if utilnet.IsIPv6CIDRString(n.CIDR) {
@@ -1779,10 +1795,9 @@ func isV4InternalSubnetLargeEnough(conf *operv1.NetworkSpec) bool {
 	return maxNodesNum < (1<<(addrLen-intSubnetMask) - 3)
 }
 
-func isV6InternalSubnetLargeEnough(conf *operv1.NetworkSpec) bool {
+func isV6SubnetLargeEnough(conf *operv1.NetworkSpec, subnet string) bool {
 	var addrLen uint32
 	maxNodesNum, nodesNum, capacity := new(big.Int), new(big.Int), new(big.Int)
-	subnet := conf.DefaultNetwork.OVNKubernetesConfig.V6InternalSubnet
 	addrLen = 128
 	for _, n := range conf.ClusterNetwork {
 		if !utilnet.IsIPv6CIDRString(n.CIDR) {

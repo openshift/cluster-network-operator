@@ -476,7 +476,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 			ipv4Service = true
 		}
 		if err := pool.Add(*cidr); err != nil {
-			errs = append(errs, err)
+			errs = append(errs, errors.Errorf("Whole or subset of ServiceNetwork CIDR %s is already in use: %s", snet, err))
 		}
 	}
 
@@ -519,7 +519,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 			}
 		}
 		if err := pool.Add(*cidr); err != nil {
-			errs = append(errs, err)
+			errs = append(errs, errors.Errorf("Whole or subset of ClusterNetwork CIDR %s is already in use: %s", cnet.CIDR, err))
 		}
 	}
 
@@ -530,6 +530,80 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 		errs = append(errs, errors.Errorf("spec.clusterNetwork and spec.serviceNetwork must either both be IPv4-only, both be IPv6-only, or both be dual-stack"))
 	}
 
+	oc := conf.DefaultNetwork.OVNKubernetesConfig
+	if oc != nil {
+		if oc.IPv4 != nil {
+			// Check whether IPv4 join switch subnet overlaps with any other configurable subnet
+			if oc.IPv4.InternalJoinSubnet != "" {
+				_, ipv4JoinSwitchCidr, err := net.ParseCIDR(oc.IPv4.InternalJoinSubnet)
+				if err != nil {
+					errs = append(errs, errors.Errorf("could not parse v4InternalJoinSubnet %s", oc.IPv4.InternalJoinSubnet))
+				}
+				if err := pool.Add(*ipv4JoinSwitchCidr); err != nil {
+					errs = append(errs, errors.Errorf("Whole or subset of v4InternalJoinSubnet CIDR %s is already in use: %s", oc.IPv4.InternalJoinSubnet, err))
+				}
+			}
+
+			// Check whether IPv4 transit switch subnet overlaps with any other configurable subnet
+			if oc.IPv4.InternalTransitSwitchSubnet != "" {
+				_, ipv4TransitSwitchCidr, err := net.ParseCIDR(oc.IPv4.InternalTransitSwitchSubnet)
+				if err != nil {
+					errs = append(errs, errors.Errorf("could not parse v4InternalTransitSwitchSubnet %s", oc.IPv4.InternalTransitSwitchSubnet))
+				}
+				if err := pool.Add(*ipv4TransitSwitchCidr); err != nil {
+					errs = append(errs, errors.Errorf("Whole or subset of v4InternalTransitSwitchSubnet CIDR %s is already in use: %s", oc.IPv4.InternalTransitSwitchSubnet, err))
+				}
+			}
+		}
+
+		if oc.IPv6 != nil {
+			// // Check whether IPv6 join switch subnet overlaps with any other configurable subnet
+			if oc.IPv6.InternalJoinSubnet != "" {
+				_, ipv6JoinSwitchCidr, err := net.ParseCIDR(oc.IPv6.InternalJoinSubnet)
+				if err != nil {
+					errs = append(errs, errors.Errorf("could not parse v6InternalJoinSubnet %s", oc.IPv6.InternalJoinSubnet))
+				}
+				if err := pool.Add(*ipv6JoinSwitchCidr); err != nil {
+					errs = append(errs, errors.Errorf("Whole or subset of v6InternalJoinSubnet CIDR %s is already in use: %s", oc.IPv6.InternalJoinSubnet, err))
+				}
+			}
+
+			// Check whether IPv6 transit switch subnet overlaps with any other configurable subnet
+			if oc.IPv6.InternalTransitSwitchSubnet != "" {
+				_, ipv6TransitSwitchCidr, err := net.ParseCIDR(oc.IPv6.InternalTransitSwitchSubnet)
+				if err != nil {
+					errs = append(errs, errors.Errorf("could not parse v6InternalTransitSwitchSubnet %s", oc.IPv6.InternalTransitSwitchSubnet))
+				}
+				if err := pool.Add(*ipv6TransitSwitchCidr); err != nil {
+					errs = append(errs, errors.Errorf("Whole or subset of v6InternalTransitSwitchSubnet CIDR %s is already in use: %s", oc.IPv6.InternalTransitSwitchSubnet, err))
+				}
+			}
+		}
+
+		if oc.GatewayConfig != nil {
+			// Check whether IPv4 Masquerade subnet overlaps with any other configurable subnet
+			if oc.GatewayConfig.IPv4.InternalMasqueradeSubnet != "" {
+				_, ipv4MasqueradeCidr, err := net.ParseCIDR(oc.GatewayConfig.IPv4.InternalMasqueradeSubnet)
+				if err != nil {
+					errs = append(errs, errors.Errorf("could not parse v4InternalMasqueradeSubnet %s", oc.GatewayConfig.IPv4.InternalMasqueradeSubnet))
+				}
+				if err := pool.Add(*ipv4MasqueradeCidr); err != nil {
+					errs = append(errs, errors.Errorf("Whole or subset of v4InternalMasqueradeSubnet CIDR %s is already in use: %s", oc.GatewayConfig.IPv4.InternalMasqueradeSubnet, err))
+				}
+			}
+
+			// Check whether IPv6 Masquerade subnet overlaps with any other configurable subnet
+			if oc.GatewayConfig.IPv6.InternalMasqueradeSubnet != "" {
+				_, ipv6MasqueradeCidr, err := net.ParseCIDR(oc.GatewayConfig.IPv6.InternalMasqueradeSubnet)
+				if err != nil {
+					errs = append(errs, errors.Errorf("could not parse v6InternalMasqueradeSubnet %s", oc.GatewayConfig.IPv6.InternalMasqueradeSubnet))
+				}
+				if err := pool.Add(*ipv6MasqueradeCidr); err != nil {
+					errs = append(errs, errors.Errorf("Whole or subset of v6InternalMasqueradeSubnet CIDR %s is already in use: %s", oc.GatewayConfig.IPv6.InternalMasqueradeSubnet, err))
+				}
+			}
+		}
+	}
 	return errs
 }
 
