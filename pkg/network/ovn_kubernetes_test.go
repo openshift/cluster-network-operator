@@ -1020,7 +1020,6 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	crd := OVNKubernetesConfig.DeepCopy()
 	config := &crd.Spec
 	ovnConfig := config.DefaultNetwork.OVNKubernetesConfig
-	ovnConfig.GatewayConfig = &operv1.GatewayConfig{}
 
 	err := validateOVNKubernetes(config)
 	g.Expect(err).To(BeEmpty())
@@ -1033,31 +1032,6 @@ func TestValidateOVNKubernetes(t *testing.T) {
 				ContainSubstring(substr))))
 	}
 
-	errNotExpect := func(substr string) {
-		t.Helper()
-		g.Expect(validateOVNKubernetes(config)).To(
-			Not(
-				ContainElement(MatchError(
-					ContainSubstring(substr)))))
-	}
-
-	ovnConfig.V4InternalSubnet = "100.64.0.0/22"
-	errExpect("v4InternalSubnet 100.64.0.0/22 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
-	ovnConfig.V4InternalSubnet = "100.64.0.0/21"
-	errNotExpect("v4InternalSubnet 100.64.0.0/21 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
-	ovnConfig.V6InternalSubnet = "fd01::/48"
-	errExpect("v6InternalSubnet fd01::/48 and ClusterNetwork must have matching IP families")
-	ovnConfig.V4InternalSubnet = "10.128.0.0/16"
-	errExpect("v4InternalSubnet 10.128.0.0/16 overlaps with ClusterNetwork 10.128.0.0/15")
-	ovnConfig.V4InternalSubnet = "172.30.0.0/18"
-	errExpect("v4InternalSubnet 172.30.0.0/18 overlaps with ServiceNetwork 172.30.0.0/16")
-	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "10.128.0.0/16"
-	errExpect("v4InternalMasqueradeSubnet 10.128.0.0/16 overlaps with ClusterNetwork 10.128.0.0/15")
-	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd01::/48"
-	errExpect("v6InternalMasqueradeSubnet fd01::/48 and ClusterNetwork must have matching IP families")
-	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "172.30.0.0/18"
-	errExpect("v4InternalMasqueradeSubnet 172.30.0.0/18 overlaps with ServiceNetwork 172.30.0.0/16")
-
 	// set mtu to insanity
 	ovnConfig.MTU = ptrToUint32(70000)
 	errExpect("invalid MTU 70000")
@@ -1066,30 +1040,9 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	ovnConfig.GenevePort = ptrToUint32(70001)
 	errExpect("invalid GenevePort 70001")
 
-	config.ServiceNetwork = []string{"fd02::/112"}
 	config.ClusterNetwork = []operv1.ClusterNetworkEntry{{
 		CIDR: "fd01::/48", HostPrefix: 64,
 	}}
-	errExpect("v4InternalSubnet 172.30.0.0/18 and ClusterNetwork must have matching IP families")
-	errExpect("v4InternalMasqueradeSubnet 172.30.0.0/18 and ClusterNetwork must have matching IP families")
-	ovnConfig.V6InternalSubnet = "fd01::/64"
-	errExpect("v6InternalSubnet fd01::/64 overlaps with ClusterNetwork fd01::/48")
-	ovnConfig.V6InternalSubnet = "fd03::/112"
-	errExpect("v6InternalSubnet fd03::/112 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
-	ovnConfig.V6InternalSubnet = "fd03::/111"
-	errNotExpect("v6InternalSubnet fd03::/111 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
-	ovnConfig.V6InternalSubnet = "fd02::/64"
-	errExpect("v6InternalSubnet fd02::/64 overlaps with ServiceNetwork fd02::/112")
-	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd01::/64"
-	errExpect("v6InternalMasqueradeSubnet fd01::/64 overlaps with ClusterNetwork fd01::/48")
-	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd02::/64"
-	errExpect("v6InternalMasqueradeSubnet fd02::/64 overlaps with ServiceNetwork fd02::/112")
-	ovnConfig.V4InternalSubnet = "100.99.0.0/16"
-	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "100.99.0.0/16"
-	errExpect("v4InternalMasqueradeSubnet 100.99.0.0/16 overlaps with v4InternalSubnet 100.99.0.0/16")
-	ovnConfig.V6InternalSubnet = "fd69::/125"
-	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd69::/125"
-	errExpect("v6InternalMasqueradeSubnet fd69::/125 overlaps with v6InternalSubnet fd69::/125")
 
 	// invalid ipv6 mtu
 	ovnConfig.MTU = ptrToUint32(576)
@@ -1097,6 +1050,166 @@ func TestValidateOVNKubernetes(t *testing.T) {
 
 	config.ClusterNetwork = nil
 	errExpect("ClusterNetwork cannot be empty")
+}
+
+func TestValidateOVNKubernetesSubnetsIPv4(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+	ovnConfig := config.DefaultNetwork.OVNKubernetesConfig
+	ovnConfig.GatewayConfig = &operv1.GatewayConfig{}
+	ovnConfig.IPv4 = &operv1.IPv4OVNKubernetesConfig{}
+	ovnConfig.IPv6 = &operv1.IPv6OVNKubernetesConfig{}
+
+	err := validateOVNKubernetesSubnets(config)
+	g.Expect(err).NotTo(HaveOccurred())
+	fillDefaults(config, nil)
+
+	errExpect := func(substr string) {
+		t.Helper()
+		g.Expect(validateOVNKubernetesSubnets(config)).To(
+			ContainElement(MatchError(
+				ContainSubstring(substr))))
+	}
+
+	errNotExpect := func(substr string) {
+		t.Helper()
+		g.Expect(validateOVNKubernetesSubnets(config)).To(
+			Not(
+				ContainElement(MatchError(
+					ContainSubstring(substr)))))
+	}
+	// IP family(IPv4) and subnet length check
+	ovnConfig.V4InternalSubnet = "100.64.0.0/22"
+	errExpect("v4InternalJoinSubnet 100.64.0.0/22 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.V6InternalSubnet = "fd01::/48"
+	errExpect("JoinSubnet fd01::/48 and ClusterNetwork must have matching IP families")
+	ovnConfig.V4InternalSubnet = "100.64.0.0/21"
+	errNotExpect("v4InternalJoinSubnet 100.64.0.0/21 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.IPv4.InternalJoinSubnet = "100.64.0.0/22"
+	ovnConfig.V4InternalSubnet = ""
+	errNotExpect("v4InternalSubnet will be deprecated soon, until then it must be same as v4InternalJoinSubnet 100.64.0.0/22")
+	errExpect("v4InternalJoinSubnet 100.64.0.0/22 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.IPv4.InternalJoinSubnet = "100.64.0.0/21"
+	errNotExpect("v4InternalJoinSubnet 100.64.0.0/21 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.IPv6.InternalJoinSubnet = "fd01::/48"
+	errExpect("JoinSubnet fd01::/48 and ClusterNetwork must have matching IP families")
+	ovnConfig.IPv4.InternalJoinSubnet = "100.64.0.0/22"
+	ovnConfig.V4InternalSubnet = "100.64.0.0/22"
+	errNotExpect("v4InternalSubnet will be deprecated soon, until then it must be same as v4InternalJoinSubnet 100.64.0.0/22")
+	ovnConfig.IPv4.InternalJoinSubnet = "100.64.0.0/23"
+	ovnConfig.V4InternalSubnet = "100.64.0.0/22"
+	errExpect("v4InternalSubnet will be deprecated soon, until then it must be same as v4InternalJoinSubnet 100.64.0.0/23")
+	ovnConfig.IPv4.InternalTransitSwitchSubnet = "100.88.0.0/22"
+	errExpect("v4InternalTransitSwitchSubnet 100.88.0.0/22 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.IPv4.InternalTransitSwitchSubnet = "100.88.0.0/21"
+	errNotExpect("v4InternalTransitSwitchSubnet 100.88.0.0/21 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.IPv6.InternalTransitSwitchSubnet = "fd97::/48"
+	errExpect("v6InternalTransitSwitchSubnet fd97::/48 and ClusterNetwork must have matching IP families")
+	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd01::/48"
+	errExpect("v6InternalMasqueradeSubnet fd01::/48 and ClusterNetwork must have matching IP families")
+
+	// IPv4 subnet overlap check
+	ovnConfig.V4InternalSubnet = ""
+	ovnConfig.IPv4.InternalJoinSubnet = "10.128.0.0/16"
+	errExpect("Whole or subset of v4InternalJoinSubnet CIDR 10.128.0.0/16 is already in use: CIDRs 10.128.0.0/15 and 10.128.0.0/16 overlap")
+	ovnConfig.IPv4.InternalTransitSwitchSubnet = "10.128.0.0/16"
+	errExpect("Whole or subset of v4InternalTransitSwitchSubnet CIDR 10.128.0.0/16 is already in use: CIDRs 10.128.0.0/15 and 10.128.0.0/16 overlap")
+	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "10.128.0.0/16"
+	errExpect("Whole or subset of v4InternalMasqueradeSubnet CIDR 10.128.0.0/16 is already in use: CIDRs 10.128.0.0/15 and 10.128.0.0/16 overlap")
+	ovnConfig.IPv4.InternalJoinSubnet = "100.99.0.0/16"
+	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "100.99.0.0/16"
+	errExpect("Whole or subset of v4InternalMasqueradeSubnet CIDR 100.99.0.0/16 is already in use: CIDRs 100.99.0.0/16 and 100.99.0.0/16 overlap")
+	ovnConfig.IPv4.InternalJoinSubnet = "100.99.0.0/16"
+	ovnConfig.IPv4.InternalTransitSwitchSubnet = "100.99.0.0/16"
+	errExpect("Whole or subset of v4InternalTransitSwitchSubnet CIDR 100.99.0.0/16 is already in use: CIDRs 100.99.0.0/16 and 100.99.0.0/16 overlap")
+	ovnConfig.IPv4.InternalTransitSwitchSubnet = "100.99.0.0/16"
+	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "100.99.0.0/16"
+	errExpect("Whole or subset of v4InternalMasqueradeSubnet CIDR 100.99.0.0/16 is already in use: CIDRs 100.99.0.0/16 and 100.99.0.0/16 overlap")
+}
+
+func TestValidateOVNKubernetesSubnetsIPv6(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+	ovnConfig := config.DefaultNetwork.OVNKubernetesConfig
+	ovnConfig.GatewayConfig = &operv1.GatewayConfig{}
+	ovnConfig.IPv4 = &operv1.IPv4OVNKubernetesConfig{}
+	ovnConfig.IPv6 = &operv1.IPv6OVNKubernetesConfig{}
+
+	err := validateOVNKubernetesSubnets(config)
+	g.Expect(err).NotTo(HaveOccurred())
+	fillDefaults(config, nil)
+
+	errExpect := func(substr string) {
+		t.Helper()
+		g.Expect(validateOVNKubernetesSubnets(config)).To(
+			ContainElement(MatchError(
+				ContainSubstring(substr))))
+	}
+
+	errNotExpect := func(substr string) {
+		t.Helper()
+		g.Expect(validateOVNKubernetesSubnets(config)).To(
+			Not(
+				ContainElement(MatchError(
+					ContainSubstring(substr)))))
+	}
+
+	config.ServiceNetwork = []string{"fd02::/112"}
+	config.ClusterNetwork = []operv1.ClusterNetworkEntry{{
+		CIDR: "fd01::/48", HostPrefix: 64,
+	}}
+
+	// IP family(IPv6) and subnet length check
+	ovnConfig.V6InternalSubnet = "fd03::/112"
+	errExpect("v6InternalJoinSubnet fd03::/112 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.V4InternalSubnet = "100.64.0.0/22"
+	errExpect("JoinSubnet 100.64.0.0/22 and ClusterNetwork must have matching IP families")
+	ovnConfig.V6InternalSubnet = "fd03::/111"
+	errNotExpect("v6InternalJoinSubnet fd03::/111 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.IPv6.InternalJoinSubnet = "fd03::/112"
+	ovnConfig.V6InternalSubnet = ""
+	errNotExpect("v6InternalJoinSubnet will be deprecated soon, until then it must be same as v6InternalJoinSubnet fd03::/112")
+	errExpect("v6InternalJoinSubnet fd03::/112 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.IPv6.InternalJoinSubnet = "fd03::/111"
+	errNotExpect("v6InternalJoinSubnet fd03::/111 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.IPv4.InternalJoinSubnet = "100.64.0.0/22"
+	errExpect("JoinSubnet 100.64.0.0/22 and ClusterNetwork must have matching IP families")
+	ovnConfig.IPv6.InternalJoinSubnet = "fd03::/112"
+	ovnConfig.V6InternalSubnet = "fd03::/112"
+	errNotExpect("v6InternalSubnet will be deprecated soon, until then it must be same as v6InternalJoinSubnet fd03::/112")
+	ovnConfig.IPv6.InternalJoinSubnet = "fd03::/112"
+	ovnConfig.V6InternalSubnet = "fd03::/113"
+	errExpect("v6InternalSubnet will be deprecated soon, until then it must be same as v6InternalJoinSubnet fd03::/112")
+	ovnConfig.IPv6.InternalTransitSwitchSubnet = "fd03::/112"
+	errExpect("v6InternalTransitSwitchSubnet fd03::/112 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.IPv6.InternalTransitSwitchSubnet = "fd03::/111"
+	errNotExpect("v6InternalTransitSwitchSubnet fd03::/111 is not large enough for the maximum number of nodes which can be supported by ClusterNetwork")
+	ovnConfig.IPv4.InternalTransitSwitchSubnet = "100.88.0.0/22"
+	errExpect("v4InternalTransitSwitchSubnet 100.88.0.0/22 and ClusterNetwork must have matching IP families")
+	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "169.254.169.0/29"
+	errExpect("v4InternalMasqueradeSubnet 169.254.169.0/29 and ClusterNetwork must have matching IP families")
+
+	// IPv6 subnet overlap check
+	ovnConfig.V6InternalSubnet = ""
+	ovnConfig.IPv6.InternalJoinSubnet = "fd01::/64"
+	errExpect("Whole or subset of v6InternalJoinSubnet CIDR fd01::/64 is already in use: CIDRs fd01::/48 and fd01::/64 overlap")
+	ovnConfig.IPv6.InternalTransitSwitchSubnet = "fd01::/64"
+	errExpect("Whole or subset of v6InternalTransitSwitchSubnet CIDR fd01::/64 is already in use: CIDRs fd01::/48 and fd01::/64 overlap")
+	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd01::/64"
+	errExpect("Whole or subset of v6InternalMasqueradeSubnet CIDR fd01::/64 is already in use: CIDRs fd01::/48 and fd01::/64 overlap")
+	ovnConfig.IPv6.InternalJoinSubnet = "fd69::/111"
+	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd69::/111"
+	errExpect("Whole or subset of v6InternalMasqueradeSubnet CIDR fd69::/111 is already in use: CIDRs fd69::/111 and fd69::/111 overlap")
+	ovnConfig.IPv6.InternalJoinSubnet = "fd69::/111"
+	ovnConfig.IPv6.InternalTransitSwitchSubnet = "fd69::/111"
+	errExpect("Whole or subset of v6InternalTransitSwitchSubnet CIDR fd69::/111 is already in use: CIDRs fd69::/111 and fd69::/111 overlap")
+	ovnConfig.IPv6.InternalTransitSwitchSubnet = "fd69::/111"
+	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd69::/111"
+	errExpect("Whole or subset of v6InternalMasqueradeSubnet CIDR fd69::/111 is already in use: CIDRs fd69::/111 and fd69::/111 overlap")
 }
 
 func TestValidateOVNKubernetesDualStack(t *testing.T) {
