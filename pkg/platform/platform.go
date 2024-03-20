@@ -30,7 +30,17 @@ var cloudProviderConfig = types.NamespacedName{
 // isNetworkNodeIdentityEnabled determines if network node identity should be enabled.
 // It checks the `enabled` key in the network-node-identity/openshift-network-operator configmap.
 // If the configmap doesn't exist, it returns true (the feature is enabled by default).
-func isNetworkNodeIdentityEnabled(client cnoclient.Client) (bool, error) {
+func isNetworkNodeIdentityEnabled(client cnoclient.Client, infra *bootstrap.InfraStatus) (bool, error) {
+	if infra.ControlPlaneTopology == configv1.ExternalTopologyMode &&
+		infra.PlatformType == configv1.IBMCloudPlatformType {
+		// In environments with external control plane topology, the API server is deployed out of cluster.
+		// This means that CNO cannot easily predict how to deploy and enforce the node identity webhook.
+		// IBMCloud uses an external control plane topology with Calico as the CNI for both HyperShift based ROKS
+		// deployments and IBM ROKS Toolkit based ROKS deployments.
+		klog.Infof("Network node identity is disabled on %s platorm", configv1.IBMCloudPlatformType)
+		return false, nil
+	}
+
 	nodeIdentity := &corev1.ConfigMap{}
 	nodeIdentityLookup := types.NamespacedName{Name: "network-node-identity", Namespace: names.APPLIED_NAMESPACE}
 	if err := client.ClientFor("").CRClient().Get(context.TODO(), nodeIdentityLookup, nodeIdentity); err != nil {
@@ -127,7 +137,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		}
 	}
 
-	netIDEnabled, err := isNetworkNodeIdentityEnabled(client)
+	netIDEnabled, err := isNetworkNodeIdentityEnabled(client, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine if network node identity should be enabled: %w", err)
 	}

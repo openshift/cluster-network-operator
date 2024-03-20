@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
@@ -52,15 +51,6 @@ func isBootstrapComplete(cli cnoclient.Client) (bool, error) {
 func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client cnoclient.Client) ([]*uns.Unstructured, error) {
 	if !bootstrapResult.Infra.NetworkNodeIdentityEnabled {
 		klog.Infof("Network node identity is disabled")
-		return nil, nil
-	}
-	if bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode &&
-		bootstrapResult.Infra.PlatformType == configv1.IBMCloudPlatformType {
-		// In environments with external control plane topology, the API server is deployed out of cluster.
-		// This means that CNO cannot easily predict how to deploy and enforce the node identity webhook.
-		// IBMCloud uses an external control plane topology with Calico as the CNI for both HyperShift based ROKS
-		// deployments and IBM ROKS Toolkit based ROKS deployments.
-		klog.Infof("Network node identity is disabled on %s platorm", configv1.IBMCloudPlatformType)
 		return nil, nil
 	}
 	data := render.MakeRenderData()
