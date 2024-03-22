@@ -55,22 +55,14 @@ oc annotate --local -o yaml \
 oc annotate --local -o yaml --overwrite \
   "${RELEASE_PROFILE}" \
   "${ROKS_PROFILE}" \
-  -f vendor/github.com/openshift/api/operator/v1/0000_70_cluster-network-operator_01-Default.crd.yaml > manifests/0000_70_cluster-network-operator_01-Default.crd.yaml
-oc annotate --local -o yaml --overwrite \
-  "${RELEASE_PROFILE}" \
-  "${ROKS_PROFILE}" \
-  -f vendor/github.com/openshift/api/operator/v1/0000_70_cluster-network-operator_01-CustomNoUpgrade.crd.yaml > manifests/0000_70_cluster-network-operator_01-CustomNoUpgrade.crd.yaml
-oc annotate --local -o yaml --overwrite \
-  "${RELEASE_PROFILE}" \
-  "${ROKS_PROFILE}" \
-  -f vendor/github.com/openshift/api/operator/v1/0000_70_cluster-network-operator_01-TechPreviewNoUpgrade.crd.yaml > manifests/0000_70_cluster-network-operator_01-TechPreviewNoUpgrade.crd.yaml
+  -f vendor/github.com/openshift/api/operator/v1/zz_generated.crd-manifests/0000_70_network_01_networks.crd.yaml > manifests/0000_70_network_01_networks.crd.yaml
 
 echo "${HEADER}" > manifests/0000_70_cluster-network-operator_01_egr_crd.yaml
 oc annotate --local -o yaml --overwrite \
   "${RELEASE_PROFILE}" \
   "${ROKS_PROFILE}" \
   "${SINGLE_NODE_DEV_PROFILE}" \
-  -f vendor/github.com/openshift/api/networkoperator/v1/001-egressrouter.crd.yaml >> manifests/0000_70_cluster-network-operator_01_egr_crd.yaml
+  -f vendor/github.com/openshift/api/networkoperator/v1/zz_generated.crd-manifests/001_egressrouters.crd.yaml >> manifests/0000_70_cluster-network-operator_01_egr_crd.yaml
 
 echo "${HEADER}" > bindata/cloud-network-config-controller/common/001-crd.yaml
-cat vendor/github.com/openshift/api/cloudnetwork/v1/001-cloudprivateipconfig.crd.yaml >> bindata/cloud-network-config-controller/common/001-crd.yaml
+cat vendor/github.com/openshift/api/cloudnetwork/v1/zz_generated.crd-manifests/001_cloudprivateipconfigs.crd.yaml >> bindata/cloud-network-config-controller/common/001-crd.yaml
