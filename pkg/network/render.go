@@ -676,10 +676,6 @@ func isMigrationChangeSafe(prev, next *operv1.NetworkSpec, infraStatus *bootstra
 	if next.Migration != nil && next.Migration.Mode == operv1.LiveNetworkMigrationMode && infraStatus.HostedControlPlane != nil {
 		return []error{errors.Errorf("live migration is unsupported in a HyperShift environment")}
 	}
-	if next.Migration != nil && next.Migration.Mode == operv1.LiveNetworkMigrationMode &&
-		!infraStatus.StandaloneManagedCluster {
-		return []error{errors.Errorf("live migration is unsupported on a self managed cluster")}
-	}
 	if prev.Migration != nil && next.Migration != nil && prev.Migration.NetworkType != next.Migration.NetworkType && next.Migration.Mode != operv1.LiveNetworkMigrationMode {
 		return []error{errors.Errorf("cannot change migration network type after migration has started")}
 	}
