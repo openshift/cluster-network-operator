@@ -1,31 +1,38 @@
 package network
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sort"
 	"strings"
 
-	"github.com/openshift/cluster-network-operator/pkg/names"
-	corev1 "k8s.io/api/core/v1"
-
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilnet "k8s.io/utils/net"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-
-	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/util/sets"
-	utilnet "k8s.io/utils/net"
 )
 
 var dualStackPlatforms = sets.NewString(
@@ -113,13 +120,14 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	}
 	objs = append(objs, o...)
 
+	// render network public
 	o, err = renderNetworkPublic(manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
-	// render
+	// render network node identity
 	o, err = renderNetworkNodeIdentity(operConf, bootstrapResult, manifestDir, client)
 	if err != nil {
 		return nil, progressing, err
@@ -137,6 +145,20 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 		return nil, progressing, err
 	}
 	objs = append(objs, o...)
+
+	// render networking console plugin
+	o, err = renderNetworkingConsolePlugin(manifestDir, client)
+	if err != nil {
+		return nil, progressing, err
+	}
+	if o != nil {
+		objs = append(objs, o...)
+	}
+
+	err = registerNetworkingConsolePlugin(client)
+	if err != nil {
+		return nil, progressing, err
+	}
 
 	log.Printf("Render phase done, rendered %d objects", len(objs))
 	return objs, progressing, nil
@@ -490,7 +512,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 			ipv4Service = true
 		}
 		if err := pool.Add(*cidr); err != nil {
-			errs = append(errs, errors.Errorf("Whole or subset of ServiceNetwork CIDR %s is already in use: %s", snet, err))
+			errs = append(errs, err)
 		}
 	}
 
@@ -533,7 +555,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 			}
 		}
 		if err := pool.Add(*cidr); err != nil {
-			errs = append(errs, errors.Errorf("Whole or subset of ClusterNetwork CIDR %s is already in use: %s", cnet.CIDR, err))
+			errs = append(errs, err)
 		}
 	}
 
@@ -886,6 +908,110 @@ func renderIPTablesAlerter(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.
 	return manifests, nil
 }
 
+// renderNetworkingConsolePlugin renders the common objects related to the networking console plugin resources
+func renderNetworkingConsolePlugin(manifestDir string, cl cnoclient.Client) ([]*uns.Unstructured, error) {
+	if !isConsolePluginCRDExist(cl) {
+		log.Printf("consoleplugins.console.openshift.io CRD does not exist yet")
+		return nil, nil
+	}
+
+	tmpFallbackConsoleImage := "quay.io/orenc/networking-console-plugin:4.16"
+	data := render.MakeRenderData()
+	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
+
+	val, ok := os.LookupEnv("NETWORKING_CONSOLE_PLUGIN_IMAGE")
+	if ok {
+		data.Data["NetworkingConsolePluginImage"] = val
+	} else {
+		data.Data["NetworkingConsolePluginImage"] = tmpFallbackConsoleImage
+	}
+
+	manifests, err := render.RenderDir(filepath.Join(manifestDir, "networking-console-plugin"), &data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to render networking-console-plugin manifests")
+	}
+	return manifests, nil
+}
+
+type Patch struct {
+	Type types.PatchType
+	Data []byte
+}
+
+// registerNetworkingConsolePlugin enables console plugin for networking-console if not already enabled
+func registerNetworkingConsolePlugin(cl cnoclient.Client) error {
+	if !isConsolePluginCRDExist(cl) {
+		return nil
+	}
+	pluginName := "networking-console-plugin"
+	clusterConsole := "cluster"
+	consoleKey := client.ObjectKey{Name: "cluster"}
+	consoleObj := &operv1.Console{}
+
+	crc := cl.Default().CRClient()
+	err := crc.Get(context.TODO(), consoleKey, consoleObj)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Printf("NOTICE: consoles.operator.openshift.io %s is not available yet.", clusterConsole)
+			return nil
+		}
+		return errors.Wrapf(err, "Could not get consoles.operator.openshift.io resource")
+	}
+
+	if stringInSlice(consoleObj.Spec.Plugins, pluginName) {
+		return nil
+	}
+
+	var patches []cnoclient.JsonPatch
+
+	if consoleObj.Spec.Plugins == nil {
+		patches = []cnoclient.JsonPatch{{
+			Op:    "add",
+			Path:  "/spec/plugins",
+			Value: []string{pluginName},
+		}}
+	} else {
+		patches = []cnoclient.JsonPatch{{
+			Op:    "add",
+			Path:  "/spec/plugins/-",
+			Value: pluginName,
+		}}
+	}
+
+	patchBytes, err := json.Marshal(patches)
+	patch := crclient.RawPatch(types.JSONPatchType, patchBytes)
+
+	if err != nil {
+		panic(err)
+	}
+
+	err = crc.Patch(context.TODO(), consoleObj, patch)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("registering console-plugin %q with console %q failed", pluginName, clusterConsole))
+	}
+	return nil
+}
+
 func isSupportedDualStackPlatform(platformType configv1.PlatformType) bool {
 	return dualStackPlatforms.Has(string(platformType))
+}
+
+func isConsolePluginCRDExist(cl cnoclient.Client) bool {
+	consolePluginCrdKey := client.ObjectKey{Name: "consoleplugins.console.openshift.io"}
+	consolePluginCrdObj := &apiextensionsv1.CustomResourceDefinition{}
+	err := cl.Default().CRClient().Get(context.TODO(), consolePluginCrdKey, consolePluginCrdObj)
+	if err != nil {
+		log.Printf("ERROR: unable to get consoleplugins.console.openshift.io CRD: %s", err.Error())
+	}
+	return err == nil
+}
+
+func stringInSlice(s []string, str string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+
+	return false
 }

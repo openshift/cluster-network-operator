@@ -61,3 +61,9 @@ type ClusterClient interface {
 
 	AddCustomInformer(inf cache.SharedInformer)
 }
+
+type JsonPatch struct {
+	Op    string      `json:"op"`
+	Path  string      `json:"path"`
+	Value interface{} `json:"value,omitempty"`
+}
