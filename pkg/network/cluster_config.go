@@ -116,9 +116,6 @@ func ValidateClusterConfig(clusterConfig *configv1.Network, client cnoclient.Cli
 		if infraRes.HostedControlPlane != nil {
 			return errors.Errorf("network type live migration is not supported on HyperShift clusters")
 		}
-		if !infraRes.StandaloneManagedCluster {
-			return errors.Errorf("network type live migration is not supported on self managed clusters")
-		}
 	}
 
 	return nil
