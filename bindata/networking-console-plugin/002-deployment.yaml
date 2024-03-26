@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: networking-console-plugin
+  namespace: openshift-network-console
+  annotations:
+    kubernetes.io/description: |
+      This deployment deploys the Networking console plugin pod which serves
+      the contents of the Networking section in OpenShift Console
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+    networkoperator.openshift.io/non-critical: ""
+  labels:
+    app.kubernetes.io/component: networking-console-plugin
+    app.kubernetes.io/managed-by: cluster-network-operator
+    app.kubernetes.io/name: networking-console-plugin
+    app.kubernetes.io/part-of: cluster-network-operator
+spec:
+  replicas: {{.Replicas}}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: networking-console-plugin
+      app.kubernetes.io/managed-by: cluster-network-operator
+      app.kubernetes.io/name: networking-console-plugin
+      app.kubernetes.io/part-of: cluster-network-operator
+{{- if gt .Replicas 1 }}
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate
+{{- end }}
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app.kubernetes.io/component: networking-console-plugin
+        app.kubernetes.io/managed-by: cluster-network-operator
+        app.kubernetes.io/name: networking-console-plugin
+        app.kubernetes.io/part-of: cluster-network-operator
+    spec:
+{{- if gt .Replicas 1 }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: networking-console-plugin
+                  app.kubernetes.io/managed-by: cluster-network-operator
+                  app.kubernetes.io/name: networking-console-plugin
+                  app.kubernetes.io/part-of: cluster-network-operator
+              namespaces:
+              - openshift-network-console
+              topologyKey: kubernetes.io/hostname
+            weight: 90
+{{- end }}
+      automountServiceAccountToken: false
+      containers:
+      - command:
+        - /bin/sh
+        - -c
+        - |
+          if echo "$POD_IP" | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}$'; then
+            LISTEN_ADDRESS_PORT_REPLACED_AT_RUNTIME="9443"
+          else
+            LISTEN_ADDRESS_PORT_REPLACED_AT_RUNTIME="[::]:9443"
+          fi
+          sed "s/LISTEN_ADDRESS_PORT_REPLACED_AT_RUNTIME/$LISTEN_ADDRESS_PORT_REPLACED_AT_RUNTIME/g" /etc/nginx/nginx.conf > /tmp/nginx.conf
+          exec nginx -c /tmp/nginx.conf -g 'daemon off;'
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: "{{.NetworkingConsolePluginImage}}"
+        imagePullPolicy: IfNotPresent
+        name: networking-console-plugin
+        ports:
+        - containerPort: 9443
+          name: https
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /var/cert
+          name: networking-console-plugin-cert
+          readOnly: true
+        - mountPath: /etc/nginx/nginx.conf
+          name: nginx-conf
+          readOnly: true
+          subPath: nginx.conf
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: system-cluster-critical
+      restartPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: networking-console-plugin
+        name: nginx-conf
+      - name: networking-console-plugin-cert
+        secret:
+          defaultMode: 420
+          secretName: networking-console-plugin-cert
