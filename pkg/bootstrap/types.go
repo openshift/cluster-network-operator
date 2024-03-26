@@ -119,6 +119,9 @@ type InfraStatus struct {
 
 	// MachineConfigClusterOperatorReady set to true when Machine Config cluster operator is in ready state.
 	MachineConfigClusterOperatorReady bool
+
+	// ConsolePluginCRDExists set to true when the consoleplugins.console.openshift.io has been deployed.
+	ConsolePluginCRDExists bool
 }
 
 // APIServer is the hostname & port of a given APIServer. (This is the
