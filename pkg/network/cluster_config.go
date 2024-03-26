@@ -6,6 +6,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
@@ -22,6 +23,16 @@ var pluginsUsingHostPrefix = sets.NewString(string(operv1.NetworkTypeOpenShiftSD
 
 // ValidateClusterConfig ensures the cluster config is valid.
 func ValidateClusterConfig(clusterConfig *configv1.Network, client cnoclient.Client) error {
+	// If for whatever reason it is not possible to get the platform type, fail
+	infraRes, err := platform.InfraStatus(client)
+	if err != nil {
+		return err
+	}
+	return validateClusterConfig(clusterConfig, infraRes)
+}
+
+func validateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.InfraStatus) error {
+
 	// Check all networks for overlaps
 	pool := iputil.IPPool{}
 
@@ -96,12 +107,6 @@ func ValidateClusterConfig(clusterConfig *configv1.Network, client cnoclient.Cli
 		return errors.Errorf("spec.networkType is required")
 	}
 
-	// If for whatever reason it is not possible to get the platform type, fail
-	infraRes, err := platform.InfraStatus(client)
-	if err != nil {
-		return err
-	}
-
 	// Validate that this is either a BareMetal or None PlatformType. For all other
 	// PlatformTypes, migration to DualStack is prohibited
 	if ipv4Service && ipv6Service || ipv4Cluster && ipv6Cluster {
@@ -115,9 +120,6 @@ func ValidateClusterConfig(clusterConfig *configv1.Network, client cnoclient.Cli
 		// HostedControlPlane is not nil if in a HyperShift env
 		if infraRes.HostedControlPlane != nil {
 			return errors.Errorf("network type live migration is not supported on HyperShift clusters")
-		}
-		if !infraRes.StandaloneManagedCluster {
-			return errors.Errorf("network type live migration is not supported on self managed clusters")
 		}
 	}
 
