@@ -10,7 +10,6 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/util"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -148,13 +147,6 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		return nil, fmt.Errorf("failed to determine if network node identity should be enabled: %w", err)
 	}
 	res.NetworkNodeIdentityEnabled = netIDEnabled
-
-	// standalone managed clusters is a set managed clusters (excl HyperShift clusters).
-	isStandaloneManagedCluster, err := util.IsStandaloneManagedCluster(context.TODO(), client, res.PlatformType)
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect if standalone managed cluster: %v", err)
-	}
-	res.StandaloneManagedCluster = isStandaloneManagedCluster
 
 	// Skip retrieving IPsec MachineConfig and MachineConfigPool if it's a hypershift cluster because
 	// those object kinds are not supported there.

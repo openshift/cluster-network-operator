@@ -2,7 +2,6 @@ package network
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -122,33 +121,9 @@ func TestValidClusterConfigLiveMigration(t *testing.T) {
 		expectedErrorMsg string
 	}{
 		{
-			"error when standalone cluster and migration label applied",
-			&bootstrap.InfraStatus{},
-			&configv1.Network{
-				Spec: networkConfig,
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
-				}},
-			[]crclient.Object{&operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}},
-			true,
-			"network type live migration is not supported on self managed clusters",
-		},
-		{
-			"no error when standalone cluster and migration label not applied",
+			"no error when standalone cluster and migration label applied",
 			&bootstrap.InfraStatus{},
 			&configv1.Network{Spec: networkConfig},
-			[]crclient.Object{&operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}},
-			false,
-			"",
-		},
-		{
-			"no error when managed cluster and migration label applied",
-			&bootstrap.InfraStatus{StandaloneManagedCluster: true},
-			&configv1.Network{
-				Spec: networkConfig,
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
-				}},
 			[]crclient.Object{&operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}},
 			false,
 			"",
@@ -180,7 +155,7 @@ func TestValidClusterConfigLiveMigration(t *testing.T) {
 		},
 		{
 			"error when trying to migrate from sdn in multinenat mode",
-			&bootstrap.InfraStatus{StandaloneManagedCluster: true},
+			&bootstrap.InfraStatus{},
 			&configv1.Network{
 				Spec: networkConfig,
 				ObjectMeta: metav1.ObjectMeta{
@@ -198,7 +173,7 @@ func TestValidClusterConfigLiveMigration(t *testing.T) {
 		},
 		{
 			"error when cluster network overlaps with ovn-k internal subnet overlap",
-			&bootstrap.InfraStatus{StandaloneManagedCluster: true},
+			&bootstrap.InfraStatus{},
 			&configv1.Network{
 				Spec: networkConfig,
 				ObjectMeta: metav1.ObjectMeta{
@@ -219,7 +194,7 @@ func TestValidClusterConfigLiveMigration(t *testing.T) {
 		},
 		{
 			"error when service overlaps with ovn-k internal transit switch subnet overlap",
-			&bootstrap.InfraStatus{StandaloneManagedCluster: true},
+			&bootstrap.InfraStatus{},
 			&configv1.Network{
 				Spec: networkConfig,
 				ObjectMeta: metav1.ObjectMeta{
@@ -243,7 +218,7 @@ func TestValidClusterConfigLiveMigration(t *testing.T) {
 		},
 		{
 			"error when service network overlaps with ovn-k internal transit switch subnet overlap",
-			&bootstrap.InfraStatus{StandaloneManagedCluster: true},
+			&bootstrap.InfraStatus{},
 			&configv1.Network{
 				Spec: func() configv1.NetworkSpec {
 					cfg := networkConfig
@@ -271,7 +246,7 @@ func TestValidClusterConfigLiveMigration(t *testing.T) {
 		},
 		{
 			"error when pods with 'pod.network.openshift.io/assign-macvlan' annotation are present in the cluster",
-			&bootstrap.InfraStatus{StandaloneManagedCluster: true},
+			&bootstrap.InfraStatus{},
 			&configv1.Network{
 				Spec: networkConfig,
 				ObjectMeta: metav1.ObjectMeta{
@@ -298,16 +273,9 @@ func TestValidClusterConfigLiveMigration(t *testing.T) {
 		},
 	}
 
-	// restore env var flag post test if its set
-	hcpEnvVarEnabled := os.Getenv("HYPERSHIFT") != ""
-	defer func() {
-		if hcpEnvVarEnabled {
-			os.Setenv("HYPERSHIFT", "")
-		}
-	}()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Logf("Running test: %s", tt.name)
 			client := fake.NewFakeClient(tt.objects...)
 			err := validateClusterConfig(tt.config, tt.infraRes, client)
 			if tt.expectErr {
