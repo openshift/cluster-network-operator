@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
@@ -32,8 +34,7 @@ var dualStackPlatforms = sets.NewString(
 	string(configv1.OpenStackPlatformType),
 )
 
-func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client cnoclient.Client,
-	featureGates featuregates.FeatureGate) ([]*uns.Unstructured, bool, error) {
+func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client cnoclient.Client, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, bool, error) {
 	log.Printf("Starting render phase")
 	var progressing bool
 	objs := []*uns.Unstructured{}
@@ -41,21 +42,21 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	// render cloud network config controller **before** the network plugin.
 	// the network plugin is dependent upon having the cloud network CRD
 	// defined as to initialize its watcher, otherwise it will error and crash
-	o, err := renderCloudNetworkConfigController(conf, bootstrapResult, manifestDir)
+	o, err := renderCloudNetworkConfigController(operConf, bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
 	// render Multus
-	o, err = renderMultus(conf, bootstrapResult, manifestDir)
+	o, err = renderMultus(operConf, bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
 	// render MultusAdmissionController
-	o, err = renderMultusAdmissionController(conf, manifestDir,
+	o, err = renderMultusAdmissionController(operConf, manifestDir,
 		bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode, bootstrapResult, client)
 	if err != nil {
 		return nil, progressing, err
@@ -63,24 +64,24 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	objs = append(objs, o...)
 
 	// render MultiNetworkPolicy
-	o, err = renderMultiNetworkpolicy(conf, manifestDir)
+	o, err = renderMultiNetworkpolicy(operConf, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
 	// render default network
-	o, progressing, err = renderDefaultNetwork(conf, bootstrapResult, manifestDir, client, featureGates)
+	o, progressing, err = renderDefaultNetwork(operConf, bootstrapResult, manifestDir, client, featureGates)
 	if err != nil {
 		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
-	if conf.Migration != nil && conf.Migration.NetworkType != "" {
+	if operConf.Migration != nil && operConf.Migration.NetworkType != "" {
 		// During SDN Migration, CNO needs to convert the custom resources of
 		// egressIP, egressFirewall, etc. Therefore we need to render the CRDs for
 		// both OpenShiftSDN and OVNKubernetes.
-		o, err = renderCRDForMigration(conf, manifestDir, featureGates)
+		o, err = renderCRDForMigration(operConf, manifestDir, featureGates)
 		if err != nil {
 			return nil, progressing, err
 		}
@@ -91,21 +92,21 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	// There is currently a restriction that renderStandaloneKubeProxy() is
 	// called after renderDefaultNetwork(). The OVN-Kubernetes code is enabling
 	// KubeProxy in Node Mode of "dpu".
-	o, err = renderStandaloneKubeProxy(conf, bootstrapResult, manifestDir)
+	o, err = renderStandaloneKubeProxy(operConf, bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
 	// render additional networks
-	o, err = renderAdditionalNetworks(conf, manifestDir)
+	o, err = renderAdditionalNetworks(operConf, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
 	// render network diagnostics
-	o, err = renderNetworkDiagnostics(conf, manifestDir)
+	o, err = renderNetworkDiagnostics(operConf, clusterConf, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -118,7 +119,7 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	objs = append(objs, o...)
 
 	// render
-	o, err = renderNetworkNodeIdentity(conf, bootstrapResult, manifestDir, client)
+	o, err = renderNetworkNodeIdentity(operConf, bootstrapResult, manifestDir, client)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -802,8 +803,13 @@ func renderMultiNetworkpolicy(conf *operv1.NetworkSpec, manifestDir string) ([]*
 }
 
 // renderNetworkDiagnostics renders the connectivity checks
-func renderNetworkDiagnostics(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func renderNetworkDiagnostics(conf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	if conf.DisableNetworkDiagnostics {
+		return nil, nil
+	}
+
+	klog.Errorf("PADI: %#v", clusterConf.NetworkDiagnostics)
+	if clusterConf.NetworkDiagnostics.Mode == configv1.NetworkDiagnosticsDisabled {
 		return nil, nil
 	}
 
@@ -811,6 +817,22 @@ func renderNetworkDiagnostics(conf *operv1.NetworkSpec, manifestDir string) ([]*
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["NetworkCheckSourceImage"] = os.Getenv("NETWORK_CHECK_SOURCE_IMAGE")
 	data.Data["NetworkCheckTargetImage"] = os.Getenv("NETWORK_CHECK_TARGET_IMAGE")
+
+	klog.Errorf("PADI: %#v", clusterConf.NetworkDiagnostics)
+	defaultNodeSelector := map[string]string{"kubernetes.io/os": "linux"}
+	data.Data["NetworkCheckSourceNodeSelector"] = defaultNodeSelector
+	if clusterConf.NetworkDiagnostics.SourceDeploymentNodePlacement.NodeSelector != nil {
+		data.Data["NetworkCheckSourceNodeSelector"] = clusterConf.NetworkDiagnostics.SourceDeploymentNodePlacement.NodeSelector
+	}
+	data.Data["NetworkCheckTargetNodeSelector"] = defaultNodeSelector
+	if clusterConf.NetworkDiagnostics.TargetDaemonsetNodePlacement.NodeSelector != nil {
+		data.Data["NetworkCheckTargetNodeSelector"] = clusterConf.NetworkDiagnostics.TargetDaemonsetNodePlacement.NodeSelector
+	}
+	data.Data["NetworkCheckSourceTolerations"] = clusterConf.NetworkDiagnostics.SourceDeploymentNodePlacement.Tolerations
+	data.Data["NetworkCheckTargetTolerations"] = []corev1.Toleration{{Operator: corev1.TolerationOpExists}}
+	if clusterConf.NetworkDiagnostics.TargetDaemonsetNodePlacement.Tolerations != nil {
+		data.Data["NetworkCheckTargetTolerations"] = clusterConf.NetworkDiagnostics.TargetDaemonsetNodePlacement.Tolerations
+	}
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network-diagnostics"), &data)
 	if err != nil {
