@@ -59,11 +59,17 @@ data:
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
     nodeport=true
-{{- if (index . "V4JoinSubnet") }}
+  
+{{- if not (eq .InternalJoinSubnetV4 "")}}
+    v4-join-subnet="{{.InternalJoinSubnetV4}}"
+{{- else if (index . "V4JoinSubnet") }}
     v4-join-subnet="{{.V4JoinSubnet}}"
 {{- end }}
-{{- if (index . "V6JoinSubnet") }}
-    v6-join-subnet="{{.V6JoinSubnet}}"
+
+{{- if not (eq .InternalJoinSubnetV6 "")}}
+    v4-join-subnet="{{.InternalJoinSubnetV6}}"
+{{- else if (index . "V6JoinSubnet") }}
+    v4-join-subnet="{{.V6JoinSubnet}}"
 {{- end }}
 
 {{- if (index . "V4InternalMasqueradeSubnet")}}

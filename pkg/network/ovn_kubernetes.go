@@ -166,6 +166,19 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["SmartNicModeLabel"] = bootstrapResult.OVN.OVNKubernetesConfig.SmartNicModeLabel
 	data.Data["MgmtPortResourceName"] = bootstrapResult.OVN.OVNKubernetesConfig.MgmtPortResourceName
 	data.Data["OVN_CONTROLLER_INACTIVITY_PROBE"] = os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
+	data.Data["InternalJoinSubnetV4"] = ""
+	data.Data["InternalTransitSwitchSubnetV4"] = ""
+	if conf.DefaultNetwork.OVNKubernetesConfig.IPv4 != nil {
+		data.Data["InternalTransitSwitchSubnetV4"] = conf.DefaultNetwork.OVNKubernetesConfig.IPv4.InternalTransitSwitchSubnet
+		data.Data["InternalJoinSubnetV4"] = conf.DefaultNetwork.OVNKubernetesConfig.IPv4.InternalJoinSubnet
+	}
+	data.Data["InternalJoinSubnetV6"] = ""
+	data.Data["InternalTransitSwitchSubnetV6"] = ""
+	if conf.DefaultNetwork.OVNKubernetesConfig.IPv6 != nil {
+		data.Data["InternalTransitSwitchSubnetV6"] = conf.DefaultNetwork.OVNKubernetesConfig.IPv6.InternalTransitSwitchSubnet
+		data.Data["InternalJoinSubnetV6"] = conf.DefaultNetwork.OVNKubernetesConfig.IPv6.InternalJoinSubnet
+	}
+
 	controller_inactivity_probe := os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
 	if len(controller_inactivity_probe) == 0 {
 		controller_inactivity_probe = "180000"

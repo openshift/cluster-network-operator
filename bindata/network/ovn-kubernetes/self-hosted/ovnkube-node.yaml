@@ -492,6 +492,8 @@ spec:
               ${NETWORK_NODE_IDENTITY_ENABLE}
           fi
 {{- end }}
+          echo "InternalJoinSubnetV4: {{.InternalJoinSubnetV4}}"
+          echo "InternalJoinSubnetV6: {{.InternalJoinSubnetV6}}"
           . /ovnkube-lib/ovnkube-lib.sh || exit 1
           start-ovnkube-node ${OVN_KUBE_LOG_LEVEL} 29103 29105
         env:
