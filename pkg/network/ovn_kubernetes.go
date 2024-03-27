@@ -99,12 +99,14 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OvnControlPlaneImage"] = os.Getenv("OVN_IMAGE")
 	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled {
 		data.Data["OvnControlPlaneImage"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.ControlPlaneImage
+		data.Data["K8S_APISERVER"] = "https://" + net.JoinHostPort(bootstrapResult.Infra.HostedControlPlane.AdvertiseAddress, strconv.Itoa(bootstrapResult.Infra.HostedControlPlane.AdvertisePort))
+	} else {
+		data.Data["K8S_APISERVER"] = "https://" + net.JoinHostPort(apiServer.Host, apiServer.Port)
 	}
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 	data.Data["Socks5ProxyImage"] = os.Getenv("SOCKS5_PROXY_IMAGE")
 	data.Data["KUBERNETES_SERVICE_HOST"] = apiServer.Host
 	data.Data["KUBERNETES_SERVICE_PORT"] = apiServer.Port
-	data.Data["K8S_APISERVER"] = "https://" + net.JoinHostPort(apiServer.Host, apiServer.Port)
 	data.Data["K8S_LOCAL_APISERVER"] = "https://" + net.JoinHostPort(localAPIServer.Host, localAPIServer.Port)
 	data.Data["HTTP_PROXY"] = ""
 	data.Data["HTTPS_PROXY"] = ""
