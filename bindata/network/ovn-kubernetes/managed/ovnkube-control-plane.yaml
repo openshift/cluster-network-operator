@@ -96,6 +96,7 @@ spec:
             This allows for pod-pod connectivity in postStart hooks the first time they run.
             EOF
         image: "{{.OvnControlPlaneImage}}"
+      automountServiceAccountToken: false
       containers:
       # token-minter creates a token with the default service account path
       # The token is read by ovn-k containers to authenticate against the hosted cluster api server
