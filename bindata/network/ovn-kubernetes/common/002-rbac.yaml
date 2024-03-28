@@ -9,7 +9,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: openshift-ovn-kubernetes-node
+  name: openshift-ovn-kubernetes-node-limited
   namespace: openshift-ovn-kubernetes
 rules:
 - apiGroups: [""]
