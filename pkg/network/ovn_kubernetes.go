@@ -361,6 +361,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	productFlavor := "self-hosted"
 	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled {
 		productFlavor = "managed"
+		data.Data["CAConfigMap"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.CAConfigMap
+		data.Data["CAConfigMapKey"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.CAConfigMapKey
 	}
 	manifestSubDir := filepath.Join(manifestDir, "network/ovn-kubernetes", productFlavor)
 	manifestDirs = append(manifestDirs, manifestSubDir)
@@ -642,6 +644,8 @@ func bootstrapOVNHyperShiftConfig(hc *hypershift.HyperShiftConfig, kubeClient cn
 		Namespace:         hc.Namespace,
 		ReleaseImage:      hc.ReleaseImage,
 		ControlPlaneImage: hc.ControlPlaneImage,
+		CAConfigMap:       hc.CAConfigMap,
+		CAConfigMapKey:    hc.CAConfigMapKey,
 	}
 
 	if !hc.Enabled {

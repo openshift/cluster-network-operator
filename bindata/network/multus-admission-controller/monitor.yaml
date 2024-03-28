@@ -26,8 +26,8 @@ spec:
     tlsConfig:
       ca:
         configMap:
-          key: service-ca.crt
-          name: openshift-service-ca.crt
+          key: {{.CAConfigMapKey}}
+          name: {{.CAConfigMap}}
       cert:
         secret:
           key: tls.crt

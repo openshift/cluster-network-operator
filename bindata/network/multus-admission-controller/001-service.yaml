@@ -13,7 +13,10 @@ metadata:
 {{- if .HyperShiftEnabled}}
     network.operator.openshift.io/cluster-name: {{.ManagementClusterName}}
 {{- end }}
+# Any new HCP deployment will automatically reconcile this secret in the HCP without the service-ca operator
+{{- if or (not .HyperShiftEnabled) (eq .CAConfigMap "openshift-service-ca.crt")}}
     service.alpha.openshift.io/serving-cert-secret-name: multus-admission-controller-secret
+{{- end }}
 spec:
   ports:
   - name: webhook

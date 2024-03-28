@@ -46,11 +46,10 @@ func getOpenshiftNamespaces(client cnoclient.Client) (string, error) {
 }
 
 // renderMultusAdmissonControllerConfig returns the manifests of Multus Admisson Controller
-func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client) ([]*uns.Unstructured, error) {
+func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client, hsc *hypershift.HyperShiftConfig, clientName string) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 	var err error
 
-	hsc := hypershift.NewHyperShiftConfig()
 	replicas := getMultusAdmissionControllerReplicas(bootstrapResult, hsc.Enabled)
 	if ignoredNamespaces == "" {
 		ignoredNamespaces, err = getOpenshiftNamespaces(client)
@@ -81,17 +80,18 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 		data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
 		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
 		data.Data["RunAsUser"] = hsc.RunAsUser
+		data.Data["CAConfigMap"] = hsc.CAConfigMap
+		data.Data["CAConfigMapKey"] = hsc.CAConfigMapKey
 
-		// Get serving CA from the management cluster since the service resides there
 		serviceCA := &corev1.ConfigMap{}
-		err := client.ClientFor(names.ManagementClusterName).CRClient().Get(
-			context.TODO(), types.NamespacedName{Namespace: hsc.Namespace, Name: "openshift-service-ca.crt"}, serviceCA)
+		err := client.ClientFor(clientName).CRClient().Get(
+			context.TODO(), types.NamespacedName{Namespace: hsc.Namespace, Name: hsc.CAConfigMap}, serviceCA)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get managments clusters service CA: %v", err)
 		}
-		ca, exists := serviceCA.Data["service-ca.crt"]
+		ca, exists := serviceCA.Data[hsc.CAConfigMapKey]
 		if !exists {
-			return nil, fmt.Errorf("(%s) %s/%s missing 'service-ca.crt' key", serviceCA.GroupVersionKind(), serviceCA.Namespace, serviceCA.Name)
+			return nil, fmt.Errorf("(%s) %s/%s missing CA ConfigMap key", serviceCA.GroupVersionKind(), serviceCA.Namespace, serviceCA.Name)
 		}
 
 		data.Data["ManagementServiceCABundle"] = base64.URLEncoding.EncodeToString([]byte(ca))

@@ -1,6 +1,7 @@
 package network
 
 import (
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"log"
 	"net"
 	"os"
@@ -770,8 +771,9 @@ func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir strin
 	var err error
 	out := []*uns.Unstructured{}
 
+	hsc := hypershift.NewHyperShiftConfig()
 	objs, err := renderMultusAdmissonControllerConfig(manifestDir, externalControlPlane,
-		bootstrapResult, client)
+		bootstrapResult, client, hsc, names.ManagementClusterName)
 	if err != nil {
 		return nil, err
 	}

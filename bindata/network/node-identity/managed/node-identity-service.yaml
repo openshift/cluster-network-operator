@@ -8,7 +8,11 @@ metadata:
     hypershift.openshift.io/allow-guest-webhooks: "true"
   annotations:
     network.operator.openshift.io/cluster-name: {{.ManagementClusterName}}
-    service.alpha.openshift.io/serving-cert-secret-name: network-node-identity-secret
+# If the default CAConfigMap 'openshift-service-ca.crt' was used then the HostedCluster isn't reconciling the secret, so
+# we need to add the annotation so service-ca creates the secret
+{{- if eq .CAConfigMap "openshift-service-ca.crt"}}
+    service.beta.openshift.io/serving-cert-secret-name: network-node-identity-secret
+{{- end}}
 spec:
   ports:
     - name: webhook

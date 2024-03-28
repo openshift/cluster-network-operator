@@ -79,8 +79,12 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 	// HyperShift specific
 	if hcpCfg := hypershift.NewHyperShiftConfig(); hcpCfg.Enabled {
 		webhookCAClient = client.ClientFor(names.ManagementClusterName)
-		webhookCALookup = types.NamespacedName{Name: "openshift-service-ca.crt", Namespace: hcpCfg.Namespace}
-		caKey = "service-ca.crt"
+
+		data.Data["CAConfigMap"] = hcpCfg.CAConfigMap
+		data.Data["CAConfigMapKey"] = hcpCfg.CAConfigMapKey
+
+		webhookCALookup = types.NamespacedName{Name: hcpCfg.CAConfigMap, Namespace: hcpCfg.Namespace}
+		caKey = hcpCfg.CAConfigMapKey
 
 		data.Data["HostedClusterNamespace"] = hcpCfg.Namespace
 		data.Data["ManagementClusterName"] = names.ManagementClusterName

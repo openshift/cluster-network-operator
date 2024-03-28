@@ -14,6 +14,8 @@ type OVNHyperShiftBootstrapResult struct {
 	ControlPlaneReplicas int
 	ReleaseImage         string
 	ControlPlaneImage    string
+	CAConfigMap          string
+	CAConfigMapKey       string
 }
 
 type OVNConfigBoostrapResult struct {
