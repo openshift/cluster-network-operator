@@ -149,6 +149,7 @@ rules:
   resources:
   - adminpolicybasedexternalroutes/status
   - egressfirewalls/status
+  - egressqoses/status
   verbs:
   - patch
 {{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
