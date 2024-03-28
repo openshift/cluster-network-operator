@@ -566,3 +566,59 @@ func setupTestInfraAndBasicRenderConfigs(t *testing.T, prevType, nextType operv1
 	fillDefaults(next, nil)
 	return g, infra, prev, next
 }
+
+func TestValidateIPPools(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+	ovnConfig := config.DefaultNetwork.OVNKubernetesConfig
+	ovnConfig.GatewayConfig = &operv1.GatewayConfig{}
+	ovnConfig.IPv4 = &operv1.IPv4OVNKubernetesConfig{}
+	ovnConfig.IPv6 = &operv1.IPv6OVNKubernetesConfig{}
+
+	err := validateOVNKubernetes(config)
+	g.Expect(err).To(BeEmpty())
+	fillDefaults(config, nil)
+
+	errExpect := func(substr string) {
+		t.Helper()
+		g.Expect(validateIPPools(config)).To(
+			ContainElement(MatchError(
+				ContainSubstring(substr))))
+	}
+	ovnConfig.IPv4.InternalJoinSubnet = "10.128.0.0/16"
+	errExpect("Whole or subset of v4InternalJoinSubnet CIDR 10.128.0.0/16 is already in use: CIDRs 10.128.0.0/15 and 10.128.0.0/16 overlap")
+	ovnConfig.IPv4.InternalTransitSwitchSubnet = "10.128.0.0/16"
+	errExpect("Whole or subset of v4InternalTransitSwitchSubnet CIDR 10.128.0.0/16 is already in use: CIDRs 10.128.0.0/15 and 10.128.0.0/16 overlap")
+	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "10.128.0.0/16"
+	errExpect("Whole or subset of v4InternalMasqueradeSubnet CIDR 10.128.0.0/16 is already in use: CIDRs 10.128.0.0/15 and 10.128.0.0/16 overlap")
+	ovnConfig.IPv4.InternalJoinSubnet = "100.99.0.0/16"
+	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "100.99.0.0/16"
+	errExpect("Whole or subset of v4InternalMasqueradeSubnet CIDR 100.99.0.0/16 is already in use: CIDRs 100.99.0.0/16 and 100.99.0.0/16 overlap")
+	ovnConfig.IPv4.InternalJoinSubnet = "100.99.0.0/16"
+	ovnConfig.IPv4.InternalTransitSwitchSubnet = "100.99.0.0/16"
+	errExpect("Whole or subset of v4InternalTransitSwitchSubnet CIDR 100.99.0.0/16 is already in use: CIDRs 100.99.0.0/16 and 100.99.0.0/16 overlap")
+	ovnConfig.IPv4.InternalTransitSwitchSubnet = "100.99.0.0/16"
+	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "100.99.0.0/16"
+	errExpect("Whole or subset of v4InternalMasqueradeSubnet CIDR 100.99.0.0/16 is already in use: CIDRs 100.99.0.0/16 and 100.99.0.0/16 overlap")
+
+	config.ClusterNetwork = []operv1.ClusterNetworkEntry{{
+		CIDR: "fd01::/48", HostPrefix: 64,
+	}}
+	ovnConfig.IPv6.InternalJoinSubnet = "fd01::/64"
+	errExpect("Whole or subset of v6InternalJoinSubnet CIDR fd01::/64 is already in use: CIDRs fd01::/48 and fd01::/64 overlap")
+	ovnConfig.IPv6.InternalTransitSwitchSubnet = "fd01::/64"
+	errExpect("Whole or subset of v6InternalTransitSwitchSubnet CIDR fd01::/64 is already in use: CIDRs fd01::/48 and fd01::/64 overlap")
+	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd01::/64"
+	errExpect("Whole or subset of v6InternalMasqueradeSubnet CIDR fd01::/64 is already in use: CIDRs fd01::/48 and fd01::/64 overlap")
+	ovnConfig.IPv6.InternalJoinSubnet = "fd69::/125"
+	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd69::/125"
+	errExpect("Whole or subset of v6InternalMasqueradeSubnet CIDR fd69::/125 is already in use: CIDRs fd69::/125 and fd69::/125 overlap")
+	ovnConfig.IPv6.InternalJoinSubnet = "fd69::/125"
+	ovnConfig.IPv6.InternalTransitSwitchSubnet = "fd69::/125"
+	errExpect("Whole or subset of v6InternalTransitSwitchSubnet CIDR fd69::/125 is already in use: CIDRs fd69::/125 and fd69::/125 overlap")
+	ovnConfig.IPv6.InternalTransitSwitchSubnet = "fd69::/125"
+	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd69::/125"
+	errExpect("Whole or subset of v6InternalMasqueradeSubnet CIDR fd69::/125 is already in use: CIDRs fd69::/125 and fd69::/125 overlap")
+}
