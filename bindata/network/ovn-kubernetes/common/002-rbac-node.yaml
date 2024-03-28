@@ -139,7 +139,6 @@ rules:
   - adminpolicybasedexternalroutes
   - adminpolicybasedexternalroutes/status
   - egressfirewalls
-  - egressips
   - egressqoses
   - egressservices
   - egressservices/status
@@ -149,6 +148,13 @@ rules:
   - patch
   - update
   - watch
+- apiGroups: ["k8s.ovn.org"]
+  resources:
+    - egressips
+  verbs:
+    - get
+    - list
+    - watch
 {{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
 - apiGroups: ["policy.networking.k8s.io"]
   resources:
@@ -165,17 +171,6 @@ rules:
   verbs:
   - update
 {{- end }}
-- apiGroups: ["cloud.network.openshift.io"]
-  resources:
-  - cloudprivateipconfigs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
 - apiGroups:
   - k8s.cni.cncf.io
   resources:
