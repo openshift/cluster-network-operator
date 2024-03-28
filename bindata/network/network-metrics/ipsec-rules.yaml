@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+    name: cluster-network-ipsec-rules
+    namespace: openshift-network-operator
+spec:
+    groups:
+    - name: openshift-network.rules
+      rules:
+      - expr: |-
+          sum by (mode,api_flavor) (
+            cluster_network_ipsec_state{namespace=~"openshift-network-operator"}
+          )
+        record: openshift:cluster_network_ipsec_state:sum
