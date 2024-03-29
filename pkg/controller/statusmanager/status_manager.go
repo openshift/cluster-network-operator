@@ -2,6 +2,7 @@ package statusmanager
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -316,16 +317,21 @@ func (status *StatusManager) writeHypershiftStatus(operStatus *operv1.NetworkSta
 // Set updates the operator and clusteroperator statuses with the provided conditions.
 func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv1.OperatorCondition) {
 	var operStatus *operv1.NetworkStatus
+	oc := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 
 	// Set status on the network.operator object
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		oc := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 		err := status.client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Name: names.OPERATOR_CONFIG}, oc)
 		if err != nil {
 			// Should never happen outside of unit tests
 			return err
 		}
-
+		return nil
+	})
+	if err != nil {
+		// Should never happen outside of unit tests
+		log.Printf("Failed to get operator: %v", err)
+	} else {
 		oldStatus := oc.Status.DeepCopy()
 
 		oc.Status.Version = os.Getenv("RELEASE_VERSION")
@@ -378,24 +384,19 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 
 		operStatus = &oc.Status
 
-		if equality.Semantic.DeepEqual(&oc.Status, oldStatus) {
-			return nil
-		}
+		if !equality.Semantic.DeepEqual(&oc.Status, oldStatus) {
+			type st struct {
+				Status operv1.NetworkStatus `json:"status"`
+			}
+			// make sure we only update the status field
+			patchData, _ := json.Marshal(&st{
+				Status: oc.Status,
+			})
 
-		buf, err := yaml.Marshal(oc.Status.Conditions)
-		if err != nil {
-			buf = []byte(fmt.Sprintf("(failed to convert to YAML: %s)", err))
+			if err := status.client.ClientFor("").CRClient().Patch(context.TODO(), oc, crclient.RawPatch(types.MergePatchType, patchData)); err != nil {
+				log.Printf("Failed to set operator status: %v", err)
+			}
 		}
-
-		if err := status.client.ClientFor("").CRClient().Update(context.TODO(), oc); err != nil {
-			return err
-		}
-		log.Printf("Network operator config updated with conditions:\n%s", buf)
-
-		return nil
-	})
-	if err != nil {
-		log.Printf("Failed to set operator status: %v", err)
 	}
 
 	// Set status conditions on the network clusteroperator object.
