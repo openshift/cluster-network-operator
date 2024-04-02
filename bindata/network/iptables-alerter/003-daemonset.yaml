@@ -1,0 +1,71 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: iptables-alerter
+  namespace: openshift-network-operator
+  annotations:
+    kubernetes.io/description: |
+      This daemon set runs the iptables-alerter on each node
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+    networkoperator.openshift.io/non-critical: ""
+spec:
+  selector:
+    matchLabels:
+      app: iptables-alerter
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: iptables-alerter
+        component: network
+        type: infra
+        openshift.io/component: network
+    spec:
+      hostNetwork: true
+      hostPID: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      serviceAccountName: iptables-alerter
+      priorityClassName: "openshift-user-critical"
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: iptables-alerter
+        image: {{.CLIImage}}
+        command: [ "/iptables-alerter/iptables-alerter.sh" ]
+        resources:
+          requests:
+            cpu: 10m
+            memory: 65Mi
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /iptables-alerter
+          name: iptables-alerter-script
+        - mountPath: /host
+          name: host-slash
+          readOnly: true
+          mountPropagation: HostToContainer
+        env:
+        - name: CONTAINER_RUNTIME_ENDPOINT
+          value: unix:///run/crio/crio.sock
+        - name: ALERTER_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - name: iptables-alerter-script
+          configMap:
+            name: iptables-alerter-script
+            defaultMode: 0744
+        - name: host-slash
+          hostPath:
+            path: /

@@ -1,0 +1,32 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openshift-iptables-alerter
+rules:
+- apiGroups: ["", "events.k8s.io"]
+  resources:
+  - events
+  verbs:
+  - get
+  - list
+  - create
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: iptables-alerter
+  namespace: openshift-network-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openshift-iptables-alerter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openshift-iptables-alerter
+subjects:
+- kind: ServiceAccount
+  namespace: openshift-network-operator
+  name: iptables-alerter

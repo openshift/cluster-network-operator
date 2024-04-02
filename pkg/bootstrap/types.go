@@ -65,9 +65,17 @@ type OVNBootstrapResult struct {
 	FlowsConfig           *FlowsConfig
 }
 
+// IPTablesAlerterBootstrapResult contains configuration for the iptables-alerter
+type IPTablesAlerterBootstrapResult struct {
+	// Enabled is true if the iptables-alerter should be enabled
+	Enabled bool
+}
+
 type BootstrapResult struct {
-	OVN   OVNBootstrapResult
 	Infra InfraStatus
+
+	OVN             OVNBootstrapResult
+	IPTablesAlerter IPTablesAlerterBootstrapResult
 }
 
 type InfraStatus struct {
