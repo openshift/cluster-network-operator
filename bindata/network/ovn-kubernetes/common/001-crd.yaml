@@ -863,7 +863,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/network-policy-api/pull/30
-    policy.networking.k8s.io/bundle-version: v0.1.1
+    policy.networking.k8s.io/bundle-version: v0.1.3
     policy.networking.k8s.io/channel: experimental
   creationTimestamp: null
   name: adminnetworkpolicies.policy.networking.k8s.io
@@ -1151,13 +1151,13 @@ spec:
 
                               <network-policy-api:experimental>
                             items:
-                              description: |-
-                                CIDR is an IP address range in CIDR notation (for example, "10.0.0.0/8" or "fd00::/8").
-                                This string must be validated by implementations using net.ParseCIDR
-                                TODO: Introduce CEL CIDR validation regex isCIDR() in Kube 1.31 when it is available.
+                              description: CIDR is an IP address range in CIDR notation
+                                (for example, "10.0.0.0/8" or "fd00::/8").
                               maxLength: 43
                               type: string
                               x-kubernetes-validations:
+                              - message: Invalid CIDR format provided
+                                rule: isCIDR(self)
                               - message: CIDR must be either an IPv4 or IPv6 address.
                                   IPv4 address embedded in IPv6 addresses are not
                                   supported
@@ -1945,7 +1945,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/network-policy-api/pull/30
-    policy.networking.k8s.io/bundle-version: v0.1.1
+    policy.networking.k8s.io/bundle-version: v0.1.3
     policy.networking.k8s.io/channel: experimental
   creationTimestamp: null
   name: baselineadminnetworkpolicies.policy.networking.k8s.io
@@ -2223,13 +2223,13 @@ spec:
 
                               <network-policy-api:experimental>
                             items:
-                              description: |-
-                                CIDR is an IP address range in CIDR notation (for example, "10.0.0.0/8" or "fd00::/8").
-                                This string must be validated by implementations using net.ParseCIDR
-                                TODO: Introduce CEL CIDR validation regex isCIDR() in Kube 1.31 when it is available.
+                              description: CIDR is an IP address range in CIDR notation
+                                (for example, "10.0.0.0/8" or "fd00::/8").
                               maxLength: 43
                               type: string
                               x-kubernetes-validations:
+                              - message: Invalid CIDR format provided
+                                rule: isCIDR(self)
                               - message: CIDR must be either an IPv4 or IPv6 address.
                                   IPv4 address embedded in IPv6 addresses are not
                                   supported
