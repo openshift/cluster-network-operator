@@ -287,7 +287,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20240215110531-750a3e21ebaf
+# github.com/openshift/api v0.0.0-20240405191225-abd990ce290b
 ## explicit; go 1.21
 github.com/openshift/api
 github.com/openshift/api/annotations
@@ -301,6 +301,7 @@ github.com/openshift/api/build
 github.com/openshift/api/build/v1
 github.com/openshift/api/cloudnetwork
 github.com/openshift/api/cloudnetwork/v1
+github.com/openshift/api/cloudnetwork/v1/zz_generated.crd-manifests
 github.com/openshift/api/config
 github.com/openshift/api/config/v1
 github.com/openshift/api/config/v1alpha1
@@ -329,12 +330,14 @@ github.com/openshift/api/network/v1
 github.com/openshift/api/network/v1alpha1
 github.com/openshift/api/networkoperator
 github.com/openshift/api/networkoperator/v1
+github.com/openshift/api/networkoperator/v1/zz_generated.crd-manifests
 github.com/openshift/api/oauth
 github.com/openshift/api/oauth/v1
 github.com/openshift/api/openshiftcontrolplane
 github.com/openshift/api/openshiftcontrolplane/v1
 github.com/openshift/api/operator
 github.com/openshift/api/operator/v1
+github.com/openshift/api/operator/v1/zz_generated.crd-manifests
 github.com/openshift/api/operator/v1alpha1
 github.com/openshift/api/operatorcontrolplane
 github.com/openshift/api/operatorcontrolplane/v1alpha1
