@@ -3,6 +3,7 @@ package platform
 import (
 	"context"
 	"fmt"
+	"k8s.io/utils/pointer"
 	"os"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -115,6 +116,18 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 			return nil, fmt.Errorf("failed to retrieve HostedControlPlane %s: %v", types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, err)
 		}
 		res.HostedControlPlane = hcp
+		if res.HostedControlPlane.Spec.Networking.APIServer == nil {
+			res.HostedControlPlane.Spec.Networking.APIServer = &hyperv1.APIServerNetworking{
+				AdvertiseAddress: pointer.String("172.20.0.1"),
+				Port:             pointer.Int32(6443),
+			}
+		}
+		if res.HostedControlPlane.Spec.Networking.APIServer.AdvertiseAddress == nil {
+			res.HostedControlPlane.Spec.Networking.APIServer.AdvertiseAddress = pointer.String("172.20.0.1")
+		}
+		if res.HostedControlPlane.Spec.Networking.APIServer.Port == nil {
+			res.HostedControlPlane.Spec.Networking.APIServer.Port = pointer.Int32(6443)
+		}
 	}
 
 	netIDEnabled, err := isNetworkNodeIdentityEnabled(client)
