@@ -96,6 +96,8 @@ spec:
           value: quay.io/openshift/origin-cli:latest
         - name: FRR_K8S_IMAGE
           value: quay.io/openshift/origin-metallb-frr:latest
+        - name: NETWORKING_CONSOLE_PLUGIN_IMAGE
+          value: quay.io/openshift/origin-networking-console-plugin:latest
         - name: POD_NAME
           valueFrom:
             fieldRef:
