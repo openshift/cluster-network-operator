@@ -154,6 +154,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["RoutableMTU"] = nil
 	// v4 and v6 join subnet are used when the user wants to use the addresses that we reserve for the join subnet in ovn-k
 	// TODO: this field is being deprecated and will turn into c.GatewayConfig.IPv4/6.InternalJoinSubnet when we introduce the transit switch config into the api
+	data.Data["V4JoinSubnet"] = ""
+	data.Data["V6JoinSubnet"] = ""
+	data.Data["V4TransitSwitchSubnet"] = ""
+	data.Data["V6TransitSwitchSubnet"] = ""
+
 	data.Data["V4JoinSubnet"] = c.V4InternalSubnet
 	data.Data["V6JoinSubnet"] = c.V6InternalSubnet
 	if c.IPv4 != nil {

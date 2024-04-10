@@ -575,6 +575,15 @@ data:
         "
       fi
 
+      ovn_v4_join_subnet_opt=
+      if [[ "{{.V4JoinSubnet}}" != "" ]]; then
+        ovn_v4_join_subnet_opt="--gateway-v4-join-subnet {{.V4JoinSubnet}}"
+      fi
+      ovn_v6_join_subnet_opt=
+      if [[ "{{.V6JoinSubnet}}" != "" ]]; then
+        ovn_v6_join_subnet_opt="--gateway-v6-join-subnet {{.V6JoinSubnet}}"
+      fi
+
       exec /usr/bin/ovnkube \
         --init-ovnkube-controller "${K8S_NODE}" \
         --init-node "${K8S_NODE}" \
@@ -604,5 +613,7 @@ data:
         ${gw_interface_flag} \
         --enable-multi-external-gateway=true \
         ${ip_forwarding_flag} \
-        ${NETWORK_NODE_IDENTITY_ENABLE}
+        ${NETWORK_NODE_IDENTITY_ENABLE} \
+        ${ovn_v4_join_subnet_opt} \
+        ${ovn_v6_join_subnet_opt}
     }

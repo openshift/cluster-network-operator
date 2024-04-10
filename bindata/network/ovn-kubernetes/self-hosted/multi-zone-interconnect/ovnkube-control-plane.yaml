@@ -101,6 +101,24 @@ spec:
             set +o allexport
           fi
 
+          ovn_v4_join_subnet_opt=
+          if [[ "{{.V4JoinSubnet}}" != "" ]]; then
+            ovn_v4_join_subnet_opt="--gateway-v4-join-subnet {{.V4JoinSubnet}}"
+          fi
+          ovn_v6_join_subnet_opt=
+          if [[ "{{.V6JoinSubnet}}" != "" ]]; then
+            ovn_v6_join_subnet_opt="--gateway-v6-join-subnet {{.V6JoinSubnet}}"
+          fi
+
+          ovn_v4_transit_switch_subnet_opt=
+          if [[ "{{.V4TransitSwitchSubnet}}" != "" ]]; then
+            ovn_v4_transit_switch_subnet_opt="--cluster-manager-v4-transit-switch-subnet {{.V4TransitSwitchSubnet}}"
+          fi
+          ovn_v6_transit_switch_subnet_opt=
+          if [[ "{{.V6TransitSwitchSubnet}}" != "" ]]; then
+            ovn_v6_transit_switch_subnet_opt="--cluster-manager-v6-transit-switch-subnet {{.V6TransitSwitchSubnet}}"
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
@@ -109,7 +127,11 @@ spec:
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
             --metrics-bind-address "127.0.0.1:29108" \
             --metrics-enable-pprof \
-            --metrics-enable-config-duration
+            --metrics-enable-config-duration \
+            ${ovn_v4_join_subnet_opt} \
+            ${ovn_v6_join_subnet_opt} \
+            ${ovn_v4_transit_switch_subnet_opt} \
+            ${ovn_v6_transit_switch_subnet_opt}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
