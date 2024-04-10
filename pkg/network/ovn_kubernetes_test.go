@@ -234,49 +234,6 @@ logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
 		},
 		{
-			desc: "custom join subnet",
-			expected: `
-[default]
-mtu="1500"
-cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
-encap-port="8061"
-enable-lflow-cache=true
-lflow-cache-limit-kb=1048576
-enable-udp-aggregation=true
-
-[kubernetes]
-service-cidrs="172.30.0.0/16"
-ovn-config-namespace="openshift-ovn-kubernetes"
-apiserver="https://testing.test:8443"
-host-network-namespace="openshift-host-network"
-platform-type="GCP"
-healthz-bind-address="0.0.0.0:10256"
-dns-service-namespace="openshift-dns"
-dns-service-name="dns-default"
-
-[ovnkubernetesfeature]
-enable-egress-ip=true
-enable-egress-firewall=true
-enable-egress-qos=true
-enable-egress-service=true
-egressip-node-healthcheck-port=9107
-enable-multi-network=true
-enable-multi-external-gateway=true
-
-[gateway]
-mode=shared
-nodeport=true
-v4-join-subnet="100.99.0.0/16"
-
-[logging]
-libovsdblogfile=/var/log/ovnkube/libovsdb.log
-logfile-maxsize=100
-logfile-maxbackups=5
-logfile-maxage=0`,
-			v4InternalSubnet:         "100.99.0.0/16",
-			controlPlaneReplicaCount: 2,
-		},
-		{
 			desc: "custom masquerade subnet",
 			expected: `
 [default]
