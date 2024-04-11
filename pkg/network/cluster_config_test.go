@@ -1,21 +1,19 @@
 package network
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/util"
 
 	. "github.com/onsi/gomega"
 )
@@ -110,93 +108,54 @@ func TestValidClusterConfigLiveMigration(t *testing.T) {
 	g := NewGomegaWithT(t)
 	tests := []struct {
 		name              string
-		managedCluster    bool
 		hypershiftCluster bool
 		annotation        bool
 		expectErr         bool
 	}{
 		{
-			"no error when standalone managed cluster and migration label applied",
-			true,
+			"no error when standalone cluster and migration label applied",
 			false,
 			true,
-			false,
-		},
-		{
-			"error when self managed cluster and migration label applied",
-			false,
-			false,
-			true,
-			true,
-		},
-		{
-
-			"no error when standalone managed cluster and migration label not applied",
-			true,
-			false,
-			false,
 			false,
 		},
 		{
 
-			"no error when self managed cluster and migration label not applied",
-			false,
+			"no error when standalone cluster and migration label not applied",
 			false,
 			false,
 			false,
 		},
 		{
-
 			"error when HyperShift and migration label applied",
-			true,
 			true,
 			true,
 			true,
 		},
 	}
 
-	// restore env var flag post test if its set
-	hcpEnvVarEnabled := os.Getenv("HYPERSHIFT") != ""
-	defer func() {
-		if hcpEnvVarEnabled {
-			os.Setenv("HYPERSHIFT", "")
-		}
-	}()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cc := *ClusterConfig.DeepCopy()
 			net := &configv1.Network{Spec: cc}
-			infrastructure := &configv1.Infrastructure{
-				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
-				Status: configv1.InfrastructureStatus{
-					PlatformStatus: &configv1.PlatformStatus{},
-				},
-			}
-			client := fake.NewFakeClient(infrastructure)
-			err := createProxy(client)
-			g.Expect(err).NotTo(HaveOccurred())
+
+			infraRes := &bootstrap.InfraStatus{}
+
 			if tt.hypershiftCluster {
-				// HyperShift is detected if an env var is set
-				os.Setenv("HYPERSHIFT", "")
-			} else {
-				os.Unsetenv("HYPERSHIFT")
+				infraRes.HostedControlPlane = &hypershift.HostedControlPlane{}
 			}
 			if tt.annotation {
 				net.Annotations = map[string]string{names.NetworkTypeMigrationAnnotation: ""}
 			}
-			if tt.managedCluster && !tt.hypershiftCluster {
-				err := client.Default().CRClient().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: util.STANDALONE_MANAGED_CLUSTER_NAMESPACE}})
-				if err != nil {
-					t.Errorf("failed to create test namespace %q: %v", util.STANDALONE_MANAGED_CLUSTER_NAMESPACE, err)
+			err := validateClusterConfig(net, infraRes)
+			if tt.expectErr {
+				g.Expect(err).To(HaveOccurred())
+				if tt.hypershiftCluster {
+					errMsg := "network type live migration is not supported on HyperShift clusters"
+					g.Expect(err).To(MatchError(Equal(errMsg)))
 				}
 			}
-			err = ValidateClusterConfig(net, client)
-			if tt.expectErr && err == nil {
-				t.Errorf("expected error but got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Errorf("expected no err but got error: %v", err)
+			if !tt.expectErr {
+				g.Expect(err).NotTo(HaveOccurred())
 			}
 		})
 	}
