@@ -42,9 +42,7 @@ func getCO(client cnoclient.Client, name string) (*configv1.ClusterOperator, err
 }
 
 func getOC(client cnoclient.Client) (*operv1.Network, error) {
-	oc := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	err := client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Name: names.OPERATOR_CONFIG}, oc)
-	return oc, err
+	return client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OPERATOR_CONFIG, metav1.GetOptions{})
 }
 
 func getStatuses(client cnoclient.Client, name string) (*configv1.ClusterOperator, *operv1.Network, error) {
@@ -53,9 +51,19 @@ func getStatuses(client cnoclient.Client, name string) (*configv1.ClusterOperato
 	if err != nil {
 		return nil, nil, err
 	}
-	oc := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Name: names.OPERATOR_CONFIG}, oc)
+	oc, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OPERATOR_CONFIG, metav1.GetOptions{})
 	return co, oc, err
+}
+
+func setOC(t *testing.T, client cnoclient.Client, oc *operv1.Network) {
+	t.Helper()
+	_, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Update(context.TODO(), oc, metav1.UpdateOptions{})
+	if apierrors.IsNotFound(err) {
+		_, err = client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Create(context.TODO(), oc, metav1.CreateOptions{})
+	}
+	if err != nil {
+		t.Fatalf("Failed to set: %v", err)
+	}
 }
 
 func set(t *testing.T, client cnoclient.Client, obj crclient.Object) {
@@ -132,7 +140,7 @@ func TestStatusManager_set(t *testing.T) {
 	// make the network.operator object
 	log.Print("Creating Network Operator Config")
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	set(t, client, no)
+	setOC(t, client, no)
 
 	condUpdate := operv1.OperatorCondition{
 		Type:   string(configv1.OperatorUpgradeable),
@@ -268,7 +276,7 @@ func TestStatusManager_set_kuryr(t *testing.T) {
 		},
 	}
 
-	set(t, client, no)
+	setOC(t, client, no)
 
 	condNoProgress := operv1.OperatorCondition{
 		Type:   operv1.OperatorStatusTypeProgressing,
@@ -285,7 +293,7 @@ func TestStatusManager_set_kuryr(t *testing.T) {
 			Type: operv1.NetworkTypeKuryr,
 		},
 	}
-	set(t, client, no)
+	setOC(t, client, no)
 
 	condUpdateBlocked := operv1.OperatorCondition{
 		Type:   string(configv1.OperatorUpgradeable),
@@ -315,7 +323,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 		t.Fatalf("unexpected error (expected Not Found): %v", err)
 	}
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	set(t, client, no)
+	setOC(t, client, no)
 
 	condUpdate := operv1.OperatorCondition{
 		Type:   string(configv1.OperatorUpgradeable),
@@ -403,7 +411,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	status := New(client, "testing", "")
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	set(t, client, no)
+	setOC(t, client, no)
 
 	status.SetFromPods()
 	co, oc, err := getStatuses(client, "testing")
@@ -1005,7 +1013,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	status := New(client, "testing", "")
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	set(t, client, no)
+	setOC(t, client, no)
 
 	status.SetFromPods()
 
@@ -1344,7 +1352,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	status := New(client, "testing", "")
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	set(t, client, no)
+	setOC(t, client, no)
 
 	dsA := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1586,7 +1594,7 @@ func TestStatusManagerHyperShift(t *testing.T) {
 	mgmtStatus := New(mgmtClient, "testing", "")
 	setFakeListers(mgmtStatus)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-	set(t, mgmtClient, no)
+	setOC(t, mgmtClient, no)
 	mgmtStatus.set(true, validConditions...)
 
 	// Create valid minimal Deployment in the management cluster
