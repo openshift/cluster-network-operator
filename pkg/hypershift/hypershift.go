@@ -56,6 +56,7 @@ type HostedControlPlane struct {
 	NodeSelector                 map[string]string
 	AdvertiseAddress             string
 	AdvertisePort                int
+	PriorityClass                string
 }
 
 // AvailabilityPolicy specifies a high level availability policy for components.
@@ -127,6 +128,11 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 		return nil, fmt.Errorf("failed to extract controllerAvailabilityPolicy: %v", err)
 	}
 
+	controlPlanePriorityClassAnnotation, _, err := unstructured.NestedString(hcp.UnstructuredContent(), "metadata", "annotations", "hypershift.openshift.io/control-plane-priority-class")
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract control plane priority class annotation: %v", err)
+	}
+
 	nodeSelector, _, err := unstructured.NestedStringMap(hcp.UnstructuredContent(), "spec", "nodeSelector")
 	if err != nil {
 		return nil, fmt.Errorf("failed extract nodeSelector: %v", err)
@@ -174,6 +180,7 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 		NodeSelector:                 nodeSelector,
 		AdvertiseAddress:             advertiseAddress,
 		AdvertisePort:                int(advertisePort),
+		PriorityClass:                controlPlanePriorityClassAnnotation,
 	}, nil
 }
 
