@@ -2,12 +2,14 @@ package network
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	. "github.com/onsi/gomega"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"testing"
@@ -401,7 +403,7 @@ func TestRenderUnknownNetwork(t *testing.T) {
 
 	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{}, []configv1.FeatureGateName{})
 
-	objs, _, err := Render(prev, bootstrapResult, manifestDir, client, featureGatesCNO)
+	objs, _, err := Render(prev, &configv1.NetworkSpec{}, manifestDir, client, featureGatesCNO, bootstrapResult)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Validate that openshift-sdn isn't rendered
@@ -558,4 +560,54 @@ func setupTestInfraAndBasicRenderConfigs(t *testing.T, prevType, nextType operv1
 	fillDefaults(prev, nil)
 	fillDefaults(next, nil)
 	return g, infra, prev, next
+}
+
+func Test_renderNetworkDiagnostics(t *testing.T) {
+	type args struct {
+		operConf    *operv1.NetworkSpec
+		clusterConf *configv1.NetworkSpec
+	}
+	tests := []struct {
+		name        string
+		args        args
+		want        int
+		expectedErr error
+	}{
+		{
+			name: "Disabled when networkDiagnostics is empty and DisableNetworkDiagnostics is true",
+			args: args{
+				operConf:    &operv1.NetworkSpec{DisableNetworkDiagnostics: true},
+				clusterConf: &configv1.NetworkSpec{NetworkDiagnostics: configv1.NetworkDiagnostics{}},
+			},
+			want:        0,
+			expectedErr: nil,
+		},
+		{
+			name: "Disabled when networkDiagnostics mode is disabled",
+			args: args{
+				operConf:    &operv1.NetworkSpec{},
+				clusterConf: &configv1.NetworkSpec{NetworkDiagnostics: configv1.NetworkDiagnostics{Mode: configv1.NetworkDiagnosticsDisabled}},
+			},
+			want:        0,
+			expectedErr: nil,
+		},
+		{
+			name: "networkDiagnostics takes precedence over DisableNetworkDiagnostics",
+			args: args{
+				operConf:    &operv1.NetworkSpec{DisableNetworkDiagnostics: true},
+				clusterConf: &configv1.NetworkSpec{NetworkDiagnostics: configv1.NetworkDiagnostics{Mode: configv1.NetworkDiagnosticsAll}},
+			},
+			want:        14,
+			expectedErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := renderNetworkDiagnostics(tt.args.operConf, tt.args.clusterConf, manifestDir)
+			if !reflect.DeepEqual(tt.expectedErr, err) {
+				t.Errorf("Test_renderNetworkDiagnostics() err = %v, want %v", err, tt.expectedErr)
+			}
+			assert.Equalf(t, tt.want, len(got), "renderNetworkDiagnostics(%v, %v, %v)", tt.args.operConf, tt.args.clusterConf, manifestDir)
+		})
+	}
 }
