@@ -401,7 +401,7 @@ func TestRenderUnknownNetwork(t *testing.T) {
 
 	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{}, []configv1.FeatureGateName{})
 
-	objs, _, err := Render(prev, bootstrapResult, manifestDir, client, featureGatesCNO)
+	objs, _, err := Render(prev, nil, bootstrapResult, manifestDir, client, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Validate that openshift-sdn isn't rendered
