@@ -54,6 +54,7 @@ spec:
             path: /
           initialDelaySeconds: 30
           timeoutSeconds: 10
+        terminationMessagePolicy: FallbackToLogsOnError
         env:
         - name: K8S_NODE_NAME
           valueFrom:
