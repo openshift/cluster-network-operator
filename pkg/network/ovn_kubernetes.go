@@ -459,15 +459,15 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	manifestDirs = append(manifestDirs, filepath.Join(manifestSubDirBasePath, "common"))
 
-	ongoingMigrationFromSingleToMultiZone := (!targetZoneMode.fastForwardToMultiZone &&
-		isMigrationToMultiZoneAboutToStartOrOngoing(bootstrapResult.OVN, &targetZoneMode))
+	ongoingUpgradePhaseFromSingleToMultiZone := (!targetZoneMode.fastForwardToMultiZone &&
+		isUpgradePhaseToMultiZoneAboutToStartOrOngoing(bootstrapResult.OVN, &targetZoneMode))
 	// choose the YAMLs based on the target zone mode (4.14 only)
 	manifestSubDir := filepath.Join(manifestSubDirBasePath, MULTIZONE_FOLDER) // default is multizone
 	if targetZoneMode.zoneMode == zoneModeSingleZone {
 		// non-default, internal use only; this is selected in the first phase of an upgrade from a
 		// non-interconnect version (< 4.14) to an interconnect version (>= 4.14)
 		manifestSubDir = filepath.Join(manifestSubDirBasePath, SINGLEZONE_FOLDER)
-	} else if ongoingMigrationFromSingleToMultiZone {
+	} else if ongoingUpgradePhaseFromSingleToMultiZone {
 		// intermediate step when converting from single zone to multizone; this is selected
 		// in the second phase of an upgrade from a non-interconnect version (< 4.14)
 		// to an interconnect version (>= 4.14). Skipped when fastForwardToMultiZone is set.
@@ -530,17 +530,17 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// Process phase 2 of the upgrade to IC (4.14 single zone  -> 4.14 multizone)
 	updateNode, updateMaster, updateControlPlane := shouldUpdateOVNKonInterConnectZoneModeChange(bootstrapResult.OVN, targetZoneMode)
 
-	// Process any update in IP family if the cluster is not migrating from single zone to multizone;
+	// Process any update in IP family if the cluster is not moving from single zone to multizone;
 	// annotate ovnkube with IP family (single/dual stack) and cluster CIDR
 	updateNode, updateMaster, updateControlPlane, err = handleIPFamilyAnnotationAndIPFamilyChange(
-		conf, bootstrapResult.OVN, &objs, ongoingMigrationFromSingleToMultiZone, updateNode, updateMaster, updateControlPlane)
+		conf, bootstrapResult.OVN, &objs, ongoingUpgradePhaseFromSingleToMultiZone, updateNode, updateMaster, updateControlPlane)
 	if err != nil {
 		return nil, progressing, fmt.Errorf("unable to render OVN: failed to handle IP family annotation or change: %w", err)
 	}
 
 	// Process phase 1 of the upgrade to IC (4.13 -> 4.14 single zone) or a z-stream 4.14.z upgrade;
 	// hold off if we're handling an IP family migration
-	if !ongoingMigrationFromSingleToMultiZone && updateNode && updateMaster && updateControlPlane {
+	if !ongoingUpgradePhaseFromSingleToMultiZone && updateNode && updateMaster && updateControlPlane {
 		updateNode, updateMaster, updateControlPlane = handleOVNKUpdateUponOpenshiftUpgrade(conf, bootstrapResult.OVN)
 	}
 	// Before upgrading ovnk, deploy the prepuller DaemonSet to download the new image on all nodes
@@ -555,7 +555,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		bootstrapResult.OVN.ControlPlaneUpdateStatus != nil, updateControlPlane)
 
 	// If we need to delay the rollout of control plane, we'll tag its deployment with:
-	// - "create-wait" when migrating to multizone in phase2 of the upgrade: we delay control
+	// - "create-wait" when moving to multizone in phase2 of the upgrade: we delay control
 	//   plane until all ovnkube node pods are up; since there's no control plane in single zone, "create-wait"
 	// prevents the control plane from getting pushed to the API server right away; the annotation is removed as soon
 	// as ovnkube-node has rolled out.
@@ -1764,12 +1764,12 @@ func handleOVNKUpdateUponOpenshiftUpgrade(conf *operv1.NetworkSpec, ovn bootstra
 
 // handleIPFamilyAnnotationAndIPFamilyChange reads the desired IP family mode (single or dual stack) from config,
 // and annotates the ovnk DaemonSet/StatefulSet/deployment with that value.
-// If the config value is different from the current mode and we're not already migrating zone mode, then it applies
-// the new mode first to the ovnkube-node DaemonSet and then to the control plane (or master, in single zone). If zone
-// migration is ongoing, it continues to annotate the ovnk DaemonSet/StatefulSet/deployment with the current value until
-// the zone mode migration is over, at which point it starts the migration to the new IP family mode.
+// If the config value is different from the current mode and we're not already moving from single to multizone, then it applies
+// the new mode first to the ovnkube-node DaemonSet and then to the control plane (or master, in single zone). If the upgrade
+// to multizone is ongoing, it continues to annotate the ovnk DaemonSet/StatefulSet/deployment with the current value until
+// multizone is deployed, at which point it starts the migration to the new IP family mode.
 func handleIPFamilyAnnotationAndIPFamilyChange(conf *operv1.NetworkSpec, ovn bootstrap.OVNBootstrapResult, objs *[]*uns.Unstructured,
-	ongoingMigrationFromSingleToMultizone, updateNode, updateMaster, updateControlPlane bool) (bool, bool, bool, error) {
+	ongoingUpgradePhaseFromSingleToMultizone, updateNode, updateMaster, updateControlPlane bool) (bool, bool, bool, error) {
 
 	newUpdateNode, newUpdateMaster, newUpdateControlPlane := updateNode, updateMaster, updateControlPlane
 
@@ -1781,7 +1781,7 @@ func handleIPFamilyAnnotationAndIPFamilyChange(conf *operv1.NetworkSpec, ovn boo
 	ipFamilyMode := ipFamilyModeFromConfig
 	var clusterNetworkCIDRs string
 
-	if !ongoingMigrationFromSingleToMultizone && updateNode && updateMaster && updateControlPlane {
+	if !ongoingUpgradePhaseFromSingleToMultizone && updateNode && updateMaster && updateControlPlane {
 		clusterNetworkCIDRs = getClusterCIDRsFromConfig(conf)
 
 		var updateMasterOrControlPlane bool
@@ -1797,9 +1797,9 @@ func handleIPFamilyAnnotationAndIPFamilyChange(conf *operv1.NetworkSpec, ovn boo
 		newUpdateControlPlane = updateMasterOrControlPlane
 
 	} else {
-		// skip IP family migration if we're already switching zone mode
-		// Annotate DaemonSet/StatefulSet/deployment with old value: get to new value once zone migration is over
-		klog.Infof("IP family migration (if any) is post-poned until zone migration is complete")
+		// skip IP family migration if we're already moving from single to multizone.
+		// Annotate DaemonSet/StatefulSet/deployment with old value: get to new value once we're on multizone.
+		klog.Infof("IP family migration (if any) is post-poned until cluster is done moving from single to multizone")
 		ipFamilyMode, clusterNetworkCIDRs = getIPFamilyAndClusterCIDRsAnnotationOrConfig(conf, ovn, ipFamilyMode)
 
 	}
@@ -2284,15 +2284,15 @@ func isInterConnectEnabledOnMasterDaemonset(ds *appsv1.DaemonSet) bool {
 	return isInterConnectEnabledOnDaemonset(ds, util.OVN_MASTER)
 }
 
-// migration from single zone to multizone is about to start if:
+// The cluster is about to move from single zone to multizone if:
 //   - target is single zone only when evaluating if phase1 has ended in prepareUpgradeToInterConnect, which then sets the target
 //     to multizone; target is multizone in all other cases;
-//   - configmap exists, so as to not mistaken transient situations (e.g. nodes going down, resulting in ovnkube-xyz appearing as progressing)
-//     happening after the end of the 2-phase upgrade as a new migration
+//   - configmap exists, so as to not mistaken a transient situation (e.g. nodes going down, resulting in ovnkube-xyz appearing as progressing)
+//     happening after the end of the 2-phase upgrade as a new upgrade phase to multizone
 //   - node is running, is >= 4.14 (--interconnect-enabled), is in single zone and is not progressing
 //   - master is running, is >= 4.14 (--interconnect-enabled), is in single zone and is not progressing
 //   - control plane is not running
-func isMigrationToMultiZoneAboutToStart(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType, assessEndOfUpgradePhase1 bool) bool {
+func isUpgradePhaseToMultiZoneAboutToStart(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType, assessEndOfUpgradePhase1 bool) bool {
 	targetZoneModeValue := zoneModeMultiZone
 	if assessEndOfUpgradePhase1 {
 		targetZoneModeValue = zoneModeSingleZone
@@ -2307,14 +2307,14 @@ func isMigrationToMultiZoneAboutToStart(ovn bootstrap.OVNBootstrapResult, target
 		!ovn.MasterUpdateStatus.Progressing
 }
 
-// migration from single zone to multizone is ongoing if:
+// The cluster is currently moving from single zone to multizone if:
 //   - target is multizone and configmap exists
 //   - node is running, is >=4.14, is already in multizone (progressing or not)
 //   - master is running, is >= 4/14 (expected not to be progressing, but let's relax this condition
 //     in case any error occurs on the pod, causing any master pod to restart and its status to be shown as "progressing")
 //   - control plane either is not running (at the start, when multizone node is rolling out) or
 //     is progressing (at the end, when node is already multizone)
-func isMigrationToMultiZoneOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
+func isUpgradePhaseToMultiZoneOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
 	return targetZoneMode.zoneMode == zoneModeMultiZone &&
 		targetZoneMode.configMapFound &&
 
@@ -2328,13 +2328,13 @@ func isMigrationToMultiZoneOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneM
 		(ovn.ControlPlaneUpdateStatus == nil || ovn.ControlPlaneUpdateStatus.Progressing)
 }
 
-// migration from single zone to multizone is complete if:
+// The cluster is done moving from single zone to multizone if:
 //   - target is multizone and the configmap exists
 //   - node, is running, is >=4.14, is in multizone, is not progressing
 //   - master is either running, is >= 4/14, is not progressing  or it's not running at all;
 //     warning: master will be removed in the final step
 //   - control plane either is running and not progressing
-func isMigrationToMultiZoneComplete(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
+func isUpgradePhaseToMultiZoneComplete(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
 	return targetZoneMode.zoneMode == zoneModeMultiZone &&
 		targetZoneMode.configMapFound &&
 		ovn.NodeUpdateStatus != nil && ovn.ControlPlaneUpdateStatus != nil &&
@@ -2343,12 +2343,12 @@ func isMigrationToMultiZoneComplete(ovn bootstrap.OVNBootstrapResult, targetZone
 		!ovn.NodeUpdateStatus.Progressing &&
 		!ovn.ControlPlaneUpdateStatus.Progressing &&
 
-		// master is still up and updated to 4.14; converge to end of zone migration also if master is already gone
+		// master is still up and updated to 4.14; consider the switch to multizone done also if master is already gone
 		(ovn.MasterUpdateStatus == nil || ovn.MasterUpdateStatus.InterConnectEnabled && !ovn.MasterUpdateStatus.Progressing)
 }
 
-func isMigrationToMultiZoneAboutToStartOrOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
-	return isMigrationToMultiZoneAboutToStart(ovn, targetZoneMode, false) || isMigrationToMultiZoneOngoing(ovn, targetZoneMode)
+func isUpgradePhaseToMultiZoneAboutToStartOrOngoing(ovn bootstrap.OVNBootstrapResult, targetZoneMode *targetZoneModeType) bool {
+	return isUpgradePhaseToMultiZoneAboutToStart(ovn, targetZoneMode, false) || isUpgradePhaseToMultiZoneOngoing(ovn, targetZoneMode)
 }
 
 func doesVersionEnableInterConnect(string) bool {
@@ -2414,11 +2414,11 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 		targetZoneMode.configMapFound = true
 		targetZoneMode.zoneMode = zoneModeSingleZone
 
-	} else if isMigrationToMultiZoneAboutToStart(ovn, targetZoneMode, true) && !targetZoneMode.fastForwardToMultiZone {
+	} else if isUpgradePhaseToMultiZoneAboutToStart(ovn, targetZoneMode, true) && !targetZoneMode.fastForwardToMultiZone {
 		// [start of phase 2]
 		// if node and master DaemonSets have already upgraded to >= 4.14 single zone and
 		// we previously pushed a configmap for single zone,
-		// patch the configmap and proceed with the migration to multizone.
+		// patch the configmap and move the cluster to multizone.
 		klog.Infof("Upgrade to interconnect, start of phase2: patching IC configmap for multizone")
 
 		patch := []map[string]interface{}{
@@ -2441,7 +2441,7 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 
 		targetZoneMode.zoneMode = zoneModeMultiZone
 
-	} else if isMigrationToMultiZoneComplete(ovn, targetZoneMode) {
+	} else if isUpgradePhaseToMultiZoneComplete(ovn, targetZoneMode) {
 		// [after completion of phase 2]
 		// daemonsets have rolled out in multizone mode
 		// Remove the configmap: this won't trigger any further roll out, but along with the annotation
@@ -2468,7 +2468,7 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 		(ovn.NodeUpdateStatus.Progressing || ovn.MasterUpdateStatus.Progressing) {
 		klog.Infof("Upgrade to interconnect, phase1 is ongoing")
 
-	} else if isMigrationToMultiZoneOngoing(ovn, targetZoneMode) {
+	} else if isUpgradePhaseToMultiZoneOngoing(ovn, targetZoneMode) {
 		klog.Infof("Upgrade to interconnect, phase2 is ongoing")
 	}
 
