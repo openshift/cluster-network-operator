@@ -166,7 +166,7 @@ rules:
   - adminnetworkpolicies/status
   - baselineadminnetworkpolicies/status
   verbs:
-  - update
+  - patch
 {{- end }}
 - apiGroups:
   - k8s.cni.cncf.io

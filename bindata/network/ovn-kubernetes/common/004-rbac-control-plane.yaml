@@ -82,6 +82,20 @@ rules:
   - egressqoses/status
   verbs:
   - patch
+{{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
+- apiGroups: ["policy.networking.k8s.io"]
+  resources:
+  - adminnetworkpolicies
+  - baselineadminnetworkpolicies
+  verbs:
+  - list
+- apiGroups: ["policy.networking.k8s.io"]
+  resources:
+  - adminnetworkpolicies/status
+  - baselineadminnetworkpolicies/status
+  verbs:
+  - patch
+{{- end }}
 - apiGroups: ["k8s.ovn.org"]
   resources:
     - egressservices/status
