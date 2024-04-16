@@ -227,3 +227,6 @@ const DashboardNamespace = "openshift-config-managed"
 
 // DefaultFieldManagerPrefix is the default field manager prefix set on the managed fields.
 const DefaultFieldManagerPrefix = "network-operator"
+
+// NetworkDiagnosticsAvailableCondition is the condition type for network diagnostics availability
+const NetworkDiagnosticsAvailableCondition string = "NetworkDiagnosticsAvailable"
