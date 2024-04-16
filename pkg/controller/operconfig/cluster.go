@@ -122,5 +122,10 @@ func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConf
 	clusterConfig.Status = *status
 	clusterConfig.TypeMeta = metav1.TypeMeta{APIVersion: configv1.GroupVersion.String(), Kind: "Network"}
 
-	return k8sutil.ToUnstructured(clusterConfig)
+	obj, err := k8sutil.ToUnstructured(clusterConfig)
+	// TODO(kyrtapz) Use apply configurations instead
+	// Remove the networkDiagnostics as this field is a optional non-pointer(always gets marshaled in json)
+	// but it might not exist in the API and should only be set by the user
+	uns.RemoveNestedField(obj.Object, "spec", "networkDiagnostics")
+	return obj, err
 }
