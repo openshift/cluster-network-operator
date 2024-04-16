@@ -79,7 +79,7 @@ func setStatus(t *testing.T, client cnoclient.Client, obj crclient.Object) {
 }
 
 // sl: labels that all status-havers have
-var sl map[string]string = map[string]string{names.GenerateStatusLabel: ""}
+var sl map[string]string = map[string]string{names.GenerateStatusLabel: names.StandAloneClusterName}
 
 // Tests that the parts of newConditions that are set match what's in oldConditions (but
 // doesn't look at anything else in oldConditions)
@@ -115,7 +115,7 @@ func conditionsEqual(oldConditions, newConditions []operv1.OperatorCondition) bo
 
 func TestStatusManager_set(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing", "")
+	status := New(client, "testing", names.StandAloneClusterName)
 
 	// No operator config yet; should reflect this in the cluster operator
 	status.set(false)
@@ -308,7 +308,7 @@ func TestStatusManager_set_OpenShiftSDN(t *testing.T) {
 
 func TestStatusManagerSetDegraded(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing", "")
+	status := New(client, "testing", names.StandAloneClusterName)
 
 	_, err := getOC(client)
 	if !errors.IsNotFound(err) {
@@ -400,7 +400,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 
 func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing", "")
+	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	set(t, client, no)
@@ -1002,7 +1002,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 
 func TestStatusManagerSetFromDeployments(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing", "")
+	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	set(t, client, no)
@@ -1341,7 +1341,7 @@ func setLastPodState(t *testing.T, client cnoclient.Client, name string, ps podS
 
 func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	client := fake.NewFakeClient()
-	status := New(client, "testing", "")
+	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	set(t, client, no)
@@ -1583,7 +1583,7 @@ func TestStatusManagerHyperShift(t *testing.T) {
 
 	// mgmt status
 	mgmtClient := fake.NewFakeClient()
-	mgmtStatus := New(mgmtClient, "testing", "")
+	mgmtStatus := New(mgmtClient, "testing", names.StandAloneClusterName)
 	setFakeListers(mgmtStatus)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	set(t, mgmtClient, no)
@@ -1639,4 +1639,78 @@ func TestStatusManagerHyperShift(t *testing.T) {
 	}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
 	}
+}
+
+func TestStatusManagerSetFromDeploymentsWithExcluded(t *testing.T) {
+	client := fake.NewFakeClient()
+	status := New(client, "testing", names.StandAloneClusterName)
+	setFakeListers(status)
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	set(t, client, no)
+
+	status.SetFromPods()
+
+	co, oc, err := getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionTrue,
+			Reason: "Deploying",
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
+	}
+
+	// Create minimal tracked Deployment
+	depA := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Labels: sl}, Status: appsv1.DeploymentStatus{
+		Replicas:          1,
+		UpdatedReplicas:   1,
+		ReadyReplicas:     1,
+		AvailableReplicas: 1,
+	}}
+	set(t, client, depA)
+
+	// Create another deployment that is not ready but doesn't affect the status since it is excluded(GenerateStatusLabel is value is empty)
+	depB := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "beta", Labels: map[string]string{names.GenerateStatusLabel: ""}}, Status: appsv1.DeploymentStatus{
+		Replicas:            10,
+		UnavailableReplicas: 10,
+	}}
+	set(t, client, depB)
+
+	status.SetFromPods()
+
+	co, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionFalse,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Status: operv1.ConditionTrue,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeAvailable,
+			Status: operv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) != 1 {
+		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
+	}
+
 }

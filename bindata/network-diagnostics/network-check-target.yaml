@@ -9,6 +9,8 @@ metadata:
       a dummy app to be checked by network-check-source pod
     release.openshift.io/version: "{{.ReleaseVersion}}"
     networkoperator.openshift.io/non-critical: ""
+  labels:
+    networkoperator.openshift.io/generates-operator-status: ""
 spec:
   selector:
       matchLabels:

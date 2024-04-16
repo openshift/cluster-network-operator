@@ -9,6 +9,8 @@ metadata:
       pod network connectivity checks
     release.openshift.io/version: "{{.ReleaseVersion}}"
     networkoperator.openshift.io/non-critical: ""
+  labels:
+    networkoperator.openshift.io/generates-operator-status: ""
 spec:
   replicas: 1
   selector:

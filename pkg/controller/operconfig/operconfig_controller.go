@@ -426,14 +426,17 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 				l = map[string]string{}
 			}
 
-			// In HyperShift use the infrastructure name to differentiate between resources deployed by the management cluster CNO and CNO deployed in the hosted clusters control plane namespace
-			// Without that the CNO running against the management cluster would pick the resources rendered by the hosted cluster CNO
-			if hcpCfg.Enabled {
-				l[names.GenerateStatusLabel] = bootstrapResult.Infra.InfraName
-			} else {
-				l[names.GenerateStatusLabel] = names.StandAloneClusterName
+			// Resources with GenerateStatusLabel set to "" are not meant to generate status
+			if v, exists := l[names.GenerateStatusLabel]; !exists || v != "" {
+				// In HyperShift use the infrastructure name to differentiate between resources deployed by the management cluster CNO and CNO deployed in the hosted clusters control plane namespace
+				// Without that the CNO running against the management cluster would pick the resources rendered by the hosted cluster CNO
+				if hcpCfg.Enabled {
+					l[names.GenerateStatusLabel] = bootstrapResult.Infra.InfraName
+				} else {
+					l[names.GenerateStatusLabel] = names.StandAloneClusterName
+				}
+				obj.SetLabels(l)
 			}
-			obj.SetLabels(l)
 		}
 		restMapping, err := r.mapper.RESTMapping(obj.GroupVersionKind().GroupKind())
 		if err != nil {

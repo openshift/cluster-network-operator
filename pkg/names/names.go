@@ -58,6 +58,7 @@ const NonCriticalAnnotation = "networkoperator.openshift.io/non-critical"
 // Currently, this is looked for on Deployments, DaemonSets, and StatefulSets.
 // Its value reflects which cluster the resource belongs to. This helps avoid an overlap
 // in Hypershift where there can be multiple CNO instances running in the management cluster.
+// If the value is empty, the resource is not going to be tracked by StatusController.
 const GenerateStatusLabel = "networkoperator.openshift.io/generates-operator-status"
 
 // StandAloneClusterName is a value used for GenerateStatusLabel label when running in non-Hypershift environments
