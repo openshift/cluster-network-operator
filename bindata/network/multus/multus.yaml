@@ -253,6 +253,7 @@ spec:
             memory: 65Mi
         securityContext:
           privileged: true
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /entrypoint
           name: cni-binary-copy
