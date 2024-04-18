@@ -148,7 +148,7 @@ spec:
           EOF
             # Wait until the certificate signing request has been signed.
             counter=0
-            until [ -n "$(kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' 2>/dev/null)" ]
+            until [ -n "$(kubectl get csr -lk8s.ovn.org/ipsec-csr="$(hostname)" --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' 2>/dev/null)" ]
             do
               counter=$((counter+1))
               sleep 1
@@ -160,7 +160,7 @@ spec:
             done
 
             # Decode the signed certificate.
-            kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' | base64 -d | openssl x509 -outform pem -text -out $cert_pem
+            kubectl get csr -lk8s.ovn.org/ipsec-csr="$(hostname)" --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' | base64 -d | openssl x509 -outform pem -text -out $cert_pem
 
             # Get the CA certificate so we can authenticate peer nodes.
             openssl x509 -in /signer-ca/ca-bundle.crt -outform pem -text -out /etc/openvswitch/keys/ipsec-cacert.pem
@@ -217,9 +217,9 @@ spec:
             # need to ensure that xfrm state and policies are not flushed.
 
             # Don't allow ovs monitor to cleanup persistent state
-            kill $(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null) 2>/dev/null || true
+            kill "$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)" 2>/dev/null || true
             # Don't allow pluto to clear xfrm state and policies on exit
-            kill -9 $(cat /var/run/pluto/pluto.pid 2>/devnull) 2>/dev/null || true
+            kill -9 "$(cat /var/run/pluto/pluto.pid 2>/dev/null)" 2>/dev/null || true
 
             /usr/sbin/ipsec --stopnflog
             exit 0
