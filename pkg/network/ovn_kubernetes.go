@@ -1466,22 +1466,23 @@ func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
 		// One of the IPsec MachineConfig is not created yet, so return false.
 		return false
 	}
-	ipSecPluginOnMasterNodes := hasSourceInMachineConfigStatus(infra.MasterMCPStatus, infra.MasterIPsecMachineConfigs)
-	ipSecPluginOnWorkerNodes := hasSourceInMachineConfigStatus(infra.WorkerMCPStatus, infra.WorkerIPsecMachineConfigs)
+	ipSecPluginOnMasterNodes := infra.MasterMCPStatus.MachineCount == infra.MasterMCPStatus.UpdatedMachineCount &&
+		hasSourceInMachineConfigStatus(infra.MasterMCPStatus, infra.MasterIPsecMachineConfigs)
+	ipSecPluginOnWorkerNodes := infra.WorkerMCPStatus.MachineCount == infra.WorkerMCPStatus.UpdatedMachineCount &&
+		hasSourceInMachineConfigStatus(infra.WorkerMCPStatus, infra.WorkerIPsecMachineConfigs)
 	return ipSecPluginOnMasterNodes && ipSecPluginOnWorkerNodes
 }
 
 func hasSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
-	sourceNames := sets.New[string]()
+	ipSecMachineConfigNames := sets.New[string]()
 	for _, machineConfig := range machineConfigs {
-		sourceNames.Insert(machineConfig.Name)
+		ipSecMachineConfigNames.Insert(machineConfig.Name)
 	}
+	sourceNames := sets.New[string]()
 	for _, source := range machineConfigStatus.Configuration.Source {
-		if sourceNames.Has(source.Name) {
-			return true
-		}
+		sourceNames.Insert(source.Name)
 	}
-	return false
+	return sourceNames.IsSuperset(ipSecMachineConfigNames)
 }
 
 // shouldUpdateOVNKonUpgrade determines if we should roll out changes to
