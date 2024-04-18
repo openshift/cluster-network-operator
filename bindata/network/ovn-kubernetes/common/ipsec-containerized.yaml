@@ -148,7 +148,7 @@ spec:
           EOF
             # Wait until the certificate signing request has been signed.
             counter=0
-            until [ -n $(kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' 2>/dev/null) ]
+            until [ -n "$(kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' 2>/dev/null)" ]
             do
               counter=$((counter+1))
               sleep 1
