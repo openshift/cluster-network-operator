@@ -64,8 +64,14 @@ const OVN_NODE_IDENTITY_CERT_DURATION = "24h"
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
 
 const (
-	OVSFlowsConfigMapName   = "ovs-flows-config"
-	OVSFlowsConfigNamespace = names.APPLIED_NAMESPACE
+	OVSFlowsConfigMapName        = "ovs-flows-config"
+	OVSFlowsConfigNamespace      = names.APPLIED_NAMESPACE
+	defaultV4InternalSubnet      = "100.64.0.0/16"
+	defaultV6InternalSubnet      = "fd98::/64"
+	defaultV4TransitSwitchSubnet = "100.88.0.0/16"
+	defaultV6TransitSwitchSubnet = "fd97::/64"
+	defaultV4MasqueradeSubnet    = "169.254.169.0/29"
+	defaultV6MasqueradeSubnet    = "fd69::/125"
 )
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
@@ -1759,4 +1765,24 @@ func isIPSecEnabledInPod(pod v1.PodTemplateSpec, containerName string) bool {
 		}
 	}
 	return false
+}
+
+// GetInternalSubnets returns internal subnet values for both IP families
+// It returns default values if conf is nil or the subnets are not configured
+func GetInternalSubnets(conf *operv1.OVNKubernetesConfig) (v4Subnet, v6Subnet string) {
+	v4Subnet = defaultV4InternalSubnet
+	v6Subnet = defaultV6InternalSubnet
+
+	if conf == nil {
+		return
+	}
+
+	if conf.V4InternalSubnet != "" {
+		v4Subnet = conf.V4InternalSubnet
+	}
+
+	if conf.V6InternalSubnet != "" {
+		v6Subnet = conf.V6InternalSubnet
+	}
+	return
 }
