@@ -33,3 +33,17 @@ func ListAllNamespaces(ctx context.Context, client Client) ([]*v1.Namespace, err
 	})
 	return list, err
 }
+
+func ListAllPodsWithAnnotationKey(ctx context.Context, client Client, annotationKey string) ([]*v1.Pod, error) {
+	list := []*v1.Pod{}
+	err := pager.New(func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
+		return client.Default().Kubernetes().CoreV1().Pods("").List(ctx, opts)
+	}).EachListItem(ctx, metav1.ListOptions{}, func(obj runtime.Object) error {
+		pod := obj.(*v1.Pod)
+		if _, ok := pod.Annotations[annotationKey]; ok {
+			list = append(list, pod)
+		}
+		return nil
+	})
+	return list, err
+}
