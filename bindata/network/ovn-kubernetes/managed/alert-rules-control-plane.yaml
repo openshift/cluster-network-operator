@@ -15,6 +15,14 @@ spec:
     rules:
     - record: cluster:ovnkube_controller_egress_routing_via_host:max
       expr: max(ovnkube_controller_egress_routing_via_host)
+    - record: cluster:ovnkube_controller_admin_network_policies_db_objects:max
+      expr: max by(table_name)(ovnkube_controller_admin_network_policies_db_objects)
+    - record: cluster:ovnkube_controller_baseline_admin_network_policies_db_objects:max
+      expr: max by(table_name)(ovnkube_controller_baseline_admin_network_policies_db_objects)
+    - record: cluster:ovnkube_controller_admin_network_policies_rules:max
+      expr: max by(direction, action)(ovnkube_controller_admin_network_policies_rules)
+    - record: cluster:ovnkube_controller_baseline_admin_network_policies_rules:max
+      expr: max by(direction, action)(ovnkube_controller_baseline_admin_network_policies_rules)
     # OVN kubernetes cluster manager functional alerts
     - alert: V4SubnetAllocationThresholdExceeded
       annotations:
