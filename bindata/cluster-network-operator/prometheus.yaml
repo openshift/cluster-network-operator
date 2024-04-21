@@ -12,7 +12,7 @@ spec:
     - name: openshift-network.rules
       rules:
       - expr: |-
-          sum by (mode,is_legacy_api) (
+          group by (mode,is_legacy_api) (
             openshift_network_operator_ipsec_state{namespace=~"openshift-network-operator"}
           )
-        record: openshift:openshift_network_operator_ipsec_state:sum
+        record: openshift:openshift_network_operator_ipsec_state:info
