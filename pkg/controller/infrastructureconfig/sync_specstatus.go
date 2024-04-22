@@ -25,17 +25,17 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 
 	switch {
 	case updatedInfraConfig.Status.PlatformStatus.Type == configv1.BareMetalPlatformType:
-		if updatedInfraConfig.Spec.PlatformSpec.BareMetal == nil {
-			// This is migration path from pre-4.16 version in which PlatformSpec was not defined.
-			// We first upgrade the struct to a new one (introduced in 4.16) and populate afterward.
-			log.Print("Detected nil platform spec for baremetal, initializing")
-			updatedInfraConfig.Spec.PlatformSpec.BareMetal = &configv1.BareMetalPlatformSpec{}
-		}
 		if updatedInfraConfig.Status.PlatformStatus.BareMetal == nil {
 			// This is a safeguard against strange platform combinations that do not fill the
 			// PlatformStatus (e.g. UPI under some circumstances).
 			log.Print("Detected nil platform status for baremetal, aborting")
 			return updatedInfraConfig, nil
+		}
+		if updatedInfraConfig.Spec.PlatformSpec.BareMetal == nil {
+			// This is migration path from pre-4.16 version in which PlatformSpec was not defined.
+			// We first upgrade the struct to a new one (introduced in 4.16) and populate afterward.
+			log.Print("Detected nil platform spec for baremetal, initializing")
+			updatedInfraConfig.Spec.PlatformSpec.BareMetal = &configv1.BareMetalPlatformSpec{}
 		}
 		statusApiVips = &updatedInfraConfig.Status.PlatformStatus.BareMetal.APIServerInternalIPs
 		specApiVips = &updatedInfraConfig.Spec.PlatformSpec.BareMetal.APIServerInternalIPs
@@ -52,13 +52,17 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 		}
 
 	case updatedInfraConfig.Status.PlatformStatus.Type == configv1.VSpherePlatformType:
-		if updatedInfraConfig.Spec.PlatformSpec.VSphere == nil {
-			log.Print("Detected nil platform spec for vSphere, initializing")
-			updatedInfraConfig.Spec.PlatformSpec.VSphere = &configv1.VSpherePlatformSpec{}
-		}
+		// vSphere UPI is a special type of platform that behaves differently than any other UPI.
+		// It sets the type, but does not populate Spec and Status fields, leaving them as `nil`.
+		// We need to keep it like that so that the API validations pass correctly (as empty struct
+		// serializes differently than `nil`).
 		if updatedInfraConfig.Status.PlatformStatus.VSphere == nil {
 			log.Print("Detected nil platform status for vSphere, aborting")
 			return updatedInfraConfig, nil
+		}
+		if updatedInfraConfig.Spec.PlatformSpec.VSphere == nil {
+			log.Print("Detected nil platform spec for vSphere, initializing")
+			updatedInfraConfig.Spec.PlatformSpec.VSphere = &configv1.VSpherePlatformSpec{}
 		}
 		statusApiVips = &updatedInfraConfig.Status.PlatformStatus.VSphere.APIServerInternalIPs
 		specApiVips = &updatedInfraConfig.Spec.PlatformSpec.VSphere.APIServerInternalIPs
@@ -75,13 +79,13 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 		}
 
 	case updatedInfraConfig.Status.PlatformStatus.Type == configv1.OpenStackPlatformType:
-		if updatedInfraConfig.Spec.PlatformSpec.OpenStack == nil {
-			log.Print("Detected nil platform spec for openstack, initializing")
-			updatedInfraConfig.Spec.PlatformSpec.OpenStack = &configv1.OpenStackPlatformSpec{}
-		}
 		if updatedInfraConfig.Status.PlatformStatus.OpenStack == nil {
 			log.Print("Detected nil platformstatus for OpenStack, aborting")
 			return updatedInfraConfig, nil
+		}
+		if updatedInfraConfig.Spec.PlatformSpec.OpenStack == nil {
+			log.Print("Detected nil platform spec for openstack, initializing")
+			updatedInfraConfig.Spec.PlatformSpec.OpenStack = &configv1.OpenStackPlatformSpec{}
 		}
 		statusApiVips = &updatedInfraConfig.Status.PlatformStatus.OpenStack.APIServerInternalIPs
 		specApiVips = &updatedInfraConfig.Spec.PlatformSpec.OpenStack.APIServerInternalIPs

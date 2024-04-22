@@ -807,7 +807,7 @@ func Test_SpecStatusSynchronizer(t *testing.T) {
 			},
 		},
 		{
-			name: "should handle missing vsphere platform status: VSphere UPI doesn't populate VSphere field",
+			name: "should handle vSphere UPI: platform status is never populated",
 			givenInfra: configv1.Infrastructure{
 				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
 				Spec: configv1.InfrastructureSpec{
@@ -834,6 +834,72 @@ func Test_SpecStatusSynchronizer(t *testing.T) {
 							APIServerInternalIPs: []configv1.IP{"224.0.0.1"},
 							IngressIPs:           []configv1.IP{"224.0.0.2"},
 						},
+					},
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform: configv1.VSpherePlatformType,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type:    "VSphere",
+						VSphere: nil,
+					},
+				},
+			},
+		},
+		{
+			name: "should handle vSphere UPI: empty spec and status should not fail",
+			givenInfra: configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						VSphere: &configv1.VSpherePlatformSpec{},
+					},
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform: configv1.VSpherePlatformType,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type:    "VSphere",
+						VSphere: nil,
+					},
+				},
+			},
+			wantedInfra: configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						VSphere: &configv1.VSpherePlatformSpec{},
+					},
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform: configv1.VSpherePlatformType,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type:    "VSphere",
+						VSphere: nil,
+					},
+				},
+			},
+		},
+		{
+			name: "should handle vSphere UPI: nil spec and status should not fail",
+			givenInfra: configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						VSphere: nil,
+					},
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform: configv1.VSpherePlatformType,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type:    "VSphere",
+						VSphere: nil,
+					},
+				},
+			},
+			wantedInfra: configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						VSphere: nil,
 					},
 				},
 				Status: configv1.InfrastructureStatus{
