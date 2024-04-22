@@ -99,11 +99,11 @@ type InfraStatus struct {
 	// WorkerIPsecMachineConfigs contains ipsec machine config objects of worker nodes.
 	WorkerIPsecMachineConfigs []*mcfgv1.MachineConfig
 
-	// MasterMCPStatus contains machine config pool status of master nodes.
-	MasterMCPStatus mcfgv1.MachineConfigPoolStatus
+	// MasterMCPStatus contains machine config pool statuses for pools having master role.
+	MasterMCPStatuses []mcfgv1.MachineConfigPoolStatus
 
-	// WorkerMCPStatus contains machine config pool status of worker nodes.
-	WorkerMCPStatus mcfgv1.MachineConfigPoolStatus
+	// WorkerMCPStatus contains machine config pool statuses for pools having worker role.
+	WorkerMCPStatuses []mcfgv1.MachineConfigPoolStatus
 
 	// MachineConfigClusterOperatorReady set to true when Machine Config cluster operator is in ready state.
 	MachineConfigClusterOperatorReady bool

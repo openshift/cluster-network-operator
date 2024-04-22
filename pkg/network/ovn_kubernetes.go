@@ -1456,16 +1456,32 @@ func containsNetworkOwnerRef(ownerRefs []metav1.OwnerReference) bool {
 	return false
 }
 
-// isIPsecMachineConfigActive returns true if both master and worker's machine config pool are ready with
+// isIPsecMachineConfigActive returns true if both master and worker's machine config pools are ready with
 // ipsec machine config extension rolled out, otherwise returns false.
 func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
 	if infra.MasterIPsecMachineConfigs == nil || infra.WorkerIPsecMachineConfigs == nil {
 		// One of the IPsec MachineConfig is not created yet, so return false.
 		return false
 	}
-	ipSecPluginOnMasterNodes := hasSourceInMachineConfigStatus(infra.MasterMCPStatus, infra.MasterIPsecMachineConfigs)
-	ipSecPluginOnWorkerNodes := hasSourceInMachineConfigStatus(infra.WorkerMCPStatus, infra.WorkerIPsecMachineConfigs)
-	return ipSecPluginOnMasterNodes && ipSecPluginOnWorkerNodes
+	if len(infra.MasterMCPStatuses) == 0 || len(infra.WorkerMCPStatuses) == 0 {
+		// When none of MachineConfig pools exist, then return false. needed for unit test.
+		return false
+	}
+	ipSecPluginOnPool := func(status mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
+		return status.MachineCount == status.UpdatedMachineCount &&
+			hasSourceInMachineConfigStatus(status, machineConfigs)
+	}
+	for _, masterMCPStatus := range infra.MasterMCPStatuses {
+		if !ipSecPluginOnPool(masterMCPStatus, infra.MasterIPsecMachineConfigs) {
+			return false
+		}
+	}
+	for _, workerMCPStatus := range infra.WorkerMCPStatuses {
+		if !ipSecPluginOnPool(workerMCPStatus, infra.WorkerIPsecMachineConfigs) {
+			return false
+		}
+	}
+	return true
 }
 
 func hasSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
