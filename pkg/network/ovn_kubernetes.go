@@ -100,7 +100,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// render the manifests on disk
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
-	data.Data["OvnImage"] = os.Getenv("OVN_IMAGE")
+	data.Data["OvnImage"] = "quay.io/jtanenba/ovn-kubernetes:release4.12sdn4185"
 	data.Data["OvnkubeMasterReplicas"] = len(bootstrapResult.OVN.MasterAddresses)
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 	data.Data["Socks5ProxyImage"] = os.Getenv("SOCKS5_PROXY_IMAGE")
