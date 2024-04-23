@@ -589,6 +589,7 @@ spec:
               command: ["/bin/bash", "-c", "echo drop-icmp done"]
         securityContext:
           privileged: true
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
 {{ if .NETWORK_NODE_IDENTITY_ENABLE }}
         - mountPath: /etc/ovn/

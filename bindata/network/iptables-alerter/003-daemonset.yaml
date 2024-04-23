@@ -46,6 +46,7 @@ spec:
             memory: 65Mi
         securityContext:
           privileged: true
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /iptables-alerter
           name: iptables-alerter-script

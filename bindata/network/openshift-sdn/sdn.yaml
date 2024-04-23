@@ -426,6 +426,7 @@ spec:
           requests:
             cpu: 5m
             memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
         env:
         - name: K8S_NODE
           valueFrom:
