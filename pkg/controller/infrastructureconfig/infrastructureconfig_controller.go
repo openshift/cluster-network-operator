@@ -8,7 +8,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/retry"
@@ -20,7 +19,6 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
-	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -46,8 +44,7 @@ func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c c
 	}
 
 	return &ReconcileInfrastructureConfig{
-		client:      c,
-		typedClient: configClient,
+		client:      configClient,
 		scheme:      mgr.GetScheme(),
 		status:      status,
 		fieldSyncer: &synchronizer{},
@@ -75,8 +72,7 @@ var _ reconcile.Reconciler = &ReconcileInfrastructureConfig{}
 
 // ReconcileInfrastructureConfig reconciles a cluster Infrastructure object
 type ReconcileInfrastructureConfig struct {
-	client      cnoclient.Client
-	typedClient *configclient.Clientset
+	client      *configclient.Clientset
 	scheme      *runtime.Scheme
 	status      *statusmanager.StatusManager
 	fieldSyncer fieldSynchronizer
@@ -98,9 +94,7 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 	}
 
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		// Fetch the infrastructure config
-		infraConfig := &configv1.Infrastructure{}
-		err := r.client.Default().CRClient().Get(ctx, request.NamespacedName, infraConfig)
+		infraConfig, err := r.client.ConfigV1().Infrastructures().Get(ctx, request.Name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				// Request object not found, could have been deleted after reconcile request.
@@ -130,7 +124,7 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 
 		// The "duplicated" logic below is because Update on custom CRDs is not modifying the Status subresource.
 		if !reflect.DeepEqual(updatedInfraConfig.Spec, infraConfig.Spec) {
-			if _, err = r.typedClient.ConfigV1().Infrastructures().Update(ctx, updatedInfraConfig, metav1.UpdateOptions{}); err != nil {
+			if _, err = r.client.ConfigV1().Infrastructures().Update(ctx, updatedInfraConfig, metav1.UpdateOptions{}); err != nil {
 				err = fmt.Errorf("Error while client-side updating infrastructures.%s/cluster: %w", configv1.GroupName, err)
 				log.Println(err)
 
@@ -141,7 +135,7 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 		}
 
 		if !reflect.DeepEqual(updatedInfraConfig.Status, infraConfig.Status) {
-			if _, err = r.typedClient.ConfigV1().Infrastructures().UpdateStatus(ctx, updatedInfraConfig, metav1.UpdateOptions{}); err != nil {
+			if _, err = r.client.ConfigV1().Infrastructures().UpdateStatus(ctx, updatedInfraConfig, metav1.UpdateOptions{}); err != nil {
 				err = fmt.Errorf("Error while client-side updating status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
 				log.Println(err)
 
@@ -159,16 +153,4 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 
 	r.status.SetNotDegraded(statusmanager.InfrastructureConfig)
 	return reconcile.Result{}, nil
-}
-
-func (r *ReconcileInfrastructureConfig) updateInfrastructureConfig(ctx context.Context, infraConfig *configv1.Infrastructure, subresources ...string) error {
-	infraConfigToApply := &configv1.Infrastructure{
-		ObjectMeta: v1.ObjectMeta{
-			Name: infraConfig.Name,
-		},
-		Status: infraConfig.Status,
-		Spec:   infraConfig.Spec,
-	}
-
-	return apply.ApplyObject(ctx, r.client, infraConfigToApply, ControllerName, subresources...)
 }
