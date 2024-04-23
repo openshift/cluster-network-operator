@@ -253,6 +253,59 @@ func TestStatusManager_set(t *testing.T) {
 	}
 }
 
+func TestStatusManager_set_OpenShiftSDN(t *testing.T) {
+	client := fake.NewFakeClient()
+	status := New(client, "testing", "")
+
+	// make the network.operator object
+	log.Print("Creating Network Operator Config")
+	no := &operv1.Network{
+		ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+		Spec: operv1.NetworkSpec{
+			DefaultNetwork: operv1.DefaultNetworkDefinition{
+				Type: operv1.NetworkTypeOpenShiftSDN,
+			},
+		},
+	}
+
+	set(t, client, no)
+
+	condNoProgress := operv1.OperatorCondition{
+		Type:   operv1.OperatorStatusTypeProgressing,
+		Status: operv1.ConditionFalse,
+	}
+	condAvailable := operv1.OperatorCondition{
+		Type:   operv1.OperatorStatusTypeAvailable,
+		Status: operv1.ConditionTrue,
+	}
+
+	// Check if OpenShiftSDN will make operator non-upgradable
+	no.Spec = operv1.NetworkSpec{
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOpenShiftSDN,
+		},
+	}
+	set(t, client, no)
+
+	condUpdateBlocked := operv1.OperatorCondition{
+		Type:   operv1.OperatorStatusTypeUpgradeable,
+		Status: operv1.ConditionFalse,
+		Reason: "OpenShiftSDNConfigured",
+		Message: "Cluster is configured with OpenShiftSDN, which is not supported in the next version. Please " +
+			"follow the documented steps to migrate from OpenShiftSDN to OVN-Kubernetes in order to be able to upgrade. " +
+			"https://docs.openshift.com/container-platform/4.16/networking/ovn_kubernetes_network_provider/migrate-from-openshift-sdn.html",
+	}
+	status.set(true, condNoProgress, condAvailable)
+
+	oc, err := getOC(client)
+	if err != nil {
+		t.Fatalf("error getting network.operator: %v", err)
+	}
+	if !conditionsEqual(oc.Status.Conditions, []operv1.OperatorCondition{condAvailable, condUpdateBlocked, condNoProgress}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+}
+
 func TestStatusManagerSetDegraded(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", "")
