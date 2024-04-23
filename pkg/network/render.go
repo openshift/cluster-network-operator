@@ -131,6 +131,12 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	}
 	objs = append(objs, o...)
 
+	o, err = renderIPTablesAlerter(conf, bootstrapResult, manifestDir)
+	if err != nil {
+		return nil, progressing, err
+	}
+	objs = append(objs, o...)
+
 	log.Printf("Render phase done, rendered %d objects", len(objs))
 	return objs, progressing, nil
 }
@@ -842,6 +848,23 @@ func renderCNO(manifestDir string) ([]*uns.Unstructured, error) {
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "cluster-network-operator"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render cluster-network-operator manifests")
+	}
+	return manifests, nil
+}
+
+// renderIPTablesAlerter generates the manifests for the pod iptables usage alerter
+func renderIPTablesAlerter(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+	if !bootstrapResult.IPTablesAlerter.Enabled {
+		return nil, nil
+	}
+
+	data := render.MakeRenderData()
+	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
+	data.Data["CLIImage"] = os.Getenv("CLI_IMAGE")
+
+	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network", "iptables-alerter"), &data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to render network/iptables-alerter manifests")
 	}
 	return manifests, nil
 }

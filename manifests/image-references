@@ -70,3 +70,7 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-cloud-network-config-controller:latest
+  - name: cli
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-cli:latest
