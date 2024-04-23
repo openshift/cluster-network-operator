@@ -11,5 +11,6 @@ COPY --from=builder  /go/src/github.com/openshift/cluster-network-operator/clust
 COPY manifests /manifests
 COPY bindata /bindata
 ENV OPERATOR_NAME=cluster-network-operator
+ENV OPERATOR_NAMES=cluster-network-operator
 CMD ["/usr/bin/cluster-network-operator"]
 LABEL io.openshift.release.operator true
