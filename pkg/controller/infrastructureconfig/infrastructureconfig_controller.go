@@ -6,38 +6,51 @@ import (
 	"log"
 	"reflect"
 
-	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/cluster-network-operator/pkg/apply"
-	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
-	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
-	"github.com/openshift/cluster-network-operator/pkg/names"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	configv1 "github.com/openshift/api/config/v1"
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	"github.com/openshift/cluster-network-operator/pkg/apply"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 )
 
 const ControllerName = "infrastructureconfig"
 
 // Add attaches our control loop to the manager and watches for infrastructure objects
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) error {
-	return add(mgr, newReconciler(mgr, status, c))
+	rc, err := newReconciler(mgr, status, c)
+	if err != nil {
+		return err
+	}
+	return add(mgr, rc)
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) (reconcile.Reconciler, error) {
+	kubeConfig := c.Default().Config()
+	configClient, err := configclient.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	return &ReconcileInfrastructureConfig{
 		client:      c,
+		clientSet:   configClient,
 		scheme:      mgr.GetScheme(),
 		status:      status,
 		fieldSyncer: &synchronizer{},
-	}
+	}, nil
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -62,6 +75,7 @@ var _ reconcile.Reconciler = &ReconcileInfrastructureConfig{}
 // ReconcileInfrastructureConfig reconciles a cluster Infrastructure object
 type ReconcileInfrastructureConfig struct {
 	client      cnoclient.Client
+	clientSet   *configclient.Clientset
 	scheme      *runtime.Scheme
 	status      *statusmanager.StatusManager
 	fieldSyncer fieldSynchronizer
@@ -112,12 +126,35 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 		return reconcile.Result{}, err
 	}
 
-	// The "duplicated" logic below is a direct result of how server-side-apply works for this
-	// object. Where it would be natural that `apply.ApplyObject` updates both Spec and Status
-	// at the same time, in reality the first call only updates Spec and leaves Status with the
-	// old content. To fix that and have Status also updated, we are executing a second call with
-	// explicit marker that "status" subresource should be updated.
-	if !reflect.DeepEqual(updatedInfraConfig.Spec, infraConfig.Spec) {
+	// Forcefully grab ownership of Infrastructure CR by doing a no-op apply. This is needed
+	// so that subsequent updates can be applied correctly. We need to first remove exiting fieldManagers
+	// and then apply an unchanged object so that we become its manager. Only afterwards we are allowed
+	// to modify pre-existing values.
+	if !reflect.DeepEqual(updatedInfraConfig.Spec, infraConfig.Spec) || !reflect.DeepEqual(updatedInfraConfig.Status, infraConfig.Status) {
+		if err = r.stealInfrastructureConfig(ctx, infraConfig); err != nil {
+			err = fmt.Errorf("Error while stealing ownership of infrastructures.%s/cluster: %w", configv1.GroupName, err)
+			log.Println(err)
+
+			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureSpecOrStatus", err.Error())
+			return reconcile.Result{}, err
+		}
+		if err = r.updateInfrastructureConfig(ctx, infraConfig); err != nil {
+			err = fmt.Errorf("Error while stealing ownership of infrastructures.%s/cluster: %w", configv1.GroupName, err)
+			log.Println(err)
+
+			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureSpecOrStatus", err.Error())
+			return reconcile.Result{}, err
+		}
+		if err = r.updateInfrastructureConfig(ctx, infraConfig, "status"); err != nil {
+			err = fmt.Errorf("Error while stealing ownership of status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
+			log.Println(err)
+
+			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureStatus", err.Error())
+			return reconcile.Result{}, err
+		}
+		log.Printf("Successfully stole ownership of infrastructure config.")
+
+		// The "duplicated" logic below is because Update on custom CRDs is not modifying the Status subresource.
 		if err = r.updateInfrastructureConfig(ctx, updatedInfraConfig); err != nil {
 			err = fmt.Errorf("Error while updating infrastructures.%s/cluster: %w", configv1.GroupName, err)
 			log.Println(err)
@@ -125,10 +162,6 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureSpecOrStatus", err.Error())
 			return reconcile.Result{}, err
 		}
-		log.Printf("Successfully synchronized infrastructure config.")
-	}
-
-	if !reflect.DeepEqual(updatedInfraConfig.Status, infraConfig.Status) {
 		if err = r.updateInfrastructureConfig(ctx, updatedInfraConfig, "status"); err != nil {
 			err = fmt.Errorf("Error while updating status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
 			log.Println(err)
@@ -136,7 +169,7 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureStatus", err.Error())
 			return reconcile.Result{}, err
 		}
-		log.Printf("Successfully synchronized infrastructure config status")
+		log.Printf("Successfully synchronized infrastructure config")
 	}
 
 	r.status.SetNotDegraded(statusmanager.InfrastructureConfig)
@@ -153,4 +186,14 @@ func (r *ReconcileInfrastructureConfig) updateInfrastructureConfig(ctx context.C
 	}
 
 	return apply.ApplyObject(ctx, r.client, infraConfigToApply, ControllerName, subresources...)
+}
+
+func (r *ReconcileInfrastructureConfig) stealInfrastructureConfig(ctx context.Context, infraConfig *configv1.Infrastructure, subresources ...string) error {
+	payloadBytes := []byte(`[{"op": "replace", "path": "/metadata/managedFields", "value": [{}]}]`)
+
+	_, err := r.clientSet.ConfigV1().Infrastructures().Patch(ctx, infraConfig.Name, types.JSONPatchType, payloadBytes, v1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to patch: %w", err)
+	}
+	return nil
 }
