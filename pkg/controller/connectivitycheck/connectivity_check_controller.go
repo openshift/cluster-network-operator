@@ -10,6 +10,7 @@ import (
 	"time"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
+	applyconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	configv1client "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	configv1listers "github.com/openshift/client-go/config/listers/config/v1"
@@ -18,6 +19,7 @@ import (
 	operatorcontrolplaneinformers "github.com/openshift/client-go/operatorcontrolplane/informers/externalversions"
 	"github.com/openshift/cluster-network-operator/pkg/controller/eventrecorder"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/connectivitycheckcontroller"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -26,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	applyconfigmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -46,6 +49,7 @@ type NetworkConnectivityCheckController interface {
 // Checks between network-check-source pod and network-check-target service and endpoints this being managed by a Daemonset
 func NewNetworkConnectivityCheckController(
 	operatorClient v1helpers.OperatorClient,
+	configClient *configv1client.Clientset,
 	operatorcontrolplaneClient *operatorcontrolplaneclient.Clientset,
 	apiextensionsClient *apiextensionsclient.Clientset,
 	kubeInformersForNamespaces v1helpers.KubeInformersForNamespaces,
@@ -80,6 +84,7 @@ func NewNetworkConnectivityCheckController(
 	c.ConnectivityCheckController = c.WithReapOldConnectivityCheck(operatorcontrolplaneInformers)
 	generator := &connectivityCheckTemplateProvider{
 		operatorClient:                    operatorClient,
+		configClient:                      configClient,
 		operatorcontrolplaneClient:        operatorcontrolplaneClient,
 		diagnosticsPodLister:              kubeInformersForNamespaces.InformersFor("openshift-network-diagnostics").Core().V1().Pods().Lister(),
 		diagnosticsEndpointsLister:        kubeInformersForNamespaces.InformersFor("openshift-network-diagnostics").Core().V1().Endpoints().Lister(),
@@ -92,6 +97,7 @@ func NewNetworkConnectivityCheckController(
 		nodeLister:                        kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Lister(),
 		infrastructureLister:              configInformers.Config().V1().Infrastructures().Lister(),
 	}
+
 	return c.WithPodNetworkConnectivityCheckApplyFn(generator.generate)
 }
 
@@ -101,6 +107,7 @@ type networkConnectivityCheckController struct {
 
 type connectivityCheckTemplateProvider struct {
 	operatorClient                    v1helpers.OperatorClient
+	configClient                      *configv1client.Clientset
 	operatorcontrolplaneClient        *operatorcontrolplaneclient.Clientset
 	diagnosticsPodLister              corev1listers.PodLister
 	diagnosticsEndpointsLister        corev1listers.EndpointsLister
@@ -112,6 +119,7 @@ type connectivityCheckTemplateProvider struct {
 	openshiftAPIServerServiceLister   corev1listers.ServiceLister
 	nodeLister                        corev1listers.NodeLister
 	infrastructureLister              configv1listers.InfrastructureLister
+	connectivityChecksStatus          metav1.Condition
 }
 
 func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncContext factory.SyncContext) ([]*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration, error) {
@@ -143,6 +151,7 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 	}
 
 	var checks []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration
+	var anySourcePodScheduled bool
 	nodes := make(map[string]*v1.Node)
 	nodeApiVersion := "v1"
 	nodeKind := "Node"
@@ -151,6 +160,7 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 			// network-checker pod hasn't been assigned a node yet, skip
 			continue
 		}
+		anySourcePodScheduled = true
 		var node *v1.Node
 		var ok bool
 		if node, ok = nodes[pod.Spec.NodeName]; !ok {
@@ -177,6 +187,36 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 			checks = append(checks, check)
 		}
 	}
+
+	currentStatus := metav1.Condition{
+		Type:   names.NetworkDiagnosticsAvailableCondition,
+		Status: metav1.ConditionTrue,
+		Reason: "AsExpected",
+	}
+	if len(pods) == 0 || !anySourcePodScheduled {
+		currentStatus.Status = metav1.ConditionFalse
+		currentStatus.Reason = "NoSources"
+		currentStatus.Message = "No source pods available"
+	} else if len(templates) == 0 {
+		currentStatus.Status = metav1.ConditionFalse
+		currentStatus.Reason = "NoTargets"
+		currentStatus.Message = "No targets available"
+	}
+
+	if c.connectivityChecksStatus != currentStatus {
+		condition := currentStatus
+		condition.LastTransitionTime = metav1.NewTime(time.Now())
+		netConfig := applyconfigv1.Network(names.CLUSTER_CONFIG).WithStatus(applyconfigv1.NetworkStatus().WithConditions(condition))
+		_, err := c.configClient.ConfigV1().Networks().Apply(context.TODO(), netConfig, metav1.ApplyOptions{
+			Force:        true,
+			FieldManager: "cluster-network-operator/connectivity-check-controller",
+		})
+		if err != nil {
+			return nil, err
+		}
+		c.connectivityChecksStatus = currentStatus
+	}
+
 	return checks, nil
 }
 
@@ -422,11 +462,13 @@ func Start(ctx context.Context, kubeConfig *rest.Config) error {
 		"default",
 		"",
 	)
+
 	configInformers := configinformers.NewSharedInformerFactory(configClient, 10*time.Minute)
 	operatorcontrolplaneInformers := operatorcontrolplaneinformers.NewSharedInformerFactoryWithOptions(operatorcontrolplaneClient,
 		10*time.Minute, operatorcontrolplaneinformers.WithNamespace("openshift-network-diagnostics"))
 	connectivityCheckController := NewNetworkConnectivityCheckController(
 		operatorClient,
+		configClient,
 		operatorcontrolplaneClient,
 		apiextensionsClient,
 		kubeInformersForNamespaces,

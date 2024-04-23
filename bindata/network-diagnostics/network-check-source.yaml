@@ -9,6 +9,8 @@ metadata:
       pod network connectivity checks
     release.openshift.io/version: "{{.ReleaseVersion}}"
     networkoperator.openshift.io/non-critical: ""
+  labels:
+    networkoperator.openshift.io/generates-operator-status: ""
 spec:
   replicas: 1
   selector:
@@ -64,8 +66,33 @@ spec:
           requests:
             memory: 40Mi
             cpu: 10m
+      {{ if .NetworkCheckSourceNodeSelector }}
       nodeSelector:
-        kubernetes.io/os: "linux"
+        {{ range $key, $value := .NetworkCheckSourceNodeSelector }}
+        "{{$key}}": "{{$value}}"
+        {{ end }}
+      {{ end }}
+      {{ if .NetworkCheckSourceTolerations }}
+      tolerations:
+      {{ range .NetworkCheckSourceTolerations }}
+        -
+          {{ if .Key }}
+          key: "{{.Key}}"
+          {{ end }}
+          {{ if .Operator }}
+          operator: "{{.Operator}}"
+          {{ end }}
+          {{ if .Value }}
+          value: "{{.Value}}"
+          {{ end }}
+          {{ if .Effect }}
+          effect: "{{.Effect}}"
+          {{ end }}
+          {{ if .TolerationSeconds }}
+          tolerationSeconds: "{{.TolerationSeconds}}"
+          {{ end }}
+      {{ end }}
+      {{ end }}
 
 ---
 apiVersion: v1

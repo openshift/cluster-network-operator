@@ -110,8 +110,8 @@ require (
 )
 
 require (
-	github.com/openshift/api v0.0.0-20240405191225-abd990ce290b
-	github.com/openshift/client-go v0.0.0-20230926161409-848405da69e1
+	github.com/openshift/api v0.0.0-20240416170644-3efee4252217
+	github.com/openshift/client-go v0.0.0-20240415214935-be70f772f157
 	github.com/openshift/library-go v0.0.0-20231128230659-785a9313da6c
 	github.com/openshift/machine-config-operator v0.0.1-0.20231002195040-a2469941c0dc
 	k8s.io/apiextensions-apiserver v0.29.0
