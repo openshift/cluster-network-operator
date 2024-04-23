@@ -6,38 +6,52 @@ import (
 	"log"
 	"reflect"
 
-	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/cluster-network-operator/pkg/apply"
-	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
-	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
-	"github.com/openshift/cluster-network-operator/pkg/names"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	configv1 "github.com/openshift/api/config/v1"
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	"github.com/openshift/cluster-network-operator/pkg/apply"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 )
 
 const ControllerName = "infrastructureconfig"
 
 // Add attaches our control loop to the manager and watches for infrastructure objects
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) error {
-	return add(mgr, newReconciler(mgr, status, c))
+	rc, err := newReconciler(mgr, status, c)
+	if err != nil {
+		return err
+	}
+	return add(mgr, rc)
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) (reconcile.Reconciler, error) {
+	kubeConfig := c.Default().Config()
+	configClient, err := configclient.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	return &ReconcileInfrastructureConfig{
 		client:      c,
+		typedClient: configClient,
 		scheme:      mgr.GetScheme(),
 		status:      status,
 		fieldSyncer: &synchronizer{},
-	}
+	}, nil
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -62,6 +76,7 @@ var _ reconcile.Reconciler = &ReconcileInfrastructureConfig{}
 // ReconcileInfrastructureConfig reconciles a cluster Infrastructure object
 type ReconcileInfrastructureConfig struct {
 	client      cnoclient.Client
+	typedClient *configclient.Clientset
 	scheme      *runtime.Scheme
 	status      *statusmanager.StatusManager
 	fieldSyncer fieldSynchronizer
@@ -82,61 +97,64 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 		return reconcile.Result{}, nil
 	}
 
-	// Fetch the infrastructure config
-	infraConfig := &configv1.Infrastructure{}
-	err := r.client.Default().CRClient().Get(ctx, request.NamespacedName, infraConfig)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Return and don't requeue
-			log.Println("Object seems to have been deleted")
-			return reconcile.Result{}, nil
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		// Fetch the infrastructure config
+		infraConfig := &configv1.Infrastructure{}
+		err := r.client.Default().CRClient().Get(ctx, request.NamespacedName, infraConfig)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				// Request object not found, could have been deleted after reconcile request.
+				// Return and don't requeue
+				log.Println("Object seems to have been deleted")
+				return nil
+			}
+			// Error reading the object - requeue the request.
+			err = fmt.Errorf("Error while reading infrastructures.%s/cluster: %w", configv1.GroupName, err)
+			log.Println(err)
+			return err
 		}
-		// Error reading the object - requeue the request.
-		err = fmt.Errorf("Error while reading infrastructures.%s/cluster: %w", configv1.GroupName, err)
-		log.Println(err)
-		return reconcile.Result{}, err
-	}
 
-	// Synchronizing VIPs does not require error handling as it performs an automatic migration
-	// for a data structure introduced in OCP 4.12. The function does not operate on any
-	// user-provided input, thus errors can only be a result of unhealthy cluster state.
-	updatedInfraConfig := r.fieldSyncer.VipsSynchronize(infraConfig)
+		// Synchronizing VIPs does not require error handling as it performs an automatic migration
+		// for a data structure introduced in OCP 4.12. The function does not operate on any
+		// user-provided input, thus errors can only be a result of unhealthy cluster state.
+		updatedInfraConfig := r.fieldSyncer.VipsSynchronize(infraConfig)
 
-	updatedInfraConfig, err = r.fieldSyncer.SpecStatusSynchronize(updatedInfraConfig)
-	if err != nil {
-		err = fmt.Errorf("Error while synchronizing spec and status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
-		log.Println(err)
-
-		r.status.SetDegraded(statusmanager.InfrastructureConfig, "SyncInfrastructureSpecAndStatus", err.Error())
-		return reconcile.Result{}, err
-	}
-
-	// The "duplicated" logic below is a direct result of how server-side-apply works for this
-	// object. Where it would be natural that `apply.ApplyObject` updates both Spec and Status
-	// at the same time, in reality the first call only updates Spec and leaves Status with the
-	// old content. To fix that and have Status also updated, we are executing a second call with
-	// explicit marker that "status" subresource should be updated.
-	if !reflect.DeepEqual(updatedInfraConfig.Spec, infraConfig.Spec) {
-		if err = r.updateInfrastructureConfig(ctx, updatedInfraConfig); err != nil {
-			err = fmt.Errorf("Error while updating infrastructures.%s/cluster: %w", configv1.GroupName, err)
+		updatedInfraConfig, err = r.fieldSyncer.SpecStatusSynchronize(updatedInfraConfig)
+		if err != nil {
+			err = fmt.Errorf("Error while synchronizing spec and status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
 			log.Println(err)
 
-			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureSpecOrStatus", err.Error())
-			return reconcile.Result{}, err
+			r.status.SetDegraded(statusmanager.InfrastructureConfig, "SyncInfrastructureSpecAndStatus", err.Error())
+			return err
 		}
-		log.Printf("Successfully synchronized infrastructure config.")
-	}
 
-	if !reflect.DeepEqual(updatedInfraConfig.Status, infraConfig.Status) {
-		if err = r.updateInfrastructureConfig(ctx, updatedInfraConfig, "status"); err != nil {
-			err = fmt.Errorf("Error while updating status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
-			log.Println(err)
+		// The "duplicated" logic below is because Update on custom CRDs is not modifying the Status subresource.
+		if !reflect.DeepEqual(updatedInfraConfig.Spec, infraConfig.Spec) {
+			if _, err = r.typedClient.ConfigV1().Infrastructures().Update(ctx, updatedInfraConfig, metav1.UpdateOptions{}); err != nil {
+				err = fmt.Errorf("Error while client-side updating infrastructures.%s/cluster: %w", configv1.GroupName, err)
+				log.Println(err)
 
-			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureStatus", err.Error())
-			return reconcile.Result{}, err
+				r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureSpecOrStatus", err.Error())
+				return err
+			}
+			log.Printf("Successfully synchronized infrastructure config.")
 		}
-		log.Printf("Successfully synchronized infrastructure config status")
+
+		if !reflect.DeepEqual(updatedInfraConfig.Status, infraConfig.Status) {
+			if _, err = r.typedClient.ConfigV1().Infrastructures().UpdateStatus(ctx, updatedInfraConfig, metav1.UpdateOptions{}); err != nil {
+				err = fmt.Errorf("Error while client-side updating status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
+				log.Println(err)
+
+				r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureSpecOrStatus", err.Error())
+				return err
+			}
+			log.Printf("Successfully synchronized infrastructure config status.")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return reconcile.Result{}, err
 	}
 
 	r.status.SetNotDegraded(statusmanager.InfrastructureConfig)
