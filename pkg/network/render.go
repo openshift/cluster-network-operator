@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/api/features"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
@@ -623,7 +624,7 @@ func renderCRDForMigration(conf *operv1.NetworkSpec, manifestDir string, feature
 		// the CRD installation can happen according to whether the feature gate is enabled or not
 		// in the cluster
 		data := render.MakeRenderData()
-		data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(configv1.FeatureGateAdminNetworkPolicy)
+		data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(features.FeatureGateAdminNetworkPolicy)
 		manifests, err := render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/common/001-crd.yaml"), &data)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to render OVNKubernetes CRDs")
