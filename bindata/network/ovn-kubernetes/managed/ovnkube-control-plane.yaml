@@ -169,6 +169,11 @@ spec:
             dns_name_resolver_enabled_flag="--enable-dns-name-resolver"
           fi
 
+          persistent_ips_enabled_flag=
+          if [[ "{{.OVN_PERSISTENT_IPS_ENABLE}}" == "true" ]]; then
+            persistent_ips_enabled_flag="--enable-persistent-ips"
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
@@ -185,7 +190,8 @@ spec:
             ${ovn_v6_join_subnet_opt} \
             ${ovn_v4_transit_switch_subnet_opt} \
             ${ovn_v6_transit_switch_subnet_opt} \
-            ${dns_name_resolver_enabled_flag}
+            ${dns_name_resolver_enabled_flag} \
+            ${persistent_ips_enabled_flag}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config

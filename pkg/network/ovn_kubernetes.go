@@ -357,6 +357,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = true
 	}
 
+	data.Data["OVN_PERSISTENT_IPS_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGatePersistentIPsForVirtualization)
+
 	//there only needs to be two cluster managers
 	clusterManagerReplicas := 2
 	if bootstrapResult.OVN.ControlPlaneReplicaCount < 2 {
