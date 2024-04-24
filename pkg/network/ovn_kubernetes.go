@@ -13,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	goruntime "runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -711,11 +710,6 @@ func bootstrapOVNHyperShiftConfig(hc *hypershift.HyperShiftConfig, kubeClient cn
 
 func getDisableUDPAggregation(cl crclient.Reader) bool {
 	disable := false
-
-	// Disable by default on s390x because it sometimes doesn't work there; see OCPBUGS-2532
-	if goruntime.GOARCH == "s390x" {
-		disable = true
-	}
 
 	cm := &corev1.ConfigMap{}
 	if err := cl.Get(context.TODO(), types.NamespacedName{
