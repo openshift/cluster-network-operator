@@ -452,6 +452,7 @@ spec:
                   break
               elif [ -z "${SDN_SUBNET}" ] && [ -n "${OVN_SUBNET}" ]; then
                   echo "OVN_SUBNET is ${OVN_SUBNET}"
+                  SUBNET=${OVN_SUBNET}
                   break
               elif [ -n "${SDN_SUBNET}" ] && [ -n "${OVN_SUBNET}" ] && [ "${SDN_SUBNET}" == "${OVN_SUBNET}" ]; then
                   echo "Subnets matched! SDN_SUBNET: ${SDN_SUBNET}, OVN_SUBNET: ${OVN_SUBNET}"
