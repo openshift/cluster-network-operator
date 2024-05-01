@@ -45,6 +45,7 @@ spec:
           privileged: true
           capabilities:
             add: ["SYS_ADMIN", "SYS_NET_ADMIN"]
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - name: host
           mountPath: /host
