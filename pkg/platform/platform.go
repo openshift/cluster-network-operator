@@ -13,6 +13,7 @@ import (
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
@@ -25,6 +26,11 @@ var cloudProviderConfig = types.NamespacedName{
 	Namespace: "openshift-config-managed",
 	Name:      "kube-cloud-config",
 }
+
+var (
+	masterRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "master"}
+	workerRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "worker"}
+)
 
 // isNetworkNodeIdentityEnabled determines if network node identity should be enabled.
 // It checks the `enabled` key in the network-node-identity/openshift-network-operator configmap.
@@ -154,36 +160,32 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	// The IPsecMachineConfig in 4.14 is created by user and can be created with any name and also is not managed by network operator, so find it by using the label
 	// and looking for the extension.
 
-	masterIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, "machineconfiguration.openshift.io/role=master")
+	masterIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, masterRoleMachineConfigLabel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ipsec machine configs for master: %v", err)
 	}
 	res.MasterIPsecMachineConfigs = masterIPsecMachineConfigs
 
-	workerIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, "machineconfiguration.openshift.io/role=worker")
+	workerIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, workerRoleMachineConfigLabel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ipsec machine configs for worker: %v", err)
 	}
 	res.WorkerIPsecMachineConfigs = workerIPsecMachineConfigs
 
 	if res.MasterIPsecMachineConfigs != nil {
-		mcpMaster := &mcfgv1.MachineConfigPool{}
-		if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "master"}, mcpMaster); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return nil, fmt.Errorf("failed to get machine config pool for master: %v", err)
-			}
+		mcpMasterStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, masterRoleMachineConfigLabel)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get machine config pools for master role: %v", err)
 		}
-		res.MasterMCPStatus = mcpMaster.Status
+		res.MasterMCPStatuses = mcpMasterStatuses
 	}
 
 	if res.WorkerIPsecMachineConfigs != nil {
-		mcpWorker := &mcfgv1.MachineConfigPool{}
-		if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "worker"}, mcpWorker); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return nil, fmt.Errorf("failed to get machine config pool for worker: %v", err)
-			}
+		mcpWorkerStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, workerRoleMachineConfigLabel)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get machine config pools for worker role: %v", err)
 		}
-		res.WorkerMCPStatus = mcpWorker.Status
+		res.WorkerMCPStatuses = mcpWorkerStatuses
 	}
 
 	machineConfigClusterOperatorReady, err := isMachineConfigClusterOperatorReady(client)
@@ -195,13 +197,9 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	return res, nil
 }
 
-func findIPsecMachineConfigsWithLabel(client cnoclient.Client, selector string) ([]*mcfgv1.MachineConfig, error) {
-	lSelector, err := labels.Parse(selector)
-	if err != nil {
-		return nil, err
-	}
+func findIPsecMachineConfigsWithLabel(client cnoclient.Client, mcLabel labels.Set) ([]*mcfgv1.MachineConfig, error) {
 	machineConfigs := &mcfgv1.MachineConfigList{}
-	err = client.Default().CRClient().List(context.TODO(), machineConfigs, &crclient.ListOptions{LabelSelector: lSelector})
+	err := client.Default().CRClient().List(context.TODO(), machineConfigs, &crclient.ListOptions{LabelSelector: mcLabel.AsSelector()})
 	if err != nil {
 		return nil, err
 	}
@@ -233,4 +231,24 @@ func isMachineConfigClusterOperatorReady(client cnoclient.Client) (bool, error) 
 	}
 	machineConfigClusterOperatorReady := available && !degraded && !progressing
 	return machineConfigClusterOperatorReady, nil
+}
+
+func getMachineConfigPoolStatuses(ctx context.Context, client cnoclient.Client, mcLabel labels.Set) ([]mcfgv1.MachineConfigPoolStatus, error) {
+	mcpList := &mcfgv1.MachineConfigPoolList{}
+	if err := client.Default().CRClient().List(ctx, mcpList); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+	}
+	var mcpStatuses []mcfgv1.MachineConfigPoolStatus
+	for _, mcp := range mcpList.Items {
+		mcSelector, err := metav1.LabelSelectorAsSelector(mcp.Spec.MachineConfigSelector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid machine config label selector in %s pool", mcp.Name)
+		}
+		if mcSelector.Matches(mcLabel) {
+			mcpStatuses = append(mcpStatuses, mcp.Status)
+		}
+	}
+	return mcpStatuses, nil
 }
