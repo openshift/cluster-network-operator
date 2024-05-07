@@ -144,7 +144,7 @@ spec:
           EOF
             # Wait until the certificate signing request has been signed.
             counter=0
-            until [ -n $(kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' 2>/dev/null) ]
+            until [ -n "$(kubectl get csr -lk8s.ovn.org/ipsec-csr="$(hostname)" --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' 2>/dev/null)" ]
             do
               counter=$((counter+1))
               sleep 1
@@ -156,7 +156,7 @@ spec:
             done
 
             # Decode the signed certificate.
-            kubectl get csr -lk8s.ovn.org/ipsec-csr=$(hostname) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' | base64 -d | openssl x509 -outform pem -text -out $cert_pem
+            kubectl get csr -lk8s.ovn.org/ipsec-csr="$(hostname)" --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].status.certificate}' | base64 -d | openssl x509 -outform pem -text -out $cert_pem
 
             # kubectl delete csr/$(hostname)
 
@@ -267,7 +267,7 @@ spec:
                    # need to ensure that xfrm state and policies are not flushed.
 
                    # Don't allow ovs monitor to cleanup persistent state
-                   kill $(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null) 2>/dev/null || true
+                   kill "$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)" 2>/dev/null || true
         env:
         - name: K8S_NODE
           valueFrom:
