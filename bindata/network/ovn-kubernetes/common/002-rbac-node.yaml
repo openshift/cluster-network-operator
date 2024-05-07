@@ -152,6 +152,15 @@ rules:
   - egressqoses/status
   verbs:
   - patch
+{{- if .DNS_NAME_RESOLVER_ENABLE }}
+- apiGroups: ["network.openshift.io"]
+  resources:
+  - dnsnameresolvers
+  verbs:
+  - get
+  - list
+  - watch
+{{- end }}
 {{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
 - apiGroups: ["policy.networking.k8s.io"]
   resources:
