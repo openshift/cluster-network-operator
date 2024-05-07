@@ -557,6 +557,11 @@ data:
         admin_network_policy_enabled_flag="--enable-admin-network-policy"
       fi
 
+      dns_name_resolver_enabled_flag=
+      if [[ "{{.DNS_NAME_RESOLVER_ENABLE}}" == "true" ]]; then
+        dns_name_resolver_enabled_flag="--enable-dns-name-resolver"
+      fi
+
       # If IP Forwarding mode is global set it in the host here.
       ip_forwarding_flag=
       if [ "{{.IP_FORWARDING_MODE}}" == "Global" ]; then
@@ -606,6 +611,7 @@ data:
         ${multi_network_enabled_flag} \
         ${multi_network_policy_enabled_flag} \
         ${admin_network_policy_enabled_flag} \
+        ${dns_name_resolver_enabled_flag} \
         --enable-multicast \
         --zone ${K8S_NODE} \
         --enable-interconnect \

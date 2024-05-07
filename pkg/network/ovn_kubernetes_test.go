@@ -12,6 +12,7 @@ import (
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -91,7 +92,10 @@ func TestRenderOVNKubernetes(t *testing.T) {
 			},
 		},
 	}
-	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
+	featureGatesCNO := featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{},
+	)
 	fakeClient := cnofake.NewFakeClient()
 
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
@@ -149,7 +153,10 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 			},
 		},
 	}
-	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
+	featureGatesCNO := featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{},
+	)
 	fakeClient := cnofake.NewFakeClient()
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -189,7 +196,7 @@ func TestRenderedOVNKubernetesConfig(t *testing.T) {
 		disableGRO               bool
 		disableMultiNet          bool
 		enableMultiNetPolicies   bool
-		enableAdminNetPolicies   bool
+		enabledFeatureGates      []configv1.FeatureGateName
 	}
 	testcases := []testcase{
 		{
@@ -732,7 +739,7 @@ logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
 
 			enableMultiNetPolicies: true,
-			enableAdminNetPolicies: true,
+			enabledFeatureGates:    []configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy},
 		},
 		{
 			desc: "enable multi-network policies without multi-network support",
@@ -776,7 +783,50 @@ logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
 			disableMultiNet:          true,
 			enableMultiNetPolicies:   true,
-			enableAdminNetPolicies:   true,
+			enabledFeatureGates:      []configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy},
+		},
+		{
+			desc: "enable dns-name resolver feature",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://testing.test:8443"
+host-network-namespace="openshift-host-network"
+platform-type="GCP"
+healthz-bind-address="0.0.0.0:10256"
+dns-service-namespace="openshift-dns"
+dns-service-name="dns-default"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-multi-external-gateway=true
+enable-dns-name-resolver=true
+
+[gateway]
+mode=shared
+nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0`,
+			controlPlaneReplicaCount: 2,
+			enabledFeatureGates:      []configv1.FeatureGateName{configv1.FeatureGateDNSNameResolver},
 		},
 	}
 	g := NewGomegaWithT(t)
@@ -827,12 +877,22 @@ logfile-maxage=0`,
 					DisableUDPAggregation: tc.disableGRO,
 				},
 			}
-			enabled := []configv1.FeatureGateName{}
-			disabled := []configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}
-			if tc.enableAdminNetPolicies {
-				disabled = []configv1.FeatureGateName{}
-				enabled = []configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}
+
+			knownFeatureGates := []configv1.FeatureGateName{
+				configv1.FeatureGateAdminNetworkPolicy,
+				configv1.FeatureGateDNSNameResolver,
 			}
+			s := sets.New[configv1.FeatureGateName](tc.enabledFeatureGates...)
+			enabled := []configv1.FeatureGateName{}
+			disabled := []configv1.FeatureGateName{}
+			for _, f := range knownFeatureGates {
+				if s.Has(f) {
+					enabled = append(enabled, f)
+				} else {
+					disabled = append(disabled, f)
+				}
+			}
+
 			featureGatesCNO := featuregates.NewFeatureGate(enabled, disabled)
 			fakeClient := cnofake.NewFakeClient()
 			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
@@ -1977,8 +2037,10 @@ metadata:
 				},
 				PrePullerUpdateStatus: prepullerStatus,
 			}
-			featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
-
+			featureGatesCNO := featuregates.NewFeatureGate(
+				[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+				[]configv1.FeatureGateName{},
+			)
 			fakeClient := cnofake.NewFakeClient()
 			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
@@ -2284,7 +2346,10 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 	}
 
 	// At the 1st pass, ensure IPsec MachineConfigs are not rolled out until MCO is ready.
-	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
+	featureGatesCNO := featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{},
+	)
 	fakeClient := cnofake.NewFakeClient()
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
@@ -2502,7 +2567,10 @@ func TestRenderOVNKubernetesEnableIPsecForHostedControlPlane(t *testing.T) {
 		},
 	}
 
-	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
+	featureGatesCNO := featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{},
+	)
 	fakeClient := cnofake.NewFakeClient()
 	// Set is as Hypershift hosted control plane.
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
@@ -2619,7 +2687,10 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
-	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
+	featureGatesCNO := featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{},
+	)
 	fakeClient := cnofake.NewFakeClient()
 
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
@@ -2726,7 +2797,10 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 	}
 
 	// Upgrade starts and it's going to rollout IPsec Machine Configs without making any changes into existing IPsec configs.
-	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
+	featureGatesCNO := featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{},
+	)
 	fakeClient := cnofake.NewFakeClient()
 	// Now it's going to rollout IPsec Machine Configs.
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
@@ -2888,7 +2962,10 @@ func TestRenderOVNKubernetesIPsecUpgradeWithHypershiftHostedCluster(t *testing.T
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.HostedControlPlane = &hypershift.HostedControlPlane{}
 	// Upgrade starts and it's going to get only ovn-ipsec-containerized DS.
-	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
+	featureGatesCNO := featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{},
+	)
 	fakeClient := cnofake.NewFakeClient()
 	// Now it must get IPsec containerized daemonset without MachineConfigs.
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
@@ -2990,7 +3067,10 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 			},
 		},
 	}
-	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
+	featureGatesCNO := featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{},
+	)
 
 	fakeClient := cnofake.NewFakeClient()
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
@@ -3124,7 +3204,10 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 			},
 		},
 	}
-	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
+	featureGatesCNO := featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{},
+	)
 
 	fakeClient := cnofake.NewFakeClient()
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
@@ -3253,7 +3336,10 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 			},
 		},
 	}
-	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
+	featureGatesCNO := featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{},
+	)
 
 	// the new rendered config should hold the node to do the dualstack conversion
 	// the upgrade code holds the controlPlanes to update the nodes first
@@ -3351,7 +3437,10 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 				},
 				FlowsConfig: tc.FlowsConfig,
 			}
-			featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
+			featureGatesCNO := featuregates.NewFeatureGate(
+				[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+				[]configv1.FeatureGateName{},
+			)
 			fakeClient := cnofake.NewFakeClient()
 			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 			g.Expect(err).ToNot(HaveOccurred())

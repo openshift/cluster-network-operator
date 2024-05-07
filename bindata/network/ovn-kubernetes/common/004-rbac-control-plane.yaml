@@ -101,6 +101,19 @@ rules:
     - egressservices/status
   verbs:
     - update
+{{- if .DNS_NAME_RESOLVER_ENABLE }}
+- apiGroups: ["network.openshift.io"]
+  resources:
+  - dnsnameresolvers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+{{- end }}
 - apiGroups: ["cloud.network.openshift.io"]
   resources:
   - cloudprivateipconfigs
