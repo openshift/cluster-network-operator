@@ -23,6 +23,7 @@ data:
     ^net.ipv4.conf.IFNAME.arp_accept$
     ^net.ipv4.conf.IFNAME.arp_notify$
     ^net.ipv4.conf.IFNAME.disable_policy$
+    ^net.ipv4.conf.IFNAME.rp_filter$
     ^net.ipv4.conf.IFNAME.secure_redirects$
     ^net.ipv4.conf.IFNAME.send_redirects$
     ^net.ipv6.conf.IFNAME.accept_ra$
@@ -30,5 +31,7 @@ data:
     ^net.ipv6.conf.IFNAME.accept_source_route$
     ^net.ipv6.conf.IFNAME.arp_accept$
     ^net.ipv6.conf.IFNAME.arp_notify$
+    ^net.ipv6.conf.IFNAME.disable_ipv6$
+    ^net.ipv6.conf.IFNAME.disable_policy$
     ^net.ipv6.neigh.IFNAME.base_reachable_time_ms$
     ^net.ipv6.neigh.IFNAME.retrans_time_ms$
