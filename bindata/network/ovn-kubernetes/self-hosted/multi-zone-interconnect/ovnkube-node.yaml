@@ -431,49 +431,39 @@ spec:
         - |
           set -xe
 {{- if .IsNetworkTypeLiveMigration }}
-          # In case of rollback, ovnkube need to reuse the host subnet used by openshift-sdn, so we need to create the node subnets annotations for the local node if it doesn't exist.
-          # retry loop
+          NODE_CNI="OVNKubernetes"
+          if ip link show br-ex; then
+            echo "br-ex exists"
+            kubectl label node --overwrite ${K8S_NODE} migration.network.openshift.io/plugin-
+          else
+            echo "br-ex doesn't exist"
+            NODE_CNI="OpenShiftSDN"
+            kubectl label node --overwrite ${K8S_NODE} migration.network.openshift.io/plugin=
+          fi
+
           RETRY_INTERVAL=3
-          MAX_RETRIES=10
+          MAX_RETRIES=100
           for ((retry_count=1; retry_count<=MAX_RETRIES; retry_count++)); do
-              # Get SDN subnet
-              SDN_SUBNET=$(kubectl get hostsubnet ${K8S_NODE} -o jsonpath="{.subnet}"||true)
-
-              # Get OVN subnet
-              OVN_SUBNET=$(kubectl get node ${K8S_NODE} -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/node-subnets}' | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,3}'||true)
-
-              if [ -n "${SDN_SUBNET}" ] && [ -z "${OVN_SUBNET}" ]; then
-                  echo "OVN_SUBNET is empty, create the node-subnets annotation with the SDN_SUBNET ${SDN_SUBNET}"
-                  SUBNET=${SDN_SUBNET}
-                  break
-              elif [ -z "${SDN_SUBNET}" ] && [ -n "${OVN_SUBNET}" ]; then
-                  echo "OVN_SUBNET is ${OVN_SUBNET}"
-                  break
-              elif [ -n "${SDN_SUBNET}" ] && [ -n "${OVN_SUBNET}" ] && [ "${SDN_SUBNET}" == "${OVN_SUBNET}" ]; then
-                  echo "Subnets matched! SDN_SUBNET: ${SDN_SUBNET}, OVN_SUBNET: ${OVN_SUBNET}"
-                  SUBNET=${SDN_SUBNET}
-                  break
-              elif [ -n "${SDN_SUBNET}" ] && [ -n "${OVN_SUBNET}" ] && ! [ "${SDN_SUBNET}" == "${OVN_SUBNET}" ]; then
-                  echo "Subnets don't match! SDN_SUBNET: ${SDN_SUBNET}, OVN_SUBNET: ${OVN_SUBNET}"
-                  exit 1
-              else
-                  echo "Round ${retry_count}/${MAX_RETRIES} - Retrying... SDN_SUBNET: ${SDN_SUBNET}, OVN_SUBNET: ${OVN_SUBNET}"
-                  sleep $RETRY_INTERVAL
-              fi
+            # Align the node subnet with SDN
+            SDN_SUBNET=$(kubectl get hostsubnet ${K8S_NODE} -o jsonpath="{.subnet}"||true)
+            if [ -z "${SDN_SUBNET}" ]; then
+              echo "SDN node subnet is not found, retry..."
+              sleep $RETRY_INTERVAL
+            else
+              echo "use SDN node subnet ${SDN_SUBNET}"
+              SUBNET=${SDN_SUBNET}
+              break
+            fi
           done
           if [ ${retry_count} -gt ${MAX_RETRIES} ]; then
-              echo "All retries failed. Exiting."
-              exit 1
+            echo "All retries failed. Exiting."
+            exit 1
           fi
 
           kubectl annotate node ${K8S_NODE} --overwrite k8s.ovn.org/node-subnets={\"default\":[\"${SUBNET}\"]}
           kubectl annotate node ${K8S_NODE} --overwrite k8s.ovn.org/hybrid-overlay-node-subnet=${SUBNET}
-          if ip link show br-ex; then
-            echo "br-ex exists, run ovnkube"
-            kubectl label node --overwrite ${K8S_NODE} migration.network.openshift.io/plugin-
-          else
-            echo "br-ex doesn't exist"
-            kubectl label node --overwrite ${K8S_NODE} migration.network.openshift.io/plugin=
+
+          if [ "${NODE_CNI}" == "OpenShiftSDN" ]; then
             echo "run hybrid-overlay-node"
             NETWORK_NODE_IDENTITY_ENABLE=
             if [[ "{{.NETWORK_NODE_IDENTITY_ENABLE}}" == "true" ]]; then
