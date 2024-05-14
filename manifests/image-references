@@ -22,6 +22,10 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-multus-cni:latest
+  - name: multus-cni-microshift
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-multus-cni-microshift-rhel9:latest
   - name: multus-whereabouts-ipam-cni
     from:
       kind: DockerImage
@@ -42,6 +46,10 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-container-networking-plugins:latest
+  - name: containernetworking-plugins-microshift
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-container-networking-plugins-microshift-rhel9:latest
   - name: ovn-kubernetes
     from:
       kind: DockerImage
