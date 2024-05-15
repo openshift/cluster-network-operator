@@ -63,10 +63,10 @@ data:
     mode={{.OVN_GATEWAY_MODE}}
     nodeport=true
 {{- if (index . "V4InternalMasqueradeSubnet")}}
-    v4-internal-masquerade-subnet="{{.V4InternalMasqueradeSubnet}}"
+    v4-masquerade-subnet="{{.V4InternalMasqueradeSubnet}}"
 {{- end }}
 {{- if (index . "V6InternalMasqueradeSubnet")}}
-    v6-internal-masquerade-subnet="{{.V6InternalMasqueradeSubnet}}"
+    v6-masquerade-subnet="{{.V6InternalMasqueradeSubnet}}"
 {{- end }}
 
     [logging]

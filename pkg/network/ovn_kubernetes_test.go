@@ -276,7 +276,7 @@ enable-multi-external-gateway=true
 [gateway]
 mode=shared
 nodeport=true
-v4-internal-masquerade-subnet="100.98.0.0/16"
+v4-masquerade-subnet="100.98.0.0/16"
 
 [logging]
 libovsdblogfile=/var/log/ovnkube/libovsdb.log
