@@ -589,6 +589,19 @@ data:
         ovn_v6_join_subnet_opt="--gateway-v6-join-subnet {{.V6JoinSubnet}}"
       fi
 
+{{- if not .OVNIPsecEnable }}
+      # flush out xfrm state and policy entries so that it cleans up
+      # entries created for ovs. Since it's cleaning up whole entries,
+      # it may cause slight interruption in case of external ipsec
+      # configuration.
+      echo "remove ovs ipsec state if present"
+      ip x s flush
+      ip x p flush
+      rm -f /etc/ipsec.d/openshift.conf || true
+      # if pluto is running, we need to restart it after the flush
+      chroot /proc/1/root ipsec restart || true
+{{- end }}
+
       exec /usr/bin/ovnkube \
         --init-ovnkube-controller "${K8S_NODE}" \
         --init-node "${K8S_NODE}" \
