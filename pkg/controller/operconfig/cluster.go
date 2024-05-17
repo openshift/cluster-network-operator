@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/api/features"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -23,7 +24,7 @@ import (
 // MergeClusterConfig merges in the existing cluster config in to the
 // operator config, overwriting any changes to the managed fields.
 func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig *operv1.Network, clusterConfig *configv1.Network) error {
-	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok && r.featureGates.Enabled(configv1.FeatureGateNetworkLiveMigration) {
+	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok && r.featureGates.Enabled(features.FeatureGateNetworkLiveMigration) {
 		// During network type live migration, all the update to network.operator shall only be handled by the clusterconfig controller
 		return nil
 	}
@@ -92,7 +93,7 @@ func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConf
 	// Sync status.conditions when live migration is processing
 	clusterConfigWithConditions := clusterConfig.DeepCopy()
 	nowTimestamp := metav1.Now()
-	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok && r.featureGates.Enabled(configv1.FeatureGateNetworkLiveMigration) {
+	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok && r.featureGates.Enabled(features.FeatureGateNetworkLiveMigration) {
 		if meta.IsStatusConditionPresentAndEqual(clusterConfig.Status.Conditions, names.NetworkTypeMigrationInProgress, metav1.ConditionTrue) {
 			err = r.syncNetworkTypeMigrationConditions(ctx, operConfig, clusterConfigWithConditions)
 			if err != nil {
