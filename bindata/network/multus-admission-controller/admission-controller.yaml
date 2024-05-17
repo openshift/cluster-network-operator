@@ -218,11 +218,7 @@ spec:
       serviceAccountName: multus-ac
       priorityClassName: "system-cluster-critical"
 {{- else}}
-{{- if .PriorityClass}}
-      priorityClassName: {{.PriorityClass}}
-{{- else}}
-      priorityClassName: "hypershift-control-plane"
-{{- end }}
+      priorityClassName: {{ .PriorityClass | default "hypershift-control-plane" }}
 {{- end }}
       restartPolicy: Always
 {{- if not .ExternalControlPlane }}
