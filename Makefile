@@ -35,6 +35,12 @@ install.tools:
 update-codegen:
 	hack/update-codegen.sh
 
+.PHONY: verify-update-codegen
+verify-update-codegen: update-codegen
+	git diff --exit-code
+
+.PHONY: verify
+verify: verify-update-codegen
 
 clean:
 	$(RM) cluster-network-operator cluster-network-check-endpoints cluster-network-check-target
