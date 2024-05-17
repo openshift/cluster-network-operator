@@ -14,6 +14,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -79,6 +80,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	data.Data["RHOBSMonitoring"] = os.Getenv("RHOBS_MONITORING")
 	data.Data["ResourceRequestCPU"] = nil
 	data.Data["ResourceRequestMemory"] = nil
+	data.Data["PriorityClass"] = nil
 	if hsc.Enabled {
 		data.Data["AdmissionControllerNamespace"] = hsc.Namespace
 		data.Data["KubernetesServiceHost"] = bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal].Host
@@ -111,18 +113,23 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 		multusDeploy := &appsv1.Deployment{}
 		err = client.ClientFor(clientName).CRClient().Get(
 			context.TODO(), types.NamespacedName{Namespace: hsc.Namespace, Name: "multus-admission-controller"}, multusDeploy)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get multus deployment: %v", err)
-		}
-		multusContainer, ok := findContainer(multusDeploy.Spec.Template.Spec.Containers, "multus-admission-controller")
-		if !ok {
-			return nil, errors.New("error finding multus container")
-		}
-		if !multusContainer.Resources.Requests.Cpu().IsZero() {
-			data.Data["ResourceRequestCPU"] = multusContainer.Resources.Requests.Cpu().MilliValue()
-		}
-		if !multusContainer.Resources.Requests.Memory().IsZero() {
-			data.Data["ResourceRequestMemory"] = multusContainer.Resources.Requests.Memory().Value() / bytesInMiB
+		if err == nil {
+			multusContainer, ok := findContainer(multusDeploy.Spec.Template.Spec.Containers, "multus-admission-controller")
+			if !ok {
+				return nil, errors.New("error finding multus container")
+			}
+			if !multusContainer.Resources.Requests.Cpu().IsZero() {
+				data.Data["ResourceRequestCPU"] = multusContainer.Resources.Requests.Cpu().MilliValue()
+			}
+			if !multusContainer.Resources.Requests.Memory().IsZero() {
+				data.Data["ResourceRequestMemory"] = multusContainer.Resources.Requests.Memory().Value() / bytesInMiB
+			}
+		} else {
+			if apierrors.IsNotFound(err) {
+				klog.Warningf("failed to get multus deployment: %v", err)
+			} else {
+				return nil, fmt.Errorf("failed to get multus deployment: %v", err)
+			}
 		}
 
 		data.Data["ReleaseImage"] = hsc.ReleaseImage
