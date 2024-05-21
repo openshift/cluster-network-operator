@@ -6,9 +6,12 @@ import (
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
+	v1 "github.com/openshift/api/network/v1"
 	operv1 "github.com/openshift/api/operator/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
@@ -106,52 +109,191 @@ func TestValidateClusterConfig(t *testing.T) {
 
 func TestValidClusterConfigLiveMigration(t *testing.T) {
 	g := NewGomegaWithT(t)
+	networkConfig := *ClusterConfig.DeepCopy()
+	networkConfig.NetworkType = "OVNKubernetes"
+
 	tests := []struct {
-		name              string
-		hypershiftCluster bool
-		annotation        bool
-		expectErr         bool
+		name             string
+		infraRes         *bootstrap.InfraStatus
+		config           *configv1.Network
+		objects          []crclient.Object
+		expectErr        bool
+		expectedErrorMsg string
 	}{
 		{
 			"no error when standalone cluster and migration label applied",
+			&bootstrap.InfraStatus{},
+			&configv1.Network{
+				Spec: networkConfig,
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				}},
+			[]crclient.Object{&operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}},
 			false,
-			true,
-			false,
+			"",
 		},
 		{
 
 			"no error when standalone cluster and migration label not applied",
+			&bootstrap.InfraStatus{},
+			&configv1.Network{Spec: networkConfig},
+			[]crclient.Object{&operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}},
 			false,
-			false,
-			false,
+			"",
 		},
 		{
 			"error when HyperShift and migration label applied",
+			&bootstrap.InfraStatus{HostedControlPlane: &hypershift.HostedControlPlane{}},
+			&configv1.Network{
+				Spec: networkConfig,
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				},
+				Status: configv1.NetworkStatus{NetworkType: string(operv1.NetworkTypeOpenShiftSDN)}},
+			[]crclient.Object{&operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}},
 			true,
+			"network type live migration is not supported on HyperShift clusters",
+		},
+		{
+			"error when trying to migrate to an unsupported cni",
+			&bootstrap.InfraStatus{},
+			&configv1.Network{
+				Spec: *ClusterConfig.DeepCopy(),
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				}},
+			[]crclient.Object{&operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}},
 			true,
+			"network type live migration is only supported for OVNKubernetes and OpenShiftSDN CNI",
+		},
+		{
+			"error when trying to migrate from sdn in multinenat mode",
+			&bootstrap.InfraStatus{},
+			&configv1.Network{
+				Spec: networkConfig,
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				},
+				Status: configv1.NetworkStatus{NetworkType: string(operv1.NetworkTypeOpenShiftSDN)}},
+			[]crclient.Object{&operv1.Network{
+				ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+				Spec: operv1.NetworkSpec{
+					DefaultNetwork: operv1.DefaultNetworkDefinition{
+						Type:               operv1.NetworkTypeOpenShiftSDN,
+						OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{Mode: "Multitenant"}}}}},
 			true,
+			"network type live migration is not supported on SDN Multitenant clusters",
+		},
+		{
+			"error when cluster network overlaps with ovn-k internal subnet overlap",
+			&bootstrap.InfraStatus{},
+			&configv1.Network{
+				Spec: networkConfig,
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				},
+				Status: configv1.NetworkStatus{NetworkType: string(operv1.NetworkTypeOpenShiftSDN)}},
+			[]crclient.Object{&operv1.Network{
+				ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+				Spec: operv1.NetworkSpec{
+					DefaultNetwork: operv1.DefaultNetworkDefinition{
+						Type: operv1.NetworkTypeOpenShiftSDN,
+						OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
+							// 10.2.0.0/22 is the second clusternetwork in networkConfig
+							V4InternalSubnet: "10.2.2.0/24",
+						}}}}},
+			true,
+			"network clusterNetwork(10.2.0.0/22) overlaps with network v4InternalSubnet(10.2.2.0/24)",
+		},
+		{
+			"error when service overlaps with ovn-k internal transit switch subnet overlap",
+			&bootstrap.InfraStatus{},
+			&configv1.Network{
+				Spec: networkConfig,
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				},
+				Status: configv1.NetworkStatus{NetworkType: string(operv1.NetworkTypeOpenShiftSDN)}},
+			[]crclient.Object{&operv1.Network{
+				ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+				Spec: operv1.NetworkSpec{
+					DefaultNetwork: operv1.DefaultNetworkDefinition{
+						Type: operv1.NetworkTypeOpenShiftSDN,
+						OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
+							// "192.168.0.0/20" is the service network in networkConfig
+							IPv4: &operv1.IPv4OVNKubernetesConfig{
+								InternalTransitSwitchSubnet: "192.0.0.0/8",
+							},
+						}}}}},
+			true,
+
+			"network serviceNetwork(192.168.0.0/20) overlaps with network v4InternalTransitSwitchSubnet(192.0.0.0/8)",
+		},
+		{
+			"error when service network overlaps with ovn-k internal transit switch subnet overlap",
+			&bootstrap.InfraStatus{},
+			&configv1.Network{
+				Spec: func() configv1.NetworkSpec {
+					cfg := networkConfig
+					cfg.ClusterNetwork = []configv1.ClusterNetworkEntry{
+						{
+							CIDR:       "fd00:1234::/48",
+							HostPrefix: 64,
+						}}
+					//fd97::/64 is the default v6 transit switch subnet
+					cfg.ServiceNetwork = []string{"fd97::/48"}
+					return cfg
+				}(),
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				},
+				Status: configv1.NetworkStatus{NetworkType: string(operv1.NetworkTypeOpenShiftSDN)}},
+			[]crclient.Object{&operv1.Network{
+				ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+				Spec: operv1.NetworkSpec{
+					DefaultNetwork: operv1.DefaultNetworkDefinition{
+						Type: operv1.NetworkTypeOpenShiftSDN,
+					}}}},
+			true,
+			"network serviceNetwork(fd97::/48) overlaps with network v6InternalTransitSwitchSubnet(fd97::/64)",
+		},
+		{
+			"error when pods with 'pod.network.openshift.io/assign-macvlan' annotation are present in the cluster",
+			&bootstrap.InfraStatus{},
+			&configv1.Network{
+				Spec: networkConfig,
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				},
+				Status: configv1.NetworkStatus{NetworkType: string(operv1.NetworkTypeOpenShiftSDN)}},
+			[]crclient.Object{
+				&operv1.Network{
+					ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+					Spec: operv1.NetworkSpec{
+						DefaultNetwork: operv1.DefaultNetworkDefinition{
+							Type: operv1.NetworkTypeOpenShiftSDN,
+						},
+					},
+				},
+				&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{v1.AssignMacvlanAnnotation: ""},
+					},
+				},
+			},
+			true,
+			"network type live migration is not supported for pods with \"pod.network.openshift.io/assign-macvlan\" annotation. Please remove all egress router pods",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cc := *ClusterConfig.DeepCopy()
-			net := &configv1.Network{Spec: cc}
-
-			infraRes := &bootstrap.InfraStatus{}
-
-			if tt.hypershiftCluster {
-				infraRes.HostedControlPlane = &hypershift.HostedControlPlane{}
-			}
-			if tt.annotation {
-				net.Annotations = map[string]string{names.NetworkTypeMigrationAnnotation: ""}
-			}
-			err := validateClusterConfig(net, infraRes)
+			client := fake.NewFakeClient(tt.objects...)
+			err := validateClusterConfig(tt.config, tt.infraRes, client)
 			if tt.expectErr {
 				g.Expect(err).To(HaveOccurred())
-				if tt.hypershiftCluster {
-					errMsg := "network type live migration is not supported on HyperShift clusters"
-					g.Expect(err).To(MatchError(Equal(errMsg)))
+				if tt.expectedErrorMsg != "" {
+					g.Expect(err).To(MatchError(Equal(tt.expectedErrorMsg)))
 				}
 			}
 			if !tt.expectErr {
