@@ -33,6 +33,11 @@ data:
         ovn_v6_transit_switch_subnet_opt="--cluster-manager-v6-transit-switch-subnet {{.V6TransitSwitchSubnet}}"
       fi
     
+      admin_network_policy_enabled_flag=
+      if [[ "{{.OVN_ADMIN_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
+        admin_network_policy_enabled_flag="--enable-admin-network-policy"
+      fi
+    
       dns_name_resolver_enabled_flag=
       if [[ "{{.DNS_NAME_RESOLVER_ENABLE}}" == "true" ]]; then
         dns_name_resolver_enabled_flag="--enable-dns-name-resolver"
@@ -51,5 +56,6 @@ data:
       ${ovn_v6_join_subnet_opt} \
       ${ovn_v4_transit_switch_subnet_opt} \
       ${ovn_v6_transit_switch_subnet_opt} \
+      ${admin_network_policy_enabled_flag} \
       ${dns_name_resolver_enabled_flag}
     }

@@ -48,9 +48,6 @@ data:
     enable-admin-network-policy=true
 {{- end }}
     enable-multi-external-gateway=true
-{{- if .DNS_NAME_RESOLVER_ENABLE }}
-    enable-dns-name-resolver=true
-{{- end }}
 
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
