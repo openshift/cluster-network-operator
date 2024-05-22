@@ -22,6 +22,7 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        network.operator.openshift.io/ovnkube-script-lib-hash: "{{.OVNKubeControlPlaneConfigHash}}"
       labels:
         app: ovnkube-control-plane
         component: network

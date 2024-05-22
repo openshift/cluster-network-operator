@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"log"
 	"math"
 	"math/big"
@@ -366,20 +367,22 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	commonManifestDir := filepath.Join(manifestDir, "network/ovn-kubernetes/common")
 
 	cmPaths := []string{
-		filepath.Join(commonManifestDir, "008-script-lib.yaml"),
+		filepath.Join(commonManifestDir, "008-script-lib-node.yaml"),
+		filepath.Join(commonManifestDir, "008-script-lib-control-plane.yaml"),
 	}
 
 	// Many ovnkube config options are stored in ConfigMaps; the ovnkube
 	// daemonsets need to know when those ConfigMaps change so they can
 	// restart with the new options. Render those ConfigMaps first and
 	// embed a hash of their data into the ovnkube-node daemonsets.
-	h := sha1.New()
-	for _, path := range cmPaths {
+	// Updating pod annotation will trigger an immediate configMap refresh (https://github.com/kubernetes/website/pull/18082).
+	cmHashes := make([]hash.Hash, len(cmPaths))
+	for i, path := range cmPaths {
 		manifests, err := render.RenderTemplate(path, &data)
 		if err != nil {
 			return nil, progressing, errors.Wrapf(err, "failed to render ConfigMap template %q", path)
 		}
-
+		h := sha1.New()
 		// Hash each rendered ConfigMap object's data
 		for _, m := range manifests {
 			bytes, err := json.Marshal(m)
@@ -390,8 +393,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 				return nil, progressing, errors.Wrapf(err, "failed to hash ConfigMap %q data", path)
 			}
 		}
+		cmHashes[i] = h
 	}
-	data.Data["OVNKubeConfigHash"] = hex.EncodeToString(h.Sum(nil))
+	data.Data["OVNKubeNodeConfigHash"] = hex.EncodeToString(cmHashes[0].Sum(nil))
+	data.Data["OVNKubeControlPlaneConfigHash"] = hex.EncodeToString(cmHashes[1].Sum(nil))
 
 	manifestDirs := make([]string, 0, 2)
 	manifestDirs = append(manifestDirs, commonManifestDir)
