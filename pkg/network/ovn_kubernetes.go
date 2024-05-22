@@ -82,7 +82,7 @@ const (
 // - the ovnkube-control-plane deployment
 // and some other small things.
 func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string,
-	client cnoclient.Client, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, bool, error) {
+	featureGates featuregates.FeatureGate) ([]*uns.Unstructured, bool, error) {
 	var progressing bool
 
 	// TODO: Fix operator behavior when running in a cluster with an externalized control plane.
