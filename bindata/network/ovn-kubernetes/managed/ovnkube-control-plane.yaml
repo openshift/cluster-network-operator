@@ -145,47 +145,9 @@ spec:
                 exit 1
             fi
           done
-
-          ovn_v4_join_subnet_opt=
-          if [[ "{{.V4JoinSubnet}}" != "" ]]; then
-            ovn_v4_join_subnet_opt="--gateway-v4-join-subnet {{.V4JoinSubnet}}"
-          fi
-          ovn_v6_join_subnet_opt=
-          if [[ "{{.V6JoinSubnet}}" != "" ]]; then
-            ovn_v6_join_subnet_opt="--gateway-v6-join-subnet {{.V6JoinSubnet}}"
-          fi
-
-          ovn_v4_transit_switch_subnet_opt=
-          if [[ "{{.V4TransitSwitchSubnet}}" != "" ]]; then
-            ovn_v4_transit_switch_subnet_opt="--cluster-manager-v4-transit-switch-subnet {{.V4TransitSwitchSubnet}}"
-          fi
-          ovn_v6_transit_switch_subnet_opt=
-          if [[ "{{.V6TransitSwitchSubnet}}" != "" ]]; then
-            ovn_v6_transit_switch_subnet_opt="--cluster-manager-v6-transit-switch-subnet {{.V6TransitSwitchSubnet}}"
-          fi
-
-          dns_name_resolver_enabled_flag=
-          if [[ "{{.DNS_NAME_RESOLVER_ENABLE}}" == "true" ]]; then
-            dns_name_resolver_enabled_flag="--enable-dns-name-resolver"
-          fi
-
-          echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
-          exec /usr/bin/ovnkube \
-            --enable-interconnect \
-            --init-cluster-manager "${K8S_NODE}" \
-            --config-file=/run/ovnkube-config/ovnkube.conf \
-            --k8s-token-file=/var/run/secrets/hosted_cluster/token \
-            --loglevel "${OVN_KUBE_LOG_LEVEL}" \
-            --metrics-bind-address "0.0.0.0:9108" \
-            --metrics-enable-pprof \
-            --metrics-enable-config-duration \
-            --node-server-privkey ${TLS_PK} \
-            --node-server-cert ${TLS_CERT} \
-            ${ovn_v4_join_subnet_opt} \
-            ${ovn_v6_join_subnet_opt} \
-            ${ovn_v4_transit_switch_subnet_opt} \
-            ${ovn_v6_transit_switch_subnet_opt} \
-            ${dns_name_resolver_enabled_flag}
+          
+          . /ovnkube-lib/ovnkube-lib.sh || exit 1
+          start-ovnkube-control-plane 9108
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
@@ -198,6 +160,8 @@ spec:
         - name: ovn-control-plane-metrics-cert
           mountPath: /etc/pki/tls/metrics-cert
           readOnly: True
+        - mountPath: /ovnkube-lib
+          name: ovnkube-script-lib
         resources:
           requests:
             cpu: 10m
@@ -283,6 +247,10 @@ spec:
           items:
             - key: ca.crt
               path: ca.crt
+      - name: ovnkube-script-lib
+        configMap:
+          name: ovnkube-script-lib-control-plane
+          defaultMode: 0744
       tolerations:
         - key: "hypershift.openshift.io/control-plane"
           operator: "Equal"
