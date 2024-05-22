@@ -174,6 +174,9 @@ func TestRenderMultusAdmissionControllerGetNamespace(t *testing.T) {
 				Labels: map[string]string{
 					"openshift.io/cluster-monitoring": "true",
 				},
+				Annotations: map[string]string{
+					"workload.openshift.io/allowed": "management",
+				},
 			},
 		},
 		&corev1.Namespace{
@@ -185,6 +188,9 @@ func TestRenderMultusAdmissionControllerGetNamespace(t *testing.T) {
 			Name: "test3-ignored",
 			Labels: map[string]string{
 				"openshift.io/cluster-monitoring": "true",
+			},
+			Annotations: map[string]string{
+				"workload.openshift.io/allowed": "management",
 			},
 		},
 		})
