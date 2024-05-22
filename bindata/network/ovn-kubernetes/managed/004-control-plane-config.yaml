@@ -14,7 +14,6 @@ data:
     routable-mtu="{{.RoutableMTU}}"
     {{- end }}
     cluster-subnets="{{.OVN_cidr}}"
-    encap-port="{{.GenevePort}}"
     enable-lflow-cache=true
     lflow-cache-limit-kb=1048576
 
