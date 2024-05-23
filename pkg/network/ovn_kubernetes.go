@@ -72,11 +72,7 @@ const (
 	OVSFlowsConfigMapName              = "ovs-flows-config"
 	OVNKubernetesConfigOverridesCMName = "ovn-kubernetes-config-overrides"
 
-	OVSFlowsConfigNamespace      = names.APPLIED_NAMESPACE
-	defaultV4InternalSubnet      = "100.64.0.0/16"
-	defaultV6InternalSubnet      = "fd98::/64"
-	defaultV4TransitSwitchSubnet = "100.88.0.0/16"
-	defaultV6TransitSwitchSubnet = "fd97::/64"
+	OVSFlowsConfigNamespace = names.APPLIED_NAMESPACE
 
 	defaultV4MasqueradeSubnet = "169.254.0.0/17"
 	defaultV6MasqueradeSubnet = "fd69::/112"
@@ -2041,83 +2037,6 @@ func validateOVNKubernetesSubnet(name, subnet string, otherSubnets *iputil.IPPoo
 		return fmt.Errorf("Whole or subset of %s CIDR %s is already in use: %s", name, subnet, err)
 	}
 	return nil
-}
-
-// GetInternalSubnets returns internal subnet values for both IP families
-// It returns default values if conf is nil or the subnets are not configured
-func GetInternalSubnets(conf *operv1.OVNKubernetesConfig) (v4Subnet, v6Subnet string) {
-	v4Subnet = defaultV4InternalSubnet
-	v6Subnet = defaultV6InternalSubnet
-
-	if conf == nil {
-		return
-	}
-
-	if conf.V4InternalSubnet != "" {
-		v4Subnet = conf.V4InternalSubnet
-	}
-	if conf.IPv4 != nil {
-		// conf.IPv4.InternalJoinSubnet takes precedence over conf.V4InternalSubnet
-		if conf.IPv4.InternalJoinSubnet != "" {
-			v4Subnet = conf.IPv4.InternalJoinSubnet
-		}
-	}
-
-	if conf.V6InternalSubnet != "" {
-		v6Subnet = conf.V6InternalSubnet
-	}
-	if conf.IPv6 != nil {
-		// conf.IPv6.InternalJoinSubnet takes precedence over conf.V6InternalSubnet
-		if conf.IPv6.InternalJoinSubnet != "" {
-			v6Subnet = conf.IPv6.InternalJoinSubnet
-		}
-	}
-	return
-}
-
-// GetTransitSwitchSubnets returns transit switch subnet values for both IP families
-// It returns default values if conf is nil or the subnets are not configured
-func GetTransitSwitchSubnets(conf *operv1.OVNKubernetesConfig) (v4Subnet, v6Subnet string) {
-	v4Subnet = defaultV4TransitSwitchSubnet
-	v6Subnet = defaultV6TransitSwitchSubnet
-
-	if conf == nil {
-		return
-	}
-
-	if conf.IPv4 != nil {
-		if conf.IPv4.InternalTransitSwitchSubnet != "" {
-			v4Subnet = conf.IPv4.InternalTransitSwitchSubnet
-		}
-	}
-
-	if conf.IPv6 != nil {
-		if conf.IPv6.InternalTransitSwitchSubnet != "" {
-			v6Subnet = conf.IPv6.InternalTransitSwitchSubnet
-		}
-	}
-	return
-}
-
-// GetMasqueradeSubnet returns masquerade subnet values for both IP families
-// It returns default values if conf is nil or the subnets are not configured
-func GetMasqueradeSubnet(conf *operv1.OVNKubernetesConfig) (v4Subnet, v6Subnet string) {
-	v4Subnet = defaultV4MasqueradeSubnet
-	v6Subnet = defaultV6MasqueradeSubnet
-
-	if conf == nil {
-		return
-	}
-
-	if conf.GatewayConfig != nil {
-		if conf.GatewayConfig.IPv4.InternalMasqueradeSubnet != "" {
-			v4Subnet = conf.GatewayConfig.IPv4.InternalMasqueradeSubnet
-		}
-		if conf.GatewayConfig.IPv6.InternalMasqueradeSubnet != "" {
-			v4Subnet = conf.GatewayConfig.IPv6.InternalMasqueradeSubnet
-		}
-	}
-	return
 }
 
 // getOVNKubernetesConfigOverrides retrieves OVN Kubernetes configuration overrides from the

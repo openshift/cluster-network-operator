@@ -114,18 +114,8 @@ require (
 require (
 	cel.dev/expr v0.25.0 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
-	github.com/ajeddeloh/go-json v0.0.0-20200220154158-5ae607161559 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
-	github.com/aws/aws-sdk-go v1.55.5 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
-	github.com/clarketm/json v1.17.1 // indirect
-	github.com/coreos/fcct v0.5.0 // indirect
-	github.com/coreos/go-json v0.0.0-20230131223807-18775e0fb4fb // indirect
-	github.com/coreos/go-systemd v0.0.0-20190719114852-fd7a80b32e1f // indirect
-	github.com/coreos/ign-converter v0.0.0-20241125185625-2f773079ca81 // indirect
-	github.com/coreos/ignition v0.35.0 // indirect
-	github.com/coreos/ignition/v2 v2.20.0 // indirect
-	github.com/coreos/vcontext v0.0.0-20230201181013-d72178a18687 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fatih/color v1.18.0 // indirect
@@ -155,14 +145,12 @@ require (
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/spf13/cast v1.9.2 // indirect
 	github.com/stoewer/go-strcase v1.3.1 // indirect
-	github.com/vincent-petithory/dataurl v1.0.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.38.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.38.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	go4.org v0.0.0-20201209231011-d4a079459e60 // indirect
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251103181224-f26f9409b101 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251103181224-f26f9409b101 // indirect
