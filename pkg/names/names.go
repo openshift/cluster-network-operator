@@ -64,10 +64,6 @@ const GenerateStatusLabel = "networkoperator.openshift.io/generates-operator-sta
 // StandAloneClusterName is a value used for GenerateStatusLabel label when running in non-Hypershift environments
 const StandAloneClusterName = "stand-alone"
 
-// NetworkMigrationAnnotation is an annotation on the networks.operator.openshift.io CR to indicate
-// that executing network migration (switching the default network type of the cluster) is allowed.
-const NetworkMigrationAnnotation = "networkoperator.openshift.io/network-migration"
-
 // NetworkIPFamilyAnnotation is an annotation on the OVN networks.operator.openshift.io daemonsets
 // to indicate the current IP Family mode of the cluster: "single-stack" or "dual-stack"
 const NetworkIPFamilyModeAnnotation = "networkoperator.openshift.io/ip-family-mode"
@@ -140,37 +136,6 @@ const OpenShiftComponent = "openshift.io/owning-component"
 
 // ClusterNetworkOperatorJiraComponent is the jira component name for the cluster-network-operator
 const ClusterNetworkOperatorJiraComponent = "Networking / cluster-network-operator"
-
-// NetworkTypeMigrationAnnotation is an annotation on the OVN networks.operator.openshift.io CR to indicate
-// that executing network type live migration
-const NetworkTypeMigrationAnnotation = "network.openshift.io/network-type-migration"
-
-// MachineConfigPoolsUpdating is the reason string NetworkTypeMigrationTargetCNIInUse and NetworkTypeMigrationMTUReady
-// conditions to indicate if MCP is updating
-const MachineConfigPoolsUpdating string = "MachineConfigPoolsUpdating"
-
-// MachineConfigPoolDegraded is the reason string NetworkTypeMigrationTargetCNIInUse and NetworkTypeMigrationMTUReady
-// conditions to indicate if MCP is degraded
-const MachineConfigPoolDegraded string = "MachineConfigPoolDegraded"
-
-// Status condition types of network.config for live migration
-const (
-	// NetworkTypeMigrationInProgress is the condition type for network type live migration to indicate if the migration
-	// is in progress
-	NetworkTypeMigrationInProgress string = "NetworkTypeMigrationInProgress"
-	// NetworkTypeMigrationTargetCNIAvailable is the condition type for network type live migration to indicate if
-	// target CNI is available
-	NetworkTypeMigrationTargetCNIAvailable string = "NetworkTypeMigrationTargetCNIAvailable"
-	// NetworkTypeMigrationTargetCNIInUse is the condition type for network type live migration to indicate if the
-	// target CNI in use
-	NetworkTypeMigrationTargetCNIInUse string = "NetworkTypeMigrationTargetCNIInUse"
-	// NetworkTypeMigrationOriginalCNIPurged is the condition type for network type live migration to indicate if the
-	// original CNI has been purged
-	NetworkTypeMigrationOriginalCNIPurged string = "NetworkTypeMigrationOriginalCNIPurged"
-	// NetworkTypeMigrationMTUReady is the condition type for network type live migration to indicate if the routable
-	// MTU is set
-	NetworkTypeMigrationMTUReady string = "NetworkTypeMigrationMTUReady"
-)
 
 const (
 	// MachineConfigLabelRoleKey label key for machine config role.

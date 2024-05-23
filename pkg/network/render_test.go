@@ -82,7 +82,7 @@ func TestClusterNetworkNoMigration(t *testing.T) {
 func TestServiceNetworkChangeNotOkOnMigration(t *testing.T) {
 	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
 
-	prev.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
+	prev.Migration = &operv1.NetworkMigration{MTU: &operv1.MTUMigration{}}
 
 	// You can't change service network during migration.
 	next.ServiceNetwork = []string{"1.2.3.0/24"}
