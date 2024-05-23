@@ -28,8 +28,8 @@ var cloudProviderConfig = types.NamespacedName{
 }
 
 var (
-	masterRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "master"}
-	workerRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "worker"}
+	MasterRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "master"}
+	WorkerRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "worker"}
 )
 
 // isNetworkNodeIdentityEnabled determines if network node identity should be enabled.
@@ -160,20 +160,20 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	// The IPsecMachineConfig in 4.14 is created by user and can be created with any name and also is not managed by network operator, so find it by using the label
 	// and looking for the extension.
 
-	masterIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, masterRoleMachineConfigLabel)
+	masterIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, MasterRoleMachineConfigLabel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ipsec machine configs for master: %v", err)
 	}
 	res.MasterIPsecMachineConfigs = masterIPsecMachineConfigs
 
-	workerIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, workerRoleMachineConfigLabel)
+	workerIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, WorkerRoleMachineConfigLabel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ipsec machine configs for worker: %v", err)
 	}
 	res.WorkerIPsecMachineConfigs = workerIPsecMachineConfigs
 
 	if res.MasterIPsecMachineConfigs != nil {
-		mcpMasterStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, masterRoleMachineConfigLabel)
+		mcpMasterStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, MasterRoleMachineConfigLabel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get machine config pools for master role: %v", err)
 		}
@@ -181,7 +181,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	}
 
 	if res.WorkerIPsecMachineConfigs != nil {
-		mcpWorkerStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, workerRoleMachineConfigLabel)
+		mcpWorkerStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, WorkerRoleMachineConfigLabel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get machine config pools for worker role: %v", err)
 		}
