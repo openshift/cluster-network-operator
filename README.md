@@ -18,24 +18,23 @@ The network operator gets its configuration from two objects: the Cluster and th
 
 Any changes to the Cluster configuration are propagated down in to the Operator configuration. In the event of conflicts, the Operator configuration will be updated to match the Cluster configuration.
 
-For example, if you want to use OVN networking instead of the default SDN networking, do the following:
+For example, if you want to change the service network CIDR, do the following:
  
 Create the cluster using openshift-install and generate the install-config. Use a convenient directory for the cluster.
 ```
 $ openshift-install --dir=MY_CLUSTER create install-config
 ```
-Edit the MY_CLUSTER/install-config.yaml and change the `networkType:` to, for example, OVNKubernetes
+Edit the MY_CLUSTER/install-config.yaml and change first value under `serviceNetwork` to, for example, `10.144.0.0/16`.
 
 After that go on with the install.
 
 When you want to change the default networing parameters,
-for example, you want to use a different VXLAN port for OpenShiftSDN, then you will need to create the manifest files.
+for example, you want to use a different MTU, then you will need to create the manifest files.
 
 ```
 $ openshift-install --dir=MY_CLUSTER create manifests
 ```
 The `MY_CLUSTER/manifests/cluster-network-02-config.yml` contains the cluster network operator configuration. It is the basis of the operator configuration and can't be changed.
-In particular the "networkType" can't be changed. See above for how to set the "networkType".
 
 The `cluster-network-02-config.yml` file is copied to a new file and that file is edited for new configuration.
 ```
@@ -78,12 +77,10 @@ spec:
   clusterNetwork:
   - cidr: 10.128.0.0/14
     hostPrefix: 23
-  networkType: OpenShiftSDN
+  networkType: OVNKubernetes
   serviceNetwork:
   - 172.30.0.0/16
 ```
-
-Alternatively, ovn-kubernetes is configured when `networkType: OVNKubernetes`.
 
 *Corresponding Operator Config* `manifests/cluster-network-03-config.yml`
 
@@ -100,7 +97,7 @@ spec:
   - cidr: 10.128.0.0/14
     hostPrefix: 23
   defaultNetwork:
-    type: OpenShiftSDN
+    type: OVNKubernetes
   serviceNetwork:
   - 172.30.0.0/16
 ```
@@ -108,7 +105,7 @@ spec:
 ## Configuring IP address pools
 The ClusterNetworks and ServiceNetwork are configured in the `MY_CLUSTER/install-config` from above. They cannot be changed in the manifests.
 
-Users must supply at least two address pools - ClusterNetwork for pods, and ServiceNetwork for services. Some network plugins, such as OpenShiftSDN and OVNKubernetes, support multiple ClusterNetworks. All address blocks must be non-overlapping and a multiple of `hostPrefix`. 
+Users must supply at least two address pools - ClusterNetwork for pods, and ServiceNetwork for services. Some network plugins, such as OVNKubernetes, support multiple ClusterNetworks. All address blocks must be non-overlapping and a multiple of `hostPrefix`.
 
 For future expansion, multiple `serviceNetwork` entries are allowed by the configuration but not actually supported by any network plugins. Supplying multiple addresses is invalid.
 
@@ -143,55 +140,10 @@ Different network providers have additional provider-specific settings.
 The network type is always read from the Cluster configuration.
 
 Currently, the understood values for `networkType` are:
-* `OpenShiftSDN`
 * `OVNKubernetes`
 
 Other values are ignored. If you wish to use use a third-party network provider not managed by the operator, set the network type to something meaningful to you. The operator will not install or upgrade a network provider, but all other Network Operator functionality remains.
 
-
-### Configuring OpenShiftSDN
-OpenShiftSDN supports the following configuration options, all of which are optional:
-* `mode`: one of "Subnet" "Multitenant", or "NetworkPolicy". Configures the [isolation mode](https://docs.openshift.com/container-platform/3.11/architecture/networking/sdn.html#overview) for OpenShift SDN. The default is "NetworkPolicy".
-* `vxlanPort`: The port to use for the VXLAN overlay. The default is 4789
-* `MTU`: The MTU to use for the VXLAN overlay. The default is the MTU of the node that the cluster-network-operator is first run on, minus 50 bytes for overhead. If the nodes in your cluster don't all have the same MTU then you will need to set this explicitly.
-* `useExternalOpenvswitch`: boolean. If the nodes are already running openvswitch, and OpenShiftSDN should not install its own, set this to true. This only needed for certain advanced installations with DPDK or OpenStack.
-* `enableUnidling`: boolean. Whether the service proxy should allow idling and unidling of services.
-
-These configuration flags are only in the Operator configuration object.
-
-Example from the `manifests/cluster-network-03-config.yml` file:
-```yaml
-spec:
-  defaultNetwork:
-    type: OpenShiftSDN
-    openshiftSDNConfig:
-      mode: NetworkPolicy
-      vxlanPort: 4789
-      mtu: 1450
-      enableUnidling: true
-      useExternalOpenvswitch: false
-```
-
-Additionally, you can configure per-node verbosity for openshift-sdn. This is useful
-if you want to debug an issue, and can reproduce it on a single node. To do this,
-create a special ConfigMap with keys based on the Node's name:
-
-```yaml
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: env-overrides
-  namespace: openshift-sdn
-data:
-  # to set the node processes on a single node to verbose
-  # replace this with the node's name (from oc get nodes)
-  ip-10-0-135-96.us-east-2.compute.internal: |
-    OPENSHIFT_SDN_LOG_LEVEL=5
-  # to enable verbose logging in the sdn controller, use
-  # the special node name of _master
-  _master: |
-    OPENSHIFT_SDN_LOG_LEVEL=5
-```
 
 ### Configuring OVNKubernetes
 OVNKubernetes supports the following configuration options, all of which are optional and once set at cluster creation, they can't be changed except for `gatewayConfig` and `IPsec` which can be changed at runtime:
@@ -350,7 +302,7 @@ spec:
 To understand more about each field, and to see the default values check out the [Openshift api definition](https://github.com/openshift/api/blob/master/operator/v1/types_network.go#L397)
 
 ## Configuring kube-proxy
-Some plugins (like OpenShift SDN) have a built-in kube-proxy, some plugins require a standalone kube-proxy to be deployed, and some (like ovn-kubnernetes) don't use kube-proxy at all.
+Some plugins require a standalone kube-proxy to be deployed.
 
 The deployKubeProxy flag can be used to indicate whether CNO should deploy a standalone kube-proxy, but for supported network types, this will default to the correct value automatically.
 
@@ -363,7 +315,7 @@ For plugins that use kube-proxy (whether built-in or standalone), you can config
 * `bindAddress`: The address to "bind" to - the address for which traffic will be redirected.
 * `proxyArguments`: additional command-line flags to pass to kube-proxy - see the [documentation](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/).
 
-The top-level flag `deployKubeProxy` tells the network operator to explicitly deploy a kube-proxy process. Generally, you will not need to provide this; the operator will decide appropriately. For example, OpenShiftSDN includes an embedded service proxy, so this flag is automatically false in that case.
+The top-level flag `deployKubeProxy` tells the network operator to explicitly deploy a kube-proxy process. Generally, you will not need to provide this; the operator will decide appropriately.
 
 Example from the `manifests/cluster-network-03-config.yml` file:
 ```yaml
@@ -533,7 +485,6 @@ Most network changes are unsafe to roll out to a production cluster. Therefore, 
 It is safe to edit the following fields in the Operator configuration:
 * deployKubeProxy
 * all of kubeProxyConfig
-* OpenshiftSDN enableUnidling, useExternalOpenvswitch.
 
 ### Force-applying an unsafe change
 Administrators may wish to forcefully apply a disruptive change to a cluster that is not serving production traffic. To do this, first they should make the desired configuration change to the CRD. Then, delete the network operator's understanding of the state of the system:

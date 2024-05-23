@@ -194,7 +194,6 @@ The following options are always accepted but only used for new clusters:
  -e EXPORT_ENV_ONLY  exports cluster environment only, used as a helper which allows you to modify the image you want to target later
  -f CONFIG           the path to an openshift-install-created install-config.yaml file; if not given one will be created
  -i INSTALLER        path to the openshift-install binary; if not given PATH will be searched
- -n PLUGIN           the name of the network plugin to deploy; one of [sdn|OpenShiftSDN|ovn|OVNKubernetes]
  -w                  pause after creating manifests to allow manual overrides
 
 The following environment variables are honored:
@@ -207,8 +206,8 @@ The following environment variables are honored:
 
 EXPORT_ENV_ONLY=false
 PLUGIN_IMAGE="${PLUGIN_IMAGE:-}"
-NETWORK_PLUGIN="OpenShiftSDN"
-IMAGE_ENV_KEY="SDN_IMAGE"
+NETWORK_PLUGIN="OVNKubernetes"
+IMAGE_ENV_KEY="OVN_IMAGE"
 CLUSTER_DIR="${CLUSTER_DIR:-}"
 INSTALLER_PATH="${INSTALLER_PATH:-}"
 INSTALL_CONFIG="${INSTALL_CONFIG:-}"
@@ -224,20 +223,6 @@ while getopts "e?c:f:i:m:k:n:w" opt; do
         i) INSTALLER_PATH="${OPTARG}";;
         m) PLUGIN_IMAGE="${OPTARG}";;
         k) KUBECONFIG="${OPTARG}";;
-        n)
-            case ${OPTARG} in
-                ovn|OVNKubernetes)
-                    NETWORK_PLUGIN="OVNKubernetes"
-                    IMAGE_ENV_KEY="OVN_IMAGE"
-                    ;;
-                sdn|OpenShiftSDN)
-                    ;;
-                *)
-                    echo "Unknown network plugin ${OPTARG}" >&2
-                    exit 1
-                ;;
-            esac
-            ;;
         w)
             WAIT_FOR_MANIFEST_UPDATES=1
             ;;
