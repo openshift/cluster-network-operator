@@ -21,10 +21,7 @@ var NoIPAMConfig = operv1.Network{
 			},
 		},
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
-			Type: operv1.NetworkTypeOpenShiftSDN,
-			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
-				Mode: operv1.SDNModeNetworkPolicy,
-			},
+			Type: operv1.NetworkTypeOVNKubernetes,
 		},
 	},
 }
@@ -46,10 +43,7 @@ var DHCPConfig = operv1.Network{
 			},
 		},
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
-			Type: operv1.NetworkTypeOpenShiftSDN,
-			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
-				Mode: operv1.SDNModeNetworkPolicy,
-			},
+			Type: operv1.NetworkTypeOVNKubernetes,
 		},
 	},
 }
@@ -71,10 +65,7 @@ var WhereaboutsConfig = operv1.Network{
 			},
 		},
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
-			Type: operv1.NetworkTypeOpenShiftSDN,
-			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
-				Mode: operv1.SDNModeNetworkPolicy,
-			},
+			Type: operv1.NetworkTypeOVNKubernetes,
 		},
 	},
 }
@@ -96,10 +87,7 @@ var WhereaboutsConflistConfig = operv1.Network{
 			},
 		},
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
-			Type: operv1.NetworkTypeOpenShiftSDN,
-			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
-				Mode: operv1.SDNModeNetworkPolicy,
-			},
+			Type: operv1.NetworkTypeOVNKubernetes,
 		},
 	},
 }
@@ -121,10 +109,7 @@ var InvalidIPAMConfig = operv1.Network{
 			},
 		},
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
-			Type: operv1.NetworkTypeOpenShiftSDN,
-			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
-				Mode: operv1.SDNModeNetworkPolicy,
-			},
+			Type: operv1.NetworkTypeOVNKubernetes,
 		},
 	},
 }
@@ -152,10 +137,7 @@ var DHCPConfigSimpleMacvlan = operv1.Network{
 			},
 		},
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
-			Type: operv1.NetworkTypeOpenShiftSDN,
-			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
-				Mode: operv1.SDNModeNetworkPolicy,
-			},
+			Type: operv1.NetworkTypeOVNKubernetes,
 		},
 	},
 }
@@ -205,10 +187,7 @@ var NoDHCPConfigSimpleMacvlan = operv1.Network{
 			},
 		},
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
-			Type: operv1.NetworkTypeOpenShiftSDN,
-			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
-				Mode: operv1.SDNModeNetworkPolicy,
-			},
+			Type: operv1.NetworkTypeOVNKubernetes,
 		},
 	},
 }
