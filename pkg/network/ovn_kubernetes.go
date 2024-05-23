@@ -1495,7 +1495,7 @@ func shouldUpdateOVNKonPrepull(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 func isCNOIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
 	isCNOIPsecMachineConfigPresentIn := func(mcs []*mcfgv1.MachineConfig) bool {
 		for _, mc := range mcs {
-			if containsNetworkOwnerRef(mc.OwnerReferences) {
+			if ContainsNetworkOwnerRef(mc.OwnerReferences) {
 				return true
 			}
 		}
@@ -1503,16 +1503,6 @@ func isCNOIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
 	}
 	return isCNOIPsecMachineConfigPresentIn(infra.MasterIPsecMachineConfigs) &&
 		isCNOIPsecMachineConfigPresentIn(infra.WorkerIPsecMachineConfigs)
-}
-
-func containsNetworkOwnerRef(ownerRefs []metav1.OwnerReference) bool {
-	for _, ownerRef := range ownerRefs {
-		if ownerRef.APIVersion == operv1.GroupVersion.String() && ownerRef.Kind == "Network" &&
-			(ownerRef.Controller != nil && *ownerRef.Controller) && ownerRef.Name == "cluster" {
-			return true
-		}
-	}
-	return false
 }
 
 // isIPsecMachineConfigActive returns true if both master and worker's machine config pools are ready with
@@ -2030,4 +2020,16 @@ func GetMasqueradeSubnet(conf *operv1.OVNKubernetesConfig) (v4Subnet, v6Subnet s
 		}
 	}
 	return
+}
+
+// ContainsNetworkOwnerRef returns true if any one the given OwnerReference is owned
+// by cluster network operator, otherwise returns false
+func ContainsNetworkOwnerRef(ownerRefs []metav1.OwnerReference) bool {
+	for _, ownerRef := range ownerRefs {
+		if ownerRef.APIVersion == operv1.GroupVersion.String() && ownerRef.Kind == "Network" &&
+			(ownerRef.Controller != nil && *ownerRef.Controller) && ownerRef.Name == "cluster" {
+			return true
+		}
+	}
+	return false
 }
