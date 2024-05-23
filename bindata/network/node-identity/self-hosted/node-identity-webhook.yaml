@@ -6,7 +6,7 @@ webhooks:
 {{ if .ConfigureNodeAdmissionWebhook }}
   - name: node.network-node-identity.openshift.io
     clientConfig:
-      url: https://{{.NetworkNodeIdentityAddress}}:{{.NetworkNodeIdentityPort}}/node
+      url: https://{{.NetworkNodeIdentityAddress}}/node
       caBundle: {{.NetworkNodeIdentityCABundle}}
     admissionReviewVersions: ['v1']
     sideEffects: None
@@ -19,7 +19,7 @@ webhooks:
 {{ end }}
   - name: pod.network-node-identity.openshift.io
     clientConfig:
-      url: https://{{.NetworkNodeIdentityAddress}}:{{.NetworkNodeIdentityPort}}/pod
+      url: https://{{.NetworkNodeIdentityAddress}}/pod
       caBundle: {{.NetworkNodeIdentityCABundle}}
     admissionReviewVersions: ['v1']
     sideEffects: None
