@@ -112,11 +112,14 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 	if err := validateVipsWithVips(*specApiVips, *specIngressVips, elb); err != nil {
 		return nil, fmt.Errorf("Error on validating VIPs: %v", err)
 	}
-	if err := validateVipsWithMachineNetworks(*specApiVips, *specMachineNetworks); err != nil {
-		return nil, fmt.Errorf("Error on validating API VIPs and Machine Networks: %v", err)
-	}
-	if err := validateVipsWithMachineNetworks(*specIngressVips, *specMachineNetworks); err != nil {
-		return nil, fmt.Errorf("Error on validating Ingress VIPs and Machine Networks: %v", err)
+
+	if !elb {
+		if err := validateVipsWithMachineNetworks(*specApiVips, *specMachineNetworks); err != nil {
+			return nil, fmt.Errorf("Error on validating API VIPs and Machine Networks: %v", err)
+		}
+		if err := validateVipsWithMachineNetworks(*specIngressVips, *specMachineNetworks); err != nil {
+			return nil, fmt.Errorf("Error on validating Ingress VIPs and Machine Networks: %v", err)
+		}
 	}
 
 	if err := syncVips(specApiVips, statusApiVips); err != nil {
