@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +20,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -45,6 +49,17 @@ var networkTypeMigrationConditionTypes = []string{
 	names.NetworkTypeMigrationTargetCNIInUse,
 	names.NetworkTypeMigrationOriginalCNIPurged,
 }
+
+const metricLiveMigrationConditionLabelKey = "type"
+
+var metricLiveMigrationCondition = metrics.NewGaugeVec(&metrics.GaugeOpts{
+	Namespace: "openshift_network_operator",
+	Name:      "live_migration_condition",
+	Help: "A metric which represents the status of each condition type for CNI live migration. The set of status condition " +
+		"types is defined for network.config to support observability of CNI live migration. " +
+		"A '1' value represents condition status true, '0' false and '-1' unknown. " +
+		"The metric is available when CNI live migration has started by annotating the Network CR.",
+}, []string{metricLiveMigrationConditionLabelKey})
 
 var gvrEgressFirewall = schema.GroupVersionResource{Group: "k8s.ovn.org", Version: "v1", Resource: "egressfirewalls"}
 var gvrEgressNetworkPolicy = schema.GroupVersionResource{Group: "network.openshift.io", Version: "v1", Resource: "egressnetworkpolicies"}
@@ -680,6 +695,34 @@ func (r *ReconcileOperConfig) syncNetworkTypeMigrationConditions(ctx context.Con
 		clusterConfig.Status.Conditions = clusterConfigUpdated.Status.Conditions
 	}
 	return nil
+}
+
+var liveMigrationConditionMetricOnce sync.Once
+
+func syncLiveMigrationConditionMetric(conditions []metav1.Condition) {
+	liveMigrationConditionMetricOnce.Do(func() {
+		legacyregistry.MustRegister(metricLiveMigrationCondition)
+	})
+	metricLiveMigrationCondition.Reset()
+	// type in-progress is not included within the following conditions type list networkTypeMigrationConditionTypes because its processed
+	// differently to the other types, but here we treat it the same as other condition types for live migration.
+	allLiveMigrationConditionTypes := append([]string{names.NetworkTypeMigrationInProgress}, networkTypeMigrationConditionTypes...)
+	conditionTypeLabel := prometheus.Labels{metricLiveMigrationConditionLabelKey: ""}
+	for _, liveMigrationConditionType := range allLiveMigrationConditionTypes {
+		conditionTypeLabel[metricLiveMigrationConditionLabelKey] = liveMigrationConditionType
+		conditionGauge := metricLiveMigrationCondition.With(conditionTypeLabel)
+		existingCondition := meta.FindStatusCondition(conditions, liveMigrationConditionType)
+		if existingCondition != nil {
+			switch existingCondition.Status {
+			case metav1.ConditionUnknown:
+				conditionGauge.Set(-1)
+			case metav1.ConditionTrue:
+				conditionGauge.Set(1)
+			case metav1.ConditionFalse:
+				conditionGauge.Set(0)
+			}
+		}
+	}
 }
 
 func resetMigrationConditions(conditions *[]metav1.Condition, nowTimestamp metav1.Time) {
