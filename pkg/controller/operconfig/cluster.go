@@ -112,6 +112,7 @@ func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConf
 		} else {
 			resetMigrationConditions(&clusterConfigWithConditions.Status.Conditions, nowTimestamp)
 		}
+		syncLiveMigrationConditionMetric(clusterConfigWithConditions.Status.Conditions)
 	}
 
 	status.Conditions = clusterConfigWithConditions.Status.Conditions
