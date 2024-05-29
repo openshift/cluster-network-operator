@@ -14,7 +14,16 @@ data:
     set -euo pipefail
 
     function crictl {
-        chroot /host /bin/crictl "$@"
+        case "${1}" in
+        inspectp)
+            # Eat errors, since the pod may have exited since we started the loop.
+            # The caller will catch the empty return value
+            chroot /host /bin/crictl "$@" 2>/dev/null || true
+            ;;
+        *)
+            chroot /host /bin/crictl "$@"
+            ;;
+        esac
     }
     function jq {
         chroot /host /bin/jq "$@"
@@ -44,6 +53,11 @@ data:
             pod_namespace=$(crictl inspectp "${id}" | jq -r .status.metadata.namespace)
             pod_name=$(crictl inspectp "${id}" | jq -r .status.metadata.name)
             pod_uid=$(crictl inspectp "${id}" | jq -r .status.metadata.uid)
+
+            # If the pod exited already then crictl will have returned "" for everything
+            if [[ -z "${pod_uid}" ]]; then
+                continue
+            fi
 
             # Check if we already logged an event for it
             events=$(kubectl get events -n "${pod_namespace}" -l pod-uid="${pod_uid}" 2>/dev/null)
@@ -100,6 +114,6 @@ data:
     EOF
         done
 
-    echo ""
-    sleep 3600
+        echo ""
+        sleep 3600
     done
