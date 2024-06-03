@@ -27,7 +27,7 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
-const NetworkNodeIdentityWebhookPort = 9743
+const NetworkNodeIdentityWebhookPort = "9743"
 const NetworkNodeIdentityNamespace = "openshift-network-node-identity"
 
 // isBootstrapComplete checks whether the bootstrap phase of openshift installation completed
@@ -130,15 +130,17 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 		apiServer := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault]
 		data.Data["K8S_APISERVER"] = "https://" + net.JoinHostPort(apiServer.Host, apiServer.Port)
 
-		// NetworkNodeIdentityAddress is only used in self-hosted deployments where the webhook listens on loopback
+		// NetworkNodeIdentityIP/NetworkNodeIdentityAddress are only used in self-hosted deployments where the webhook listens on loopback
 		// listening on localhost always picks the v4 address while dialing to localhost can choose either one
 		// https://github.com/golang/go/issues/9334
 		// For that reason set the webhook address use the loopback address of the primary IP family
 		// Note: ServiceNetwork cannot be empty, so it is safe to use the first element
-		data.Data["NetworkNodeIdentityAddress"] = "127.0.0.1"
+		networkNodeIdentityIP := "127.0.0.1"
 		if utilnet.IsIPv6CIDRString(conf.ServiceNetwork[0]) {
-			data.Data["NetworkNodeIdentityAddress"] = "::1"
+			networkNodeIdentityIP = "::1"
 		}
+		data.Data["NetworkNodeIdentityIP"] = networkNodeIdentityIP
+		data.Data["NetworkNodeIdentityAddress"] = net.JoinHostPort(networkNodeIdentityIP, NetworkNodeIdentityWebhookPort)
 
 		var err error
 		clusterBootstrapFinished, err = isBootstrapComplete(client)
