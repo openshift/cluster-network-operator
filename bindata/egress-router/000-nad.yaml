@@ -11,6 +11,11 @@ spec:
     "cniVersion": "0.4.0",
     "type": "egress-router",
     "name": "egress-router-cni-nad",
+    {{ $masterinterface := .MasterInterface}} {{ if ne $masterinterface "" }}
+    "interfaceArgs": {
+      "master": "{{$masterinterface}}"
+    },
+    {{ end }}
     "ip": {
       "addresses": [
         "{{.Addresses}}"
