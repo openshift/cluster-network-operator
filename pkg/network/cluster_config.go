@@ -127,7 +127,7 @@ func validateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.
 	}
 
 	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok {
-		return validateLiveMigration(clusterConfig, infraRes, client)
+		return ValidateLiveMigration(clusterConfig, infraRes, client)
 	}
 
 	return nil
@@ -230,7 +230,7 @@ var metricLiveMigrationBlocked = metrics.NewGaugeVec(&metrics.GaugeOpts{
 
 var liveMigrationBlockedMetricOnce sync.Once
 
-func validateLiveMigration(clusterConfig *configv1.Network, infraRes *bootstrap.InfraStatus, client cnoclient.Client) error {
+func ValidateLiveMigration(clusterConfig *configv1.Network, infraRes *bootstrap.InfraStatus, client cnoclient.Client) error {
 	liveMigrationBlockedMetricOnce.Do(func() {
 		legacyregistry.MustRegister(metricLiveMigrationBlocked)
 	})
@@ -251,21 +251,21 @@ func validateLiveMigration(clusterConfig *configv1.Network, infraRes *bootstrap.
 		return errors.Errorf("network type live migration is not supported on HyperShift clusters")
 	}
 
-	operNet := &operv1.Network{}
-	err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: names.CLUSTER_CONFIG}, operNet)
+	operConfig := &operv1.Network{}
+	err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: names.CLUSTER_CONFIG}, operConfig)
 	if err != nil {
 		return errors.Errorf("error getting network configuration: %v", err)
 	}
 
 	// Status contains the CNI we are migrating from
 	if clusterConfig.Status.NetworkType == string(operv1.NetworkTypeOpenShiftSDN) {
-		if operNet.Spec.DefaultNetwork.OpenShiftSDNConfig != nil &&
-			operNet.Spec.DefaultNetwork.OpenShiftSDNConfig.Mode == operv1.SDNModeMultitenant {
+		if operConfig.Spec.DefaultNetwork.OpenShiftSDNConfig != nil &&
+			operConfig.Spec.DefaultNetwork.OpenShiftSDNConfig.Mode == operv1.SDNModeMultitenant {
 			metricLiveMigrationBlocked.With(prometheus.Labels{metricLiveMigrationBlockedLabelKey: unsupportedSDNNetworkIsolationMode}).Set(1)
 			return errors.Errorf("network type live migration is not supported on SDN Multitenant clusters")
 		}
 
-		if err := validateOVNKubernetesCIDROverlap(clusterConfig, operNet); err != nil {
+		if err := validateOVNKubernetesCIDROverlap(clusterConfig, operConfig); err != nil {
 			return err
 		}
 

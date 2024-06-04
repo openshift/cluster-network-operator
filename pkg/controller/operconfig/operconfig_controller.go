@@ -562,7 +562,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// Update Network.config.openshift.io.Status
-	status, err := r.ClusterNetworkStatus(ctx, operConfig)
+	status, err := r.ClusterNetworkStatus(ctx, operConfig, bootstrapResult)
 	if err != nil {
 		log.Printf("Could not generate network status: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "StatusError",
