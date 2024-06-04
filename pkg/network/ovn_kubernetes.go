@@ -549,6 +549,54 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		updateNode, renderPrePull = shouldUpdateOVNKonPrepull(bootstrapResult.OVN, os.Getenv("RELEASE_VERSION"))
 	}
 
+	// 4.13 deploys ovn-ipsec daemonset, while 4.14 deploys ovn-ipsec-host and ovn-ipsec-containerized daemonsets,
+	// which require the certificates issued by ovnkube-node-identity, otherwise they'll be in crashloopbackoff
+	// for most of the upgrade. https://issues.redhat.com/browse/OCPBUGS-33500
+	// During 4.13->4.14 upgrades, run the 4.13 ovn-ipsec daemonset until phase 2 of the upgrade to IC is done,
+	// that is until all multizone ovnkube-node pods are deployed, at which point the new 4.14 daemonsets can be
+	// created and the 4.13 one is removed.
+	if ongoingUpgradeToInterconnect {
+		// don't create ovn-ipsec-host until upgrade to IC is done
+		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-host", func(o *uns.Unstructured) {
+			anno := o.GetAnnotations()
+			if anno == nil {
+				anno = map[string]string{}
+			}
+			anno[names.CreateWaitAnnotation] = "true"
+			o.SetAnnotations(anno)
+		})
+		// don't create ovn-ipsec-containerized until upgrade to IC is done
+		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-containerized", func(o *uns.Unstructured) {
+			anno := o.GetAnnotations()
+			if anno == nil {
+				anno = map[string]string{}
+			}
+			anno[names.CreateWaitAnnotation] = "true"
+			o.SetAnnotations(anno)
+		})
+		// HACK: Add a dummy representation of 4.13 ovn-ipsec daemonset with create-wait annotation,
+		// so that the existing instance from 4.13 will continue to run, it won't be replaced
+		// by this one below, and deleteRelatedObjectsNotRendered in status_manager.go
+		// won't delete it from the API server.
+		ovnIPsecLegacyDS := &appsv1.DaemonSet{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "DaemonSet",
+				APIVersion: appsv1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ovn-ipsec",
+				Namespace: util.OVN_NAMESPACE,
+				// We never update the legacy ovn-ipsec daemonset.
+				Annotations: map[string]string{names.CreateWaitAnnotation: "true"},
+			},
+		}
+		obj, err := k8s.ToUnstructured(ovnIPsecLegacyDS)
+		if err != nil {
+			return nil, progressing, fmt.Errorf("unable to render legacy ovn-ipsec daemonset: %w", err)
+		}
+		objs = append(objs, obj)
+	}
+
 	klog.Infof("ovnk components: ovnkube-node: isRunning=%t, update=%t; ovnkube-master: isRunning=%t, update=%t; ovnkube-control-plane: isRunning=%t, update=%t",
 		bootstrapResult.OVN.NodeUpdateStatus != nil, updateNode,
 		bootstrapResult.OVN.MasterUpdateStatus != nil, updateMaster,
