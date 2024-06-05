@@ -44,6 +44,8 @@ spec:
           requests:
             cpu: 10m
             memory: 65Mi
+          limits:
+            cpu: 10m
         securityContext:
           privileged: true
         terminationMessagePolicy: FallbackToLogsOnError
