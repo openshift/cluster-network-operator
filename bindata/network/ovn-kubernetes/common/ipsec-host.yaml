@@ -236,6 +236,11 @@ spec:
           ip x s flush
           ip x p flush
 
+          # Make libreswan to narrow down the proposals exchanged by two peers to a mutally acceptable set.
+          # The /etc/ipsec.d/openshift.conf file can not be used because it is managed by openvswitch.
+          # Hence this is being set as default conn parameter in /etc/ipsec.conf file.
+          echo -e "\nconn %default\n    narrowing=yes" >> /etc/ipsec.conf
+
           # since pluto is on the host, we need to restart it after the flush
           chroot /proc/1/root ipsec restart
 
