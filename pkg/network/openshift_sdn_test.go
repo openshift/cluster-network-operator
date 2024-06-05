@@ -138,8 +138,13 @@ func TestValidateOpenShiftSDN(t *testing.T) {
 	config := &crd.Spec
 	sdnConfig := config.DefaultNetwork.OpenShiftSDNConfig
 
-	err := validateOpenShiftSDN(config)
-	g.Expect(err).To(BeEmpty())
+	// Top-level validation should fail
+	err := Validate(config)
+	g.Expect(err).To(HaveOccurred(), "expected openshift-sdn config to be rejected")
+	g.Expect(err.Error()).To(ContainSubstring("unsupported network type"))
+
+	errs := validateOpenShiftSDN(config)
+	g.Expect(errs).To(BeEmpty())
 	fillDefaults(config, nil)
 
 	errExpect := func(substr string) {

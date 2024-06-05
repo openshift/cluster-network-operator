@@ -26,13 +26,15 @@ func TestPreviousVersionsSafe(t *testing.T) {
 		appliedConfig string
 	}{
 
-		// The default configuration for a 4.1.0 cluster
+		// The default configuration for an ovn-kubernetes-based 4.4.0 cluster;
+		// this is the oldest configuration that it would be possible to
+		// successfully update to 4.17 or later.
 		{
-			name: "4.1.0 openshift-sdn",
+			name: "4.4.0 ovn-kubernetes",
 
-			inputConfig: `{"clusterNetwork":[{"cidr":"10.128.0.0/14","hostPrefix":23}],"defaultNetwork":{"type":"OpenShiftSDN"},"serviceNetwork":["172.30.0.0/16"]}`,
+			inputConfig: `{"clusterNetwork":[{"cidr":"10.128.0.0/14","hostPrefix":23}],"defaultNetwork":{"type":"OVNKubernetes"},"serviceNetwork":["172.30.0.0/16"]}`,
 
-			appliedConfig: `{"clusterNetwork":[{"cidr":"10.128.0.0/14","hostPrefix":23}],"serviceNetwork":["172.30.0.0/16"],"defaultNetwork":{"type":"OpenShiftSDN","openshiftSDNConfig":{"mode":"NetworkPolicy","vxlanPort":4789,"mtu":8951}},"disableMultiNetwork":false,"deployKubeProxy":false,"kubeProxyConfig":{"bindAddress":"0.0.0.0","proxyArguments":{"metrics-bind-address":["0.0.0.0"],"metrics-port":["9101"]}}}'`,
+			appliedConfig: `{"clusterNetwork":[{"cidr":"10.128.0.0/14","hostPrefix":23}],"serviceNetwork":["172.30.0.0/16"],"defaultNetwork":{"type":"OVNKubernetes","ovnKubernetesConfig":null,"disableMultiNetwork":false,"deployKubeProxy":false,"kubeProxyConfig":null}}'`,
 		},
 	}
 
