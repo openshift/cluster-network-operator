@@ -234,6 +234,9 @@ spec:
           ip x s flush
           ip x p flush
 
+          sed -i "/config setup/a \        plutodebug=\"all\"" /etc/ipsec.conf
+          sed -i "/config setup/a \        logfile=/var/log/pluto.log" /etc/ipsec.conf
+
           # since pluto is on the host, we need to restart it after the flush
           chroot /proc/1/root ipsec restart
 
