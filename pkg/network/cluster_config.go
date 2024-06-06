@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 
 	configv1 "github.com/openshift/api/config/v1"
 	v1 "github.com/openshift/api/network/v1"
@@ -19,9 +20,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	utilnet "k8s.io/utils/net"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // list of known plugins that require hostPrefix to be set
@@ -197,6 +201,7 @@ func validateOVNKubernetesCIDROverlap(clusterCofnig *configv1.Network, operConfi
 				return errors.Wrapf(err, "could not parse %s:%s", subnetB.name, subnetB.cidr)
 			}
 			if netA.Contains(netB.IP) || netB.Contains(netA.IP) {
+				metricLiveMigrationBlocked.With(prometheus.Labels{metricLiveMigrationBlockedLabelKey: fmt.Sprintf("overlapping_networks_%s_%s", subnetA.name, subnetB.name)}).Set(1)
 				return fmt.Errorf("network %s(%s) overlaps with network %s(%s)",
 					subnetA.name, subnetA.cidr, subnetB.name, subnetB.cidr)
 			}
@@ -206,7 +211,30 @@ func validateOVNKubernetesCIDROverlap(clusterCofnig *configv1.Network, operConfi
 	return nil
 }
 
+const metricLiveMigrationBlockedLabelKey = "reason"
+
+// openshift_network_operator_live_migration_blocked metric 'reason' label key name values
+const (
+	unsupportedCNI                     = "UnsupportedCNI"
+	unsupportedHCPCluster              = "UnsupportedHyperShiftCluster"
+	unsupportedSDNNetworkIsolationMode = "UnsupportedSDNNetworkIsolationMode"
+	unsupportedMACVlanInterface        = "UnsupportedMACVLANInterface"
+)
+
+var metricLiveMigrationBlocked = metrics.NewGaugeVec(&metrics.GaugeOpts{
+	Namespace: "openshift_network_operator",
+	Name:      "live_migration_blocked",
+	Help: "A metric which contains a constant '1' value labeled with the reason CNI live migration may not begin. " +
+		"The metric is available when CNI live migration has started by annotating the Network CR.",
+}, []string{metricLiveMigrationBlockedLabelKey})
+
+var liveMigrationBlockedMetricOnce sync.Once
+
 func ValidateLiveMigration(clusterConfig *configv1.Network, infraRes *bootstrap.InfraStatus, client cnoclient.Client) error {
+	liveMigrationBlockedMetricOnce.Do(func() {
+		legacyregistry.MustRegister(metricLiveMigrationBlocked)
+	})
+	metricLiveMigrationBlocked.Reset()
 	// If the migration is completed or is already progressing do not run the validation
 	if clusterConfig.Spec.NetworkType == clusterConfig.Status.NetworkType ||
 		meta.IsStatusConditionPresentAndEqual(clusterConfig.Status.Conditions, names.NetworkTypeMigrationInProgress, metav1.ConditionTrue) {
@@ -214,10 +242,12 @@ func ValidateLiveMigration(clusterConfig *configv1.Network, infraRes *bootstrap.
 	}
 	if clusterConfig.Spec.NetworkType != string(operv1.NetworkTypeOpenShiftSDN) &&
 		clusterConfig.Spec.NetworkType != string(operv1.NetworkTypeOVNKubernetes) {
+		metricLiveMigrationBlocked.With(prometheus.Labels{metricLiveMigrationBlockedLabelKey: unsupportedCNI}).Set(1)
 		return fmt.Errorf("network type live migration is only supported for OVNKubernetes and OpenShiftSDN CNI")
 	}
 
 	if infraRes.HostedControlPlane != nil {
+		metricLiveMigrationBlocked.With(prometheus.Labels{metricLiveMigrationBlockedLabelKey: unsupportedHCPCluster}).Set(1)
 		return errors.Errorf("network type live migration is not supported on HyperShift clusters")
 	}
 
@@ -231,6 +261,7 @@ func ValidateLiveMigration(clusterConfig *configv1.Network, infraRes *bootstrap.
 	if clusterConfig.Status.NetworkType == string(operv1.NetworkTypeOpenShiftSDN) {
 		if operConfig.Spec.DefaultNetwork.OpenShiftSDNConfig != nil &&
 			operConfig.Spec.DefaultNetwork.OpenShiftSDNConfig.Mode == operv1.SDNModeMultitenant {
+			metricLiveMigrationBlocked.With(prometheus.Labels{metricLiveMigrationBlockedLabelKey: unsupportedSDNNetworkIsolationMode}).Set(1)
 			return errors.Errorf("network type live migration is not supported on SDN Multitenant clusters")
 		}
 
@@ -244,6 +275,7 @@ func ValidateLiveMigration(clusterConfig *configv1.Network, infraRes *bootstrap.
 			return errors.Wrapf(err, "error listing macvlan pods")
 		}
 		if len(macVlanPods) != 0 {
+			metricLiveMigrationBlocked.With(prometheus.Labels{metricLiveMigrationBlockedLabelKey: unsupportedMACVlanInterface}).Set(1)
 			return fmt.Errorf("network type live migration is not supported for pods with %q annotation."+
 				" Please remove all egress router pods", v1.AssignMacvlanAnnotation)
 		}
