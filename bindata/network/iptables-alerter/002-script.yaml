@@ -47,13 +47,6 @@ data:
             fi
             netns=$(basename "${netns_path}")
 
-            # Check if we already logged an event for it
-            events=$(kubectl get events -n "${pod_namespace}" -l pod-uid="${pod_uid}" 2>/dev/null)
-            if [[ -n "${events}" ]]; then
-                echo "Skipping pod ${pod_namespace}/${pod_name} which we already logged an event for."
-                continue
-            fi
-
             # Set iptables_output to the first iptables rule in the pod's network
             # namespace, if any. (We use `awk` here rather than `grep` intentionally
             # to avoid awkwardness with grep's exit status on no match.)
@@ -63,6 +56,13 @@ data:
                 awk '/^-A/ {print; exit}'
             )
             if [[ -z "${iptables_output}" ]]; then
+                continue
+            fi
+
+            # Check if we already logged an event for it
+            events=$(kubectl get events -n "${pod_namespace}" -l pod-uid="${pod_uid}" 2>/dev/null)
+            if [[ -n "${events}" ]]; then
+                echo "Skipping pod ${pod_namespace}/${pod_name} which we already logged an event for."
                 continue
             fi
 
