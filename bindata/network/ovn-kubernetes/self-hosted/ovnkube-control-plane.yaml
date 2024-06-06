@@ -124,6 +124,11 @@ spec:
             ovn_v6_transit_switch_subnet_opt="--cluster-manager-v6-transit-switch-subnet {{.V6TransitSwitchSubnet}}"
           fi
 
+          dns_name_resolver_enabled_flag=
+          if [[ "{{.DNS_NAME_RESOLVER_ENABLE}}" == "true" ]]; then
+            dns_name_resolver_enabled_flag="--enable-dns-name-resolver"
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
@@ -136,7 +141,8 @@ spec:
             ${ovn_v4_join_subnet_opt} \
             ${ovn_v6_join_subnet_opt} \
             ${ovn_v4_transit_switch_subnet_opt} \
-            ${ovn_v6_transit_switch_subnet_opt}
+            ${ovn_v6_transit_switch_subnet_opt} \
+            ${dns_name_resolver_enabled_flag}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
