@@ -50,8 +50,6 @@ spec:
         env:
         - name: RELEASE_VERSION
           value: 0.0.1-snapshot
-        - name: SDN_IMAGE
-          value: quay.io/openshift/origin-sdn:latest
         - name: KUBE_PROXY_IMAGE
           value: quay.io/openshift/origin-kube-proxy:latest
         - name: KUBE_RBAC_PROXY_IMAGE

@@ -568,7 +568,7 @@ func validateMultus(conf *operv1.NetworkSpec) []error {
 func validateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 	switch conf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
-		return validateOpenShiftSDN(conf)
+		return []error{errors.Errorf("unsupported network type %q", conf.DefaultNetwork.Type)}
 	case operv1.NetworkTypeOVNKubernetes:
 		return validateOVNKubernetes(conf)
 	default:
