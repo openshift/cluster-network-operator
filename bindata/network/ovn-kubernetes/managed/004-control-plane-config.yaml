@@ -35,6 +35,9 @@ data:
     enable-egress-firewall=true
     enable-egress-qos=true
     enable-egress-service=true
+{{- if .ReachabilityTotalTimeoutSeconds }}
+    egressip-reachability-total-timeout={{.ReachabilityTotalTimeoutSeconds}}
+{{- end }}
 {{- if .ReachabilityNodePort }}
     egressip-node-healthcheck-port={{.ReachabilityNodePort}}
 {{- end }}
