@@ -41,9 +41,6 @@ data:
 {{- if .ReachabilityNodePort }}
     egressip-node-healthcheck-port={{.ReachabilityNodePort}}
 {{- end }}
-{{- if .OVN_MULTI_NETWORK_ENABLE }}
-    enable-multi-network=true
-{{- end }}
 {{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
     enable-multi-networkpolicy=true
 {{- end }}

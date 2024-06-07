@@ -42,6 +42,11 @@ data:
       if [[ "{{.DNS_NAME_RESOLVER_ENABLE}}" == "true" ]]; then
         dns_name_resolver_enabled_flag="--enable-dns-name-resolver"
       fi
+    
+      multi_network_enabled_flag=
+      if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" ]]; then
+        multi_network_enabled_flag="--enable-multi-network"
+      fi
       
       echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
       exec /usr/bin/ovnkube \
@@ -57,5 +62,6 @@ data:
       ${ovn_v4_transit_switch_subnet_opt} \
       ${ovn_v6_transit_switch_subnet_opt} \
       ${admin_network_policy_enabled_flag} \
-      ${dns_name_resolver_enabled_flag}
+      ${dns_name_resolver_enabled_flag} \
+      ${multi_network_enabled_flag}
     }
