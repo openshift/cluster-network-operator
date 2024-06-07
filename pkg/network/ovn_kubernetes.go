@@ -557,7 +557,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// created and the 4.13 one is removed.
 	if ongoingUpgradeToInterconnect {
 		// don't create ovn-ipsec-host until upgrade to IC is done
-		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-host", func(o *uns.Unstructured) {
+		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, util.OVN_IPSEC_HOST, func(o *uns.Unstructured) {
 			anno := o.GetAnnotations()
 			if anno == nil {
 				anno = map[string]string{}
@@ -566,7 +566,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			o.SetAnnotations(anno)
 		})
 		// don't create ovn-ipsec-containerized until upgrade to IC is done
-		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-containerized", func(o *uns.Unstructured) {
+		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, util.OVN_IPSEC_CONTAINERIZED, func(o *uns.Unstructured) {
 			anno := o.GetAnnotations()
 			if anno == nil {
 				anno = map[string]string{}
@@ -1624,18 +1624,25 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		prepullerStatus.Progressing = daemonSetProgressing(prePullerDaemonSet, true)
 	}
 
-	ipsecHostDaemonSet := &appsv1.DaemonSet{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "DaemonSet",
-			APIVersion: appsv1.SchemeGroupVersion.String(),
-		},
-	}
-	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec-host"}
-	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecHostDaemonSet); err != nil {
+	ipsecHostDaemonSet, err := kubeClient.Default().Kubernetes().AppsV1().DaemonSets(util.OVN_NAMESPACE).Get(context.TODO(), util.OVN_IPSEC_HOST, metav1.GetOptions{})
+	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("Failed to retrieve existing ipsec DaemonSet: %w", err)
+			return nil, fmt.Errorf("Failed to retrieve existing %s DaemonSet: %w", util.OVN_IPSEC_HOST, err)
 		} else {
-			ipsecStatus = nil
+			// retrieve ovn-ipsec as a fallback during 4.13->4.14 upgrade to have a consistent ipsecStatus
+			ipsecDaemonSet, err := kubeClient.Default().Kubernetes().AppsV1().DaemonSets(util.OVN_NAMESPACE).Get(context.TODO(), util.OVN_IPSEC, metav1.GetOptions{})
+			if err != nil {
+				if !apierrors.IsNotFound(err) {
+					return nil, fmt.Errorf("Failed to retrieve ovn-ipsec DaemonSet: %w", err)
+				} else {
+					ipsecStatus = nil
+				}
+			} else {
+				ipsecStatus.Namespace = ipsecDaemonSet.Namespace
+				ipsecStatus.Name = ipsecDaemonSet.Name
+				ipsecStatus.IPFamilyMode = ipsecDaemonSet.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
+				ipsecStatus.Version = ipsecDaemonSet.GetAnnotations()["release.openshift.io/version"]
+			}
 		}
 	} else {
 		ipsecStatus.Namespace = ipsecHostDaemonSet.Namespace
