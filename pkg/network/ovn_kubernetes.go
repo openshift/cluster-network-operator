@@ -1366,7 +1366,7 @@ type targetZoneModeType struct {
 func getTargetInterConnectZoneMode(kubeClient cnoclient.Client) (targetZoneModeType, error) {
 	targetZoneMode := targetZoneModeType{}
 
-	interConnectConfigMap, err := util.GetInterConnectConfigMap(kubeClient.ClientFor("").Kubernetes())
+	interConnectConfigMap, err := util.GetInterConnectConfigMap(kubeClient.Default().Kubernetes())
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			klog.Infof("No OVN InterConnect configMap found, applying default: multizone")
@@ -2463,9 +2463,10 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 				"zone-mode": fmt.Sprint(zoneModeSingleZone),
 			},
 		}
-		if err := client.ClientFor("").CRClient().Create(context.TODO(), configMap); err != nil {
+		if _, err := client.Default().Kubernetes().CoreV1().ConfigMaps(util.OVN_NAMESPACE).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
 			return fmt.Errorf("could not create interconnect configmap: %w", err)
 		}
+
 		targetZoneMode.configMapFound = true
 		targetZoneMode.zoneMode = zoneModeSingleZone
 
@@ -2488,7 +2489,7 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 		if err != nil {
 			return fmt.Errorf("could not marshal patch for interconnect configmap: %w", err)
 		}
-		if _, err = client.ClientFor("").Kubernetes().CoreV1().ConfigMaps(util.OVN_NAMESPACE).Patch(
+		if _, err = client.Default().Kubernetes().CoreV1().ConfigMaps(util.OVN_NAMESPACE).Patch(
 			context.TODO(), util.OVN_INTERCONNECT_CONFIGMAP_NAME,
 			types.JSONPatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 			return fmt.Errorf("could not patch existing interconnect configmap: %w", err)
@@ -2514,7 +2515,7 @@ func prepareUpgradeToInterConnect(ovn bootstrap.OVNBootstrapResult, client cnocl
 
 		// HACK Once we're here, there are no more updates to the DaemonSets and CNO won't update
 		// the version in its status unless we add a dummy annotation to a watched resource
-		return annotateNodeDaemonset(client.ClientFor("").Kubernetes())
+		return annotateNodeDaemonset(client.Default().Kubernetes())
 	}
 
 	// Print IC upgrade status when phase 1 or phase 2 are ongoing
