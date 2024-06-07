@@ -9,6 +9,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
@@ -68,7 +69,7 @@ func (r *ReconcileOperConfig) UpdateOperConfig(ctx context.Context, operConfig *
 
 // ClusterNetworkStatus generates the cluster config Status based on the operator
 // config.
-func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConfig *operv1.Network) (*uns.Unstructured, error) {
+func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConfig *operv1.Network, bootstrapResult *bootstrap.BootstrapResult) (*uns.Unstructured, error) {
 	// retrieve the existing cluster config object
 	clusterConfig := &configv1.Network{
 		TypeMeta:   metav1.TypeMeta{APIVersion: configv1.GroupVersion.String(), Kind: "Network"},
@@ -99,10 +100,15 @@ func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConf
 				return nil, err
 			}
 		} else if clusterConfig.Spec.NetworkType != clusterConfig.Status.NetworkType {
+			// Do not initialize live migration if it is not valid
+			if err := network.ValidateLiveMigration(clusterConfig, &bootstrapResult.Infra, r.client); err != nil {
+				return nil, err
+			}
 			initMigrationConditions(&clusterConfigWithConditions.Status.Conditions, nowTimestamp)
 		} else {
 			resetMigrationConditions(&clusterConfigWithConditions.Status.Conditions, nowTimestamp)
 		}
+		syncLiveMigrationConditionMetric(clusterConfigWithConditions.Status.Conditions)
 	}
 
 	status.Conditions = clusterConfigWithConditions.Status.Conditions
