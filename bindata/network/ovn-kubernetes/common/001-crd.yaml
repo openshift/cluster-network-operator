@@ -950,7 +950,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/network-policy-api/pull/30
-    policy.networking.k8s.io/bundle-version: v0.1.3
+    policy.networking.k8s.io/bundle-version: v0.1.5
     policy.networking.k8s.io/channel: experimental
   creationTimestamp: null
   name: adminnetworkpolicies.policy.networking.k8s.io
@@ -1779,6 +1779,7 @@ spec:
               subject:
                 description: |-
                   Subject defines the pods to which this AdminNetworkPolicy applies.
+                  Note that host-networked pods are not included in subject selection.
 
 
                   Support: Core
@@ -2032,7 +2033,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/network-policy-api/pull/30
-    policy.networking.k8s.io/bundle-version: v0.1.3
+    policy.networking.k8s.io/bundle-version: v0.1.5
     policy.networking.k8s.io/channel: experimental
   creationTimestamp: null
   name: baselineadminnetworkpolicies.policy.networking.k8s.io
@@ -2833,6 +2834,7 @@ spec:
               subject:
                 description: |-
                   Subject defines the pods to which this BaselineAdminNetworkPolicy applies.
+                  Note that host-networked pods are not included in subject selection.
 
 
                   Support: Core
