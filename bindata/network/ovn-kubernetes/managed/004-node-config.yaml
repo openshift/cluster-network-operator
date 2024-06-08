@@ -1,5 +1,5 @@
 ---
-# The ovnconfig config file. Used by both node and master processes.
+# The ovnconfig config file. Used by ovnkube-node in hypershift hostedcluster.
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -25,9 +25,6 @@ data:
 {{- if .OVNHybridOverlayEnable }}
     no-hostsubnet-nodes="kubernetes.io/os=windows"
 {{- end  }}
-{{- if .IsNetworkTypeLiveMigration }}
-    no-hostsubnet-nodes="migration.network.openshift.io/plugin="
-{{- end }}
     platform-type="{{.PlatformType}}"
     healthz-bind-address="0.0.0.0:10256"
     dns-service-namespace="openshift-dns"
@@ -58,13 +55,7 @@ data:
 {{- if (index . "V6InternalMasqueradeSubnet")}}
     v6-masquerade-subnet="{{.V6InternalMasqueradeSubnet}}"
 {{- end }}
-
-    [logging]
-    libovsdblogfile=/var/log/ovnkube/libovsdb.log
-    logfile-maxsize=100
-    logfile-maxbackups=5
-    logfile-maxage=0
-{{- if or .OVNHybridOverlayEnable .IsNetworkTypeLiveMigration}}
+{{- if .OVNHybridOverlayEnable }}
 
     [hybridoverlay]
     enabled=true

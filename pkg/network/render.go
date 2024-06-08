@@ -72,7 +72,7 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	objs = append(objs, o...)
 
 	// render default network
-	o, progressing, err = renderDefaultNetwork(operConf, bootstrapResult, manifestDir, client, featureGates)
+	o, progressing, err = renderDefaultNetwork(operConf, bootstrapResult, manifestDir, featureGates)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -584,7 +584,7 @@ func validateMigration(conf *operv1.NetworkSpec) []error {
 // renderDefaultNetwork generates the manifests corresponding to the requested
 // default network
 func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string,
-	client cnoclient.Client, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, bool, error) {
+	featureGates featuregates.FeatureGate) ([]*uns.Unstructured, bool, error) {
 	dn := conf.DefaultNetwork
 	if errs := validateDefaultNetwork(conf); len(errs) > 0 {
 		return nil, false, errors.Errorf("invalid Default Network configuration: %v", errs)
@@ -592,7 +592,7 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 
 	if conf.Migration != nil && conf.Migration.Mode == operv1.LiveNetworkMigrationMode {
 		log.Printf("Render both CNIs for live migration")
-		ovnObjs, ovnProgressing, err := renderOVNKubernetes(conf, bootstrapResult, manifestDir, client, featureGates)
+		ovnObjs, ovnProgressing, err := renderOVNKubernetes(conf, bootstrapResult, manifestDir, featureGates)
 		if err != nil {
 			return nil, false, err
 		}
@@ -607,7 +607,7 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 	case operv1.NetworkTypeOpenShiftSDN:
 		return renderOpenShiftSDN(conf, bootstrapResult, manifestDir)
 	case operv1.NetworkTypeOVNKubernetes:
-		return renderOVNKubernetes(conf, bootstrapResult, manifestDir, client, featureGates)
+		return renderOVNKubernetes(conf, bootstrapResult, manifestDir, featureGates)
 	default:
 		log.Printf("NOTICE: Unknown network type %s, ignoring", dn.Type)
 		return nil, false, nil

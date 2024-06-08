@@ -1,10 +1,11 @@
----
-# The ovnconfig config file. Used by both node and master processes.
+# The ovnconfig config file. Used by master processes in hypershift hostedcluster.
 kind: ConfigMap
 apiVersion: v1
 metadata:
   name: ovnkube-config
-  namespace: openshift-ovn-kubernetes
+  namespace: {{.HostedClusterNamespace}}
+  annotations:
+    network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
 data:
   ovnkube.conf:   |-
     [default]
@@ -15,24 +16,20 @@ data:
     cluster-subnets="{{.OVN_cidr}}"
     enable-lflow-cache=true
     lflow-cache-limit-kb=1048576
-    enable-udp-aggregation={{.EnableUDPAggregation}}
 
     [kubernetes]
     service-cidrs="{{.OVN_service_cidr}}"
     ovn-config-namespace="openshift-ovn-kubernetes"
-    apiserver="{{.K8S_APISERVER}}"
+    cacert="/hosted-ca/ca.crt"
+    apiserver="{{.K8S_LOCAL_APISERVER}}"
     host-network-namespace="openshift-host-network"
 {{- if .OVNHybridOverlayEnable }}
     no-hostsubnet-nodes="kubernetes.io/os=windows"
 {{- end  }}
-{{- if .IsNetworkTypeLiveMigration }}
-    no-hostsubnet-nodes="migration.network.openshift.io/plugin="
-{{- end }}
     platform-type="{{.PlatformType}}"
-    healthz-bind-address="0.0.0.0:10256"
     dns-service-namespace="openshift-dns"
     dns-service-name="dns-default"
- 
+
     [ovnkubernetesfeature]
     enable-egress-ip=true
     enable-egress-firewall=true
@@ -47,6 +44,9 @@ data:
 {{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
     enable-multi-networkpolicy=true
 {{- end }}
+{{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
+    enable-admin-network-policy=true
+{{- end }}
     enable-multi-external-gateway=true
 
     [gateway]
@@ -59,13 +59,14 @@ data:
     v6-masquerade-subnet="{{.V6InternalMasqueradeSubnet}}"
 {{- end }}
 
+
     [logging]
     libovsdblogfile=/var/log/ovnkube/libovsdb.log
     logfile-maxsize=100
     logfile-maxbackups=5
     logfile-maxage=0
-{{- if or .OVNHybridOverlayEnable .IsNetworkTypeLiveMigration}}
 
+{{- if .OVNHybridOverlayEnable }}
     [hybridoverlay]
     enabled=true
     {{- if .OVNHybridOverlayNetCIDR }}

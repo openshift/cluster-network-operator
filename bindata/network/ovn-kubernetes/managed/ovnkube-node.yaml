@@ -34,7 +34,7 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        network.operator.openshift.io/ovnkube-script-lib-hash: "{{.OVNKubeConfigHash}}"
+        network.operator.openshift.io/ovnkube-script-lib-hash: "{{.OVNKubeNodeConfigHash}}"
       labels:
         {{ if eq .OVN_NODE_MODE "dpu-host" }}
         app: ovnkube-node-dpu-host
