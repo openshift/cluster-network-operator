@@ -215,6 +215,8 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        # prevent blocks when node critical pods get evicted prior to workloads
+        cluster-autoscaler.kubernetes.io/enable-ds-eviction: "false"
       labels:
         app: multus
         component: network
@@ -415,6 +417,8 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        # prevent blocks when node critical pods get evicted prior to workloads
+        cluster-autoscaler.kubernetes.io/enable-ds-eviction: "false"
       labels:
         app: multus-additional-cni-plugins
         component: network
@@ -720,6 +724,8 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        # prevent blocks when node critical pods get evicted prior to workloads
+        cluster-autoscaler.kubernetes.io/enable-ds-eviction: "false"
       labels:
         app: whereabouts-reconciler
         name: whereabouts-reconciler

@@ -14,6 +14,8 @@ spec:
         app: cni-sysctl-allowlist-ds
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        # prevent blocks when node critical pods get evicted prior to workloads
+        cluster-autoscaler.kubernetes.io/enable-ds-eviction: "false"
     spec:
       hostNetwork: true
       containers:

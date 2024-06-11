@@ -35,6 +35,8 @@ spec:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
         network.operator.openshift.io/ovnkube-script-lib-hash: "{{.OVNKubeConfigHash}}"
+        # prevent blocks when node critical pods get evicted prior to workloads
+        cluster-autoscaler.kubernetes.io/enable-ds-eviction: "false"
       labels:
         {{ if eq .OVN_NODE_MODE "dpu-host" }}
         app: ovnkube-node-dpu-host
