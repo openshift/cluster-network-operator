@@ -6,7 +6,6 @@ run:
 linters:
   disable-all: true #so that lint version bumps don't change results
   enable:
-    - deadcode
     - errcheck
     - exportloopref
     - gosimple
@@ -16,10 +15,8 @@ linters:
     - nolintlint
     - nosprintfhostport
     - staticcheck
-    - structcheck
     - tenv
     - typecheck
     - unconvert
     - unused
-    - varcheck
     - wastedassign
