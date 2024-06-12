@@ -663,12 +663,12 @@ func (r *ReconcileOperConfig) syncNetworkTypeMigrationConditions(ctx context.Con
 	nowTimestamp := metav1.Now()
 	clusterConfigUpdated := clusterConfig.DeepCopy()
 
-	targetMachineConfigApplied, _, err := r.ensureMachineConfigPools(ctx, clusterConfigUpdated, names.NetworkTypeMigrationTargetCNIInUse, ovsConfigurationUnitMatch, nowTimestamp)
+	targetMachineConfigApplied, mcpIsStable, err := r.ensureMachineConfigPools(ctx, clusterConfigUpdated, names.NetworkTypeMigrationTargetCNIInUse, ovsConfigurationUnitMatch, nowTimestamp)
 	if err != nil {
 		return err
 	}
 
-	_, mcpIsStable, err := r.ensureMachineConfigPools(ctx, clusterConfigUpdated, names.NetworkTypeMigrationMTUReady, routebleMtuUnitMatch, nowTimestamp)
+	_, _, err = r.ensureMachineConfigPools(ctx, clusterConfigUpdated, names.NetworkTypeMigrationMTUReady, routebleMtuUnitMatch, nowTimestamp)
 	if err != nil {
 		return err
 	}
