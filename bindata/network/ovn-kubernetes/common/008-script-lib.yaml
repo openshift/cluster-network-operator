@@ -569,6 +569,8 @@ data:
         sysctl -w net.ipv6.conf.all.forwarding=1
       else
         ip_forwarding_flag="--disable-forwarding"
+        iptables -P FORWARD DROP
+        ip6tables -P FORWARD DROP
       fi
 
       NETWORK_NODE_IDENTITY_ENABLE=
