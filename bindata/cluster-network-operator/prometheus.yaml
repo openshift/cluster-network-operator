@@ -1,0 +1,18 @@
+##
+# This file is not applied correctly during cluster installation when located in
+# the manifests directory, this is the reason why it is located in the bindata directory.
+##
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+    name: openshift-network-operator-ipsec-rules
+    namespace: openshift-network-operator
+spec:
+    groups:
+    - name: openshift-network.rules
+      rules:
+      - expr: |-
+          group by (mode,is_legacy_api) (
+            openshift_network_operator_ipsec_state{namespace=~"openshift-network-operator"}
+          )
+        record: openshift:openshift_network_operator_ipsec_state:info

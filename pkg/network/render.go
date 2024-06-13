@@ -124,6 +124,12 @@ func Render(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult
 	}
 	objs = append(objs, o...)
 
+	o, err = renderCNO(manifestDir)
+	if err != nil {
+		return nil, progressing, err
+	}
+	objs = append(objs, o...)
+
 	log.Printf("Render phase done, rendered %d objects", len(objs))
 	return objs, progressing, nil
 }
@@ -827,6 +833,17 @@ func renderNetworkPublic(manifestDir string) ([]*uns.Unstructured, error) {
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network", "public"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render network/public manifests")
+	}
+	return manifests, nil
+}
+
+// renderCNO renders the common objects in the cluster-network-operator directory
+func renderCNO(manifestDir string) ([]*uns.Unstructured, error) {
+	data := render.MakeRenderData()
+
+	manifests, err := render.RenderDir(filepath.Join(manifestDir, "cluster-network-operator"), &data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to render cluster-network-operator manifests")
 	}
 	return manifests, nil
 }
