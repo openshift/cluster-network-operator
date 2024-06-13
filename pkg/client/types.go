@@ -37,7 +37,7 @@ type ClusterClient interface {
 	Kubernetes() kubernetes.Interface
 
 	// OpenshiftOperatorClient returns the clientset for operator.openshift.io
-	OpenshiftOperatorClient() *osoperclient.Clientset
+	OpenshiftOperatorClient() osoperclient.Interface
 
 	// Config returns the clients rest config
 	Config() *rest.Config
