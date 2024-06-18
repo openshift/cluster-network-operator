@@ -114,6 +114,8 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 	}
 
 	if !elb {
+		log.Printf("CHOCOBOMB: negative ELB; full PlatformStatus dump: %+v", updatedInfraConfig.Status.PlatformStatus.BareMetal)
+		log.Printf("CHOCOBOMB: negative ELB; full PlatformStatus.Loadbalancer dump: %+v", updatedInfraConfig.Status.PlatformStatus.BareMetal.LoadBalancer)
 		if err := validateVipsWithMachineNetworks(*specApiVips, *specMachineNetworks); err != nil {
 			return nil, fmt.Errorf("Error on validating API VIPs and Machine Networks: %v", err)
 		}
