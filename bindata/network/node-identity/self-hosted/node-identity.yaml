@@ -52,7 +52,7 @@ spec:
             # sets pod annotations in multi-homing layer3 network controller (cluster-manager)
             exec /usr/bin/ovnkube-identity  --k8s-apiserver={{.K8S_APISERVER}} \
                 --webhook-cert-dir="/etc/webhook-cert" \
-                --webhook-host={{.NetworkNodeIdentityAddress}} \
+                --webhook-host={{.NetworkNodeIdentityIP}} \
                 --webhook-port={{.NetworkNodeIdentityPort}} \
                 ${ho_enable} \
                 --enable-interconnect \
