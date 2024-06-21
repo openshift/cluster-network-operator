@@ -30,6 +30,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnofake "github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/util"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 )
 
@@ -2146,6 +2147,222 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 	if _, ok := renderedControlPlane.GetAnnotations()[names.CreateOnlyAnnotation]; ok {
 		t.Errorf("controlPlane daemonset are equal, dual-stack should modify controlPlanes")
 	}
+}
+
+// Check that, all throughout the upgrade from 4.13 to 4.14, the 4.13 ovn-ipsec DaemonSet is rendered
+// up until the upgrade is over, at which point the two 4.14 ipsec DaemonSets (ovn-ipsec-host and ovn-ipsec-containerized)
+// can finally be deployed. The subtlety in the implementation is that all three daemonsets are always rendered during the upgrade,
+// but with the "create-wait" annotation, so that the running ovn-ipsec is not replaced and the two 4.14 DSs are not deployed.
+// Once the upgrade is over, ovn-ipsec no longer rendered and the two 4.14 DSs are rendered without the annotation.
+func TestRenderOVNKubernetesIPsecUpgradeFrom413(t *testing.T) {
+	checkDaemonsetIsRendered := func(objs []*uns.Unstructured, daemonsetName, daemonsetNamespace string, mustExist, mustHaveCreateWaitAnnotation bool, errMessage string) {
+		renderedDaemonset := findInObjs("apps", "DaemonSet", daemonsetName, daemonsetNamespace, objs)
+		if renderedDaemonset == nil && mustExist {
+			// daemonset wasn't rendered, but should have been
+			t.Errorf("[%s] %s DaemonSet not rendered by renderOVNKubernetes", errMessage, daemonsetName)
+		}
+		if renderedDaemonset != nil {
+			if !mustExist {
+				// daemonset was rendered, but should not have been
+				t.Errorf("[%s] %s DaemonSet rendered by renderOVNKubernetes, but should not have been", errMessage, daemonsetName)
+			}
+
+			_, hasAnnotation := renderedDaemonset.GetAnnotations()[names.CreateWaitAnnotation]
+			if mustHaveCreateWaitAnnotation && !hasAnnotation {
+				t.Errorf("[%s] %s DaemonSet should have create-wait annotation, but it does not", errMessage, daemonsetName)
+			}
+			if !mustHaveCreateWaitAnnotation && hasAnnotation {
+				t.Errorf("[%s] %s DaemonSet should not have create-wait annotation, but it has it", errMessage, daemonsetName)
+			}
+		}
+	}
+
+	config := &operv1.NetworkSpec{
+		ServiceNetwork: []string{"172.30.0.0/16", "fd00:3:2:1::/112"},
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+			{
+				CIDR:       "fd00:1:2:3::/64",
+				HostPrefix: 56,
+			},
+		},
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOVNKubernetes,
+			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
+				GenevePort:  ptrToUint32(8061),
+				IPsecConfig: &operv1.IPsecConfig{},
+			},
+		},
+	}
+	errs := validateOVNKubernetes(config)
+	if len(errs) > 0 {
+		t.Errorf("Unexpected error: %v", errs)
+	}
+	fillDefaults(config, nil)
+
+	t.Setenv("RELEASE_VERSION", "4.14.0") // upgrading to 4.14.0
+
+	// bootstrap represents the current status
+	// the current cluster is single-stack and is on version 4.13.0
+	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.Infra = bootstrap.InfraStatus{}
+	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+		MasterAddresses: []string{"1.2.3.4"},
+		MasterUpdateStatus: &bootstrap.OVNUpdateStatus{
+			Kind:                "Daemonset",
+			Namespace:           util.OVN_NAMESPACE,
+			Name:                util.OVN_MASTER,
+			Version:             "4.13.0",
+			IPFamilyMode:        names.IPFamilySingleStack,
+			InterConnectEnabled: false,
+		},
+		NodeUpdateStatus: &bootstrap.OVNUpdateStatus{
+			Kind:                 "DaemonSet",
+			Namespace:            util.OVN_NAMESPACE,
+			Name:                 util.OVN_NODE,
+			Version:              "4.13.0",
+			IPFamilyMode:         names.IPFamilySingleStack,
+			InterConnectEnabled:  false,
+			InterConnectZoneMode: "singlezone",
+		},
+		IPsecUpdateStatus: &bootstrap.OVNUpdateStatus{
+			Kind:         "Daemonset",
+			Namespace:    util.OVN_NAMESPACE,
+			Name:         util.OVN_IPSEC,
+			IPFamilyMode: names.IPFamilySingleStack,
+			Version:      "4.13.0",
+		},
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName: "",
+			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+				Enabled: false,
+			},
+		},
+	}
+
+	fmt.Println("\n============= Upgrade starts, CNO pushes interconnect configmap and starts rolling out ovnkube-node")
+	errMsg := "upgrade from 4.13 starts"
+
+	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
+	fakeClient := cnofake.NewFakeClient()
+
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	if err != nil {
+		t.Errorf("[%s] Unexpected error: %v", errMsg, err)
+	}
+
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC_HOST, util.OVN_NAMESPACE, true, true, errMsg)
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC_CONTAINERIZED, util.OVN_NAMESPACE, true, true, errMsg)
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC, util.OVN_NAMESPACE, true, true, errMsg)
+
+	// Move to phase 1 of the upgrade to 4.14: ovnk master and node are deployed with 4.14 image
+	// The 4.13 ipsec daemonset should still be rendered along with the 4.14 ones.
+	fmt.Println("\n============= phase 1 of the upgrade is ongoing (roll out of ovnk master)")
+	errMsg = "phase 1 ongoing"
+	bootstrapResult.OVN.MasterUpdateStatus.Version = "4.14.0"
+	bootstrapResult.OVN.MasterUpdateStatus.InterConnectEnabled = true
+	bootstrapResult.OVN.MasterUpdateStatus.Progressing = true
+
+	bootstrapResult.OVN.NodeUpdateStatus.Version = "4.14.0"
+	bootstrapResult.OVN.NodeUpdateStatus.InterConnectEnabled = true
+
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	if err != nil {
+		t.Errorf("[%s] Unexpected error: %v", errMsg, err)
+	}
+
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC_HOST, util.OVN_NAMESPACE, true, true, errMsg)
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC_CONTAINERIZED, util.OVN_NAMESPACE, true, true, errMsg)
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC, util.OVN_NAMESPACE, true, true, errMsg)
+
+	// move to phase 2 of the upgrade: ovnk master, ovnk node, ovnk control plane are all up
+	// The 4.13 ipsec daemonset should still be rendered along with the 4.14 ones.
+	fmt.Println("\n============= phase 1 is done, phase 2 is about to start; will start roll out of ovnkube node")
+	errMsg = "end of phase 1, will start phase 2"
+
+	bootstrapResult.OVN.NodeUpdateStatus.Progressing = false
+	bootstrapResult.OVN.MasterUpdateStatus.Progressing = false
+
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	if err != nil {
+		t.Errorf("[%s] Unexpected error: %v", errMsg, err)
+	}
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC_HOST, util.OVN_NAMESPACE, true, true, errMsg)
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC_CONTAINERIZED, util.OVN_NAMESPACE, true, true, errMsg)
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC, util.OVN_NAMESPACE, true, true, errMsg)
+
+	// move to phase 2 of the upgrade: ovnk master, ovnk node, ovnk control plane are all up
+	// The 4.13 ipsec daemonset should still be rendered along with the 4.14 ones.
+	fmt.Println("\n============= phase 2 is ongoing: roll out of ovnk control plane")
+	errMsg = "phase 2 ongoing"
+
+	bootstrapResult.OVN.ControlPlaneUpdateStatus = &bootstrap.OVNUpdateStatus{
+		Kind:         "Deployment",
+		Namespace:    util.OVN_NAMESPACE,
+		Name:         util.OVN_CONTROL_PLANE,
+		Version:      "4.14.0",
+		IPFamilyMode: names.IPFamilySingleStack,
+		Progressing:  true,
+	}
+
+	bootstrapResult.OVN.NodeUpdateStatus.InterConnectZoneMode = "multizone" // ovnkube-node roll out is done and it's now on multizone
+
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	if err != nil {
+		t.Errorf("[%s] Unexpected error: %v", errMsg, err)
+	}
+
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC_HOST, util.OVN_NAMESPACE, true, true, errMsg)
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC_CONTAINERIZED, util.OVN_NAMESPACE, true, true, errMsg)
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC, util.OVN_NAMESPACE, true, true, errMsg)
+
+	// move to the end of the upgrade: ovnk master is gone, ovnk node, ovnk control plane are up.
+	// The 4.13 ipsec daemonset is gone; the two 4.14 ipsec daemonsets are finally rendered without
+	// the create-wait annotation.
+	fmt.Println("\n============= end of phase 2, will remove ovnkube master")
+	errMsg = "end of phase 2"
+
+	bootstrapResult.OVN.ControlPlaneUpdateStatus.Progressing = false // roll out of control plane is done
+
+	// HACK: at the end the upgrade to OVN IC, we temporarily annotate ovnkube-node so that CNO can annotate it
+	nodeDaemonSet := &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{
+		Name: util.OVN_NODE, Namespace: util.OVN_NAMESPACE, Annotations: map[string]string{}}}
+	_, err = fakeClient.Default().Kubernetes().AppsV1().DaemonSets(util.OVN_NAMESPACE).Create(context.TODO(), nodeDaemonSet, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("[%s] Unexpected error when creating ovnkube-node: %v", errMsg, err)
+	}
+
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	if err != nil {
+		t.Errorf("[%s] Unexpected error: %v", errMsg, err)
+	}
+
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC, util.OVN_NAMESPACE, false, false, errMsg)              // ovn-ipsec is not rendered anymore
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC_HOST, util.OVN_NAMESPACE, true, false, errMsg)          // ovn-ipsec-host is rendered without the create-wait annotation
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC_CONTAINERIZED, util.OVN_NAMESPACE, true, false, errMsg) // ditto for ovn-ipsec-containerized
+
+	fmt.Println("\n============= any further CNO iteration after the upgrade")
+	errMsg = "iteration after upgrade"
+
+	bootstrapResult.OVN.MasterUpdateStatus = nil // ovnk master is gone
+
+	bootstrapResult.OVN.IPsecUpdateStatus.Name = util.OVN_IPSEC_HOST // ovn-ipsec-host now replaced ovn-ipsec
+	bootstrapResult.OVN.IPsecUpdateStatus.Version = "4.14.0"
+
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	if err != nil {
+		t.Errorf("[%s] Unexpected error: %v", errMsg, err)
+	}
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC, util.OVN_NAMESPACE, false, false, errMsg)              // ovn-ipsec is not rendered anymore
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC_HOST, util.OVN_NAMESPACE, true, false, errMsg)          // ovn-ipsec-host is rendered without the create-wait annotation
+	checkDaemonsetIsRendered(objs, util.OVN_IPSEC_CONTAINERIZED, util.OVN_NAMESPACE, true, false, errMsg) // ditto for ovn-ipsec-containerized
+
 }
 
 func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
