@@ -111,7 +111,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 
 		// Preserve any existing multus container resource requests which may have been modified by an external source
 		multusDeploy := &appsv1.Deployment{}
-		err = client.ClientFor(clientName).CRClient().Get(
+		err = client.ClientFor(names.ManagementClusterName).CRClient().Get(
 			context.TODO(), types.NamespacedName{Namespace: hsc.Namespace, Name: "multus-admission-controller"}, multusDeploy)
 		if err == nil {
 			multusContainer, ok := findContainer(multusDeploy.Spec.Template.Spec.Containers, "multus-admission-controller")
