@@ -217,13 +217,6 @@ var (
 					enableIn(configv1.Default, configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 					mustRegister()
 
-	FeatureGateNetworkSegmentation = newFeatureGate("NetworkSegmentation").
-					reportProblemsToJiraComponent("Networking/ovn-kubernetes").
-					contactPerson("tssurya").
-					productScope(ocpSpecific).
-					enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
-					mustRegister()
-
 	FeatureGateNetworkLiveMigration = newFeatureGate("NetworkLiveMigration").
 					reportProblemsToJiraComponent("Networking/ovn-kubernetes").
 					contactPerson("pliu").

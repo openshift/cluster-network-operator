@@ -48,6 +48,10 @@ func (c dynamicStaticPodOperatorClient) GetStaticPodOperatorState() (*operatorv1
 	}
 	instance := uncastInstance.(*unstructured.Unstructured)
 
+	return getStaticPodOperatorStateFromInstance(instance)
+}
+
+func getStaticPodOperatorStateFromInstance(instance *unstructured.Unstructured) (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
 	spec, err := getStaticPodOperatorSpecFromUnstructured(instance.UnstructuredContent())
 	if err != nil {
 		return nil, nil, "", err
@@ -66,16 +70,7 @@ func (c dynamicStaticPodOperatorClient) GetStaticPodOperatorStateWithQuorum(ctx 
 		return nil, nil, "", err
 	}
 
-	spec, err := getStaticPodOperatorSpecFromUnstructured(instance.UnstructuredContent())
-	if err != nil {
-		return nil, nil, "", err
-	}
-	status, err := getStaticPodOperatorStatusFromUnstructured(instance.UnstructuredContent())
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	return spec, status, instance.GetResourceVersion(), nil
+	return getStaticPodOperatorStateFromInstance(instance)
 }
 
 func (c dynamicStaticPodOperatorClient) UpdateStaticPodOperatorSpec(ctx context.Context, resourceVersion string, spec *operatorv1.StaticPodOperatorSpec) (*operatorv1.StaticPodOperatorSpec, string, error) {

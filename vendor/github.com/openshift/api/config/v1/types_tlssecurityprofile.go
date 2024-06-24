@@ -211,7 +211,6 @@ type TLSProfileSpec struct {
 	//   ciphers:
 	//     - DES-CBC3-SHA
 	//
-	// +listType=atomic
 	Ciphers []string `json:"ciphers"`
 	// minTLSVersion is used to specify the minimal version of the TLS protocol
 	// that is negotiated during the TLS handshake. For example, to use TLS
