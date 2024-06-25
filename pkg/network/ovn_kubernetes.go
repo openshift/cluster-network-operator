@@ -132,6 +132,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["V6JoinSubnet"] = ""
 	data.Data["V4TransitSwitchSubnet"] = ""
 	data.Data["V6TransitSwitchSubnet"] = ""
+	data.Data["V4InternalMasqueradeSubnet"] = ""
+	data.Data["V6InternalMasqueradeSubnet"] = ""
 
 	data.Data["V4JoinSubnet"] = c.V4InternalSubnet
 	data.Data["V6JoinSubnet"] = c.V6InternalSubnet
