@@ -40,6 +40,7 @@ import (
 
 const (
 	OneYear = 365 * 24 * time.Hour
+	OneHour = time.Hour
 )
 
 // Add attaches our control loop to the manager and watches for PKI objects
@@ -196,8 +197,8 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			Namespace:     config.Namespace,
 			Name:          config.Name + "-ca",
 			JiraComponent: names.ClusterNetworkOperatorJiraComponent,
-			Validity:      10 * OneYear,
-			Refresh:       9 * OneYear,
+			Validity:      5 * OneHour,
+			Refresh:       2 * OneHour,
 			Informer:      inf.Core().V1().Secrets(),
 			Lister:        inf.Core().V1().Secrets().Lister(),
 			Client:        clientset.CoreV1(),
@@ -216,8 +217,8 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			Namespace:     config.Namespace,
 			Name:          config.Name + "-cert",
 			JiraComponent: names.ClusterNetworkOperatorJiraComponent,
-			Validity:      OneYear / 2,
-			Refresh:       OneYear / 4,
+			Validity:      OneHour / 2,
+			Refresh:       OneHour / 4,
 			CertCreator: &certrotation.ServingRotation{
 				Hostnames: func() []string { return []string{spec.TargetCert.CommonName} },
 
