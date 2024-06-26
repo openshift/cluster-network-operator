@@ -19,6 +19,7 @@ import (
 
 	yaml "github.com/ghodss/yaml"
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/api/features"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
@@ -304,8 +305,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	// leverage feature gates
-	data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(configv1.FeatureGateAdminNetworkPolicy)
-	data.Data["DNS_NAME_RESOLVER_ENABLE"] = featureGates.Enabled(configv1.FeatureGateDNSNameResolver)
+	data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(features.FeatureGateAdminNetworkPolicy)
+	data.Data["DNS_NAME_RESOLVER_ENABLE"] = featureGates.Enabled(features.FeatureGateDNSNameResolver)
 
 	data.Data["ReachabilityTotalTimeoutSeconds"] = c.EgressIPConfig.ReachabilityTotalTimeoutSeconds
 
@@ -355,6 +356,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		// enabled
 		data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = true
 	}
+
+	data.Data["OVN_PERSISTENT_IPS_ENABLE"] = featureGates.Enabled(features.FeatureGatePersistentIPsForVirtualization)
 
 	//there only needs to be two cluster managers
 	clusterManagerReplicas := 2

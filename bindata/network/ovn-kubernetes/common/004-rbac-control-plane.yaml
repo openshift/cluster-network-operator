@@ -144,6 +144,18 @@ rules:
   - network-attachment-definitions
   - multi-networkpolicies
   verbs: ["list", "get", "watch"]
+{{- if .OVN_PERSISTENT_IPS_ENABLE }}
+- apiGroups:
+    - k8s.cni.cncf.io
+  resources:
+    - ipamclaims
+  verbs: ["list", "get", "watch"]
+- apiGroups:
+  - "k8s.cni.cncf.io"
+  resources:
+    - ipamclaims/status
+  verbs: [ "patch", "update" ]
+{{- end}}
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

@@ -10,6 +10,7 @@ import (
 
 	k8serrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // DomainName checks if the given string is a valid domain name.
@@ -40,8 +41,8 @@ func Subdomain(v string) error {
 // Host validates if host is a valid IP address or subdomain in DNS (RFC 1123).
 func Host(host string) error {
 	errDomain := DomainName(host, false)
-	errIP := validation.IsValidIP(host)
-	if errDomain != nil && errIP != nil {
+	errs := validation.IsValidIP(field.NewPath(""), host)
+	if errDomain != nil && errs != nil {
 		return fmt.Errorf("invalid host: %s", host)
 	}
 
