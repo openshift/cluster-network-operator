@@ -26,6 +26,7 @@ spec:
         hypershift.openshift.io/release-image: {{.ReleaseImage}}
         cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: "hosted-cluster-api-access,cloud-token,hosted-ca-cert"
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        openshift.io/required-scc: restricted-v2
       labels:
         app: cloud-network-config-controller
         hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
