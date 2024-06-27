@@ -3,6 +3,7 @@ package validation
 import (
 	"errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"net"
 	"net/url"
 	"strconv"
@@ -40,7 +41,7 @@ func Subdomain(v string) error {
 // Host validates if host is a valid IP address or subdomain in DNS (RFC 1123).
 func Host(host string) error {
 	errDomain := DomainName(host, false)
-	errIP := validation.IsValidIP(host)
+	errIP := validation.IsValidIP(field.NewPath(""), host)
 	if errDomain != nil && errIP != nil {
 		return fmt.Errorf("invalid host: %s", host)
 	}

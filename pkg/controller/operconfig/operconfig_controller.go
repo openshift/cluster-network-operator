@@ -133,21 +133,32 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 		return err
 	}
 
+	informer, err := mgr.GetCache().GetInformer(context.Background(), &configv1.Network{})
+	if err != nil {
+		return err
+	}
+
 	// Watch for changes to networkDiagnostics in network.config
-	err = c.Watch(source.Kind(mgr.GetCache(), &configv1.Network{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
-		UpdateFunc: func(evt event.UpdateEvent) bool {
-			old, ok := evt.ObjectOld.(*configv1.Network)
-			if !ok {
-				return true
-			}
-			new, ok := evt.ObjectNew.(*configv1.Network)
-			if !ok {
-				return true
-			}
-			if reflect.DeepEqual(old.Spec.NetworkDiagnostics, new.Spec.NetworkDiagnostics) {
-				return false
-			}
-			return true
+	err = c.Watch(&source.Informer{
+		Informer: informer,
+		Handler:  &handler.EnqueueRequestForObject{},
+		Predicates: []predicate.Predicate{
+			predicate.Funcs{
+				UpdateFunc: func(evt event.UpdateEvent) bool {
+					old, ok := evt.ObjectOld.(*configv1.Network)
+					if !ok {
+						return true
+					}
+					new, ok := evt.ObjectNew.(*configv1.Network)
+					if !ok {
+						return true
+					}
+					if reflect.DeepEqual(old.Spec.NetworkDiagnostics, new.Spec.NetworkDiagnostics) {
+						return false
+					}
+					return true
+				},
+			},
 		},
 	})
 	if err != nil {
@@ -155,21 +166,27 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 	}
 
 	// Watch for changes to primary resource Network (as long as the spec changes)
-	err = c.Watch(source.Kind(mgr.GetCache(), &operv1.Network{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
-		UpdateFunc: func(evt event.UpdateEvent) bool {
-			old, ok := evt.ObjectOld.(*operv1.Network)
-			if !ok {
-				return true
-			}
-			new, ok := evt.ObjectNew.(*operv1.Network)
-			if !ok {
-				return true
-			}
-			if reflect.DeepEqual(old.Spec, new.Spec) {
-				log.Printf("Skipping reconcile of Network.operator.openshift.io: spec unchanged")
-				return false
-			}
-			return true
+	err = c.Watch(&source.Informer{
+		Informer: informer,
+		Handler:  &handler.EnqueueRequestForObject{},
+		Predicates: []predicate.Predicate{
+			predicate.Funcs{
+				UpdateFunc: func(evt event.UpdateEvent) bool {
+					old, ok := evt.ObjectOld.(*operv1.Network)
+					if !ok {
+						return true
+					}
+					new, ok := evt.ObjectNew.(*operv1.Network)
+					if !ok {
+						return true
+					}
+					if reflect.DeepEqual(old.Spec, new.Spec) {
+						log.Printf("Skipping reconcile of Network.operator.openshift.io: spec unchanged")
+						return false
+					}
+					return true
+				},
+			},
 		},
 	})
 	if err != nil {
@@ -187,15 +204,18 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 
 	r.client.Default().AddCustomInformer(cmInformer) // Tell the ClusterClient about this informer
 
-	if err := c.Watch(&source.Informer{Informer: cmInformer},
-		handler.EnqueueRequestsFromMapFunc(reconcileOperConfig),
-		predicate.ResourceVersionChangedPredicate{},
-		predicate.NewPredicateFuncs(func(object crclient.Object) bool {
-			// Ignore ConfigMaps we manage as part of this loop
-			return !(object.GetName() == "network-operator-lock" ||
-				object.GetName() == "applied-cluster")
-		}),
-	); err != nil {
+	if err := c.Watch(&source.Informer{
+		Informer: cmInformer,
+		Handler:  handler.EnqueueRequestsFromMapFunc(reconcileOperConfig),
+		Predicates: []predicate.Predicate{
+			predicate.ResourceVersionChangedPredicate{},
+			predicate.NewPredicateFuncs(func(object crclient.Object) bool {
+				// Ignore ConfigMaps we manage as part of this loop
+				return !(object.GetName() == "network-operator-lock" ||
+					object.GetName() == "applied-cluster")
+			}),
+		},
+	}); err != nil {
 		return err
 	}
 
@@ -218,11 +238,13 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 			return true
 		},
 	}
-	if err := c.Watch(
-		source.Kind(mgr.GetCache(), &corev1.Node{}),
-		handler.EnqueueRequestsFromMapFunc(reconcileOperConfig),
-		nodePredicate,
-	); err != nil {
+	if err := c.Watch(&source.Informer{
+		Informer: informer,
+		Handler:  handler.TypedEnqueueRequestsFromMapFunc(reconcileOperConfig),
+		Predicates: []predicate.Predicate{
+			nodePredicate,
+		},
+	}); err != nil {
 		return err
 	}
 
