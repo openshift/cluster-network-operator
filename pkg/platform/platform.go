@@ -14,11 +14,32 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 )
 
 var cloudProviderConfig = types.NamespacedName{
 	Namespace: "openshift-config-managed",
 	Name:      "kube-cloud-config",
+}
+
+// isNetworkNodeIdentityEnabled determines if network node identity should be enabled.
+// It checks the `enabled` key in the network-node-identity/openshift-network-operator configmap.
+// If the configmap doesn't exist, it returns true (the feature is enabled by default).
+func isNetworkNodeIdentityEnabled(client cnoclient.Client) (bool, error) {
+	nodeIdentity := &corev1.ConfigMap{}
+	nodeIdentityLookup := types.NamespacedName{Name: "network-node-identity", Namespace: names.APPLIED_NAMESPACE}
+	if err := client.ClientFor("").CRClient().Get(context.TODO(), nodeIdentityLookup, nodeIdentity); err != nil {
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %s", err)
+	}
+	enabled, ok := nodeIdentity.Data["enabled"]
+	if ok {
+		return enabled == "true", nil
+	}
+	klog.Warningf("key `enabled` not found in the network-node-identity configmap, defaulting to enabled")
+	return true, nil
 }
 
 func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
@@ -95,5 +116,12 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		}
 		res.HostedControlPlane = hcp
 	}
+
+	netIDEnabled, err := isNetworkNodeIdentityEnabled(client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine if network node identity should be enabled: %w", err)
+	}
+	res.NetworkNodeIdentityEnabled = netIDEnabled
+
 	return res, nil
 }
