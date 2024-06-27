@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
@@ -48,8 +49,18 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	informer, err := mgr.GetCache().GetInformer(context.Background(), &configv1.Network{})
+	if err != nil {
+		return err
+	}
 	// Watch for changes to primary resource config.openshift.io/v1/Infrastructure
-	err = c.Watch(source.Kind(mgr.GetCache(), &configv1.Infrastructure{}), &handler.EnqueueRequestForObject{}, onPremPlatformPredicate())
+	err = c.Watch(&source.Informer{
+		Informer: informer,
+		Handler:  &handler.EnqueueRequestForObject{},
+		Predicates: []predicate.Predicate{
+			onPremPlatformPredicate(),
+		},
+	})
 	if err != nil {
 		return err
 	}

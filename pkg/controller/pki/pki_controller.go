@@ -56,7 +56,7 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.C
 	}
 
 	// Watch for changes to primary resource PKI.network.operator.openshift.io/v1
-	err = c.Watch(source.Kind(mgr.GetCache(), &netopv1.OperatorPKI{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &netopv1.OperatorPKI{}, &handler.TypedEnqueueRequestForObject[*netopv1.OperatorPKI]{}))
 	if err != nil {
 		return err
 	}
@@ -193,9 +193,11 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 	cont := certrotation.NewCertRotationController(
 		fmt.Sprintf("%s/%s", config.Namespace, config.Name), // name, not really used
 		certrotation.RotatedSigningCASecret{
-			Namespace:     config.Namespace,
-			Name:          config.Name + "-ca",
-			JiraComponent: names.ClusterNetworkOperatorJiraComponent,
+			Namespace: config.Namespace,
+			Name:      config.Name + "-ca",
+			AdditionalAnnotations: certrotation.AdditionalAnnotations{
+				JiraComponent: names.ClusterNetworkOperatorJiraComponent,
+			},
 			Validity:      10 * OneYear,
 			Refresh:       9 * OneYear,
 			Informer:      inf.Core().V1().Secrets(),
@@ -204,23 +206,26 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			EventRecorder: &eventrecorder.LoggingRecorder{},
 		},
 		certrotation.CABundleConfigMap{
-			Namespace:     config.Namespace,
-			Name:          config.Name + "-ca",
-			JiraComponent: names.ClusterNetworkOperatorJiraComponent,
+			Namespace: config.Namespace,
+			Name:      config.Name + "-ca",
+			AdditionalAnnotations: certrotation.AdditionalAnnotations{
+				JiraComponent: names.ClusterNetworkOperatorJiraComponent,
+			},
 			Lister:        inf.Core().V1().ConfigMaps().Lister(),
 			Informer:      inf.Core().V1().ConfigMaps(),
 			Client:        clientset.CoreV1(),
 			EventRecorder: &eventrecorder.LoggingRecorder{},
 		},
 		certrotation.RotatedSelfSignedCertKeySecret{
-			Namespace:     config.Namespace,
-			Name:          config.Name + "-cert",
-			JiraComponent: names.ClusterNetworkOperatorJiraComponent,
-			Validity:      OneYear / 2,
-			Refresh:       OneYear / 4,
+			Namespace: config.Namespace,
+			Name:      config.Name + "-cert",
+			AdditionalAnnotations: certrotation.AdditionalAnnotations{
+				JiraComponent: names.ClusterNetworkOperatorJiraComponent,
+			},
+			Validity: OneYear / 2,
+			Refresh:  OneYear / 4,
 			CertCreator: &certrotation.ServingRotation{
 				Hostnames: func() []string { return []string{spec.TargetCert.CommonName} },
-
 				// Force the certificate to also be client
 				CertificateExtensionFn: []crypto.CertificateExtensionFunc{
 					toClientCert,

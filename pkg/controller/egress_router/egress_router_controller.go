@@ -50,7 +50,7 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, cli cnoclient
 	}
 
 	// Watch for changes to primary resource EgressRouter.network.operator.openshift.io/v1
-	err = c.Watch(source.Kind(mgr.GetCache(), &netopv1.EgressRouter{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &netopv1.EgressRouter{}, &handler.TypedEnqueueRequestForObject[*netopv1.EgressRouter]{}))
 	if err != nil {
 		return err
 	}

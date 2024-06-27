@@ -42,8 +42,19 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	informer, err := mgr.GetCache().GetInformer(context.Background(), &configv1.Network{})
+	if err != nil {
+		return err
+	}
+
 	// Watch for changes to primary resource config.openshift.io/v1/Network
-	err = c.Watch(source.Kind(mgr.GetCache(), &configv1.Network{}), &handler.EnqueueRequestForObject{}, predicate.GenerationChangedPredicate{})
+	err = c.Watch(&source.Informer{
+		Informer: informer,
+		Handler:  &handler.EnqueueRequestForObject{},
+		Predicates: []predicate.Predicate{
+			predicate.GenerationChangedPredicate{},
+		},
+	})
 	if err != nil {
 		return err
 	}

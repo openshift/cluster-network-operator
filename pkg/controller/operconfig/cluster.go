@@ -3,6 +3,7 @@ package operconfig
 import (
 	"context"
 	"fmt"
+	apifeatures "github.com/openshift/api/features"
 	"log"
 	"reflect"
 

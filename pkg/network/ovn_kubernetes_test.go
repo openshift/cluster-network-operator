@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	apifeatures "github.com/openshift/api/features"
 	"strconv"
 	"strings"
 	"testing"

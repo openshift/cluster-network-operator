@@ -21,14 +21,14 @@ require (
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
 	golang.org/x/net v0.26.0
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	k8s.io/api v0.30.2
-	k8s.io/apimachinery v0.30.2
+	k8s.io/api v0.31.0-alpha.2
+	k8s.io/apimachinery v0.31.0-alpha.2 // replaced with v0.30.2 in replace() block below
 	k8s.io/code-generator v0.30.2
-	k8s.io/component-base v0.30.2
+	k8s.io/component-base v0.31.0-alpha.2 // v0.30.2 uses outdated and build breaking type from prometheus. update in v0.31
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-proxy v0.30.2
 	k8s.io/utils v0.0.0-20240502163921-fe8a2dddb1d0
-	sigs.k8s.io/controller-runtime v0.16.0
+	sigs.k8s.io/controller-runtime v0.18.4
 )
 
 require (
@@ -114,13 +114,13 @@ require (
 	github.com/openshift/library-go v0.0.0-20240621150525-4bb4238aef81
 	github.com/openshift/machine-config-operator v0.0.1-0.20231002195040-a2469941c0dc
 	k8s.io/apiextensions-apiserver v0.30.2
-	k8s.io/client-go v0.30.2
+	k8s.io/client-go v0.31.0-alpha.2
 )
 
 require (
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/ajeddeloh/go-json v0.0.0-20200220154158-5ae607161559 // indirect
-	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
+	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go v1.44.204 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
@@ -133,7 +133,7 @@ require (
 	github.com/coreos/ignition/v2 v2.15.0 // indirect
 	github.com/coreos/vcontext v0.0.0-20230201181013-d72178a18687 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
-	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
+	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/cel-go v0.20.1 // indirect
@@ -141,7 +141,6 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
-	github.com/onsi/ginkgo/v2 v2.17.3 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
@@ -153,8 +152,14 @@ require (
 	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240624140628-dc46fd24d27d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240624140628-dc46fd24d27d // indirect
+	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	k8s.io/apiserver v0.30.2 // indirect
 	k8s.io/gengo/v2 v2.0.0-20240404160639-a0386bf69313 // indirect
 	k8s.io/kms v0.30.2 // indirect
 	k8s.io/kube-aggregator v0.30.1 // indirect
+)
+
+replace (
+	github.com/google/cel-go => github.com/google/cel-go v0.17.8
+	k8s.io/apimachinery => k8s.io/apimachinery v0.30.2
 )

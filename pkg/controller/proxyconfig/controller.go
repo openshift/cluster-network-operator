@@ -65,14 +65,16 @@ func add(mgr manager.Manager, r *ReconcileProxyConfig) error {
 	}
 
 	// watch for changes to configmaps in openshift-config
-	if err := c.Watch(&source.Informer{Informer: r.cmInformer},
-		&handler.EnqueueRequestForObject{},
+	if err := c.Watch(&source.Informer{
+		Informer: r.cmInformer,
+		Handler:  &handler.EnqueueRequestForObject{},
+	},
 	); err != nil {
 		return err
 	}
 
 	// Watch for changes to the proxy resource.
-	err = c.Watch(source.Kind(mgr.GetCache(), &configv1.Proxy{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &configv1.Proxy{}, &handler.TypedEnqueueRequestForObject[*configv1.Proxy]{}))
 	if err != nil {
 		return err
 	}
