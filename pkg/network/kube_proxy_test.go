@@ -132,6 +132,8 @@ logging:
   options:
     json:
       infoBufferSize: "0"
+    text:
+      infoBufferSize: "0"
   verbosity: 0
 metricsBindAddress: 1.2.3.4:999
 mode: blah
@@ -217,6 +219,8 @@ logging:
   flushFrequency: 0
   options:
     json:
+      infoBufferSize: "0"
+    text:
       infoBufferSize: "0"
   verbosity: 0
 metricsBindAddress: '[fd00:1234::4]:51999'
@@ -470,6 +474,8 @@ logging:
   flushFrequency: 0
   options:
     json:
+      infoBufferSize: "0"
+    text:
       infoBufferSize: "0"
   verbosity: 0
 metricsBindAddress: 0.0.0.0:29102
