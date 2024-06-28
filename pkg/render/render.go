@@ -23,6 +23,7 @@ type RenderData struct {
 }
 
 func MakeRenderData() RenderData {
+
 	return RenderData{
 		Funcs: template.FuncMap{},
 		Data:  map[string]interface{}{},
