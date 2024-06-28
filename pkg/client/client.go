@@ -63,7 +63,7 @@ type OperatorClusterClient struct {
 	kFactory kinformer.SharedInformerFactory
 
 	// client & informers for operator.openshift.io
-	osOperClient  *osoperclient.Clientset
+	osOperClient  osoperclient.Interface
 	osOperFactory osoperinformer.SharedInformerFactory
 
 	// restMapper is the mapper from GVK to GVR (among other fun tasks)
@@ -204,7 +204,7 @@ func (c *OperatorClusterClient) Kubernetes() kubernetes.Interface {
 }
 
 // OpenshiftOperatorClient returns the clientset for operator.openshift.io
-func (c *OperatorClusterClient) OpenshiftOperatorClient() *osoperclient.Clientset {
+func (c *OperatorClusterClient) OpenshiftOperatorClient() osoperclient.Interface {
 	return c.osOperClient
 }
 

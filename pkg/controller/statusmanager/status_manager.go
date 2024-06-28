@@ -14,6 +14,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
+	applyoperv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -56,6 +57,7 @@ const (
 
 const (
 	ClusteredNameSeparator = '/'
+	fieldManager           = "cluster-network-operator/status-manager"
 )
 
 type ClusteredName struct {
@@ -318,9 +320,8 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 	var operStatus *operv1.NetworkStatus
 
 	// Set status on the network.operator object
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		oc := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
-		err := status.client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Name: names.OPERATOR_CONFIG}, oc)
+	err := func() error {
+		oc, err := status.client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OPERATOR_CONFIG, metav1.GetOptions{})
 		if err != nil {
 			// Should never happen outside of unit tests
 			return err
@@ -401,13 +402,25 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 			buf = []byte(fmt.Sprintf("(failed to convert to YAML: %s)", err))
 		}
 
-		if err := status.client.ClientFor("").CRClient().Update(context.TODO(), oc); err != nil {
+		// Use applyconfigurations to change only the specified fields
+		net := applyoperv1.Network(names.OPERATOR_CONFIG).
+			WithStatus(applyoperv1.NetworkStatus().WithVersion(oc.Status.Version))
+		for _, condition := range oc.Status.Conditions {
+			net.Status.WithConditions(applyoperv1.OperatorCondition().
+				WithType(condition.Type).
+				WithStatus(condition.Status).
+				WithLastTransitionTime(condition.LastTransitionTime).
+				WithReason(condition.Reason).
+				WithMessage(condition.Message))
+		}
+		if _, err := status.client.ClientFor("").OpenshiftOperatorClient().OperatorV1().Networks().Apply(
+			context.TODO(), net, metav1.ApplyOptions{Force: true, FieldManager: fieldManager}); err != nil {
 			return err
 		}
 		log.Printf("Network operator config updated with conditions:\n%s", buf)
 
 		return nil
-	})
+	}()
 	if err != nil {
 		log.Printf("Failed to set operator status: %v", err)
 	}
