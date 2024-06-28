@@ -185,8 +185,8 @@ spec:
         imagePullPolicy: IfNotPresent
         resources:
           requests:
-            cpu: 10m
-            memory: 50Mi
+            cpu: {{ .ResourceRequestCPU | default "10" }}m
+            memory: {{ .ResourceRequestMemory | default "50" }}Mi
         ports:
         - name: metrics-port
           containerPort: 9091
@@ -218,7 +218,7 @@ spec:
       serviceAccountName: multus-ac
       priorityClassName: "system-cluster-critical"
 {{- else}}
-      priorityClassName: "hypershift-control-plane"
+      priorityClassName: {{ .PriorityClass | default "hypershift-control-plane" }}
 {{- end }}
       restartPolicy: Always
 {{- if not .ExternalControlPlane }}

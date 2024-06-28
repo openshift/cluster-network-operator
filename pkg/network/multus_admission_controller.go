@@ -11,7 +11,10 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -22,6 +25,8 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 )
+
+const bytesInMiB = 1024 * 1024
 
 // ignoredNamespaces contains the comma separated namespace list that should be ignored
 // to watch by multus admission controller. This only initialized first invocation.
@@ -75,6 +80,9 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	data.Data["ManagementClusterName"] = names.ManagementClusterName
 	data.Data["AdmissionControllerNamespace"] = "openshift-multus"
 	data.Data["RHOBSMonitoring"] = os.Getenv("RHOBS_MONITORING")
+	data.Data["ResourceRequestCPU"] = nil
+	data.Data["ResourceRequestMemory"] = nil
+	data.Data["PriorityClass"] = nil
 	if hsc.Enabled {
 		data.Data["AdmissionControllerNamespace"] = hsc.Namespace
 		data.Data["KubernetesServiceHost"] = bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal].Host
@@ -102,6 +110,30 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 		data.Data["ClusterIDLabel"] = hypershift.ClusterIDLabel
 		data.Data["ClusterID"] = bootstrapResult.Infra.HostedControlPlane.ClusterID
 		data.Data["HCPNodeSelector"] = bootstrapResult.Infra.HostedControlPlane.NodeSelector
+		data.Data["PriorityClass"] = bootstrapResult.Infra.HostedControlPlane.PriorityClass
+
+		// Preserve any existing multus container resource requests which may have been modified by an external source
+		multusDeploy := &appsv1.Deployment{}
+		err = client.ClientFor(clientName).CRClient().Get(
+			context.TODO(), types.NamespacedName{Namespace: hsc.Namespace, Name: "multus-admission-controller"}, multusDeploy)
+		if err == nil {
+			multusContainer, ok := findContainer(multusDeploy.Spec.Template.Spec.Containers, "multus-admission-controller")
+			if !ok {
+				return nil, errors.New("error finding multus container")
+			}
+			if !multusContainer.Resources.Requests.Cpu().IsZero() {
+				data.Data["ResourceRequestCPU"] = multusContainer.Resources.Requests.Cpu().MilliValue()
+			}
+			if !multusContainer.Resources.Requests.Memory().IsZero() {
+				data.Data["ResourceRequestMemory"] = multusContainer.Resources.Requests.Memory().Value() / bytesInMiB
+			}
+		} else {
+			if apierrors.IsNotFound(err) {
+				klog.Warningf("failed to get multus deployment: %v", err)
+			} else {
+				return nil, fmt.Errorf("failed to get multus deployment: %v", err)
+			}
+		}
 
 		data.Data["ReleaseImage"] = hsc.ReleaseImage
 	}
@@ -112,4 +144,13 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	}
 	objs = append(objs, manifests...)
 	return objs, nil
+}
+
+func findContainer(conts []v1.Container, name string) (v1.Container, bool) {
+	for _, cont := range conts {
+		if cont.Name == name {
+			return cont, true
+		}
+	}
+	return v1.Container{}, false
 }
