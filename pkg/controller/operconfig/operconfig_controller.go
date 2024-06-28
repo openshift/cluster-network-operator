@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
+	"github.com/openshift/cluster-network-operator/pkg/util"
 	ipsecMetrics "github.com/openshift/cluster-network-operator/pkg/util/ipsec"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -325,10 +326,12 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// If we need to, probe the host's MTU via a Job.
-	// It's okay if this is 0, since running clusters have no need of this
-	// and thus do not need to probe MTU
+	// Note that running clusters have no need of this but we want the configmap
+	// mtu to be created for consistancy with other non-hypershift clusters.
+	// A hypershift cluster may not have any worker nodes for running the mtu prober.
 	mtu := 0
-	if network.NeedMTUProbe(prev, &operConfig.Spec) {
+	err = r.client.Default().CRClient().Get(ctx, types.NamespacedName{Namespace: util.MTU_CM_NAMESPACE, Name: util.MTU_CM_NAME}, &corev1.ConfigMap{})
+	if network.NeedMTUProbe(prev, &operConfig.Spec) || (apierrors.IsNotFound(err) && infraStatus.HostedControlPlane == nil) {
 		mtu, err = r.probeMTU(ctx, operConfig, infraStatus)
 		if err != nil {
 			log.Printf("Failed to probe MTU: %v", err)
