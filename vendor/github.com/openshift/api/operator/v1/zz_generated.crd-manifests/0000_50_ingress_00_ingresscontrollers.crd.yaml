@@ -113,8 +113,14 @@ spec:
                   OpenShift's built-in OAuth server."
                 properties:
                   name:
-                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    default: ""
+                    description: 'Name of the referent. This field is effectively
+                      required, but due to backwards compatibility is allowed to be
+                      empty. Instances of this type with an empty value here are almost
+                      certainly wrong. TODO: Add other useful fields. apiVersion,
+                      kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Drop `kubebuilder:default` when controller-gen doesn''t
+                      need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
@@ -240,6 +246,7 @@ spec:
                           type: string
                         nullable: true
                         type: array
+                        x-kubernetes-list-type: atomic
                       dnsManagementPolicy:
                         default: Managed
                         description: 'dnsManagementPolicy indicates if the lifecycle
@@ -872,6 +879,7 @@ spec:
                       type: string
                     nullable: true
                     type: array
+                    x-kubernetes-list-type: atomic
                   uniqueId:
                     description: "uniqueId describes configuration for a custom HTTP
                       header that the ingress controller should inject into incoming
@@ -1078,6 +1086,7 @@ spec:
                         maxItems: 1
                         nullable: true
                         type: array
+                        x-kubernetes-list-type: atomic
                       httpCaptureHeaders:
                         description: "httpCaptureHeaders defines HTTP headers that
                           should be captured in access logs.  If this field is empty,
@@ -1116,6 +1125,7 @@ spec:
                               type: object
                             nullable: true
                             type: array
+                            x-kubernetes-list-type: atomic
                           response:
                             description: "response specifies which HTTP response headers
                               to capture. \n If this field is empty, no response headers
@@ -1145,6 +1155,7 @@ spec:
                               type: object
                             nullable: true
                             type: array
+                            x-kubernetes-list-type: atomic
                         type: object
                       httpLogFormat:
                         description: "httpLogFormat specifies the format of the log
@@ -1210,11 +1221,13 @@ spec:
                           items:
                             type: string
                           type: array
+                          x-kubernetes-list-type: atomic
                       required:
                       - key
                       - operator
                       type: object
                     type: array
+                    x-kubernetes-list-type: atomic
                   matchLabels:
                     additionalProperties:
                       type: string
@@ -1271,11 +1284,13 @@ spec:
                               items:
                                 type: string
                               type: array
+                              x-kubernetes-list-type: atomic
                           required:
                           - key
                           - operator
                           type: object
                         type: array
+                        x-kubernetes-list-type: atomic
                       matchLabels:
                         additionalProperties:
                           type: string
@@ -1330,6 +1345,7 @@ spec:
                           type: string
                       type: object
                     type: array
+                    x-kubernetes-list-type: atomic
                 type: object
               replicas:
                 description: "replicas is the desired number of ingress controller
@@ -1408,11 +1424,13 @@ spec:
                           items:
                             type: string
                           type: array
+                          x-kubernetes-list-type: atomic
                       required:
                       - key
                       - operator
                       type: object
                     type: array
+                    x-kubernetes-list-type: atomic
                   matchLabels:
                     additionalProperties:
                       type: string
@@ -1452,6 +1470,7 @@ spec:
                         items:
                           type: string
                         type: array
+                        x-kubernetes-list-type: atomic
                       minTLSVersion:
                         description: "minTLSVersion is used to specify the minimal
                           version of the TLS protocol that is negotiated during the
@@ -1772,6 +1791,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               domain:
                 description: domain is the actual domain in use.
                 type: string
@@ -1877,6 +1899,7 @@ spec:
                           type: string
                         nullable: true
                         type: array
+                        x-kubernetes-list-type: atomic
                       dnsManagementPolicy:
                         default: Managed
                         description: 'dnsManagementPolicy indicates if the lifecycle
@@ -2148,11 +2171,13 @@ spec:
                           items:
                             type: string
                           type: array
+                          x-kubernetes-list-type: atomic
                       required:
                       - key
                       - operator
                       type: object
                     type: array
+                    x-kubernetes-list-type: atomic
                   matchLabels:
                     additionalProperties:
                       type: string
@@ -2197,11 +2222,13 @@ spec:
                           items:
                             type: string
                           type: array
+                          x-kubernetes-list-type: atomic
                       required:
                       - key
                       - operator
                       type: object
                     type: array
+                    x-kubernetes-list-type: atomic
                   matchLabels:
                     additionalProperties:
                       type: string
@@ -2230,6 +2257,7 @@ spec:
                     items:
                       type: string
                     type: array
+                    x-kubernetes-list-type: atomic
                   minTLSVersion:
                     description: "minTLSVersion is used to specify the minimal version
                       of the TLS protocol that is negotiated during the TLS handshake.
