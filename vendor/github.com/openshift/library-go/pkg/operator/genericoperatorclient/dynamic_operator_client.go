@@ -89,6 +89,19 @@ func (c dynamicOperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *op
 	}
 	instance := uncastInstance.(*unstructured.Unstructured)
 
+	return getOperatorStateFromInstance(instance)
+}
+
+func (c dynamicOperatorClient) GetOperatorStateWithQuorum(ctx context.Context) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
+	instance, err := c.client.Get(ctx, c.configName, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	return getOperatorStateFromInstance(instance)
+}
+
+func getOperatorStateFromInstance(instance *unstructured.Unstructured) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
 	spec, err := getOperatorSpecFromUnstructured(instance.UnstructuredContent())
 	if err != nil {
 		return nil, nil, "", err

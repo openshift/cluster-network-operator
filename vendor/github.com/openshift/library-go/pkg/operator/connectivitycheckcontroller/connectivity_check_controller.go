@@ -30,6 +30,9 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
+
+	// this is dependency magnet, required so that we can sync the pod-network checker definition yaml
+	_ "github.com/openshift/api/operatorcontrolplane/v1alpha1/zz_generated.crd-manifests"
 )
 
 const (
@@ -196,7 +199,7 @@ func (c *connectivityCheckController) Sync(ctx context.Context, syncContext fact
 		}
 	}
 
-	var newCheckNames sets.String
+	var newCheckNames sets.Set[string]
 	if c.podNetworkConnectivityCheckFn != nil {
 		newCheckNames, err = c.handlePodNetworkConnectivityCheckFn(ctx, syncContext)
 	} else if c.podNetworkConnectivityCheckApplyFn != nil {
@@ -224,13 +227,13 @@ func (c *connectivityCheckController) Sync(ctx context.Context, syncContext fact
 	return nil
 }
 
-func (c *connectivityCheckController) handlePodNetworkConnectivityCheckFn(ctx context.Context, syncContext factory.SyncContext) (sets.String, error) {
+func (c *connectivityCheckController) handlePodNetworkConnectivityCheckFn(ctx context.Context, syncContext factory.SyncContext) (sets.Set[string], error) {
 	newChecks, err := c.podNetworkConnectivityCheckFn(ctx, syncContext)
 	if err != nil {
 		return nil, err
 	}
 	pnccClient := c.operatorcontrolplaneClient.ControlplaneV1alpha1().PodNetworkConnectivityChecks(c.namespace)
-	newCheckNames := sets.NewString()
+	newCheckNames := sets.New[string]()
 	for _, newCheck := range newChecks {
 		newCheckNames.Insert(newCheck.Name)
 		existing, err := pnccClient.Get(ctx, newCheck.Name, metav1.GetOptions{})
@@ -264,13 +267,13 @@ func (c *connectivityCheckController) handlePodNetworkConnectivityCheckFn(ctx co
 	return newCheckNames, nil
 }
 
-func (c *connectivityCheckController) handlePodNetworkConnectivityCheckApplyFn(ctx context.Context, syncContext factory.SyncContext) (sets.String, error) {
+func (c *connectivityCheckController) handlePodNetworkConnectivityCheckApplyFn(ctx context.Context, syncContext factory.SyncContext) (sets.Set[string], error) {
 	newChecks, err := c.podNetworkConnectivityCheckApplyFn(ctx, syncContext)
 	if err != nil {
 		return nil, err
 	}
 	pnccClient := c.operatorcontrolplaneClient.ControlplaneV1alpha1().PodNetworkConnectivityChecks(c.namespace)
-	newCheckNames := sets.NewString()
+	newCheckNames := sets.New[string]()
 	for _, newCheck := range newChecks {
 		newCheckNames.Insert(*newCheck.Name)
 		newCheck.WithLabels(map[string]string{managedByLabelKey: managedByLabelValue})
