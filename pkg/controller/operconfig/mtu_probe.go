@@ -58,6 +58,12 @@ func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, 
 	if err != nil {
 		return 0, fmt.Errorf("failed to deploy mtu prober: %w", err)
 	}
+	r.mtuProberCleanedUp = false
+	defer func() {
+		if err := r.deleteMTUProber(ctx, infra); err != nil {
+			klog.Errorf("Failed to clean up mtu prober: %v", err)
+		}
+	}()
 
 	klog.Info("MTU prober deployed, waiting for result ConfigMap")
 
@@ -77,9 +83,6 @@ func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, 
 	})
 
 	if err == nil {
-		if err := r.deleteMTUProber(ctx, infra); err != nil {
-			klog.Errorf("failed to clean up mtu prober: %v", err)
-		}
 		return mtu, nil
 	}
 
