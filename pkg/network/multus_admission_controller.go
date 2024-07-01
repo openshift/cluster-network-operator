@@ -40,7 +40,10 @@ func getOpenshiftNamespaces(client cnoclient.Client) (string, error) {
 	}
 
 	for _, ns := range nsList.Items {
-		namespaces = append(namespaces, ns.Name)
+		// add OpenShift components to ignored namespace
+		if metav1.HasAnnotation(ns.ObjectMeta, "workload.openshift.io/allowed") && ns.Annotations["workload.openshift.io/allowed"] == "management" {
+			namespaces = append(namespaces, ns.Name)
+		}
 	}
 	return strings.Join(namespaces, ","), nil
 }
