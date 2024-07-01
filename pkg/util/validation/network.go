@@ -11,7 +11,6 @@ import (
 
 	k8serrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // DomainName checks if the given string is a valid domain name.

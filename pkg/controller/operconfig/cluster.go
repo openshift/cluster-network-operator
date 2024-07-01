@@ -8,7 +8,6 @@ import (
 	"reflect"
 
 	configv1 "github.com/openshift/api/config/v1"
-	apifeatures "github.com/openshift/api/features"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"

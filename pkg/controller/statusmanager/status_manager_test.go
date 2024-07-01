@@ -1280,7 +1280,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depB.Status.UpdatedReplicas = depB.Status.Replicas
 	depB.Status.UnavailableReplicas = 0
 	depB.Status.AvailableReplicas = depB.Status.Replicas
-	set(t, client, depB)
+	setStatus(t, client, depB)
 	status.SetFromPods()
 
 	co, oc, err = getStatuses(client, "testing")
