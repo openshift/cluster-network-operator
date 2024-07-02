@@ -482,7 +482,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 			ipv4Service = true
 		}
 		if err := pool.Add(*cidr); err != nil {
-			errs = append(errs, err)
+			errs = append(errs, errors.Errorf("Whole or subset of ServiceNetwork CIDR %s is already in use: %s", snet, err))
 		}
 	}
 
@@ -525,7 +525,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 			}
 		}
 		if err := pool.Add(*cidr); err != nil {
-			errs = append(errs, err)
+			errs = append(errs, errors.Errorf("Whole or subset of ClusterNetwork CIDR %s is already in use: %s", cnet.CIDR, err))
 		}
 	}
 

@@ -14,6 +14,7 @@ get_latest_release() {
 
 # Get latest tagged release of controller-gen
 LATEST_CONTROLLER_GEN_VER=$(get_latest_release)
+LATEST_CONTROLLER_GEN_VER='v0.14.0'
 
 if ( ! ( command -v controller-gen > /dev/null )  || test "$(controller-gen --version)" != "Version: ${LATEST_CONTROLLER_GEN_VER}" ); then
   echo "controller-gen not found or out-of-date, installing latest version sigs.k8s.io/controller-tools@${LATEST_CONTROLLER_GEN_VER}"
