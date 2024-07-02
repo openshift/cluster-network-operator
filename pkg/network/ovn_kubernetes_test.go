@@ -3356,15 +3356,6 @@ func (f *fakeClientReader) List(_ context.Context, _ crclient.ObjectList, _ ...c
 	return errors.New("unexpected invocation to List")
 }
 
-func findContainer(conts []v1.Container, name string) (v1.Container, bool) {
-	for _, cont := range conts {
-		if cont.Name == name {
-			return cont, true
-		}
-	}
-	return v1.Container{}, false
-}
-
 func convert(src *uns.Unstructured, dst metav1.Object) error {
 	j, err := src.MarshalJSON()
 	if err != nil {
