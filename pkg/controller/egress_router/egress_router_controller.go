@@ -27,6 +27,7 @@ import (
 
 	netopv1 "github.com/openshift/api/networkoperator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -50,7 +51,7 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, cli cnoclient
 	}
 
 	// Watch for changes to primary resource EgressRouter.network.operator.openshift.io/v1
-	err = c.Watch(source.Kind(mgr.GetCache(), &netopv1.EgressRouter{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind[crclient.Object](mgr.GetCache(), &netopv1.EgressRouter{}, &handler.EnqueueRequestForObject{}))
 	if err != nil {
 		return err
 	}

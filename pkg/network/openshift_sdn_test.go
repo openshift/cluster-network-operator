@@ -534,6 +534,8 @@ logging:
   options:
     json:
       infoBufferSize: "0"
+    text:
+      infoBufferSize: "0"
   verbosity: 0
 metricsBindAddress: 127.0.0.1:29101
 mode: unidling+iptables
@@ -606,6 +608,8 @@ logging:
   flushFrequency: 0
   options:
     json:
+      infoBufferSize: "0"
+    text:
       infoBufferSize: "0"
   verbosity: 0
 metricsBindAddress: 127.0.0.1:29101

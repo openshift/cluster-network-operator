@@ -134,7 +134,7 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 	}
 
 	// Watch for changes to networkDiagnostics in network.config
-	err = c.Watch(source.Kind(mgr.GetCache(), &configv1.Network{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
+	err = c.Watch(source.Kind[crclient.Object](mgr.GetCache(), &configv1.Network{}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		UpdateFunc: func(evt event.UpdateEvent) bool {
 			old, ok := evt.ObjectOld.(*configv1.Network)
 			if !ok {
@@ -149,13 +149,13 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 			}
 			return true
 		},
-	})
+	}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to primary resource Network (as long as the spec changes)
-	err = c.Watch(source.Kind(mgr.GetCache(), &operv1.Network{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
+	err = c.Watch(source.Kind[crclient.Object](mgr.GetCache(), &operv1.Network{}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		UpdateFunc: func(evt event.UpdateEvent) bool {
 			old, ok := evt.ObjectOld.(*operv1.Network)
 			if !ok {
@@ -171,7 +171,7 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 			}
 			return true
 		},
-	})
+	}))
 	if err != nil {
 		return err
 	}
@@ -187,15 +187,18 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 
 	r.client.Default().AddCustomInformer(cmInformer) // Tell the ClusterClient about this informer
 
-	if err := c.Watch(&source.Informer{Informer: cmInformer},
-		handler.EnqueueRequestsFromMapFunc(reconcileOperConfig),
-		predicate.ResourceVersionChangedPredicate{},
-		predicate.NewPredicateFuncs(func(object crclient.Object) bool {
-			// Ignore ConfigMaps we manage as part of this loop
-			return !(object.GetName() == "network-operator-lock" ||
-				object.GetName() == "applied-cluster")
-		}),
-	); err != nil {
+	if err := c.Watch(&source.Informer{
+		Informer: cmInformer,
+		Handler:  handler.EnqueueRequestsFromMapFunc(reconcileOperConfig),
+		Predicates: []predicate.TypedPredicate[crclient.Object]{
+			predicate.ResourceVersionChangedPredicate{},
+			predicate.NewPredicateFuncs(func(object crclient.Object) bool {
+				// Ignore ConfigMaps we manage as part of this loop
+				return !(object.GetName() == "network-operator-lock" ||
+					object.GetName() == "applied-cluster")
+			}),
+		},
+	}); err != nil {
 		return err
 	}
 
@@ -218,11 +221,7 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 			return true
 		},
 	}
-	if err := c.Watch(
-		source.Kind(mgr.GetCache(), &corev1.Node{}),
-		handler.EnqueueRequestsFromMapFunc(reconcileOperConfig),
-		nodePredicate,
-	); err != nil {
+	if err := c.Watch(source.Kind[crclient.Object](mgr.GetCache(), &corev1.Node{}, handler.EnqueueRequestsFromMapFunc(reconcileOperConfig), nodePredicate)); err != nil {
 		return err
 	}
 

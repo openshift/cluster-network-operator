@@ -26,7 +26,7 @@ func LogLevelToVerbosity(logLevel operatorv1.LogLevel) int {
 	}
 }
 
-var validLogLevels = sets.NewString(
+var validLogLevels = sets.New(
 	string(operatorv1.Normal),
 	string(operatorv1.Debug),
 	string(operatorv1.Trace),

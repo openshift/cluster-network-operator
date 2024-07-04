@@ -73,6 +73,8 @@ logging:
   options:
     json:
       infoBufferSize: "0"
+    text:
+      infoBufferSize: "0"
   verbosity: 0
 metricsBindAddress: 0.0.0.0:9102
 mode: iptables
@@ -150,6 +152,8 @@ logging:
   options:
     json:
       infoBufferSize: "0"
+    text:
+      infoBufferSize: "0"
   verbosity: 0
 metricsBindAddress: 5.6.7.8:9999
 mode: userspace
@@ -223,6 +227,8 @@ logging:
   options:
     json:
       infoBufferSize: "0"
+    text:
+      infoBufferSize: "0"
   verbosity: 0
 metricsBindAddress: 5.6.7.8:9102
 mode: iptables
@@ -295,6 +301,8 @@ logging:
   flushFrequency: 0
   options:
     json:
+      infoBufferSize: "0"
+    text:
       infoBufferSize: "0"
   verbosity: 0
 metricsBindAddress: 0.0.0.0:9999
@@ -373,6 +381,8 @@ logging:
   flushFrequency: 0
   options:
     json:
+      infoBufferSize: "0"
+    text:
       infoBufferSize: "0"
   verbosity: 0
 metricsBindAddress: 0.0.0.0:9102

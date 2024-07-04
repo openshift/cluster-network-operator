@@ -37,6 +37,15 @@ func (c *OperatorHelperClient) GetOperatorState() (*operatorv1.OperatorSpec, *op
 	return &instance.Spec.OperatorSpec, &instance.Status.OperatorStatus, instance.ResourceVersion, nil
 }
 
+func (c *OperatorHelperClient) GetOperatorStateWithQuorum(ctx context.Context) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
+	instance, err := c.client.Get(ctx, names.OPERATOR_CONFIG, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	return &instance.Spec.OperatorSpec, &instance.Status.OperatorStatus, instance.ResourceVersion, nil
+}
+
 func (c *OperatorHelperClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
 	instance, err := c.informer.Lister().Get(names.OPERATOR_CONFIG)
 	if err != nil {
