@@ -53,11 +53,11 @@ data:
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
     nodeport=true
-{{- if (index . "V4JoinSubnet") }}
-    v4-join-subnet="{{.V4JoinSubnet}}"
+{{- if (index . "V4InternalMasqueradeSubnet")}}
+    v4-masquerade-subnet="{{.V4InternalMasqueradeSubnet}}"
 {{- end }}
-{{- if (index . "V6JoinSubnet") }}
-    v6-join-subnet="{{.V6JoinSubnet}}"
+{{- if (index . "V6InternalMasqueradeSubnet")}}
+    v6-masquerade-subnet="{{.V6InternalMasqueradeSubnet}}"
 {{- end }}
 {{- if .OVNHybridOverlayEnable }}
 
@@ -138,20 +138,21 @@ data:
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
     nodeport=true
-{{- if (index . "V4JoinSubnet") }}
-    v4-join-subnet="{{.V4JoinSubnet}}"
+{{- if (index . "V4InternalMasqueradeSubnet")}}
+    v4-masquerade-subnet="{{.V4InternalMasqueradeSubnet}}"
 {{- end }}
-{{- if (index . "V6JoinSubnet") }}
-    v6-join-subnet="{{.V6JoinSubnet}}"
+{{- if (index . "V6InternalMasqueradeSubnet")}}
+    v6-masquerade-subnet="{{.V6InternalMasqueradeSubnet}}"
 {{- end }}
+
 
     [logging]
     libovsdblogfile=/var/log/ovnkube/libovsdb.log
     logfile-maxsize=100
     logfile-maxbackups=5
     logfile-maxage=0
-{{- if .OVNHybridOverlayEnable }}
 
+{{- if .OVNHybridOverlayEnable }}
     [hybridoverlay]
     enabled=true
     {{- if .OVNHybridOverlayNetCIDR }}

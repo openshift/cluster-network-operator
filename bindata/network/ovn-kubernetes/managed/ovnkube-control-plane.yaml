@@ -145,6 +145,24 @@ spec:
             fi
           done
 
+          ovn_v4_join_subnet_opt=
+          if [[ "{{.V4JoinSubnet}}" != "" ]]; then
+            ovn_v4_join_subnet_opt="--gateway-v4-join-subnet {{.V4JoinSubnet}}"
+          fi
+          ovn_v6_join_subnet_opt=
+          if [[ "{{.V6JoinSubnet}}" != "" ]]; then
+            ovn_v6_join_subnet_opt="--gateway-v6-join-subnet {{.V6JoinSubnet}}"
+          fi
+
+          ovn_v4_transit_switch_subnet_opt=
+          if [[ "{{.V4TransitSwitchSubnet}}" != "" ]]; then
+            ovn_v4_transit_switch_subnet_opt="--cluster-manager-v4-transit-switch-subnet {{.V4TransitSwitchSubnet}}"
+          fi
+          ovn_v6_transit_switch_subnet_opt=
+          if [[ "{{.V6TransitSwitchSubnet}}" != "" ]]; then
+            ovn_v6_transit_switch_subnet_opt="--cluster-manager-v6-transit-switch-subnet {{.V6TransitSwitchSubnet}}"
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
@@ -156,7 +174,11 @@ spec:
             --metrics-enable-pprof \
             --metrics-enable-config-duration \
             --node-server-privkey ${TLS_PK} \
-            --node-server-cert ${TLS_CERT}
+            --node-server-cert ${TLS_CERT} \
+            ${ovn_v4_join_subnet_opt} \
+            ${ovn_v6_join_subnet_opt} \
+            ${ovn_v4_transit_switch_subnet_opt} \
+            ${ovn_v6_transit_switch_subnet_opt}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
