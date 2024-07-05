@@ -83,22 +83,25 @@ func add(mgr manager.Manager, r *ReconcileDashboard) error {
 	r.client.Default().AddCustomInformer(cmInformer) // Tell the ClusterClient about this informer
 
 	firstRun := true
-	return c.Watch(&source.Informer{Informer: cmInformer},
-		&handler.EnqueueRequestForObject{},
-		predicate.ResourceVersionChangedPredicate{},
-		predicate.NewPredicateFuncs(func(object crclient.Object) bool {
-			if firstRun {
-				firstRun = false
-				return true
-			}
-			for _, ref := range dashboardRefs {
-				if object.GetName() == ref.name {
+	return c.Watch(&source.Informer{
+		Informer: cmInformer,
+		Handler:  &handler.EnqueueRequestForObject{},
+		Predicates: []predicate.TypedPredicate[crclient.Object]{
+			predicate.ResourceVersionChangedPredicate{},
+			predicate.NewPredicateFuncs(func(object crclient.Object) bool {
+				if firstRun {
+					firstRun = false
 					return true
 				}
-			}
-			return false
-		}),
-	)
+				for _, ref := range dashboardRefs {
+					if object.GetName() == ref.name {
+						return true
+					}
+				}
+				return false
+			}),
+		},
+	})
 }
 
 var _ reconcile.Reconciler = &ReconcileDashboard{}

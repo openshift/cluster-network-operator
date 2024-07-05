@@ -105,9 +105,10 @@ func (s *StatusManager) AddPodWatcher(mgr manager.Manager) error {
 	}
 
 	for _, inf := range infs {
-		if err := c.Watch(&source.Informer{Informer: inf},
-			handler.EnqueueRequestsFromMapFunc(enqueueRP),
-		); err != nil {
+		if err := c.Watch(&source.Informer{
+			Informer: inf,
+			Handler:  handler.EnqueueRequestsFromMapFunc(enqueueRP),
+		}); err != nil {
 			return err
 		}
 	}

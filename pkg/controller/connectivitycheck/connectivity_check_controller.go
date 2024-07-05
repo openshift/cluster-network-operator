@@ -204,8 +204,13 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 	}
 
 	if c.connectivityChecksStatus != currentStatus {
-		condition := currentStatus
-		condition.LastTransitionTime = metav1.NewTime(time.Now())
+		condition := applyconfigmetav1.Condition().
+			WithType(currentStatus.Type).
+			WithStatus(currentStatus.Status).
+			WithObservedGeneration(currentStatus.ObservedGeneration).
+			WithLastTransitionTime(metav1.NewTime(time.Now())).
+			WithReason(currentStatus.Reason).
+			WithMessage(currentStatus.Message)
 		netConfig := applyconfigv1.Network(names.CLUSTER_CONFIG).WithStatus(applyconfigv1.NetworkStatus().WithConditions(condition))
 		_, err := c.configClient.ConfigV1().Networks().Apply(context.TODO(), netConfig, metav1.ApplyOptions{
 			Force:        true,

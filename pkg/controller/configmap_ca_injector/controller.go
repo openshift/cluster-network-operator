@@ -81,16 +81,22 @@ func add(mgr manager.Manager, r *ReconcileConfigMapInjector) error {
 	}
 
 	// Wire up the informers to the queue
-	if err := c.Watch(&source.Informer{Informer: r.labelInformer},
-		&handler.EnqueueRequestForObject{},
-		predicate.ResourceVersionChangedPredicate{},
-	); err != nil {
+	if err := c.Watch(&source.Informer{
+		Informer: r.labelInformer,
+		Handler:  &handler.EnqueueRequestForObject{},
+		Predicates: []predicate.TypedPredicate[crclient.Object]{
+			predicate.ResourceVersionChangedPredicate{},
+		},
+	}); err != nil {
 		return err
 	}
-	if err := c.Watch(&source.Informer{Informer: r.nsInformer},
-		&handler.EnqueueRequestForObject{},
-		predicate.NewPredicateFuncs(isCABundle),
-	); err != nil {
+	if err := c.Watch(&source.Informer{
+		Informer: r.nsInformer,
+		Handler:  &handler.EnqueueRequestForObject{},
+		Predicates: []predicate.TypedPredicate[crclient.Object]{
+			predicate.NewPredicateFuncs(isCABundle),
+		},
+	}); err != nil {
 		return err
 	}
 

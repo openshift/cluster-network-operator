@@ -64,16 +64,18 @@ func add(mgr manager.Manager, r *ReconcileAllowlist) error {
 
 	r.client.Default().AddCustomInformer(cmInformer) // Tell the ClusterClient about this informer
 
-	return c.Watch(&source.Informer{Informer: cmInformer},
-		&handler.EnqueueRequestForObject{},
-		predicate.ResourceVersionChangedPredicate{},
-		predicate.NewPredicateFuncs(func(object crclient.Object) bool {
-			// Only care about cni-sysctl-allowlist, but also watching for default-cni-sysctl-allowlist
-			// as a trigger for creating cni-sysctl-allowlist if it doesn't exist
-			return (strings.Contains(object.GetName(), names.ALLOWLIST_CONFIG_NAME))
-
-		}),
-	)
+	return c.Watch(&source.Informer{
+		Informer: cmInformer,
+		Handler:  &handler.EnqueueRequestForObject{},
+		Predicates: []predicate.TypedPredicate[crclient.Object]{
+			predicate.ResourceVersionChangedPredicate{},
+			predicate.NewPredicateFuncs(func(object crclient.Object) bool {
+				// Only care about cni-sysctl-allowlist, but also watching for default-cni-sysctl-allowlist
+				// as a trigger for creating cni-sysctl-allowlist if it doesn't exist
+				return (strings.Contains(object.GetName(), names.ALLOWLIST_CONFIG_NAME))
+			}),
+		},
+	})
 }
 
 var _ reconcile.Reconciler = &ReconcileAllowlist{}

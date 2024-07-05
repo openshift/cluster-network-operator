@@ -57,7 +57,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to CetificateSigningRequest resource
-	err = c.Watch(source.Kind(mgr.GetCache(), &csrv1.CertificateSigningRequest{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind[crclient.Object](mgr.GetCache(), &csrv1.CertificateSigningRequest{}, &handler.EnqueueRequestForObject{}))
 	if err != nil {
 		return err
 	}
