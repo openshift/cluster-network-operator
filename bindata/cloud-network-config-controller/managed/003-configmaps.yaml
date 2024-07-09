@@ -6,3 +6,13 @@ metadata:
   annotations:
     network.operator.openshift.io/cluster-name:  {{.ManagementClusterName}}
 # placeholder; will be replaced in render.go
+
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  namespace: {{.HostedClusterNamespace}}
+  name: trusted-ca-bundle-managed
+  labels:
+    config.openshift.io/inject-trusted-cabundle: "true"
+# will have CA-bundle injected by the CNO

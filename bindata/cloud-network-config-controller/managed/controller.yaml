@@ -189,6 +189,9 @@ spec:
         volumeMounts:
         - mountPath: /hosted-ca
           name: hosted-ca-cert
+        - name: trusted-ca
+          mountPath: /etc/pki/ca-trust/extracted/pem
+          readOnly: true
         - mountPath: /var/run/secrets/hosted_cluster
           name: hosted-cluster-api-access
         - name: cloud-provider-secret
@@ -227,6 +230,12 @@ spec:
           items:
             - key: ca.crt
               path: ca.crt
+      - name: trusted-ca
+        configMap:
+          name: trusted-ca-bundle-managed
+          items:
+          - key: ca-bundle.crt
+            path: tls-ca-bundle.pem
       - name: admin-kubeconfig
         secret:
           secretName: service-network-admin-kubeconfig
