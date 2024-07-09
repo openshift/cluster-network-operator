@@ -625,6 +625,7 @@ func renderCRDForMigration(conf *operv1.NetworkSpec, manifestDir string, feature
 		// in the cluster
 		data := render.MakeRenderData()
 		data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateAdminNetworkPolicy)
+		data.Data["OVN_NETWORK_SEGMENTATION_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateNetworkSegmentation)
 		manifests, err := render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/common/001-crd.yaml"), &data)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to render OVNKubernetes CRDs")
