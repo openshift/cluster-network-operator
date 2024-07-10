@@ -73,6 +73,7 @@ const (
 	defaultV6TransitSwitchSubnet = "fd97::/64"
 	defaultV4MasqueradeSubnet    = "169.254.169.0/29"
 	defaultV6MasqueradeSubnet    = "fd69::/125"
+	egressIPDisabled             = "disabled"
 )
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
@@ -308,6 +309,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateAdminNetworkPolicy)
 	data.Data["DNS_NAME_RESOLVER_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateDNSNameResolver)
 
+	data.Data["EgressIPEnabled"] = true
+	if c.EgressIPConfig.Mode != nil && *c.EgressIPConfig.Mode == egressIPDisabled {
+		data.Data["EgressIPEnabled"] = false
+	}
 	data.Data["ReachabilityTotalTimeoutSeconds"] = c.EgressIPConfig.ReachabilityTotalTimeoutSeconds
 
 	reachability_node_port := os.Getenv("OVN_EGRESSIP_HEALTHCHECK_PORT")

@@ -463,6 +463,62 @@ cluster-subnets="10.132.0.0/14"`,
 			controlPlaneReplicaCount: 2,
 		},
 		{
+			desc: "EgressIPConfig disabled",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://testing.test:8443"
+host-network-namespace="openshift-host-network"
+no-hostsubnet-nodes="kubernetes.io/os=windows"
+platform-type="GCP"
+healthz-bind-address="0.0.0.0:10256"
+dns-service-namespace="openshift-dns"
+dns-service-name="dns-default"
+
+[ovnkubernetesfeature]
+enable-egress-ip=false
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-multi-external-gateway=true
+
+[gateway]
+mode=local
+nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0
+
+[hybridoverlay]
+enabled=true
+cluster-subnets="10.132.0.0/14"`,
+			hybridOverlayConfig: &operv1.HybridOverlayConfig{
+				HybridClusterNetwork: []operv1.ClusterNetworkEntry{
+					{CIDR: "10.132.0.0/14", HostPrefix: 23},
+				},
+			},
+			gatewayConfig: &operv1.GatewayConfig{
+				RoutingViaHost: true,
+			},
+			egressIPConfig: &operv1.EgressIPConfig{
+				Mode: stringPtr("disabled"),
+			},
+		},
+		{
 			desc: "HybridOverlay with custom VXLAN port",
 			expected: `
 [default]
@@ -3756,6 +3812,10 @@ func uintPtr(x uint) *uint {
 }
 
 func boolPtr(x bool) *bool {
+	return &x
+}
+
+func stringPtr(x string) *string {
 	return &x
 }
 
