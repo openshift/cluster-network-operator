@@ -4,6 +4,8 @@ go 1.22.0
 
 toolchain go1.22.4
 
+replace github.com/openshift/api => github.com/andreaskaris/api-definitions v0.0.0-20240710195316-4b33cb295b7d
+
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/sprig/v3 v3.2.3
