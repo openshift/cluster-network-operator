@@ -11,6 +11,7 @@ type OVNHyperShiftBootstrapResult struct {
 	ClusterID            string
 	Namespace            string
 	HCPNodeSelector      map[string]string
+	HCPTolerations       []string
 	ControlPlaneReplicas int
 	ReleaseImage         string
 	ControlPlaneImage    string
