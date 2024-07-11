@@ -110,6 +110,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 		data.Data["ClusterIDLabel"] = hypershift.ClusterIDLabel
 		data.Data["ClusterID"] = bootstrapResult.Infra.HostedControlPlane.ClusterID
 		data.Data["HCPNodeSelector"] = bootstrapResult.Infra.HostedControlPlane.NodeSelector
+		data.Data["HCPTolerations"] = bootstrapResult.Infra.HostedControlPlane.Tolerations
 		data.Data["PriorityClass"] = bootstrapResult.Infra.HostedControlPlane.PriorityClass
 
 		// Preserve any existing multus container resource requests which may have been modified by an external source

@@ -97,6 +97,8 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 		data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
 		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
 		data.Data["HCPNodeSelector"] = bootstrapResult.Infra.HostedControlPlane.NodeSelector
+		data.Data["HCPTolerations"] = bootstrapResult.Infra.HostedControlPlane.Tolerations
+
 		data.Data["NetworkNodeIdentityImage"] = hcpCfg.ControlPlaneImage // OVN_CONTROL_PLANE_IMAGE
 		localAPIServer := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal]
 		data.Data["K8S_LOCAL_APISERVER"] = "https://" + net.JoinHostPort(localAPIServer.Host, localAPIServer.Port)
