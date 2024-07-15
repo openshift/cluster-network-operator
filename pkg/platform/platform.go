@@ -118,6 +118,10 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 
 	// AWS and OpenStack specify a CA bundle via a config map; retrieve it.
 	if res.PlatformType == configv1.AWSPlatformType || res.PlatformType == configv1.OpenStackPlatformType {
+		// In HyperShift clusters, the kube-cloud-config ConfigMap should be retrieved from the hosted control plane namespace.
+		if hc := hypershift.NewHyperShiftConfig(); hc.Enabled {
+			cloudProviderConfig.Namespace = hc.Namespace
+		}
 		cm := &corev1.ConfigMap{}
 		if err := client.Default().CRClient().Get(context.TODO(), cloudProviderConfig, cm); err != nil {
 			if !apierrors.IsNotFound(err) {
