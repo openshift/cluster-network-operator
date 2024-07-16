@@ -307,6 +307,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// leverage feature gates
 	data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateAdminNetworkPolicy)
 	data.Data["DNS_NAME_RESOLVER_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateDNSNameResolver)
+	data.Data["OVN_NETWORK_SEGMENTATION_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateNetworkSegmentation)
 
 	data.Data["ReachabilityTotalTimeoutSeconds"] = c.EgressIPConfig.ReachabilityTotalTimeoutSeconds
 

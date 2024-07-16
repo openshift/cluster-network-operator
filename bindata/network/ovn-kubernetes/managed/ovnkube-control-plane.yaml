@@ -174,6 +174,15 @@ spec:
             persistent_ips_enabled_flag="--enable-persistent-ips"
           fi
 
+          # This is needed so that converting clusters from GA to TP
+          # will rollout control plane pods as well
+          network_segmentation_enabled_flag=
+          multi_network_enabled_flag=
+          if [[ "{{.OVN_NETWORK_SEGMENTATION_ENABLE}}" == "true" ]]; then
+            multi_network_enabled_flag="--enable-multi-network"
+            network_segmentation_enabled_flag="--enable-network-segmentation"
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
@@ -191,7 +200,9 @@ spec:
             ${ovn_v4_transit_switch_subnet_opt} \
             ${ovn_v6_transit_switch_subnet_opt} \
             ${dns_name_resolver_enabled_flag} \
-            ${persistent_ips_enabled_flag}
+            ${persistent_ips_enabled_flag} \
+            ${multi_network_enabled_flag} \
+            ${network_segmentation_enabled_flag}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config

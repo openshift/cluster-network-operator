@@ -547,6 +547,12 @@ data:
         multi_network_enabled_flag="--enable-multi-network"
       fi
 
+      network_segmentation_enabled_flag=
+      if [[ "{{.OVN_NETWORK_SEGMENTATION_ENABLE}}" == "true" ]]; then
+        multi_network_enabled_flag="--enable-multi-network"
+        network_segmentation_enabled_flag="--enable-network-segmentation"
+      fi
+
       multi_network_policy_enabled_flag=
       if [[ "{{.OVN_MULTI_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
         multi_network_policy_enabled_flag="--enable-multi-networkpolicy"
@@ -615,6 +621,7 @@ data:
         --disable-snat-multiple-gws \
         ${export_network_flows_flags} \
         ${multi_network_enabled_flag} \
+        ${network_segmentation_enabled_flag} \
         ${multi_network_policy_enabled_flag} \
         ${admin_network_policy_enabled_flag} \
         ${dns_name_resolver_enabled_flag} \
