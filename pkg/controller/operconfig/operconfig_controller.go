@@ -372,6 +372,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			fmt.Sprintf("Internal error while reconciling platform networking resources: %v", err))
 		return reconcile.Result{}, err
 	}
+	log.Printf("EMILIEN Bootstrap infra kubeconfig: %v", bootstrapResult.Infra.KubeCloudConfig)
 
 	if !reflect.DeepEqual(operConfig, newOperConfig) {
 		if err := r.UpdateOperConfig(ctx, newOperConfig); err != nil {

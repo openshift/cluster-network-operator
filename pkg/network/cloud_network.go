@@ -18,6 +18,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/klog/v2"
 )
 
 // renderCloudNetworkConfigController renders the cloud network config controller
@@ -62,6 +63,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		},
 		Data: cloudBootstrapResult.KubeCloudConfig,
 	}
+	klog.Infof("EMILIEN: KubeCloudConfig: %v", cloudBootstrapResult.KubeCloudConfig)
 	if cloudBootstrapResult.PlatformType == v1.AWSPlatformType {
 		for _, ep := range cloudBootstrapResult.PlatformStatus.AWS.ServiceEndpoints {
 			if ep.Name == "ec2" {

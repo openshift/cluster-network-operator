@@ -116,6 +116,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		res.PlatformRegion = infraConfig.Status.PlatformStatus.GCP.Region
 	}
 
+	klog.Infof("EMILIEN: InfraStatus: %v", res)
 	// AWS and OpenStack specify a CA bundle via a config map; retrieve it.
 	if res.PlatformType == configv1.AWSPlatformType || res.PlatformType == configv1.OpenStackPlatformType {
 		// In HyperShift clusters, the kube-cloud-config ConfigMap should be retrieved from the hosted control plane namespace.
@@ -128,6 +129,8 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 				return nil, fmt.Errorf("failed to retrieve ConfigMap %s: %w", cloudProviderConfig, err)
 			}
 		} else {
+			klog.Infof("EMILIEN: Found kube-cloud-config ConfigMap %s", cloudProviderConfig)
+			klog.Infof("EMILIEN: Data: %v", cm.Data)
 			res.KubeCloudConfig = cm.Data
 		}
 	}
