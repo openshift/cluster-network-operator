@@ -1488,14 +1488,24 @@ func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
 		return status.MachineCount == status.UpdatedMachineCount &&
 			hasSourceInMachineConfigStatus(status, machineConfigs)
 	}
+
 	for _, masterMCPStatus := range infra.MasterMCPStatuses {
 		if !ipSecPluginOnPool(masterMCPStatus, infra.MasterIPsecMachineConfigs) {
 			return false
 		}
 	}
-	for _, workerMCPStatus := range infra.WorkerMCPStatuses {
-		if !ipSecPluginOnPool(workerMCPStatus, infra.WorkerIPsecMachineConfigs) {
-			return false
+	mcpList := &mcfgv1.MachineConfigPoolList{}
+	for _, mcp := range mcpList.Items {
+		if mcp.Name != "master" {
+			for _, source := range mcp.Status.Configuration.Source {
+				isContainIpsec := false
+				if strings.Contains(source.Name, "ipsec") {
+					isContainIpsec = true
+				}
+				if !isContainIpsec {
+					return false
+				}
+			}
 		}
 	}
 	return true
