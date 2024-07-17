@@ -116,7 +116,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		res.PlatformRegion = infraConfig.Status.PlatformStatus.GCP.Region
 	}
 
-	klog.Infof("EMILIEN: InfraStatus: %v", res)
+	klog.Infof("EMILIEN: KubeCloudConfig in InfraStatus func %v", res.KubeCloudConfig)
 	// AWS and OpenStack specify a CA bundle via a config map; retrieve it.
 	if res.PlatformType == configv1.AWSPlatformType || res.PlatformType == configv1.OpenStackPlatformType {
 		cm := &corev1.ConfigMap{}
@@ -124,6 +124,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 			if !apierrors.IsNotFound(err) {
 				return nil, fmt.Errorf("failed to retrieve ConfigMap %s: %w", cloudProviderConfig, err)
 			}
+			klog.Infof("EMILIEN: ConfigMap %s not found", cloudProviderConfig)
 		} else {
 			klog.Infof("EMILIEN: Found kube-cloud-config ConfigMap %s", cloudProviderConfig)
 			klog.Infof("EMILIEN: Data: %v", cm.Data)
