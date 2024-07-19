@@ -143,6 +143,11 @@ spec:
             network_segmentation_enabled_flag="--enable-network-segmentation"
           fi
 
+          route_advertisements_enable_flag=
+          if [[ "{{.OVN_ROUTE_ADVERTISEMENTS_ENABLE}}" == "true" ]]; then
+            route_advertisements_enable_flag="--enable-route-advertisements"
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
@@ -159,7 +164,8 @@ spec:
             ${dns_name_resolver_enabled_flag} \
             ${persistent_ips_enabled_flag} \
             ${multi_network_enabled_flag} \
-            ${network_segmentation_enabled_flag}
+            ${network_segmentation_enabled_flag} \
+            ${route_advertisements_enable_flag}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
