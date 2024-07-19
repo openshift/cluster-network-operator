@@ -212,6 +212,41 @@ rules:
     - list
     - watch
 {{- end}}
+{{- if .OVN_ROUTE_ADVERTISEMENTS_ENABLE }}
+- apiGroups:
+  - k8s.ovn.org
+  resources:
+  - routeadvertisements
+  verbs:
+  - list
+  - get
+  - watch
+- apiGroups:
+  - k8s.ovn.org
+  resources:
+  - routeadvertisements/status
+  verbs:
+  - patch
+  - update
+- apiGroups: 
+  - frrk8s.metallb.io
+  resources:
+  - frrconfigurations
+  verbs:
+  - list
+  - get
+  - watch
+  - create
+  - delete
+  - update
+  - patch
+- apiGroups:
+  - k8s.cni.cncf.io
+  resources:
+  - network-attachment-definitions
+  verbs: 
+  - patch
+{{- end}}
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
