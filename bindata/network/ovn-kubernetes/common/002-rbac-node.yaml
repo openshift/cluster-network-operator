@@ -199,6 +199,16 @@ rules:
   - get
   - list
   - watch
+{{- if .OVN_ROUTE_ADVERTISEMENTS_ENABLE }}
+- apiGroups:
+  - k8s.ovn.org
+  resources:
+  - routeadvertisements
+  verbs:
+  - list
+  - get
+  - watch
+{{- end}}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
