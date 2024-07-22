@@ -268,6 +268,16 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNIPsecDaemonsetEnable"] = OVNIPsecDaemonsetEnable
 	data.Data["OVNIPsecEnable"] = OVNIPsecEnable
 
+	// Set progressing to true until IPsec DaemonSet is rendered when EW IPsec config is enabled.
+	// TODO Do a poor man's job mapping machine config pool status to CNO progressing state for now.
+	// This has two problems:
+	// - Not a great feedback to the user on why we are progressing other than `Waiting to render manifests`.
+	// - If pool status degrades due to CNO's changes, CNO stays progressing where it would be
+	//   potentially better to report it as degraded as well.
+	// Overall, mapping machine config pool status to CNO status should better be done in status manager.
+	// Future efforts on this are tracked in https://issues.redhat.com/browse/SDN-4829.
+	progressing = OVNIPsecDaemonsetEnable && !renderIPsecHostDaemonSet && !renderIPsecContainerizedDaemonSet
+
 	klog.V(5).Infof("IPsec: is MachineConfig enabled: %v, is East-West DaemonSet enabled: %v", data.Data["IPsecMachineConfigEnable"], data.Data["OVNIPsecDaemonsetEnable"])
 
 	if c.GatewayConfig != nil && c.GatewayConfig.RoutingViaHost {
@@ -1456,16 +1466,32 @@ func containsNetworkOwnerRef(ownerRefs []metav1.OwnerReference) bool {
 	return false
 }
 
-// isIPsecMachineConfigActive returns true if both master and worker's machine config pool are ready with
+// isIPsecMachineConfigActive returns true if both master and worker's machine config pools are ready with
 // ipsec machine config extension rolled out, otherwise returns false.
 func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
 	if infra.MasterIPsecMachineConfigs == nil || infra.WorkerIPsecMachineConfigs == nil {
 		// One of the IPsec MachineConfig is not created yet, so return false.
 		return false
 	}
-	ipSecPluginOnMasterNodes := hasSourceInMachineConfigStatus(infra.MasterMCPStatus, infra.MasterIPsecMachineConfigs)
-	ipSecPluginOnWorkerNodes := hasSourceInMachineConfigStatus(infra.WorkerMCPStatus, infra.WorkerIPsecMachineConfigs)
-	return ipSecPluginOnMasterNodes && ipSecPluginOnWorkerNodes
+	if len(infra.MasterMCPStatuses) == 0 || len(infra.WorkerMCPStatuses) == 0 {
+		// When none of MachineConfig pools exist, then return false. needed for unit test.
+		return false
+	}
+	ipSecPluginOnPool := func(status mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
+		return status.MachineCount == status.UpdatedMachineCount &&
+			hasSourceInMachineConfigStatus(status, machineConfigs)
+	}
+	for _, masterMCPStatus := range infra.MasterMCPStatuses {
+		if !ipSecPluginOnPool(masterMCPStatus, infra.MasterIPsecMachineConfigs) {
+			return false
+		}
+	}
+	for _, workerMCPStatus := range infra.WorkerMCPStatuses {
+		if !ipSecPluginOnPool(workerMCPStatus, infra.WorkerIPsecMachineConfigs) {
+			return false
+		}
+	}
+	return true
 }
 
 func hasSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
