@@ -156,6 +156,24 @@ rules:
     - ipamclaims/status
   verbs: [ "patch", "update" ]
 {{- end}}
+{{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
+- apiGroups:
+    - discovery.k8s.io
+  resources:
+    - endpointslices
+  verbs:
+    - create
+    - delete
+    - update
+    - get
+    - list
+    - watch
+- apiGroups: [""]
+  resources:
+    - services/finalizers
+  verbs:
+    - update
+{{- end}}
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
