@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -134,6 +135,12 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	objs = append(objs, o...)
 
 	o, err = renderIPTablesAlerter(operConf, bootstrapResult, manifestDir)
+	if err != nil {
+		return nil, progressing, err
+	}
+	objs = append(objs, o...)
+
+	o, err = renderAdditionalRoutingCapabilities(operConf, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -890,4 +897,27 @@ func renderIPTablesAlerter(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.
 
 func isSupportedDualStackPlatform(platformType configv1.PlatformType) bool {
 	return dualStackPlatforms.Has(string(platformType))
+}
+
+func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+	if conf == nil || conf.AdditionalRoutingCapabilities == nil {
+		return nil, nil
+	}
+	var out []*uns.Unstructured
+	for _, provider := range conf.AdditionalRoutingCapabilities.Providers {
+		switch provider {
+		case operv1.RoutingCapabilitiesProviderFRR:
+			data := render.MakeRenderData()
+			data.Data["FRRK8sImage"] = os.Getenv("FRR_K8S_IMAGE")
+			data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
+			data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
+			objs, err := render.RenderDir(filepath.Join(manifestDir, "network/frr-k8s"), &data)
+			if err != nil {
+				return nil, fmt.Errorf("failed to render frr-k8s manifests: %w", err)
+			}
+			out = append(out, objs...)
+		}
+	}
+
+	return out, nil
 }

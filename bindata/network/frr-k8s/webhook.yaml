@@ -1,0 +1,121 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frr-k8s-webhook-service
+  namespace: openshift-frr-k8s
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: frr-k8s-webhook-server-cert
+spec:
+  ports:
+  - port: 443
+    targetPort: 9443
+  selector:
+    component: frr-k8s-webhook-server
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: frr-k8s-validating-webhook-configuration
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: frr-k8s-webhook-service
+      namespace: openshift-frr-k8s
+      path: /validate-frrk8s-metallb-io-v1beta1-frrconfiguration
+  failurePolicy: Fail
+  name: frrconfigurationsvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - frrk8s.metallb.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - frrconfigurations
+  sideEffects: None
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frr-k8s-webhook-server
+  namespace: openshift-frr-k8s
+  labels:
+    app: frr-k8s
+    component: frr-k8s-webhook-server
+  annotations:
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+    matchLabels:
+      component: frr-k8s-webhook-server
+  template:
+    metadata:
+      labels:
+        component: frr-k8s-webhook-server
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        openshift.io/required-scc: restricted-v2
+    spec:
+      containers:
+      - command:
+        - /frr-k8s
+        args:
+        - --log-level=info
+        - --webhook-mode=onlywebhook
+        - --disable-cert-rotation=true
+        - --namespace=$(NAMESPACE)
+        - --health-probe-bind-address=:8081
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        image: {{.FRRK8sImage}}
+        name: frr-k8s-webhook-server
+        securityContext:
+         runAsNonRoot: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 3
+        volumeMounts:
+        - name: cert
+          mountPath: /tmp/k8s-webhook-server/serving-certs
+          readOnly: true
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+        operator: Exists
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+        operator: Exists
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: frr-k8s-webhook-server-cert
+      serviceAccountName: frr-k8s-daemon
+      priorityClassName: system-cluster-critical
+      terminationGracePeriodSeconds: 10

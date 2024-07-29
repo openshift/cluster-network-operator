@@ -1,0 +1,279 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: frr-k8s
+  namespace: openshift-frr-k8s
+  labels:
+    app: frr-k8s
+    component: frr-k8s
+  annotations:
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
+  selector:
+    matchLabels:
+      app: frr-k8s
+      component: frr-k8s
+  template:
+    metadata:
+      labels:
+        app: frr-k8s
+        component: frr-k8s
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        openshift.io/required-scc: privileged
+    spec:
+      serviceAccountName: frr-k8s-daemon
+      priorityClassName: system-node-critical
+      terminationGracePeriodSeconds: 0
+      hostNetwork: true
+      volumes:
+      - name: frr-sockets
+        emptyDir: {}
+      - name: frr-startup
+        configMap:
+          name: frr-startup
+      - name: frr-conf
+        emptyDir: {}
+      - name: reloader
+        emptyDir: {}
+      - name: metrics
+        emptyDir: {}
+      - name: metrics-certs
+        secret:
+          secretName: frr-k8s-certs-secret
+      initContainers:
+      # Copies the initial config files with the right permissions to the shared volume.
+      - name: cp-frr-files
+        image: {{.FRRK8sImage}}
+        securityContext:
+          runAsUser: 100
+          runAsGroup: 101
+        command: ["/bin/sh", "-c", "cp -rLf /tmp/frr/* /etc/frr/"]
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: frr-startup
+          mountPath: /tmp/frr
+        - name: frr-conf
+          mountPath: /etc/frr
+      # Copies the reloader to the shared volume between the speaker and reloader.
+      - name: cp-reloader
+        image: {{.FRRK8sImage}}
+        command: ["/bin/sh", "-c", "cp -f /frr-reloader.sh /etc/frr_reloader/"]
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: reloader
+          mountPath: /etc/frr_reloader
+      # Copies the metrics exporter
+      - name: cp-metrics
+        image: {{.FRRK8sImage}}
+        command: ["/bin/sh", "-c", "cp -f /frr-metrics /etc/frr_metrics/"]
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: metrics
+          mountPath: /etc/frr_metrics
+      shareProcessNamespace: true
+      containers:
+      - name: controller
+        image: {{.FRRK8sImage}}
+        command:
+        - /frr-k8s
+        args:
+        - --node-name=$(NODE_NAME)
+        - --namespace=$(NAMESPACE)
+        - --metrics-bind-address=127.0.0.1:7572
+        - --log-level=info
+        - --health-probe-bind-address=127.0.0.1:8081
+        env:
+        - name: FRR_CONFIG_FILE
+          value: /etc/frr_reloader/frr.conf
+        - name: FRR_RELOADER_PID_FILE
+          value: /etc/frr_reloader/reloader.pid
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        ports:
+        - containerPort: 7572
+          name: monitoring
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            host: 127.0.0.1
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            host: 127.0.0.1
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_RAW
+        volumeMounts:
+          - name: reloader
+            mountPath: /etc/frr_reloader
+      - name: frr
+        securityContext:
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+            - SYS_ADMIN
+            - NET_BIND_SERVICE
+        image: {{.FRRK8sImage}}
+        env:
+        - name: TINI_SUBREAPER
+          value: "true"
+        volumeMounts:
+        - name: frr-sockets
+          mountPath: /var/run/frr
+        - name: frr-conf
+          mountPath: /etc/frr
+        # The command is FRR's default entrypoint & waiting for the log file to appear and tailing it.
+        # If the log file isn't created in 60 seconds the tail fails and the container is restarted.
+        # This workaround is needed to have the frr logs as part of kubectl logs -c frr < controller_pod_name >.
+        command:
+        - /bin/sh
+        - -c
+        - |
+          /sbin/tini -- /usr/lib/frr/docker-start &
+          attempts=0
+          until [[ -f /etc/frr/frr.log || $attempts -eq 60 ]]; do
+            sleep 1
+            attempts=$(( $attempts + 1 ))
+          done
+          tail -f /etc/frr/frr.log
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: 7573
+            host: 127.0.0.1
+          periodSeconds: 10
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /livez
+            port: 7573
+            host: 127.0.0.1
+          failureThreshold: 30
+          periodSeconds: 5
+      - name: reloader
+        image: {{.FRRK8sImage}}
+        command: ["/etc/frr_reloader/frr-reloader.sh"]
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: frr-sockets
+          mountPath: /var/run/frr
+        - name: frr-conf
+          mountPath: /etc/frr
+        - name: reloader
+          mountPath: /etc/frr_reloader
+      - name: frr-metrics
+        image: {{.FRRK8sImage}}
+        command: ["/etc/frr_metrics/frr-metrics"]
+        args:
+        - --metrics-port=7573
+        - --metrics-bind-address=127.0.0.1
+        ports:
+        - containerPort: 7573
+          name: monitoring
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: frr-sockets
+          mountPath: /var/run/frr
+        - name: frr-conf
+          mountPath: /etc/frr
+        - name: metrics
+          mountPath: /etc/frr_metrics
+      - name: kube-rbac-proxy
+        image: {{.KubeRBACProxyImage}}
+        args:
+        - --logtostderr
+        - --secure-listen-address=:9140
+        - --upstream=http://127.0.0.1:7572/
+        - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - --tls-private-key-file=/etc/metrics/tls.key
+        - --tls-cert-file=/etc/metrics/tls.crt
+        ports:
+        - containerPort: 9140
+          name: metricshttps
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: metrics-certs
+          mountPath: /etc/metrics
+          readOnly: true
+      - name: kube-rbac-proxy-frr
+        image: {{.KubeRBACProxyImage}}
+        args:
+        - --logtostderr
+        - --secure-listen-address=:9141
+        - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - --upstream=http://127.0.0.1:7573/
+        - --tls-private-key-file=/etc/metrics/tls.key
+        - --tls-cert-file=/etc/metrics/tls.crt
+        ports:
+        - containerPort: 9141
+          name: metricshttps
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: metrics-certs
+          mountPath: /etc/metrics
+          readOnly: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+        operator: Exists
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+        operator: Exists

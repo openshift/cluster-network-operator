@@ -224,6 +224,19 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 				continue
 			}
 
+			// Do not remove FRR CRD to prevent data loss that would happen when
+			// its instances are automaticaly removed as a result. This is
+			// specially meaningful as MetalLB operator relies on FRR and
+			// reconciles the CNO flag to deploy it. This reconciliation would
+			// be meaningless it we were to destroy the configuration. user will
+			// have to remove such configuration and the CRD manually. TODO:
+			// perhaps degrade CNO state if CRDs are attempted to be removed
+			// when instances exist on the system.
+			if gvk.Kind == "CustomResourceDefinition" && gvk.Group == "apiextensions.k8s.io" && currentObj.Name == "frrconfigurations.frrk8s.metallb.io" {
+				klog.Info("Won't remove FRR CRD frrconfigurations.frrk8s.metallb.io, skip")
+				continue
+			}
+
 			log.Printf("Detected related object with GVK %+v, namespace %v and name %v not rendered by manifests, deleting...", gvk, currentObj.Namespace, currentObj.Name)
 			objToDelete := &uns.Unstructured{}
 			objToDelete.SetName(currentObj.Name)
