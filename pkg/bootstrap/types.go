@@ -44,8 +44,7 @@ type OVNUpdateStatus struct {
 // OVNIPsecStatus contains status of current IPsec configuration
 // in the cluster.
 type OVNIPsecStatus struct {
-	LegacyIPsecUpgrade bool // true if IPsec in 4.14 or Pre-4.14 cluster is upgraded to latest version
-	OVNIPsecActive     bool // set to true unless we are sure it is not.
+	OVNIPsecActive bool // set to true unless we are sure it is not.
 }
 
 type OVNBootstrapResult struct {
