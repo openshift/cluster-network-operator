@@ -273,6 +273,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["IPsecMachineConfigEnable"] = IPsecMachineConfigEnable
 	data.Data["OVNIPsecDaemonsetEnable"] = OVNIPsecDaemonsetEnable
 	data.Data["OVNIPsecEnable"] = OVNIPsecEnable
+	data.Data["IPsecCheckForLibreswan"] = renderIPsecHostDaemonSet && renderIPsecContainerizedDaemonSet
 
 	klog.V(5).Infof("IPsec: is MachineConfig enabled: %v, is East-West DaemonSet enabled: %v", data.Data["IPsecMachineConfigEnable"], data.Data["OVNIPsecDaemonsetEnable"])
 
@@ -468,8 +469,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-containerized")
 	}
 
-	// When upgrading a legacy IPsec deployment, avoid any updates until IPsec MachineConfigs
-	// are active.
+	// When disabling IPsec deployment, avoid any updates until IPsec is completely
+	// disabled from OVN.
 	if renderIPsecDaemonSetAsCreateWaitOnly {
 		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-host", func(o *uns.Unstructured) {
 			anno := o.GetAnnotations()
@@ -488,25 +489,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			anno[names.CreateWaitAnnotation] = "true"
 			o.SetAnnotations(anno)
 		})
-		// The legacy ovn-ipsec deployment is only rendered during upgrades until we
-		// are ready to remove it.
-		ovnIPsecLegacyDS := &appsv1.DaemonSet{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "DaemonSet",
-				APIVersion: appsv1.SchemeGroupVersion.String(),
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "ovn-ipsec",
-				Namespace: util.OVN_NAMESPACE,
-				// We never update the legacy ovn-ipsec daemonset.
-				Annotations: map[string]string{names.CreateWaitAnnotation: "true"},
-			},
-		}
-		obj, err := k8s.ToUnstructured(ovnIPsecLegacyDS)
-		if err != nil {
-			return nil, progressing, fmt.Errorf("unable to render legacy ovn-ipsec daemonset: %w", err)
-		}
-		objs = append(objs, obj)
 	}
 
 	klog.Infof("ovnk components: ovnkube-node: isRunning=%t, update=%t; ovnkube-control-plane: isRunning=%t, update=%t",
@@ -596,7 +578,6 @@ func IsIPsecLegacyAPI(conf *operv1.OVNKubernetesConfig) bool {
 func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootstrap.BootstrapResult) (renderCNOIPsecMachineConfig, renderIPsecDaemonSet,
 	renderIPsecOVN, renderIPsecHostDaemonSet, renderIPsecContainerizedDaemonSet, renderIPsecDaemonSetAsCreateWaitOnly bool) {
 	isHypershiftHostedCluster := bootstrapResult.Infra.HostedControlPlane != nil
-	isIpsecUpgrade := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.LegacyIPsecUpgrade
 	isOVNIPsecActive := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.OVNIPsecActive
 
 	mode := GetIPsecMode(conf)
@@ -605,7 +586,6 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// change to them. So during upgrade, we must keep track if IPsec MachineConfigs are
 	// active or not for non Hybrid hosted cluster.
 	isIPsecMachineConfigActive := isIPsecMachineConfigActive(bootstrapResult.Infra)
-	isIPsecMachineConfigNotActiveOnUpgrade := isIpsecUpgrade && !isIPsecMachineConfigActive && !isHypershiftHostedCluster
 	isMachineConfigClusterOperatorReady := bootstrapResult.Infra.MachineConfigClusterOperatorReady
 	isCNOIPsecMachineConfigPresent := isCNOIPsecMachineConfigPresent(bootstrapResult.Infra)
 
@@ -614,15 +594,19 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	renderIPsecDaemonSet = isOVNIPsecActive || mode == operv1.IPsecModeFull
 
 	// If ipsec is enabled, we render the host ipsec deployment except for
-	// hypershift hosted clusters and we need to wait for the ipsec MachineConfig
-	// extensions to be active first. We must also render host ipsec deployment
-	// at the time of upgrade though user created IPsec Machine Config is not
-	// present/active.
-	renderIPsecHostDaemonSet = (renderIPsecDaemonSet && isIPsecMachineConfigActive && !isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnUpgrade
+	// hypershift hosted clusters. We must also render host ipsec daemonset
+	// when any of the machine config pool in paused state without ipsec machine
+	// config deployed and at the same time unpaused pools having ipsec machine
+	// config deployed. This helps host ipsec daemonset pods to be effective on
+	// unpaused pool nodes.
+	renderIPsecHostDaemonSet = renderIPsecDaemonSet && !isHypershiftHostedCluster
 
-	// The containerized ipsec deployment is only rendered during upgrades or
-	// for hypershift hosted clusters.
-	renderIPsecContainerizedDaemonSet = (renderIPsecDaemonSet && isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnUpgrade
+	// The containerized ipsec deployment is only rendered for hypershift hosted clusters.
+	// We must also render containerized ipsec daemonset when any of the machine config
+	// pool in paused state without ipsec machine config deployed and at the same time
+	// unpaused pools having ipsec machine config deployed. This helps containerized daemonset
+	// pods to be effective on paused pool nodes.
+	renderIPsecContainerizedDaemonSet = (renderIPsecDaemonSet && isHypershiftHostedCluster) || !isIPsecMachineConfigActive
 
 	// MachineConfig IPsec extensions rollout is needed for the ipsec enablement and are used in both External and Full modes.
 	// except  when the containerized deployment is used in hypershift hosted clusters.
@@ -635,9 +619,8 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// to be active if it's not an upgrade and not a hypershift hosted cluster.
 	renderIPsecOVN = (renderIPsecHostDaemonSet || renderIPsecContainerizedDaemonSet) && mode == operv1.IPsecModeFull
 
-	// While OVN ipsec is being upgraded and IPsec MachineConfigs deployment is in progress
-	// (or) IPsec config in OVN is being disabled, then ipsec deployment is not updated.
-	renderIPsecDaemonSetAsCreateWaitOnly = isIPsecMachineConfigNotActiveOnUpgrade || (isOVNIPsecActive && !renderIPsecOVN)
+	// IPsec config in OVN is being disabled, then ipsec deployment is not updated.
+	renderIPsecDaemonSetAsCreateWaitOnly = isOVNIPsecActive && !renderIPsecOVN
 
 	return
 }
@@ -1173,65 +1156,39 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		prepullerStatus.Progressing = daemonSetProgressing(prePullerDaemonSet, true)
 	}
 
-	ipsecDaemonSet := &appsv1.DaemonSet{
+	ipsecStatus := &bootstrap.OVNIPsecStatus{}
+	ipsecContainerizedDaemonSet := &appsv1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
 	}
-
-	ipsecStatus := &bootstrap.OVNIPsecStatus{}
-
-	// The IPsec daemonset name is ovn-ipsec if we are upgrading from <= 4.13.
-	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec"}
-	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecDaemonSet); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("Failed to retrieve existing pre-4.14 ipsec DaemonSet: %w", err)
-		} else {
-			ipsecStatus = nil
-		}
-	} else {
-		ipsecStatus.LegacyIPsecUpgrade = true
+	ipsecHostDaemonSet := &appsv1.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
 	}
-
-	if ipsecStatus == nil {
-		ipsecStatus = &bootstrap.OVNIPsecStatus{}
-		ipsecContainerizedDaemonSet := &appsv1.DaemonSet{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "DaemonSet",
-				APIVersion: appsv1.SchemeGroupVersion.String(),
-			},
+	// Retrieve container based IPsec daemonset with name ovn-ipsec-containerized.
+	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec-containerized"}
+	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecContainerizedDaemonSet); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to retrieve ipsec containerized DaemonSet: %w", err)
+		} else {
+			ipsecContainerizedDaemonSet = nil
 		}
-		ipsecHostDaemonSet := &appsv1.DaemonSet{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "DaemonSet",
-				APIVersion: appsv1.SchemeGroupVersion.String(),
-			},
+	}
+	// Retrieve host based IPsec daemonset with name ovn-ipsec-host
+	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec-host"}
+	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecHostDaemonSet); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Failed to retrieve ipsec host DaemonSet: %w", err)
+		} else {
+			ipsecHostDaemonSet = nil
 		}
-		// Retrieve container based IPsec daemonset with name ovn-ipsec-containerized.
-		nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec-containerized"}
-		if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecContainerizedDaemonSet); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return nil, fmt.Errorf("Failed to retrieve existing ipsec containerized DaemonSet: %w", err)
-			} else {
-				ipsecContainerizedDaemonSet = nil
-			}
-		}
-		// Retrieve host based IPsec daemonset with name ovn-ipsec-host
-		nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovn-ipsec-host"}
-		if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, ipsecHostDaemonSet); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return nil, fmt.Errorf("Failed to retrieve existing ipsec host DaemonSet: %w", err)
-			} else {
-				ipsecHostDaemonSet = nil
-			}
-		}
-		if ipsecContainerizedDaemonSet != nil && ipsecHostDaemonSet != nil {
-			// Both IPsec daemonset versions exist, so this is an upgrade from 4.14.
-			ipsecStatus.LegacyIPsecUpgrade = true
-		} else if ipsecContainerizedDaemonSet == nil && ipsecHostDaemonSet == nil {
-			ipsecStatus = nil
-		}
+	}
+	if ipsecContainerizedDaemonSet == nil && ipsecHostDaemonSet == nil {
+		ipsecStatus = nil
 	}
 
 	// set OVN IPsec status into ipsecStatus only when IPsec daemonset(s) exists in the cluster.
