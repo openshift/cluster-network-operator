@@ -312,9 +312,6 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec, infraStatus *bootstrap.InfraSt
 		errs = append(errs, err)
 	}
 
-	// Check the network migration
-	errs = append(errs, isMigrationChangeSafe(prev, next, infraStatus)...)
-
 	// Check the default network
 	errs = append(errs, isDefaultNetworkChangeSafe(prev, next)...)
 
@@ -595,7 +592,17 @@ func validateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 
 // validateMigration validates if migration path is possible
 func validateMigration(conf *operv1.NetworkSpec) []error {
-	return []error{}
+	var errs []error
+
+	if conf.Migration != nil {
+		if conf.Migration.NetworkType != "" {
+			errs = append(errs, errors.Errorf("network type migration is not supported"))
+		}
+		if conf.Migration.Features != nil {
+			errs = append(errs, errors.Errorf("network feature migration is not supported"))
+		}
+	}
+	return errs
 }
 
 // renderDefaultNetwork generates the manifests corresponding to the requested
@@ -682,37 +689,15 @@ func fillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int)
 }
 
 func isDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
-
 	if prev.DefaultNetwork.Type != next.DefaultNetwork.Type {
-		if prev.Migration == nil {
-			return []error{errors.Errorf("cannot change default network type when not doing migration")}
-		} else {
-			if operv1.NetworkType(prev.Migration.NetworkType) != next.DefaultNetwork.Type {
-				return []error{errors.Errorf("can only change default network type to the target migration network type")}
-			}
-		}
+		return []error{errors.Errorf("cannot change default network type")}
 	}
 
-	if prev.Migration == nil || prev.Migration.NetworkType == "" {
-		switch prev.DefaultNetwork.Type {
-		case operv1.NetworkTypeOpenShiftSDN:
-			return isOpenShiftSDNChangeSafe(prev, next)
-		case operv1.NetworkTypeOVNKubernetes:
-			return isOVNKubernetesChangeSafe(prev, next)
-		default:
-			return nil
-		}
-	}
-	return nil
-}
-
-func isMigrationChangeSafe(prev, next *operv1.NetworkSpec, infraStatus *bootstrap.InfraStatus) []error {
-	// infra.HostedControlPlane is not nil only when HyperShift is enabled
-	if next.Migration != nil && next.Migration.Mode == operv1.LiveNetworkMigrationMode && infraStatus.HostedControlPlane != nil {
-		return []error{errors.Errorf("live migration is unsupported in a HyperShift environment")}
-	}
-	if prev.Migration != nil && next.Migration != nil && prev.Migration.NetworkType != next.Migration.NetworkType && next.Migration.Mode != operv1.LiveNetworkMigrationMode {
-		return []error{errors.Errorf("cannot change migration network type after migration has started")}
+	switch prev.DefaultNetwork.Type {
+	case operv1.NetworkTypeOpenShiftSDN:
+		return isOpenShiftSDNChangeSafe(prev, next)
+	case operv1.NetworkTypeOVNKubernetes:
+		return isOVNKubernetesChangeSafe(prev, next)
 	}
 	return nil
 }
