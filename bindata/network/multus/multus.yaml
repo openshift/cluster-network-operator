@@ -282,6 +282,7 @@ spec:
         # kubelet socket
         - name: host-var-lib-kubelet
           mountPath: /var/lib/kubelet
+          mountPropagation: HostToContainer
         - name: hostroot
           mountPath: /hostroot
           mountPropagation: HostToContainer

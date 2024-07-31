@@ -547,6 +547,7 @@ spec:
         - mountPath: /var/lib/kubelet
           name: host-kubelet
           readOnly: true
+          mountPropagation: HostToContainer
 {{ end }}
         # for checking ovs-configuration service
         - mountPath: /etc/systemd/system
