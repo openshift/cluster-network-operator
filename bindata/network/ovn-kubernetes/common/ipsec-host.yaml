@@ -48,6 +48,12 @@ spec:
         - |
           #!/bin/bash
           set -exuo pipefail
+{{ if .IPsecCheckForLibreswan }}
+          if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
+            echo "host doesnt have libreswan, therefore ipsec will be configured by ipsec-containerized daemonset, this ovn ipsec container has nothing to init"
+            exit 0
+          fi
+{{ end }}
 {{ if .NETWORK_NODE_IDENTITY_ENABLE }}
           # When NETWORK_NODE_IDENTITY_ENABLE is true, use the per-node certificate to create a kubeconfig
           # that will be used to talk to the API
@@ -192,6 +198,9 @@ spec:
           name: etc-openvswitch
         - mountPath: /etc
           name: host-etc
+        - mountPath: /usr/share/rpm
+          name: host-usr-share-rpm
+          readOnly: true
         resources:
           requests:
             cpu: 10m
@@ -207,6 +216,13 @@ spec:
         - |
           #!/bin/bash
           set -exuo pipefail
+
+{{ if .IPsecCheckForLibreswan }}
+          if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
+            echo "host doesnt have libreswan, therefore ipsec will be configured by ipsec-containerized daemonset, this ovn ipsec container will sleep to infinity"
+            sleep infinity
+          fi
+{{ end }}
 
           # Don't start IPsec until ovnkube-node has finished setting up the node
           counter=0
@@ -283,6 +299,13 @@ spec:
                    # In order to maintain traffic flows during container restart, we
                    # need to ensure that xfrm state and policies are not flushed.
 
+{{ if .IPsecCheckForLibreswan }}
+                   if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
+                     echo "host doesnt have libreswan, therefore ipsec will be configured by ipsec-containerized daemonset, preStop wont do anything"
+                     exit 0
+                   fi
+{{ end }}
+
                    # Don't allow ovs monitor to cleanup persistent state
                    kill "$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)" 2>/dev/null || true
         env:
@@ -310,6 +333,9 @@ spec:
           name: ipsec-bin
         - mountPath: /usr/libexec/ipsec
           name: ipsec-lib
+        - mountPath: /usr/share/rpm
+          name: host-usr-share-rpm
+          readOnly: true
         resources:
           requests:
             cpu: 10m
@@ -322,6 +348,12 @@ spec:
             - -c
             - |
               #!/bin/bash
+{{ if .IPsecCheckForLibreswan }}
+              if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
+                echo "host doesnt have libreswan, therefore ipsec will be configured by ipsec-containerized daemonset, this ovn ipsec container is always \"alive\""
+                exit 0
+              fi
+{{ end }}
               if [[ $(ipsec whack --trafficstatus | wc -l) -eq 0 ]]; then
                 echo "no ipsec traffic configured"
                 exit 10
@@ -507,6 +539,10 @@ spec:
           path: /usr/libexec/ipsec
           type: Directory
         name: ipsec-lib
+      - name: host-usr-share-rpm
+        hostPath:
+          path: /usr/share/rpm
+          type: DirectoryOrCreate
       tolerations:
       - operator: "Exists"
 {{end}}
