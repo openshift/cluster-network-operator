@@ -1479,7 +1479,7 @@ func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
 		// One of the IPsec MachineConfig is not created yet, so return false.
 		return false
 	}
-	if len(infra.MasterMCPStatuses) == 0 || len(infra.WorkerMCPStatuses) == 0 {
+	if len(infra.MasterMCPs) == 0 || len(infra.WorkerMCPs) == 0 {
 		// When none of MachineConfig pools exist, then return false. needed for unit test.
 		return false
 	}
@@ -1487,13 +1487,13 @@ func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
 		return status.MachineCount == status.UpdatedMachineCount &&
 			hasSourceInMachineConfigStatus(status, machineConfigs)
 	}
-	for _, masterMCPStatus := range infra.MasterMCPStatuses {
-		if !ipSecPluginOnPool(masterMCPStatus, infra.MasterIPsecMachineConfigs) {
+	for _, masterMCP := range infra.MasterMCPs {
+		if !ipSecPluginOnPool(masterMCP.Status, infra.MasterIPsecMachineConfigs) {
 			return false
 		}
 	}
-	for _, workerMCPStatus := range infra.WorkerMCPStatuses {
-		if !ipSecPluginOnPool(workerMCPStatus, infra.WorkerIPsecMachineConfigs) {
+	for _, workerMCP := range infra.WorkerMCPs {
+		if !ipSecPluginOnPool(workerMCP.Status, infra.WorkerIPsecMachineConfigs) {
 			return false
 		}
 	}
