@@ -2489,10 +2489,10 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 
 	// At the 3rd pass, test render logic while MC extension rollout is in progress.
 	bootstrapResult.Infra.MachineConfigClusterOperatorReady = false
-	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 0, UpdatedMachineCount: 0,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}
-	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}
+	bootstrapResult.Infra.MasterMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 0, UpdatedMachineCount: 0,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}}
+	bootstrapResult.Infra.WorkerMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}}
 	objs, progressing, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -2521,10 +2521,10 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 
 	// At the 4th pass, test render logic once MC extension rollout is complete.
 	bootstrapResult.Infra.MachineConfigClusterOperatorReady = true
-	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
-	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
+	bootstrapResult.Infra.MasterMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}}
+	bootstrapResult.Infra.WorkerMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}}
 	objs, progressing, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -2741,14 +2741,15 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
-	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
-	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
+	bootstrapResult.Infra.MasterMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}}
+	bootstrapResult.Infra.WorkerMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}}
 	featureGatesCNO := featuregates.NewFeatureGate(
 		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver, apifeatures.FeatureGateNetworkSegmentation},
 		[]configv1.FeatureGateName{apifeatures.FeatureGatePersistentIPsForVirtualization},
 	)
+
 	fakeClient := cnofake.NewFakeClient()
 
 	objs, progressing, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
@@ -2914,10 +2915,10 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].OwnerReferences = networkOwnerRef()
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
-	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
-	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
+	bootstrapResult.Infra.MasterMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}}
+	bootstrapResult.Infra.WorkerMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}}
 	objs, progressing, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -3146,10 +3147,10 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].OwnerReferences = networkOwnerRef()
-	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
-	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
+	bootstrapResult.Infra.MasterMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}}
+	bootstrapResult.Infra.WorkerMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}}
 	objs, progressing, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -3283,10 +3284,10 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
-	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
-	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
+	bootstrapResult.Infra.MasterMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}}
+	bootstrapResult.Infra.WorkerMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}}
 	objs, progressing, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
