@@ -17,7 +17,8 @@ data:
         case "${1}" in
         inspectp)
             # Eat errors, since the pod may have exited since we started the loop.
-            # The caller will catch the empty return value
+            # Unfortunately, calls may fail for other reasons too, so all callers must
+            # deal appropriately with empty return values.
             chroot /host /bin/crictl "$@" 2>/dev/null || true
             ;;
         *)
@@ -38,7 +39,7 @@ data:
         for id in $(crictl pods -q); do
             # Check that it's a pod-network pod
             netns=$(crictl inspectp "${id}" | jq -r .status.linux.namespaces.options.network)
-            if [[ "${netns}" == "NODE" ]]; then
+            if [[ "${netns}" != "POD" ]]; then
                 continue
             fi
 
@@ -54,8 +55,8 @@ data:
             pod_name=$(crictl inspectp "${id}" | jq -r .status.metadata.name)
             pod_uid=$(crictl inspectp "${id}" | jq -r .status.metadata.uid)
 
-            # If the pod exited already then crictl will have returned "" for everything
-            if [[ -z "${pod_uid}" ]]; then
+            # Make sure we got valid data (ie, not crictl errors)
+            if [[ -z "${pod_namespace}" || -z "${pod_name}" || -z "${pod_uid}" ]]; then
                 continue
             fi
 
