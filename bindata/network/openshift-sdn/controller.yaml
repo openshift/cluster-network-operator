@@ -27,11 +27,6 @@ spec:
         - /bin/bash
         - -c
         - |
-{{- if .IsNetworkTypeLiveMigration }}
-          echo "wait for hostsubnets to be created by sdn pods"
-          # The hostsubnets needs be created according to the ovnkube node-subnets by the sdn pods before running the sdn controller.
-          while ! oc get nodes -o custom-columns=NAME:.metadata.name --no-headers| xargs -i oc get hostsubnet {}; do sleep 3; done
-{{- end }}
           if [[ -f /env/_master ]]; then
             set -o allexport
             source /env/_master

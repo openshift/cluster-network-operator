@@ -68,76 +68,6 @@ spec:
         - |
           #!/bin/bash
           set -euo pipefail
-{{- if .IsNetworkTypeLiveMigration }}
-          set -x
-          NODE_CNI="OpenShiftSDN"
-          if ip link show br-ex; then
-            echo "br-ex exists"
-            NODE_CNI="OVNKubernetes"
-          else
-            echo "br-ex doesn't exist"
-          fi
-          export NODE_CNI
-
-          # retry loop
-          RETRY_INTERVAL=3
-          MAX_RETRIES=100
-          for ((retry_count=1; retry_count<=MAX_RETRIES; retry_count++)); do
-            # Get SDN subnet
-            SDN_SUBNET=$(oc get hostsubnet ${K8S_NODE_NAME} -o jsonpath="{.subnet}"||true)
-
-            # Get OVN subnet
-            OVN_SUBNET=$(oc get node ${K8S_NODE_NAME} -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/node-subnets}' | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,3}'||true)
-
-            if [ "${NODE_CNI}" == "OpenShiftSDN" ]; then
-              if [ -z "${SDN_SUBNET}" ]; then
-                echo "SDN node subnet is not found, retry..."
-                sleep $RETRY_INTERVAL
-              else
-                break
-              fi
-            else
-              if [ -z "${OVN_SUBNET}" ]; then
-                echo "OVN node subnet is not found, retry..."
-                sleep $RETRY_INTERVAL
-              else
-                # When rolling back, SDN controll plane will not start until the hostsubnet has been created here.
-                echo "Use OVN-K subnet ${OVN_SUBNET}, when the node CNI is OVN-K"
-                if [ -z "${SDN_SUBNET}" ]; then
-                  echo "SDN_SUBNET is empty, create the hostsubnet CR with OVN_SUBNET ${OVN_SUBNET}"
-                  SUBNET=${OVN_SUBNET}
-                  NODE_UID=$(oc get node ${K8S_NODE_NAME} -o jsonpath='{.metadata.uid}')
-                  NODE_IP=$(oc get node ${K8S_NODE_NAME} -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
-                  cat <<EOF | oc apply -f -
-          apiVersion: network.openshift.io/v1
-          kind: HostSubnet
-          metadata:
-            name: ${K8S_NODE_NAME}
-            annotations:
-              pod.network.openshift.io/node-uid: ${NODE_UID}
-          host: ${K8S_NODE_NAME}
-          hostIP: ${NODE_IP}
-          subnet: ${SUBNET}
-          EOF
-                fi
-                break
-              fi
-            fi
-          done
-          if [ ${retry_count} -gt ${MAX_RETRIES} ]; then
-            echo "All retries failed. Exiting."
-            exit 1
-          fi
-          if [ "${NODE_CNI}" == "OVNKubernetes" ]; then
-            echo "sleep..."
-            trap : TERM INT; sleep infinity & wait
-            exit
-          else
-            echo "run openshift-sdn-node"
-          fi
-          ovs-vsctl --if-exists del-br br-int
-          ovs-vsctl --if-exists del-br br-ext
-{{- end }}
           # if another process is listening on the cni-server socket, wait until it exits
           trap 'kill $(jobs -p); rm -f /etc/cni/net.d/80-openshift-network.conf ; exit 0' TERM
           retries=0
@@ -330,11 +260,6 @@ spec:
             - |
               #!/bin/bash
               set -euo pipefail
-{{- if .IsNetworkTypeLiveMigration }}
-              if ip link show br-ex; then
-                exit 0
-              fi
-{{- end}}
               test -f /etc/cni/net.d/80-openshift-network.conf
           initialDelaySeconds: 5
           periodSeconds: 5
