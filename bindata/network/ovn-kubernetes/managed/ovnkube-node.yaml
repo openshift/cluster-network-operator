@@ -496,6 +496,8 @@ spec:
           name: ovnkube-config
         - mountPath: /env
           name: env-overrides
+        - mountPath: /etc/ipsec.d/
+          name: ipsec-conf
         resources:
           requests:
             cpu: 10m
@@ -682,6 +684,10 @@ spec:
       - name: host-var-lib-cni-networks-ovn-kubernetes
         hostPath:
           path: /var/lib/cni/networks/ovn-k8s-cni-overlay
+      - name: ipsec-conf
+        hostPath:
+          path: /etc/ipsec.d/
+          type: DirectoryOrCreate
       - name: ovnkube-config
         configMap:
           name: ovnkube-config
