@@ -590,12 +590,12 @@ data:
       fi
 
       ovn_v4_masquerade_subnet_opt=
-      if [[ "{{.V4InternalMasqueradeSubnet}}" != "" ]]; then
-        ovn_v4_masquerade_subnet_opt="--gateway-v4-masquerade-subnet {{.V4InternalMasqueradeSubnet}}"
+      if [[ "{{.V4MasqueradeSubnet}}" != "" ]]; then
+        ovn_v4_masquerade_subnet_opt="--gateway-v4-masquerade-subnet {{.V4MasqueradeSubnet}}"
       fi
       ovn_v6_masquerade_subnet_opt=
-      if [[ "{{.V6InternalMasqueradeSubnet}}" != "" ]]; then
-        ovn_v6_masquerade_subnet_opt="--gateway-v6-masquerade-subnet {{.V6InternalMasqueradeSubnet}}"
+      if [[ "{{.V6MasqueradeSubnet}}" != "" ]]; then
+        ovn_v6_masquerade_subnet_opt="--gateway-v6-masquerade-subnet {{.V6MasqueradeSubnet}}"
       fi
 
       exec /usr/bin/ovnkube \

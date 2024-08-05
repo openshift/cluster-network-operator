@@ -132,8 +132,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["V6JoinSubnet"] = ""
 	data.Data["V4TransitSwitchSubnet"] = ""
 	data.Data["V6TransitSwitchSubnet"] = ""
-	data.Data["V4InternalMasqueradeSubnet"] = ""
-	data.Data["V6InternalMasqueradeSubnet"] = ""
+	data.Data["V4MasqueradeSubnet"] = ""
+	data.Data["V6MasqueradeSubnet"] = ""
 
 	data.Data["V4JoinSubnet"] = c.V4InternalSubnet
 	data.Data["V6JoinSubnet"] = c.V6InternalSubnet
@@ -155,10 +155,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 	// v4 and v6InternalMasqueradeSubnet are used when the user wants to use the addresses that we reserve in ovn-k for ip masquerading
 	if c.GatewayConfig != nil && c.GatewayConfig.IPv4.InternalMasqueradeSubnet != "" {
-		data.Data["V4InternalMasqueradeSubnet"] = c.GatewayConfig.IPv4.InternalMasqueradeSubnet
+		data.Data["V4MasqueradeSubnet"] = c.GatewayConfig.IPv4.InternalMasqueradeSubnet
 	}
 	if c.GatewayConfig != nil && c.GatewayConfig.IPv6.InternalMasqueradeSubnet != "" {
-		data.Data["V6InternalMasqueradeSubnet"] = c.GatewayConfig.IPv6.InternalMasqueradeSubnet
+		data.Data["V6MasqueradeSubnet"] = c.GatewayConfig.IPv6.InternalMasqueradeSubnet
 	}
 	data.Data["EnableUDPAggregation"] = !bootstrapResult.OVN.OVNKubernetesConfig.DisableUDPAggregation
 	data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = bootstrapResult.Infra.NetworkNodeIdentityEnabled
