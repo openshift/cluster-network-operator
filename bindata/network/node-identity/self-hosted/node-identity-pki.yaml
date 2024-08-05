@@ -7,4 +7,4 @@ metadata:
   namespace: openshift-network-node-identity
 spec:
   targetCert:
-    commonName: {{.NetworkNodeIdentityAddress}}
+    commonName: {{.NetworkNodeIdentityIP}}
