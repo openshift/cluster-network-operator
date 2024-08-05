@@ -16,6 +16,9 @@ metadata:
     {{ if .OVNIPsecEnable }}
     networkoperator.openshift.io/ipsec-enabled: "true"
     {{ end }}
+    {{ if .DefaultMasqueradeNetworkCIDRs }}
+    networkoperator.openshift.io/default-masquerade-network-cidrs: "{{.DefaultMasqueradeNetworkCIDRs}}"
+    {{ end }}
 spec:
   selector:
     matchLabels:

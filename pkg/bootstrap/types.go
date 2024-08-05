@@ -2,8 +2,9 @@ package bootstrap
 
 import (
 	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 )
 
 type OVNHyperShiftBootstrapResult struct {
@@ -61,9 +62,11 @@ type OVNBootstrapResult struct {
 	// IPsecUpdateStatus is the status of ovn-ipsec config
 	IPsecUpdateStatus *OVNIPsecStatus
 	// PrePullerUpdateStatus is the status of ovnkube-upgrades-prepuller daemonset
-	PrePullerUpdateStatus *OVNUpdateStatus
-	OVNKubernetesConfig   *OVNConfigBoostrapResult
-	FlowsConfig           *FlowsConfig
+	PrePullerUpdateStatus     *OVNUpdateStatus
+	OVNKubernetesConfig       *OVNConfigBoostrapResult
+	FlowsConfig               *FlowsConfig
+	DefaultV4MasqueradeSubnet string
+	DefaultV6MasqueradeSubnet string
 }
 
 // IPTablesAlerterBootstrapResult contains configuration for the iptables-alerter

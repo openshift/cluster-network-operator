@@ -13,6 +13,9 @@ metadata:
     kubernetes.io/description: |
       This daemonset launches the ovn-kubernetes per node networking components.
     release.openshift.io/version: "{{.ReleaseVersion}}"
+    {{ if .DefaultMasqueradeNetworkCIDRs }}
+    networkoperator.openshift.io/default-masquerade-network-cidrs: "{{.DefaultMasqueradeNetworkCIDRs}}"
+    {{ end }}
     {{ if .OVNIPsecEnable }}
     networkoperator.openshift.io/ipsec-enabled: "true"
     {{ end }}
