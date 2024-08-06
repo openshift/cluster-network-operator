@@ -601,6 +601,15 @@ data:
         ovn_v6_join_subnet_opt="--gateway-v6-join-subnet {{.V6JoinSubnet}}"
       fi
 
+      ovn_v4_masquerade_subnet_opt=
+      if [[ "{{.V4MasqueradeSubnet}}" != "" ]]; then
+        ovn_v4_masquerade_subnet_opt="--gateway-v4-masquerade-subnet {{.V4MasqueradeSubnet}}"
+      fi
+      ovn_v6_masquerade_subnet_opt=
+      if [[ "{{.V6MasqueradeSubnet}}" != "" ]]; then
+        ovn_v6_masquerade_subnet_opt="--gateway-v6-masquerade-subnet {{.V6MasqueradeSubnet}}"
+      fi
+
       exec /usr/bin/ovnkube \
         --init-ovnkube-controller "${K8S_NODE}" \
         --init-node "${K8S_NODE}" \
@@ -633,5 +642,7 @@ data:
         ${ip_forwarding_flag} \
         ${NETWORK_NODE_IDENTITY_ENABLE} \
         ${ovn_v4_join_subnet_opt} \
-        ${ovn_v6_join_subnet_opt}
+        ${ovn_v6_join_subnet_opt} \
+        ${ovn_v4_masquerade_subnet_opt} \
+        ${ovn_v6_masquerade_subnet_opt} 
     }
