@@ -2371,10 +2371,10 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 
 	// At the 3rd pass, test render logic while MC extension rollout is in progress.
 	bootstrapResult.Infra.MachineConfigClusterOperatorReady = false
-	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 0, UpdatedMachineCount: 0,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}
-	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}
+	bootstrapResult.Infra.MasterMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 0, UpdatedMachineCount: 0,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}}
+	bootstrapResult.Infra.WorkerMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}}
 	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -2402,10 +2402,10 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 
 	// At the 4th pass, test render logic once MC extension rollout is complete.
 	bootstrapResult.Infra.MachineConfigClusterOperatorReady = true
-	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
-	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
+	bootstrapResult.Infra.MasterMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}}
+	bootstrapResult.Infra.WorkerMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}}
 	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -2615,10 +2615,10 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
-	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
-	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
+	bootstrapResult.Infra.MasterMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}}
+	bootstrapResult.Infra.WorkerMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}}
 	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
 	fakeClient := cnofake.NewFakeClient()
 
@@ -2652,6 +2652,303 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
 	}
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+	if renderedNode == nil {
+		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedNode.GetAnnotations()[names.IPsecEnableAnnotation]; !ok {
+		t.Errorf("ovn-ipsec DaemonSet should have ipsec-enabled annotation, but it doesn't %v", renderedNode)
+	}
+}
+
+func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfigPoolPauseState(t *testing.T) {
+	g := NewGomegaWithT(t)
+	config := &operv1.NetworkSpec{
+		ServiceNetwork: []string{"172.30.0.0/16", "fd00:3:2:1::/112"},
+		ClusterNetwork: []operv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+			{
+				CIDR:       "fd00:1:2:3::/64",
+				HostPrefix: 56,
+			},
+		},
+		DefaultNetwork: operv1.DefaultNetworkDefinition{
+			Type: operv1.NetworkTypeOVNKubernetes,
+			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
+				GenevePort:  ptrToUint32(8061),
+				IPsecConfig: &operv1.IPsecConfig{},
+			},
+		},
+	}
+	errs := validateOVNKubernetes(config)
+	if len(errs) > 0 {
+		t.Errorf("Unexpected error: %v", errs)
+	}
+	fillDefaults(config, nil)
+
+	// at the same time we have an upgrade
+	t.Setenv("RELEASE_VERSION", "2.0.0")
+
+	// bootstrap also represents current status
+	// the current cluster is single-stack and has version 1.9.9
+	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+		ControlPlaneUpdateStatus: &bootstrap.OVNUpdateStatus{
+			Kind:         "Deployment",
+			Namespace:    "openshift-ovn-kubernetes",
+			Name:         "ovnkube-control-plane",
+			Version:      "1.9.9",
+			IPFamilyMode: names.IPFamilySingleStack,
+		},
+		NodeUpdateStatus: &bootstrap.OVNUpdateStatus{
+			Kind:         "DaemonSet",
+			Namespace:    "openshift-ovn-kubernetes",
+			Name:         "ovnkube-node",
+			Version:      "1.9.9",
+			IPFamilyMode: names.IPFamilySingleStack,
+		},
+		IPsecUpdateStatus: &bootstrap.OVNIPsecStatus{
+			LegacyIPsecUpgrade: true,
+			OVNIPsecActive:     true,
+		},
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName: "",
+			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+				Enabled: false,
+			},
+		},
+	}
+
+	// Start the upgrade and it's going rollout ovn-ipsec-host DS with CNO IPsec MachineConfigs.
+	bootstrapResult.Infra = bootstrap.InfraStatus{}
+	bootstrapResult.Infra.MachineConfigClusterOperatorReady = true
+	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
+	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
+	bootstrapResult.Infra.MasterMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}}
+	bootstrapResult.Infra.WorkerMCPs = []mcfgv1.MachineConfigPool{{Spec: mcfgv1.MachineConfigPoolSpec{Paused: false},
+		Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 0, UpdatedMachineCount: 0}}}
+	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy}, []configv1.FeatureGateName{})
+	fakeClient := cnofake.NewFakeClient()
+
+	objs, progressing, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	g.Expect(progressing).To(BeFalse())
+	// Ensure renderOVNKubernetes rolls out its own MachineConfigs
+	renderedMasterIPsecExtension := findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
+	if renderedMasterIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's not available", masterMachineConfigIPsecExtName)
+	}
+	renderedWorkerIPsecExtension := findInObjs("machineconfiguration.openshift.io", "MachineConfig", workerMachineConfigIPsecExtName, "", objs)
+	if renderedWorkerIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's  not available", workerMachineConfigIPsecExtName)
+	}
+	// Ensure both ipsec host and containerizd daemonsets rendered with create-wait annotation.
+	renderedIPsec := findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec == nil {
+		t.Errorf("ovn-ipsec-host DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
+		t.Errorf("ovn-ipsec-host DaemonSet should have create-wait annotation, but it doesn't")
+	}
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec == nil {
+		t.Errorf("ovn-ipsec-containerized DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
+		t.Errorf("ovn-ipsec-containerized DaemonSet should have create-wait annotation, but it doesn't")
+	}
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec == nil {
+		t.Errorf("ovn-ipsec DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
+		t.Errorf("ovn-ipsec DaemonSet should have create-wait annotation, but it doesn't")
+	}
+	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+	if renderedNode == nil {
+		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedNode.GetAnnotations()[names.IPsecEnableAnnotation]; !ok {
+		t.Errorf("ovn-ipsec DaemonSet should have ipsec-enabled annotation, but it doesn't %v", renderedNode)
+	}
+
+	// Move worker pool into paused state and check rendering result.
+	bootstrapResult.Infra.WorkerMCPs[0].Spec.Paused = true
+	objs, progressing, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	g.Expect(progressing).To(BeFalse())
+	// Ensure renderOVNKubernetes rolls out its own MachineConfigs
+	renderedMasterIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
+	if renderedMasterIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's not available", masterMachineConfigIPsecExtName)
+	}
+	renderedWorkerIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", workerMachineConfigIPsecExtName, "", objs)
+	if renderedWorkerIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's  not available", workerMachineConfigIPsecExtName)
+	}
+	// Ensure both ipsec host and containerizd daemonsets rendered without create-wait annotation.
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec == nil {
+		t.Errorf("ovn-ipsec-host DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; ok {
+		t.Errorf("ovn-ipsec-host DaemonSet should not have create-wait annotation, but it does")
+	}
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec == nil {
+		t.Errorf("ovn-ipsec-containerized DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; ok {
+		t.Errorf("ovn-ipsec-containerized DaemonSet should not have create-wait annotation, but it does")
+	}
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec != nil {
+		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
+	}
+	renderedNode = findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+	if renderedNode == nil {
+		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedNode.GetAnnotations()[names.IPsecEnableAnnotation]; !ok {
+		t.Errorf("ovn-ipsec DaemonSet should have ipsec-enabled annotation, but it doesn't %v", renderedNode)
+	}
+
+	// Move worker pool into unpaused state and check for rendering result.
+	bootstrapResult.Infra.WorkerMCPs[0].Spec.Paused = false
+	objs, progressing, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	g.Expect(progressing).To(BeFalse())
+	// Ensure renderOVNKubernetes rolls out its own MachineConfigs
+	renderedMasterIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
+	if renderedMasterIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's not available", masterMachineConfigIPsecExtName)
+	}
+	renderedWorkerIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", workerMachineConfigIPsecExtName, "", objs)
+	if renderedWorkerIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's  not available", workerMachineConfigIPsecExtName)
+	}
+	// Ensure both ipsec host and containerizd daemonsets rendered with create-wait annotation.
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec == nil {
+		t.Errorf("ovn-ipsec-host DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
+		t.Errorf("ovn-ipsec-host DaemonSet should have create-wait annotation, but it doesn't")
+	}
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec == nil {
+		t.Errorf("ovn-ipsec-containerized DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
+		t.Errorf("ovn-ipsec-containerized DaemonSet should have create-wait annotation, but it doesn't")
+	}
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec == nil {
+		t.Errorf("ovn-ipsec DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
+		t.Errorf("ovn-ipsec DaemonSet should have create-wait annotation, but it doesn't")
+	}
+	renderedNode = findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+	if renderedNode == nil {
+		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedNode.GetAnnotations()[names.IPsecEnableAnnotation]; !ok {
+		t.Errorf("ovn-ipsec DaemonSet should have ipsec-enabled annotation, but it doesn't %v", renderedNode)
+	}
+
+	// Move worker pool into paused state but with IPsec Machine Config with ready status
+	// and check for rendering result.
+	bootstrapResult.Infra.WorkerMCPs[0].Spec.Paused = true
+	bootstrapResult.Infra.WorkerMCPs[0].Status.ReadyMachineCount = 1
+	bootstrapResult.Infra.WorkerMCPs[0].Status.UpdatedMachineCount = 1
+	bootstrapResult.Infra.WorkerMCPs[0].Status.Configuration = mcfgv1.MachineConfigPoolStatusConfiguration{
+		Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}
+	objs, progressing, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	g.Expect(progressing).To(BeFalse())
+	// Ensure renderOVNKubernetes rolls out its own MachineConfigs
+	renderedMasterIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
+	if renderedMasterIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's not available", masterMachineConfigIPsecExtName)
+	}
+	renderedWorkerIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", workerMachineConfigIPsecExtName, "", objs)
+	if renderedWorkerIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's  not available", workerMachineConfigIPsecExtName)
+	}
+	// Ensure only ipsec host daemonset exists now.
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec == nil {
+		t.Errorf("ovn-ipsec-host DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; ok {
+		t.Errorf("ovn-ipsec-host DaemonSet should not have create-wait annotation, but it does")
+	}
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec != nil {
+		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
+	}
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec != nil {
+		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
+	}
+	renderedNode = findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+	if renderedNode == nil {
+		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedNode.GetAnnotations()[names.IPsecEnableAnnotation]; !ok {
+		t.Errorf("ovn-ipsec DaemonSet should have ipsec-enabled annotation, but it doesn't %v", renderedNode)
+	}
+
+	// Move worker pool into unpaused state and check for rendering result.
+	bootstrapResult.Infra.WorkerMCPs[0].Spec.Paused = true
+	objs, progressing, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	g.Expect(progressing).To(BeFalse())
+	// Ensure renderOVNKubernetes rolls out its own MachineConfigs
+	renderedMasterIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
+	if renderedMasterIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's not available", masterMachineConfigIPsecExtName)
+	}
+	renderedWorkerIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", workerMachineConfigIPsecExtName, "", objs)
+	if renderedWorkerIPsecExtension == nil {
+		t.Errorf("The MachineConfig %s must exist, but it's  not available", workerMachineConfigIPsecExtName)
+	}
+	// Ensure only ipsec host daemonset exists now.
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec == nil {
+		t.Errorf("ovn-ipsec-host DaemonSet must exist, but it's not available")
+	}
+	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; ok {
+		t.Errorf("ovn-ipsec-host DaemonSet should not have create-wait annotation, but it does")
+	}
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec != nil {
+		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
+	}
+	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
+	if renderedIPsec != nil {
+		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
+	}
+	renderedNode = findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 	if renderedNode == nil {
 		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
 	}
@@ -2779,10 +3076,10 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].OwnerReferences = networkOwnerRef()
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
-	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
-	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
+	bootstrapResult.Infra.MasterMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}}
+	bootstrapResult.Infra.WorkerMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}}
 	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -3001,10 +3298,10 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].OwnerReferences = networkOwnerRef()
-	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
-	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
+	bootstrapResult.Infra.MasterMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}}
+	bootstrapResult.Infra.WorkerMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}}
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -3132,10 +3429,10 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
-	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
-	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
-		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
+	bootstrapResult.Infra.MasterMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}}
+	bootstrapResult.Infra.WorkerMCPs = []mcfgv1.MachineConfigPool{{Status: mcfgv1.MachineConfigPoolStatus{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
+		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}}
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
