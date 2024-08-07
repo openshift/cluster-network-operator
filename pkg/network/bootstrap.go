@@ -16,7 +16,7 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Bootstrap creates resources required by SDN on the cloud.
+// Bootstrap creates resources required by the network plugin on the cloud.
 func Bootstrap(conf *operv1.Network, client cnoclient.Client) (*bootstrap.BootstrapResult, error) {
 	out := &bootstrap.BootstrapResult{}
 

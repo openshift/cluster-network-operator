@@ -17,10 +17,7 @@ var NetworkMetricsDaemonConfig = operv1.Network{
 			},
 		},
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
-			Type: operv1.NetworkTypeOpenShiftSDN,
-			OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{
-				Mode: operv1.SDNModeNetworkPolicy,
-			},
+			Type: operv1.NetworkTypeOVNKubernetes,
 		},
 	},
 }

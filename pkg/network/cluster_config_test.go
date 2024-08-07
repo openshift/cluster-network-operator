@@ -436,11 +436,11 @@ func TestMergeClusterConfig(t *testing.T) {
 func TestStatusFromConfig(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	crd := OpenShiftSDNConfig.DeepCopy()
+	crd := OVNKubernetesConfig.DeepCopy()
 	fillDefaults(&crd.Spec, nil)
 
 	var mtu uint32 = 1300
-	crd.Spec.DefaultNetwork.OpenShiftSDNConfig.MTU = &mtu
+	crd.Spec.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
 
 	status := StatusFromOperatorConfig(&crd.Spec, &configv1.NetworkStatus{})
 	g.Expect(status).To(Equal(&configv1.NetworkStatus{
@@ -457,10 +457,10 @@ func TestStatusFromConfig(t *testing.T) {
 		ServiceNetwork:    []string{"172.30.0.0/16"},
 		ClusterNetworkMTU: 1300,
 
-		NetworkType: "OpenShiftSDN",
+		NetworkType: "OVNKubernetes",
 	}))
 
-	*crd.Spec.DefaultNetwork.OpenShiftSDNConfig.MTU = 1500
+	*crd.Spec.DefaultNetwork.OVNKubernetesConfig.MTU = 1500
 	status = StatusFromOperatorConfig(&crd.Spec, status)
 	g.Expect(status).To(Equal(&configv1.NetworkStatus{
 		ClusterNetwork: []configv1.ClusterNetworkEntry{
@@ -476,7 +476,7 @@ func TestStatusFromConfig(t *testing.T) {
 		ServiceNetwork:    []string{"172.30.0.0/16"},
 		ClusterNetworkMTU: 1500,
 
-		NetworkType: "OpenShiftSDN",
+		NetworkType: "OVNKubernetes",
 	}))
 
 	// If someone manually edits the status we will overwrite them
@@ -499,14 +499,14 @@ func TestStatusFromConfig(t *testing.T) {
 		ServiceNetwork:    []string{"172.30.0.0/16"},
 		ClusterNetworkMTU: 1500,
 
-		NetworkType: "OpenShiftSDN",
+		NetworkType: "OVNKubernetes",
 	}))
 }
 
 func TestStatusFromConfigUnknown(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	crd := OpenShiftSDNConfig.DeepCopy()
+	crd := OVNKubernetesConfig.DeepCopy()
 	fillDefaults(&crd.Spec, nil)
 
 	crd.Spec.DefaultNetwork.Type = "None"

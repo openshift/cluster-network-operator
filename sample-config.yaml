@@ -9,6 +9,4 @@ spec:
     - cidr: "10.128.0.0/14"
       hostPrefix: 23
   defaultNetwork:
-    type: OpenShiftSDN
-    openshiftSDNConfig:
-      mode: NetworkPolicy
+    type: OVNKubernetes
