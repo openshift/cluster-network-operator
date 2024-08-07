@@ -173,6 +173,28 @@ rules:
     - services/finalizers
   verbs:
     - update
+- apiGroups: ["k8s.ovn.org"]
+  resources:
+    - userdefinednetworks
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups: ["k8s.ovn.org"]
+  resources:
+    - userdefinednetworks
+    - userdefinednetworks/status
+  verbs:
+    - patch
+    - update
+- apiGroups: [ "k8s.cni.cncf.io" ]
+  resources:
+    - network-attachment-definitions
+  verbs:
+    - patch
+    - update
+    - create
+    - delete
 {{- end}}
 
 ---
