@@ -78,3 +78,7 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-cli:latest
+  - name: networking-console-plugin
+    from:
+      kind: DockerImage
+      name: quay.io/openshift/origin-networking-console-plugin:latest
