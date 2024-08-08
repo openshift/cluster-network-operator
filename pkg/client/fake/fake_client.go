@@ -80,7 +80,7 @@ func isOpenShiftObject(obj crclient.Object) bool {
 	return false
 }
 
-// NewFakeClient creates a fake client with a backing store that contains the given objexts.
+// NewFakeClient creates a fake client with a backing store that contains the given objects.
 //
 // Note that, due to limitations in the test infrastructure, each client has an independent store.
 // This means that changes made in, say, the crclient, won't show up in the Dynamic client or the typed

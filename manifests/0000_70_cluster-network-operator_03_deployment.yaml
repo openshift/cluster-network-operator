@@ -106,6 +106,8 @@ spec:
           value: "quay.io/openshift/origin-cloud-network-config-controller:latest"
         - name: CLI_IMAGE
           value: "quay.io/openshift/origin-cli:latest"
+        - name: NETWORKING_CONSOLE_PLUGIN_IMAGE
+          value: "quay.io/openshift/origin-networking-console-plugin:latest"
         - name: POD_NAME
           valueFrom:
             fieldRef:
