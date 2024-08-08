@@ -16,6 +16,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -129,6 +130,45 @@ func TestRenderOVNKubernetes(t *testing.T) {
 		_, ok := sel["node-role.kubernetes.io/master"]
 		g.Expect(ok).To(BeTrue())
 	}
+
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("CustomResourceDefinition", "", "userdefinednetworks.k8s.ovn.org")), "UDN CRD should exist")
+
+	for _, obj := range objs {
+		if obj.GetKind() == "ClusterRole" && obj.GetName() == "openshift-ovn-kubernetes-control-plane-limited" {
+			clusterRole, err := encodeClusterRole(obj)
+			g.Expect(err).ToNot(HaveOccurred())
+			expectedRules := []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{"k8s.ovn.org"},
+					Resources: []string{"userdefinednetworks"},
+					Verbs:     []string{"get", "list", "watch"},
+				},
+				{
+					APIGroups: []string{"k8s.ovn.org"},
+					Resources: []string{"userdefinednetworks", "userdefinednetworks/status"},
+					Verbs:     []string{"patch", "update"},
+				},
+				{
+					APIGroups: []string{"k8s.cni.cncf.io"},
+					Resources: []string{"network-attachment-definitions"},
+					Verbs:     []string{"patch", "update", "create", "delete"},
+				},
+			}
+			g.Expect(clusterRole.Rules).To(ContainElements(expectedRules))
+		}
+	}
+}
+
+func encodeClusterRole(obj *uns.Unstructured) (*rbacv1.ClusterRole, error) {
+	objJSON, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	var clusterRole rbacv1.ClusterRole
+	if err := json.Unmarshal(objJSON, &clusterRole); err != nil {
+		return nil, err
+	}
+	return &clusterRole, nil
 }
 
 // TestRenderOVNKubernetesIPv6 tests IPv6 support
