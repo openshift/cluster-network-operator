@@ -91,6 +91,8 @@ spec:
             value: "{{.KubernetesServicePort}}"
           - name: KUBERNETES_SERVICE_HOST
             value: "{{.KubernetesServiceHost}}"
+          - name: AZURE_MSI_AUTHENTICATION
+            value: "{{.AzureMSIAuthentication}}"
       containers:
       # hosted-cluster-token creates a token with a custom path(/var/run/secrets/hosted_cluster/token)
       # The token path is included in the kubeconfig used by cncc containers to talk to the hosted clusters API server
