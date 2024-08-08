@@ -35,7 +35,11 @@ data:
     dns-service-name="dns-default"
  
     [ovnkubernetesfeature]
+    {{- if .EgressIPEnabled }}
     enable-egress-ip=true
+    {{- else }}
+    enable-egress-ip=false
+    {{- end}}
     enable-egress-firewall=true
     enable-egress-qos=true
     enable-egress-service=true

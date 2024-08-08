@@ -327,6 +327,13 @@ var (
 					enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 					mustRegister()
 
+	FeatureGateManagedBootImagesAWS = newFeatureGate("ManagedBootImagesAWS").
+					reportProblemsToJiraComponent("MachineConfigOperator").
+					contactPerson("djoshy").
+					productScope(ocpSpecific).
+					enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
+					mustRegister()
+
 	FeatureGateDisableKubeletCloudCredentialProviders = newFeatureGate("DisableKubeletCloudCredentialProviders").
 								reportProblemsToJiraComponent("cloud-provider").
 								contactPerson("jspeed").
@@ -565,5 +572,12 @@ var (
 					reportProblemsToJiraComponent("Installer").
 					contactPerson("r4f4").
 					productScope(ocpSpecific).
+					mustRegister()
+
+	FeatureGateIngressControllerLBSubnetsAWS = newFeatureGate("IngressControllerLBSubnetsAWS").
+					reportProblemsToJiraComponent("Routing").
+					contactPerson("miciah").
+					productScope(ocpSpecific).
+					enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 					mustRegister()
 )
