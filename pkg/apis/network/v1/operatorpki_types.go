@@ -32,6 +32,8 @@ import (
 //
 // +k8s:openapi-gen=true
 // +kubebuilder:resource:path=operatorpkis,scope=Namespaced
+// +kubebuilder:metadata:annotations=include.release.openshift.io/self-managed-high-availability=true
+// +kubebuilder:metadata:annotations=include.release.openshift.io/ibm-cloud-managed=true
 type OperatorPKI struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
