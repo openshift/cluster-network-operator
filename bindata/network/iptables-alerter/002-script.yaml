@@ -14,20 +14,7 @@ data:
     set -euo pipefail
 
     function crictl {
-        case "${1}" in
-        inspectp)
-            # Eat errors, since the pod may have exited since we started the loop.
-            # Unfortunately, calls may fail for other reasons too, so all callers must
-            # deal appropriately with empty return values.
-            chroot /host /bin/crictl "$@" 2>/dev/null || true
-            ;;
-        *)
-            chroot /host /bin/crictl "$@"
-            ;;
-        esac
-    }
-    function jq {
-        chroot /host /bin/jq "$@"
+        chroot /host /bin/crictl "$@"
     }
     function ip {
         chroot /host /sbin/ip "$@"
@@ -37,35 +24,28 @@ data:
         date
         # Iterate over local pods
         for id in $(crictl pods -q); do
-            # Check that it's a pod-network pod
-            netns=$(crictl inspectp "${id}" | jq -r .status.linux.namespaces.options.network)
+            # Inspect the pod
+            read pod_namespace pod_name pod_uid netns netns_path <<<$(
+                {{- /* bindata/network/iptables-alerter/002-script.yaml is processed
+                     * as a go template (eg, to fill in {{.ReleaseVersion}} above), but
+                     * it also needs to contain a go template string (to pass to crictl
+                     * below). We do this by putting the crictl argument as a string
+                     * literal inside an argument of the outer template:
+                     *     ... --template {{`'BLAH BLAH BLAH'`}} ...
+                     * becomes
+                     *     ... --template 'BLAH BLAH BLAH' ...
+                     * in the actual ConfigMap.
+                     */ -}}
+                crictl inspectp -o go-template --template {{`'{{.status.metadata.namespace}} {{.status.metadata.name}} {{.status.metadata.uid}} {{.status.linux.namespaces.options.network}} {{range .info.runtimeSpec.linux.namespaces }}{{if eq .type "network"}}{{.path}}{{end}}{{end}}'`}} ${id}  2>/dev/null || true )
+
+            # Check that it's a pod-network pod. (This also catches "crictl errored out".)
             if [[ "${netns}" != "POD" ]]; then
                 continue
             fi
-
-            # Find the network namespace
-            netns_path=$(crictl inspectp "${id}" | jq -r '.info.runtimeSpec.linux.namespaces[] | select(.type == "network").path')
             if [[ ! "${netns_path}" =~ ^/var/run/netns/ ]]; then
                 continue
             fi
             netns=$(basename "${netns_path}")
-
-            # Gather pod metadata
-            pod_namespace=$(crictl inspectp "${id}" | jq -r .status.metadata.namespace)
-            pod_name=$(crictl inspectp "${id}" | jq -r .status.metadata.name)
-            pod_uid=$(crictl inspectp "${id}" | jq -r .status.metadata.uid)
-
-            # Make sure we got valid data (ie, not crictl errors)
-            if [[ -z "${pod_namespace}" || -z "${pod_name}" || -z "${pod_uid}" ]]; then
-                continue
-            fi
-
-            # Check if we already logged an event for it
-            events=$(kubectl get events -n "${pod_namespace}" -l pod-uid="${pod_uid}" 2>/dev/null)
-            if [[ -n "${events}" ]]; then
-                echo "Skipping pod ${pod_namespace}/${pod_name} which we already logged an event for."
-                continue
-            fi
 
             # Set iptables_output to the first iptables rule in the pod's network
             # namespace, if any. (We use `awk` here rather than `grep` intentionally
@@ -76,6 +56,13 @@ data:
                 awk '/^-A/ {print; exit}'
             )
             if [[ -z "${iptables_output}" ]]; then
+                continue
+            fi
+
+            # Check if we already logged an event for it
+            events=$(kubectl get events -n "${pod_namespace}" -l pod-uid="${pod_uid}" 2>/dev/null)
+            if [[ -n "${events}" ]]; then
+                echo "Skipping pod ${pod_namespace}/${pod_name} which we already logged an event for."
                 continue
             fi
 
