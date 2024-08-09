@@ -285,10 +285,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	IPsecMachineConfigEnable, OVNIPsecDaemonsetEnable, OVNIPsecEnable, renderIPsecHostDaemonSet, renderIPsecContainerizedDaemonSet,
-		renderIPsecDaemonSetAsCreateWaitOnly := shouldRenderIPsec(c, bootstrapResult)
+		renderIPsecDaemonSetAsCreateWaitOnly, renderBothIPsecDemonSetsWhenAPoolPausedState := shouldRenderIPsec(c, bootstrapResult)
 	data.Data["IPsecMachineConfigEnable"] = IPsecMachineConfigEnable
 	data.Data["OVNIPsecDaemonsetEnable"] = OVNIPsecDaemonsetEnable
 	data.Data["OVNIPsecEnable"] = OVNIPsecEnable
+	data.Data["IPsecCheckForLibreswan"] = renderBothIPsecDemonSetsWhenAPoolPausedState
 
 	// Set progressing to true until IPsec DaemonSet is rendered when EW IPsec config is enabled.
 	// TODO Do a poor man's job mapping machine config pool status to CNO progressing state for now.
@@ -625,7 +626,7 @@ func IsIPsecLegacyAPI(conf *operv1.OVNKubernetesConfig) bool {
 // MachineConfig kind is not supported there.
 // All Other cases are not supported in pre-4.14 deployments.
 func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootstrap.BootstrapResult) (renderCNOIPsecMachineConfig, renderIPsecDaemonSet,
-	renderIPsecOVN, renderIPsecHostDaemonSet, renderIPsecContainerizedDaemonSet, renderIPsecDaemonSetAsCreateWaitOnly bool) {
+	renderIPsecOVN, renderIPsecHostDaemonSet, renderIPsecContainerizedDaemonSet, renderIPsecDaemonSetAsCreateWaitOnly, renderBothIPsecDemonSetsWhenAPoolPausedState bool) {
 	isHypershiftHostedCluster := bootstrapResult.Infra.HostedControlPlane != nil
 	isIpsecUpgrade := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.LegacyIPsecUpgrade
 	isOVNIPsecActive := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.OVNIPsecActive
@@ -635,7 +636,9 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// On upgrade, we will just remove any existing ipsec deployment without making any
 	// change to them. So during upgrade, we must keep track if IPsec MachineConfigs are
 	// active or not for non Hybrid hosted cluster.
-	isIPsecMachineConfigActive := isIPsecMachineConfigActive(bootstrapResult.Infra)
+	machineConfigPoolPaused := isThereAnyMachineConfigPoolPaused(bootstrapResult.Infra)
+	isIPsecMachineConfigActiveInUnPausedPools := isIPsecMachineConfigActive(bootstrapResult.Infra, true)
+	isIPsecMachineConfigActive := isIPsecMachineConfigActive(bootstrapResult.Infra, false)
 	isIPsecMachineConfigNotActiveOnUpgrade := isIpsecUpgrade && !isIPsecMachineConfigActive && !isHypershiftHostedCluster
 	isMachineConfigClusterOperatorReady := bootstrapResult.Infra.MachineConfigClusterOperatorReady
 	isCNOIPsecMachineConfigPresent := isCNOIPsecMachineConfigPresent(bootstrapResult.Infra)
@@ -644,16 +647,24 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// or if EW IPsec config is enabled.
 	renderIPsecDaemonSet = isOVNIPsecActive || mode == operv1.IPsecModeFull
 
+	// When any of the machine pool in paused state and IPsec MachineConfig is not active on paused pools and active on
+	// other unpaused pools then render both host and containerized ipsec deployment until machine config pools are moved
+	// into unpaused state and IPsec MachineConfig is active on all pools.
+	renderBothIPsecDemonSetsWhenAPoolPausedState = machineConfigPoolPaused && isIPsecMachineConfigActiveInUnPausedPools &&
+		!isIPsecMachineConfigActive
+
 	// If ipsec is enabled, we render the host ipsec deployment except for
 	// hypershift hosted clusters and we need to wait for the ipsec MachineConfig
 	// extensions to be active first. We must also render host ipsec deployment
 	// at the time of upgrade though user created IPsec Machine Config is not
 	// present/active.
-	renderIPsecHostDaemonSet = (renderIPsecDaemonSet && isIPsecMachineConfigActive && !isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnUpgrade
+	renderIPsecHostDaemonSet = (renderIPsecDaemonSet && isIPsecMachineConfigActive && !isHypershiftHostedCluster) ||
+		isIPsecMachineConfigNotActiveOnUpgrade || renderBothIPsecDemonSetsWhenAPoolPausedState
 
 	// The containerized ipsec deployment is only rendered during upgrades or
 	// for hypershift hosted clusters.
-	renderIPsecContainerizedDaemonSet = (renderIPsecDaemonSet && isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnUpgrade
+	renderIPsecContainerizedDaemonSet = (renderIPsecDaemonSet && isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnUpgrade ||
+		renderBothIPsecDemonSetsWhenAPoolPausedState
 
 	// MachineConfig IPsec extensions rollout is needed for the ipsec enablement and are used in both External and Full modes.
 	// except  when the containerized deployment is used in hypershift hosted clusters.
@@ -668,7 +679,7 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 
 	// While OVN ipsec is being upgraded and IPsec MachineConfigs deployment is in progress
 	// (or) IPsec config in OVN is being disabled, then ipsec deployment is not updated.
-	renderIPsecDaemonSetAsCreateWaitOnly = isIPsecMachineConfigNotActiveOnUpgrade || (isOVNIPsecActive && !renderIPsecOVN)
+	renderIPsecDaemonSetAsCreateWaitOnly = (isIPsecMachineConfigNotActiveOnUpgrade && !renderBothIPsecDemonSetsWhenAPoolPausedState) || (isOVNIPsecActive && !renderIPsecOVN)
 
 	return
 }
@@ -1516,12 +1527,12 @@ func containsNetworkOwnerRef(ownerRefs []metav1.OwnerReference) bool {
 
 // isIPsecMachineConfigActive returns true if both master and worker's machine config pools are ready with
 // ipsec machine config extension rolled out, otherwise returns false.
-func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
+func isIPsecMachineConfigActive(infra bootstrap.InfraStatus, checkOnlyUnpausedPool bool) bool {
 	if infra.MasterIPsecMachineConfigs == nil || infra.WorkerIPsecMachineConfigs == nil {
 		// One of the IPsec MachineConfig is not created yet, so return false.
 		return false
 	}
-	if len(infra.MasterMCPStatuses) == 0 || len(infra.WorkerMCPStatuses) == 0 {
+	if len(infra.MasterMCPs) == 0 || len(infra.WorkerMCPs) == 0 {
 		// When none of MachineConfig pools exist, then return false. needed for unit test.
 		return false
 	}
@@ -1529,17 +1540,48 @@ func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
 		return status.MachineCount == status.UpdatedMachineCount &&
 			hasSourceInMachineConfigStatus(status, machineConfigs)
 	}
-	for _, masterMCPStatus := range infra.MasterMCPStatuses {
-		if !ipSecPluginOnPool(masterMCPStatus, infra.MasterIPsecMachineConfigs) {
+	for _, masterMCP := range infra.MasterMCPs {
+		if checkOnlyUnpausedPool && masterMCP.Spec.Paused {
+			continue
+		}
+		if !ipSecPluginOnPool(masterMCP.Status, infra.MasterIPsecMachineConfigs) {
 			return false
 		}
 	}
-	for _, workerMCPStatus := range infra.WorkerMCPStatuses {
-		if !ipSecPluginOnPool(workerMCPStatus, infra.WorkerIPsecMachineConfigs) {
+	for _, workerMCP := range infra.WorkerMCPs {
+		if checkOnlyUnpausedPool && workerMCP.Spec.Paused {
+			continue
+		}
+		if !ipSecPluginOnPool(workerMCP.Status, infra.WorkerIPsecMachineConfigs) {
 			return false
 		}
 	}
 	return true
+}
+
+func isThereAnyMachineConfigPoolPaused(infra bootstrap.InfraStatus) bool {
+	if infra.MasterIPsecMachineConfigs == nil || infra.WorkerIPsecMachineConfigs == nil {
+		// One of the IPsec MachineConfig is not created yet, so return false.
+		return false
+	}
+	if len(infra.MasterMCPs) == 0 || len(infra.WorkerMCPs) == 0 {
+		// When none of MachineConfig pools exist, then return false. needed for unit test.
+		return false
+	}
+	isPausedPool := func(pool mcfgv1.MachineConfigPool) bool {
+		return pool.Spec.Paused
+	}
+	for _, masterMCP := range infra.MasterMCPs {
+		if isPausedPool(masterMCP) {
+			return true
+		}
+	}
+	for _, workerMCP := range infra.WorkerMCPs {
+		if isPausedPool(workerMCP) {
+			return true
+		}
+	}
+	return false
 }
 
 func hasSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
