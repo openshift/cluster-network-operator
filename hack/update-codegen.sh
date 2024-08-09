@@ -52,10 +52,17 @@ oc annotate --local -o yaml \
   -f _output/crds/network.operator.openshift.io_operatorpkis.yaml >> manifests/0000_70_cluster-network-operator_01_pki_crd.yaml
 
 # and also the CRD from library-go
-oc annotate --local -o yaml --overwrite \
-  "${RELEASE_PROFILE}" \
-  "${ROKS_PROFILE}" \
-  -f vendor/github.com/openshift/api/operator/v1/zz_generated.crd-manifests/0000_70_network_01_networks.crd.yaml > manifests/0000_70_network_01_networks.crd.yaml
+rm -f "manifests/0000_70_network_01_networks"*.yaml
+for file in "vendor/github.com/openshift/api/operator/v1/zz_generated.crd-manifests/0000_70_network_01_networks"*.yaml; do
+  # Extract the filename from the path
+  filename=$(basename "${file}")
+
+  # Annotate and move the file to the destination directory with the same filename
+  oc annotate --local -o yaml --overwrite \
+    "${RELEASE_PROFILE}" \
+    "${ROKS_PROFILE}" \
+    -f "${file}" > "manifests/${filename}"
+done
 
 echo "${HEADER}" > manifests/0000_70_cluster-network-operator_01_egr_crd.yaml
 oc annotate --local -o yaml --overwrite \
