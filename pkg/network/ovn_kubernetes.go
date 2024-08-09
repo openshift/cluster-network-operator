@@ -21,14 +21,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	apifeatures "github.com/openshift/api/features"
 	operv1 "github.com/openshift/api/operator/v1"
-	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
-	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
-	"github.com/openshift/cluster-network-operator/pkg/hypershift"
-	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/render"
-	"github.com/openshift/cluster-network-operator/pkg/util"
-	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
-	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
@@ -44,6 +36,15 @@ import (
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/render"
+	"github.com/openshift/cluster-network-operator/pkg/util"
+	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
+	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 )
 
 const CLUSTER_CONFIG_NAME = "cluster-config-v1"
@@ -71,8 +72,9 @@ const (
 	defaultV6InternalSubnet      = "fd98::/64"
 	defaultV4TransitSwitchSubnet = "100.88.0.0/16"
 	defaultV6TransitSwitchSubnet = "fd97::/64"
-	defaultV4MasqueradeSubnet    = "169.254.169.0/29"
-	defaultV6MasqueradeSubnet    = "fd69::/125"
+
+	defaultV4MasqueradeSubnet = "169.254.0.0/17"
+	defaultV6MasqueradeSubnet = "fd69::/112"
 )
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
@@ -133,8 +135,25 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["V6JoinSubnet"] = ""
 	data.Data["V4TransitSwitchSubnet"] = ""
 	data.Data["V6TransitSwitchSubnet"] = ""
-	data.Data["V4MasqueradeSubnet"] = ""
-	data.Data["V6MasqueradeSubnet"] = ""
+	data.Data["V4MasqueradeSubnet"] = bootstrapResult.OVN.DefaultV4MasqueradeSubnet
+	data.Data["V6MasqueradeSubnet"] = bootstrapResult.OVN.DefaultV6MasqueradeSubnet
+	if c.GatewayConfig != nil && c.GatewayConfig.IPv4.InternalMasqueradeSubnet != "" {
+		data.Data["V4MasqueradeSubnet"] = c.GatewayConfig.IPv4.InternalMasqueradeSubnet
+	}
+	if c.GatewayConfig != nil && c.GatewayConfig.IPv6.InternalMasqueradeSubnet != "" {
+		data.Data["V6MasqueradeSubnet"] = c.GatewayConfig.IPv6.InternalMasqueradeSubnet
+	}
+
+	// Set DefaultMasqueradeNetworkCIDRs to bootstrapResult.OVN.DefaultV[4|6]MasqueradeSubnet
+	// so the current default values are persisted through an annotation.
+	var defaultMasqueradeNetworkCIDRs []string
+	if bootstrapResult.OVN.DefaultV4MasqueradeSubnet != "" {
+		defaultMasqueradeNetworkCIDRs = append(defaultMasqueradeNetworkCIDRs, bootstrapResult.OVN.DefaultV4MasqueradeSubnet)
+	}
+	if bootstrapResult.OVN.DefaultV6MasqueradeSubnet != "" {
+		defaultMasqueradeNetworkCIDRs = append(defaultMasqueradeNetworkCIDRs, bootstrapResult.OVN.DefaultV6MasqueradeSubnet)
+	}
+	data.Data["DefaultMasqueradeNetworkCIDRs"] = strings.Join(defaultMasqueradeNetworkCIDRs, ",")
 
 	data.Data["V4JoinSubnet"] = c.V4InternalSubnet
 	data.Data["V6JoinSubnet"] = c.V6InternalSubnet
@@ -154,13 +173,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			data.Data["V6TransitSwitchSubnet"] = c.IPv6.InternalTransitSwitchSubnet
 		}
 	}
-	// v4 and v6InternalMasqueradeSubnet are used when the user wants to use the addresses that we reserve in ovn-k for ip masquerading
-	if c.GatewayConfig != nil && c.GatewayConfig.IPv4.InternalMasqueradeSubnet != "" {
-		data.Data["V4MasqueradeSubnet"] = c.GatewayConfig.IPv4.InternalMasqueradeSubnet
-	}
-	if c.GatewayConfig != nil && c.GatewayConfig.IPv6.InternalMasqueradeSubnet != "" {
-		data.Data["V6MasqueradeSubnet"] = c.GatewayConfig.IPv6.InternalMasqueradeSubnet
-	}
+
 	data.Data["EnableUDPAggregation"] = !bootstrapResult.OVN.OVNKubernetesConfig.DisableUDPAggregation
 	data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = bootstrapResult.Infra.NetworkNodeIdentityEnabled
 	data.Data["NodeIdentityCertDuration"] = OVN_NODE_IDENTITY_CERT_DURATION
@@ -1264,6 +1277,28 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		PrePullerUpdateStatus:    prepullerStatus,
 		OVNKubernetesConfig:      ovnConfigResult,
 		FlowsConfig:              bootstrapFlowsConfig(kubeClient.ClientFor("").CRClient()),
+	}
+
+	// preserve any default masquerade subnet values that might have been set previously
+	if masqueradeCIDRs, ok := nodeDaemonSet.GetAnnotations()[names.MasqueradeCIDRsAnnotation]; ok {
+		for _, masqueradeCIDR := range strings.Split(masqueradeCIDRs, ",") {
+			if utilnet.IsIPv6CIDRString(masqueradeCIDR) {
+				klog.Infof("Found the DefaultV6MasqueradeSubnet(%s) in the %q annotation", masqueradeCIDR, names.MasqueradeCIDRsAnnotation)
+				res.DefaultV6MasqueradeSubnet = masqueradeCIDR
+			} else if utilnet.IsIPv4CIDRString(masqueradeCIDR) {
+				klog.Infof("Found the DefaultV4MasqueradeSubnet(%s) in the %q annotation", masqueradeCIDR, names.MasqueradeCIDRsAnnotation)
+				res.DefaultV4MasqueradeSubnet = masqueradeCIDR
+			} else {
+				return nil, fmt.Errorf("invalid masquerade CIDR %q found in %q", masqueradeCIDR, masqueradeCIDRs)
+			}
+		}
+	}
+
+	// set the default masquerade CIDR for new clusters while ignoring upgrades
+	if res.ControlPlaneUpdateStatus == nil && res.NodeUpdateStatus == nil {
+		klog.Infof("Configuring the default masquerade subnets to %q and %q", defaultV4MasqueradeSubnet, defaultV6MasqueradeSubnet)
+		res.DefaultV4MasqueradeSubnet = defaultV4MasqueradeSubnet
+		res.DefaultV6MasqueradeSubnet = defaultV6MasqueradeSubnet
 	}
 	return &res, nil
 }
