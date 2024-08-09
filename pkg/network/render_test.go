@@ -611,3 +611,47 @@ func Test_renderNetworkDiagnostics(t *testing.T) {
 		})
 	}
 }
+
+func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
+	type args struct {
+		operConf *operv1.NetworkSpec
+	}
+	tests := []struct {
+		name        string
+		args        args
+		want        int
+		expectedErr error
+	}{
+		{
+			name: "No capability",
+			args: args{
+				operConf: &operv1.NetworkSpec{},
+			},
+			want:        0,
+			expectedErr: nil,
+		},
+		{
+			name: "FRR capability",
+			args: args{
+				operConf: &operv1.NetworkSpec{
+					AdditionalRoutingCapabilities: &operv1.AdditionalRoutingCapabilities{
+						Providers: []operv1.RoutingCapabilitiesProvider{
+							operv1.RoutingCapabilitiesProviderFRR,
+						},
+					},
+				},
+			},
+			want:        16,
+			expectedErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := renderAdditionalRoutingCapabilities(tt.args.operConf, manifestDir)
+			if !reflect.DeepEqual(tt.expectedErr, err) {
+				t.Errorf("renderAdditionalRoutingCapabilities() err = %v, want %v", err, tt.expectedErr)
+			}
+			assert.Equalf(t, tt.want, len(got), "renderAdditionalRoutingCapabilities(%v, %v)", tt.args.operConf, manifestDir)
+		})
+	}
+}

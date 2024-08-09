@@ -106,6 +106,8 @@ spec:
           value: "quay.io/openshift/origin-cloud-network-config-controller:latest"
         - name: CLI_IMAGE
           value: "quay.io/openshift/origin-cli:latest"
+        - name: FRR_K8S_IMAGE
+          value: "quay.io/openshift/origin-metallb-frr:latest"
         - name: POD_NAME
           valueFrom:
             fieldRef:

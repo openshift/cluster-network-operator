@@ -20,7 +20,7 @@ require (
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
 	golang.org/x/net v0.23.0
-	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.30.2
 	k8s.io/apimachinery v0.30.2
 	k8s.io/code-generator v0.30.2
@@ -111,7 +111,7 @@ require (
 )
 
 require (
-	github.com/openshift/api v0.0.0-20240704102751-33ed71ab039f
+	github.com/openshift/api v0.0.0-20240807093642-3cab566552bb
 	github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87
 	github.com/openshift/library-go v0.0.0-20240704110337-4002bdd84f05
 	github.com/openshift/machine-config-operator v0.0.1-0.20231002195040-a2469941c0dc

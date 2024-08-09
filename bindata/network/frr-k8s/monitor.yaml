@@ -1,0 +1,61 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frr-k8s-monitor-service
+  namespace: openshift-frr-k8s
+  labels:
+    name: frr-k8s-monitor-service
+  annotations:
+    prometheus.io/scrape: "true"
+    service.beta.openshift.io/serving-cert-secret-name: frr-k8s-certs-secret
+spec:
+  selector:
+    app: frr-k8s
+    component: frr-k8s
+  clusterIP: None
+  ports:
+  - name: metricshttps
+    port: 9140
+    targetPort: 9140
+  - name: frrmetricshttps
+    port: 9141
+    targetPort: 9141
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: frr-k8s-monitor
+  namespace: openshift-frr-k8s
+  labels:
+    app: frr-k8s
+    component: frr-k8s
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+spec:
+  endpoints:
+    - port: metricshttps
+      honorLabels: true
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      scheme: https
+      tlsConfig:
+        caFile: /etc/prometheus/configmaps/prometheus.io/scrape/service-ca.crt
+        serverName: openshift-frr-k8s-metrics-service.openshift-frr-k8s.svc
+        insecureSkipVerify: false
+    - port: frrmetricshttps
+      honorLabels: true
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      scheme: https
+      tlsConfig:
+        caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+        serverName: openshift-frr-k8s-metrics-service.openshift-frr-k8s.svc
+        insecureSkipVerify: false
+  jobLabel: app
+  namespaceSelector:
+    matchNames:
+    - openshift-frr-k8s
+  selector:
+    matchLabels:
+      name: frr-k8s-monitor-service
