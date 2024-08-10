@@ -1,21 +1,23 @@
 package network
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
+	v1 "github.com/openshift/api/network/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/util"
 
 	. "github.com/onsi/gomega"
 )
@@ -108,50 +110,191 @@ func TestValidateClusterConfig(t *testing.T) {
 
 func TestValidClusterConfigLiveMigration(t *testing.T) {
 	g := NewGomegaWithT(t)
+	networkConfig := *ClusterConfig.DeepCopy()
+	networkConfig.NetworkType = "OVNKubernetes"
+
 	tests := []struct {
-		name              string
-		managedCluster    bool
-		hypershiftCluster bool
-		annotation        bool
-		expectErr         bool
+		name             string
+		infraRes         *bootstrap.InfraStatus
+		config           *configv1.Network
+		objects          []crclient.Object
+		expectErr        bool
+		expectedErrorMsg string
 	}{
 		{
-			"no error when standalone managed cluster and migration label applied",
+			"error when standalone cluster and migration label applied",
+			&bootstrap.InfraStatus{},
+			&configv1.Network{
+				Spec: networkConfig,
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				}},
+			[]crclient.Object{&operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}},
 			true,
-			false,
-			true,
-			false,
+			"network type live migration is not supported on self managed clusters",
 		},
 		{
-			"error when self managed cluster and migration label applied",
+			"no error when standalone cluster and migration label not applied",
+			&bootstrap.InfraStatus{},
+			&configv1.Network{Spec: networkConfig},
+			[]crclient.Object{&operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}},
 			false,
-			false,
-			true,
-			true,
+			"",
 		},
 		{
-
-			"no error when standalone managed cluster and migration label not applied",
-			true,
+			"no error when managed cluster and migration label applied",
+			&bootstrap.InfraStatus{StandaloneManagedCluster: true},
+			&configv1.Network{
+				Spec: networkConfig,
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				}},
+			[]crclient.Object{&operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}},
 			false,
-			false,
-			false,
+			"",
 		},
 		{
-
-			"no error when self managed cluster and migration label not applied",
-			false,
-			false,
-			false,
-			false,
-		},
-		{
-
 			"error when HyperShift and migration label applied",
+			&bootstrap.InfraStatus{HostedControlPlane: &hypershift.HostedControlPlane{}},
+			&configv1.Network{
+				Spec: networkConfig,
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				},
+				Status: configv1.NetworkStatus{NetworkType: string(operv1.NetworkTypeOpenShiftSDN)}},
+			[]crclient.Object{&operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}},
 			true,
+			"network type live migration is not supported on HyperShift clusters",
+		},
+		{
+			"error when trying to migrate to an unsupported cni",
+			&bootstrap.InfraStatus{},
+			&configv1.Network{
+				Spec: *ClusterConfig.DeepCopy(),
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				}},
+			[]crclient.Object{&operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}},
 			true,
+			"network type live migration is only supported for OVNKubernetes and OpenShiftSDN CNI",
+		},
+		{
+			"error when trying to migrate from sdn in multinenat mode",
+			&bootstrap.InfraStatus{StandaloneManagedCluster: true},
+			&configv1.Network{
+				Spec: networkConfig,
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				},
+				Status: configv1.NetworkStatus{NetworkType: string(operv1.NetworkTypeOpenShiftSDN)}},
+			[]crclient.Object{&operv1.Network{
+				ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+				Spec: operv1.NetworkSpec{
+					DefaultNetwork: operv1.DefaultNetworkDefinition{
+						Type:               operv1.NetworkTypeOpenShiftSDN,
+						OpenShiftSDNConfig: &operv1.OpenShiftSDNConfig{Mode: "Multitenant"}}}}},
 			true,
+			"network type live migration is not supported on SDN Multitenant clusters",
+		},
+		{
+			"error when cluster network overlaps with ovn-k internal subnet overlap",
+			&bootstrap.InfraStatus{StandaloneManagedCluster: true},
+			&configv1.Network{
+				Spec: networkConfig,
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				},
+				Status: configv1.NetworkStatus{NetworkType: string(operv1.NetworkTypeOpenShiftSDN)}},
+			[]crclient.Object{&operv1.Network{
+				ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+				Spec: operv1.NetworkSpec{
+					DefaultNetwork: operv1.DefaultNetworkDefinition{
+						Type: operv1.NetworkTypeOpenShiftSDN,
+						OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
+							// 10.2.0.0/22 is the second clusternetwork in networkConfig
+							V4InternalSubnet: "10.2.2.0/24",
+						}}}}},
 			true,
+			"network clusterNetwork(10.2.0.0/22) overlaps with network v4InternalSubnet(10.2.2.0/24)",
+		},
+		{
+			"error when service overlaps with ovn-k internal transit switch subnet overlap",
+			&bootstrap.InfraStatus{StandaloneManagedCluster: true},
+			&configv1.Network{
+				Spec: networkConfig,
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				},
+				Status: configv1.NetworkStatus{NetworkType: string(operv1.NetworkTypeOpenShiftSDN)}},
+			[]crclient.Object{&operv1.Network{
+				ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+				Spec: operv1.NetworkSpec{
+					DefaultNetwork: operv1.DefaultNetworkDefinition{
+						Type: operv1.NetworkTypeOpenShiftSDN,
+						OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
+							// "192.168.0.0/20" is the service network in networkConfig
+							IPv4: &operv1.IPv4OVNKubernetesConfig{
+								InternalTransitSwitchSubnet: "192.0.0.0/8",
+							},
+						}}}}},
+			true,
+
+			"network serviceNetwork(192.168.0.0/20) overlaps with network v4InternalTransitSwitchSubnet(192.0.0.0/8)",
+		},
+		{
+			"error when service network overlaps with ovn-k internal transit switch subnet overlap",
+			&bootstrap.InfraStatus{StandaloneManagedCluster: true},
+			&configv1.Network{
+				Spec: func() configv1.NetworkSpec {
+					cfg := networkConfig
+					cfg.ClusterNetwork = []configv1.ClusterNetworkEntry{
+						{
+							CIDR:       "fd00:1234::/48",
+							HostPrefix: 64,
+						}}
+					//fd97::/64 is the default v6 transit switch subnet
+					cfg.ServiceNetwork = []string{"fd97::/48"}
+					return cfg
+				}(),
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				},
+				Status: configv1.NetworkStatus{NetworkType: string(operv1.NetworkTypeOpenShiftSDN)}},
+			[]crclient.Object{&operv1.Network{
+				ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+				Spec: operv1.NetworkSpec{
+					DefaultNetwork: operv1.DefaultNetworkDefinition{
+						Type: operv1.NetworkTypeOpenShiftSDN,
+					}}}},
+			true,
+			"network serviceNetwork(fd97::/48) overlaps with network v6InternalTransitSwitchSubnet(fd97::/64)",
+		},
+		{
+			"error when pods with 'pod.network.openshift.io/assign-macvlan' annotation are present in the cluster",
+			&bootstrap.InfraStatus{StandaloneManagedCluster: true},
+			&configv1.Network{
+				Spec: networkConfig,
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.NetworkTypeMigrationAnnotation: ""},
+				},
+				Status: configv1.NetworkStatus{NetworkType: string(operv1.NetworkTypeOpenShiftSDN)}},
+			[]crclient.Object{
+				&operv1.Network{
+					ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+					Spec: operv1.NetworkSpec{
+						DefaultNetwork: operv1.DefaultNetworkDefinition{
+							Type: operv1.NetworkTypeOpenShiftSDN,
+						},
+					},
+				},
+				&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{v1.AssignMacvlanAnnotation: ""},
+					},
+				},
+			},
+			true,
+			"network type live migration is not supported for pods with \"pod.network.openshift.io/assign-macvlan\" annotation. Please remove all egress router pods",
 		},
 	}
 
@@ -165,38 +308,16 @@ func TestValidClusterConfigLiveMigration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cc := *ClusterConfig.DeepCopy()
-			net := &configv1.Network{Spec: cc}
-			infrastructure := &configv1.Infrastructure{
-				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
-				Status: configv1.InfrastructureStatus{
-					PlatformStatus: &configv1.PlatformStatus{},
-				},
-			}
-			client := fake.NewFakeClient(infrastructure)
-			err := createProxy(client)
-			g.Expect(err).NotTo(HaveOccurred())
-			if tt.hypershiftCluster {
-				// HyperShift is detected if an env var is set
-				os.Setenv("HYPERSHIFT", "")
-			} else {
-				os.Unsetenv("HYPERSHIFT")
-			}
-			if tt.annotation {
-				net.Annotations = map[string]string{names.NetworkTypeMigrationAnnotation: ""}
-			}
-			if tt.managedCluster && !tt.hypershiftCluster {
-				err := client.Default().CRClient().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: util.STANDALONE_MANAGED_CLUSTER_NAMESPACE}})
-				if err != nil {
-					t.Errorf("failed to create test namespace %q: %v", util.STANDALONE_MANAGED_CLUSTER_NAMESPACE, err)
+			client := fake.NewFakeClient(tt.objects...)
+			err := validateClusterConfig(tt.config, tt.infraRes, client)
+			if tt.expectErr {
+				g.Expect(err).To(HaveOccurred())
+				if tt.expectedErrorMsg != "" {
+					g.Expect(err).To(MatchError(Equal(tt.expectedErrorMsg)))
 				}
 			}
-			err = ValidateClusterConfig(net, client)
-			if tt.expectErr && err == nil {
-				t.Errorf("expected error but got nil")
-			}
-			if !tt.expectErr && err != nil {
-				t.Errorf("expected no err but got error: %v", err)
+			if !tt.expectErr {
+				g.Expect(err).NotTo(HaveOccurred())
 			}
 		})
 	}
