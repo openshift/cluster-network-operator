@@ -106,7 +106,7 @@ func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c c
 
 	certDuration := 5 * 365 * 24 * time.Hour
 	if featureGates.Enabled(features.FeatureShortCertRotation) {
-		certDuration = 2 * time.Hour
+		certDuration = 4 * time.Hour
 	}
 	return &ReconcileCSR{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status, clientset: clientset, certDuration: certDuration}, nil
 
