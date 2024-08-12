@@ -11,6 +11,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"log"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -26,11 +27,19 @@ import (
 	"github.com/openshift/library-go/pkg/operator/certrotation"
 	"github.com/pkg/errors"
 
+	features "github.com/openshift/api/features"
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	configinformers "github.com/openshift/client-go/config/informers/externalversions"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
+	"github.com/openshift/library-go/pkg/operator/events"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -44,8 +53,8 @@ const (
 )
 
 // Add attaches our control loop to the manager and watches for PKI objects
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client) error {
-	r, err := newPKIReconciler(mgr, status)
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, client cnoclient.Client) error {
+	r, err := newPKIReconciler(mgr, status, client)
 	if err != nil {
 		return err
 	}
@@ -77,6 +86,8 @@ type PKIReconciler struct {
 	pkis map[types.NamespacedName]*pki
 	// For computing status
 	pkiErrs map[types.NamespacedName]error
+
+	certDuration time.Duration
 }
 
 // The periodic resync interval.
@@ -86,10 +97,65 @@ var ResyncPeriod = 5 * time.Minute
 
 // newPKIReconciler creates the toplevel reconciler that receives PKI updates
 // and configures the CertRotationController accordingly
-func newPKIReconciler(mgr manager.Manager, status *statusmanager.StatusManager) (reconcile.Reconciler, error) {
+func newPKIReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) (reconcile.Reconciler, error) {
 	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		return nil, err
+	}
+
+	kubeConfig := c.Default().Config()
+	kubeClient := c.Default().Kubernetes()
+	configClient, err := configclient.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, err
+	}
+	configInformers := configinformers.NewSharedInformerFactory(configClient, 10*time.
+		Minute)
+
+	desiredVersion := os.Getenv("RELEASE_VERSION")
+	missingVersion := "0.0.1-snapshot"
+
+	eventRecorder := events.NewKubeRecorder(kubeClient.CoreV1().Events("openshift-network-operator"), "cluster-network-operator", &corev1.ObjectReference{
+		APIVersion: "apps/v1",
+		Kind:       "Deployment",
+		Namespace:  "openshift-network-operator",
+		Name:       "network-operator",
+	})
+
+	// By default, this will exit(0) the process if the featuregates ever change to a different set of values.
+	featureGateAccessor := featuregates.NewFeatureGateAccess(
+		desiredVersion, missingVersion,
+		configInformers.Config().V1().ClusterVersions(), configInformers.Config().
+			V1().FeatureGates(),
+		eventRecorder,
+	)
+	// TODO: 1) If other controllers in CNO also want to use featureGates then we should move this code to outside
+	// operconfig-controller 2) For now we pass the neverStop channel; FIXME: use c.Default().AddCustomInformer and
+	// change this to pass a proper stop channel and context which are closed and cancelled properly upon exit.
+	go featureGateAccessor.Run(context.TODO())
+	go configInformers.Start(wait.NeverStop)
+
+	klog.Infof("Waiting for feature gates initialization...")
+	select {
+	case <-featureGateAccessor.InitialFeatureGatesObserved():
+		featureGates, err := featureGateAccessor.CurrentFeatureGates()
+		if err != nil {
+			return nil, err
+		} else {
+			klog.Infof("FeatureGates initialized: knownFeatureGates=%v", featureGates.KnownFeatures())
+		}
+	case <-time.After(1 * time.Minute):
+		return nil, fmt.Errorf("timed out waiting for FeatureGate detection")
+	}
+
+	featureGates, err := featureGateAccessor.CurrentFeatureGates()
+	if err != nil {
+		return nil, err
+	}
+
+	certDuration := 365 * 24 * time.Hour / 2
+	if featureGates.Enabled(features.FeatureShortCertRotation) {
+		certDuration = 2 * time.Hour
 	}
 
 	return &PKIReconciler{
@@ -97,8 +163,9 @@ func newPKIReconciler(mgr manager.Manager, status *statusmanager.StatusManager) 
 		status:    status,
 		clientset: clientset,
 
-		pkis:    map[types.NamespacedName]*pki{},
-		pkiErrs: map[types.NamespacedName]error{},
+		pkis:         map[types.NamespacedName]*pki{},
+		pkiErrs:      map[types.NamespacedName]error{},
+		certDuration: certDuration,
 	}, nil
 }
 
@@ -129,7 +196,7 @@ func (r *PKIReconciler) Reconcile(ctx context.Context, request reconcile.Request
 		}
 	}
 	if existing == nil {
-		existing, err = newPKI(obj, r.clientset, r.mgr)
+		existing, err = newPKI(obj, r.clientset, r.mgr, r.certDuration)
 		if err != nil {
 			log.Println(err)
 			r.pkiErrs[request.NamespacedName] =
@@ -177,7 +244,7 @@ type pki struct {
 }
 
 // newPKI creates a CertRotationController for the supplied configuration
-func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr manager.Manager) (*pki, error) {
+func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr manager.Manager, certDuration time.Duration) (*pki, error) {
 	spec := config.Spec
 
 	// Ugly: the existing cache + informers used as part of the controller-manager
@@ -223,8 +290,8 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			AdditionalAnnotations: certrotation.AdditionalAnnotations{
 				JiraComponent: names.ClusterNetworkOperatorJiraComponent,
 			},
-			Validity: OneYear / 2,
-			Refresh:  OneYear / 4,
+			Validity: certDuration,
+			Refresh:  certDuration / 2,
 			CertCreator: &certrotation.ServingRotation{
 				Hostnames: func() []string { return []string{spec.TargetCert.CommonName} },
 
