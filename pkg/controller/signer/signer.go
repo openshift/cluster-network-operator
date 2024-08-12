@@ -13,11 +13,7 @@ import (
 	"time"
 )
 
-const (
-	oneYear = 365 * 24 * time.Hour
-)
-
-func newCertificateTemplate(certReq *x509.CertificateRequest) *x509.Certificate {
+func newCertificateTemplate(certReq *x509.CertificateRequest, certDuration time.Duration) *x509.Certificate {
 	// Like in openshift/library-go/pkg/crypto/crypto.go, we will generate a random
 	// serial number
 	serialNumber := mathrand.New(mathrand.NewSource(time.Now().UTC().UnixNano())).Int63()
@@ -28,7 +24,7 @@ func newCertificateTemplate(certReq *x509.CertificateRequest) *x509.Certificate 
 		SignatureAlgorithm: x509.SHA512WithRSA,
 
 		NotBefore:    time.Now().Add(-1 * time.Second),
-		NotAfter:     time.Now().Add(5 * oneYear),
+		NotAfter:     time.Now().Add(certDuration),
 		SerialNumber: big.NewInt(serialNumber),
 
 		DNSNames:              certReq.DNSNames,

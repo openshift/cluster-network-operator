@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/pkg/errors"
 
 	"path/filepath"
@@ -38,7 +39,7 @@ import (
 )
 
 // Attach control loop to the manager and watch for Egress Router objects
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, cli cnoclient.Client) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, cli cnoclient.Client, _ featuregates.FeatureGate) error {
 	r, err := newEgressRouterReconciler(mgr, status, cli)
 	if err != nil {
 		return err
