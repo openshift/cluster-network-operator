@@ -78,7 +78,3 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-cli:latest
-  - name: metallb-frr
-    from:
-      kind: DockerImage
-      name: quay.io/openshift/origin-metallb-frr:latest
