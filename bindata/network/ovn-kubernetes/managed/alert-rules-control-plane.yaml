@@ -350,6 +350,7 @@ spec:
     - alert: OVNKubernetesNorthdInactive
       annotations:
         summary: Exactly one OVN northd instance must have an active status.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/OVNKubernetesNorthdInactive.md
         description: Exactly one OVN northd must have an active status within the high availability set.
           Networking control plane is degraded.
       expr: |
