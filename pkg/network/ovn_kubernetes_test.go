@@ -149,6 +149,11 @@ func TestRenderOVNKubernetes(t *testing.T) {
 					Verbs:     []string{"patch", "update"},
 				},
 				{
+					APIGroups: []string{"k8s.ovn.org"},
+					Resources: []string{"userdefinednetworks/finalizers"},
+					Verbs:     []string{"update"},
+				},
+				{
 					APIGroups: []string{"k8s.cni.cncf.io"},
 					Resources: []string{"network-attachment-definitions"},
 					Verbs:     []string{"patch", "update", "create", "delete"},

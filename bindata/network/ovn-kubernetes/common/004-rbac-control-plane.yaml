@@ -187,6 +187,11 @@ rules:
   verbs:
     - patch
     - update
+- apiGroups: [ "k8s.ovn.org" ]
+  resources:
+    - userdefinednetworks/finalizers
+  verbs:
+    - update
 - apiGroups: [ "k8s.cni.cncf.io" ]
   resources:
     - network-attachment-definitions
