@@ -31,7 +31,16 @@ install.tools:
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | bash -s -- -b ${GOPATH}/bin
 .PHONY: install.tools
 
+.PHONY: update-codegen
+update-codegen:
+	hack/update-codegen.sh
 
+.PHONY: verify-update-codegen
+verify-update-codegen: update-codegen
+	git diff --exit-code
+
+.PHONY: verify
+verify: verify-update-codegen
 
 clean:
 	$(RM) cluster-network-operator cluster-network-check-endpoints cluster-network-check-target
