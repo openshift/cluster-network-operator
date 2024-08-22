@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -10,24 +11,24 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/openshift/cluster-network-operator/pkg/names"
-	corev1 "k8s.io/api/core/v1"
-
-	"github.com/pkg/errors"
-
 	configv1 "github.com/openshift/api/config/v1"
 	apifeatures "github.com/openshift/api/features"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/retry"
+	utilnet "k8s.io/utils/net"
+
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-
-	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/util/sets"
-	utilnet "k8s.io/utils/net"
 )
 
 var dualStackPlatforms = sets.NewString(
@@ -35,6 +36,10 @@ var dualStackPlatforms = sets.NewString(
 	string(configv1.NonePlatformType),
 	string(configv1.VSpherePlatformType),
 	string(configv1.OpenStackPlatformType),
+)
+
+const (
+	pluginName = "networking-console-plugin"
 )
 
 func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, manifestDir string, client cnoclient.Client, featureGates featuregates.FeatureGate, bootstrapResult *bootstrap.BootstrapResult) ([]*uns.Unstructured, bool, error) {
@@ -115,13 +120,14 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	}
 	objs = append(objs, o...)
 
+	// render network public
 	o, err = renderNetworkPublic(manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
-	// render
+	// render network node identity
 	o, err = renderNetworkNodeIdentity(operConf, bootstrapResult, manifestDir, client)
 	if err != nil {
 		return nil, progressing, err
@@ -145,6 +151,20 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 		return nil, progressing, err
 	}
 	objs = append(objs, o...)
+
+	// render networking console plugin
+	o, err = renderNetworkingConsolePlugin(manifestDir, bootstrapResult)
+	if err != nil {
+		return nil, progressing, err
+	}
+	if o != nil {
+		objs = append(objs, o...)
+	}
+
+	err = registerNetworkingConsolePlugin(bootstrapResult, client)
+	if err != nil {
+		return nil, progressing, err
+	}
 
 	log.Printf("Render phase done, rendered %d objects", len(objs))
 	return objs, progressing, nil
@@ -893,6 +913,60 @@ func renderIPTablesAlerter(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.
 		return nil, errors.Wrap(err, "failed to render network/iptables-alerter manifests")
 	}
 	return manifests, nil
+}
+
+// renderNetworkingConsolePlugin renders the common objects related to the networking console plugin resources
+func renderNetworkingConsolePlugin(manifestDir string, bootstrapResult *bootstrap.BootstrapResult) ([]*uns.Unstructured, error) {
+	if !bootstrapResult.Infra.ConsolePluginCRDExists {
+		log.Printf("consoleplugins.console.openshift.io CRD does not exist yet")
+		return nil, nil
+	}
+
+	data := render.MakeRenderData()
+	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
+
+	replicas := int32(2)
+	if bootstrapResult.Infra.InfrastructureTopology == configv1.SingleReplicaTopologyMode {
+		// the plugin pod(s) are running on worker nodes. in case of SingleReplica of
+		// Infrastructure Topology, we use one replica for the networking console plugin.
+		replicas = int32(1)
+	}
+	data.Data["Replicas"] = replicas
+
+	consolePluginImage, ok := os.LookupEnv("NETWORKING_CONSOLE_PLUGIN_IMAGE")
+	if !ok {
+		return nil, errors.Errorf("Could not get NETWORKING_CONSOLE_PLUGIN_IMAGE env var")
+	}
+	data.Data["NetworkingConsolePluginImage"] = consolePluginImage
+
+	manifests, err := render.RenderDir(filepath.Join(manifestDir, "networking-console-plugin"), &data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to render networking-console-plugin manifests")
+	}
+
+	return manifests, nil
+}
+
+// registerNetworkingConsolePlugin enables console plugin for networking-console if not already enabled
+func registerNetworkingConsolePlugin(bootstrapResult *bootstrap.BootstrapResult, cl cnoclient.Client) error {
+	if !bootstrapResult.Infra.ConsolePluginCRDExists {
+		return nil
+	}
+
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		console, err := cl.ClientFor("").OpenshiftOperatorClient().OperatorV1().Consoles().Get(context.TODO(), "cluster", metav1.GetOptions{})
+		if err != nil {
+			return errors.Wrap(err, "Failed to get Console Operator resource")
+		}
+
+		if sets.NewString(console.Spec.Plugins...).Has(pluginName) {
+			return nil
+		}
+		console.Spec.Plugins = append(console.Spec.Plugins, pluginName)
+
+		_, err = cl.Default().OpenshiftOperatorClient().OperatorV1().Consoles().Update(context.TODO(), console, metav1.UpdateOptions{})
+		return err
+	})
 }
 
 func isSupportedDualStackPlatform(platformType configv1.PlatformType) bool {

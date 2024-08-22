@@ -1,0 +1,18 @@
+apiVersion: console.openshift.io/v1
+kind: ConsolePlugin
+metadata:
+  labels:
+    app.kubernetes.io/component: networking-console-plugin
+    app.kubernetes.io/managed-by: cluster-network-operator
+    app.kubernetes.io/name:  networking-console-plugin
+    app.kubernetes.io/part-of: cluster-network-operator
+  name:  networking-console-plugin
+spec:
+  backend:
+    service:
+      basePath: /
+      name:  networking-console-plugin
+      namespace: openshift-network-console
+      port: 9443
+    type: Service
+  displayName: Networking Console Plugin
