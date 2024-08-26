@@ -60,12 +60,14 @@ spec:
                   operator: In
                   values:
                     - {{.HostedClusterNamespace}}
+{{- if (gt .ClusterManagerReplicas 1) }}
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
               matchLabels:
                 app: ovnkube-control-plane
             topologyKey: topology.kubernetes.io/zone
+{{- end }}
         podAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
