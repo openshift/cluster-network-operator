@@ -219,6 +219,7 @@ const (
 	unsupportedHCPCluster              = "UnsupportedHyperShiftCluster"
 	unsupportedSDNNetworkIsolationMode = "UnsupportedSDNNetworkIsolationMode"
 	unsupportedMACVlanInterface        = "UnsupportedMACVLANInterface"
+	networkOverlap                     = "NetworkOverlap"
 )
 
 var metricLiveMigrationBlocked = metrics.NewGaugeVec(&metrics.GaugeOpts{
@@ -266,6 +267,7 @@ func ValidateLiveMigration(clusterConfig *configv1.Network, infraRes *bootstrap.
 		}
 
 		if err := validateOVNKubernetesCIDROverlap(clusterConfig, operConfig); err != nil {
+			metricLiveMigrationBlocked.With(prometheus.Labels{metricLiveMigrationBlockedLabelKey: networkOverlap}).Set(1)
 			return err
 		}
 
