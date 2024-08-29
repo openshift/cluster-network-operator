@@ -9,6 +9,7 @@ metadata:
       the contents of the Networking section in OpenShift Console
     release.openshift.io/version: "{{.ReleaseVersion}}"
     networkoperator.openshift.io/non-critical: ""
+    openshift.io/required-scc: restricted-v2
   labels:
     app.kubernetes.io/component: networking-console-plugin
     app.kubernetes.io/managed-by: cluster-network-operator
