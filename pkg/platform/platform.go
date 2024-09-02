@@ -3,6 +3,7 @@ package platform
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -11,7 +12,9 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -148,6 +151,11 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	}
 	res.NetworkNodeIdentityEnabled = netIDEnabled
 
+	res.ConsolePluginCRDExists, err = consolePluginCRDExists(client)
+	if err != nil {
+		return nil, err
+	}
+
 	// Skip retrieving IPsec MachineConfig and MachineConfigPool if it's a hypershift cluster because
 	// those object kinds are not supported there.
 	if res.HostedControlPlane != nil {
@@ -251,4 +259,19 @@ func getMachineConfigPoolStatuses(ctx context.Context, client cnoclient.Client, 
 		}
 	}
 	return mcpStatuses, nil
+}
+
+func consolePluginCRDExists(cl cnoclient.Client) (bool, error) {
+	consolePluginCrdKey := crclient.ObjectKey{Name: "consoleplugins.console.openshift.io"}
+	consolePluginCrdObj := &apiextensionsv1.CustomResourceDefinition{}
+	err := cl.Default().CRClient().Get(context.TODO(), consolePluginCrdKey, consolePluginCrdObj)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Printf("consoleplugins.console.openshift.io CRD was not found: %v", err)
+			return false, nil
+		} else {
+			return false, errors.Wrap(err, "failed to get consoleplugins.console.openshift.io CRD")
+		}
+	}
+	return true, nil
 }
