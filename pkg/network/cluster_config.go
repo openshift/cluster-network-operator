@@ -251,10 +251,6 @@ func ValidateLiveMigration(clusterConfig *configv1.Network, infraRes *bootstrap.
 		return errors.Errorf("network type live migration is not supported on HyperShift clusters")
 	}
 
-	if !infraRes.StandaloneManagedCluster {
-		return errors.Errorf("network type live migration is not supported on self managed clusters")
-	}
-
 	operConfig := &operv1.Network{}
 	err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: names.CLUSTER_CONFIG}, operConfig)
 	if err != nil {
