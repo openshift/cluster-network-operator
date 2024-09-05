@@ -27,12 +27,13 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	apifeatures "github.com/openshift/api/features"
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnofake "github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 var (
@@ -260,6 +261,7 @@ encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -301,6 +303,7 @@ encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -356,6 +359,7 @@ encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -414,6 +418,7 @@ encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -472,6 +477,7 @@ encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -529,6 +535,7 @@ encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -576,6 +583,7 @@ encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -625,6 +633,7 @@ encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=false
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -667,6 +676,7 @@ encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -709,6 +719,7 @@ encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -755,6 +766,7 @@ encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -798,6 +810,7 @@ encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -842,6 +855,7 @@ encap-port="8061"
 enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
