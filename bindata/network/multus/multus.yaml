@@ -609,6 +609,7 @@ spec:
               "log_level": "debug"
             }
             EOF
+            chmod 600 $WHEREABOUTS_GLOBALCONFIG
 
             else
               warn "Doesn't look like we're running in a kubernetes environment (no serviceaccount token)"
