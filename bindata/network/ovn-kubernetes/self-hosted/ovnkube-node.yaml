@@ -477,9 +477,43 @@ spec:
                 --cert-duration={{.NodeIdentityCertDuration}}
               "
             fi
+
+            ovn_v4_masquerade_subnet_opt=
+            if [[ "{{.V4MasqueradeSubnet}}" != "" ]]; then
+              ovn_v4_masquerade_subnet_opt="--gateway-v4-masquerade-subnet {{.V4MasqueradeSubnet}}"
+            fi
+            ovn_v6_masquerade_subnet_opt=
+            if [[ "{{.V6MasqueradeSubnet}}" != "" ]]; then
+              ovn_v6_masquerade_subnet_opt="--gateway-v6-masquerade-subnet {{.V6MasqueradeSubnet}}"
+            fi
+
+            ovn_v4_join_subnet_opt=
+            if [[ "{{.V4JoinSubnet}}" != "" ]]; then
+              ovn_v4_join_subnet_opt="--gateway-v4-join-subnet {{.V4JoinSubnet}}"
+            fi
+            ovn_v6_join_subnet_opt=
+            if [[ "{{.V6JoinSubnet}}" != "" ]]; then
+              ovn_v6_join_subnet_opt="--gateway-v6-join-subnet {{.V6JoinSubnet}}"
+            fi
+
+            ovn_v4_transit_switch_subnet_opt=
+            if [[ "{{.V4TransitSwitchSubnet}}" != "" ]]; then
+              ovn_v4_transit_switch_subnet_opt="--cluster-manager-v4-transit-switch-subnet {{.V4TransitSwitchSubnet}}"
+            fi
+            ovn_v6_transit_switch_subnet_opt=
+            if [[ "{{.V6TransitSwitchSubnet}}" != "" ]]; then
+              ovn_v6_transit_switch_subnet_opt="--cluster-manager-v6-transit-switch-subnet {{.V6TransitSwitchSubnet}}"
+            fi
+
             exec /usr/bin/hybrid-overlay-node --node "${K8S_NODE}" \
               --config-file=/run/ovnkube-config/ovnkube.conf \
-              ${NETWORK_NODE_IDENTITY_ENABLE}
+              ${NETWORK_NODE_IDENTITY_ENABLE} \
+              ${ovn_v4_masquerade_subnet_opt} \
+              ${ovn_v6_masquerade_subnet_opt} \
+              ${ovn_v4_join_subnet_opt} \
+              ${ovn_v6_join_subnet_opt} \
+              ${ovn_v4_transit_switch_subnet_opt} \
+              ${ovn_v6_transit_switch_subnet_opt}
           fi
 {{- end }}
           . /ovnkube-lib/ovnkube-lib.sh || exit 1
