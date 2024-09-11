@@ -30,6 +30,7 @@ spec:
       annotations:
         hypershift.openshift.io/release-image: {{.ReleaseImage}}
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        openshift.io/required-scc: restricted-v2
       labels:
         app: network-node-identity
         component: network
