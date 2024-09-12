@@ -62,6 +62,7 @@ spec:
                     hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
                 topologyKey: kubernetes.io/hostname
       priorityClassName: hypershift-control-plane
+{{- if (eq .AroHcpMIClientID "")}}
       securityContext:
 {{- if not (eq .RunAsUser "")}}
         runAsUser: {{.RunAsUser}}
@@ -69,6 +70,7 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+{{- end }}
       initContainers:
       - name: hosted-cluster-kubecfg-setup
         image: "{{.CLIImage}}"
@@ -92,8 +94,14 @@ spec:
             value: "{{.KubernetesServicePort}}"
           - name: KUBERNETES_SERVICE_HOST
             value: "{{.KubernetesServiceHost}}"
-          - name: AZURE_MSI_AUTHENTICATION
-            value: "{{.AzureMSIAuthentication}}"
+{{- if not (eq .AroHcpMIClientID "")}}
+      - name: adapter-init
+        image: {{.AzureAdapterInitImage}}
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          capabilities:
+            add: ["NET_ADMIN"]
+{{- end }}
       containers:
       # hosted-cluster-token creates a token with a custom path(/var/run/secrets/hosted_cluster/token)
       # The token path is included in the kubeconfig used by cncc containers to talk to the hosted clusters API server
@@ -134,6 +142,19 @@ spec:
             name: admin-kubeconfig
           - mountPath: /var/run/secrets/openshift/serviceaccount
             name: cloud-token
+{{- if not (eq .AroHcpMIClientID "")}}
+      - name: adapter-server
+        image: {{.AzureAdapterServerImage}}
+        imagePullPolicy: IfNotPresent
+        args: ["sp"]
+        env:
+          - name: "AZURE_CLIENT_ID"
+            value: "{{.AroHcpMIClientID}}"
+          - name: "AZURE_CLIENT_SECRET"
+            value: "{{.ClientIDSecret}}"
+          - name: "AZURE_TENANT_ID"
+            value: "{{.TenantID}}"
+{{- end }}
       - name: controller
         securityContext:
           allowPrivilegeEscalation: false
@@ -165,6 +186,8 @@ spec:
               -secret-name cloud-network-config-controller-creds \
               -kubeconfig /var/run/secrets/hosted_cluster/kubeconfig
         env:
+        - name: ARO_HCP_MI_CLIENT_ID
+          value: "{{.AroHcpMIClientID}}"
         - name: CONTROLLER_NAMESPACE
           value: "openshift-cloud-network-config-controller"
         - name: CONTROLLER_NAME
