@@ -80,12 +80,14 @@ spec:
                   matchLabels:
                     hypershift.openshift.io/hosted-control-plane: {{.AdmissionControllerNamespace}}
                 topologyKey: kubernetes.io/hostname
+{{- if (gt .Replicas 1) }}
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
               matchLabels:
                 app: multus-admission-controller
             topologyKey: topology.kubernetes.io/zone
+{{- end }}
       initContainers:
         - name: hosted-cluster-kubecfg-setup
           image: "{{.CLIImage}}"
