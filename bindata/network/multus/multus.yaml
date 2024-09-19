@@ -328,7 +328,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-      terminationGracePeriodSeconds: 10
+      terminationGracePeriodSeconds: 30
       volumes:
         - name: system-cni-dir
           hostPath:
