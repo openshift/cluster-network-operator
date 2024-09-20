@@ -56,12 +56,14 @@ spec:
                     operator: In
                     values:
                       - {{.HostedClusterNamespace}}
+{{- if (gt .NetworkNodeIdentityReplicas 1)}}
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
                 matchLabels:
                   app: network-node-identity
               topologyKey: topology.kubernetes.io/zone
+{{- end }}
         podAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
