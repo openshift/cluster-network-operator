@@ -236,6 +236,20 @@ spec:
           ip x s flush
           ip x p flush
 
+          # Use /etc/ipsec.d/cno.conf file to write our own default IPsec connection parameters.
+          # The /etc/ipsec.d/openshift.conf file can not be used because it is managed by openvswitch.
+          touch /etc/ipsec.d/cno.conf
+          if ! grep -q "narrowing=yes" /etc/ipsec.d/cno.conf; then
+          cat <<EOF > /etc/ipsec.d/cno.conf
+          # Default IPsec connection parameters rendered by network operator.
+          # The narrowing=yes is needed to narrow down the proposals exchanged
+          # by two peers to a mutually acceptable set, otherwise it sometimes
+          # have traffic hit between peer nodes.
+          conn %default
+              narrowing=yes
+          EOF
+          fi
+
           # since pluto is on the host, we need to restart it after the flush
           chroot /proc/1/root ipsec restart
 
