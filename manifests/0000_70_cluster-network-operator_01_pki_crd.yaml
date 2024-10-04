@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.15.0
+    controller-gen.kubebuilder.io/version: v0.16.4
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
   name: operatorpkis.network.operator.openshift.io
@@ -23,15 +23,15 @@ spec:
         description: "OperatorPKI is a simple certificate authority. It is not intended
           for external\nuse - rather, it is internal to the network operator. The
           CNO creates a CA and\na certificate signed by that CA. The certificate has
-          both ClientAuth\nand ServerAuth extended usages enabled.\n\n\n\tMore specifically,
-          given an OperatorPKI with <name>, the CNO will manage:\n\n\n- A Secret called
+          both ClientAuth\nand ServerAuth extended usages enabled.\n\n\tMore specifically,
+          given an OperatorPKI with <name>, the CNO will manage:\n\n- A Secret called
           <name>-ca with two data keys:\n  - tls.key - the private key\n  - tls.crt
-          - the CA certificate\n\n\n- A ConfigMap called <name>-ca with a single data
-          key:\n  - cabundle.crt - the CA certificate(s)\n\n\n- A Secret called <name>-cert
+          - the CA certificate\n\n- A ConfigMap called <name>-ca with a single data
+          key:\n  - cabundle.crt - the CA certificate(s)\n\n- A Secret called <name>-cert
           with two data keys:\n  - tls.key - the private key\n  - tls.crt - the certificate,
-          signed by the CA\n\n\nThe CA certificate will have a validity of 10 years,
+          signed by the CA\n\nThe CA certificate will have a validity of 10 years,
           rotated after 9.\nThe target certificate will have a validity of 6 months,
-          rotated after 3\n\n\nThe CA certificate will have a CommonName of \"<namespace>_<name>-ca@<timestamp>\",
+          rotated after 3\n\nThe CA certificate will have a CommonName of \"<namespace>_<name>-ca@<timestamp>\",
           where\n<timestamp> is the last rotation time."
         properties:
           apiVersion:
