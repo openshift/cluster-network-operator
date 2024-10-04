@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
+
 	"github.com/imdario/mergo"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -18,7 +20,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func NewStaticPodOperatorClient(config *rest.Config, gvr schema.GroupVersionResource) (v1helpers.StaticPodOperatorClient, dynamicinformer.DynamicSharedInformerFactory, error) {
+func NewStaticPodOperatorClient(config *rest.Config, gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, extractApplySpec StaticPodOperatorSpecExtractorFunc, extractApplyStatus StaticPodOperatorStatusExtractorFunc) (v1helpers.StaticPodOperatorClient, dynamicinformer.DynamicSharedInformerFactory, error) {
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
 		return nil, nil, err
@@ -30,9 +32,12 @@ func NewStaticPodOperatorClient(config *rest.Config, gvr schema.GroupVersionReso
 
 	return &dynamicStaticPodOperatorClient{
 		dynamicOperatorClient: dynamicOperatorClient{
-			configName: defaultConfigName,
-			informer:   informer,
-			client:     client,
+			gvk:                gvk,
+			configName:         defaultConfigName,
+			informer:           informer,
+			client:             client,
+			extractApplySpec:   extractApplySpec,
+			extractApplyStatus: extractApplyStatus,
 		},
 	}, informers, nil
 }
@@ -121,6 +126,14 @@ func (c dynamicStaticPodOperatorClient) UpdateStaticPodOperatorStatus(ctx contex
 	}
 
 	return retStatus, nil
+}
+
+func (c dynamicOperatorClient) ApplyStaticPodOperatorSpec(ctx context.Context, fieldManager string, desiredConfiguration *applyoperatorv1.StaticPodOperatorSpecApplyConfiguration) (err error) {
+	return c.applyOperatorSpec(ctx, fieldManager, desiredConfiguration)
+}
+
+func (c dynamicOperatorClient) ApplyStaticPodOperatorStatus(ctx context.Context, fieldManager string, desiredConfiguration *applyoperatorv1.StaticPodOperatorStatusApplyConfiguration) (err error) {
+	return c.applyOperatorStatus(ctx, fieldManager, desiredConfiguration)
 }
 
 func getStaticPodOperatorSpecFromUnstructured(obj map[string]interface{}) (*operatorv1.StaticPodOperatorSpec, error) {

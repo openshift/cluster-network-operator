@@ -3,6 +3,7 @@ package connectivitycheck
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"net"
 	"net/url"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 	configv1client "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	configv1listers "github.com/openshift/client-go/config/listers/config/v1"
+	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
 	applyconfigv1alpha1 "github.com/openshift/client-go/operatorcontrolplane/applyconfigurations/operatorcontrolplane/v1alpha1"
 	operatorcontrolplaneclient "github.com/openshift/client-go/operatorcontrolplane/clientset/versioned"
 	operatorcontrolplaneinformers "github.com/openshift/client-go/operatorcontrolplane/informers/externalversions"
@@ -447,7 +449,12 @@ func Start(ctx context.Context, kubeConfig *rest.Config) error {
 	if err != nil {
 		return err
 	}
-	operatorClient, dynamicInformers, err := genericoperatorclient.NewClusterScopedOperatorClient(kubeConfig, operatorv1.GroupVersion.WithResource("openshiftapiservers"))
+	operatorClient, dynamicInformers, err := genericoperatorclient.NewClusterScopedOperatorClient(
+		kubeConfig,
+		operatorv1.GroupVersion.WithResource("openshiftapiservers"),
+		operatorv1.GroupVersion.WithKind("OpenShiftAPIServer"),
+		extractOperatorSpec,
+		extractOperatorStatus)
 	if err != nil {
 		return err
 	}
@@ -491,4 +498,11 @@ func Start(ctx context.Context, kubeConfig *rest.Config) error {
 	operatorcontrolplaneInformers.Start(ctx.Done())
 
 	return nil
+}
+
+func extractOperatorSpec(obj *unstructured.Unstructured, fieldManager string) (*applyoperatorv1.OperatorSpecApplyConfiguration, error) {
+	return applyoperatorv1.OperatorSpec(), nil
+}
+func extractOperatorStatus(obj *unstructured.Unstructured, fieldManager string) (*applyoperatorv1.OperatorStatusApplyConfiguration, error) {
+	return applyoperatorv1.OperatorStatus(), nil
 }
