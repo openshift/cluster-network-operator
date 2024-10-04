@@ -426,7 +426,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 				WithReason(condition.Reason).
 				WithMessage(condition.Message))
 		}
-		if _, err := status.client.ClientFor("").OpenshiftOperatorClient().OperatorV1().Networks().Apply(
+		if _, err := status.client.ClientFor("").OpenshiftOperatorClient().OperatorV1().Networks().ApplyStatus(
 			context.TODO(), net, metav1.ApplyOptions{Force: true, FieldManager: fieldManager}); err != nil {
 			return err
 		}

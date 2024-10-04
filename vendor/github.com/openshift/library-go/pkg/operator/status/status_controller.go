@@ -100,7 +100,14 @@ func (c *StatusSyncer) WithRelatedObjectsFunc(f RelatedObjectsFunc) {
 }
 
 func (c *StatusSyncer) Run(ctx context.Context, workers int) {
-	c.controllerFactory.WithPostStartHooks(c.watchVersionGetterPostRunHook).WithSync(c.Sync).ToController("StatusSyncer_"+c.Name(), c.recorder).Run(ctx, workers)
+	c.controllerFactory.
+		WithPostStartHooks(c.watchVersionGetterPostRunHook).
+		WithSync(c.Sync).
+		ToController(
+			"StatusSyncer_"+c.Name(), // don't change what is passed here unless you also remove the old FooDegraded condition
+			c.recorder,
+		).
+		Run(ctx, workers)
 }
 
 // WithDegradedInertia returns a copy of the StatusSyncer with the

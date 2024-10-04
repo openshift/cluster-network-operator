@@ -3,6 +3,7 @@ package connectivitycheck
 import (
 	"context"
 	"fmt"
+	"k8s.io/utils/clock"
 	"net"
 	"net/url"
 	"strconv"
@@ -447,7 +448,13 @@ func Start(ctx context.Context, kubeConfig *rest.Config) error {
 	if err != nil {
 		return err
 	}
-	operatorClient, dynamicInformers, err := genericoperatorclient.NewClusterScopedOperatorClient(kubeConfig, operatorv1.GroupVersion.WithResource("openshiftapiservers"))
+	operatorClient, dynamicInformers, err := genericoperatorclient.NewClusterScopedOperatorClient(
+		clock.RealClock{},
+		kubeConfig,
+		operatorv1.GroupVersion.WithResource("openshiftapiservers"),
+		operatorv1.GroupVersion.WithKind("OpenShiftAPIServer"),
+		nil,
+		nil)
 	if err != nil {
 		return err
 	}
