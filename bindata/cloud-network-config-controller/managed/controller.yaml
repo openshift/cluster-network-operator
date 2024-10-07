@@ -185,6 +185,16 @@ spec:
         - name: "NO_PROXY"
           value: "{{ .NO_PROXY}}"
 {{ end }}
+{{- if not (eq .AroHcpSecretProviderClass "")}}
+        - name: "AZURE_CLIENT_ID"
+          value: "{{ .AroHcpClientID}}"
+        - name: "AZURE_TENANT_ID"
+          value: "{{ .AroHcpTenantID}}"
+        - name: "AZURE_CLIENT_CERTIFICATE_PATH"
+          value: "{{ .AroHcpCertPath}}"
+        - name: "AZURE_CLIENT_SEND_CERTIFICATE_CHAIN"
+          value: "true"
+{{ end }}
         resources:
           requests:
             cpu: 10m
@@ -203,6 +213,11 @@ spec:
         - name: cloud-token
           mountPath: /var/run/secrets/openshift/serviceaccount
           readOnly: true
+{{- if not (eq .AroHcpSecretProviderClass "")}}
+        - name: cncc-cert
+          mountPath: /mnt/certs
+          readOnly: true
+{{- end }}
         terminationMessagePolicy: FallbackToLogsOnError
       tolerations:
     {{- if .HCPTolerations }}
@@ -244,3 +259,11 @@ spec:
       - name: kube-cloud-config
         configMap:
           name: cloud-network-config-controller-kube-cloud-config
+{{- if not (eq .AroHcpSecretProviderClass "")}}
+      - name: cncc-cert
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            - "secretProviderClass":{{.AroHcpSecretProviderClass}}
+{{- end }}
