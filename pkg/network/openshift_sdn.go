@@ -62,21 +62,27 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 	data.Data["RoutableMTU"] = nil
 	data.Data["MTU"] = nil
 
-	if conf.Migration != nil && conf.Migration.MTU != nil {
-		if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
-			data.Data["MTU"] = conf.Migration.MTU.Network.From
-			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.To
-		} else {
-			data.Data["MTU"] = conf.Migration.MTU.Network.To
-			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.From
-		}
+	data.Data["IsNetworkTypeLiveMigration"] = false
+	if conf.Migration != nil {
+		if conf.Migration.MTU != nil {
+			if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
+				data.Data["MTU"] = conf.Migration.MTU.Network.From
+				data.Data["RoutableMTU"] = conf.Migration.MTU.Network.To
+			} else {
+				data.Data["MTU"] = conf.Migration.MTU.Network.To
+				data.Data["RoutableMTU"] = conf.Migration.MTU.Network.From
+			}
 
-		// c.MTU is used to set the applied network configuration MTU
-		// MTU migration procedure:
-		//  1. User sets the MTU they want to migrate to
-		//  2. CNO sets the MTU as applied
-		//  3. User can then set the MTU as configured
-		c.MTU = conf.Migration.MTU.Network.To
+			// c.MTU is used to set the applied network configuration MTU
+			// MTU migration procedure:
+			//  1. User sets the MTU they want to migrate to
+			//  2. CNO sets the MTU as applied
+			//  3. User can then set the MTU as configured
+			c.MTU = conf.Migration.MTU.Network.To
+		}
+		if conf.Migration.Mode == operv1.LiveNetworkMigrationMode {
+			data.Data["IsNetworkTypeLiveMigration"] = true
+		}
 	}
 
 	clusterNetwork, err := clusterNetwork(conf)

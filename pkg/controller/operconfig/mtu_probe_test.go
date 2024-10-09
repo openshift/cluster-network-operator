@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	hyperv1 "github.com/openshift/hypershift/api/v1beta1"
 
+	"github.com/openshift/cluster-network-operator/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,7 +37,7 @@ func TestProbeMTU(t *testing.T) {
 			name:  "AWS selfhosted, value from configmap is used",
 			infra: &bootstrap.InfraStatus{PlatformType: configv1.AWSPlatformType},
 			objects: []crclient.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Namespace: cmNamespace, Name: cmName},
+				ObjectMeta: metav1.ObjectMeta{Namespace: util.MTU_CM_NAMESPACE, Name: util.MTU_CM_NAME},
 				Data:       map[string]string{"mtu": "5000"},
 			}},
 			expectedMTU: 5000,
@@ -54,7 +55,7 @@ func TestProbeMTU(t *testing.T) {
 			name:  "Azure selfhosted, value from configmap is used",
 			infra: &bootstrap.InfraStatus{PlatformType: configv1.AzurePlatformType},
 			objects: []crclient.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Namespace: cmNamespace, Name: cmName},
+				ObjectMeta: metav1.ObjectMeta{Namespace: util.MTU_CM_NAMESPACE, Name: util.MTU_CM_NAME},
 				Data:       map[string]string{"mtu": "5000"},
 			}},
 			expectedMTU: 5000,
@@ -63,7 +64,7 @@ func TestProbeMTU(t *testing.T) {
 			name:  "Unknown platform on Hypershift, value from configmap is used",
 			infra: &bootstrap.InfraStatus{ControlPlaneTopology: configv1.ExternalTopologyMode, HostedControlPlane: &hyperv1.HostedControlPlane{}},
 			objects: []crclient.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Namespace: cmNamespace, Name: cmName},
+				ObjectMeta: metav1.ObjectMeta{Namespace: util.MTU_CM_NAMESPACE, Name: util.MTU_CM_NAME},
 				Data:       map[string]string{"mtu": "5000"},
 			}},
 			expectedMTU: 5000,
@@ -72,7 +73,7 @@ func TestProbeMTU(t *testing.T) {
 			name:  "Unknown platform, value from configmap is used",
 			infra: &bootstrap.InfraStatus{},
 			objects: []crclient.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Namespace: cmNamespace, Name: cmName},
+				ObjectMeta: metav1.ObjectMeta{Namespace: util.MTU_CM_NAMESPACE, Name: util.MTU_CM_NAME},
 				Data:       map[string]string{"mtu": "5000"},
 			}},
 			expectedMTU: 5000,

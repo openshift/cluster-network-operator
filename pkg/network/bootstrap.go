@@ -32,6 +32,14 @@ func Bootstrap(conf *operv1.Network, client cnoclient.Client) (*bootstrap.Bootst
 			return nil, err
 		}
 		out.OVN = *o
+	default:
+		if (conf.Spec.Migration != nil && conf.Spec.Migration.Mode == operv1.LiveNetworkMigrationMode) {
+			o, err := bootstrapOVN(conf, client, infraStatus)
+			if err != nil {
+				return nil, err
+			}
+			out.OVN = *o
+		}
 	}
 
 	return out, nil
