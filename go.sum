@@ -42,6 +42,8 @@ github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d h1:Byv0BzEl
 github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d/go.mod h1:WaHUgvxTVq04UNunO+XhnAqY/wQc+bxr74GqbsZ/Jqw=
 github.com/ashcrow/osrelease v0.0.0-20180626175927-9b292693c55c h1:icme0QhxrgZOxTBnT6K8dfGLwbKWSOVwPB95XTbo8Ws=
 github.com/ashcrow/osrelease v0.0.0-20180626175927-9b292693c55c/go.mod h1:BRljTyotlu+6N+Qlu5MhjxpdmccCnp9lDvZjNNV8qr4=
+github.com/atiratree/api v0.0.0-20240919135006-ad4921b7f7e9 h1:84qVapX1hpqflNoOJiB71zDhMLppM4memYdbSH2MwDg=
+github.com/atiratree/api v0.0.0-20240919135006-ad4921b7f7e9/go.mod h1:OOh6Qopf21pSzqNVCB5gomomBXb8o5sGKZxG2KNpaXM=
 github.com/aws/aws-sdk-go v1.19.11/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aws/aws-sdk-go v1.44.204 h1:7/tPUXfNOHB390A63t6fJIwmlwVQAkAwcbzKsU2/6OQ=
 github.com/aws/aws-sdk-go v1.44.204/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
@@ -265,8 +267,6 @@ github.com/onsi/ginkgo/v2 v2.17.1 h1:V++EzdbhI4ZV4ev0UTIj0PzhzOcReJFyJaLjtSF55M8
 github.com/onsi/ginkgo/v2 v2.17.1/go.mod h1:llBI3WDLL9Z6taip6f33H76YcWtJv+7R3HigUjbIBOs=
 github.com/onsi/gomega v1.33.0 h1:snPCflnZrpMsy94p4lXVEkHo12lmPnc3vY5XBbreexE=
 github.com/onsi/gomega v1.33.0/go.mod h1:+925n5YtiFsLzzafLUHzVMBpvvRAzrydIBiSIxjX3wY=
-github.com/openshift/api v0.0.0-20240821141839-566edf361acd h1:w6iUQAWYiMiI0P0cY/uo0Vq6SV174rGVePl0ZFRwKuc=
-github.com/openshift/api v0.0.0-20240821141839-566edf361acd/go.mod h1:OOh6Qopf21pSzqNVCB5gomomBXb8o5sGKZxG2KNpaXM=
 github.com/openshift/build-machinery-go v0.0.0-20240613134303-8359781da660 h1:F0zE2bmdVvaEd18VXuGYQdJJ1FYJu4MIDW9PYZWc9No=
 github.com/openshift/build-machinery-go v0.0.0-20240613134303-8359781da660/go.mod h1:8jcm8UPtg2mCAsxfqKil1xrmRMI3a+XU2TZ9fF8A7TE=
 github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87 h1:JtLhaGpSEconE+1IKmIgCOof/Len5ceG6H1pk43yv5U=

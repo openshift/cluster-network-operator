@@ -80,7 +80,7 @@ func (c *OperatorHelperClient) UpdateOperatorStatus(ctx context.Context, resourc
 	updated.ResourceVersion = resourceVersion
 	updated.Status.OperatorStatus = *status
 
-	ret, err := c.client.Update(ctx, updated, metav1.UpdateOptions{})
+	ret, err := c.client.UpdateStatus(ctx, updated, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
