@@ -306,16 +306,17 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if prev != nil {
 		network.FillDefaults(prev, prev, mtu)
 	}
-
+	// Reserve operConfig for the DeepEqual check before UpdateOperConfig
+	newOperConfig := operConfig.DeepCopy()
 	// Fill all defaults explicitly
-	network.FillDefaults(&operConfig.Spec, prev, mtu)
+	network.FillDefaults(&newOperConfig.Spec, prev, mtu)
 
 	// Compare against previous applied configuration to see if this change
 	// is safe.
 	if prev != nil {
 		// We may need to fill defaults here -- sort of as a poor-man's
 		// upconversion scheme -- if we add additional fields to the config.
-		err = network.IsChangeSafe(prev, &operConfig.Spec, infraStatus)
+		err = network.IsChangeSafe(prev, &newOperConfig.Spec, infraStatus)
 		if err != nil {
 			log.Printf("Not applying unsafe change: %v", err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
@@ -323,8 +324,6 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{}, err
 		}
 	}
-
-	newOperConfig := operConfig.DeepCopy()
 
 	// Bootstrap any resources
 	bootstrapResult, err := network.Bootstrap(newOperConfig, r.client)

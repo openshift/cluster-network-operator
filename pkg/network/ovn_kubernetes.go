@@ -187,22 +187,28 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["EnableUDPAggregation"] = !bootstrapResult.OVN.OVNKubernetesConfig.DisableUDPAggregation
 	data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = bootstrapResult.Infra.NetworkNodeIdentityEnabled
 	data.Data["NodeIdentityCertDuration"] = OVN_NODE_IDENTITY_CERT_DURATION
+	data.Data["IsNetworkTypeLiveMigration"] = false
 
-	if conf.Migration != nil && conf.Migration.MTU != nil {
-		if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
-			data.Data["MTU"] = conf.Migration.MTU.Network.From
-			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.To
-		} else {
-			data.Data["MTU"] = conf.Migration.MTU.Network.To
-			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.From
+	if conf.Migration != nil {
+		if conf.Migration.MTU != nil && conf.Migration.Mode != operv1.LiveNetworkMigrationMode {
+			if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
+				data.Data["MTU"] = conf.Migration.MTU.Network.From
+				data.Data["RoutableMTU"] = conf.Migration.MTU.Network.To
+			} else {
+				data.Data["MTU"] = conf.Migration.MTU.Network.To
+				data.Data["RoutableMTU"] = conf.Migration.MTU.Network.From
+			}
+
+			// c.MTU is used to set the applied network configuration MTU
+			// MTU migration procedure:
+			//  1. User sets the MTU they want to migrate to
+			//  2. CNO sets the MTU as applied
+			//  3. User can then set the MTU as configured
+			c.MTU = conf.Migration.MTU.Network.To
 		}
-
-		// c.MTU is used to set the applied network configuration MTU
-		// MTU migration procedure:
-		//  1. User sets the MTU they want to migrate to
-		//  2. CNO sets the MTU as applied
-		//  3. User can then set the MTU as configured
-		c.MTU = conf.Migration.MTU.Network.To
+		if conf.Migration.Mode == operv1.LiveNetworkMigrationMode {
+			data.Data["IsNetworkTypeLiveMigration"] = true
+		}
 	}
 	data.Data["GenevePort"] = c.GenevePort
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
