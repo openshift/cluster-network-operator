@@ -142,7 +142,9 @@ rules:
     - egressips
     - egressqoses
     - egressservices
+{{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
     - userdefinednetworks
+{{- end }}
   verbs:
     - get
     - list
