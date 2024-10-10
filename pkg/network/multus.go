@@ -38,7 +38,11 @@ func renderMultus(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bootstrap
 	usedhcp, usewhereabouts := detectAuxiliaryIPAM(conf)
 	h := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault].Host
 	p := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault].Port
-	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), usedhcp, usewhereabouts, h, p, bootstrapResult)
+	isNetworkTypeLiveMigration := false
+	if conf.Migration != nil && conf.Migration.Mode == operv1.LiveNetworkMigrationMode {
+		isNetworkTypeLiveMigration = true
+	}
+	objs, err = renderMultusConfig(manifestDir, string(conf.DefaultNetwork.Type), usedhcp, usewhereabouts, h, p, bootstrapResult, isNetworkTypeLiveMigration)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +58,7 @@ func renderMultus(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bootstrap
 }
 
 // renderMultusConfig returns the manifests of Multus
-func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, useWhereabouts bool, apihost, apiport string, bootstrapResult *bootstrap.BootstrapResult) ([]*uns.Unstructured, error) {
+func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, useWhereabouts bool, apihost, apiport string, bootstrapResult *bootstrap.BootstrapResult, isNetworkTypeLiveMigration bool) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 
 	// render the manifests on disk
@@ -94,6 +98,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 	if bootstrapResult.Infra.NetworkNodeIdentityEnabled {
 		data.Data["KubeletKubeconfigPath"] = determineKubeConfigPath()
 	}
+	data.Data["IsNetworkTypeLiveMigration"] = isNetworkTypeLiveMigration
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus"), &data)
 	if err != nil {

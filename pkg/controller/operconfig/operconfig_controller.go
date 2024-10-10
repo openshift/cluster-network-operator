@@ -21,6 +21,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
+	"github.com/openshift/cluster-network-operator/pkg/util"
 	ipsecMetrics "github.com/openshift/cluster-network-operator/pkg/util/ipsec"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -256,8 +257,11 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// This will also commit the change back to the apiserver.
 	if err := r.MergeClusterConfig(ctx, operConfig); err != nil {
 		log.Printf("Failed to merge the cluster configuration: %v", err)
-		r.status.SetDegraded(statusmanager.OperatorConfig, "MergeClusterConfig",
-			fmt.Sprintf("Internal error while merging cluster configuration and operator configuration: %v", err))
+		// not set degraded if the err is a version conflict, but return a reconcile err for retry.
+		if !apierrors.IsConflict(err) {
+			r.status.SetDegraded(statusmanager.OperatorConfig, "MergeClusterConfig",
+				fmt.Sprintf("Internal error while merging cluster configuration and operator configuration: %v", err))
+		}
 		return reconcile.Result{}, err
 	}
 
@@ -288,10 +292,12 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// If we need to, probe the host's MTU via a Job.
-	// It's okay if this is 0, since running clusters have no need of this
-	// and thus do not need to probe MTU
+	// Note that running clusters have no need of this but we want the configmap
+	// mtu to be created for consistancy with other non-hypershift clusters.
+	// A hypershift cluster may not have any worker nodes for running the mtu prober.
 	mtu := 0
-	if network.NeedMTUProbe(prev, &operConfig.Spec) {
+	err = r.client.Default().CRClient().Get(ctx, types.NamespacedName{Namespace: util.MTU_CM_NAMESPACE, Name: util.MTU_CM_NAME}, &corev1.ConfigMap{})
+	if network.NeedMTUProbe(prev, &operConfig.Spec) || (apierrors.IsNotFound(err) && infraStatus.HostedControlPlane == nil) {
 		mtu, err = r.probeMTU(ctx, operConfig, infraStatus)
 		if err != nil {
 			log.Printf("Failed to probe MTU: %v", err)
@@ -306,16 +312,17 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if prev != nil {
 		network.FillDefaults(prev, prev, mtu)
 	}
-
+	// Reserve operConfig for the DeepEqual check before UpdateOperConfig
+	newOperConfig := operConfig.DeepCopy()
 	// Fill all defaults explicitly
-	network.FillDefaults(&operConfig.Spec, prev, mtu)
+	network.FillDefaults(&newOperConfig.Spec, prev, mtu)
 
 	// Compare against previous applied configuration to see if this change
 	// is safe.
 	if prev != nil {
 		// We may need to fill defaults here -- sort of as a poor-man's
 		// upconversion scheme -- if we add additional fields to the config.
-		err = network.IsChangeSafe(prev, &operConfig.Spec, infraStatus)
+		err = network.IsChangeSafe(prev, &newOperConfig.Spec, infraStatus)
 		if err != nil {
 			log.Printf("Not applying unsafe change: %v", err)
 			r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
@@ -323,8 +330,6 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{}, err
 		}
 	}
-
-	newOperConfig := operConfig.DeepCopy()
 
 	// Bootstrap any resources
 	bootstrapResult, err := network.Bootstrap(newOperConfig, r.client)
@@ -338,8 +343,11 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if !reflect.DeepEqual(operConfig, newOperConfig) {
 		if err := r.UpdateOperConfig(ctx, newOperConfig); err != nil {
 			log.Printf("Failed to update the operator configuration: %v", err)
-			r.status.SetDegraded(statusmanager.OperatorConfig, "UpdateOperatorConfig",
-				fmt.Sprintf("Internal error while updating operator configuration: %v", err))
+			// not set degraded if the err is a version conflict, but return a reconcile err for retry.
+			if !apierrors.IsConflict(err) {
+				r.status.SetDegraded(statusmanager.OperatorConfig, "UpdateOperatorConfig",
+					fmt.Sprintf("Internal error while updating operator configuration: %v", err))
+			}
 			return reconcile.Result{}, err
 		}
 	}
@@ -522,7 +530,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// Update Network.config.openshift.io.Status
-	status, err := r.ClusterNetworkStatus(ctx, operConfig)
+	status, err := r.ClusterNetworkStatus(ctx, operConfig, bootstrapResult)
 	if err != nil {
 		log.Printf("Could not generate network status: %v", err)
 		r.status.SetDegraded(statusmanager.OperatorConfig, "StatusError",
