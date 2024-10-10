@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	v1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
 
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -19,6 +20,17 @@ import (
 type OperatorHelperClient struct {
 	informer operatorinformerv1.NetworkInformer
 	client   operatorclientv1.NetworkInterface
+}
+
+// ApplyOperatorSpec and ApplyOperatorStatus were added here:
+// https://github.com/openshift/library-go/commit/2e06abc0a54d9ecd0a8783325068896c347bd137#diff-0e7fb0f95ea48e43d0cad6743df9338e45348ebb2ca9aa0c5491eda440642b45
+// added as no-ops for now.
+// TO-DO: investigate if it's better to implement and use these.
+func (c *OperatorHelperClient) ApplyOperatorSpec(ctx context.Context, fieldManager string, applyConfiguration *v1.OperatorSpecApplyConfiguration) (err error) {
+	return nil
+}
+func (c *OperatorHelperClient) ApplyOperatorStatus(ctx context.Context, fieldManager string, applyConfiguration *v1.OperatorStatusApplyConfiguration) (err error) {
+	return nil
 }
 
 // OperatorHelperClient implements the v1helpers OperatorClient interface
