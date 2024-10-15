@@ -553,6 +553,11 @@ data:
         network_segmentation_enabled_flag="--enable-network-segmentation"
       fi
 
+      network_observability_enabled_flag=
+      if [[ "{{.OVN_OBSERVABILITY_ENABLE}}" == "true" ]]; then
+        network_observability_enabled_flag="--enable-observability"
+      fi
+
       multi_network_policy_enabled_flag=
       if [[ "{{.OVN_MULTI_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
         multi_network_policy_enabled_flag="--enable-multi-networkpolicy"
@@ -634,6 +639,7 @@ data:
         ${multi_network_policy_enabled_flag} \
         ${admin_network_policy_enabled_flag} \
         ${dns_name_resolver_enabled_flag} \
+        ${network_observability_enabled_flag} \
         --enable-multicast \
         --zone ${K8S_NODE} \
         --enable-interconnect \
