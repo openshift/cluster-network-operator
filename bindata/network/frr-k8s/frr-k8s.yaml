@@ -258,7 +258,7 @@ spec:
         - --tls-cert-file=/etc/metrics/tls.crt
         ports:
         - containerPort: 9141
-          name: metricshttps
+          name: frrmetricshttps
         resources:
           requests:
             cpu: 10m
