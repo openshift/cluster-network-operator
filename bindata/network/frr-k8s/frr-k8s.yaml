@@ -86,7 +86,7 @@ spec:
         - --node-name=$(NODE_NAME)
         - --namespace=$(NAMESPACE)
         - --metrics-bind-address=127.0.0.1:7572
-        - --log-level=info
+        - $(LOG_LEVEL)
         - --health-probe-bind-address=127.0.0.1:8081
         env:
         - name: FRR_CONFIG_FILE
@@ -97,6 +97,12 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: env-overrides
+              key: frrk8s-loglevel
+              optional: true              
         - name: NAMESPACE
           valueFrom:
             fieldRef:
