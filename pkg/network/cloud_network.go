@@ -102,7 +102,10 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		data.Data["HTTP_PROXY"] = os.Getenv("MGMT_HTTP_PROXY")
 		data.Data["HTTPS_PROXY"] = os.Getenv("MGMT_HTTPS_PROXY")
 		data.Data["NO_PROXY"] = os.Getenv("MGMT_NO_PROXY")
-		data.Data["AzureMSIAuthentication"] = os.Getenv("AZURE_MSI_AUTHENTICATION")
+		data.Data["AroHcpClientID"] = os.Getenv("AZURE_CLIENT_ID")
+		data.Data["AroHcpTenantID"] = os.Getenv("AZURE_TENANT_ID")
+		data.Data["AroHcpCertPath"] = os.Getenv("AZURE_CLIENT_CERTIFICATE_PATH")
+		data.Data["AroHcpSecretProviderClass"] = os.Getenv("ARO_HCP_SECRET_PROVIDER_CLASS")
 		caOverride.ObjectMeta = metav1.ObjectMeta{
 			Namespace:   hcpCfg.Namespace,
 			Name:        "cloud-network-config-controller-kube-cloud-config",
