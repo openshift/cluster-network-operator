@@ -173,19 +173,19 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	res.WorkerIPsecMachineConfigs = workerIPsecMachineConfigs
 
 	if res.MasterIPsecMachineConfigs != nil {
-		mcpMasterStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, masterRoleMachineConfigLabel)
+		masterMCPs, err := getMachineConfigPools(context.TODO(), client, masterRoleMachineConfigLabel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get machine config pools for master role: %v", err)
 		}
-		res.MasterMCPStatuses = mcpMasterStatuses
+		res.MasterMCPs = masterMCPs
 	}
 
 	if res.WorkerIPsecMachineConfigs != nil {
-		mcpWorkerStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, workerRoleMachineConfigLabel)
+		workerMCPs, err := getMachineConfigPools(context.TODO(), client, workerRoleMachineConfigLabel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get machine config pools for worker role: %v", err)
 		}
-		res.WorkerMCPStatuses = mcpWorkerStatuses
+		res.WorkerMCPs = workerMCPs
 	}
 
 	machineConfigClusterOperatorReady, err := isMachineConfigClusterOperatorReady(client)
@@ -233,22 +233,22 @@ func isMachineConfigClusterOperatorReady(client cnoclient.Client) (bool, error) 
 	return machineConfigClusterOperatorReady, nil
 }
 
-func getMachineConfigPoolStatuses(ctx context.Context, client cnoclient.Client, mcLabel labels.Set) ([]mcfgv1.MachineConfigPoolStatus, error) {
+func getMachineConfigPools(ctx context.Context, client cnoclient.Client, mcLabel labels.Set) ([]mcfgv1.MachineConfigPool, error) {
 	mcpList := &mcfgv1.MachineConfigPoolList{}
 	if err := client.Default().CRClient().List(ctx, mcpList); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, err
 		}
 	}
-	var mcpStatuses []mcfgv1.MachineConfigPoolStatus
+	var mcps []mcfgv1.MachineConfigPool
 	for _, mcp := range mcpList.Items {
 		mcSelector, err := metav1.LabelSelectorAsSelector(mcp.Spec.MachineConfigSelector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid machine config label selector in %s pool", mcp.Name)
 		}
 		if mcSelector.Matches(mcLabel) {
-			mcpStatuses = append(mcpStatuses, mcp.Status)
+			mcps = append(mcps, mcp)
 		}
 	}
-	return mcpStatuses, nil
+	return mcps, nil
 }
