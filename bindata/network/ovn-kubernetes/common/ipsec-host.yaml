@@ -270,6 +270,18 @@ spec:
           # since pluto is on the host, we need to restart it after the flush
           chroot /proc/1/root ipsec restart
 
+          counter=0
+          until [ -r /run/pluto/pluto.ctl ]; do
+            counter=$((counter+1))
+            sleep 1
+            if [ $counter -gt 300 ];
+            then
+              echo "ipsec has not started after $counter seconds"
+              exit 1
+            fi
+          done
+          echo "ipsec service is restarted"
+
           # Workaround for https://github.com/libreswan/libreswan/issues/373
           ulimit -n 1024
 
