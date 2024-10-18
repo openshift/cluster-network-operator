@@ -493,7 +493,29 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
 	}
 
-	// Clear MachineConfigPool degraded condition and ensure network operator is no longer in degraded state.
+	// Update MachineConfigPool with progressing condition and ensure network operator is moved from degraded state into progressing state.
+	workerIPsecMachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{Conditions: []mcfgv1.MachineConfigPoolCondition{{Type: mcfgv1.MachineConfigPoolUpdating,
+		Status: v1.ConditionTrue}}}
+	set(t, client, workerIPsecMachineConfigPool)
+
+	status.SetFromMachineConfigs()
+	co, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
+	}
+
+	// Clear MachineConfigPool progressing condition and ensure network operator is no longer either in degraded or progressing state.
 	workerIPsecMachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{}
 	set(t, client, workerIPsecMachineConfigPool)
 
@@ -505,6 +527,14 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
 		{
 			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
 			Status: operv1.ConditionFalse,
 		},
 	}) {
