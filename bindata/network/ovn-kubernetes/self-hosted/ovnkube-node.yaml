@@ -449,6 +449,7 @@ spec:
             NODE_CNI="OpenShiftSDN"
             kubectl label node --overwrite ${K8S_NODE} migration.network.openshift.io/plugin=
           fi
+          export NODE_CNI
 
           RETRY_INTERVAL=3
           MAX_RETRIES=100
