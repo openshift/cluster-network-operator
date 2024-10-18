@@ -27,24 +27,33 @@ func (status *StatusManager) SetFromMachineConfigs() {
 	// Both master and worker role machine configs don't have ipsec plugin present, so return now.
 	if !master && !worker {
 		status.setNotDegraded(MachineConfig)
+		status.unsetProgressing(MachineConfig)
 		return
 	}
-	var degraded bool
+	var degraded, progressing bool
 	if master {
 		// IPsec machine config exists for master role, check its machine config pool and update network
-		// operator degraded condition accordingly.
+		// operator degraded and progressing conditions accordingly.
 		degraded, err = status.isMachineConfigPoolDegraded(platform.MasterRoleMachineConfigLabel)
 		if err != nil {
-			log.Printf("failed to check machine config pools for master role: %v", err)
+			log.Printf("failed to check machine config pools degrade state for master role: %v", err)
 		}
 		if degraded {
 			status.setDegraded(MachineConfig, "IPsec", "master role machine config pool(s) in degraded state")
 			return
 		}
+		progressing, err = status.isMachineConfigPoolProgressing(platform.MasterRoleMachineConfigLabel)
+		if err != nil {
+			log.Printf("failed to check machine config pools progressing state for master role: %v", err)
+		}
+		if progressing {
+			status.setProgressing(MachineConfig, "IPsec", "master role machine config pool(s) in progressing state")
+			return
+		}
 	}
 	if worker {
 		// IPsec machine config exists for worker role, check its machine config pool and update network
-		// operator degraded condition accordingly.
+		// operator degraded and progressing conditions accordingly.
 		degraded, err = status.isMachineConfigPoolDegraded(platform.WorkerRoleMachineConfigLabel)
 		if err != nil {
 			log.Printf("failed to check machine config pools for worker role: %v", err)
@@ -53,9 +62,20 @@ func (status *StatusManager) SetFromMachineConfigs() {
 			status.setDegraded(MachineConfig, "IPsec", "worker role machine config pool(s) in degraded state")
 			return
 		}
+		progressing, err = status.isMachineConfigPoolProgressing(platform.WorkerRoleMachineConfigLabel)
+		if err != nil {
+			log.Printf("failed to check machine config pools progressing state for worker role: %v", err)
+		}
+		if progressing {
+			status.setProgressing(MachineConfig, "IPsec", "worker role machine config pool(s) in progressing state")
+			return
+		}
 	}
 	if !degraded {
 		status.setNotDegraded(MachineConfig)
+	}
+	if !progressing {
+		status.unsetProgressing(MachineConfig)
 	}
 }
 
@@ -66,12 +86,35 @@ func (status *StatusManager) isMachineConfigPoolDegraded(mcLabel labels.Set) (bo
 		return false, err
 	}
 	for _, pool := range pools {
+		if pool.Spec.Paused {
+			// Ignore pool from status reporting if it is in paused state.
+			continue
+		}
 		if mcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolDegraded) {
 			degraded = true
 			break
 		}
 	}
 	return degraded, nil
+}
+
+func (status *StatusManager) isMachineConfigPoolProgressing(mcLabel labels.Set) (bool, error) {
+	var progressing bool
+	pools, err := status.findIPsecMachineConfigPoolsForLabel(mcLabel)
+	if err != nil {
+		return false, err
+	}
+	for _, pool := range pools {
+		if pool.Spec.Paused {
+			// Ignore pool from status reporting if it is in paused state.
+			continue
+		}
+		if mcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolUpdating) {
+			progressing = true
+			break
+		}
+	}
+	return progressing, nil
 }
 
 func (status *StatusManager) findIPsecMachineConfigPoolsForLabel(mcLabel labels.Set) ([]*mcfgv1.MachineConfigPool, error) {
