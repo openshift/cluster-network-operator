@@ -2,6 +2,8 @@ package client
 
 import (
 	"context"
+	"fmt"
+	v1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
 
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -86,4 +88,40 @@ func (c *OperatorHelperClient) UpdateOperatorStatus(ctx context.Context, resourc
 	}
 
 	return &ret.Status.OperatorStatus, nil
+}
+
+func (c *OperatorHelperClient) ApplyOperatorSpec(ctx context.Context, fieldManager string, desiredConfiguration *v1.OperatorSpecApplyConfiguration) (err error) {
+	if desiredConfiguration == nil {
+		return fmt.Errorf("desiredConfiguration must have value")
+	}
+	desiredConfigurationAsNetwork := &v1.NetworkSpecApplyConfiguration{}
+	desiredConfigurationAsNetwork.OperatorSpecApplyConfiguration = *desiredConfiguration
+	networkApplyConfig := v1.Network(names.CLUSTER_CONFIG)
+	networkApplyConfig.Spec = desiredConfigurationAsNetwork
+
+	_, err = c.client.Apply(ctx, networkApplyConfig, metav1.ApplyOptions{
+		FieldManager: fieldManager,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to apply network operator spec: %w", err)
+	}
+	return nil
+}
+
+func (c *OperatorHelperClient) ApplyOperatorStatus(ctx context.Context, fieldManager string, desiredConfiguration *v1.OperatorStatusApplyConfiguration) error {
+	if desiredConfiguration == nil {
+		return fmt.Errorf("desiredConfiguration must have value")
+	}
+	desiredConfigurationAsNetwork := &v1.NetworkStatusApplyConfiguration{}
+	desiredConfigurationAsNetwork.OperatorStatusApplyConfiguration = *desiredConfiguration
+	networkApplyConfig := v1.Network(names.CLUSTER_CONFIG)
+	networkApplyConfig.Status = desiredConfigurationAsNetwork
+
+	_, err := c.client.ApplyStatus(ctx, networkApplyConfig, metav1.ApplyOptions{
+		FieldManager: fieldManager,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to apply network operator status: %w", err)
+	}
+	return nil
 }
