@@ -46,6 +46,7 @@ const (
 	OperatorRender
 	ProxyConfig
 	InjectorConfig
+	MachineConfig
 	PodDeployment
 	PKIConfig
 	EgressRouterConfig
@@ -53,7 +54,6 @@ const (
 	CertificateSigner
 	InfrastructureConfig
 	DashboardConfig
-	MachineConfig
 	maxStatusLevel
 )
 

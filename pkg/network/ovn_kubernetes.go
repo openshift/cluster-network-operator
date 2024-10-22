@@ -1495,33 +1495,17 @@ func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
 		// When none of MachineConfig pools exist, then return false. needed for unit test.
 		return false
 	}
-	ipSecPluginOnPool := func(status mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
-		return status.MachineCount == status.UpdatedMachineCount &&
-			hasSourceInMachineConfigStatus(status, machineConfigs)
-	}
 	for _, masterMCPStatus := range infra.MasterMCPStatuses {
-		if !ipSecPluginOnPool(masterMCPStatus, infra.MasterIPsecMachineConfigs) {
+		if !AreMachineConfigsRenderedOnPool(masterMCPStatus, infra.MasterIPsecMachineConfigs) {
 			return false
 		}
 	}
 	for _, workerMCPStatus := range infra.WorkerMCPStatuses {
-		if !ipSecPluginOnPool(workerMCPStatus, infra.WorkerIPsecMachineConfigs) {
+		if !AreMachineConfigsRenderedOnPool(workerMCPStatus, infra.WorkerIPsecMachineConfigs) {
 			return false
 		}
 	}
 	return true
-}
-
-func hasSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
-	ipSecMachineConfigNames := sets.New[string]()
-	for _, machineConfig := range machineConfigs {
-		ipSecMachineConfigNames.Insert(machineConfig.Name)
-	}
-	sourceNames := sets.New[string]()
-	for _, source := range machineConfigStatus.Configuration.Source {
-		sourceNames.Insert(source.Name)
-	}
-	return sourceNames.IsSuperset(ipSecMachineConfigNames)
 }
 
 // shouldUpdateOVNKonUpgrade determines if we should roll out changes to
@@ -2011,4 +1995,22 @@ func ContainsNetworkOwnerRef(ownerRefs []metav1.OwnerReference) bool {
 		}
 	}
 	return false
+}
+
+// AreMachineConfigsRenderedOnPool returns true if machineConfigs are completely rendered on the given machine config
+// pool status, otherwise returns false.
+func AreMachineConfigsRenderedOnPool(status mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
+	return status.MachineCount == status.UpdatedMachineCount && hasSourceInMachineConfigStatus(status, machineConfigs)
+}
+
+func hasSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
+	ipSecMachineConfigNames := sets.New[string]()
+	for _, machineConfig := range machineConfigs {
+		ipSecMachineConfigNames.Insert(machineConfig.Name)
+	}
+	sourceNames := sets.New[string]()
+	for _, source := range machineConfigStatus.Configuration.Source {
+		sourceNames.Insert(source.Name)
+	}
+	return sourceNames.IsSuperset(ipSecMachineConfigNames)
 }
