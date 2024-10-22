@@ -292,16 +292,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNIPsecDaemonsetEnable"] = OVNIPsecDaemonsetEnable
 	data.Data["OVNIPsecEnable"] = OVNIPsecEnable
 
-	// Set progressing to true until IPsec DaemonSet is rendered when EW IPsec config is enabled.
-	// TODO Do a poor man's job mapping machine config pool status to CNO progressing state for now.
-	// This has two problems:
-	// - Not a great feedback to the user on why we are progressing other than `Waiting to render manifests`.
-	// - If pool status degrades due to CNO's changes, CNO stays progressing where it would be
-	//   potentially better to report it as degraded as well.
-	// Overall, mapping machine config pool status to CNO status should better be done in status manager.
-	// Future efforts on this are tracked in https://issues.redhat.com/browse/SDN-4829.
-	progressing = OVNIPsecDaemonsetEnable && !renderIPsecHostDaemonSet && !renderIPsecContainerizedDaemonSet
-
 	klog.V(5).Infof("IPsec: is MachineConfig enabled: %v, is East-West DaemonSet enabled: %v", data.Data["IPsecMachineConfigEnable"], data.Data["OVNIPsecDaemonsetEnable"])
 
 	if c.GatewayConfig != nil && c.GatewayConfig.RoutingViaHost {
