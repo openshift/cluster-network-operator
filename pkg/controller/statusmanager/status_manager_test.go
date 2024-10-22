@@ -13,6 +13,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -27,6 +28,11 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var (
+	masterMachineConfigIPsecExtName = "80-ipsec-master-extensions"
+	workerMachineConfigIPsecExtName = "80-ipsec-worker-extensions"
 )
 
 //nolint:errcheck
@@ -435,15 +441,17 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	}
 
 	// Create Machine Config and Machine Config Pool for ipsec plugin.
-	masterIPsecMachineConfig := &mcfgv1.MachineConfig{ObjectMeta: metav1.ObjectMeta{Name: "80-ipsec-master-extensions",
-		Labels:          map[string]string{"machineconfiguration.openshift.io/role": "master"},
+	masterIPsecMachineConfig := &mcfgv1.MachineConfig{ObjectMeta: metav1.ObjectMeta{Name: masterMachineConfigIPsecExtName,
+		Labels:          platform.MasterRoleMachineConfigLabel,
 		OwnerReferences: networkOwnerRef()},
 		Spec: mcfgv1.MachineConfigSpec{Extensions: []string{"ipsec"}}}
 	set(t, client, masterIPsecMachineConfig)
 
 	masterIPsecmachineConfigPool := &mcfgv1.MachineConfigPool{ObjectMeta: metav1.ObjectMeta{Name: "master"},
 		Spec: mcfgv1.MachineConfigPoolSpec{MachineConfigSelector: &metav1.LabelSelector{
-			MatchLabels: map[string]string{"machineconfiguration.openshift.io/role": "master"}}}}
+			MatchLabels: platform.MasterRoleMachineConfigLabel}},
+		Status: mcfgv1.MachineConfigPoolStatus{Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
+			Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	set(t, client, masterIPsecmachineConfigPool)
 	status.SetFromMachineConfigs()
 	co, oc, err = getStatuses(client, "testing")
@@ -463,15 +471,15 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	}
 
 	// Create MachineConfigPool with degraded condition for ipsec plugin and validate network operator condition.
-	workerIPsecMachineConfig := &mcfgv1.MachineConfig{ObjectMeta: metav1.ObjectMeta{Name: "80-ipsec-worker-extensions",
-		Labels:          map[string]string{"machineconfiguration.openshift.io/role": "worker"},
+	workerIPsecMachineConfig := &mcfgv1.MachineConfig{ObjectMeta: metav1.ObjectMeta{Name: workerMachineConfigIPsecExtName,
+		Labels:          platform.WorkerRoleMachineConfigLabel,
 		OwnerReferences: networkOwnerRef()},
 		Spec: mcfgv1.MachineConfigSpec{Extensions: []string{"ipsec"}}}
 	set(t, client, workerIPsecMachineConfig)
 
 	workerIPsecMachineConfigPool := &mcfgv1.MachineConfigPool{ObjectMeta: metav1.ObjectMeta{Name: "worker"},
 		Spec: mcfgv1.MachineConfigPoolSpec{MachineConfigSelector: &metav1.LabelSelector{
-			MatchLabels: map[string]string{"machineconfiguration.openshift.io/role": "worker"}}},
+			MatchLabels: platform.WorkerRoleMachineConfigLabel}},
 		Status: mcfgv1.MachineConfigPoolStatus{Conditions: []mcfgv1.MachineConfigPoolCondition{{Type: mcfgv1.MachineConfigPoolDegraded,
 			Status: v1.ConditionTrue}}}}
 	set(t, client, workerIPsecMachineConfigPool)
@@ -516,7 +524,8 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	}
 
 	// Clear MachineConfigPool progressing condition and ensure network operator is no longer either in degraded or progressing state.
-	workerIPsecMachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{}
+	workerIPsecMachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
+		Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}
 	set(t, client, workerIPsecMachineConfigPool)
 
 	status.SetFromMachineConfigs()
