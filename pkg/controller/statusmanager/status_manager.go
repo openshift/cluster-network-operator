@@ -114,11 +114,6 @@ type StatusManager struct {
 	ssInformers map[string]cache.SharedIndexInformer
 	ssListers   map[string]StatefulSetLister
 
-	mcInformer  cache.SharedIndexInformer
-	mcLister    MachineConfigLister
-	mcpInformer cache.SharedIndexInformer
-	mcpLister   MachineConfigPoolLister
-
 	labelSelector labels.Selector
 
 	relatedObjects []configv1.ObjectReference
