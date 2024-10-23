@@ -3,17 +3,18 @@ package statusmanager
 import (
 	"context"
 
-	configv1client "github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned"
-	mcfgv1informer "github.com/openshift/machine-config-operator/pkg/generated/informers/externalversions/machineconfiguration.openshift.io/v1"
-	mcfgv1lister "github.com/openshift/machine-config-operator/pkg/generated/listers/machineconfiguration.openshift.io/v1"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -22,44 +23,13 @@ type MachineConfigsWatcher struct {
 	status *StatusManager
 }
 
-func (s *StatusManager) initInformerForMachineConfigs(cfg *rest.Config) error {
-	configClient, err := configv1client.NewForConfig(cfg)
-	if err != nil {
-		return err
-	}
-	labelSelector, err := labels.Parse("machineconfiguration.openshift.io/role in (master, worker)")
-	if err != nil {
-		return err
-	}
-	inf := mcfgv1informer.NewFilteredMachineConfigInformer(configClient, 0,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = labelSelector.String()
-		})
-	s.client.ClientFor("").AddCustomInformer(inf)
-	s.mcInformer = inf
-	s.mcLister = mcfgv1lister.NewMachineConfigLister(inf.GetIndexer())
-
-	inf = mcfgv1informer.NewMachineConfigPoolInformer(configClient, 0,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	s.client.ClientFor("").AddCustomInformer(inf)
-	s.mcpInformer = inf
-	s.mcpLister = mcfgv1lister.NewMachineConfigPoolLister(inf.GetIndexer())
-
-	return nil
-}
-
 // AddMachineConfigsWatcher wires up the MachineConfigWatcher and MachineConfigPoolWatcher
 // to the controller-manager.
-func (s *StatusManager) AddMachineConfigsWatcher(cfg *rest.Config, mgr manager.Manager) error {
+func (s *StatusManager) AddMachineConfigsWatcher(mgr manager.Manager) error {
 	if s.hyperShiftConfig.Enabled {
 		// MachineConfig is not supported in HyperShift cluster, so return without
 		// initializing watcher.
 		return nil
-	}
-	err := s.initInformerForMachineConfigs(cfg)
-	if err != nil {
-		return err
 	}
 
 	pw := &MachineConfigsWatcher{
@@ -70,19 +40,71 @@ func (s *StatusManager) AddMachineConfigsWatcher(cfg *rest.Config, mgr manager.M
 		return err
 	}
 
-	err = c.Watch(&source.Informer{Informer: s.mcInformer,
-		Handler: handler.EnqueueRequestsFromMapFunc(enqueueRP)})
+	err = c.Watch(source.Kind[crclient.Object](mgr.GetCache(), &mcfgv1.MachineConfig{},
+		&handler.EnqueueRequestForObject{}, onMachineConfigPredicate()))
 	if err != nil {
 		return err
 	}
 
-	return c.Watch(&source.Informer{Informer: s.mcpInformer,
-		Handler: handler.EnqueueRequestsFromMapFunc(enqueueRP)})
+	return c.Watch(source.Kind[crclient.Object](mgr.GetCache(), &mcfgv1.MachineConfigPool{},
+		&handler.EnqueueRequestForObject{}, onMachineConfigPoolPredicate()))
 }
 
 // Reconcile triggers a re-update of Status.
 func (p *MachineConfigsWatcher) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(p.status.SetDegradedOnPanicAndCrash)
-	p.status.SetFromMachineConfigs()
+	p.status.SetFromMachineConfigs(ctx)
 	return reconcile.Result{}, nil
+}
+
+func onMachineConfigPredicate() predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			mc := e.Object.(*mcfgv1.MachineConfig)
+			return hasRequiredLabel(mc)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			mc := e.ObjectNew.(*mcfgv1.MachineConfig)
+			return hasRequiredLabel(mc)
+		},
+	}
+}
+
+func onMachineConfigPoolPredicate() predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			mcp := e.Object.(*mcfgv1.MachineConfigPool)
+			return hasRequiredMachineConfigSelector(mcp)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			mcp := e.ObjectNew.(*mcfgv1.MachineConfigPool)
+			return hasRequiredMachineConfigSelector(mcp)
+		},
+	}
+}
+
+func hasRequiredLabel(mc *mcfgv1.MachineConfig) bool {
+	isSubset := func(mcLabels, roleLabel map[string]string) bool {
+		for roleLKey, roleLValue := range roleLabel {
+			if mcLabelValue, ok := mcLabels[roleLKey]; !ok || mcLabelValue != roleLValue {
+				return false
+			}
+		}
+		return true
+	}
+	return isSubset(mc.Labels, platform.MasterRoleMachineConfigLabel) ||
+		isSubset(mc.Labels, platform.WorkerRoleMachineConfigLabel)
+}
+
+func hasRequiredMachineConfigSelector(mcp *mcfgv1.MachineConfigPool) bool {
+	mcSelector, err := metav1.LabelSelectorAsSelector(mcp.Spec.MachineConfigSelector)
+	if err != nil {
+		klog.Errorf("invalid machine config label selector in %s pool", mcp.Name)
+		return false
+	}
+	var (
+		masterLabelSet labels.Set = platform.MasterRoleMachineConfigLabel
+		workerLabelSet labels.Set = platform.MasterRoleMachineConfigLabel
+	)
+	return mcSelector.Matches(masterLabelSet) || mcSelector.Matches(workerLabelSet)
 }
