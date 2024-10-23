@@ -3,7 +3,6 @@ package statusmanager
 import (
 	"context"
 
-	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -20,8 +19,6 @@ func setFakeListers(sm *StatusManager) {
 	sm.ssListers = map[string]StatefulSetLister{
 		"": &fakeStatefulSetLister{sm},
 	}
-	sm.mcLister = &fakeMachineConfigLister{sm}
-	sm.mcpLister = &fakeMachineConfigPoolLister{sm}
 }
 
 type fakeDaemonSetLister struct {
@@ -32,13 +29,6 @@ type fakeDeploymentLister struct {
 	sm *StatusManager
 }
 type fakeStatefulSetLister struct {
-	sm *StatusManager
-}
-type fakeMachineConfigLister struct {
-	sm *StatusManager
-}
-
-type fakeMachineConfigPoolLister struct {
 	sm *StatusManager
 }
 
@@ -80,34 +70,6 @@ func (f *fakeStatefulSetLister) List(selector labels.Selector) (ret []*appsv1.St
 	}
 	for i := range l.Items {
 		ret = append(ret, &l.Items[i])
-	}
-	return ret, nil
-}
-
-func (f *fakeMachineConfigLister) List(selector labels.Selector) (ret []*mcfgv1.MachineConfig, err error) {
-	machineConfigs := &mcfgv1.MachineConfigList{}
-	err = f.sm.client.Default().CRClient().List(context.TODO(), machineConfigs, &crclient.ListOptions{
-		LabelSelector: selector,
-	})
-	if err != nil {
-		return nil, err
-	}
-	for i := range machineConfigs.Items {
-		ret = append(ret, &machineConfigs.Items[i])
-	}
-	return ret, nil
-}
-
-func (f *fakeMachineConfigPoolLister) List(selector labels.Selector) (ret []*mcfgv1.MachineConfigPool, err error) {
-	pools := &mcfgv1.MachineConfigPoolList{}
-	err = f.sm.client.Default().CRClient().List(context.TODO(), pools, &crclient.ListOptions{
-		LabelSelector: selector,
-	})
-	if err != nil {
-		return nil, err
-	}
-	for i := range pools.Items {
-		ret = append(ret, &pools.Items[i])
 	}
 	return ret, nil
 }
