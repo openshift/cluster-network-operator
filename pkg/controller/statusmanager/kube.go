@@ -7,7 +7,6 @@ import (
 
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 
-	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -27,14 +26,6 @@ type DeploymentLister interface {
 
 type StatefulSetLister interface {
 	List(selector labels.Selector) (ret []*appsv1.StatefulSet, err error)
-}
-
-type MachineConfigPoolLister interface {
-	List(selector labels.Selector) (ret []*mcfgv1.MachineConfigPool, err error)
-}
-
-type MachineConfigLister interface {
-	List(selector labels.Selector) (ret []*mcfgv1.MachineConfig, err error)
 }
 
 // just the scaffolding needed to be able to send patched annotations
