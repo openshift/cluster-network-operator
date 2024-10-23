@@ -290,16 +290,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNIPsecDaemonsetEnable"] = OVNIPsecDaemonsetEnable
 	data.Data["OVNIPsecEnable"] = OVNIPsecEnable
 
-	// Set progressing to true until IPsec DaemonSet is rendered when EW IPsec config is enabled.
-	// TODO Do a poor man's job mapping machine config pool status to CNO progressing state for now.
-	// This has two problems:
-	// - Not a great feedback to the user on why we are progressing other than `Waiting to render manifests`.
-	// - If pool status degrades due to CNO's changes, CNO stays progressing where it would be
-	//   potentially better to report it as degraded as well.
-	// Overall, mapping machine config pool status to CNO status should better be done in status manager.
-	// Future efforts on this are tracked in https://issues.redhat.com/browse/SDN-4829.
-	progressing = OVNIPsecDaemonsetEnable && !renderIPsecHostDaemonSet && !renderIPsecContainerizedDaemonSet
-
 	klog.V(5).Infof("IPsec: is MachineConfig enabled: %v, is East-West DaemonSet enabled: %v", data.Data["IPsecMachineConfigEnable"], data.Data["OVNIPsecDaemonsetEnable"])
 
 	if c.GatewayConfig != nil && c.GatewayConfig.RoutingViaHost {
@@ -1495,7 +1485,7 @@ func shouldUpdateOVNKonPrepull(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 func isCNOIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
 	isCNOIPsecMachineConfigPresentIn := func(mcs []*mcfgv1.MachineConfig) bool {
 		for _, mc := range mcs {
-			if containsNetworkOwnerRef(mc.OwnerReferences) {
+			if ContainsNetworkOwnerRef(mc.OwnerReferences) {
 				return true
 			}
 		}
@@ -1503,16 +1493,6 @@ func isCNOIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
 	}
 	return isCNOIPsecMachineConfigPresentIn(infra.MasterIPsecMachineConfigs) &&
 		isCNOIPsecMachineConfigPresentIn(infra.WorkerIPsecMachineConfigs)
-}
-
-func containsNetworkOwnerRef(ownerRefs []metav1.OwnerReference) bool {
-	for _, ownerRef := range ownerRefs {
-		if ownerRef.APIVersion == operv1.GroupVersion.String() && ownerRef.Kind == "Network" &&
-			(ownerRef.Controller != nil && *ownerRef.Controller) && ownerRef.Name == "cluster" {
-			return true
-		}
-	}
-	return false
 }
 
 // isIPsecMachineConfigActive returns true if both master and worker's machine config pools are ready with
@@ -1526,33 +1506,17 @@ func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
 		// When none of MachineConfig pools exist, then return false. needed for unit test.
 		return false
 	}
-	ipSecPluginOnPool := func(status mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
-		return status.MachineCount == status.UpdatedMachineCount &&
-			hasSourceInMachineConfigStatus(status, machineConfigs)
-	}
 	for _, masterMCPStatus := range infra.MasterMCPStatuses {
-		if !ipSecPluginOnPool(masterMCPStatus, infra.MasterIPsecMachineConfigs) {
+		if !AreMachineConfigsRenderedOnPool(masterMCPStatus, infra.MasterIPsecMachineConfigs) {
 			return false
 		}
 	}
 	for _, workerMCPStatus := range infra.WorkerMCPStatuses {
-		if !ipSecPluginOnPool(workerMCPStatus, infra.WorkerIPsecMachineConfigs) {
+		if !AreMachineConfigsRenderedOnPool(workerMCPStatus, infra.WorkerIPsecMachineConfigs) {
 			return false
 		}
 	}
 	return true
-}
-
-func hasSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
-	ipSecMachineConfigNames := sets.New[string]()
-	for _, machineConfig := range machineConfigs {
-		ipSecMachineConfigNames.Insert(machineConfig.Name)
-	}
-	sourceNames := sets.New[string]()
-	for _, source := range machineConfigStatus.Configuration.Source {
-		sourceNames.Insert(source.Name)
-	}
-	return sourceNames.IsSuperset(ipSecMachineConfigNames)
 }
 
 // shouldUpdateOVNKonUpgrade determines if we should roll out changes to
@@ -2030,4 +1994,34 @@ func GetMasqueradeSubnet(conf *operv1.OVNKubernetesConfig) (v4Subnet, v6Subnet s
 		}
 	}
 	return
+}
+
+// ContainsNetworkOwnerRef returns true if any one the given OwnerReference is owned
+// by cluster network operator, otherwise returns false
+func ContainsNetworkOwnerRef(ownerRefs []metav1.OwnerReference) bool {
+	for _, ownerRef := range ownerRefs {
+		if ownerRef.APIVersion == operv1.GroupVersion.String() && ownerRef.Kind == "Network" &&
+			(ownerRef.Controller != nil && *ownerRef.Controller) && ownerRef.Name == "cluster" {
+			return true
+		}
+	}
+	return false
+}
+
+// AreMachineConfigsRenderedOnPool returns true if machineConfigs are completely rendered on the given machine config
+// pool status, otherwise returns false.
+func AreMachineConfigsRenderedOnPool(status mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
+	return status.MachineCount == status.UpdatedMachineCount && hasSourceInMachineConfigStatus(status, machineConfigs)
+}
+
+func hasSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPoolStatus, machineConfigs []*mcfgv1.MachineConfig) bool {
+	ipSecMachineConfigNames := sets.New[string]()
+	for _, machineConfig := range machineConfigs {
+		ipSecMachineConfigNames.Insert(machineConfig.Name)
+	}
+	sourceNames := sets.New[string]()
+	for _, source := range machineConfigStatus.Configuration.Source {
+		sourceNames.Insert(source.Name)
+	}
+	return sourceNames.IsSuperset(ipSecMachineConfigNames)
 }

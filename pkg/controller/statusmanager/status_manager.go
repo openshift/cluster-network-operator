@@ -45,6 +45,7 @@ const (
 	OperatorRender
 	ProxyConfig
 	InjectorConfig
+	MachineConfig
 	PodDeployment
 	PKIConfig
 	EgressRouterConfig
