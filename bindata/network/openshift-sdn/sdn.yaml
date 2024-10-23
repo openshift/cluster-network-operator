@@ -75,6 +75,7 @@ spec:
           else
             echo "br-ex doesn't exist"
           fi
+          export NODE_CNI
 
           # retry loop
           RETRY_INTERVAL=3
