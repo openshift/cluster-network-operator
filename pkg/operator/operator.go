@@ -100,7 +100,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	// Add controller-runtime controllers
 	klog.Info("Adding controller-runtime controllers")
-	if err := controller.AddToManager(controllerConfig.KubeConfig, o.manager, o.StatusManager, o.client); err != nil {
+	if err := controller.AddToManager(o.manager, o.StatusManager, o.client); err != nil {
 		return fmt.Errorf("failed to add controllers to manager: %w", err)
 	}
 
