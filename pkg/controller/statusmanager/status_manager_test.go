@@ -370,7 +370,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}}}}}
 	setOC(t, client, no)
 
-	status.SetFromMachineConfigs()
+	status.SetFromMachineConfigs(context.TODO())
 	co, oc, err := getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -400,7 +400,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		Status: mcfgv1.MachineConfigPoolStatus{Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
 			Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	set(t, client, masterIPsecmachineConfigPool)
-	status.SetFromMachineConfigs()
+	status.SetFromMachineConfigs(context.TODO())
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -431,7 +431,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 			Status: v1.ConditionTrue}}}}
 	set(t, client, workerIPsecMachineConfigPool)
 
-	status.SetFromMachineConfigs()
+	status.SetFromMachineConfigs(context.TODO())
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -453,7 +453,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		Status: v1.ConditionTrue}}}
 	set(t, client, workerIPsecMachineConfigPool)
 
-	status.SetFromMachineConfigs()
+	status.SetFromMachineConfigs(context.TODO())
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -475,7 +475,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}
 	set(t, client, workerIPsecMachineConfigPool)
 
-	status.SetFromMachineConfigs()
+	status.SetFromMachineConfigs(context.TODO())
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
