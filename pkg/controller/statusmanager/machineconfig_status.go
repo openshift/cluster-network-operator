@@ -1,6 +1,7 @@
 package statusmanager
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -9,17 +10,18 @@ import (
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (status *StatusManager) SetFromMachineConfigs() {
+func (status *StatusManager) SetFromMachineConfigs(ctx context.Context) {
 	status.Lock()
 	defer status.Unlock()
 
-	masterMachineConfigs, err := status.networkMachineConfigExists(platform.MasterRoleMachineConfigLabel)
+	masterMachineConfigs, err := status.networkMachineConfigs(ctx, platform.MasterRoleMachineConfigLabel)
 	if err != nil {
 		log.Printf("failed to retrieve machine configs for master role: %v", err)
 	}
-	workerMachineConfigs, err := status.networkMachineConfigExists(platform.WorkerRoleMachineConfigLabel)
+	workerMachineConfigs, err := status.networkMachineConfigs(ctx, platform.WorkerRoleMachineConfigLabel)
 	if err != nil {
 		log.Printf("failed to retrieve machine configs for worker role: %v", err)
 	}
@@ -31,9 +33,9 @@ func (status *StatusManager) SetFromMachineConfigs() {
 	}
 
 	if len(masterMachineConfigs) > 0 {
-		// Network operator owned machine config exists for master role, check its machine config pool and update network
+		// Network operator owned machine configs exist for master role, check its machine config pool and update network
 		// operator degraded and progressing conditions accordingly.
-		pools, err := status.findMachineConfigPoolsForLabel(platform.MasterRoleMachineConfigLabel)
+		pools, err := status.findMachineConfigPoolsForLabel(ctx, platform.MasterRoleMachineConfigLabel)
 		if err != nil {
 			log.Printf("failed to get machine config pools for the label %s: %v", platform.MasterRoleMachineConfigLabel, err)
 		}
@@ -59,9 +61,9 @@ func (status *StatusManager) SetFromMachineConfigs() {
 		status.unsetProgressing(MachineConfig)
 	}
 	if len(workerMachineConfigs) > 0 {
-		// Network operator owned machine config exists for worker role, check its machine config pool and update network
+		// Network operator owned machine configs exist for worker role, check its machine config pool and update network
 		// operator degraded and progressing conditions accordingly.
-		pools, err := status.findMachineConfigPoolsForLabel(platform.WorkerRoleMachineConfigLabel)
+		pools, err := status.findMachineConfigPoolsForLabel(ctx, platform.WorkerRoleMachineConfigLabel)
 		if err != nil {
 			log.Printf("failed to get machine config pools for the label %s: %v", platform.WorkerRoleMachineConfigLabel, err)
 		}
@@ -119,33 +121,35 @@ func (status *StatusManager) isMachineConfigPoolProgressing(pools []*mcfgv1.Mach
 	return progressing
 }
 
-func (status *StatusManager) findMachineConfigPoolsForLabel(mcLabel labels.Set) ([]*mcfgv1.MachineConfigPool, error) {
-	var mcPools []*mcfgv1.MachineConfigPool
-	pools, err := status.mcpLister.List(labels.Everything())
+func (status *StatusManager) findMachineConfigPoolsForLabel(ctx context.Context, mcLabel labels.Set) ([]*mcfgv1.MachineConfigPool, error) {
+	mcPoolList := &mcfgv1.MachineConfigPoolList{}
+	err := status.client.Default().CRClient().List(ctx, mcPoolList, &client.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	for i := range pools {
-		mcSelector, err := metav1.LabelSelectorAsSelector(pools[i].Spec.MachineConfigSelector)
+	var mcPools []*mcfgv1.MachineConfigPool
+	for i := range mcPoolList.Items {
+		mcSelector, err := metav1.LabelSelectorAsSelector(mcPoolList.Items[i].Spec.MachineConfigSelector)
 		if err != nil {
-			return nil, fmt.Errorf("invalid machine config label selector in %s pool", pools[i].Name)
+			return nil, fmt.Errorf("invalid machine config label selector in %s pool", mcPoolList.Items[i].Name)
 		}
 		if mcSelector.Matches(mcLabel) {
-			mcPools = append(mcPools, pools[i])
+			mcPools = append(mcPools, &mcPoolList.Items[i])
 		}
 	}
 	return mcPools, nil
 }
 
-func (status *StatusManager) networkMachineConfigExists(mcLabel labels.Set) ([]*mcfgv1.MachineConfig, error) {
-	mcs, err := status.mcLister.List(mcLabel.AsSelector())
+func (status *StatusManager) networkMachineConfigs(ctx context.Context, mcLabel labels.Set) ([]*mcfgv1.MachineConfig, error) {
+	mcs := &mcfgv1.MachineConfigList{}
+	err := status.client.Default().CRClient().List(ctx, mcs, &client.ListOptions{LabelSelector: mcLabel.AsSelector()})
 	if err != nil {
 		return nil, err
 	}
 	var machineConfigs []*mcfgv1.MachineConfig
-	for _, mc := range mcs {
-		if network.ContainsNetworkOwnerRef(mc.OwnerReferences) {
-			machineConfigs = append(machineConfigs, mc)
+	for i := range mcs.Items {
+		if network.ContainsNetworkOwnerRef(mcs.Items[i].OwnerReferences) {
+			machineConfigs = append(machineConfigs, &mcs.Items[i])
 		}
 	}
 	return machineConfigs, nil
