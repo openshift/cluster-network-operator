@@ -246,6 +246,14 @@ spec:
           # After a restart of this container (or on initial startup), we flush xfrm state and policy
           # before we start pluto and ovs-monitor-ipsec in order to start in a known good state. This
           # will result in a small interruption in traffic until pluto and ovs-monitor-ipsec start again.
+          # Let us stop ipsec service first and wait for few seconds.
+          # This allows pluto to:
+          # 1) destroy all inbound SA.
+          # 2) send delete payloads to the other side to let them close their SA and once replies are sent.
+          # 3) pluto destroy also outbound SA.
+          chroot /proc/1/root ipsec stop && sleep 30s
+          # Try flushing xfrm state and policy explicitly again. It may not have any effect as ipsec stop
+          # cleaned up those entries already.
           ip x s flush
           ip x p flush
 
