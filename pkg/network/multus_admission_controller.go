@@ -88,6 +88,9 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 		data.Data["KubernetesServiceHost"] = bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal].Host
 		data.Data["KubernetesServicePort"] = bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal].Port
 		data.Data["CLIImage"] = os.Getenv("CLI_IMAGE")
+		if os.Getenv("CLI_CONTROL_PLANE_IMAGE") != "" {
+			data.Data["CLIImage"] = os.Getenv("CLI_CONTROL_PLANE_IMAGE")
+		}
 		data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
 		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
 		data.Data["RunAsUser"] = hsc.RunAsUser

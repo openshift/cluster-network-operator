@@ -94,6 +94,9 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 		}
 		data.Data["ReleaseImage"] = hcpCfg.ReleaseImage
 		data.Data["CLIImage"] = os.Getenv("CLI_IMAGE")
+		if os.Getenv("CLI_CONTROL_PLANE_IMAGE") != "" {
+			data.Data["CLIImage"] = os.Getenv("CLI_CONTROL_PLANE_IMAGE")
+		}
 		data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
 		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
 		data.Data["HCPNodeSelector"] = bootstrapResult.Infra.HostedControlPlane.NodeSelector
