@@ -30,6 +30,7 @@ var cloudProviderConfig = types.NamespacedName{
 var (
 	masterRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "master"}
 	workerRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "worker"}
+	EWIPsecOnly                  = true
 )
 
 // isNetworkNodeIdentityEnabled determines if network node identity should be enabled.
@@ -150,7 +151,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 
 	// Skip retrieving IPsec MachineConfig and MachineConfigPool if it's a hypershift cluster because
 	// those object kinds are not supported there.
-	if res.HostedControlPlane != nil {
+	if res.HostedControlPlane != nil || EWIPsecOnly {
 		return res, nil
 	}
 
