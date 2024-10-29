@@ -14,6 +14,7 @@ import (
 	configv1client "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	configv1listers "github.com/openshift/client-go/config/listers/config/v1"
+	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
 	applyconfigv1alpha1 "github.com/openshift/client-go/operatorcontrolplane/applyconfigurations/operatorcontrolplane/v1alpha1"
 	operatorcontrolplaneclient "github.com/openshift/client-go/operatorcontrolplane/clientset/versioned"
 	operatorcontrolplaneinformers "github.com/openshift/client-go/operatorcontrolplane/informers/externalversions"
@@ -29,11 +30,14 @@ import (
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	applyconfigmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/clock"
 )
 
 type NetworkConnectivityCheckController interface {
@@ -435,6 +439,37 @@ func withTarget(label, target string) func(check *applyconfigv1alpha1.PodNetwork
 	return WithTarget(label + "-" + target)
 }
 
+func extractOperatorSpec(obj *unstructured.Unstructured, fieldManager string) (*applyoperatorv1.OperatorSpecApplyConfiguration, error) {
+	castObj := &operatorv1.OpenShiftAPIServer{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, castObj); err != nil {
+		return nil, fmt.Errorf("unable to convert to OpenShiftAPIServer: %w", err)
+	}
+	ret, err := applyoperatorv1.ExtractOpenShiftAPIServer(castObj, fieldManager)
+	if err != nil {
+		return nil, fmt.Errorf("unable to extract fields for %q: %w", fieldManager, err)
+	}
+	if ret.Spec == nil {
+		return nil, nil
+	}
+	return &ret.Spec.OperatorSpecApplyConfiguration, nil
+}
+
+func extractOperatorStatus(obj *unstructured.Unstructured, fieldManager string) (*applyoperatorv1.OperatorStatusApplyConfiguration, error) {
+	castObj := &operatorv1.OpenShiftAPIServer{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, castObj); err != nil {
+		return nil, fmt.Errorf("unable to convert to OpenShiftAPIServer: %w", err)
+	}
+	ret, err := applyoperatorv1.ExtractOpenShiftAPIServerStatus(castObj, fieldManager)
+	if err != nil {
+		return nil, fmt.Errorf("unable to extract fields for %q: %w", fieldManager, err)
+	}
+
+	if ret.Status == nil {
+		return nil, nil
+	}
+	return &ret.Status.OperatorStatusApplyConfiguration, nil
+}
+
 func Start(ctx context.Context, kubeConfig *rest.Config) error {
 	protoKubeConfig := rest.CopyConfig(kubeConfig)
 	protoKubeConfig.ContentType = "application/vnd.kubernetes.protobuf,application/json"
@@ -447,7 +482,8 @@ func Start(ctx context.Context, kubeConfig *rest.Config) error {
 	if err != nil {
 		return err
 	}
-	operatorClient, dynamicInformers, err := genericoperatorclient.NewClusterScopedOperatorClient(kubeConfig, operatorv1.GroupVersion.WithResource("openshiftapiservers"))
+	operatorClient, dynamicInformers, err := genericoperatorclient.NewClusterScopedOperatorClient(clock.RealClock{}, kubeConfig, operatorv1.GroupVersion.WithResource("openshiftapiservers"), operatorv1.SchemeGroupVersion.WithKind("OpenShiftAPIServer"), extractOperatorSpec,
+		extractOperatorStatus)
 	if err != nil {
 		return err
 	}

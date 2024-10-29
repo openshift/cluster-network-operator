@@ -3,7 +3,9 @@ package client
 import (
 	"context"
 
+	applyconfiguration "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/library-go/pkg/apiserver/jsonpatch"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,4 +88,16 @@ func (c *OperatorHelperClient) UpdateOperatorStatus(ctx context.Context, resourc
 	}
 
 	return &ret.Status.OperatorStatus, nil
+}
+
+func (c *OperatorHelperClient) ApplyOperatorSpec(ctx context.Context, fieldManager string, desiredConfiguration *applyconfiguration.OperatorSpecApplyConfiguration) error {
+	return nil
+}
+
+func (c *OperatorHelperClient) ApplyOperatorStatus(ctx context.Context, fieldManager string, desiredConfiguration *applyconfiguration.OperatorStatusApplyConfiguration) error {
+	return nil
+}
+
+func (c *OperatorHelperClient) PatchOperatorStatus(ctx context.Context, jsonPatch *jsonpatch.PatchSet) (err error) {
+	return nil
 }
