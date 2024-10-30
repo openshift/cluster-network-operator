@@ -163,7 +163,7 @@ func (r *ReconcileProxyConfig) validateConfigMapRef(trustedCA string) (*corev1.C
 // of the key is one or more valid PEM encoded certificates, returning slices of
 // the validated certificates and certificate data.
 func (r *ReconcileProxyConfig) validateTrustBundle(cfgMap *corev1.ConfigMap) ([]*x509.Certificate, []byte, error) {
-	certBundle, bundleData, err := validation.TrustBundleConfigMap(cfgMap)
+	certBundle, bundleData, err := validation.TrustBundleConfigMap(cfgMap, names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -60,6 +60,7 @@ const OVN_NODE_MODE_FULL = "full"
 const OVN_NODE_MODE_DPU_HOST = "dpu-host"
 const OVN_NODE_MODE_DPU = "dpu"
 const OVN_NODE_SELECTOR_DPU = "network.operator.openshift.io/dpu: ''"
+const OVN_NODE_IDENTITY_CERT_DURATION = "24h"
 
 // gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
@@ -125,6 +126,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["V4JoinSubnet"] = c.V4InternalSubnet
 	data.Data["V6JoinSubnet"] = c.V6InternalSubnet
 	data.Data["EnableUDPAggregation"] = !bootstrapResult.OVN.OVNKubernetesConfig.DisableUDPAggregation
+	data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = bootstrapResult.Infra.NetworkNodeIdentityEnabled
+	data.Data["NodeIdentityCertDuration"] = OVN_NODE_IDENTITY_CERT_DURATION
 
 	if conf.Migration != nil && conf.Migration.MTU != nil {
 		if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
