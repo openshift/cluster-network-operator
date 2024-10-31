@@ -303,6 +303,10 @@ spec:
           name: host-var-lib
         - mountPath: /etc
           name: host-etc
+        - mountPath: /usr/sbin/ipsec
+          name: ipsec-bin
+        - mountPath: /usr/libexec/ipsec
+          name: ipsec-lib
         resources:
           requests:
             cpu: 10m
@@ -358,6 +362,14 @@ spec:
           path: /etc
           type: Directory
         name: host-etc
+      - hostPath:
+          path: /usr/sbin/ipsec
+          type: File
+        name: ipsec-bin
+      - hostPath:
+          path: /usr/libexec/ipsec
+          type: Directory
+        name: ipsec-lib
       tolerations:
       - operator: "Exists"
 {{end}}
