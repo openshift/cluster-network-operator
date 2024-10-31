@@ -540,26 +540,29 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{}, err
 		}
 
-		migration := operConfig.Spec.Migration
-		if migration.Features == nil || migration.Features.EgressFirewall {
-			err = migrateEgressFirewallCRs(ctx, operConfig, r.client)
-			if err != nil {
-				log.Printf("Could not migrate EgressFirewall CRs: %v", err)
-				return reconcile.Result{}, err
+		// start feature migration when the cluster CNI is changed to the target type
+		if operConfig.Spec.Migration.NetworkType == string(operConfig.Spec.DefaultNetwork.Type) {
+			migration := operConfig.Spec.Migration
+			if migration.Features == nil || migration.Features.EgressFirewall {
+				err = migrateEgressFirewallCRs(ctx, operConfig, r.client)
+				if err != nil {
+					log.Printf("Could not migrate EgressFirewall CRs: %v", err)
+					return reconcile.Result{}, err
+				}
 			}
-		}
-		if migration.Features == nil || migration.Features.Multicast {
-			err = migrateMulticastEnablement(ctx, operConfig, r.client)
-			if err != nil {
-				log.Printf("Could not migrate Multicast settings: %v", err)
-				return reconcile.Result{}, err
+			if migration.Features == nil || migration.Features.Multicast {
+				err = migrateMulticastEnablement(ctx, operConfig, r.client)
+				if err != nil {
+					log.Printf("Could not migrate Multicast settings: %v", err)
+					return reconcile.Result{}, err
+				}
 			}
-		}
-		if migration.Features == nil || migration.Features.EgressIP {
-			err = migrateEgressIpCRs(ctx, operConfig, r.client)
-			if err != nil {
-				log.Printf("Could not migrate EgressIP CRs: %v", err)
-				return reconcile.Result{}, err
+			if migration.Features == nil || migration.Features.EgressIP {
+				err = migrateEgressIpCRs(ctx, operConfig, r.client)
+				if err != nil {
+					log.Printf("Could not migrate EgressIP CRs: %v", err)
+					return reconcile.Result{}, err
+				}
 			}
 		}
 	}
