@@ -44,11 +44,9 @@ spec:
               source "/env/_master"
               set +o allexport
             fi
-
-            ho_enable=
-{{- if .OVNHybridOverlayEnable }}
+            # OVN-K will try to remove hybrid overlay node annotations even when the hybrid overlay is not enabled.
+            # https://github.com/ovn-org/ovn-kubernetes/blob/ac6820df0b338a246f10f412cd5ec903bd234694/go-controller/pkg/ovn/master.go#L791
             ho_enable="--enable-hybrid-overlay"
-{{ end }}
             echo "I$(date "+%m%d %H:%M:%S.%N") - network-node-identity - start webhook"
             # extra-allowed-user: service account `ovn-kubernetes-control-plane`
             # sets pod annotations in multi-homing layer3 network controller (cluster-manager)

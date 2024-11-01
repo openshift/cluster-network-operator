@@ -54,6 +54,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			return o.client.Default().RESTMapper(), nil
 		},
 		MetricsBindAddress: "0",
+		Logger:             klog.Background(),
 	})
 	if err != nil {
 		return err
