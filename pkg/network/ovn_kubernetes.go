@@ -41,6 +41,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/cluster-network-operator/pkg/util"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
@@ -640,6 +641,7 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	isIPsecMachineConfigNotActiveOnUpgrade := isIpsecUpgrade && !isIPsecMachineConfigActive && !isHypershiftHostedCluster
 	isMachineConfigClusterOperatorReady := bootstrapResult.Infra.MachineConfigClusterOperatorReady
 	isCNOIPsecMachineConfigPresent := isCNOIPsecMachineConfigPresent(bootstrapResult.Infra)
+	isUserDefinedIPsecMachineConfigPresent := isUserDefinedIPsecMachineConfigPresent(bootstrapResult.Infra)
 
 	// We render the ipsec deployment if IPsec is already active in OVN
 	// or if EW IPsec config is enabled.
@@ -657,9 +659,11 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	renderIPsecContainerizedDaemonSet = (renderIPsecDaemonSet && isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnUpgrade
 
 	// MachineConfig IPsec extensions rollout is needed for the ipsec enablement and are used in both External and Full modes.
-	// except  when the containerized deployment is used in hypershift hosted clusters.
-	renderCNOIPsecMachineConfig = (mode != operv1.IPsecModeDisabled || renderIPsecDaemonSet) && !isHypershiftHostedCluster
-	// Wait for MCO to be ready unless we had already rendered the IPsec MachineConfig
+	// except when the containerized deployment is used in hypershift hosted clusters.  Also do not render Machine Config if
+	// user already created their own machine config for IPsec.
+	renderCNOIPsecMachineConfig = (mode != operv1.IPsecModeDisabled || renderIPsecDaemonSet) && !isHypershiftHostedCluster &&
+		!isUserDefinedIPsecMachineConfigPresent
+	// Wait for MCO to be ready unless we had already rendered the IPsec MachineConfig.
 	renderCNOIPsecMachineConfig = renderCNOIPsecMachineConfig && (isCNOIPsecMachineConfigPresent || isMachineConfigClusterOperatorReady)
 
 	// We render OVN IPsec if East-West IPsec is enabled or it's upgrade is in progress.
@@ -1513,6 +1517,21 @@ func containsNetworkOwnerRef(ownerRefs []metav1.OwnerReference) bool {
 		}
 	}
 	return false
+}
+
+// isUserDefinedIPsecMachineConfigPresent returns true if user owned MachineConfigs for IPsec
+// are already present in both master and worker nodes, otherwise returns false.
+func isUserDefinedIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
+	isUserDefinedMachineConfigPresentIn := func(mcs []*mcfgv1.MachineConfig) bool {
+		for _, mc := range mcs {
+			if platform.IsUserDefinedIPsecMachineConfig(mc) {
+				return true
+			}
+		}
+		return false
+	}
+	return isUserDefinedMachineConfigPresentIn(infra.MasterIPsecMachineConfigs) &&
+		isUserDefinedMachineConfigPresentIn(infra.WorkerIPsecMachineConfigs)
 }
 
 // isIPsecMachineConfigActive returns true if both master and worker's machine config pools are ready with
