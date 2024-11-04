@@ -30,6 +30,11 @@ var cloudProviderConfig = types.NamespacedName{
 var (
 	masterRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "master"}
 	workerRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "worker"}
+	// When user deploys their own machine config for installing and configuring specific version of libreswan, then
+	// corresponding master and worker role machine configs annotation must have `user-ipsec-machine-config: true`.
+	// When CNO finds machine configs with the annotation, then it skips rendering its own IPsec machine configs
+	// and reuse already deployed user machine configs for the ovn-ipsec-host daemonset.
+	UserDefinedIPsecMachineConfigAnnotation = map[string]string{"user-ipsec-machine-config": "true"}
 )
 
 // isNetworkNodeIdentityEnabled determines if network node identity should be enabled.
@@ -205,7 +210,8 @@ func findIPsecMachineConfigsWithLabel(client cnoclient.Client, mcLabel labels.Se
 	}
 	var ipsecMachineConfigs []*mcfgv1.MachineConfig
 	for i, machineConfig := range machineConfigs.Items {
-		if sets.New(machineConfig.Spec.Extensions...).Has("ipsec") {
+		if sets.New(machineConfig.Spec.Extensions...).Has("ipsec") ||
+			IsUserDefinedIPsecMachineConfig(&machineConfigs.Items[i]) {
 			ipsecMachineConfigs = append(ipsecMachineConfigs, &machineConfigs.Items[i])
 		}
 	}
@@ -251,4 +257,21 @@ func getMachineConfigPoolStatuses(ctx context.Context, client cnoclient.Client, 
 		}
 	}
 	return mcpStatuses, nil
+}
+
+// IsUserDefinedIPsecMachineConfig return true if machine config's annotation is set with
+// `user-ipsec-machine-config: true`, otherwise returns false.
+func IsUserDefinedIPsecMachineConfig(machineConfig *mcfgv1.MachineConfig) bool {
+	if machineConfig == nil {
+		return false
+	}
+	isSubset := func(mcAnnotations, ipsecAnnotation map[string]string) bool {
+		for ipsecKey, ipsecValue := range ipsecAnnotation {
+			if mcAnnotationValue, ok := mcAnnotations[ipsecKey]; !ok || mcAnnotationValue != ipsecValue {
+				return false
+			}
+		}
+		return true
+	}
+	return isSubset(machineConfig.Annotations, UserDefinedIPsecMachineConfigAnnotation)
 }
