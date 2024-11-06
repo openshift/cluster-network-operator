@@ -25,6 +25,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/cluster-network-operator/pkg/util"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
@@ -605,7 +606,7 @@ func IsIPsecLegacyAPI(conf *operv1.OVNKubernetesConfig) bool {
 // All Other cases are not supported in pre-4.14 deployments.
 func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootstrap.BootstrapResult) (renderCNOIPsecMachineConfig, renderIPsecDaemonSet,
 	renderIPsecOVN, renderIPsecHostDaemonSet, renderIPsecContainerizedDaemonSet, renderIPsecDaemonSetAsCreateWaitOnly bool) {
-	isHypershiftHostedCluster := bootstrapResult.Infra.HostedControlPlane != nil
+	useIPsecOnContainer := bootstrapResult.Infra.HostedControlPlane != nil || platform.EWIPsecOnly
 	isIpsecUpgrade := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.LegacyIPsecUpgrade
 	isOVNIPsecActive := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.OVNIPsecActive
 
@@ -615,7 +616,7 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// change to them. So during upgrade, we must keep track if IPsec MachineConfigs are
 	// active or not for non Hybrid hosted cluster.
 	isIPsecMachineConfigActive := isIPsecMachineConfigActive(bootstrapResult.Infra)
-	isIPsecMachineConfigNotActiveOnUpgrade := isIpsecUpgrade && !isIPsecMachineConfigActive && !isHypershiftHostedCluster
+	isIPsecMachineConfigNotActiveOnUpgrade := isIpsecUpgrade && !isIPsecMachineConfigActive && !useIPsecOnContainer
 	isMachineConfigClusterOperatorReady := bootstrapResult.Infra.MachineConfigClusterOperatorReady
 	isCNOIPsecMachineConfigPresent := isCNOIPsecMachineConfigPresent(bootstrapResult.Infra)
 
@@ -628,15 +629,15 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// extensions to be active first. We must also render host ipsec deployment
 	// at the time of upgrade though user created IPsec Machine Config is not
 	// present/active.
-	renderIPsecHostDaemonSet = (renderIPsecDaemonSet && isIPsecMachineConfigActive && !isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnUpgrade
+	renderIPsecHostDaemonSet = (renderIPsecDaemonSet && isIPsecMachineConfigActive && !useIPsecOnContainer) || isIPsecMachineConfigNotActiveOnUpgrade
 
 	// The containerized ipsec deployment is only rendered during upgrades or
 	// for hypershift hosted clusters.
-	renderIPsecContainerizedDaemonSet = (renderIPsecDaemonSet && isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnUpgrade
+	renderIPsecContainerizedDaemonSet = (renderIPsecDaemonSet && useIPsecOnContainer) || isIPsecMachineConfigNotActiveOnUpgrade
 
 	// MachineConfig IPsec extensions rollout is needed for the ipsec enablement and are used in both External and Full modes.
 	// except  when the containerized deployment is used in hypershift hosted clusters.
-	renderCNOIPsecMachineConfig = (mode != operv1.IPsecModeDisabled || renderIPsecDaemonSet) && !isHypershiftHostedCluster
+	renderCNOIPsecMachineConfig = (mode != operv1.IPsecModeDisabled || renderIPsecDaemonSet) && !useIPsecOnContainer
 	// Wait for MCO to be ready unless we had already rendered the IPsec MachineConfig
 	renderCNOIPsecMachineConfig = renderCNOIPsecMachineConfig && (isCNOIPsecMachineConfigPresent || isMachineConfigClusterOperatorReady)
 
