@@ -44,8 +44,7 @@ type OVNUpdateStatus struct {
 // OVNIPsecStatus contains status of current IPsec configuration
 // in the cluster.
 type OVNIPsecStatus struct {
-	LegacyIPsecUpgrade bool // true if IPsec in 4.14 or Pre-4.14 cluster is upgraded to latest version
-	OVNIPsecActive     bool // set to true unless we are sure it is not.
+	OVNIPsecActive bool // set to true unless we are sure it is not.
 }
 
 type OVNBootstrapResult struct {
@@ -97,11 +96,11 @@ type InfraStatus struct {
 	// WorkerIPsecMachineConfigs contains ipsec machine config objects of worker nodes.
 	WorkerIPsecMachineConfigs []*mcfgv1.MachineConfig
 
-	// MasterMCPStatus contains machine config pool statuses for pools having master role.
-	MasterMCPStatuses []mcfgv1.MachineConfigPoolStatus
+	// MasterMCPs contains machine config pools having master role.
+	MasterMCPs []mcfgv1.MachineConfigPool
 
-	// WorkerMCPStatus contains machine config pool statuses for pools having worker role.
-	WorkerMCPStatuses []mcfgv1.MachineConfigPoolStatus
+	// WorkerMCPs contains machine config pools having worker role.
+	WorkerMCPs []mcfgv1.MachineConfigPool
 
 	// MachineConfigClusterOperatorReady set to true when Machine Config cluster operator is in ready state.
 	MachineConfigClusterOperatorReady bool
