@@ -12,8 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	"k8s.io/client-go/kubernetes"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -30,8 +28,8 @@ import (
 const signerName = "network.openshift.io/signer"
 
 // Add controller and start it when the Manager is started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client) error {
-	reconciler, err := newReconciler(mgr, status)
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, client cnoclient.Client) error {
+	reconciler, err := newReconciler(client, mgr, status)
 	if err != nil {
 		return err
 	}
@@ -39,13 +37,8 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.C
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager) (reconcile.Reconciler, error) {
-	// We need a clientset in order to UpdateApproval() of the CertificateSigningRequest
-	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
-	if err != nil {
-		return nil, err
-	}
-	return &ReconcileCSR{client: mgr.GetClient(), scheme: mgr.GetScheme(), status: status, clientset: clientset}, nil
+func newReconciler(client cnoclient.Client, mgr manager.Manager, status *statusmanager.StatusManager) (reconcile.Reconciler, error) {
+	return &ReconcileCSR{client: client, scheme: mgr.GetScheme(), status: status}, nil
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -82,23 +75,16 @@ var _ reconcile.Reconciler = &ReconcileCSR{}
 type ReconcileCSR struct {
 	// This client, initialized using mgr.GetClient() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client crclient.Client
+	client cnoclient.Client
 	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
-
-	// Note: We need a Clientset as the controller-runtime client does not
-	// support non-CRUD subresources (see
-	// https://github.com/kubernetes-sigs/controller-runtime/issues/452)
-	// This may risk invalidating the cache but in our case, this is not a
-	// problem as we only use this to update the approval status of the csr.
-	clientset *kubernetes.Clientset
 }
 
 // Reconcile CSR
 func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	csr := &csrv1.CertificateSigningRequest{}
-	err := r.client.Get(ctx, request.NamespacedName, csr)
+	err := r.client.Default().CRClient().Get(ctx, request.NamespacedName, csr)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -147,7 +133,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 			Reason:  "AutoApproved",
 			Message: "Automatically approved by " + signerName})
 		// Update status to "Approved"
-		_, err = r.clientset.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, request.Name, csr, metav1.UpdateOptions{})
+		_, err = r.client.Default().Kubernetes().CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, request.Name, csr, metav1.UpdateOptions{})
 		if err != nil {
 			log.Printf("Unable to approve certificate for %v and signer %v: %v", request.Name, signerName, err)
 			return reconcile.Result{}, err
@@ -162,7 +148,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 
 	// Get our CA that was created by the operatorpki.
 	caSecret := &corev1.Secret{}
-	err = r.client.Get(ctx, types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "signer-ca"}, caSecret)
+	err = r.client.Default().CRClient().Get(ctx, types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "signer-ca"}, caSecret)
 	if err != nil {
 		signerFailure(r, csr, "CAFailure",
 			fmt.Sprintf("Could not get CA certificate and key: %v", err))
@@ -212,7 +198,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 		return reconcile.Result{}, nil
 	}
 
-	err = r.client.Status().Update(ctx, csr)
+	err = r.client.Default().CRClient().Status().Update(ctx, csr)
 	if err != nil {
 		log.Printf("Unable to update signed certificate for %v and signer %v: %v", request.Name, signerName, err)
 		return reconcile.Result{}, err
@@ -224,7 +210,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 }
 
 func (r *ReconcileCSR) isValidUserName(ctx context.Context, csrUserName string) (bool, error) {
-	nodeList, err := r.clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	nodeList, err := r.client.Default().Kubernetes().CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("failed to list nodes: %v", err)
 	}
@@ -271,7 +257,7 @@ func updateCSRStatusConditions(r *ReconcileCSR, csr *csrv1.CertificateSigningReq
 		Reason:  reason,
 		Message: message})
 
-	err := r.client.Status().Update(context.TODO(), csr)
+	err := r.client.Default().CRClient().Status().Update(context.TODO(), csr)
 	if err != nil {
 		log.Printf("Could not update CSR status: %v", err)
 		r.status.SetDegraded(statusmanager.CertificateSigner, "UpdateFailure",
