@@ -138,6 +138,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	}
 
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("CustomResourceDefinition", "", "userdefinednetworks.k8s.ovn.org")), "UDN CRD should exist")
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("CustomResourceDefinition", "", "clusteruserdefinednetworks.k8s.ovn.org")), "UDN CRD should exist")
 
 	for _, obj := range objs {
 		if obj.GetKind() == "ClusterRole" && obj.GetName() == "openshift-ovn-kubernetes-control-plane-limited" {
@@ -146,23 +147,39 @@ func TestRenderOVNKubernetes(t *testing.T) {
 			expectedRules := []rbacv1.PolicyRule{
 				{
 					APIGroups: []string{"k8s.ovn.org"},
-					Resources: []string{"userdefinednetworks"},
-					Verbs:     []string{"get", "list", "watch"},
+					Resources: []string{
+						"userdefinednetworks",
+						"clusteruserdefinednetworks",
+					},
+					Verbs: []string{"get", "list", "watch"},
 				},
 				{
 					APIGroups: []string{"k8s.ovn.org"},
-					Resources: []string{"userdefinednetworks", "userdefinednetworks/status"},
-					Verbs:     []string{"patch", "update"},
+					Resources: []string{
+						"userdefinednetworks",
+						"userdefinednetworks/status",
+						"clusteruserdefinednetworks",
+						"clusteruserdefinednetworks/status",
+					},
+					Verbs: []string{"patch", "update"},
 				},
 				{
 					APIGroups: []string{"k8s.ovn.org"},
-					Resources: []string{"userdefinednetworks/finalizers"},
-					Verbs:     []string{"update"},
+					Resources: []string{
+						"userdefinednetworks/finalizers",
+						"clusteruserdefinednetworks/finalizers",
+					},
+					Verbs: []string{"update"},
 				},
 				{
 					APIGroups: []string{"k8s.cni.cncf.io"},
 					Resources: []string{"network-attachment-definitions"},
 					Verbs:     []string{"patch", "update", "create", "delete"},
+				},
+				{
+					APIGroups: []string{""},
+					Resources: []string{"namespaces"},
+					Verbs:     []string{"get", "list", "watch"},
 				},
 			}
 			g.Expect(clusterRole.Rules).To(ContainElements(expectedRules))

@@ -176,6 +176,7 @@ rules:
 - apiGroups: ["k8s.ovn.org"]
   resources:
     - userdefinednetworks
+    - clusteruserdefinednetworks
   verbs:
     - get
     - list
@@ -184,12 +185,15 @@ rules:
   resources:
     - userdefinednetworks
     - userdefinednetworks/status
+    - clusteruserdefinednetworks
+    - clusteruserdefinednetworks/status
   verbs:
     - patch
     - update
 - apiGroups: [ "k8s.ovn.org" ]
   resources:
     - userdefinednetworks/finalizers
+    - clusteruserdefinednetworks/finalizers
   verbs:
     - update
 - apiGroups: [ "k8s.cni.cncf.io" ]
@@ -200,6 +204,13 @@ rules:
     - update
     - create
     - delete
+- apiGroups: [""]
+  resources:
+    - namespaces
+  verbs:
+    - get
+    - list
+    - watch
 {{- end}}
 
 ---
