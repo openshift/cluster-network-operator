@@ -22,6 +22,10 @@ spec:
         - name: kube-multus-additional-cni-plugins
           image:  {{.MultusImage}}
           command: ["/bin/bash", "-c", "cp /entrypoint/allowlist.conf /host/etc/cni/tuning/ && touch /ready/ready && sleep INF"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 10Mi
           securityContext:
             privileged: true
           readinessProbe:
