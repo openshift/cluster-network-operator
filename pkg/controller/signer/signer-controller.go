@@ -118,6 +118,17 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 		return reconcile.Result{}, nil
 	}
 
+	isValid, err := r.isValidUserName(ctx, csr.Spec.Username)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("error occurred while validating CSR %s: %w", csr.Name, err)
+	}
+	if !isValid {
+		// Update CSR status condition with Failed condition.
+		updateCSRStatusConditions(r, csr, "CSRInvalidUser",
+			"Certificate Signing Request is set with invalid user name, can't sign it")
+		return reconcile.Result{}, nil
+	}
+
 	if len(csr.Status.Certificate) != 0 {
 		// Request already has a certificate. There is nothing
 		// to do as we will, currently, not re-certify or handle any updates to
@@ -210,6 +221,19 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 	log.Printf("Certificate signed, issued and approved for %s by %s", request.Name, signerName)
 	r.status.SetNotDegraded(statusmanager.CertificateSigner)
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileCSR) isValidUserName(ctx context.Context, csrUserName string) (bool, error) {
+	nodeList, err := r.clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("failed to list nodes: %v", err)
+	}
+	for _, node := range nodeList.Items {
+		if fmt.Sprintf("system:ovn-node:%s", node.Name) == csrUserName {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // isCertificateRequestApproved returns true if a certificate request has the
