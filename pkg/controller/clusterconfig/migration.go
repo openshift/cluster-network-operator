@@ -111,7 +111,7 @@ func (r *ReconcileClusterConfig) prepareOperatorConfigForNetworkTypeMigration(ct
 		}
 		return nil
 	}
-	if !mtuApplied && cniReady {
+	if !mtuApplied && cniReady && operConfig.Spec.DefaultNetwork.Type != operv1.NetworkType(clusterConfig.Spec.NetworkType) {
 		if isRollback {
 			klog.Infof("step-2: propagate the network type change to network.config")
 			operConfig.Spec.DefaultNetwork.Type = operv1.NetworkType(clusterConfig.Spec.NetworkType)
