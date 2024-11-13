@@ -120,11 +120,13 @@ func (r *ReconcileClusterConfig) prepareOperatorConfigForNetworkTypeMigration(ct
 		if err != nil {
 			return err
 		}
-		klog.Infof("step-2: apply routable MTU: %v", *mtuMigration.Network.To)
-		operConfig.Spec.Migration = &operv1.NetworkMigration{
-			Mode:        operv1.LiveNetworkMigrationMode,
-			NetworkType: clusterConfig.Spec.NetworkType,
-			MTU:         mtuMigration,
+		if operConfig.Spec.DefaultNetwork.Type != operv1.NetworkType(clusterConfig.Spec.NetworkType) {
+			klog.Infof("step-2: apply routable MTU: %v", *mtuMigration.Network.To)
+			operConfig.Spec.Migration = &operv1.NetworkMigration{
+				Mode:        operv1.LiveNetworkMigrationMode,
+				NetworkType: clusterConfig.Spec.NetworkType,
+				MTU:         mtuMigration,
+			}
 		}
 	}
 	return nil
