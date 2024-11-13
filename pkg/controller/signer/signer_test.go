@@ -1,14 +1,13 @@
 package signer
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"math/big"
 	"testing"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/library-go/pkg/crypto"
 	certificatev1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -75,14 +75,18 @@ func TestSigner_reconciler(t *testing.T) {
 	_, err = client.Default().Kubernetes().CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 	g.Expect(err).NotTo(HaveOccurred())
 
-	caKey, caCert, err := generateSelfSignedCACertificate()
+	ca, err := crypto.MakeSelfSignedCAConfigForDuration(signerName, 10*time.Minute)
+	g.Expect(err).NotTo(HaveOccurred())
+	certBytes := &bytes.Buffer{}
+	keyBytes := &bytes.Buffer{}
+	err = ca.WriteCertConfig(certBytes, keyBytes)
 	g.Expect(err).NotTo(HaveOccurred())
 	caSecret := &corev1.Secret{}
 	caSecret.Name = "signer-ca"
 	caSecret.Namespace = "openshift-ovn-kubernetes"
 	caSecret.Data = make(map[string][]byte)
-	caSecret.Data["tls.crt"] = []byte(caCert)
-	caSecret.Data["tls.key"] = []byte(caKey)
+	caSecret.Data["tls.crt"] = certBytes.Bytes()
+	caSecret.Data["tls.key"] = keyBytes.Bytes()
 	err = client.Default().CRClient().Create(context.TODO(), caSecret)
 	g.Expect(err).NotTo(HaveOccurred())
 
@@ -154,44 +158,6 @@ func TestSigner_reconciler_withInvalidUserName(t *testing.T) {
 	g.Expect(len(csrConditions)).To(Equal(1))
 	g.Expect(csrConditions[0].Reason).To(Equal("CSRInvalidUser"))
 	g.Expect(csrConditions[0].Type).To(Equal(certificatev1.CertificateFailed))
-}
-
-func generateSelfSignedCACertificate() (string, string, error) {
-	// Create private key.
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to generate private key: %v", err)
-	}
-	// Create a certificate template for CA certificate.
-	certTemplate := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			Organization: []string{"OpenShift"},
-			CommonName:   signerName,
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(10 * time.Minute),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-		MaxPathLen:            0,
-	}
-	// Self-sign the certificate using the private key.
-	certDER, err := x509.CreateCertificate(rand.Reader, &certTemplate, &certTemplate, &privateKey.PublicKey, privateKey)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create ca certificate: %v", err)
-	}
-	// Encode CA private key in PEM format.
-	privateKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
-	if privateKeyPEM == nil {
-		return "", "", fmt.Errorf("failed to encode private key in PEM format")
-	}
-	// Encode CA certificate in PEM format.
-	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
-	if certPEM == nil {
-		return "", "", fmt.Errorf("failed to encode certificate in PEM format")
-	}
-	return string(privateKeyPEM), string(certPEM), nil
 }
 
 func generateCSR() (string, error) {
