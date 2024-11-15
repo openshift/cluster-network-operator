@@ -310,10 +310,12 @@ infrastructures.config.openshift.io:
   Capability: ""
   Category: ""
   FeatureGates:
+  - AWSClusterHostedDNS
   - BareMetalLoadBalancer
   - GCPClusterHostedDNS
   - GCPLabelsTags
   - VSphereControlPlaneMachineSet
+  - VSphereMultiNetworks
   - VSphereMultiVCenters
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
@@ -381,7 +383,8 @@ nodes.config.openshift.io:
   CRDName: nodes.config.openshift.io
   Capability: ""
   Category: ""
-  FeatureGates: []
+  FeatureGates:
+  - MinimumKubeletVersion
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"

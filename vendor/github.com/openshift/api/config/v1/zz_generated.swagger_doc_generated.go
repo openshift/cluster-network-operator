@@ -1184,10 +1184,11 @@ func (AWSPlatformSpec) SwaggerDoc() map[string]string {
 }
 
 var map_AWSPlatformStatus = map[string]string{
-	"":                 "AWSPlatformStatus holds the current status of the Amazon Web Services infrastructure provider.",
-	"region":           "region holds the default AWS region for new AWS resources created by the cluster.",
-	"serviceEndpoints": "ServiceEndpoints list contains custom endpoints which will override default service endpoint of AWS Services. There must be only one ServiceEndpoint for a service.",
-	"resourceTags":     "resourceTags is a list of additional tags to apply to AWS resources created for the cluster. See https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html for information on tagging AWS resources. AWS supports a maximum of 50 tags per resource. OpenShift reserves 25 tags for its use, leaving 25 tags available for the user.",
+	"":                        "AWSPlatformStatus holds the current status of the Amazon Web Services infrastructure provider.",
+	"region":                  "region holds the default AWS region for new AWS resources created by the cluster.",
+	"serviceEndpoints":        "ServiceEndpoints list contains custom endpoints which will override default service endpoint of AWS Services. There must be only one ServiceEndpoint for a service.",
+	"resourceTags":            "resourceTags is a list of additional tags to apply to AWS resources created for the cluster. See https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html for information on tagging AWS resources. AWS supports a maximum of 50 tags per resource. OpenShift reserves 25 tags for its use, leaving 25 tags available for the user.",
+	"cloudLoadBalancerConfig": "cloudLoadBalancerConfig holds configuration related to DNS and cloud load balancers. It allows configuration of in-cluster DNS as an alternative to the platform default DNS implementation. When using the ClusterHosted DNS type, Load Balancer IP addresses must be provided for the API and internal API load balancers as well as the ingress load balancer.",
 }
 
 func (AWSPlatformStatus) SwaggerDoc() map[string]string {
@@ -1389,7 +1390,7 @@ var map_GCPPlatformStatus = map[string]string{
 	"region":                  "region holds the region for new GCP resources created for the cluster.",
 	"resourceLabels":          "resourceLabels is a list of additional labels to apply to GCP resources created for the cluster. See https://cloud.google.com/compute/docs/labeling-resources for information on labeling GCP resources. GCP supports a maximum of 64 labels per resource. OpenShift reserves 32 labels for internal use, allowing 32 labels for user configuration.",
 	"resourceTags":            "resourceTags is a list of additional tags to apply to GCP resources created for the cluster. See https://cloud.google.com/resource-manager/docs/tags/tags-overview for information on tagging GCP resources. GCP supports a maximum of 50 tags per resource.",
-	"cloudLoadBalancerConfig": "cloudLoadBalancerConfig is a union that contains the IP addresses of API, API-Int and Ingress Load Balancers created on the cloud platform. These values would not be populated on on-prem platforms. These Load Balancer IPs are used to configure the in-cluster DNS instances for API, API-Int and Ingress services. `dnsType` is expected to be set to `ClusterHosted` when these Load Balancer IP addresses are populated and used.",
+	"cloudLoadBalancerConfig": "cloudLoadBalancerConfig holds configuration related to DNS and cloud load balancers. It allows configuration of in-cluster DNS as an alternative to the platform default DNS implementation. When using the ClusterHosted DNS type, Load Balancer IP addresses must be provided for the API and internal API load balancers as well as the ingress load balancer.",
 }
 
 func (GCPPlatformStatus) SwaggerDoc() map[string]string {
@@ -1780,7 +1781,7 @@ func (VSpherePlatformNodeNetworkingSpec) SwaggerDoc() map[string]string {
 
 var map_VSpherePlatformSpec = map[string]string{
 	"":                     "VSpherePlatformSpec holds the desired state of the vSphere infrastructure provider. In the future the cloud provider operator, storage operator and machine operator will use these fields for configuration.",
-	"vcenters":             "vcenters holds the connection details for services to communicate with vCenter. Currently, only a single vCenter is supported.",
+	"vcenters":             "vcenters holds the connection details for services to communicate with vCenter. Currently, only a single vCenter is supported, but in tech preview 3 vCenters are supported. Once the cluster has been installed, you are unable to change the current number of defined vCenters except in the case where the cluster has been upgraded from a version of OpenShift where the vsphere platform spec was not present.  You may make modifications to the existing vCenters that are defined in the vcenters list in order to match with any added or modified failure domains.",
 	"failureDomains":       "failureDomains contains the definition of region, zone and the vCenter topology. If this is omitted failure domains (regions and zones) will not be used.",
 	"nodeNetworking":       "nodeNetworking contains the definition of internal and external network constraints for assigning the node's networking. If this field is omitted, networking defaults to the legacy address selection behavior which is to only support a single address and return the first one found.",
 	"apiServerInternalIPs": "apiServerInternalIPs are the IP addresses to contact the Kubernetes API server that can be used by components inside the cluster, like kubelets using the infrastructure rather than Kubernetes networking. These are the IPs for a self-hosted load balancer in front of the API servers. In dual stack clusters this list contains two IP addresses, one from IPv4 family and one from IPv6. In single stack clusters a single IP address is expected. When omitted, values from the status.apiServerInternalIPs will be used. Once set, the list cannot be completely removed (but its second entry can).",
@@ -1811,7 +1812,7 @@ var map_VSpherePlatformTopology = map[string]string{
 	"":               "VSpherePlatformTopology holds the required and optional vCenter objects - datacenter, computeCluster, networks, datastore and resourcePool - to provision virtual machines.",
 	"datacenter":     "datacenter is the name of vCenter datacenter in which virtual machines will be located. The maximum length of the datacenter name is 80 characters.",
 	"computeCluster": "computeCluster the absolute path of the vCenter cluster in which virtual machine will be located. The absolute path is of the form /<datacenter>/host/<cluster>. The maximum length of the path is 2048 characters.",
-	"networks":       "networks is the list of port group network names within this failure domain. Currently, we only support a single interface per RHCOS virtual machine. The available networks (port groups) can be listed using `govc ls 'network/*'` The single interface should be the absolute path of the form /<datacenter>/network/<portgroup>.",
+	"networks":       "networks is the list of port group network names within this failure domain. If feature gate VSphereMultiNetworks is enabled, up to 10 network adapters may be defined. 10 is the maximum number of virtual network devices which may be attached to a VM as defined by: https://configmax.esp.vmware.com/guest?vmwareproduct=vSphere&release=vSphere%208.0&categories=1-0 The available networks (port groups) can be listed using `govc ls 'network/*'` Networks should be in the form of an absolute path: /<datacenter>/network/<portgroup>.",
 	"datastore":      "datastore is the absolute path of the datastore in which the virtual machine is located. The absolute path is of the form /<datacenter>/datastore/<datastore> The maximum length of the path is 2048 characters.",
 	"resourcePool":   "resourcePool is the absolute path of the resource pool where virtual machines will be created. The absolute path is of the form /<datacenter>/host/<cluster>/Resources/<resourcepool>. The maximum length of the path is 2048 characters.",
 	"folder":         "folder is the absolute path of the folder where virtual machines are located. The absolute path is of the form /<datacenter>/vm/<folder>. The maximum length of the path is 2048 characters.",
@@ -2087,12 +2088,21 @@ func (NodeList) SwaggerDoc() map[string]string {
 }
 
 var map_NodeSpec = map[string]string{
-	"cgroupMode":           "CgroupMode determines the cgroups version on the node",
-	"workerLatencyProfile": "WorkerLatencyProfile determins the how fast the kubelet is updating the status and corresponding reaction of the cluster",
+	"cgroupMode":            "CgroupMode determines the cgroups version on the node",
+	"workerLatencyProfile":  "WorkerLatencyProfile determins the how fast the kubelet is updating the status and corresponding reaction of the cluster",
+	"minimumKubeletVersion": "minimumKubeletVersion is the lowest version of a kubelet that can join the cluster. Specifically, the apiserver will deny most authorization requests of kubelets that are older than the specified version, only allowing the kubelet to get and update its node object, and perform subjectaccessreviews. This means any kubelet that attempts to join the cluster will not be able to run any assigned workloads, and will eventually be marked as not ready. Its max length is 8, so maximum version allowed is either \"9.999.99\" or \"99.99.99\". Since the kubelet reports the version of the kubernetes release, not Openshift, this field references the underlying kubernetes version this version of Openshift is based off of. In other words: if an admin wishes to ensure no nodes run an older version than Openshift 4.17, then they should set the minimumKubeletVersion to 1.30.0. When comparing versions, the kubelet's version is stripped of any contents outside of major.minor.patch version. Thus, a kubelet with version \"1.0.0-ec.0\" will be compatible with minimumKubeletVersion \"1.0.0\" or earlier.",
 }
 
 func (NodeSpec) SwaggerDoc() map[string]string {
 	return map_NodeSpec
+}
+
+var map_NodeStatus = map[string]string{
+	"conditions": "conditions contain the details and the current state of the nodes.config object",
+}
+
+func (NodeStatus) SwaggerDoc() map[string]string {
+	return map_NodeStatus
 }
 
 var map_BasicAuthIdentityProvider = map[string]string{
