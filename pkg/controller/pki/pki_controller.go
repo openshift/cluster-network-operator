@@ -155,7 +155,7 @@ func newPKIReconciler(mgr manager.Manager, status *statusmanager.StatusManager, 
 
 	certDuration := 365 * 24 * time.Hour / 2
 	if featureGates.Enabled(features.FeatureShortCertRotation) {
-		certDuration = 2 * time.Hour
+		certDuration = time.Hour
 	}
 
 	return &PKIReconciler{
