@@ -40,6 +40,11 @@ spec:
         hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
         hypershift.openshift.io/control-plane: "true"
         kubernetes.io/os: "linux"
+      {{ if .HCPLabels }}
+        {{ range $key, $value := .HCPLabels }}
+        "{{$key}}": "{{$value}}"
+        {{ end }}
+      {{ end }}
     spec:
       affinity:
         nodeAffinity:
