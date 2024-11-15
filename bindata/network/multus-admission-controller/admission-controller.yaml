@@ -46,6 +46,11 @@ spec:
 {{- if .HyperShiftEnabled}}
         hypershift.openshift.io/hosted-control-plane: {{.AdmissionControllerNamespace}}
         hypershift.openshift.io/control-plane: "true"
+      {{ if .HCPLabels }}
+        {{ range $key, $value := .HCPLabels }}
+        "{{$key}}": "{{$value}}"
+        {{ end }}
+      {{ end }}
 {{- end }}
         component: network
         type: infra

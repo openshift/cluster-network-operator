@@ -95,6 +95,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		data.Data["HostedClusterNamespace"] = hcpCfg.Namespace
 		data.Data["ReleaseImage"] = hcpCfg.ReleaseImage
 		data.Data["HCPNodeSelector"] = cloudBootstrapResult.HostedControlPlane.NodeSelector
+		data.Data["HCPLabels"] = cloudBootstrapResult.HostedControlPlane.Labels
 		data.Data["HCPTolerations"] = cloudBootstrapResult.HostedControlPlane.Tolerations
 		data.Data["RunAsUser"] = hcpCfg.RunAsUser
 		// In HyperShift CloudNetworkConfigController is deployed as a part of the hosted cluster controlplane
