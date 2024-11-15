@@ -5,6 +5,9 @@ metadata:
   name: openshift-host-network
   labels:
     policy-group.network.openshift.io/host-network: ""
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
   annotations:
     openshift.io/description: "Namespace for enabling network policy specification for host network traffic. Can be used to allow access to or from host network components"
     workload.openshift.io/allowed: "management"
