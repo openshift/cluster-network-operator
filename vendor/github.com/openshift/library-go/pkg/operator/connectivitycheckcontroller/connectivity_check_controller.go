@@ -78,7 +78,10 @@ func NewConnectivityCheckController(
 	c.Controller = factory.New().
 		WithSync(c.Sync).
 		WithInformers(allTriggers...).
-		ToController("ConnectivityCheckController", recorder.WithComponentSuffix("connectivity-check-controller"))
+		ToController(
+			"ConnectivityCheckController", // don't change what is passed here unless you also remove the old FooDegraded condition
+			recorder.WithComponentSuffix("connectivity-check-controller"),
+		)
 	return c
 }
 
