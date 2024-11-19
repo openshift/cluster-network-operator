@@ -235,6 +235,7 @@ rules:
   resources:
   - ippools
   - overlappingrangeipreservations
+  - nodesliceippools
   verbs:
   - get
   - list
