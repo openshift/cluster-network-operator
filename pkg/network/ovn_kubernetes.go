@@ -291,6 +291,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["IPsecMachineConfigEnable"] = IPsecMachineConfigEnable
 	data.Data["OVNIPsecDaemonsetEnable"] = OVNIPsecDaemonsetEnable
 	data.Data["OVNIPsecEnable"] = OVNIPsecEnable
+	data.Data["OVNIPsecEncap"] = operv1.EncapsulationAuto
+	if OVNIPsecEnable && c.IPsecConfig.Full != nil {
+		data.Data["OVNIPsecEncap"] = c.IPsecConfig.Full.Encapsulation
+	}
 
 	// Set progressing to true until IPsec DaemonSet is rendered when EW IPsec config is enabled.
 	// TODO Do a poor man's job mapping machine config pool status to CNO progressing state for now.
