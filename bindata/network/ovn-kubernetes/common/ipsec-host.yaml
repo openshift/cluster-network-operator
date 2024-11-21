@@ -210,7 +210,6 @@ spec:
           #!/bin/bash
           set -exuo pipefail
 
-
           # Don't start IPsec until ovnkube-node has finished setting up the node
           counter=0
           until [ -f /etc/cni/net.d/10-ovn-kubernetes.conf ]
@@ -229,12 +228,6 @@ spec:
             echo "pluto is not running, enable the service and/or check system logs"
             exit 2
           fi
-
-          # After a restart of this container (or on initial startup), we flush xfrm state and policy
-          # before we start pluto and ovs-monitor-ipsec in order to start in a known good state. This
-          # will result in a small interruption in traffic until pluto and ovs-monitor-ipsec start again.
-          ip x s flush
-          ip x p flush
 
           # The ovs-monitor-ipsec doesn't set authby, so when it calls ipsec auto --start
           # the default ones defined at Libreswan's compile time will be used. On restart,
@@ -262,8 +255,21 @@ spec:
           EOF
           fi
 
-          # since pluto is on the host, we need to restart it after the flush
+          # since pluto is on the host, we need to restart it after changing connection
+          # parameters.
           chroot /proc/1/root ipsec restart
+
+          counter=0
+          until [ -r /run/pluto/pluto.ctl ]; do
+            counter=$((counter+1))
+            sleep 1
+            if [ $counter -gt 300 ];
+            then
+              echo "ipsec has not started after $counter seconds"
+              exit 1
+            fi
+          done
+          echo "ipsec service is restarted"
 
           # Workaround for https://github.com/libreswan/libreswan/issues/373
           ulimit -n 1024
@@ -291,8 +297,68 @@ spec:
                  - |
                    #!/bin/bash
                    set -exuo pipefail
-                   # In order to maintain traffic flows during container restart, we
-                   # need to ensure that xfrm state and policies are not flushed.
+
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+                   # When NETWORK_NODE_IDENTITY_ENABLE is true, use the per-node certificate to create a kubeconfig
+                   # that will be used to talk to the API
+
+
+                   # Wait for cert file
+                   retries=0
+                   tries=20
+                   key_cert="/etc/ovn/ovnkube-node-certs/ovnkube-client-current.pem"
+                   while [ ! -f "${key_cert}" ]; do
+                     (( retries += 1 ))
+                     if [[ "${retries}" -gt ${tries} ]]; then
+                       echo "$(date -Iseconds) - ERROR - ${key_cert} not found"
+                       return 1
+                     fi
+                     sleep 1
+                   done
+
+                   cat << EOF > /var/run/ovnkube-kubeconfig
+                   apiVersion: v1
+                   clusters:
+                     - cluster:
+                         certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                         server: {{.K8S_APISERVER}}
+                       name: default-cluster
+                   contexts:
+                     - context:
+                         cluster: default-cluster
+                         namespace: default
+                         user: default-auth
+                       name: default-context
+                   current-context: default-context
+                   kind: Config
+                   preferences: {}
+                   users:
+                     - name: default-auth
+                       user:
+                         client-certificate: /etc/ovn/ovnkube-node-certs/ovnkube-client-current.pem
+                         client-key: /etc/ovn/ovnkube-node-certs/ovnkube-client-current.pem
+                   EOF
+                   export KUBECONFIG=/var/run/ovnkube-kubeconfig
+{{ end }}
+                   # It is safe to flush xfrm states and policies and delete openshift.conf
+                   # file when east-west ipsec is disabled. This fixes a race condition when
+                   # ovs-monitor-ipsec is not fast enough to notice ipsec config change and
+                   # delete entries before it's being killed.
+                   # Since it's cleaning up all xfrm states and policies, it may cause slight
+                   # interruption until ipsec is restarted in case of external ipsec config.
+                   # We must do this before killing ovs-monitor-ipsec script, otherwise
+                   # preStop hook doesn't get a chance to run it because ovn-ipsec container
+                   # is abruptly terminated.
+                   # When east-west ipsec is not disabled, then do not flush xfrm states and
+                   # policies in order to maintain traffic flows during container restart.
+                   if [ "$(kubectl get networks.operator.openshift.io cluster -ojsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig.mode}')" != "Full" ] || \
+                      [ "$(kubectl get networks.operator.openshift.io cluster -ojsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig}')" != "{}" ]; then
+                     ip x s flush
+                     ip x p flush
+                     rm -f /etc/ipsec.d/openshift.conf
+                     # since pluto is on the host, we need to restart it after the flush
+                     chroot /proc/1/root ipsec restart
+                   fi
 
                    # Don't allow ovs monitor to cleanup persistent state
                    kill "$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)" 2>/dev/null || true
@@ -304,6 +370,10 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+        - mountPath: /etc/ovn/
+          name: etc-ovn
+{{ end }}
         # To check that network setup is complete
         - mountPath: /etc/cni/net.d
           name: host-cni-netd
