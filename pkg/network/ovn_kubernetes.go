@@ -277,6 +277,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNIPsecDaemonsetEnable"] = OVNIPsecDaemonsetEnable
 	data.Data["OVNIPsecEnable"] = OVNIPsecEnable
 	data.Data["IPsecServiceCheckOnHost"] = renderIPsecHostDaemonSet && renderIPsecContainerizedDaemonSet
+	data.Data["OVNIPsecEncap"] = operv1.EncapsulationAuto
+	if OVNIPsecEnable && c.IPsecConfig.Full != nil {
+		data.Data["OVNIPsecEncap"] = c.IPsecConfig.Full.Encapsulation
+	}
 
 	klog.V(5).Infof("IPsec: is MachineConfig enabled: %v, is East-West DaemonSet enabled: %v", data.Data["IPsecMachineConfigEnable"], data.Data["OVNIPsecDaemonsetEnable"])
 

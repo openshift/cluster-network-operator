@@ -326,8 +326,15 @@ data:
       local ipsec_encapsulation=false
 {{ if .OVNIPsecEnable }}
       ipsec=true
+      # Check for rendered IPsec encapsulation type, if it's set with "Always",
+      # then force NAT-T encapsulation option on the OVN.
+{{ if eq .OVNIPsecEncap "Always" }}
+      ipsec_encapsulation=true
+{{ end }}
       # IBMCloud does not forward ESP (IP proto 50)
       # Instead, force IBMCloud IPsec to always use NAT-T
+      # So for IBMCloud, NAT-T will be set irrespective of whatever
+      # value set in the .OVNIPsecEncap parameter.
       if [ "{{.PlatformType}}" == "IBMCloud" ]; then
         ipsec_encapsulation=true
       fi
