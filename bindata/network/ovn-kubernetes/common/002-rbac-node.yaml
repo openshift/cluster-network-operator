@@ -141,6 +141,7 @@ rules:
     - egressips
     - egressqoses
     - egressservices
+    - userdefinednetworks
   verbs:
     - get
     - list
