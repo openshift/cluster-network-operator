@@ -58,6 +58,7 @@ type HostedControlPlane struct {
 	ClusterID                    string
 	ControllerAvailabilityPolicy AvailabilityPolicy
 	NodeSelector                 map[string]string
+	Labels                       map[string]string
 	Tolerations                  []string
 	AdvertiseAddress             string
 	AdvertisePort                int
@@ -153,6 +154,11 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 	nodeSelector, _, err := unstructured.NestedStringMap(hcp.UnstructuredContent(), "spec", "nodeSelector")
 	if err != nil {
 		return nil, fmt.Errorf("failed extract nodeSelector: %v", err)
+	}
+
+	labels, _, err := unstructured.NestedStringMap(hcp.UnstructuredContent(), "spec", "labels")
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract labels: %v", err)
 	}
 
 	var tolerations []corev1.Toleration
@@ -253,6 +259,7 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 		ControllerAvailabilityPolicy: AvailabilityPolicy(controllerAvailabilityPolicy),
 		ClusterID:                    clusterID,
 		NodeSelector:                 nodeSelector,
+		Labels:                       labels,
 		Tolerations:                  tolerationsYaml,
 		AdvertiseAddress:             advertiseAddress,
 		AdvertisePort:                int(advertisePort),
