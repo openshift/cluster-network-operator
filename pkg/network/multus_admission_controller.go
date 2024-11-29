@@ -113,6 +113,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 		data.Data["ClusterIDLabel"] = hypershift.ClusterIDLabel
 		data.Data["ClusterID"] = bootstrapResult.Infra.HostedControlPlane.ClusterID
 		data.Data["HCPNodeSelector"] = bootstrapResult.Infra.HostedControlPlane.NodeSelector
+		data.Data["HCPLabels"] = bootstrapResult.Infra.HostedControlPlane.Labels
 		data.Data["HCPTolerations"] = bootstrapResult.Infra.HostedControlPlane.Tolerations
 		data.Data["PriorityClass"] = bootstrapResult.Infra.HostedControlPlane.PriorityClass
 
