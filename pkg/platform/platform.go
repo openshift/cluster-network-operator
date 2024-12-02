@@ -7,6 +7,7 @@ import (
 	"os"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
@@ -25,14 +26,20 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	MachineConfigLabelRoleKey         = "machineconfiguration.openshift.io/role"
+	MasterRoleMachineConfigLabelValue = "master"
+	WorkerRoleMachineConfigLabelValue = "worker"
+)
+
 var cloudProviderConfig = types.NamespacedName{
 	Namespace: "openshift-config-managed",
 	Name:      "kube-cloud-config",
 }
 
 var (
-	MasterRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "master"}
-	WorkerRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "worker"}
+	MasterRoleMachineConfigLabel = map[string]string{MachineConfigLabelRoleKey: MasterRoleMachineConfigLabelValue}
+	WorkerRoleMachineConfigLabel = map[string]string{MachineConfigLabelRoleKey: WorkerRoleMachineConfigLabelValue}
 	// When user deploys their own machine config for installing and configuring specific version of libreswan, then
 	// corresponding master and worker role machine configs annotation must have `user-ipsec-machine-config: true`.
 	// When CNO finds machine configs with the annotation, then it skips rendering its own IPsec machine configs
@@ -297,4 +304,45 @@ func IsUserDefinedIPsecMachineConfig(machineConfig *mcfgv1.MachineConfig) bool {
 		return true
 	}
 	return isSubset(machineConfig.Annotations, UserDefinedIPsecMachineConfigAnnotation)
+}
+
+// ContainsNetworkOwnerRef returns true if any one the given OwnerReference is owned
+// by cluster network operator, otherwise returns false
+func ContainsNetworkOwnerRef(ownerRefs []metav1.OwnerReference) bool {
+	for _, ownerRef := range ownerRefs {
+		if ownerRef.APIVersion == operv1.GroupVersion.String() && ownerRef.Kind == "Network" &&
+			(ownerRef.Controller != nil && *ownerRef.Controller) && ownerRef.Name == "cluster" {
+			return true
+		}
+	}
+	return false
+}
+
+// AreMachineConfigsRenderedOnPool returns true if machineConfigs are completely rendered on the given machine config
+// pool status, otherwise returns false.
+func AreMachineConfigsRenderedOnPool(status mcfgv1.MachineConfigPoolStatus, machineConfigs sets.Set[string]) bool {
+	checkSource := func(sourceNames sets.Set[string], machineConfigs sets.Set[string]) bool {
+		return sourceNames.IsSuperset(machineConfigs)
+	}
+	return status.MachineCount == status.UpdatedMachineCount &&
+		checkSourceInMachineConfigStatus(status, machineConfigs, checkSource)
+}
+
+// AreMachineConfigsRemovedFromPool returns true if machineConfigs are completely removed on the given machine config
+// pool status, otherwise returns false.
+func AreMachineConfigsRemovedFromPool(status mcfgv1.MachineConfigPoolStatus, machineConfigs sets.Set[string]) bool {
+	checkSource := func(sourceNames sets.Set[string], machineConfigs sets.Set[string]) bool {
+		return !sourceNames.HasAny(machineConfigs.UnsortedList()...)
+	}
+	return status.MachineCount == status.UpdatedMachineCount &&
+		checkSourceInMachineConfigStatus(status, machineConfigs, checkSource)
+}
+
+func checkSourceInMachineConfigStatus(machineConfigStatus mcfgv1.MachineConfigPoolStatus, machineConfigs sets.Set[string],
+	test func(sets.Set[string], sets.Set[string]) bool) bool {
+	sourceNames := sets.New[string]()
+	for _, source := range machineConfigStatus.Configuration.Source {
+		sourceNames.Insert(source.Name)
+	}
+	return test(sourceNames, machineConfigs)
 }
