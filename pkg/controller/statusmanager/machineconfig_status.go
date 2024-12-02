@@ -1,97 +1,139 @@
 package statusmanager
 
 import (
-	"context"
 	"fmt"
-	"log"
 
-	"github.com/openshift/cluster-network-operator/pkg/network"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 )
 
-func (status *StatusManager) SetFromMachineConfigs(ctx context.Context) {
+func (status *StatusManager) SetFromMachineConfigPool(mcPools []mcfgv1.MachineConfigPool) {
 	status.Lock()
 	defer status.Unlock()
 
-	masterMachineConfigs, err := status.networkMachineConfigs(ctx, platform.MasterRoleMachineConfigLabel)
-	if err != nil {
-		log.Printf("failed to retrieve machine configs for master role: %v", err)
+	// When network operator owned machine configs exist for master or worker role, then check
+	// its machine config pools and update network operator degraded and progressing conditions
+	// accordingly.
+	masterMCs := status.networkMachineConfigs(platform.MasterRoleMachineConfigLabelValue)
+	workerMCs := status.networkMachineConfigs(platform.WorkerRoleMachineConfigLabelValue)
+	if masterMCs != nil && masterMCs.Len() > 0 {
+		done := status.updateNetworkStatus(mcPools, platform.MasterRoleMachineConfigLabelValue, masterMCs,
+			platform.MasterRoleMachineConfigLabel, platform.AreMachineConfigsRenderedOnPool)
+		if !done {
+			return
+		}
 	}
-	workerMachineConfigs, err := status.networkMachineConfigs(ctx, platform.WorkerRoleMachineConfigLabel)
-	if err != nil {
-		log.Printf("failed to retrieve machine configs for worker role: %v", err)
+	if workerMCs != nil && workerMCs.Len() > 0 {
+		done := status.updateNetworkStatus(mcPools, platform.WorkerRoleMachineConfigLabelValue, workerMCs,
+			platform.WorkerRoleMachineConfigLabel, platform.AreMachineConfigsRenderedOnPool)
+		if !done {
+			return
+		}
 	}
-	// When both master and worker roles don't have any machine configs owned by network operator, then return now.
-	if len(masterMachineConfigs) == 0 && len(workerMachineConfigs) == 0 {
+
+	// Now it's time to check for status of deleted machine configs.
+	masterMCs = status.deletedNetworkMachineConfigs(platform.MasterRoleMachineConfigLabelValue)
+	workerMCs = status.deletedNetworkMachineConfigs(platform.WorkerRoleMachineConfigLabelValue)
+	// If no network MCs present on the deletedMachineConfigs map, then it's ok to
+	// return now with success.
+	if noNetworkMachineConfigs(masterMCs, workerMCs) {
 		status.setNotDegraded(MachineConfig)
 		status.unsetProgressing(MachineConfig)
 		return
 	}
-
-	if len(masterMachineConfigs) > 0 {
-		// Network operator owned machine configs exist for master role, check its machine config pool and update network
-		// operator degraded and progressing conditions accordingly.
-		pools, err := status.findMachineConfigPoolsForLabel(ctx, platform.MasterRoleMachineConfigLabel)
-		if err != nil {
-			log.Printf("failed to get machine config pools for the label %s: %v", platform.MasterRoleMachineConfigLabel, err)
-		}
-		degraded := status.isMachineConfigPoolDegraded(pools)
-		if degraded {
-			status.setDegraded(MachineConfig, "MachineConfig", "master role machine config pool(s) in degraded state")
+	// When Network operator owned machine configs are still getting removed from the pool, then update
+	// network operator degraded and progressing conditions accordingly.
+	if masterMCs != nil && masterMCs.Len() > 0 {
+		done := status.updateNetworkStatus(mcPools, platform.MasterRoleMachineConfigLabelValue, masterMCs,
+			platform.MasterRoleMachineConfigLabel, platform.AreMachineConfigsRemovedFromPool)
+		if !done {
 			return
 		}
-		status.setNotDegraded(MachineConfig)
-		progressing := status.isMachineConfigPoolProgressing(pools)
-		if progressing {
-			status.setProgressing(MachineConfig, "MachineConfig", "master role machine config pool(s) in progressing state")
-			return
-		}
-		for _, pool := range pools {
-			rendered := network.AreMachineConfigsRenderedOnPool(pool.Status, masterMachineConfigs)
-			if !rendered {
-				status.setProgressing(MachineConfig, "MachineConfig",
-					"master role machine config pool(s) still rendering with network operator owned machine configs")
-				return
-			}
-		}
-		status.unsetProgressing(MachineConfig)
+		delete(status.deletedMachineConfigs, platform.MasterRoleMachineConfigLabelValue)
 	}
-	if len(workerMachineConfigs) > 0 {
-		// Network operator owned machine configs exist for worker role, check its machine config pool and update network
-		// operator degraded and progressing conditions accordingly.
-		pools, err := status.findMachineConfigPoolsForLabel(ctx, platform.WorkerRoleMachineConfigLabel)
-		if err != nil {
-			log.Printf("failed to get machine config pools for the label %s: %v", platform.WorkerRoleMachineConfigLabel, err)
-		}
-		degraded := status.isMachineConfigPoolDegraded(pools)
-		if degraded {
-			status.setDegraded(MachineConfig, "MachineConfig", "worker role machine config pool(s) in degraded state")
+	if workerMCs != nil && workerMCs.Len() > 0 {
+		done := status.updateNetworkStatus(mcPools, platform.WorkerRoleMachineConfigLabelValue, workerMCs,
+			platform.WorkerRoleMachineConfigLabel, platform.AreMachineConfigsRemovedFromPool)
+		if !done {
 			return
 		}
-		status.setNotDegraded(MachineConfig)
-
-		progressing := status.isMachineConfigPoolProgressing(pools)
-		if progressing {
-			status.setProgressing(MachineConfig, "MachineConfig", "worker role machine config pool(s) in progressing state")
-			return
-		}
-		for _, pool := range pools {
-			rendered := network.AreMachineConfigsRenderedOnPool(pool.Status, workerMachineConfigs)
-			if !rendered {
-				status.setProgressing(MachineConfig, "MachineConfig",
-					"worker role machine config pool(s) still rendering with network operator owned machine configs")
-				return
-			}
-		}
-		status.unsetProgressing(MachineConfig)
+		delete(status.deletedMachineConfigs, platform.WorkerRoleMachineConfigLabelValue)
 	}
 }
 
-func (status *StatusManager) isMachineConfigPoolDegraded(pools []*mcfgv1.MachineConfigPool) bool {
+func (status *StatusManager) updateNetworkStatus(mcPools []mcfgv1.MachineConfigPool, mcRole string, machineConfigs sets.Set[string],
+	mcLabel labels.Set, test func(status mcfgv1.MachineConfigPoolStatus, machineConfigs sets.Set[string]) bool) (done bool) {
+	pools, err := status.findMachineConfigPoolsForLabel(mcPools, mcLabel)
+	if err != nil {
+		klog.Errorf("failed to get machine config pools for the label %s: %v", mcLabel, err)
+	}
+	degraded := status.isMachineConfigPoolDegraded(pools)
+	if degraded {
+		status.setDegraded(MachineConfig, "MachineConfig", fmt.Sprintf("%s role machine config pool in degraded state", mcRole))
+		return
+	}
+	status.setNotDegraded(MachineConfig)
+
+	progressing := status.isMachineConfigPoolProgressing(pools)
+	if progressing {
+		status.setProgressing(MachineConfig, "MachineConfig", fmt.Sprintf("%s role machine config pool in progressing state", mcRole))
+		return
+	}
+	for _, pool := range pools {
+		rendered := test(pool.Status, machineConfigs)
+		if !rendered {
+			status.setProgressing(MachineConfig, "MachineConfig",
+				fmt.Sprintf("%s role machine config pool is still processing with network machine config", mcRole))
+			return
+		}
+	}
+	done = true
+	status.unsetProgressing(MachineConfig)
+	return
+}
+
+func (status *StatusManager) processDeletedMachineConfig(mcName string) {
+	status.Lock()
+	defer status.Unlock()
+
+	for role, mcs := range status.availableMachineConfigs {
+		if !mcs.Has(mcName) {
+			continue
+		}
+		status.availableMachineConfigs[role].Delete(mcName)
+		if status.availableMachineConfigs[role].Len() == 0 {
+			delete(status.availableMachineConfigs, role)
+		}
+		if _, ok := status.deletedMachineConfigs[role]; !ok {
+			status.deletedMachineConfigs[role] = sets.Set[string]{}
+		}
+		status.deletedMachineConfigs[role].Insert(mcName)
+		return
+	}
+}
+
+func (status *StatusManager) processCreatedMachineConfig(mc mcfgv1.MachineConfig) {
+	// store machine config names into status.availableMachineConfigs.
+	var mcRole string
+	if role, exists := mc.Labels[platform.MachineConfigLabelRoleKey]; exists {
+		mcRole = role
+	} else {
+		klog.Errorf("machine config %s doesn't have %s label, skipping it", mc.Name, platform.MachineConfigLabelRoleKey)
+		return
+	}
+	status.Lock()
+	defer status.Unlock()
+	if _, ok := status.availableMachineConfigs[mcRole]; !ok {
+		status.availableMachineConfigs[mcRole] = sets.Set[string]{}
+	}
+	status.availableMachineConfigs[mcRole].Insert(mc.Name)
+}
+
+func (status *StatusManager) isMachineConfigPoolDegraded(pools []mcfgv1.MachineConfigPool) bool {
 	var degraded bool
 	for _, pool := range pools {
 		if pool.Spec.Paused {
@@ -106,7 +148,7 @@ func (status *StatusManager) isMachineConfigPoolDegraded(pools []*mcfgv1.Machine
 	return degraded
 }
 
-func (status *StatusManager) isMachineConfigPoolProgressing(pools []*mcfgv1.MachineConfigPool) bool {
+func (status *StatusManager) isMachineConfigPoolProgressing(pools []mcfgv1.MachineConfigPool) bool {
 	var progressing bool
 	for _, pool := range pools {
 		if pool.Spec.Paused {
@@ -121,36 +163,34 @@ func (status *StatusManager) isMachineConfigPoolProgressing(pools []*mcfgv1.Mach
 	return progressing
 }
 
-func (status *StatusManager) findMachineConfigPoolsForLabel(ctx context.Context, mcLabel labels.Set) ([]*mcfgv1.MachineConfigPool, error) {
-	mcPoolList := &mcfgv1.MachineConfigPoolList{}
-	err := status.client.Default().CRClient().List(ctx, mcPoolList, &client.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	var mcPools []*mcfgv1.MachineConfigPool
-	for i := range mcPoolList.Items {
-		mcSelector, err := metav1.LabelSelectorAsSelector(mcPoolList.Items[i].Spec.MachineConfigSelector)
+func (status *StatusManager) findMachineConfigPoolsForLabel(mcPools []mcfgv1.MachineConfigPool, mcLabel labels.Set) ([]mcfgv1.MachineConfigPool, error) {
+	var mcps []mcfgv1.MachineConfigPool
+	for _, mcPool := range mcPools {
+		mcSelector, err := metav1.LabelSelectorAsSelector(mcPool.Spec.MachineConfigSelector)
 		if err != nil {
-			return nil, fmt.Errorf("invalid machine config label selector in %s pool", mcPoolList.Items[i].Name)
+			return nil, fmt.Errorf("invalid machine config label selector in %s pool", mcPool.Name)
 		}
 		if mcSelector.Matches(mcLabel) {
-			mcPools = append(mcPools, &mcPoolList.Items[i])
+			mcps = append(mcps, mcPool)
 		}
 	}
-	return mcPools, nil
+	return mcps, nil
 }
 
-func (status *StatusManager) networkMachineConfigs(ctx context.Context, mcLabel labels.Set) ([]*mcfgv1.MachineConfig, error) {
-	mcs := &mcfgv1.MachineConfigList{}
-	err := status.client.Default().CRClient().List(ctx, mcs, &client.ListOptions{LabelSelector: mcLabel.AsSelector()})
-	if err != nil {
-		return nil, err
+func (status *StatusManager) networkMachineConfigs(role string) sets.Set[string] {
+	if mcs, ok := status.availableMachineConfigs[role]; ok {
+		return mcs
 	}
-	var machineConfigs []*mcfgv1.MachineConfig
-	for i := range mcs.Items {
-		if network.ContainsNetworkOwnerRef(mcs.Items[i].OwnerReferences) {
-			machineConfigs = append(machineConfigs, &mcs.Items[i])
-		}
+	return nil
+}
+
+func (status *StatusManager) deletedNetworkMachineConfigs(role string) sets.Set[string] {
+	if mcs, ok := status.deletedMachineConfigs[role]; ok {
+		return mcs
 	}
-	return machineConfigs, nil
+	return nil
+}
+
+func noNetworkMachineConfigs(masterMCs sets.Set[string], workerMCs sets.Set[string]) bool {
+	return (masterMCs == nil || masterMCs.Len() == 0) && (workerMCs == nil || workerMCs.Len() == 0)
 }
