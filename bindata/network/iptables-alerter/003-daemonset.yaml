@@ -35,7 +35,9 @@ spec:
       serviceAccountName: iptables-alerter
       priorityClassName: "openshift-user-critical"
       tolerations:
-      - operator: "Exists"
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
       containers:
       - name: iptables-alerter
         image: {{.CLIImage}}
