@@ -76,7 +76,7 @@ func TestRenderAdditionalNetworksCRD(t *testing.T) {
 
 	objs, err := renderAdditionalNetworksCRD(manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(objs).To(HaveLen(3))
+	g.Expect(objs).To(HaveLen(4))
 }
 
 func TestRenderRawCNIConfig(t *testing.T) {
