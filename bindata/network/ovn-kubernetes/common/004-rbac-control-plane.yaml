@@ -211,6 +211,19 @@ rules:
     - get
     - list
     - watch
+- apiGroups: ["k8s.ovn.org"]
+  resources:
+    - udnnodes
+    - userdefinednetworks/status
+  verbs:
+#TODO: Limit the permissions
+    - patch
+    - update
+    - create
+    - delete
+    - get
+    - list
+    - watch
 {{- end}}
 
 ---
