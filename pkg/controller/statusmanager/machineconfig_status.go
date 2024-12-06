@@ -20,6 +20,7 @@ func (status *StatusManager) SetFromMachineConfigPool(mcPools []mcfgv1.MachineCo
 	// accordingly.
 	masterMCs := status.networkMachineConfigs(platform.MasterRoleMachineConfigLabelValue)
 	workerMCs := status.networkMachineConfigs(platform.WorkerRoleMachineConfigLabelValue)
+	klog.Infof("available master %v and %v worker MCs", masterMCs, workerMCs)
 	if masterMCs != nil && masterMCs.Len() > 0 {
 		done := status.updateNetworkStatus(mcPools, platform.MasterRoleMachineConfigLabelValue, masterMCs,
 			platform.MasterRoleMachineConfigLabel, platform.AreMachineConfigsRenderedOnPool)
@@ -38,6 +39,7 @@ func (status *StatusManager) SetFromMachineConfigPool(mcPools []mcfgv1.MachineCo
 	// Now it's time to check for status of deleted machine configs.
 	masterMCs = status.deletedNetworkMachineConfigs(platform.MasterRoleMachineConfigLabelValue)
 	workerMCs = status.deletedNetworkMachineConfigs(platform.WorkerRoleMachineConfigLabelValue)
+	klog.Infof("deleted master %v and %v worker MCs", masterMCs, workerMCs)
 	// If no network MCs present on the deletedMachineConfigs map, then it's ok to
 	// return now with success.
 	if noNetworkMachineConfigs(masterMCs, workerMCs) {
@@ -68,10 +70,12 @@ func (status *StatusManager) SetFromMachineConfigPool(mcPools []mcfgv1.MachineCo
 func (status *StatusManager) updateNetworkStatus(mcPools []mcfgv1.MachineConfigPool, mcRole string, machineConfigs sets.Set[string],
 	mcLabel labels.Set, test func(status mcfgv1.MachineConfigPoolStatus, machineConfigs sets.Set[string]) bool) (done bool) {
 	pools, err := status.findMachineConfigPoolsForLabel(mcPools, mcLabel)
+	klog.Infof("retrieved pools %v for label %v", pools, mcLabel)
 	if err != nil {
 		klog.Errorf("failed to get machine config pools for the label %s: %v", mcLabel, err)
 	}
 	degraded := status.isMachineConfigPoolDegraded(pools)
+	klog.Infof("are pools degraded %t for label %v", degraded, mcLabel)
 	if degraded {
 		status.setDegraded(MachineConfig, "MachineConfig", fmt.Sprintf("%s role machine config pool in degraded state", mcRole))
 		return
@@ -79,12 +83,14 @@ func (status *StatusManager) updateNetworkStatus(mcPools []mcfgv1.MachineConfigP
 	status.setNotDegraded(MachineConfig)
 
 	progressing := status.isMachineConfigPoolProgressing(pools)
+	klog.Infof("are pools progressing %t for label %v", progressing, mcLabel)
 	if progressing {
 		status.setProgressing(MachineConfig, "MachineConfig", fmt.Sprintf("%s role machine config pool in progressing state", mcRole))
 		return
 	}
 	for _, pool := range pools {
 		rendered := test(pool.Status, machineConfigs)
+		klog.Infof("are pools rendered %t for label %v", rendered, mcLabel)
 		if !rendered {
 			status.setProgressing(MachineConfig, "MachineConfig",
 				fmt.Sprintf("%s role machine config pool is still processing with network machine config", mcRole))

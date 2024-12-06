@@ -59,6 +59,7 @@ func (p *MachineConfigWatcher) Reconcile(ctx context.Context, request reconcile.
 	mc := &mcfgv1.MachineConfig{}
 	err := p.cache.Get(ctx, request.NamespacedName, mc)
 	if err != nil && apierrors.IsNotFound(err) {
+		klog.Infof("reconcile deleted machine config: %v", mc.Name)
 		p.status.processDeletedMachineConfig(request.NamespacedName.Name)
 		return reconcile.Result{}, nil
 	}
@@ -66,6 +67,7 @@ func (p *MachineConfigWatcher) Reconcile(ctx context.Context, request reconcile.
 		klog.Errorf("failed to retrieve machine config: %v", err)
 		return reconcile.Result{}, nil
 	}
+	klog.Infof("reconcile created machine config: %v", mc.Name)
 	p.status.processCreatedMachineConfig(*mc)
 	return reconcile.Result{}, nil
 }
@@ -101,6 +103,7 @@ func (p *MachineConfigPoolWatcher) Reconcile(ctx context.Context, request reconc
 		klog.Errorf("failed to retrieve machine config pools: %v", err)
 		return reconcile.Result{}, nil
 	}
+	klog.Infof("reconcile machine config pools: %v", mcPools.Items)
 	p.status.SetFromMachineConfigPool(mcPools.Items)
 	return reconcile.Result{}, nil
 }
