@@ -27,9 +27,7 @@ import (
 )
 
 const (
-	MachineConfigLabelRoleKey         = "machineconfiguration.openshift.io/role"
-	MasterRoleMachineConfigLabelValue = "master"
-	WorkerRoleMachineConfigLabelValue = "worker"
+	MachineConfigLabelRoleKey = "machineconfiguration.openshift.io/role"
 )
 
 var cloudProviderConfig = types.NamespacedName{
@@ -38,8 +36,8 @@ var cloudProviderConfig = types.NamespacedName{
 }
 
 var (
-	MasterRoleMachineConfigLabel = map[string]string{MachineConfigLabelRoleKey: MasterRoleMachineConfigLabelValue}
-	WorkerRoleMachineConfigLabel = map[string]string{MachineConfigLabelRoleKey: WorkerRoleMachineConfigLabelValue}
+	MasterRoleMachineConfigLabel = map[string]string{MachineConfigLabelRoleKey: "master"}
+	WorkerRoleMachineConfigLabel = map[string]string{MachineConfigLabelRoleKey: "worker"}
 	// When user deploys their own machine config for installing and configuring specific version of libreswan, then
 	// corresponding master and worker role machine configs annotation must have `user-ipsec-machine-config: true`.
 	// When CNO finds machine configs with the annotation, then it skips rendering its own IPsec machine configs
