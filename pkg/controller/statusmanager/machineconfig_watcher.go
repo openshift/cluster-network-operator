@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/openshift/cluster-network-operator/pkg/platform"
+	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -49,24 +49,29 @@ func (s *StatusManager) AddMachineConfigWatcher(mgr manager.Manager) error {
 		return err
 	}
 
+	s.Lock()
+	defer s.Unlock()
+	if s.renderedMachineConfigs == nil {
+		s.renderedMachineConfigs, err = s.getLastRenderedMachineConfigState()
+		if err != nil {
+			return err
+		}
+	}
+
 	return c.Watch(source.Kind[crclient.Object](operatorCache, &mcfgv1.MachineConfig{},
 		&handler.EnqueueRequestForObject{}, onMachineConfigPredicate()))
 }
 
 // Reconcile triggers a re-update of Status.
-func (p *MachineConfigWatcher) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	defer utilruntime.HandleCrash(p.status.SetDegradedOnPanicAndCrash)
-	mc := &mcfgv1.MachineConfig{}
-	err := p.cache.Get(ctx, request.NamespacedName, mc)
-	if err != nil && apierrors.IsNotFound(err) {
-		p.status.processDeletedMachineConfig(request.NamespacedName.Name)
-		return reconcile.Result{}, nil
-	}
+func (m *MachineConfigWatcher) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	defer utilruntime.HandleCrash(m.status.SetDegradedOnPanicAndCrash)
+	mcPools := &mcfgv1.MachineConfigPoolList{}
+	err := m.cache.List(ctx, mcPools)
 	if err != nil {
-		klog.Errorf("failed to retrieve machine config: %v", err)
+		klog.Errorf("failed to retrieve machine config pools: %v", err)
 		return reconcile.Result{}, nil
 	}
-	p.status.processCreatedMachineConfig(*mc)
+	m.status.SetFromMachineConfigPool(mcPools.Items)
 	return reconcile.Result{}, nil
 }
 
@@ -86,6 +91,15 @@ func (s *StatusManager) AddMachineConfigPoolWatcher(mgr manager.Manager) error {
 	c, err := controller.New("machineconfigpool-watcher", mgr, controller.Options{Reconciler: pw})
 	if err != nil {
 		return err
+	}
+
+	s.Lock()
+	defer s.Unlock()
+	if s.renderedMachineConfigs == nil {
+		s.renderedMachineConfigs, err = s.getLastRenderedMachineConfigState()
+		if err != nil {
+			return err
+		}
 	}
 
 	return c.Watch(source.Kind[crclient.Object](operatorCache, &mcfgv1.MachineConfigPool{},
@@ -109,15 +123,15 @@ func onMachineConfigPredicate() predicate.Predicate {
 	return predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			mc := e.Object.(*mcfgv1.MachineConfig)
-			return platform.ContainsNetworkOwnerRef(mc.OwnerReferences)
+			return k8s.ContainsNetworkOwnerRef(mc.OwnerReferences)
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			mc := e.ObjectNew.(*mcfgv1.MachineConfig)
-			return platform.ContainsNetworkOwnerRef(mc.OwnerReferences)
+			return k8s.ContainsNetworkOwnerRef(mc.OwnerReferences)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			mc := e.Object.(*mcfgv1.MachineConfig)
-			return platform.ContainsNetworkOwnerRef(mc.OwnerReferences)
+			return k8s.ContainsNetworkOwnerRef(mc.OwnerReferences)
 		},
 	}
 }
