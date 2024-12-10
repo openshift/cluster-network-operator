@@ -33,7 +33,7 @@ import (
 	cnofake "github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/platform"
+	mcutil "github.com/openshift/cluster-network-operator/pkg/util/machineconfig"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
@@ -3295,10 +3295,10 @@ func TestRenderOVNKubernetesEnableIPsecWithUserInstalledIPsecMachineConfigs(t *t
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
-	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Annotations = platform.UserDefinedIPsecMachineConfigAnnotation
+	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Annotations = mcutil.UserDefinedIPsecMachineConfigAnnotation
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
-	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Annotations = platform.UserDefinedIPsecMachineConfigAnnotation
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Annotations = mcutil.UserDefinedIPsecMachineConfigAnnotation
 
 	// Step 1: Check renderOVNKubernetes behavior when user defined machine configs are in rolling out stage.
 	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 0, UpdatedMachineCount: 0,
@@ -3435,10 +3435,10 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
-	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Annotations = platform.UserDefinedIPsecMachineConfigAnnotation
+	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Annotations = mcutil.UserDefinedIPsecMachineConfigAnnotation
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
-	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Annotations = platform.UserDefinedIPsecMachineConfigAnnotation
+	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Annotations = mcutil.UserDefinedIPsecMachineConfigAnnotation
 	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
