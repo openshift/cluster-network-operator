@@ -332,6 +332,13 @@ data:
         ipsec_encapsulation=true
       fi
 {{ end }}
+
+{{ if eq .OVNIPsecEncap "Force" }}
+      ipsec_encapsulation=true
+{{ else if eq .OVNIPsecEncap "Disable" }}
+      ipsec_encapsulation=false
+{{ end }}
+
       IPSEC_OPTION="ipsec=${ipsec} options:ipsec_encapsulation=${ipsec_encapsulation}"
 
       # set all the NB_GLOBAL options
