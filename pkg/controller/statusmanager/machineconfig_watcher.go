@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/openshift/cluster-network-operator/pkg/platform"
+	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,15 +110,15 @@ func onMachineConfigPredicate() predicate.Predicate {
 	return predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			mc := e.Object.(*mcfgv1.MachineConfig)
-			return platform.ContainsNetworkOwnerRef(mc.OwnerReferences)
+			return k8s.ContainsNetworkOwnerRef(mc.OwnerReferences)
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			mc := e.ObjectNew.(*mcfgv1.MachineConfig)
-			return platform.ContainsNetworkOwnerRef(mc.OwnerReferences)
+			return k8s.ContainsNetworkOwnerRef(mc.OwnerReferences)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			mc := e.Object.(*mcfgv1.MachineConfig)
-			return platform.ContainsNetworkOwnerRef(mc.OwnerReferences)
+			return k8s.ContainsNetworkOwnerRef(mc.OwnerReferences)
 		},
 	}
 }

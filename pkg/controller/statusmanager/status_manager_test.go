@@ -49,6 +49,17 @@ func getCO(client cnoclient.Client, name string) (*configv1.ClusterOperator, err
 	return co, err
 }
 
+func setCO(t *testing.T, client cnoclient.Client, name string) {
+	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	err := client.ClientFor("").CRClient().Update(context.TODO(), co)
+	if apierrors.IsNotFound(err) {
+		err = client.ClientFor("").CRClient().Create(context.TODO(), co)
+	}
+	if err != nil {
+		t.Fatalf("Failed to set: %v", err)
+	}
+}
+
 func getOC(client cnoclient.Client) (*operv1.Network, error) {
 	return client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OPERATOR_CONFIG, metav1.GetOptions{})
 }
@@ -422,6 +433,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		Spec: operv1.NetworkSpec{DefaultNetwork: operv1.DefaultNetworkDefinition{
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}}}}}
 	setOC(t, client, no)
+	setCO(t, client, "testing")
 
 	mcPools := []mcfgv1.MachineConfigPool{}
 	status.SetFromMachineConfigPool(mcPools)
@@ -454,6 +466,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		Labels:          platform.MasterRoleMachineConfigLabel,
 		OwnerReferences: networkOwnerRef()},
 		Spec: mcfgv1.MachineConfigSpec{Extensions: []string{"ipsec"}}}
+	status.SetMachineConfigs([]mcfgv1.MachineConfig{masterIPsecMachineConfig})
 	status.processCreatedMachineConfig(masterIPsecMachineConfig)
 
 	masterIPsecmachineConfigPool := mcfgv1.MachineConfigPool{ObjectMeta: metav1.ObjectMeta{Name: "master"},
@@ -492,6 +505,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		Labels:          platform.WorkerRoleMachineConfigLabel,
 		OwnerReferences: networkOwnerRef()},
 		Spec: mcfgv1.MachineConfigSpec{Extensions: []string{"ipsec"}}}
+	status.SetMachineConfigs([]mcfgv1.MachineConfig{masterIPsecMachineConfig, workerIPsecMachineConfig})
 	status.processCreatedMachineConfig(workerIPsecMachineConfig)
 
 	workerIPsecMachineConfigPool := mcfgv1.MachineConfigPool{ObjectMeta: metav1.ObjectMeta{Name: "worker"},
@@ -569,6 +583,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 
 	// Remove worker machine configs and check network operator status condition is updated
 	// accordingly.
+	status.SetMachineConfigs([]mcfgv1.MachineConfig{masterIPsecMachineConfig})
 	status.processDeletedMachineConfig(workerIPsecMachineConfig.Name)
 	// No updated to worker machine config pool, so status condition moving into
 	// progressing state.
@@ -619,6 +634,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	}
 	// Remove master machine config, set master mcp into degraded state, check network operator
 	// status condition is updated accordingly.
+	status.SetMachineConfigs([]mcfgv1.MachineConfig{})
 	status.processDeletedMachineConfig(masterIPsecMachineConfig.Name)
 	masterIPsecmachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{Conditions: []mcfgv1.MachineConfigPoolCondition{{Type: mcfgv1.MachineConfigPoolDegraded,
 		Status: v1.ConditionTrue}}, Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
