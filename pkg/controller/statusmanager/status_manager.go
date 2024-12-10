@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
@@ -104,11 +105,10 @@ type StatusManager struct {
 
 	relatedObjects []configv1.ObjectReference
 
-	// local cache to store deployed network operator machine configs.
-	availableMachineConfigs map[string]sets.Set[string]
-	// local cache to store deleted network operator machine configs and
-	// not yet removed from corresponding machine config pool.
-	deletedMachineConfigs map[string]sets.Set[string]
+	// local cache to store rendered network operator machine configs.
+	renderedMachineConfigs map[string]sets.Set[string]
+	// local cache to store network operator machine configs being deleted.
+	machineConfigsBeingRemoved map[string]sets.Set[string]
 
 	// used only for upgrades from <=4.13 to 4.14 with ovn-kubernetes
 	// TODO: remove in 4.15
@@ -121,14 +121,13 @@ func New(client cnoclient.Client, name, cluster string) *StatusManager {
 		name:             name,
 		hyperShiftConfig: hypershift.NewHyperShiftConfig(),
 
-		dsInformers:             map[string]cache.SharedIndexInformer{},
-		dsListers:               map[string]DaemonSetLister{},
-		depInformers:            map[string]cache.SharedIndexInformer{},
-		depListers:              map[string]DeploymentLister{},
-		ssInformers:             map[string]cache.SharedIndexInformer{},
-		ssListers:               map[string]StatefulSetLister{},
-		availableMachineConfigs: map[string]sets.Set[string]{},
-		deletedMachineConfigs:   map[string]sets.Set[string]{},
+		dsInformers:                map[string]cache.SharedIndexInformer{},
+		dsListers:                  map[string]DaemonSetLister{},
+		depInformers:               map[string]cache.SharedIndexInformer{},
+		depListers:                 map[string]DeploymentLister{},
+		ssInformers:                map[string]cache.SharedIndexInformer{},
+		ssListers:                  map[string]StatefulSetLister{},
+		machineConfigsBeingRemoved: map[string]sets.Set[string]{},
 	}
 	var err error
 	status.labelSelector, err = labels.Parse(fmt.Sprintf("%s==%s", names.GenerateStatusLabel, cluster))

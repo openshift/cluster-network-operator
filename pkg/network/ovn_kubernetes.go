@@ -41,11 +41,11 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/cluster-network-operator/pkg/util"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
+	mcutil "github.com/openshift/cluster-network-operator/pkg/util/machineconfig"
 )
 
 const CLUSTER_CONFIG_NAME = "cluster-config-v1"
@@ -1445,7 +1445,7 @@ func shouldUpdateOVNKonPrepull(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 func isCNOIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
 	isCNOIPsecMachineConfigPresentIn := func(mcs []*mcfgv1.MachineConfig) bool {
 		for _, mc := range mcs {
-			if platform.ContainsNetworkOwnerRef(mc.OwnerReferences) {
+			if k8s.ContainsNetworkOwnerRef(mc.OwnerReferences) {
 				return true
 			}
 		}
@@ -1460,7 +1460,7 @@ func isCNOIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
 func isUserDefinedIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
 	isUserDefinedMachineConfigPresentIn := func(mcs []*mcfgv1.MachineConfig) bool {
 		for _, mc := range mcs {
-			if platform.IsUserDefinedIPsecMachineConfig(mc) {
+			if mcutil.IsUserDefinedIPsecMachineConfig(mc) {
 				return true
 			}
 		}
@@ -1486,7 +1486,7 @@ func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
 		masterIPsecMachineConfigNames.Insert(machineConfig.Name)
 	}
 	for _, masterMCPStatus := range infra.MasterMCPStatuses {
-		if !platform.AreMachineConfigsRenderedOnPool(masterMCPStatus, masterIPsecMachineConfigNames) {
+		if !mcutil.AreMachineConfigsRenderedOnPool(masterMCPStatus, masterIPsecMachineConfigNames) {
 			return false
 		}
 	}
@@ -1495,7 +1495,7 @@ func isIPsecMachineConfigActive(infra bootstrap.InfraStatus) bool {
 		workerIPsecMachineConfigNames.Insert(machineConfig.Name)
 	}
 	for _, workerMCPStatus := range infra.WorkerMCPStatuses {
-		if !platform.AreMachineConfigsRenderedOnPool(workerMCPStatus, workerIPsecMachineConfigNames) {
+		if !mcutil.AreMachineConfigsRenderedOnPool(workerMCPStatus, workerIPsecMachineConfigNames) {
 			return false
 		}
 	}
