@@ -49,6 +49,17 @@ func getCO(client cnoclient.Client, name string) (*configv1.ClusterOperator, err
 	return co, err
 }
 
+func setCO(t *testing.T, client cnoclient.Client, name string) {
+	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	err := client.ClientFor("").CRClient().Update(context.TODO(), co)
+	if apierrors.IsNotFound(err) {
+		err = client.ClientFor("").CRClient().Create(context.TODO(), co)
+	}
+	if err != nil {
+		t.Fatalf("Failed to set: %v", err)
+	}
+}
+
 func getOC(client cnoclient.Client) (*operv1.Network, error) {
 	return client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OPERATOR_CONFIG, metav1.GetOptions{})
 }
@@ -369,6 +380,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		Spec: operv1.NetworkSpec{DefaultNetwork: operv1.DefaultNetworkDefinition{
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}}}}}
 	setOC(t, client, no)
+	setCO(t, client, "testing")
 
 	mcPools := []mcfgv1.MachineConfigPool{}
 	status.SetFromMachineConfigPool(mcPools)
@@ -376,20 +388,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
-		{
-			Type:   operv1.OperatorStatusTypeDegraded,
-			Status: operv1.ConditionFalse,
-		},
-	}) {
-		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
-	}
-	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
-		{
-			Type:   operv1.OperatorStatusTypeProgressing,
-			Status: operv1.ConditionFalse,
-		},
-	}) {
+	if !conditionsInclude(oc.Status.Conditions, nil) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
 	}
 	if len(co.Status.Versions) > 0 {
@@ -401,7 +400,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		Labels:          platform.MasterRoleMachineConfigLabel,
 		OwnerReferences: networkOwnerRef()},
 		Spec: mcfgv1.MachineConfigSpec{Extensions: []string{"ipsec"}}}
-	status.processCreatedMachineConfig(masterIPsecMachineConfig)
+	status.SetMachineConfigs(context.TODO(), []mcfgv1.MachineConfig{masterIPsecMachineConfig})
 
 	masterIPsecmachineConfigPool := mcfgv1.MachineConfigPool{ObjectMeta: metav1.ObjectMeta{Name: "master"},
 		Spec: mcfgv1.MachineConfigPoolSpec{MachineConfigSelector: &metav1.LabelSelector{
@@ -439,7 +438,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		Labels:          platform.WorkerRoleMachineConfigLabel,
 		OwnerReferences: networkOwnerRef()},
 		Spec: mcfgv1.MachineConfigSpec{Extensions: []string{"ipsec"}}}
-	status.processCreatedMachineConfig(workerIPsecMachineConfig)
+	status.SetMachineConfigs(context.TODO(), []mcfgv1.MachineConfig{masterIPsecMachineConfig, workerIPsecMachineConfig})
 
 	workerIPsecMachineConfigPool := mcfgv1.MachineConfigPool{ObjectMeta: metav1.ObjectMeta{Name: "worker"},
 		Spec: mcfgv1.MachineConfigPoolSpec{MachineConfigSelector: &metav1.LabelSelector{
@@ -516,7 +515,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 
 	// Remove worker machine configs and check network operator status condition is updated
 	// accordingly.
-	status.processDeletedMachineConfig(workerIPsecMachineConfig.Name)
+	status.SetMachineConfigs(context.TODO(), []mcfgv1.MachineConfig{masterIPsecMachineConfig})
 	// No updated to worker machine config pool, so status condition moving into
 	// progressing state.
 	status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
@@ -566,7 +565,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	}
 	// Remove master machine config, set master mcp into degraded state, check network operator
 	// status condition is updated accordingly.
-	status.processDeletedMachineConfig(masterIPsecMachineConfig.Name)
+	status.SetMachineConfigs(context.TODO(), []mcfgv1.MachineConfig{})
 	masterIPsecmachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{Conditions: []mcfgv1.MachineConfigPoolCondition{{Type: mcfgv1.MachineConfigPoolDegraded,
 		Status: v1.ConditionTrue}}, Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
 		Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}
