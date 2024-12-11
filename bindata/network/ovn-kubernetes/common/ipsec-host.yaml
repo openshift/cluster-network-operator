@@ -236,6 +236,18 @@ spec:
           ip x s flush
           ip x p flush
 
+          # The ovs-monitor-ipsec doesn't set authby, so when it calls ipsec auto --start
+          # the default ones defined at Libreswan's compile time will be used. On restart,
+          # Libreswan will use authby from libreswan.config. If libreswan.config is
+          # incompatible with the Libreswan's compiled-in defaults, then we'll have an
+          # authentication problem. But OTOH, ovs-monitor-ipsec does set ike and esp algorithms,
+          # so those may be incompatible with libreswan.config as well. Hence commenting out the
+          # "include" from libreswan.conf to avoid such conflicts.
+          defaultcpinclude="include \/etc\/crypto-policies\/back-ends\/libreswan.config"
+          if ! grep -q "# ${defaultcpinclude}" /etc/ipsec.conf; then
+            sed -i "/${defaultcpinclude}/s/^/# /" /etc/ipsec.conf
+          fi
+
           # Use /etc/ipsec.d/cno.conf file to write our own default IPsec connection parameters.
           # The /etc/ipsec.d/openshift.conf file can not be used because it is managed by openvswitch.
           touch /etc/ipsec.d/cno.conf
