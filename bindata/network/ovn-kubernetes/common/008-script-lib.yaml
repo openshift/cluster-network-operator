@@ -667,5 +667,6 @@ data:
         ${ovn_v4_masquerade_subnet_opt} \
         ${ovn_v6_masquerade_subnet_opt} \
         ${ovn_v4_transit_switch_subnet_opt} \
-        ${ovn_v6_transit_switch_subnet_opt}
+        ${ovn_v6_transit_switch_subnet_opt} \
+        --disable-udn-host-isolation
     }
