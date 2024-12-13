@@ -280,6 +280,7 @@ enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
 udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+namespaces-for-inter-network-service-access="openshift-ingress"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -322,6 +323,7 @@ enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
 udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+namespaces-for-inter-network-service-access="openshift-ingress"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -378,6 +380,7 @@ enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
 udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+namespaces-for-inter-network-service-access="openshift-ingress"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -437,6 +440,7 @@ enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
 udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+namespaces-for-inter-network-service-access="openshift-ingress"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -496,6 +500,7 @@ enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
 udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+namespaces-for-inter-network-service-access="openshift-ingress"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -554,6 +559,7 @@ enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
 udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+namespaces-for-inter-network-service-access="openshift-ingress"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -602,6 +608,7 @@ enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
 udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+namespaces-for-inter-network-service-access="openshift-ingress"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -652,6 +659,7 @@ enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=false
 udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+namespaces-for-inter-network-service-access="openshift-ingress"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -695,6 +703,7 @@ enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
 udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+namespaces-for-inter-network-service-access="openshift-ingress"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -738,6 +747,7 @@ enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
 udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+namespaces-for-inter-network-service-access="openshift-ingress"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -785,6 +795,7 @@ enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
 udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+namespaces-for-inter-network-service-access="openshift-ingress"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -829,6 +840,7 @@ enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
 udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+namespaces-for-inter-network-service-access="openshift-ingress"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
@@ -874,6 +886,7 @@ enable-lflow-cache=true
 lflow-cache-limit-kb=1048576
 enable-udp-aggregation=true
 udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+namespaces-for-inter-network-service-access="openshift-ingress"
 
 [kubernetes]
 service-cidrs="172.30.0.0/16"
