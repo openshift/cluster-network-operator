@@ -287,7 +287,7 @@ spec:
           mountPropagation: HostToContainer
         - name: hostroot
           mountPath: /hostroot
-          mountPropagation: HostToContainer
+          mountPropagation: Bidirectional
         - name: multus-conf-dir
           mountPath: /etc/cni/multus/net.d
         - name: multus-daemon-config
