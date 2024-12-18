@@ -8,7 +8,15 @@ metadata:
 spec:
   config:
     ignition:
-      version: 3.2.0
+      version: 3.4.0
+    storage:
+      files:
+        - contents:
+            compression: gzip
+            source: data:;base64,H4sIAAAAAAAC/3xTQU/bTBC976947OdPDpDEkFMllENaIoHEoVKiXpIQbexxvMLsGs+EUJX+98p2oHZbIp92dubNe89v/zuJNtZFG8OZYhIMXpSyKRY4wYCgI5I4sgVTPEwiX5DjzKYyjL1LNVZXkIycAujFCi5UauvhE2xLKjB4gjY78WMWU4rGEax3IKYEA4swuh+exd45+Gc3PAsiswSA32jhMbSaR2zkaI+Ks9J7QVSUPo4uo/pQ96KkeodSYh/J72R8+elCUW4KpmR8oRJiW1JS0RtrrarmTW45o4RNVVD7zOaExQLBYQiDXBAc0LBaXSHxCmgDBb3GsynC+yXX2pd8flQmXg8+PyP8P6HU7HIJ8Qqzf0D4oyitEwSjn1VJSoTVt3TViX0ph2JVCBGeVv+woyPoNV5w5vcsRojf1s3mk/l0/W20ns7mk893t7Ob6fX6y83t3fV6Nnnn5BHqxb1enel6IyUIOdJRtP2Qzs7Zp79Z1VnUQcsqjfEYOujQbWcRoDjz0LdfK/6zCcOU1FaH1Jdv3qNCpFisd6zr4U1J5qGyI2f6EM156SB+J+ljb6xYt21gOCcqMOL6kNoasAlQ0Ou9xeIco9NTlXhHzaNrJ2ZL3cT8oW5uHylBdXlY2wf7R2rr+RfTfkc4o21svyPpcN+1uXnhTTDEyI7VrwAAAP//g8OXdUAEAAA=
+          mode: 480
+          overwrite: true
+          path: /usr/local/bin/ipsec-connect-wait.sh
     systemd:
       units:
       - name: ipsecenabler.service
@@ -22,6 +30,7 @@ spec:
          Type=oneshot
          ExecStartPre=rm -f /etc/ipsec.d/cno.conf
          ExecStart=systemctl enable --now ipsec.service
+         ExecStartPost=/usr/local/bin/ipsec-connect-wait.sh
 
          [Install]
          WantedBy=multi-user.target
