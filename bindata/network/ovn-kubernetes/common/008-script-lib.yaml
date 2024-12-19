@@ -552,6 +552,11 @@ data:
         multi_network_enabled_flag="--enable-multi-network"
         network_segmentation_enabled_flag="--enable-network-segmentation"
       fi
+      
+      route_advertisements_enable_flag=
+      if [[ "{{.OVN_ROUTE_ADVERTISEMENTS_ENABLE}}" == "true" ]]; then
+        route_advertisements_enable_flag="--enable-route-advertisements"
+      fi
 
       network_observability_enabled_flag=
       if [[ "{{.OVN_OBSERVABILITY_ENABLE}}" == "true" ]]; then
@@ -645,6 +650,7 @@ data:
         ${export_network_flows_flags} \
         ${multi_network_enabled_flag} \
         ${network_segmentation_enabled_flag} \
+        ${route_advertisements_enable_flag} \
         ${multi_network_policy_enabled_flag} \
         ${admin_network_policy_enabled_flag} \
         ${dns_name_resolver_enabled_flag} \
