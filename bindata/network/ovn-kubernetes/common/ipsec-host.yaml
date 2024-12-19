@@ -407,7 +407,7 @@ spec:
           # When east-west ipsec is not disabled, then do not flush xfrm states and
           # policies in order to maintain traffic flows during container restart.
           ipsecflush() {
-            if [ "$(kubectl get networks.operator.openshift.io cluster -ojsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig.mode}')" != "Full" ] || \
+            if [ "$(kubectl get networks.operator.openshift.io cluster -ojsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig.mode}')" != "Full" ] && \
                [ "$(kubectl get networks.operator.openshift.io cluster -ojsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig}')" != "{}" ]; then
               ip x s flush
               ip x p flush
