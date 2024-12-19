@@ -18,7 +18,15 @@ storage:
           exit 0
         fi
 
-        timeout=120
+        if ! grep -q "auto=start" /etc/ipsec.d/openshift.conf; then
+          sed -i '/^.*conn ovn.*$/a\    auto=start' /etc/ipsec.d/openshift.conf
+        fi
+
+        cat /etc/ipsec.d/openshift.conf
+
+        chroot /proc/1/root ipsec restart
+
+        timeout=180
         elapsed=0
         desiredconn=""
         establishedsa=""
@@ -39,6 +47,8 @@ storage:
         if [[ $elapsed -ge $timeout ]]; then
             echo "Timed out waiting, some connections are not established, desired conns $desiredconn, established conns $establishedsa"
         fi
+
+        ipsec status
 systemd:
   units:
   - name: ipsecenabler.service
