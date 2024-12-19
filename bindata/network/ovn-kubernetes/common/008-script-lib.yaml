@@ -584,6 +584,15 @@ data:
         ovn_v6_join_subnet_opt="--gateway-v6-join-subnet {{.V6JoinSubnet}}"
       fi
 
+      ovn_v4_transit_switch_subnet_opt=
+      if [[ "{{.V4TransitSwitchSubnet}}" != "" ]]; then
+        ovn_v4_transit_switch_subnet_opt="--cluster-manager-v4-transit-switch-subnet {{.V4TransitSwitchSubnet}}"
+      fi
+      ovn_v6_transit_switch_subnet_opt=
+      if [[ "{{.V6TransitSwitchSubnet}}" != "" ]]; then
+        ovn_v6_transit_switch_subnet_opt="--cluster-manager-v6-transit-switch-subnet {{.V6TransitSwitchSubnet}}"
+      fi
+
       exec /usr/bin/ovnkube \
         --init-ovnkube-controller "${K8S_NODE}" \
         --init-node "${K8S_NODE}" \
@@ -615,5 +624,7 @@ data:
         ${ip_forwarding_flag} \
         ${NETWORK_NODE_IDENTITY_ENABLE} \
         ${ovn_v4_join_subnet_opt} \
-        ${ovn_v6_join_subnet_opt}
+        ${ovn_v6_join_subnet_opt} \
+        ${ovn_v4_transit_switch_subnet_opt} \
+        ${ovn_v6_transit_switch_subnet_opt}
     }
