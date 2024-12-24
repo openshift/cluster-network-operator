@@ -140,6 +140,10 @@ func TestPrepareOperatorConfigForNetworkTypeMigration(t *testing.T) {
 					DefaultNetwork: operv1.DefaultNetworkDefinition{
 						Type: "OpenShiftSDN",
 					},
+					Migration: &operv1.NetworkMigration{
+						NetworkType: "OVNKubernetes",
+						Mode:        operv1.LiveNetworkMigrationMode,
+					},
 				},
 			},
 			&operv1.Network{
@@ -191,7 +195,11 @@ func TestPrepareOperatorConfigForNetworkTypeMigration(t *testing.T) {
 				},
 				Spec: operv1.NetworkSpec{
 					DefaultNetwork: operv1.DefaultNetworkDefinition{
-						Type: "OpenShiftSDN",
+						Type: "OVNKubernetes",
+					},
+					Migration: &operv1.NetworkMigration{
+						NetworkType: "OpenShiftSDN",
+						Mode:        operv1.LiveNetworkMigrationMode,
 					},
 				},
 			},
@@ -244,7 +252,7 @@ func TestPrepareOperatorConfigForNetworkTypeMigration(t *testing.T) {
 				},
 				Spec: operv1.NetworkSpec{
 					DefaultNetwork: operv1.DefaultNetworkDefinition{
-						Type: "OVNKubernetes",
+						Type: "OpenShiftSDN",
 					},
 					Migration: &operv1.NetworkMigration{
 						NetworkType: "OVNKubernetes",
@@ -271,54 +279,6 @@ func TestPrepareOperatorConfigForNetworkTypeMigration(t *testing.T) {
 					},
 					Migration: &operv1.NetworkMigration{
 						NetworkType: "OVNKubernetes",
-						Mode:        operv1.LiveNetworkMigrationMode,
-					},
-				},
-			},
-		),
-
-		generateTest(
-			"The target CNI is in use, remove routable MTU",
-			&configv1.Network{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cluster",
-					Annotations: map[string]string{
-						names.NetworkTypeMigrationAnnotation: "",
-					},
-				},
-				Spec: configv1.NetworkSpec{
-					NetworkType: "OpenShiftSDN",
-				},
-				Status: configv1.NetworkStatus{
-					NetworkType:       "OVNKubernetes",
-					ClusterNetworkMTU: 1450,
-					Conditions:        generateStatusConditions(metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionFalse, metav1.ConditionFalse),
-				},
-			},
-			&operv1.Network{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cluster",
-				},
-				Spec: operv1.NetworkSpec{
-					DefaultNetwork: operv1.DefaultNetworkDefinition{
-						Type: "OpenShiftSDN",
-					},
-					Migration: &operv1.NetworkMigration{
-						NetworkType: "OpenShiftSDN",
-						Mode:        operv1.LiveNetworkMigrationMode,
-					},
-				},
-			},
-			&operv1.Network{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cluster",
-				},
-				Spec: operv1.NetworkSpec{
-					DefaultNetwork: operv1.DefaultNetworkDefinition{
-						Type: "OpenShiftSDN",
-					},
-					Migration: &operv1.NetworkMigration{
-						NetworkType: "OpenShiftSDN",
 						Mode:        operv1.LiveNetworkMigrationMode,
 					},
 				},
@@ -430,6 +390,58 @@ func TestPrepareOperatorConfigForNetworkTypeMigration(t *testing.T) {
 								To: &hostMTU,
 							},
 						},
+					},
+				},
+			},
+		),
+
+		generateTest(
+			"Not switch from step-3 to step-2 when both NetworkTypeMigrationTargetCNIInUse and NetworkTypeMigrationMTUReady are false with reason MachineConfigNotApplied",
+			&configv1.Network{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+					Annotations: map[string]string{
+						names.NetworkTypeMigrationAnnotation: "",
+					},
+				},
+				Spec: configv1.NetworkSpec{
+					NetworkType: "OVNKubernetes",
+				},
+				Status: configv1.NetworkStatus{
+					NetworkType:       "OpenShiftSDN",
+					ClusterNetworkMTU: 1450,
+					Conditions: withCondition(generateStatusConditions(metav1.ConditionTrue, metav1.ConditionTrue, metav1.ConditionFalse, metav1.ConditionFalse, metav1.ConditionFalse), &metav1.Condition{
+						Type:   names.NetworkTypeMigrationMTUReady,
+						Status: "False",
+						Reason: "MachineConfigNotApplied",
+					}),
+				},
+			},
+			&operv1.Network{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Spec: operv1.NetworkSpec{
+					DefaultNetwork: operv1.DefaultNetworkDefinition{
+						Type: "OVNKubernetes",
+					},
+					Migration: &operv1.NetworkMigration{
+						NetworkType: "OVNKubernetes",
+						Mode:        operv1.LiveNetworkMigrationMode,
+					},
+				},
+			},
+			&operv1.Network{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Spec: operv1.NetworkSpec{
+					DefaultNetwork: operv1.DefaultNetworkDefinition{
+						Type: "OVNKubernetes",
+					},
+					Migration: &operv1.NetworkMigration{
+						NetworkType: "OVNKubernetes",
+						Mode:        operv1.LiveNetworkMigrationMode,
 					},
 				},
 			},
