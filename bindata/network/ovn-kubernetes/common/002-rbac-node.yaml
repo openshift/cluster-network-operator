@@ -127,6 +127,7 @@ rules:
     - create
     - get
     - list
+    - watch
 - apiGroups: ["security.openshift.io"]
   resources:
   - securitycontextconstraints
