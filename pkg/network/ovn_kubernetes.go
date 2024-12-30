@@ -83,10 +83,16 @@ var OVN_MASTER_DISCOVERY_TIMEOUT = 250
 
 const (
 	// TODO: get this from the route Status
-	OVN_SB_DB_ROUTE_PORT       = "443"
-	OVN_SB_DB_ROUTE_LOCAL_PORT = "9645"
-	OVSFlowsConfigMapName      = "ovs-flows-config"
-	OVSFlowsConfigNamespace    = names.APPLIED_NAMESPACE
+	OVN_SB_DB_ROUTE_PORT         = "443"
+	OVN_SB_DB_ROUTE_LOCAL_PORT   = "9645"
+	OVSFlowsConfigMapName        = "ovs-flows-config"
+	OVSFlowsConfigNamespace      = names.APPLIED_NAMESPACE
+	defaultV4InternalSubnet      = "100.64.0.0/16"
+	defaultV6InternalSubnet      = "fd98::/64"
+	defaultV4TransitSwitchSubnet = "100.88.0.0/16"
+	defaultV6TransitSwitchSubnet = "fd97::/64"
+	defaultV4MasqueradeSubnet    = "169.254.169.0/29"
+	defaultV6MasqueradeSubnet    = "fd69::/125"
 )
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
@@ -187,22 +193,28 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["EnableUDPAggregation"] = !bootstrapResult.OVN.OVNKubernetesConfig.DisableUDPAggregation
 	data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = bootstrapResult.Infra.NetworkNodeIdentityEnabled
 	data.Data["NodeIdentityCertDuration"] = OVN_NODE_IDENTITY_CERT_DURATION
+	data.Data["IsNetworkTypeLiveMigration"] = false
 
-	if conf.Migration != nil && conf.Migration.MTU != nil {
-		if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
-			data.Data["MTU"] = conf.Migration.MTU.Network.From
-			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.To
-		} else {
-			data.Data["MTU"] = conf.Migration.MTU.Network.To
-			data.Data["RoutableMTU"] = conf.Migration.MTU.Network.From
+	if conf.Migration != nil {
+		if conf.Migration.MTU != nil && conf.Migration.Mode != operv1.LiveNetworkMigrationMode {
+			if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
+				data.Data["MTU"] = conf.Migration.MTU.Network.From
+				data.Data["RoutableMTU"] = conf.Migration.MTU.Network.To
+			} else {
+				data.Data["MTU"] = conf.Migration.MTU.Network.To
+				data.Data["RoutableMTU"] = conf.Migration.MTU.Network.From
+			}
+
+			// c.MTU is used to set the applied network configuration MTU
+			// MTU migration procedure:
+			//  1. User sets the MTU they want to migrate to
+			//  2. CNO sets the MTU as applied
+			//  3. User can then set the MTU as configured
+			c.MTU = conf.Migration.MTU.Network.To
 		}
-
-		// c.MTU is used to set the applied network configuration MTU
-		// MTU migration procedure:
-		//  1. User sets the MTU they want to migrate to
-		//  2. CNO sets the MTU as applied
-		//  3. User can then set the MTU as configured
-		c.MTU = conf.Migration.MTU.Network.To
+		if conf.Migration.Mode == operv1.LiveNetworkMigrationMode {
+			data.Data["IsNetworkTypeLiveMigration"] = true
+		}
 	}
 	data.Data["GenevePort"] = c.GenevePort
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
@@ -2663,4 +2675,81 @@ func validateOVNKubernetesSubnet(name, subnet string, otherSubnets *iputil.IPPoo
 		return fmt.Errorf("Whole or subset of %s CIDR %s is already in use: %s", name, subnet, err)
 	}
 	return nil
+}
+
+// GetInternalSubnets returns internal subnet values for both IP families
+// It returns default values if conf is nil or the subnets are not configured
+func GetInternalSubnets(conf *operv1.OVNKubernetesConfig) (v4Subnet, v6Subnet string) {
+	v4Subnet = defaultV4InternalSubnet
+	v6Subnet = defaultV6InternalSubnet
+
+	if conf == nil {
+		return
+	}
+
+	if conf.V4InternalSubnet != "" {
+		v4Subnet = conf.V4InternalSubnet
+	}
+	if conf.IPv4 != nil {
+		// conf.IPv4.InternalJoinSubnet takes precedence over conf.V4InternalSubnet
+		if conf.IPv4.InternalJoinSubnet != "" {
+			v4Subnet = conf.IPv4.InternalJoinSubnet
+		}
+	}
+
+	if conf.V6InternalSubnet != "" {
+		v6Subnet = conf.V6InternalSubnet
+	}
+	if conf.IPv6 != nil {
+		// conf.IPv6.InternalJoinSubnet takes precedence over conf.V6InternalSubnet
+		if conf.IPv6.InternalJoinSubnet != "" {
+			v6Subnet = conf.IPv6.InternalJoinSubnet
+		}
+	}
+	return
+}
+
+// GetTransitSwitchSubnets returns transit switch subnet values for both IP families
+// It returns default values if conf is nil or the subnets are not configured
+func GetTransitSwitchSubnets(conf *operv1.OVNKubernetesConfig) (v4Subnet, v6Subnet string) {
+	v4Subnet = defaultV4TransitSwitchSubnet
+	v6Subnet = defaultV6TransitSwitchSubnet
+
+	if conf == nil {
+		return
+	}
+
+	if conf.IPv4 != nil {
+		if conf.IPv4.InternalTransitSwitchSubnet != "" {
+			v4Subnet = conf.IPv4.InternalTransitSwitchSubnet
+		}
+	}
+
+	if conf.IPv6 != nil {
+		if conf.IPv6.InternalTransitSwitchSubnet != "" {
+			v6Subnet = conf.IPv6.InternalTransitSwitchSubnet
+		}
+	}
+	return
+}
+
+// GetMasqueradeSubnet returns masquerade subnet values for both IP families
+// It returns default values if conf is nil or the subnets are not configured
+func GetMasqueradeSubnet(conf *operv1.OVNKubernetesConfig) (v4Subnet, v6Subnet string) {
+	v4Subnet = defaultV4MasqueradeSubnet
+	v6Subnet = defaultV6MasqueradeSubnet
+
+	if conf == nil {
+		return
+	}
+
+	if conf.GatewayConfig != nil {
+		if conf.GatewayConfig.IPv4.InternalMasqueradeSubnet != "" {
+			v4Subnet = conf.GatewayConfig.IPv4.InternalMasqueradeSubnet
+		}
+		if conf.GatewayConfig.IPv6.InternalMasqueradeSubnet != "" {
+			v4Subnet = conf.GatewayConfig.IPv6.InternalMasqueradeSubnet
+		}
+	}
+	return
 }
