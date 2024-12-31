@@ -379,7 +379,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 					Reason: "OpenShiftSDNConfigured",
 					Message: "Cluster is configured with OpenShiftSDN, which is not supported in the next version. Please " +
 						"follow the documented steps to migrate from OpenShiftSDN to OVN-Kubernetes in order to be able to upgrade. " +
-						"https://docs.openshift.com/container-platform/4.16/networking/ovn_kubernetes_network_provider/migrate-from-openshift-sdn.html",
+						"https://docs.redhat.com/en/documentation/openshift_container_platform/4.16/html/networking/ovn-kubernetes-network-plugin",
 				},
 			)
 		} else {
