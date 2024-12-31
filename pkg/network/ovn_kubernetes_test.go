@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -31,6 +32,7 @@ import (
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	cnofake "github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -3952,4 +3954,90 @@ func boolPtr(x bool) *bool {
 func networkOwnerRef() []metav1.OwnerReference {
 	isController := true
 	return []metav1.OwnerReference{{APIVersion: operv1.GroupVersion.String(), Kind: "Network", Controller: &isController, Name: "cluster"}}
+}
+
+func Test_renderOVNKubernetes(t *testing.T) {
+	fakeBootstrapResultOVN := func() *bootstrap.BootstrapResult {
+		bootstrapResult := fakeBootstrapResult()
+		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+			ControlPlaneReplicaCount: 3,
+			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+				DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+				DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+				SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+				MgmtPortResourceName: "",
+				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+					Enabled: false,
+				},
+			},
+		}
+		return bootstrapResult
+	}
+	fakeNetworkConf := func() *operv1.NetworkSpec {
+		config := OVNKubernetesConfig.DeepCopy()
+		config.Spec.DisableMultiNetwork = boolPtr(false)
+		config.Spec.DefaultNetwork.OVNKubernetesConfig.PolicyAuditConfig = &operv1.PolicyAuditConfig{}
+		return &config.Spec
+	}
+	noFeatureGates := func() featuregates.FeatureGate {
+		return featuregates.NewFeatureGate(
+			[]configv1.FeatureGateName{},
+			[]configv1.FeatureGateName{
+				apifeatures.FeatureGateAdminNetworkPolicy,
+				apifeatures.FeatureGateDNSNameResolver,
+				apifeatures.FeatureGateNetworkSegmentation,
+				apifeatures.FeatureGatePersistentIPsForVirtualization,
+				apifeatures.FeatureGateOVNObservability,
+			},
+		)
+	}
+	type args struct {
+		conf            func() *operv1.NetworkSpec
+		bootstrapResult func() *bootstrap.BootstrapResult
+		manifestDir     string
+		client          cnoclient.Client
+		featureGates    func() featuregates.FeatureGate
+	}
+	tests := []struct {
+		name          string
+		args          args
+		expectNumObjs int
+		expectErr     error
+	}{
+		{
+			name: "default",
+			args: args{
+				conf:            fakeNetworkConf,
+				bootstrapResult: fakeBootstrapResultOVN,
+				manifestDir:     manifestDirOvn,
+				client:          cnofake.NewFakeClient(),
+				featureGates:    noFeatureGates,
+			},
+			expectNumObjs: 37,
+		},
+		{
+			name: "render routeadvertisements",
+			args: args{
+				conf: func() *operv1.NetworkSpec {
+					config := fakeNetworkConf()
+					config.DefaultNetwork.OVNKubernetesConfig.RouteAdvertisements = operv1.RouteAdvertisementsEnabled
+					return config
+				},
+				bootstrapResult: fakeBootstrapResultOVN,
+				manifestDir:     manifestDirOvn,
+				client:          cnofake.NewFakeClient(),
+				featureGates:    noFeatureGates,
+			},
+			expectNumObjs: 38,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, _, err := renderOVNKubernetes(tt.args.conf(), tt.args.bootstrapResult(), tt.args.manifestDir, tt.args.client, tt.args.featureGates())
+			if !reflect.DeepEqual(tt.expectErr, err) {
+				t.Errorf("renderOVNKubernetes() err = %v, want %v", err, tt.expectErr)
+			}
+			assert.Equalf(t, tt.expectNumObjs, len(got), "renderOVNKubernetes() got %d objects, want %d", len(got), tt.expectNumObjs)
+		})
+	}
 }
