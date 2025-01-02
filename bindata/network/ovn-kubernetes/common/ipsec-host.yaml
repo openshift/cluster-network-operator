@@ -210,84 +210,89 @@ spec:
           #!/bin/bash
           set -exuo pipefail
 
-          # Don't start IPsec until ovnkube-node has finished setting up the node
+          function cleanup() {
+               kill -9 $(cat /var/run/pluto/pluto.pid 2>/dev/null) 2>/dev/null || true
+               /usr/sbin/ipsec --stopnflog
+               exit 0
+          }
+          trap cleanup SIGTERM
+
           counter=0
-          until [ -f /etc/cni/net.d/10-ovn-kubernetes.conf ]
-          do
-            counter=$((counter+1))
-            sleep 1
-            if [ $counter -gt 300 ];
-            then
+          until [ -f /etc/cni/net.d/10-ovn-kubernetes.conf ]; do
+               counter=$((counter+1))
+               sleep 1
+               if [ $counter -gt 300 ]; then
                     echo "ovnkube-node pod has not started after $counter seconds"
                     exit 1
-            fi
+               fi
           done
           echo "ovnkube-node has configured node."
 
-          if ! pgrep pluto; then
-            echo "pluto is not running, enable the service and/or check system logs"
-            exit 2
-          fi
+          ip x s flush
+          ip x p flush
+          cleanup
+          rm -f /etc/ipsec.d/openshift.conf
 
-          # The ovs-monitor-ipsec doesn't set authby, so when it calls ipsec auto --start
-          # the default ones defined at Libreswan's compile time will be used. On restart,
-          # Libreswan will use authby from libreswan.config. If libreswan.config is
-          # incompatible with the Libreswan's compiled-in defaults, then we'll have an
-          # authentication problem. But OTOH, ovs-monitor-ipsec does set ike and esp algorithms,
-          # so those may be incompatible with libreswan.config as well. Hence commenting out the
-          # "include" from libreswan.conf to avoid such conflicts.
-          defaultcpinclude="include \/etc\/crypto-policies\/back-ends\/libreswan.config"
-          if ! grep -q "# ${defaultcpinclude}" /etc/ipsec.conf; then
-            sed -i "/${defaultcpinclude}/s/^/# /" /etc/ipsec.conf
-          fi
-
-          # Use /etc/ipsec.d/cno.conf file to write our own default IPsec connection parameters.
-          # The /etc/ipsec.d/openshift.conf file can not be used because it is managed by openvswitch.
-          touch /etc/ipsec.d/cno.conf
-          if ! grep -q "narrowing=yes" /etc/ipsec.d/cno.conf; then
-          cat <<EOF > /etc/ipsec.d/cno.conf
-          # Default IPsec connection parameters rendered by network operator.
-          # The narrowing=yes is needed to narrow down the proposals exchanged
-          # by two peers to a mutually acceptable set, otherwise it sometimes
-          # have traffic hit between peer nodes.
-          conn %default
-              narrowing=yes
-          EOF
-          fi
-
-          # since pluto is on the host, we need to restart it after changing connection
-          # parameters.
-          chroot /proc/1/root ipsec restart
-
-          counter=0
-          until [ -r /run/pluto/pluto.ctl ]; do
-            counter=$((counter+1))
-            sleep 1
-            if [ $counter -gt 300 ];
-            then
-              echo "ipsec has not started after $counter seconds"
-              exit 1
-            fi
-          done
-          echo "ipsec service is restarted"
-
-          # Workaround for https://github.com/libreswan/libreswan/issues/373
           ulimit -n 1024
+          leftid=$(openssl x509 -noout -subject -nameopt RFC2253 -in /etc/openvswitch/keys/ipsec-cert.pem | grep -Eo "CN=[0-9a-z\-]+" | sed 's/CN=/@/')
+          leftcert=$(openssl x509 -noout -subject -nameopt RFC2253 -in /etc/openvswitch/keys/ipsec-cert.pem | grep -Eo "CN=[0-9a-z\-]+" | sed 's/CN=/ovs_certkey_/')
+
+          cat > /etc/ipsec.conf << EOF
+          config setup
+               uniqueids=yes
+
+          conn %default
+               keyingtries=%forever
+               type=transport
+               auto=route
+               ike=aes_gcm256-sha2_256
+               esp=aes_gcm256
+               ikev2=insist
+
+          conn ovn-opportunistic-in
+               left=%defaultroute       # Local interface (this can be %defaultroute or specific IP)
+               right=%opportunisticgroup
+               leftid=$leftid           # Local identity
+               leftrsasigkey=%cert      # RSA signature (certificate-based authentication)
+               rightid=%fromcert        # Use identity from the peer's certificate
+               leftcert="$leftcert"
+               rightca=%same
+               leftprotoport=udp/6081   # Match traffic from port 6081 (Geneve)
+               rightprotoport=udp       # Match any UDP port on the peer side
+               failureshunt=drop
+               negotiationshunt=hold
+
+          conn ovn-opportunistic-out
+               left=%defaultroute       # Local interface
+               right=%opportunisticgroup
+               leftid=$leftid           # Local identity
+               leftrsasigkey=%cert      # RSA signature (certificate-based authentication)
+               rightid=%fromcert        # Use identity from the peer's certificate
+               leftcert="$leftcert"
+               rightca=%same
+               leftprotoport=udp
+               rightprotoport=udp/6081
+               failureshunt=drop
+               negotiationshunt=hold
+          EOF
+
+          cat > /etc/ipsec.d/policies/ovn-opportunistic-in << EOF
+          10.0.64.0/18 udp 6081 0
+          EOF
+
+          cat > /etc/ipsec.d/policies/ovn-opportunistic-out << EOF
+          10.0.64.0/18 udp 0 6081
+          EOF
 
           /usr/libexec/ipsec/addconn --config /etc/ipsec.conf --checkconfig
-          # Check kernel modules
           /usr/libexec/ipsec/_stackmanager start
-          # Check nss database status
           /usr/sbin/ipsec --checknss
 
-          # Start ovs-monitor-ipsec which will monitor for changes in the ovs
-          # tunnelling configuration (for example addition of a node) and configures
-          # libreswan appropriately.
-          # We are running this in the foreground so that the container will be restarted when ovs-monitor-ipsec fails.
-          /usr/libexec/platform-python /usr/share/openvswitch/scripts/ovs-monitor-ipsec \
-            --pidfile=/var/run/openvswitch/ovs-monitor-ipsec.pid --ike-daemon=libreswan --no-restart-ike-daemon \
-            --ipsec-conf /etc/ipsec.d/openshift.conf --ipsec-d /var/lib/ipsec/nss \
-            --log-file --monitor unix:/var/run/openvswitch/db.sock
+          certutil -A -a -i /etc/openvswitch/keys/ipsec-cacert.pem -d /var/lib/ipsec/nss -n ovs_cert_cacert -t CT,,
+          openssl pkcs12 -export -in /etc/openvswitch/keys/ipsec-cert.pem -inkey /etc/openvswitch/keys/ipsec-privkey.pem -out /tmp/blah.p12 -name $leftcert -passout pass:
+          pk12util -i /tmp/blah.p12 -d /var/lib/ipsec/nss -W ''
+
+          /usr/libexec/ipsec/pluto --leak-detective --config /etc/ipsec.conf --nofork --stderrlog
         lifecycle:
            preStop:
              exec:
@@ -407,7 +412,7 @@ spec:
           # When east-west ipsec is not disabled, then do not flush xfrm states and
           # policies in order to maintain traffic flows during container restart.
           ipsecflush() {
-            if [ "$(kubectl get networks.operator.openshift.io cluster -ojsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig.mode}')" != "Full" ] || \
+            if [ "$(kubectl get networks.operator.openshift.io cluster -ojsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig.mode}')" != "Full" ] && \
                [ "$(kubectl get networks.operator.openshift.io cluster -ojsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig}')" != "{}" ]; then
               ip x s flush
               ip x p flush
