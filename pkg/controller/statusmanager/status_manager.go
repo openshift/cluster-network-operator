@@ -46,6 +46,7 @@ const (
 	OperatorRender
 	ProxyConfig
 	InjectorConfig
+	MachineConfig
 	PodDeployment
 	PKIConfig
 	EgressRouterConfig
@@ -117,6 +118,9 @@ type StatusManager struct {
 
 	relatedObjects []configv1.ObjectReference
 
+	// local cache to store deployed network operator machine configs.
+	availableMachineConfigs map[string]sets.Set[string]
+
 	// used only for upgrades from <=4.13 to 4.14 with ovn-kubernetes
 	// TODO: remove in 4.15
 	isOVNKubernetes *bool
@@ -128,12 +132,13 @@ func New(client cnoclient.Client, name, cluster string) *StatusManager {
 		name:             name,
 		hyperShiftConfig: hypershift.NewHyperShiftConfig(),
 
-		dsInformers:  map[string]cache.SharedIndexInformer{},
-		dsListers:    map[string]DaemonSetLister{},
-		depInformers: map[string]cache.SharedIndexInformer{},
-		depListers:   map[string]DeploymentLister{},
-		ssInformers:  map[string]cache.SharedIndexInformer{},
-		ssListers:    map[string]StatefulSetLister{},
+		dsInformers:             map[string]cache.SharedIndexInformer{},
+		dsListers:               map[string]DaemonSetLister{},
+		depInformers:            map[string]cache.SharedIndexInformer{},
+		depListers:              map[string]DeploymentLister{},
+		ssInformers:             map[string]cache.SharedIndexInformer{},
+		ssListers:               map[string]StatefulSetLister{},
+		availableMachineConfigs: map[string]sets.Set[string]{},
 	}
 	var err error
 	status.labelSelector, err = labels.Parse(fmt.Sprintf("%s==%s", names.GenerateStatusLabel, cluster))
