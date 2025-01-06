@@ -20,6 +20,8 @@ import (
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+const azureCertPath = "/var/run/secrets/azure"
+
 // renderCloudNetworkConfigController renders the cloud network config controller
 func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	cloudBootstrapResult := bootstrapResult.Infra
@@ -102,7 +104,11 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		data.Data["HTTP_PROXY"] = os.Getenv("MGMT_HTTP_PROXY")
 		data.Data["HTTPS_PROXY"] = os.Getenv("MGMT_HTTPS_PROXY")
 		data.Data["NO_PROXY"] = os.Getenv("MGMT_NO_PROXY")
-		data.Data["AzureMSIAuthentication"] = os.Getenv("AZURE_MSI_AUTHENTICATION")
+		data.Data["AzureManagedClientID"] = os.Getenv("ARO_HCP_MI_CLIENT_ID")
+		data.Data["AzureManagedTenantID"] = os.Getenv("ARO_HCP_TENANT_ID")
+		data.Data["AzureManagedCertDirectory"] = azureCertPath
+		data.Data["AzureManagedCertPath"] = filepath.Join(azureCertPath, os.Getenv("ARO_HCP_CLIENT_CERTIFICATE_NAME"))
+		data.Data["AzureManagedSecretProviderClass"] = os.Getenv("ARO_HCP_SECRET_PROVIDER_CLASS")
 		caOverride.ObjectMeta = metav1.ObjectMeta{
 			Namespace:   hcpCfg.Namespace,
 			Name:        "cloud-network-config-controller-kube-cloud-config",

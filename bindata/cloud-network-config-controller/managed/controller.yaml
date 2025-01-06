@@ -92,8 +92,6 @@ spec:
             value: "{{.KubernetesServicePort}}"
           - name: KUBERNETES_SERVICE_HOST
             value: "{{.KubernetesServiceHost}}"
-          - name: AZURE_MSI_AUTHENTICATION
-            value: "{{.AzureMSIAuthentication}}"
       containers:
       # hosted-cluster-token creates a token with a custom path(/var/run/secrets/hosted_cluster/token)
       # The token path is included in the kubeconfig used by cncc containers to talk to the hosted clusters API server
@@ -185,6 +183,14 @@ spec:
         - name: "NO_PROXY"
           value: "{{ .NO_PROXY}}"
 {{ end }}
+{{- if not (eq .AzureManagedClientID "")}}
+        - name: "ARO_HCP_MI_CLIENT_ID"
+          value: "{{ .AzureManagedClientID }}"
+        - name: "ARO_HCP_TENANT_ID"
+          value: "{{ .AzureManagedTenantID }}"
+        - name: "ARO_HCP_CLIENT_CERTIFICATE_PATH"
+          value: "{{ .AzureManagedCertPath}}"
+{{ end }}
         resources:
           requests:
             cpu: 10m
@@ -203,6 +209,11 @@ spec:
         - name: cloud-token
           mountPath: /var/run/secrets/openshift/serviceaccount
           readOnly: true
+{{- if not (eq .AzureManagedClientID "")}}
+        - name: cncc-cert
+          mountPath: {{.AzureManagedCertDirectory}}
+          readOnly: true
+{{- end }}
         terminationMessagePolicy: FallbackToLogsOnError
       tolerations:
     {{- if .HCPTolerations }}
@@ -244,3 +255,11 @@ spec:
       - name: kube-cloud-config
         configMap:
           name: cloud-network-config-controller-kube-cloud-config
+{{- if not (eq .AzureManagedClientID "")}}
+      - name: cncc-cert
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: {{.AzureManagedSecretProviderClass}}
+{{- end }}
