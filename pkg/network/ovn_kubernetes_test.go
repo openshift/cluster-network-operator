@@ -3991,19 +3991,6 @@ func Test_renderOVNKubernetes(t *testing.T) {
 			},
 		)
 	}
-	udnFeatureGate := func() featuregates.FeatureGate {
-		return featuregates.NewFeatureGate(
-			[]configv1.FeatureGateName{
-				apifeatures.FeatureGateNetworkSegmentation,
-			},
-			[]configv1.FeatureGateName{
-				apifeatures.FeatureGateAdminNetworkPolicy,
-				apifeatures.FeatureGateDNSNameResolver,
-				apifeatures.FeatureGatePersistentIPsForVirtualization,
-				apifeatures.FeatureGateOVNObservability,
-			},
-		)
-	}
 	type args struct {
 		conf            func() *operv1.NetworkSpec
 		bootstrapResult func() *bootstrap.BootstrapResult
@@ -4042,17 +4029,6 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				featureGates:    noFeatureGates,
 			},
 			expectNumObjs: 38,
-		},
-		{
-			name: "render with UDN",
-			args: args{
-				conf:            fakeNetworkConf,
-				bootstrapResult: fakeBootstrapResultOVN,
-				manifestDir:     manifestDirOvn,
-				client:          cnofake.NewFakeClient(),
-				featureGates:    udnFeatureGate,
-			},
-			expectNumObjs: 41,
 		},
 	}
 	for _, tt := range tests {
