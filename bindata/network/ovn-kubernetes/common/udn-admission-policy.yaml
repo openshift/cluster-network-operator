@@ -21,7 +21,7 @@ kind: ValidatingAdmissionPolicyBinding
 metadata:
   name: user-defined-networks-namespace-label-binding
 spec:
-  policyName: disable-udn-label-change
+  policyName: user-defined-networks-namespace-label
   validationActions: [Deny]
   matchResources:
     resourceRules:
