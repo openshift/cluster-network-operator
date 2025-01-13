@@ -71,7 +71,7 @@ spec:
         - --webhook-mode=onlywebhook
         - --disable-cert-rotation=true
         - --namespace=$(NAMESPACE)
-        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=:7572
         env:
         - name: NAMESPACE
           valueFrom:
@@ -79,6 +79,9 @@ spec:
               fieldPath: metadata.namespace
         image: {{.FRRK8sImage}}
         name: frr-k8s-webhook-server
+        ports:
+        - containerPort: 7572
+          name: monitoring
         securityContext:
          runAsNonRoot: true
         resources:
@@ -88,15 +91,15 @@ spec:
         terminationMessagePolicy: FallbackToLogsOnError
         livenessProbe:
           httpGet:
-            path: /healthz
-            port: 8081
+            path: /metrics
+            port: monitoring
           initialDelaySeconds: 10
           periodSeconds: 10
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /readyz
-            port: 8081
+            path: /metrics
+            port: monitoring
           initialDelaySeconds: 10
           periodSeconds: 10
           failureThreshold: 3
