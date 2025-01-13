@@ -13,8 +13,10 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,17 +30,34 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var (
+	masterMachineConfigIPsecExtName = "80-ipsec-master-extensions"
+	workerMachineConfigIPsecExtName = "80-ipsec-worker-extensions"
+)
+
 //nolint:errcheck
 func init() {
 	configv1.AddToScheme(scheme.Scheme)
 	operv1.AddToScheme(scheme.Scheme)
 	appsv1.AddToScheme(scheme.Scheme)
+	mcfgv1.AddToScheme(scheme.Scheme)
 }
 
 func getCO(client cnoclient.Client, name string) (*configv1.ClusterOperator, error) {
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	err := client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Name: name}, co)
 	return co, err
+}
+
+func setCO(t *testing.T, client cnoclient.Client, name string) {
+	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	err := client.ClientFor("").CRClient().Update(context.TODO(), co)
+	if apierrors.IsNotFound(err) {
+		err = client.ClientFor("").CRClient().Create(context.TODO(), co)
+	}
+	if err != nil {
+		t.Fatalf("Failed to set: %v", err)
+	}
 }
 
 func getOC(client cnoclient.Client) (*operv1.Network, error) {
@@ -403,6 +422,296 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	}
 	if !v1helpers.IsOperatorConditionFalse(oc.Status.Conditions, operv1.OperatorStatusTypeDegraded) && !conditionsEqual(oc.Status.Conditions, []operv1.OperatorCondition{condUpdate}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+}
+
+func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
+	client := fake.NewFakeClient()
+	status := New(client, "testing", names.StandAloneClusterName)
+	setFakeListers(status)
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+		Spec: operv1.NetworkSpec{DefaultNetwork: operv1.DefaultNetworkDefinition{
+			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}}}}}
+	setOC(t, client, no)
+	setCO(t, client, "testing")
+
+	mcPools := []mcfgv1.MachineConfigPool{}
+	status.SetFromMachineConfigPool(mcPools)
+	co, oc, err := getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
+	}
+
+	// Create Machine Config and Machine Config Pool for ipsec plugin.
+	masterIPsecMachineConfig := mcfgv1.MachineConfig{ObjectMeta: metav1.ObjectMeta{Name: masterMachineConfigIPsecExtName,
+		Labels:          platform.MasterRoleMachineConfigLabel,
+		OwnerReferences: networkOwnerRef()},
+		Spec: mcfgv1.MachineConfigSpec{Extensions: []string{"ipsec"}}}
+	status.SetMachineConfigs([]mcfgv1.MachineConfig{masterIPsecMachineConfig})
+	status.processCreatedMachineConfig(masterIPsecMachineConfig)
+
+	masterIPsecmachineConfigPool := mcfgv1.MachineConfigPool{ObjectMeta: metav1.ObjectMeta{Name: "master"},
+		Spec: mcfgv1.MachineConfigPoolSpec{MachineConfigSelector: &metav1.LabelSelector{
+			MatchLabels: platform.MasterRoleMachineConfigLabel}},
+		Status: mcfgv1.MachineConfigPoolStatus{Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
+			Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
+	mcPools = append(mcPools, masterIPsecmachineConfigPool)
+	status.SetFromMachineConfigPool(mcPools)
+	co, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
+	}
+
+	// Create MachineConfigPool with degraded condition for ipsec plugin and validate network operator condition.
+	workerIPsecMachineConfig := mcfgv1.MachineConfig{ObjectMeta: metav1.ObjectMeta{Name: workerMachineConfigIPsecExtName,
+		Labels:          platform.WorkerRoleMachineConfigLabel,
+		OwnerReferences: networkOwnerRef()},
+		Spec: mcfgv1.MachineConfigSpec{Extensions: []string{"ipsec"}}}
+	status.SetMachineConfigs([]mcfgv1.MachineConfig{masterIPsecMachineConfig, workerIPsecMachineConfig})
+	status.processCreatedMachineConfig(workerIPsecMachineConfig)
+
+	workerIPsecMachineConfigPool := mcfgv1.MachineConfigPool{ObjectMeta: metav1.ObjectMeta{Name: "worker"},
+		Spec: mcfgv1.MachineConfigPoolSpec{MachineConfigSelector: &metav1.LabelSelector{
+			MatchLabels: platform.WorkerRoleMachineConfigLabel}},
+		Status: mcfgv1.MachineConfigPoolStatus{Conditions: []mcfgv1.MachineConfigPoolCondition{{Type: mcfgv1.MachineConfigPoolDegraded,
+			Status: v1.ConditionTrue}}}}
+	mcPools = append(mcPools, workerIPsecMachineConfigPool)
+	status.SetFromMachineConfigPool(mcPools)
+	co, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
+	}
+
+	// Update MachineConfigPool with progressing condition and ensure network operator is moved from degraded state into progressing state.
+	workerIPsecMachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{Conditions: []mcfgv1.MachineConfigPoolCondition{{Type: mcfgv1.MachineConfigPoolUpdating,
+		Status: v1.ConditionTrue}}}
+	status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+		workerIPsecMachineConfigPool})
+	co, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
+	}
+
+	// Clear MachineConfigPool progressing condition and ensure network operator is no longer either in degraded or progressing state.
+	workerIPsecMachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
+		Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}
+	status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+		workerIPsecMachineConfigPool})
+	co, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
+	}
+
+	// Remove worker machine configs and check network operator status condition is updated
+	// accordingly.
+	status.SetMachineConfigs([]mcfgv1.MachineConfig{masterIPsecMachineConfig})
+	status.processDeletedMachineConfig(workerIPsecMachineConfig.Name)
+	// No updated to worker machine config pool, so status condition moving into
+	// progressing state.
+	status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+		workerIPsecMachineConfigPool})
+	co, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
+	}
+	// Update worker machine config pool status with empty source, now status
+	// condition moves into ready state.
+	workerIPsecMachineConfigPool.Status.Configuration.Source = []v1.ObjectReference{}
+	status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+		workerIPsecMachineConfigPool})
+	co, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
+	}
+	// Remove master machine config, set master mcp into degraded state, check network operator
+	// status condition is updated accordingly.
+	status.SetMachineConfigs([]mcfgv1.MachineConfig{})
+	status.processDeletedMachineConfig(masterIPsecMachineConfig.Name)
+	masterIPsecmachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{Conditions: []mcfgv1.MachineConfigPoolCondition{{Type: mcfgv1.MachineConfigPoolDegraded,
+		Status: v1.ConditionTrue}}, Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
+		Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}
+	status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+		workerIPsecMachineConfigPool})
+	co, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
+	}
+	// Update master machine config pool status with source, now status
+	// condition moves into progressing state.
+	masterIPsecmachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
+		Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}
+	status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+		workerIPsecMachineConfigPool})
+	co, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
+	}
+	// Update master machine config pool status with empty source, now status
+	// condition moves into ready state.
+	masterIPsecmachineConfigPool.Status.Configuration.Source = []v1.ObjectReference{}
+	status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+		workerIPsecMachineConfigPool})
+	co, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+	if len(co.Status.Versions) > 0 {
+		t.Fatalf("Status.Versions unexpectedly already set: %#v", co.Status.Versions)
 	}
 }
 
@@ -1721,4 +2030,9 @@ func TestStatusManagerSetFromDeploymentsWithExcluded(t *testing.T) {
 		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
+}
+
+func networkOwnerRef() []metav1.OwnerReference {
+	isController := true
+	return []metav1.OwnerReference{{APIVersion: operv1.GroupVersion.String(), Kind: "Network", Controller: &isController, Name: "cluster"}}
 }
