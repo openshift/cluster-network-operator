@@ -62,6 +62,14 @@ data:
     v6-masquerade-subnet="{{.V6InternalMasqueradeSubnet}}"
 {{- end }}
 
+    [clustermanager]
+{{- if .V4TransitSwitchSubnet }}
+    v4-transit-switch-subnet="{{.V4TransitSwitchSubnet}}"
+{{- end }}
+{{- if .V6TransitSwitchSubnet }}
+    v6-transit-switch-subnet="{{.V6TransitSwitchSubnet}}"
+{{- end }}
+
     [logging]
     libovsdblogfile=/var/log/ovnkube/libovsdb.log
     logfile-maxsize=100

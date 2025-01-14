@@ -222,6 +222,8 @@ enable-multi-network=true
 mode=shared
 nodeport=true
 
+[clustermanager]
+
 [logging]
 libovsdblogfile=/var/log/ovnkube/libovsdb.log
 logfile-maxsize=100
@@ -262,6 +264,8 @@ enable-multi-network=true
 mode=shared
 nodeport=true
 v4-masquerade-subnet="100.98.0.0/16"
+
+[clustermanager]
 
 [logging]
 libovsdblogfile=/var/log/ovnkube/libovsdb.log
@@ -309,6 +313,8 @@ enable-multi-network=true
 [gateway]
 mode=local
 nodeport=true
+
+[clustermanager]
 
 [logging]
 libovsdblogfile=/var/log/ovnkube/libovsdb.log
@@ -364,6 +370,8 @@ enable-multi-network=true
 [gateway]
 mode=local
 nodeport=true
+
+[clustermanager]
 
 [logging]
 libovsdblogfile=/var/log/ovnkube/libovsdb.log
@@ -422,6 +430,8 @@ enable-multi-network=true
 mode=local
 nodeport=true
 
+[clustermanager]
+
 [logging]
 libovsdblogfile=/var/log/ovnkube/libovsdb.log
 logfile-maxsize=100
@@ -477,6 +487,8 @@ enable-multi-network=true
 [gateway]
 mode=local
 nodeport=true
+
+[clustermanager]
 
 [logging]
 libovsdblogfile=/var/log/ovnkube/libovsdb.log
@@ -534,6 +546,8 @@ enable-multi-network=true
 mode=shared
 nodeport=true
 
+[clustermanager]
+
 [logging]
 libovsdblogfile=/var/log/ovnkube/libovsdb.log
 logfile-maxsize=100
@@ -578,6 +592,8 @@ enable-multi-network=true
 [gateway]
 mode=shared
 nodeport=true
+
+[clustermanager]
 
 [logging]
 libovsdblogfile=/var/log/ovnkube/libovsdb.log
@@ -627,6 +643,8 @@ enable-multi-network=true
 mode=shared
 nodeport=true
 
+[clustermanager]
+
 [logging]
 libovsdblogfile=/var/log/ovnkube/libovsdb.log
 logfile-maxsize=100
@@ -666,6 +684,8 @@ egressip-node-healthcheck-port=9107
 [gateway]
 mode=shared
 nodeport=true
+
+[clustermanager]
 
 [logging]
 libovsdblogfile=/var/log/ovnkube/libovsdb.log
@@ -710,6 +730,8 @@ enable-admin-network-policy=true
 mode=shared
 nodeport=true
 
+[clustermanager]
+
 [logging]
 libovsdblogfile=/var/log/ovnkube/libovsdb.log
 logfile-maxsize=100
@@ -751,6 +773,8 @@ enable-admin-network-policy=true
 [gateway]
 mode=shared
 nodeport=true
+
+[clustermanager]
 
 [logging]
 libovsdblogfile=/var/log/ovnkube/libovsdb.log
