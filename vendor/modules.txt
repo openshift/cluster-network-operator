@@ -234,7 +234,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20231106181907-f3756e6eb36b
+# github.com/openshift/api v0.0.0-20231106181907-f3756e6eb36b => github.com/pliurh/api v0.0.0-20250114114559-2e7b0006e37e
 ## explicit; go 1.19
 github.com/openshift/api
 github.com/openshift/api/apiserver
@@ -1569,6 +1569,7 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
+# github.com/openshift/api => github.com/pliurh/api v0.0.0-20250114114559-2e7b0006e37e
 # github.com/openshift/hypershift/api => github.com/openshift/hypershift v0.0.0-20220323152148-c356b8b72d66
 # k8s.io/apimachinery => k8s.io/apimachinery v0.26.0-alpha.3.0.20221108052757-4fe4321a9d5e
 # k8s.io/client-go => k8s.io/client-go v0.26.1

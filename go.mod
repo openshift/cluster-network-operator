@@ -147,6 +147,7 @@ require (
 )
 
 replace (
+	github.com/openshift/api => github.com/pliurh/api v0.0.0-20250114114559-2e7b0006e37e
 	github.com/openshift/hypershift/api => github.com/openshift/hypershift v0.0.0-20220323152148-c356b8b72d66
 	k8s.io/apimachinery => k8s.io/apimachinery v0.26.0-alpha.3.0.20221108052757-4fe4321a9d5e
 	k8s.io/client-go => k8s.io/client-go v0.26.1
