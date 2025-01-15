@@ -13,6 +13,7 @@ rules:
   - egressqoses
   - egressservices
   - adminpolicybasedexternalroutes
+  - userdefinednetworks
   verbs:
   - get
   - list
