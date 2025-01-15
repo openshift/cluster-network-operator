@@ -13,7 +13,9 @@ rules:
   - egressqoses
   - egressservices
   - adminpolicybasedexternalroutes
+  {{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
   - userdefinednetworks
+  {{- end }}
   verbs:
   - get
   - list
