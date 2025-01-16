@@ -272,7 +272,7 @@ spec:
           /usr/libexec/platform-python /usr/share/openvswitch/scripts/ovs-monitor-ipsec \
             --pidfile=/var/run/openvswitch/ovs-monitor-ipsec.pid --ike-daemon=libreswan --no-restart-ike-daemon \
             --ipsec-conf /etc/ipsec.d/openshift.conf --ipsec-d /var/lib/ipsec/nss \
-            --log-file --monitor unix:/var/run/openvswitch/db.sock
+            --log-file --monitor unix:/var/run/openvswitch/db.sock -vdbg
         lifecycle:
            preStop:
              exec:
