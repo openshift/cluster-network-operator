@@ -500,8 +500,7 @@ spec:
           type: DirectoryOrCreate
         name: etc-openvswitch
       - hostPath:
-          path: /var/run/multus/cni/net.d
-          type: ""
+          path: "{{.CNIConfDir}}"
         name: host-cni-netd
       - hostPath:
           path: /var/run
