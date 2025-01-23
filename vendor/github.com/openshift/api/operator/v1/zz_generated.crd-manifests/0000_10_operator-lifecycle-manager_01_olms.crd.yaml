@@ -2,27 +2,25 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    api-approved.openshift.io: https://github.com/openshift/api/pull/475
+    api-approved.openshift.io: https://github.com/openshift/api/pull/1504
     api.openshift.io/merged-by-featuregates: "true"
-    include.release.openshift.io/ibm-cloud-managed: "true"
+    capability.openshift.io/name: OperatorLifecycleManagerV1
     include.release.openshift.io/self-managed-high-availability: "true"
-  name: kubeapiservers.operator.openshift.io
+  name: olms.operator.openshift.io
 spec:
   group: operator.openshift.io
   names:
-    categories:
-    - coreoperators
-    kind: KubeAPIServer
-    listKind: KubeAPIServerList
-    plural: kubeapiservers
-    singular: kubeapiserver
+    kind: OLM
+    listKind: OLMList
+    plural: olms
+    singular: olm
   scope: Cluster
   versions:
   - name: v1
     schema:
       openAPIV3Schema:
         description: |-
-          KubeAPIServer provides information to configure an operator to manage kube-apiserver.
+          OLM provides information to configure an operator to manage the OLM controllers
 
           Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
         properties:
@@ -44,21 +42,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec is the specification of the desired behavior of the
-              Kubernetes API Server
+            description: spec holds user settable values for configuration
             properties:
-              failedRevisionLimit:
-                description: |-
-                  failedRevisionLimit is the number of failed static pod installer revisions to keep on disk and in the api
-                  -1 = unlimited, 0 or unset = 5 (default)
-                format: int32
-                type: integer
-              forceRedeploymentReason:
-                description: |-
-                  forceRedeploymentReason can be used to force the redeployment of the operand by providing a unique string.
-                  This provides a mechanism to kick a previously failed deployment and provide a reason why you think it will work
-                  this time instead of failing again on the same config.
-                type: string
               logLevel:
                 default: Normal
                 description: |-
@@ -77,7 +62,7 @@ spec:
               managementState:
                 description: managementState indicates whether and how the operator
                   should manage the component
-                pattern: ^(Managed|Force)$
+                pattern: ^(Managed|Unmanaged|Force|Removed)$
                 type: string
               observedConfig:
                 description: |-
@@ -101,12 +86,6 @@ spec:
                 - Trace
                 - TraceAll
                 type: string
-              succeededRevisionLimit:
-                description: |-
-                  succeededRevisionLimit is the number of successful static pod installer revisions to keep on disk and in the api
-                  -1 = unlimited, 0 or unset = 5 (default)
-                format: int32
-                type: integer
               unsupportedConfigOverrides:
                 description: |-
                   unsupportedConfigOverrides overrides the final configuration that was computed by the operator.
@@ -119,8 +98,8 @@ spec:
                 x-kubernetes-preserve-unknown-fields: true
             type: object
           status:
-            description: status is the most recently observed status of the Kubernetes
-              API Server
+            description: status holds observed values from the cluster. They may not
+              be overridden.
             properties:
               conditions:
                 description: conditions is a list of conditions and their status
@@ -209,77 +188,6 @@ spec:
                 x-kubernetes-validations:
                 - message: must only increase
                   rule: self >= oldSelf
-              latestAvailableRevisionReason:
-                description: latestAvailableRevisionReason describe the detailed reason
-                  for the most recent deployment
-                type: string
-              nodeStatuses:
-                description: nodeStatuses track the deployment values and errors across
-                  individual nodes
-                items:
-                  description: NodeStatus provides information about the current state
-                    of a particular node managed by this operator.
-                  properties:
-                    currentRevision:
-                      description: currentRevision is the generation of the most recently
-                        successful deployment
-                      format: int32
-                      type: integer
-                      x-kubernetes-validations:
-                      - message: must only increase
-                        rule: self >= oldSelf
-                    lastFailedCount:
-                      description: lastFailedCount is how often the installer pod
-                        of the last failed revision failed.
-                      type: integer
-                    lastFailedReason:
-                      description: lastFailedReason is a machine readable failure
-                        reason string.
-                      type: string
-                    lastFailedRevision:
-                      description: lastFailedRevision is the generation of the deployment
-                        we tried and failed to deploy.
-                      format: int32
-                      type: integer
-                    lastFailedRevisionErrors:
-                      description: lastFailedRevisionErrors is a list of human readable
-                        errors during the failed deployment referenced in lastFailedRevision.
-                      items:
-                        type: string
-                      type: array
-                      x-kubernetes-list-type: atomic
-                    lastFailedTime:
-                      description: lastFailedTime is the time the last failed revision
-                        failed the last time.
-                      format: date-time
-                      type: string
-                    lastFallbackCount:
-                      description: lastFallbackCount is how often a fallback to a
-                        previous revision happened.
-                      type: integer
-                    nodeName:
-                      description: nodeName is the name of the node
-                      type: string
-                    targetRevision:
-                      description: targetRevision is the generation of the deployment
-                        we're trying to apply
-                      format: int32
-                      type: integer
-                  required:
-                  - nodeName
-                  type: object
-                  x-kubernetes-validations:
-                  - fieldPath: .currentRevision
-                    message: cannot be unset once set
-                    rule: has(self.currentRevision) || !has(oldSelf.currentRevision)
-                type: array
-                x-kubernetes-list-map-keys:
-                - nodeName
-                x-kubernetes-list-type: map
-                x-kubernetes-validations:
-                - message: no more than 1 node status may have a nonzero targetRevision
-                  rule: size(self.filter(status, status.?targetRevision.orValue(0)
-                    != 0)) <= 1
               observedGeneration:
                 description: observedGeneration is the last generation change you've
                   dealt with
@@ -290,26 +198,6 @@ spec:
                   at the desired state
                 format: int32
                 type: integer
-              serviceAccountIssuers:
-                description: |-
-                  serviceAccountIssuers tracks history of used service account issuers.
-                  The item without expiration time represents the currently used service account issuer.
-                  The other items represents service account issuers that were used previously and are still being trusted.
-                  The default expiration for the items is set by the platform and it defaults to 24h.
-                  see: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-token-volume-projection
-                items:
-                  properties:
-                    expirationTime:
-                      description: |-
-                        expirationTime is the time after which this service account issuer will be pruned and removed from the trusted list
-                        of service account issuers.
-                      format: date-time
-                      type: string
-                    name:
-                      description: name is the name of the service account issuer
-                      type: string
-                  type: object
-                type: array
               version:
                 description: version is the level this availability applies to
                 type: string
@@ -317,6 +205,9 @@ spec:
         required:
         - spec
         type: object
+        x-kubernetes-validations:
+        - message: olm is a singleton, .metadata.name must be 'cluster'
+          rule: self.metadata.name == 'cluster'
     served: true
     storage: true
     subresources:
