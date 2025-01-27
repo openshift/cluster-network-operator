@@ -2306,10 +2306,6 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 	if renderedIPsec != nil {
 		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
 	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
-	}
 	renderedMasterIPsecExtension := findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
 	if renderedMasterIPsecExtension != nil {
 		t.Errorf("The MachineConfig %s must not exist, but it's available", masterMachineConfigIPsecExtName)
@@ -2333,10 +2329,6 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec != nil {
 		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
 	}
 	renderedMasterIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
 	if renderedMasterIPsecExtension == nil {
@@ -2366,10 +2358,6 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 	if renderedIPsec != nil {
 		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
 	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
-	}
 	renderedMasterIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
 	if renderedMasterIPsecExtension == nil {
 		t.Errorf("The MachineConfig %s must exist, but it's not available", masterMachineConfigIPsecExtName)
@@ -2397,10 +2385,6 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec != nil {
 		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
 	}
 	renderedMasterIPsecExtension = findInObjs("machineconfiguration.openshift.io", "MachineConfig", masterMachineConfigIPsecExtName, "", objs)
 	if renderedMasterIPsecExtension == nil {
@@ -2441,10 +2425,6 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec != nil {
 		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
 	}
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 	if renderedNode == nil {
@@ -2536,10 +2516,6 @@ func TestRenderOVNKubernetesEnableIPsecForHostedControlPlane(t *testing.T) {
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec != nil {
 		t.Errorf("ovn-ipsec-host DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
 	}
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 	if renderedNode == nil {
@@ -2663,10 +2639,6 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 	if renderedIPsec != nil {
 		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
 	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
-	}
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 	if renderedNode == nil {
 		t.Errorf("ovnkube-node DaemonSet must exist, but it's not available")
@@ -2774,13 +2746,6 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
 		t.Errorf("ovn-ipsec-containerized DaemonSet should have create-wait annotation, does not")
 	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec == nil {
-		t.Errorf("ovn-ipsec DaemonSet must exist, but it's not available")
-	}
-	if _, ok := renderedIPsec.GetAnnotations()[names.CreateWaitAnnotation]; !ok {
-		t.Errorf("ovn-ipsec DaemonSet should have create-wait annotation, does not")
-	}
 	// The ovnkube-node must set with ipsec-enabled annotation.
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 	if renderedNode == nil {
@@ -2826,10 +2791,6 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-containerized", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec != nil {
 		t.Errorf("ovn-ipsec-containerized DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
 	}
 	renderedNode = findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 	if renderedNode == nil {
@@ -2936,10 +2897,6 @@ func TestRenderOVNKubernetesIPsecUpgradeWithHypershiftHostedCluster(t *testing.T
 	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec-host", "openshift-ovn-kubernetes", objs)
 	if renderedIPsec != nil {
 		t.Errorf("ovn-ipsec-host DaemonSet must not exist, but it's available")
-	}
-	renderedIPsec = findInObjs("apps", "DaemonSet", "ovn-ipsec", "openshift-ovn-kubernetes", objs)
-	if renderedIPsec != nil {
-		t.Errorf("ovn-ipsec DaemonSet must not exist, but it's available")
 	}
 	renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 	if renderedNode == nil {
