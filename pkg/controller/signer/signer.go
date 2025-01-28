@@ -25,7 +25,7 @@ func newCertificateTemplate(certReq *x509.CertificateRequest) *x509.Certificate 
 	template := &x509.Certificate{
 		Subject: certReq.Subject,
 
-		SignatureAlgorithm: x509.SHA512WithRSA,
+		SignatureAlgorithm: x509.SHA512WithRSAPSS,
 
 		NotBefore:    time.Now().Add(-1 * time.Second),
 		NotAfter:     time.Now().Add(5 * oneYear),

@@ -113,7 +113,7 @@ spec:
             mkdir -p /etc/openvswitch/keys
 
             # Generate an SSL private key and use the key to create a certitificate signing request
-            umask 077 && openssl genrsa -out /etc/openvswitch/keys/ipsec-privkey.pem 2048
+            umask 077 && openssl genrsa -out /etc/openvswitch/keys/ipsec-privkey.pem 3072
             openssl req -new -text \
                         -extensions v3_req \
                         -addext "subjectAltName = DNS:${cn}" \
