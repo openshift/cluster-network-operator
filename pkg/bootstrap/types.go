@@ -49,8 +49,13 @@ type OVNUpdateStatus struct {
 // OVNIPsecStatus contains status of current IPsec configuration
 // in the cluster.
 type OVNIPsecStatus struct {
-	LegacyIPsecUpgrade bool // true if IPsec in 4.14 cluster is upgraded to latest version
-	OVNIPsecActive     bool // set to true unless we are sure it is not.
+	// LegacyIPsecUpgrade true if IPsec in 4.14.x cluster is upgraded to 4.15.x version.
+	LegacyIPsecUpgrade bool
+	// IsOVNIPsecActiveOrRollingOut set to true unless we are sure it is not. Note that this is
+	// set to true when ovnkube-node daemonset is in progressing state which is not reflecting
+	// actual ovn ipsec state. so must be precautious in making decisions at the time of machine
+	// configs rollout and node reboot scenarios.
+	IsOVNIPsecActiveOrRollingOut bool
 }
 
 type OVNBootstrapResult struct {
