@@ -155,3 +155,5 @@ require (
 	k8s.io/kms v0.29.0 // indirect
 	k8s.io/kube-aggregator v0.28.2 // indirect
 )
+
+replace github.com/openshift/library-go => github.com/pperiyasamy/library-go v0.0.0-20250129104748-50cad7f570e8
