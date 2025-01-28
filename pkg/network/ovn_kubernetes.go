@@ -588,9 +588,16 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 
 	isHypershiftHostedCluster := bootstrapResult.Infra.HostedControlPlane != nil
 	isIpsecLegacyUpgrade := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.LegacyIPsecUpgrade
-	isOVNIPsecActive := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.OVNIPsecActive
+	isOVNIPsecActiveOrRollingOut := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.IsOVNIPsecActiveOrRollingOut
+	isCNOIPsecMachineConfigPresent := isCNOIPsecMachineConfigPresent(bootstrapResult.Infra)
+	isUserDefinedIPsecMachineConfigPresent := isUserDefinedIPsecMachineConfigPresent(bootstrapResult.Infra)
+	isMachineConfigClusterOperatorReady := bootstrapResult.Infra.MachineConfigClusterOperatorReady
 
 	mode := GetIPsecMode(conf)
+
+	// when OVN is rolling out, OVN IPsec might be fully or partially active or inactive.
+	// If MachineConfigs are not present, we know its inactive since we only stop rendering them once inactive.
+	isOVNIPsecActive := isOVNIPsecActiveOrRollingOut && (isCNOIPsecMachineConfigPresent || isUserDefinedIPsecMachineConfigPresent || isHypershiftHostedCluster)
 
 	// We render the ipsec deployment if IPsec is already active in OVN
 	// or if EW IPsec config is enabled.
@@ -601,9 +608,6 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// - not needed for the containerized deployment is used in hypershift
 	// hosted clusters
 	// - not needed if the user already created their own
-	isMachineConfigClusterOperatorReady := bootstrapResult.Infra.MachineConfigClusterOperatorReady
-	isCNOIPsecMachineConfigPresent := isCNOIPsecMachineConfigPresent(bootstrapResult.Infra)
-	isUserDefinedIPsecMachineConfigPresent := isUserDefinedIPsecMachineConfigPresent(bootstrapResult.Infra)
 	renderCNOIPsecMachineConfig = (mode != operv1.IPsecModeDisabled || renderIPsecDaemonSet) && !isHypershiftHostedCluster &&
 		!isUserDefinedIPsecMachineConfigPresent
 	// Wait for MCO to be ready unless we had already rendered the IPsec MachineConfig.
@@ -628,7 +632,7 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// the 4.14 to 4.15 legacy IPsec upgrade as noted above.
 	renderIPsecContainerizedDaemonSet = (renderIPsecDaemonSet && isHypershiftHostedCluster) || isIPsecMachineConfigNotActiveOnLegacyUpgrade
 
-	// We render OVN IPsec if EW IPsec is enabled not before the daemon sets are
+	// We render OVN IPsec if EW IPsec is enabled and before the daemon sets are
 	// rendered. If it is already rendered, keep it rendered unless disabled.
 	renderIPsecOVN = (renderIPsecHostDaemonSet || renderIPsecContainerizedDaemonSet || isOVNIPsecActive) && mode == operv1.IPsecModeFull
 
@@ -1149,7 +1153,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		nodeStatus.Progressing = daemonSetProgressing(nodeDaemonSet, true)
 		// Retrieve OVN IPsec status from ovnkube-node daemonset as this is being used to rollout IPsec
 		// config from 4.14.
-		ovnIPsecStatus.OVNIPsecActive = !isOVNIPsecNotActiveInDaemonSet(nodeDaemonSet)
+		ovnIPsecStatus.IsOVNIPsecActiveOrRollingOut = !isOVNIPsecNotActiveInDaemonSet(nodeDaemonSet)
 		klog.Infof("ovnkube-node DaemonSet status: progressing=%t", nodeStatus.Progressing)
 
 	}
@@ -1208,9 +1212,6 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	if ipsecContainerizedDaemonSet != nil && ipsecHostDaemonSet != nil {
 		// Both IPsec daemonset versions exist, so this is an upgrade from 4.14.
 		ovnIPsecStatus.LegacyIPsecUpgrade = true
-	} else if ipsecContainerizedDaemonSet == nil && ipsecHostDaemonSet == nil {
-		// set OVN IPsec status to nil since none of the IPsec daemonset(s) exists in the cluster.
-		ovnIPsecStatus = nil
 	}
 
 	res := bootstrap.OVNBootstrapResult{
