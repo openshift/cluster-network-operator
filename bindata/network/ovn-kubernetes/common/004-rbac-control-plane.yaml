@@ -224,7 +224,6 @@ rules:
   - network-attachment-definitions
   verbs: 
   - create
-  - patch
 {{- end}}
 {{- if .OVN_ROUTE_ADVERTISEMENTS_ENABLE }}
 - apiGroups:
