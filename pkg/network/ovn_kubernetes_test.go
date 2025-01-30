@@ -177,7 +177,12 @@ func TestRenderOVNKubernetes(t *testing.T) {
 				{
 					APIGroups: []string{"k8s.cni.cncf.io"},
 					Resources: []string{"network-attachment-definitions"},
-					Verbs:     []string{"patch", "update", "create", "delete"},
+					Verbs:     []string{"patch"},
+				},
+				{
+					APIGroups: []string{"k8s.cni.cncf.io"},
+					Resources: []string{"network-attachment-definitions"},
+					Verbs:     []string{"update", "create", "delete"},
 				},
 				{
 					APIGroups: []string{""},
