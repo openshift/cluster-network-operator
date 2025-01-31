@@ -3392,7 +3392,7 @@ spec:
                           > cidr(self.cidr).prefixLength()'
                       - message: HostSubnet must < 32 for ipv4 CIDR
                         rule: '!has(self.hostSubnet) || !isCIDR(self.cidr) || (cidr(self.cidr).ip().family()
-                          == 4 && self.hostSubnet < 32)'
+                          != 4 || self.hostSubnet < 32)'
                     maxItems: 2
                     minItems: 1
                     type: array
@@ -3803,7 +3803,7 @@ spec:
                               self.hostSubnet > cidr(self.cidr).prefixLength()'
                           - message: HostSubnet must < 32 for ipv4 CIDR
                             rule: '!has(self.hostSubnet) || !isCIDR(self.cidr) ||
-                              (cidr(self.cidr).ip().family() == 4 && self.hostSubnet
+                              (cidr(self.cidr).ip().family() != 4 || self.hostSubnet
                               < 32)'
                         maxItems: 2
                         minItems: 1
