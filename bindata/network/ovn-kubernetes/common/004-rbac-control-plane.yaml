@@ -144,6 +144,12 @@ rules:
   - network-attachment-definitions
   - multi-networkpolicies
   verbs: ["list", "get", "watch"]
+- apiGroups:
+  - k8s.cni.cncf.io
+  resources:
+  - network-attachment-definitions
+  verbs:
+  - patch
 {{- if .OVN_PERSISTENT_IPS_ENABLE }}
 - apiGroups:
     - k8s.cni.cncf.io
@@ -200,7 +206,6 @@ rules:
   resources:
     - network-attachment-definitions
   verbs:
-    - patch
     - update
     - create
     - delete
