@@ -1306,7 +1306,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	}
 
 	// set the default masquerade CIDR for new clusters while ignoring upgrades
-	if res.ControlPlaneUpdateStatus == nil && res.NodeUpdateStatus == nil {
+	if res.ControlPlaneUpdateStatus == nil || res.NodeUpdateStatus == nil {
 		klog.Infof("Configuring the default masquerade subnets to %q and %q", defaultV4MasqueradeSubnet, defaultV6MasqueradeSubnet)
 		res.DefaultV4MasqueradeSubnet = defaultV4MasqueradeSubnet
 		res.DefaultV6MasqueradeSubnet = defaultV6MasqueradeSubnet
