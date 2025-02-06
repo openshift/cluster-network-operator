@@ -179,6 +179,100 @@ func Test_SpecStatusSynchronizer(t *testing.T) {
 			wantedErr: "first VIP cannot be modified",
 		},
 		{
+			name: "succeed: modifying second pair of vips",
+			givenInfra: configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						BareMetal: &configv1.BareMetalPlatformSpec{
+							APIServerInternalIPs: []configv1.IP{"224.0.0.1", "2001:0DB8::10"},
+							IngressIPs:           []configv1.IP{"224.0.0.2", "2001:0DB8::20"},
+						},
+					},
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform: configv1.BareMetalPlatformType,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: "BareMetal",
+						BareMetal: &configv1.BareMetalPlatformStatus{
+							APIServerInternalIPs: []string{"224.0.0.1", "2001:0DB8::1"},
+							IngressIPs:           []string{"224.0.0.2", "2001:0DB8::2"},
+						},
+					},
+				},
+			},
+			wantedInfra: configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						BareMetal: &configv1.BareMetalPlatformSpec{
+							APIServerInternalIPs: []configv1.IP{"224.0.0.1", "2001:0DB8::10"},
+							IngressIPs:           []configv1.IP{"224.0.0.2", "2001:0DB8::20"},
+							MachineNetworks:      []configv1.CIDR{},
+						},
+					},
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform: configv1.BareMetalPlatformType,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: "BareMetal",
+						BareMetal: &configv1.BareMetalPlatformStatus{
+							APIServerInternalIPs: []string{"224.0.0.1", "2001:0DB8::10"},
+							IngressIPs:           []string{"224.0.0.2", "2001:0DB8::20"},
+							MachineNetworks:      []configv1.CIDR{},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "succeed: deleting second pair of vips",
+			givenInfra: configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						BareMetal: &configv1.BareMetalPlatformSpec{
+							APIServerInternalIPs: []configv1.IP{"224.0.0.1"},
+							IngressIPs:           []configv1.IP{"224.0.0.2"},
+						},
+					},
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform: configv1.BareMetalPlatformType,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: "BareMetal",
+						BareMetal: &configv1.BareMetalPlatformStatus{
+							APIServerInternalIPs: []string{"224.0.0.1", "2001:0DB8::1"},
+							IngressIPs:           []string{"224.0.0.2", "2001:0DB8::2"},
+						},
+					},
+				},
+			},
+			wantedInfra: configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						BareMetal: &configv1.BareMetalPlatformSpec{
+							APIServerInternalIPs: []configv1.IP{"224.0.0.1"},
+							IngressIPs:           []configv1.IP{"224.0.0.2"},
+							MachineNetworks:      []configv1.CIDR{},
+						},
+					},
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform: configv1.BareMetalPlatformType,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: "BareMetal",
+						BareMetal: &configv1.BareMetalPlatformStatus{
+							APIServerInternalIPs: []string{"224.0.0.1"},
+							IngressIPs:           []string{"224.0.0.2"},
+							MachineNetworks:      []configv1.CIDR{},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "fail: removing machine networks from spec is forbidden",
 			givenInfra: configv1.Infrastructure{
 				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
