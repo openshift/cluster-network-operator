@@ -626,17 +626,8 @@ spec:
             current-context: whereabouts-context
             EOF
 
-            # Kubeconfig file for Whereabouts CNI plugin.
-            cat > $WHEREABOUTS_GLOBALCONFIG <<EOF
-            {
-              "datastore": "kubernetes",
-              "kubernetes": {
-                "kubeconfig": "/etc/kubernetes/cni/net.d/whereabouts.d/whereabouts.kubeconfig"
-              },
-              "reconciler_cron_expression": "30 4 * * *",
-              "log_level": "debug"
-            }
-            EOF
+            # Copy the config from ConfigMap to the desired directory
+            cp /etc/whereabouts/config/whereabouts.conf $WHEREABOUTS_GLOBALCONFIG
             chmod 600 $WHEREABOUTS_GLOBALCONFIG
 
             else
@@ -667,6 +658,8 @@ spec:
           name: cnibin
         - name: system-cni-dir
           mountPath: /host/etc/cni/net.d
+        - name: whereabouts-configmap
+          mountPath: /etc/whereabouts/config
         env:
         - name: KUBERNETES_SERVICE_PORT
           value: "{{.KUBERNETES_SERVICE_PORT}}"
@@ -721,6 +714,9 @@ spec:
           configMap:
             name: {{.CniSysctlAllowlist}}
             defaultMode: 0744
+        - name: whereabouts-configmap
+          configMap:
+            name: whereabouts-config
 {{if .RenderIpReconciler}}
 ---
 apiVersion: apps/v1
