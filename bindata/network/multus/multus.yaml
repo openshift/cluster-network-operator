@@ -106,6 +106,24 @@ data:
     fi
     rm -Rf $UPGRADE_DIRECTORY
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: whereabouts-config
+  namespace: openshift-multus
+data:
+  whereabouts.conf: |
+    {
+      "datastore": "kubernetes",
+      "kubernetes": {
+        "kubeconfig": "/etc/kubernetes/cni/net.d/whereabouts.d/whereabouts.kubeconfig"
+      },
+      "reconciler_cron_expression": "30 4 * * *",
+      "log_level": "debug",
+      "log_file": "/tmp/whereabouts.log",
+      "configuration_path": "/etc/kubernetes/cni/net.d/whereabouts.d"
+    }
+---
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -156,8 +174,7 @@ data:
           "enabled": true,
           "bootstrapKubeconfig": "{{ .KubeletKubeconfigPath }}",
           "certDir": "/etc/cni/multus/certs",
-          "certDuration": "24h"
-        },
+          "certDuration"nodeName
 {{ end }}
         "cniConfigDir": "/host/etc/cni/net.d",
         "multusConfigFile": "auto",
@@ -558,6 +575,10 @@ spec:
             WHEREABOUTS_KUBECONFIG=$CNI_CONF_DIR/whereabouts.d/whereabouts.kubeconfig
             WHEREABOUTS_GLOBALCONFIG=$CNI_CONF_DIR/whereabouts.d/whereabouts.conf
 
+            # Write the nodename to the whereabouts.d directory for standardized hostname reference across cloud providers
+            
+            echo $NODENAME > $CNI_CONF_DIR/whereabouts.d/nodename
+
             # ------------------------------- Generate a "kube-config"
             SERVICE_ACCOUNT_PATH=/var/run/secrets/kubernetes.io/serviceaccount
             KUBE_CA_FILE=${KUBE_CA_FILE:-$SERVICE_ACCOUNT_PATH/ca.crt}
@@ -609,17 +630,8 @@ spec:
             current-context: whereabouts-context
             EOF
 
-            # Kubeconfig file for Whereabouts CNI plugin.
-            cat > $WHEREABOUTS_GLOBALCONFIG <<EOF
-            {
-              "datastore": "kubernetes",
-              "kubernetes": {
-                "kubeconfig": "/etc/kubernetes/cni/net.d/whereabouts.d/whereabouts.kubeconfig"
-              },
-              "reconciler_cron_expression": "30 4 * * *",
-              "log_level": "debug"
-            }
-            EOF
+            # Copy the config from ConfigMap to the desired directory
+            cp /etc/whereabouts/config/whereabouts.conf $WHEREABOUTS_GLOBALCONFIG
             chmod 600 $WHEREABOUTS_GLOBALCONFIG
 
             else
@@ -650,7 +662,14 @@ spec:
           name: cnibin
         - name: system-cni-dir
           mountPath: /host/etc/cni/net.d
+        - name: whereabouts-configmap
+          mountPath: /etc/whereabouts/config
         env:
+        - name: NODENAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
         - name: KUBERNETES_SERVICE_PORT
           value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: KUBERNETES_SERVICE_HOST
@@ -704,7 +723,10 @@ spec:
           configMap:
             name: {{.CniSysctlAllowlist}}
             defaultMode: 0744
-{{if .RenderIpReconciler}}
+        - name: whereabouts-configmap
+          configMap:
+            name: whereabouts-config
+{{if .RenderWhereaboutsAuxillary}}
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -783,4 +805,74 @@ spec:
             items:
             - key: reconciler_cron_expression
               path: config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whereabouts-controller
+  namespace: openshift-multus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whereabouts-controller
+  template:
+    metadata:
+      labels:
+        app: whereabouts-controller
+    spec:
+      containers:
+        - command:
+            - /usr/src/whereabouts/bin/node-slice-controller
+          env:
+            - name: NODENAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: WHEREABOUTS
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+          image: {{.WhereaboutsImage}}
+          name: whereabouts
+          resources:
+            limits:
+              cpu: 100m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /host/opt/cni/bin
+              name: cnibin
+            - mountPath: /host/etc/cni/net.d
+              name: cni-net-dir
+            - name: whereabouts-configmap
+              mountPath: /host/etc/cni/net.d/whereabouts.d/whereabouts.conf
+              subPath: whereabouts.conf
+      preemptionPolicy: PreemptLowerPriority
+      priorityClassName: "system-node-critical"
+      securityContext: {}
+      serviceAccountName: multus-ancillary-tools
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - hostPath:
+            path: {{ .CNIBinDir }}
+            type: Directory          
+          name: cnibin
+        - hostPath:
+            path: {{ .SystemCNIConfDir }}
+            type: Directory          
+          name: cni-net-dir
+        - name: whereabouts-configmap
+          configMap:
+            name: whereabouts-config
+            items:
+            - key: whereabouts.conf
+              path: whereabouts.conf
 {{- end}}
+---
