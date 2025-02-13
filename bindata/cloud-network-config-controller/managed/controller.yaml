@@ -188,13 +188,15 @@ spec:
         - name: "NO_PROXY"
           value: "{{ .NO_PROXY}}"
 {{ end }}
-{{- if not (eq .AzureManagedClientID "")}}
+{{- if not (eq .AzureManagedSecretProviderClass "")}}
         - name: "ARO_HCP_MI_CLIENT_ID"
           value: "{{ .AzureManagedClientID }}"
         - name: "ARO_HCP_TENANT_ID"
           value: "{{ .AzureManagedTenantID }}"
         - name: "ARO_HCP_CLIENT_CERTIFICATE_PATH"
           value: "{{ .AzureManagedCertPath}}"
+        - name: "ARO_HCP_CLIENT_CREDENTIALS_PATH"
+          value: "{{ .AzureManagedCredsPath}}"
 {{ end }}
         resources:
           requests:
@@ -214,7 +216,7 @@ spec:
         - name: cloud-token
           mountPath: /var/run/secrets/openshift/serviceaccount
           readOnly: true
-{{- if not (eq .AzureManagedClientID "")}}
+{{- if not (eq .AzureManagedSecretProviderClass "")}}
         - name: cncc-cert
           mountPath: {{.AzureManagedCertDirectory}}
           readOnly: true
@@ -260,7 +262,7 @@ spec:
       - name: kube-cloud-config
         configMap:
           name: cloud-network-config-controller-kube-cloud-config
-{{- if not (eq .AzureManagedClientID "")}}
+{{- if not (eq .AzureManagedSecretProviderClass "")}}
       - name: cncc-cert
         csi:
           driver: secrets-store.csi.k8s.io
