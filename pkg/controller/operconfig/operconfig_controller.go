@@ -38,6 +38,7 @@ import (
 	v1coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -87,7 +88,7 @@ func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c c
 		Kind:       "Deployment",
 		Namespace:  "openshift-network-operator",
 		Name:       "network-operator",
-	})
+	}, clock.RealClock{})
 
 	// By default, this will exit(0) the process if the featuregates ever change to a different set of values.
 	featureGateAccessor := featuregates.NewFeatureGateAccess(
