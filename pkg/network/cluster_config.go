@@ -359,13 +359,16 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec, oldStatus *configv1.
 			status.Migration = &configv1.NetworkMigration{
 				NetworkType: string(operConf.DefaultNetwork.Type),
 			}
-		} else {
+		} else if operConf.Migration.NetworkType != "" {
 			status.Migration = &configv1.NetworkMigration{
 				NetworkType: operConf.Migration.NetworkType,
 			}
 		}
 
 		if operConf.Migration.MTU != nil {
+			if status.Migration == nil {
+				status.Migration = &configv1.NetworkMigration{}
+			}
 			status.Migration.MTU = &configv1.MTUMigration{
 				Network: (*configv1.MTUMigrationValues)(operConf.Migration.MTU.Network),
 				Machine: (*configv1.MTUMigrationValues)(operConf.Migration.MTU.Machine),
