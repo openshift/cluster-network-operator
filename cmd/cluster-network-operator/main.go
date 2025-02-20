@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"k8s.io/utils/clock"
 
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
@@ -47,7 +48,7 @@ func newNetworkOperatorCommand() *cobra.Command {
 	var inClusterClientName *string
 	cmdcfg := controllercmd.NewControllerCommandConfig("network-operator", version.Get(), func(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
 		return operator.RunOperator(ctx, controllerConfig, *inClusterClientName, *extraClusters)
-	})
+	}, clock.RealClock{})
 
 	cmd2 := cmdcfg.NewCommand()
 	cmd2.Use = "start"
