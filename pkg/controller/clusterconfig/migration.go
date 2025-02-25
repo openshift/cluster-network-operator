@@ -103,7 +103,7 @@ func (r *ReconcileClusterConfig) prepareOperatorConfigForNetworkTypeMigration(ct
 		return nil
 	}
 
-	if !cniReady && clusterConfig.Status.Migration == nil {
+	if !cniReady && (clusterConfig.Status.Migration == nil || clusterConfig.Status.Migration.NetworkType == "") {
 		klog.Infof("step-1: deploy target CNI: %s", clusterConfig.Spec.NetworkType)
 		operConfig.Spec.Migration = &operv1.NetworkMigration{
 			Mode:        operv1.LiveNetworkMigrationMode,
