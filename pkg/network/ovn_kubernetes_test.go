@@ -4044,6 +4044,21 @@ func Test_renderOVNKubernetes(t *testing.T) {
 			},
 			expectNumObjs: 43,
 		},
+		{
+			name: "render routeadvertisements",
+			args: args{
+				conf: func() *operv1.NetworkSpec {
+					config := fakeNetworkConf()
+					config.DefaultNetwork.OVNKubernetesConfig.RouteAdvertisements = operv1.RouteAdvertisementsEnabled
+					return config
+				},
+				bootstrapResult: fakeBootstrapResultOVN,
+				manifestDir:     manifestDirOvn,
+				client:          cnofake.NewFakeClient(),
+				featureGates:    noFeatureGates,
+			},
+			expectNumObjs: 38,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
