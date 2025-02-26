@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 
 	osoperclient "github.com/openshift/client-go/operator/clientset/versioned"
+	osoperfakeclient "github.com/openshift/client-go/operator/clientset/versioned/fake"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	crfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -42,6 +43,8 @@ type FakeClusterClient struct {
 	// crclient is the controller-runtime ClusterClient, for controllers that have
 	// not yet been migrated.
 	crclient crclient.Client
+
+	osOperClient osoperclient.Interface
 }
 
 func (fc *FakeClient) ClientFor(name string) cnoclient.ClusterClient {
@@ -98,11 +101,11 @@ func NewFakeClient(objs ...crclient.Object) cnoclient.Client {
 	}
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: ""}}
 	fc := FakeClusterClient{
-		kClient:   faketyped.NewSimpleClientset(ooTyped...),
-		dynclient: fakedynamic.NewSimpleDynamicClient(scheme.Scheme, oo...),
-		crclient:  crfake.NewClientBuilder().WithStatusSubresource(co).WithObjects(objs...).Build(),
+		kClient:      faketyped.NewSimpleClientset(ooTyped...),
+		dynclient:    fakedynamic.NewSimpleDynamicClient(scheme.Scheme, oo...),
+		crclient:     crfake.NewClientBuilder().WithStatusSubresource(co).WithObjects(objs...).Build(),
+		osOperClient: osoperfakeclient.NewSimpleClientset(),
 	}
-
 	return &FakeClient{
 		clusterClients: map[string]*FakeClusterClient{
 			names.DefaultClusterName: &fc,
@@ -150,8 +153,8 @@ func (fc *FakeClusterClient) Kubernetes() kubernetes.Interface {
 	return fc.kClient
 }
 
-func (fc *FakeClusterClient) OpenshiftOperatorClient() *osoperclient.Clientset {
-	panic("not implemented!")
+func (fc *FakeClusterClient) OpenshiftOperatorClient() osoperclient.Interface {
+	return fc.osOperClient
 }
 
 func (fc *FakeClusterClient) Config() *rest.Config {
