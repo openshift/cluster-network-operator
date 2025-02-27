@@ -127,6 +127,7 @@ func New(client cnoclient.Client, name, cluster string) *StatusManager {
 		depListers:                 map[string]DeploymentLister{},
 		ssInformers:                map[string]cache.SharedIndexInformer{},
 		ssListers:                  map[string]StatefulSetLister{},
+		renderedMachineConfigs:     map[string]sets.Set[string]{},
 		machineConfigsBeingRemoved: map[string]sets.Set[string]{},
 	}
 	var err error
