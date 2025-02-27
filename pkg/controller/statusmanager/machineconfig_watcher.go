@@ -3,7 +3,7 @@ package statusmanager
 import (
 	"context"
 
-	"github.com/openshift/cluster-network-operator/pkg/platform"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,7 +11,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
-	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -31,8 +30,9 @@ type MachineConfigPoolWatcher struct {
 	cache  cache.Cache
 }
 
-// AddMachineConfigWatcher wires up the MachineConfigWatcher to the controller-manager.
-func (s *StatusManager) AddMachineConfigWatcher(mgr manager.Manager) error {
+// AddMachineConfigWatchers wires up the MachineConfigWatcher and MachineConfigPoolWatcher
+// to the controller-manager.
+func (s *StatusManager) AddMachineConfigWatchers(mgr manager.Manager) error {
 	if s.hyperShiftConfig.Enabled {
 		// MachineConfig is not supported in HyperShift cluster, so return without
 		// initializing watcher.
@@ -40,26 +40,42 @@ func (s *StatusManager) AddMachineConfigWatcher(mgr manager.Manager) error {
 	}
 
 	operatorCache := mgr.GetCache()
-	pw := &MachineConfigWatcher{
+	machineConfigWatcher := &MachineConfigWatcher{
 		status: s,
 		cache:  operatorCache,
 	}
-	c, err := controller.New("machineconfig-watcher", mgr, controller.Options{Reconciler: pw})
+	machineConfigController, err := controller.New("machineconfig-watcher", mgr,
+		controller.Options{Reconciler: machineConfigWatcher})
+	if err != nil {
+		return err
+	}
+
+	machineConfigPoolWatcher := &MachineConfigPoolWatcher{
+		status: s,
+		cache:  operatorCache,
+	}
+	machineConfigPoolController, err := controller.New("machineconfigpool-watcher", mgr,
+		controller.Options{Reconciler: machineConfigPoolWatcher})
 	if err != nil {
 		return err
 	}
 
 	s.Lock()
-	defer s.Unlock()
-	if s.renderedMachineConfigs == nil {
-		s.renderedMachineConfigs, err = s.getLastRenderedMachineConfigState()
-		if err != nil {
-			return err
-		}
+	s.renderedMachineConfigs, err = s.getLastRenderedMachineConfigState()
+	if err != nil {
+		s.Unlock()
+		return err
+	}
+	s.Unlock()
+
+	err = machineConfigController.Watch(source.Kind(operatorCache, &mcfgv1.MachineConfig{}),
+		&handler.EnqueueRequestForObject{}, onMachineConfigPredicate())
+	if err != nil {
+		return err
 	}
 
-	return c.Watch(source.Kind[crclient.Object](operatorCache, &mcfgv1.MachineConfig{},
-		&handler.EnqueueRequestForObject{}, onMachineConfigPredicate()))
+	return machineConfigPoolController.Watch(source.Kind(operatorCache, &mcfgv1.MachineConfigPool{}),
+		&handler.EnqueueRequestForObject{}, onMachineConfigPoolPredicate())
 }
 
 // Reconcile triggers a re-update of Status.
@@ -71,39 +87,7 @@ func (m *MachineConfigWatcher) Reconcile(ctx context.Context, request reconcile.
 		klog.Errorf("failed to retrieve machine config pools: %v", err)
 		return reconcile.Result{}, nil
 	}
-	m.status.SetFromMachineConfigPool(mcPools.Items)
-	return reconcile.Result{}, nil
-}
-
-// AddMachineConfigPoolWatcher wires up the MachineConfigPoolWatcher to the controller-manager.
-func (s *StatusManager) AddMachineConfigPoolWatcher(mgr manager.Manager) error {
-	if s.hyperShiftConfig.Enabled {
-		// MachineConfig is not supported in HyperShift cluster, so return without
-		// initializing watcher.
-		return nil
-	}
-
-	operatorCache := mgr.GetCache()
-	pw := &MachineConfigPoolWatcher{
-		status: s,
-		cache:  operatorCache,
-	}
-	c, err := controller.New("machineconfigpool-watcher", mgr, controller.Options{Reconciler: pw})
-	if err != nil {
-		return err
-	}
-
-	s.Lock()
-	defer s.Unlock()
-	if s.renderedMachineConfigs == nil {
-		s.renderedMachineConfigs, err = s.getLastRenderedMachineConfigState()
-		if err != nil {
-			return err
-		}
-	}
-
-	return c.Watch(source.Kind[crclient.Object](operatorCache, &mcfgv1.MachineConfigPool{},
-		&handler.EnqueueRequestForObject{}, onMachineConfigPoolPredicate()))
+	return reconcile.Result{}, m.status.SetFromMachineConfigPool(mcPools.Items)
 }
 
 // Reconcile triggers a re-update of Status.
@@ -115,8 +99,7 @@ func (p *MachineConfigPoolWatcher) Reconcile(ctx context.Context, request reconc
 		klog.Errorf("failed to retrieve machine config pools: %v", err)
 		return reconcile.Result{}, nil
 	}
-	p.status.SetFromMachineConfigPool(mcPools.Items)
-	return reconcile.Result{}, nil
+	return reconcile.Result{}, p.status.SetFromMachineConfigPool(mcPools.Items)
 }
 
 func onMachineConfigPredicate() predicate.Predicate {
@@ -164,6 +147,6 @@ func hasRequiredMachineConfigSelector(mcp *mcfgv1.MachineConfigPool) bool {
 	matches := func(mcSelector labels.Selector, masterLabelSet labels.Set) bool {
 		return mcSelector.Matches(masterLabelSet)
 	}
-	return matches(mcSelector, platform.MasterRoleMachineConfigLabel) ||
-		matches(mcSelector, platform.WorkerRoleMachineConfigLabel)
+	return matches(mcSelector, names.MasterRoleMachineConfigLabel()) ||
+		matches(mcSelector, names.WorkerRoleMachineConfigLabel())
 }
