@@ -1,16 +1,9 @@
 package machineconfig
 
 import (
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-)
-
-var (
-	// When user deploys their own machine config for installing and configuring specific version of libreswan, then
-	// corresponding master and worker role machine configs annotation must have `user-ipsec-machine-config: true`.
-	// When CNO finds machine configs with the annotation, then it skips rendering its own IPsec machine configs
-	// and reuse already deployed user machine configs for the ovn-ipsec-host daemonset.
-	UserDefinedIPsecMachineConfigAnnotation = map[string]string{"user-ipsec-machine-config": "true"}
 )
 
 // IsUserDefinedIPsecMachineConfig return true if machine config's annotation is set with
@@ -27,7 +20,7 @@ func IsUserDefinedIPsecMachineConfig(machineConfig *mcfgv1.MachineConfig) bool {
 		}
 		return true
 	}
-	return isSubset(machineConfig.Annotations, UserDefinedIPsecMachineConfigAnnotation)
+	return isSubset(machineConfig.Annotations, names.UserDefinedIPsecMachineConfigAnnotation())
 }
 
 // AreMachineConfigsRenderedOnPool returns true if machineConfigs are completely rendered on the given machine config
