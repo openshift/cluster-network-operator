@@ -166,6 +166,39 @@ const (
 	NetworkTypeMigrationMTUReady string = "NetworkTypeMigrationMTUReady"
 )
 
+const (
+	// MachineConfigLabelRoleKey label key for machine config role.
+	MachineConfigLabelRoleKey = "machineconfiguration.openshift.io/role"
+)
+
+var (
+	masterRoleMachineConfigLabel            = map[string]string{MachineConfigLabelRoleKey: "master"}
+	workerRoleMachineConfigLabel            = map[string]string{MachineConfigLabelRoleKey: "worker"}
+	userDefinedIPsecMachineConfigAnnotation = map[string]string{"user-ipsec-machine-config": "true"}
+)
+
+// MasterRoleMachineConfigLabel returns machine config label
+// for master role.
+func MasterRoleMachineConfigLabel() map[string]string {
+	return masterRoleMachineConfigLabel
+}
+
+// WorkerRoleMachineConfigLabel returns machine config label
+// for worker role.
+func WorkerRoleMachineConfigLabel() map[string]string {
+	return workerRoleMachineConfigLabel
+}
+
+// UserDefinedIPsecMachineConfigAnnotation returns annotation for IPsec machine configs deployed by
+// user explicitly. When user deploys their own machine config for installing and configuring specific
+// version of libreswan, then corresponding master and worker role machine configs annotation must
+// have `user-ipsec-machine-config: true`. When CNO finds machine configs with the annotation, then
+// it skips rendering its own IPsec machine configs and reuse already deployed user machine configs
+// for the ovn-ipsec-host daemonset.
+func UserDefinedIPsecMachineConfigAnnotation() map[string]string {
+	return userDefinedIPsecMachineConfigAnnotation
+}
+
 // Proxy returns the namespaced name "cluster" in the
 // default namespace.
 func Proxy() types.NamespacedName {
