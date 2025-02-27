@@ -469,7 +469,13 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	r.status.SetRelatedObjects(relatedObjects)
 	r.status.SetRelatedClusterObjects(relatedClusterObjects)
-	r.status.SetMachineConfigs(ctx, renderedMachineConfigs)
+	err = r.status.SetMachineConfigs(ctx, renderedMachineConfigs)
+	if err != nil {
+		log.Printf("Failed to process machine configs: %v", err)
+		r.status.SetDegraded(statusmanager.OperatorConfig, "MachineConfigError",
+			fmt.Sprintf("Internal error while processing rendered Machine Configs: %v", err))
+		return reconcile.Result{}, err
+	}
 
 	// Apply the objects to the cluster
 	setDegraded := false
