@@ -46,7 +46,7 @@ func TestRenderNetworkMetricsDaemon(t *testing.T) {
 
 	// Check rendered object
 
-	g.Expect(len(objs)).To(Equal(31), "Expected 31 multus related objects")
+	g.Expect(len(objs)).To(Equal(32), "Expected 32 multus related objects")
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "network-metrics-daemon")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Service", "openshift-multus", "network-metrics-service")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "metrics-daemon-role")))
