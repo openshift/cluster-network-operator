@@ -19,6 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/clock"
 )
 
 func NewCheckEndpointsCommand() *cobra.Command {
@@ -55,7 +56,7 @@ func NewCheckEndpointsCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		recorder := events.NewRecorder(kubeClient.CoreV1().Events(namespace), "check-endpoint", involvedObjectRef)
+		recorder := events.NewRecorder(kubeClient.CoreV1().Events(namespace), "check-endpoint", involvedObjectRef, clock.RealClock{})
 
 		check := controller.NewPodNetworkConnectivityCheckController(
 			podName,
@@ -100,7 +101,7 @@ func NewCheckEndpointsCommand() *cobra.Command {
 		go stopController.Run(ctx, 1)
 		<-ctx.Done()
 		return nil
-	})
+	}, clock.RealClock{})
 	config.DisableLeaderElection = true
 	cmd := config.NewCommandWithContext(context.Background())
 	cmd.Use = "check-endpoints"
