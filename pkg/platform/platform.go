@@ -11,6 +11,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	mcutil "github.com/openshift/cluster-network-operator/pkg/util/machineconfig"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -29,16 +30,6 @@ var cloudProviderConfig = types.NamespacedName{
 	Namespace: "openshift-config-managed",
 	Name:      "kube-cloud-config",
 }
-
-var (
-	masterRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "master"}
-	workerRoleMachineConfigLabel = map[string]string{"machineconfiguration.openshift.io/role": "worker"}
-	// When user deploys their own machine config for installing and configuring specific version of libreswan, then
-	// corresponding master and worker role machine configs annotation must have `user-ipsec-machine-config: true`.
-	// When CNO finds machine configs with the annotation, then it skips rendering its own IPsec machine configs
-	// and reuse already deployed user machine configs for the ovn-ipsec-host daemonset.
-	UserDefinedIPsecMachineConfigAnnotation = map[string]string{"user-ipsec-machine-config": "true"}
-)
 
 // isNetworkNodeIdentityEnabled determines if network node identity should be enabled.
 // It checks the `enabled` key in the network-node-identity/openshift-network-operator configmap.
@@ -173,20 +164,20 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	// The IPsecMachineConfig in 4.14 is created by user and can be created with any name and also is not managed by network operator, so find it by using the label
 	// and looking for the extension.
 
-	masterIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, masterRoleMachineConfigLabel)
+	masterIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, names.MasterRoleMachineConfigLabel())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ipsec machine configs for master: %v", err)
 	}
 	res.MasterIPsecMachineConfigs = masterIPsecMachineConfigs
 
-	workerIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, workerRoleMachineConfigLabel)
+	workerIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, names.WorkerRoleMachineConfigLabel())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ipsec machine configs for worker: %v", err)
 	}
 	res.WorkerIPsecMachineConfigs = workerIPsecMachineConfigs
 
 	if res.MasterIPsecMachineConfigs != nil {
-		mcpMasterStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, masterRoleMachineConfigLabel)
+		mcpMasterStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, names.MasterRoleMachineConfigLabel())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get machine config pools for master role: %v", err)
 		}
@@ -194,7 +185,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	}
 
 	if res.WorkerIPsecMachineConfigs != nil {
-		mcpWorkerStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, workerRoleMachineConfigLabel)
+		mcpWorkerStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, names.WorkerRoleMachineConfigLabel())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get machine config pools for worker role: %v", err)
 		}
@@ -219,7 +210,7 @@ func findIPsecMachineConfigsWithLabel(client cnoclient.Client, mcLabel labels.Se
 	var ipsecMachineConfigs []*mcfgv1.MachineConfig
 	for i, machineConfig := range machineConfigs.Items {
 		if sets.New(machineConfig.Spec.Extensions...).Has("ipsec") ||
-			IsUserDefinedIPsecMachineConfig(&machineConfigs.Items[i]) {
+			mcutil.IsUserDefinedIPsecMachineConfig(&machineConfigs.Items[i]) {
 			ipsecMachineConfigs = append(ipsecMachineConfigs, &machineConfigs.Items[i])
 		}
 	}
@@ -280,21 +271,4 @@ func consolePluginCRDExists(cl cnoclient.Client) (bool, error) {
 		}
 	}
 	return true, nil
-}
-
-// IsUserDefinedIPsecMachineConfig return true if machine config's annotation is set with
-// `user-ipsec-machine-config: true`, otherwise returns false.
-func IsUserDefinedIPsecMachineConfig(machineConfig *mcfgv1.MachineConfig) bool {
-	if machineConfig == nil {
-		return false
-	}
-	isSubset := func(mcAnnotations, ipsecAnnotation map[string]string) bool {
-		for ipsecKey, ipsecValue := range ipsecAnnotation {
-			if mcAnnotationValue, ok := mcAnnotations[ipsecKey]; !ok || mcAnnotationValue != ipsecValue {
-				return false
-			}
-		}
-		return true
-	}
-	return isSubset(machineConfig.Annotations, UserDefinedIPsecMachineConfigAnnotation)
 }

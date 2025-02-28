@@ -26,12 +26,14 @@ import (
 	ipsecMetrics "github.com/openshift/cluster-network-operator/pkg/util/ipsec"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/library-go/pkg/operator/events"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -419,6 +421,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	relatedObjects := []configv1.ObjectReference{}
 	relatedClusterObjects := []hypershift.RelatedObject{}
+	renderedMachineConfigs := []mcfgv1.MachineConfig{}
 	hcpCfg := hypershift.NewHyperShiftConfig()
 	for _, obj := range objs {
 		// Label all DaemonSets, Deployments, and StatefulSets with the label that generates Status.
@@ -464,6 +467,16 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			Name:      obj.GetName(),
 			Namespace: obj.GetNamespace(),
 		})
+
+		if obj.GetAPIVersion() == "machineconfiguration.openshift.io/v1" && obj.GetKind() == "MachineConfig" {
+			mc := mcfgv1.MachineConfig{}
+			err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &mc)
+			if err != nil {
+				log.Printf("Unable to retrieve MachineConfig for rendered object: %v", err)
+				continue
+			}
+			renderedMachineConfigs = append(renderedMachineConfigs, mc)
+		}
 	}
 
 	relatedObjects = append(relatedObjects, configv1.ObjectReference{
@@ -486,6 +499,13 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	r.status.SetRelatedObjects(relatedObjects)
 	r.status.SetRelatedClusterObjects(relatedClusterObjects)
+	err = r.status.SetMachineConfigs(ctx, renderedMachineConfigs)
+	if err != nil {
+		log.Printf("Failed to process machine configs: %v", err)
+		r.status.SetDegraded(statusmanager.OperatorConfig, "MachineConfigError",
+			fmt.Sprintf("Internal error while processing rendered Machine Configs: %v", err))
+		return reconcile.Result{}, err
+	}
 
 	// Apply the objects to the cluster
 	setDegraded := false
