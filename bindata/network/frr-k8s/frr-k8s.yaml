@@ -87,7 +87,6 @@ spec:
         - --namespace=$(NAMESPACE)
         - --metrics-bind-address=127.0.0.1:7572
         - $(LOG_LEVEL)
-        - --health-probe-bind-address=127.0.0.1:8081
         env:
         - name: FRR_CONFIG_FILE
           value: /etc/frr_reloader/frr.conf
@@ -117,8 +116,8 @@ spec:
         terminationMessagePolicy: FallbackToLogsOnError
         livenessProbe:
           httpGet:
-            path: /healthz
-            port: 8081
+            path: /metrics
+            port: monitoring
             host: 127.0.0.1
           initialDelaySeconds: 10
           periodSeconds: 10
@@ -127,8 +126,8 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /healthz
-            port: 8081
+            path: /metrics
+            port: monitoring
             host: 127.0.0.1
           initialDelaySeconds: 10
           periodSeconds: 10
