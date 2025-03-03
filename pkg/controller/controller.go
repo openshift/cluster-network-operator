@@ -19,5 +19,8 @@ func AddToManager(m manager.Manager, sm *statusmanager.StatusManager, c cnoclien
 	if err := sm.AddPodWatcher(m); err != nil {
 		return err
 	}
+	if err := sm.AddMachineConfigWatchers(m); err != nil {
+		return err
+	}
 	return nil
 }
