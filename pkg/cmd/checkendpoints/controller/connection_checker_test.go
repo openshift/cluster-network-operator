@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
+	"k8s.io/utils/clock"
 
 	"github.com/openshift/cluster-network-operator/pkg/cmd/checkendpoints/trace"
 )
@@ -142,6 +143,7 @@ func TestManageStatusLogs(t *testing.T) {
 
 func TestManageStatusOutage(t *testing.T) {
 	//testOpErr := &net.OpError{Op: "connect", Net: "tcp", Err: errors.New("test error")}
+	var passiveClock clock.PassiveClock
 	testCases := []struct {
 		name     string
 		err      error
@@ -418,7 +420,7 @@ func TestManageStatusOutage(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			status := tc.initial
-			manageStatusOutage(events.NewInMemoryRecorder(t.Name()))(status)
+			manageStatusOutage(events.NewInMemoryRecorder(t.Name(), passiveClock))(status)
 			assert.Equal(t, tc.expected, status.Outages)
 			if t.Failed() {
 				t.Log("\n", mergepatch.ToYAMLOrError(tc.expected))
