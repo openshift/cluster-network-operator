@@ -16,7 +16,7 @@ spec:
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: frr-k8s-validating-webhook-configuration
+  name: frr-k8s-validating-webhook-configuration-ocp
   annotations:
     service.beta.openshift.io/inject-cabundle: "true"
 webhooks:
