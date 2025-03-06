@@ -329,10 +329,12 @@ spec:
           name: host-var-lib
         - mountPath: /etc
           name: host-etc
+{{ if .MountHostIPsecPath }}
         - mountPath: /usr/sbin/ipsec
           name: ipsec-bin
         - mountPath: /usr/libexec/ipsec
           name: ipsec-lib
+{{ end }}
         - mountPath: /usr/share/rpm
           name: host-usr-share-rpm
           readOnly: true
@@ -531,6 +533,7 @@ spec:
           path: /etc
           type: Directory
         name: host-etc
+{{ if .MountHostIPsecPath }}
       - hostPath:
           path: /usr/sbin/ipsec
           type: File
@@ -539,6 +542,7 @@ spec:
           path: /usr/libexec/ipsec
           type: Directory
         name: ipsec-lib
+{{end}}
       - name: host-usr-share-rpm
         hostPath:
           path: /usr/share/rpm
