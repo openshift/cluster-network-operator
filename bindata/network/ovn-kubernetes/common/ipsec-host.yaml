@@ -329,10 +329,10 @@ spec:
           name: host-var-lib
         - mountPath: /etc
           name: host-etc
-        - mountPath: /usr/sbin/ipsec
-          name: ipsec-bin
-        - mountPath: /usr/libexec/ipsec
-          name: ipsec-lib
+        - mountPath: /usr/sbin
+          name: usr-sbin
+        - mountPath: /usr/libexec
+          name: usr-libexec
         - mountPath: /usr/share/rpm
           name: host-usr-share-rpm
           readOnly: true
@@ -532,13 +532,13 @@ spec:
           type: Directory
         name: host-etc
       - hostPath:
-          path: /usr/sbin/ipsec
-          type: File
-        name: ipsec-bin
-      - hostPath:
-          path: /usr/libexec/ipsec
+          path: /usr/sbin
           type: Directory
-        name: ipsec-lib
+        name: usr-sbin
+      - hostPath:
+          path: /usr/libexec
+          type: Directory
+        name: usr-libexec
       - name: host-usr-share-rpm
         hostPath:
           path: /usr/share/rpm
