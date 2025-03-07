@@ -30,6 +30,7 @@ import (
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	mcutil "github.com/openshift/cluster-network-operator/pkg/util/machineconfig"
+	"github.com/openshift/cluster-network-operator/pkg/version"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
@@ -576,6 +577,34 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// with the the IPsec MachineConfig extensions active, the containerized
 	// daemonset is dormant and the host daemonset is active. When the upgrade
 	// finishes, the containerized daemonset is then not rendered.
+	//
+	// The upgrade from 4.14 is handled very carefully to correctly migrate
+	// from containerized ipsec deployment to the host ipsec deployment.
+	//  1. OCP 4.14 with container ipsec deployment is active using libreswan
+	//     4.6.3; and host ipsec deployment is dormant.
+	//  2. Start the 4.15 upgrade.
+	//  3. CNO upgrades to 4.15.
+	//  4. CNO renders 4.15 versions of the container ipsec deployment and
+	//     host ipsec deployment with no state change. However the host ipsec
+	//     deployment mounts to top system level directories for the host ipsec
+	//     path for this upgrade scenario. It fixes two problems.
+	//     a) version mismatch between libreswan installed on the host and
+	//        host ipsec deployment pod container.
+	//     b) host ipsec deployment pod goes into pending state if we mount the
+	//        binaries directly and libreswan has not been installed yet
+	//        on the host by IPsec machine configs.
+	//  5. CNO waits until MCO is upgraded to 4.15 and then deploys CNO ipsec
+	//     machine configs that will install and run libreswan 4.6.3 on the
+	//     host. Otherwise, without waiting for MCO 4.15, libreswan 4.9 may
+	//     be installed from 4.14 MCO which has all known stability problems
+	//     found from the bugs.
+	//     https://issues.redhat.com/browse/OCPBUGS-41823
+	//     https://issues.redhat.com/browse/OCPBUGS-42952
+	//  6. Host ipsec deployment becomes active using libreswan 4.6.3 from the
+	//     container which can successfully run against libreswan 4.6.3 running
+	//     on the host.
+	//  7. At the same time as step 6, containerized ipsec deployment becomes
+	//     dormant, and eventually gets removed when the upgrade is done.
 
 	isHypershiftHostedCluster := bootstrapResult.Infra.HostedControlPlane != nil
 	isOVNIPsecActiveOrRollingOut := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.IsOVNIPsecActiveOrRollingOut
@@ -1444,10 +1473,10 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 
 	// compute version delta
 	// versionUpgrade means the existing daemonSet needs an upgrade.
-	controlPlaneDelta := compareVersions(controlPlaneVersion, releaseVersion)
-	nodeDelta := compareVersions(nodeVersion, releaseVersion)
+	controlPlaneDelta := version.CompareVersions(controlPlaneVersion, releaseVersion)
+	nodeDelta := version.CompareVersions(nodeVersion, releaseVersion)
 
-	if controlPlaneDelta == versionUnknown || nodeDelta == versionUnknown {
+	if controlPlaneDelta == version.VersionUnknown || nodeDelta == version.VersionUnknown {
 		klog.Warningf("could not determine ovn-kubernetes daemonset update directions; node: %s, control-plane: %s, release: %s",
 			nodeVersion, controlPlaneVersion, releaseVersion)
 		return true, true
@@ -1471,14 +1500,14 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 
 	// both older (than CNO)
 	// Update node only.
-	if controlPlaneDelta == versionUpgrade && nodeDelta == versionUpgrade {
+	if controlPlaneDelta == version.VersionUpgrade && nodeDelta == version.VersionUpgrade {
 		klog.V(2).Infof("Upgrading OVN-Kubernetes node before control-plane")
 		return true, false
 	}
 
 	// control plane older, node updated
 	// update control plane if node is rolled out
-	if controlPlaneDelta == versionUpgrade && nodeDelta == versionSame {
+	if controlPlaneDelta == version.VersionUpgrade && nodeDelta == version.VersionSame {
 		if ovn.NodeUpdateStatus.Progressing {
 			klog.V(2).Infof("Waiting for OVN-Kubernetes node update to roll out before updating control-plane")
 			return true, false
@@ -1489,14 +1518,14 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 
 	// both newer
 	// downgrade control plane before node
-	if controlPlaneDelta == versionDowngrade && nodeDelta == versionDowngrade {
+	if controlPlaneDelta == version.VersionDowngrade && nodeDelta == version.VersionDowngrade {
 		klog.V(2).Infof("Downgrading OVN-Kubernetes control-plane before node")
 		return false, true
 	}
 
 	// control plane same, node needs downgrade
 	// wait for control plane rollout
-	if controlPlaneDelta == versionSame && nodeDelta == versionDowngrade {
+	if controlPlaneDelta == version.VersionSame && nodeDelta == version.VersionDowngrade {
 		if ovn.ControlPlaneUpdateStatus.Progressing {
 			klog.V(2).Infof("Waiting for OVN-Kubernetes control-plane downgrade to roll out before downgrading node")
 			return false, true
@@ -1506,7 +1535,7 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 	}
 
 	// unlikely, should be caught above
-	if controlPlaneDelta == versionSame && nodeDelta == versionSame {
+	if controlPlaneDelta == version.VersionSame && nodeDelta == version.VersionSame {
 		return true, true
 	}
 
@@ -1659,7 +1688,7 @@ func isOVNIPsecNotActiveInDaemonSet(ds *appsv1.DaemonSet) bool {
 		return false
 	}
 	// If IPsec is running with older version and ipsec=true is found from nbdb container, then return false.
-	if !isVersionGreaterThanOrEqualTo(annotations["release.openshift.io/version"], 4, 15) &&
+	if !version.IsVersionGreaterThanOrEqualTo(annotations["release.openshift.io/version"], 4, 15) &&
 		isIPSecEnabledInPod(ds.Spec.Template, util.OVN_NBDB) {
 		return false
 	}
