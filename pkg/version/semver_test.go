@@ -1,4 +1,4 @@
-package network
+package version
 
 import (
 	"strconv"
@@ -16,47 +16,47 @@ func TestDirection(t *testing.T) {
 		{
 			"1.2.3",
 			"1.2.4",
-			versionUpgrade,
+			VersionUpgrade,
 		},
 		{
 			"1.2.4",
 			"1.2.3",
-			versionDowngrade,
+			VersionDowngrade,
 		},
 		{
 			"asdf",
 			"fdsa",
-			versionUnknown,
+			VersionUnknown,
 		},
 		{
 			"1.1.1",
 			"1.1.1",
-			versionSame,
+			VersionSame,
 		},
 		{
 			"4.7.0-0.ci-2021-01-16-102811",
 			"4.7.0-0.ci-2021-01-18-121038",
-			versionUpgrade,
+			VersionUpgrade,
 		},
 		{
 			"4.7.0-0.ci-2021-01-18-121038",
 			"4.7.0-0.ci-2021-01-16-102811",
-			versionDowngrade,
+			VersionDowngrade,
 		},
 		{
 			"4.6.0-0.ci-2021-01-18-121038",
 			"4.7.0-0.ci-2021-01-16-102811",
-			versionUpgrade,
+			VersionUpgrade,
 		},
 		{
 			"4.6.5",
 			"4.7.0-0.ci-2021-01-16-102811",
-			versionUpgrade,
+			VersionUpgrade,
 		},
 	} {
 		t.Run(strconv.Itoa(idx), func(t *testing.T) {
 			g := NewGomegaWithT(t)
-			g.Expect(compareVersions(tc.from, tc.to)).To(Equal(tc.result))
+			g.Expect(CompareVersions(tc.from, tc.to)).To(Equal(tc.result))
 		})
 	}
 }
@@ -102,7 +102,7 @@ func TestVersionComparison(t *testing.T) {
 		t.Run(strconv.Itoa(idx), func(t *testing.T) {
 			g := NewGomegaWithT(t)
 
-			g.Expect(isVersionGreaterThanOrEqualTo(tc.version, tc.otherVersionMajor, tc.otherVersionMinor)).To(Equal(tc.resultGreaterThanOrEqualTo))
+			g.Expect(IsVersionGreaterThanOrEqualTo(tc.version, tc.otherVersionMajor, tc.otherVersionMinor)).To(Equal(tc.resultGreaterThanOrEqualTo))
 		})
 	}
 }
