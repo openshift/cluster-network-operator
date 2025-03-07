@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	mcutil "github.com/openshift/cluster-network-operator/pkg/util/machineconfig"
+	"github.com/openshift/cluster-network-operator/pkg/version"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -234,7 +235,16 @@ func isMachineConfigClusterOperatorReady(client cnoclient.Client) (bool, error) 
 			progressing = isConditionTrue
 		}
 	}
-	machineConfigClusterOperatorReady := available && !degraded && !progressing
+	// The network operator is supporting machine configs starting with IPsec machine configs from 4.15, so
+	// we need to consider it has to be >= 4.15 as well.
+	var isDesiredOperatorVersion bool
+	for _, v := range machineConfigClusterOperator.Status.Versions {
+		if v.Name == "operator" {
+			isDesiredOperatorVersion = version.IsVersionGreaterThanOrEqualTo(v.Version, 4, 15)
+			break
+		}
+	}
+	machineConfigClusterOperatorReady := available && !degraded && !progressing && isDesiredOperatorVersion
 	return machineConfigClusterOperatorReady, nil
 }
 
