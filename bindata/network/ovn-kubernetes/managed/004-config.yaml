@@ -18,6 +18,7 @@ data:
     lflow-cache-limit-kb=1048576
     enable-udp-aggregation={{.EnableUDPAggregation}}
     udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+    namespaces-for-inter-network-service-access="openshift-ingress"
 
     [kubernetes]
     service-cidrs="{{.OVN_service_cidr}}"
@@ -110,6 +111,7 @@ data:
     enable-lflow-cache=true
     lflow-cache-limit-kb=1048576
     udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+    namespaces-for-inter-network-service-access="openshift-ingress"
 
     [kubernetes]
     service-cidrs="{{.OVN_service_cidr}}"
