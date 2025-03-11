@@ -435,8 +435,8 @@ const (
 	DefaultCertificateLifetimeInDays   = 365 * 2 // 2 years
 	DefaultCACertificateLifetimeInDays = 365 * 5 // 5 years
 
-	// Default keys are 2048 bits
-	keyBits = 2048
+	// Default keys are 3072 bits
+	keyBits = 3072
 )
 
 type CA struct {
@@ -999,7 +999,7 @@ func newSigningCertificateTemplateForDuration(subject pkix.Name, caLifetime time
 	return &x509.Certificate{
 		Subject: subject,
 
-		SignatureAlgorithm: x509.SHA256WithRSA,
+		SignatureAlgorithm: x509.SHA512WithRSAPSS,
 
 		NotBefore: currentTime().Add(-1 * time.Second),
 		NotAfter:  currentTime().Add(caLifetime),
@@ -1039,7 +1039,7 @@ func newServerCertificateTemplateForDuration(subject pkix.Name, hosts []string, 
 	template := &x509.Certificate{
 		Subject: subject,
 
-		SignatureAlgorithm: x509.SHA256WithRSA,
+		SignatureAlgorithm: x509.SHA512WithRSAPSS,
 
 		NotBefore:    currentTime().Add(-1 * time.Second),
 		NotAfter:     currentTime().Add(lifetime),
@@ -1128,7 +1128,7 @@ func newClientCertificateTemplateForDuration(subject pkix.Name, lifetime time.Du
 	return &x509.Certificate{
 		Subject: subject,
 
-		SignatureAlgorithm: x509.SHA256WithRSA,
+		SignatureAlgorithm: x509.SHA512WithRSAPSS,
 
 		NotBefore:    currentTime().Add(-1 * time.Second),
 		NotAfter:     currentTime().Add(lifetime),
