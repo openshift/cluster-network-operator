@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"k8s.io/utils/clock"
 	"os"
 
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -47,7 +48,7 @@ func newNetworkOperatorCommand() *cobra.Command {
 	var inClusterClientName *string
 	cmdcfg := controllercmd.NewControllerCommandConfig("network-operator", version.Get(), func(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
 		return operator.RunOperator(ctx, controllerConfig, *inClusterClientName, *extraClusters)
-	})
+	}, clock.RealClock{})
 
 	cmd2 := cmdcfg.NewCommand()
 	cmd2.Use = "start"

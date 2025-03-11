@@ -231,5 +231,7 @@ func NewWrapperType(wrapped *exprpb.Type) *exprpb.Type {
 		// TODO: return an error
 		panic("Wrapped type must be a primitive")
 	}
-	return &exprpb.Type{TypeKind: &exprpb.Type_Wrapper{Wrapper: primitive}}
+	return &exprpb.Type{
+		TypeKind: &exprpb.Type_Wrapper{
+			Wrapper: primitive}}
 }

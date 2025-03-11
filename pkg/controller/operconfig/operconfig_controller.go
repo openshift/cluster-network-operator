@@ -3,6 +3,7 @@ package operconfig
 import (
 	"context"
 	"fmt"
+	"k8s.io/utils/clock"
 	"log"
 	"os"
 	"reflect"
@@ -87,7 +88,7 @@ func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c c
 		Kind:       "Deployment",
 		Namespace:  "openshift-network-operator",
 		Name:       "network-operator",
-	})
+	}, clock.RealClock{})
 
 	// By default, this will exit(0) the process if the featuregates ever change to a different set of values.
 	featureGateAccessor := featuregates.NewFeatureGateAccess(
