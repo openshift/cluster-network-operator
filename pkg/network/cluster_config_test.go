@@ -501,6 +501,58 @@ func TestStatusFromConfig(t *testing.T) {
 
 		NetworkType: "OpenShiftSDN",
 	}))
+
+	// if the network type is not set in spec.migration, the status.migration should not be added
+	crd.Spec.Migration = &operv1.NetworkMigration{
+		Features: &operv1.FeaturesMigration{
+			EgressIP: false,
+		},
+	}
+
+	status = StatusFromOperatorConfig(&crd.Spec, status)
+	g.Expect(status).To(Equal(&configv1.NetworkStatus{
+		ClusterNetwork: []configv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+			{
+				CIDR:       "10.0.0.0/14",
+				HostPrefix: 24,
+			},
+		},
+		ServiceNetwork:    []string{"172.30.0.0/16"},
+		ClusterNetworkMTU: 1500,
+		NetworkType:       "OpenShiftSDN",
+	}))
+
+	// if the network type is set in spec.migration, the status.migration should be updated
+	crd.Spec.Migration = &operv1.NetworkMigration{
+		Features: &operv1.FeaturesMigration{
+			EgressIP: false,
+		},
+		NetworkType: "OVNKubernetes",
+	}
+
+	status = StatusFromOperatorConfig(&crd.Spec, status)
+	g.Expect(status).To(Equal(&configv1.NetworkStatus{
+		ClusterNetwork: []configv1.ClusterNetworkEntry{
+			{
+				CIDR:       "10.128.0.0/15",
+				HostPrefix: 23,
+			},
+			{
+				CIDR:       "10.0.0.0/14",
+				HostPrefix: 24,
+			},
+		},
+		ServiceNetwork:    []string{"172.30.0.0/16"},
+		ClusterNetworkMTU: 1500,
+		NetworkType:       "OpenShiftSDN",
+		Migration: &configv1.NetworkMigration{
+			NetworkType: "OVNKubernetes",
+		},
+	}))
 }
 
 func TestStatusFromConfigUnknown(t *testing.T) {
