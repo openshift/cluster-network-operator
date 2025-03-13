@@ -8,12 +8,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
+	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/condition"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/management"
-	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 )
 
@@ -21,25 +21,27 @@ import (
 // As each operator can opt-out from supporting `unmanaged` or `removed` states, this controller will add failing condition when the
 // value for this field is set to this values for those operators.
 type ManagementStateController struct {
-	operatorName   string
-	operatorClient operatorv1helpers.OperatorClient
+	controllerInstanceName string
+	operatorName           string
+	operatorClient         operatorv1helpers.OperatorClient
 }
 
 func NewOperatorManagementStateController(
-	name string,
+	instanceName string,
 	operatorClient operatorv1helpers.OperatorClient,
 	recorder events.Recorder,
 ) factory.Controller {
 	c := &ManagementStateController{
-		operatorName:   name,
-		operatorClient: operatorClient,
+		controllerInstanceName: factory.ControllerInstanceName(instanceName, "ManagementState"),
+		operatorName:           instanceName,
+		operatorClient:         operatorClient,
 	}
 	return factory.New().
 		WithInformers(operatorClient.Informer()).
 		WithSync(c.sync).
 		ResyncEvery(time.Minute).
 		ToController(
-			"ManagementStateController", // don't change what is passed here unless you also remove the old FooDegraded condition
+			c.controllerInstanceName,
 			recorder.WithComponentSuffix("management-state-recorder"),
 		)
 }
@@ -53,35 +55,35 @@ func (c ManagementStateController) sync(ctx context.Context, syncContext factory
 		syncContext.Recorder().Warningf("StatusNotFound", "Unable to determine current operator status for %s", c.operatorName)
 		return nil
 	}
-
-	cond := operatorv1.OperatorCondition{
-		Type:   condition.ManagementStateDegradedConditionType,
-		Status: operatorv1.ConditionFalse,
+	if err != nil {
+		return err
 	}
 
+	cond := applyoperatorv1.OperatorCondition().
+		WithType(condition.ManagementStateDegradedConditionType).
+		WithStatus(operatorv1.ConditionFalse)
+
 	if management.IsOperatorAlwaysManaged() && detailedSpec.ManagementState == operatorv1.Unmanaged {
-		cond.Status = operatorv1.ConditionTrue
-		cond.Reason = "Unmanaged"
-		cond.Message = fmt.Sprintf("Unmanaged is not supported for %s operator", c.operatorName)
+		cond = cond.
+			WithStatus(operatorv1.ConditionTrue).
+			WithReason("Unmanaged").
+			WithMessage(fmt.Sprintf("Unmanaged is not supported for %s operator", c.operatorName))
 	}
 
 	if management.IsOperatorNotRemovable() && detailedSpec.ManagementState == operatorv1.Removed {
-		cond.Status = operatorv1.ConditionTrue
-		cond.Reason = "Removed"
-		cond.Message = fmt.Sprintf("Removed is not supported for %s operator", c.operatorName)
+		cond = cond.
+			WithStatus(operatorv1.ConditionTrue).
+			WithReason("Removed").
+			WithMessage(fmt.Sprintf("Removed is not supported for %s operator", c.operatorName))
 	}
 
 	if management.IsOperatorUnknownState(detailedSpec.ManagementState) {
-		cond.Status = operatorv1.ConditionTrue
-		cond.Reason = "Unknown"
-		cond.Message = fmt.Sprintf("Unsupported management state %q for %s operator", detailedSpec.ManagementState, c.operatorName)
+		cond = cond.
+			WithStatus(operatorv1.ConditionTrue).
+			WithReason("Unknown").
+			WithMessage(fmt.Sprintf("Unsupported management state %q for %s operator", detailedSpec.ManagementState, c.operatorName))
 	}
 
-	if _, _, updateError := v1helpers.UpdateStatus(ctx, c.operatorClient, v1helpers.UpdateConditionFn(cond)); updateError != nil {
-		if err == nil {
-			return updateError
-		}
-	}
-
-	return nil
+	status := applyoperatorv1.OperatorStatus().WithConditions(cond)
+	return c.operatorClient.ApplyOperatorStatus(ctx, c.controllerInstanceName, status)
 }
