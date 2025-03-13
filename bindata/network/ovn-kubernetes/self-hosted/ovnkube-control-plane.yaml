@@ -124,6 +124,15 @@ spec:
             ovn_v6_transit_switch_subnet_opt="--cluster-manager-v6-transit-switch-subnet {{.V6TransitSwitchSubnet}}"
           fi
 
+          ovn_v4_masquerade_subnet_opt=
+          if [[ "{{.V4MasqueradeSubnet}}" != "" ]]; then
+            ovn_v4_masquerade_subnet_opt="--gateway-v4-masquerade-subnet {{.V4MasqueradeSubnet}}"
+          fi
+          ovn_v6_masquerade_subnet_opt=
+          if [[ "{{.V6MasqueradeSubnet}}" != "" ]]; then
+            ovn_v6_masquerade_subnet_opt="--gateway-v6-masquerade-subnet {{.V6MasqueradeSubnet}}"
+          fi
+
           dns_name_resolver_enabled_flag=
           if [[ "{{.DNS_NAME_RESOLVER_ENABLE}}" == "true" ]]; then
             dns_name_resolver_enabled_flag="--enable-dns-name-resolver"
@@ -161,6 +170,8 @@ spec:
             ${ovn_v6_join_subnet_opt} \
             ${ovn_v4_transit_switch_subnet_opt} \
             ${ovn_v6_transit_switch_subnet_opt} \
+            ${ovn_v4_masquerade_subnet_opt} \
+            ${ovn_v6_masquerade_subnet_opt} \
             ${dns_name_resolver_enabled_flag} \
             ${persistent_ips_enabled_flag} \
             ${multi_network_enabled_flag} \
