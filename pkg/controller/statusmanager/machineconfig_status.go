@@ -7,9 +7,10 @@ import (
 	"reflect"
 
 	configv1 "github.com/openshift/api/config/v1"
+	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	mcutil "github.com/openshift/cluster-network-operator/pkg/util/machineconfig"
-	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	mcomcfgv1 "github.com/openshift/machine-config-operator/pkg/apihelpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -231,7 +232,7 @@ func (status *StatusManager) setLastRenderedMachineConfigState(renderedMachineCo
 func (status *StatusManager) isAnyMachineConfigPoolDegraded(pools []mcfgv1.MachineConfigPool) string {
 	var degradedPool string
 	for _, pool := range pools {
-		if mcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolDegraded) {
+		if mcomcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolDegraded) {
 			degradedPool = pool.Name
 			break
 		}
@@ -242,7 +243,7 @@ func (status *StatusManager) isAnyMachineConfigPoolDegraded(pools []mcfgv1.Machi
 func (status *StatusManager) isAnyMachineConfigPoolProgressing(pools []mcfgv1.MachineConfigPool) string {
 	var progressingPool string
 	for _, pool := range pools {
-		if mcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolUpdating) {
+		if mcomcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolUpdating) {
 			progressingPool = pool.Name
 			break
 		}

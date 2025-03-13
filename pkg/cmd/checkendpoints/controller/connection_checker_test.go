@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"k8s.io/utils/clock"
 	"net"
 	"testing"
 	"time"
@@ -418,7 +419,7 @@ func TestManageStatusOutage(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			status := tc.initial
-			manageStatusOutage(events.NewInMemoryRecorder(t.Name()))(status)
+			manageStatusOutage(events.NewInMemoryRecorder(t.Name(), clock.RealClock{}))(status)
 			assert.Equal(t, tc.expected, status.Outages)
 			if t.Failed() {
 				t.Log("\n", mergepatch.ToYAMLOrError(tc.expected))

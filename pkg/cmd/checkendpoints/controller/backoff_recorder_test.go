@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"k8s.io/utils/clock"
 	"strings"
 	"testing"
 	"time"
@@ -18,7 +19,7 @@ func TestWithShortWindow(t *testing.T) {
 	backoffDuration := longDuration
 	excessiveEventCount := 10
 
-	inMemoryRecorder := events.NewInMemoryRecorder(t.Name())
+	inMemoryRecorder := events.NewInMemoryRecorder(t.Name(), clock.RealClock{})
 	r := NewBackoffEventRecorder(inMemoryRecorder,
 		WithShortWindow(shortDuration, shortCountMax),
 		WithLongWindow(longDuration, longCountMax),
@@ -61,7 +62,7 @@ func TestWithLongWindow(t *testing.T) {
 	backoffDuration := longDuration
 	excessiveEventCount := 10
 
-	inMemoryRecorder := events.NewInMemoryRecorder(t.Name())
+	inMemoryRecorder := events.NewInMemoryRecorder(t.Name(), clock.RealClock{})
 	r := NewBackoffEventRecorder(inMemoryRecorder,
 		WithShortWindow(shortDuration, shortCountMax),
 		WithLongWindow(longDuration, longCountMax),
