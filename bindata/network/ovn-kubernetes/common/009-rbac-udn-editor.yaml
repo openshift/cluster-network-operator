@@ -1,0 +1,17 @@
+{{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openshift-ovn-kubernetes-udn-editor
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+- apiGroups: ["k8s.ovn.org"]
+  resources:
+  - userdefinednetworks
+  verbs:
+  - create
+  - update
+  - patch
+  - delete
+{{- end}}
