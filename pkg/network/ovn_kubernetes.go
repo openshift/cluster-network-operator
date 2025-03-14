@@ -20,9 +20,9 @@ import (
 	yaml "github.com/ghodss/yaml"
 	configv1 "github.com/openshift/api/config/v1"
 	apifeatures "github.com/openshift/api/features"
+	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -291,6 +291,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["IPsecMachineConfigEnable"] = IPsecMachineConfigEnable
 	data.Data["OVNIPsecDaemonsetEnable"] = OVNIPsecDaemonsetEnable
 	data.Data["OVNIPsecEnable"] = OVNIPsecEnable
+	data.Data["OVNIPsecEncap"] = operv1.EncapsulationAuto
+	if OVNIPsecEnable && c.IPsecConfig.Full != nil {
+		data.Data["OVNIPsecEncap"] = c.IPsecConfig.Full.Encapsulation
+	}
 
 	klog.V(5).Infof("IPsec: is MachineConfig enabled: %v, is East-West DaemonSet enabled: %v", data.Data["IPsecMachineConfigEnable"], data.Data["OVNIPsecDaemonsetEnable"])
 
