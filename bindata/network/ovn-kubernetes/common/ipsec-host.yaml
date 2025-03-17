@@ -109,8 +109,9 @@ spec:
           # authentic.
           echo "Configuring IPsec keys"
 
-          cert_pem=/etc/openvswitch/keys/ipsec-cert.pem
+          cert_pem=/var/lib/openvswitch/etc/keys/ipsec-cert.pem
 
+          ovs_ipsec_restart_needed="false"
           # If the certificate does not exist or it will expire in the next 6 months
           # (15770000 seconds), we will generate a new one.
           if ! openssl x509 -noout -dates -checkend 15770000 -in $cert_pem; then
@@ -118,18 +119,18 @@ spec:
             # is a requirement by OVN.
             cn=$(ovs-vsctl --retry -t 60 get Open_vSwitch . external-ids:system-id | tr -d "\"")
 
-            mkdir -p /etc/openvswitch/keys
+            mkdir -p /var/lib/openvswitch/etc/keys
 
             # Generate an SSL private key and use the key to create a certitificate signing request
-            umask 077 && openssl genrsa -out /etc/openvswitch/keys/ipsec-privkey.pem 2048
+            umask 077 && openssl genrsa -out /var/lib/openvswitch/etc/keys/ipsec-privkey.pem 2048
             openssl req -new -text \
                         -extensions v3_req \
                         -addext "subjectAltName = DNS:${cn}" \
                         -subj "/C=US/O=ovnkubernetes/OU=kind/CN=${cn}" \
-                        -key /etc/openvswitch/keys/ipsec-privkey.pem \
-                        -out /etc/openvswitch/keys/ipsec-req.pem
+                        -key /var/lib/openvswitch/etc/keys/ipsec-privkey.pem \
+                        -out /var/lib/openvswitch/etc/keys/ipsec-req.pem
 
-            csr_64=$(base64 -w0 /etc/openvswitch/keys/ipsec-req.pem) # -w0 to avoid line-wrap
+            csr_64=$(base64 -w0 /var/lib/openvswitch/etc/keys/ipsec-req.pem) # -w0 to avoid line-wrap
 
             # Request that our generated certificate signing request is
             # signed by the "network.openshift.io/signer" signer that is
@@ -169,7 +170,10 @@ spec:
             # kubectl delete csr/$(hostname)
 
             # Get the CA certificate so we can authenticate peer nodes.
-            openssl x509 -in /signer-ca/ca-bundle.crt -outform pem -text -out /etc/openvswitch/keys/ipsec-cacert.pem
+            openssl x509 -in /signer-ca/ca-bundle.crt -outform pem -text -out /var/lib/openvswitch/etc/keys/ipsec-cacert.pem
+
+            # New certs are generated, so openvswitch-ipsec service may need restart to load new certificates.
+            ovs_ipsec_restart_needed="true"
           fi
 
           # Configure OVS with the relevant keys for this node. This is required by ovs-monitor-ipsec.
@@ -178,8 +182,13 @@ spec:
           # the will get read and loaded into NSS by the ovs-monitor-ipsec process
           # which has not started yet.
           ovs-vsctl --retry -t 60 set Open_vSwitch . other_config:certificate=$cert_pem \
-                                                     other_config:private_key=/etc/openvswitch/keys/ipsec-privkey.pem \
-                                                     other_config:ca_cert=/etc/openvswitch/keys/ipsec-cacert.pem
+                                                     other_config:private_key=/var/lib/openvswitch/etc/keys/ipsec-privkey.pem \
+                                                     other_config:ca_cert=/var/lib/openvswitch/etc/keys/ipsec-cacert.pem
+
+          # Restart openvswitch-ipsec systemd service when OVS is configured with new certificate when old one expired.
+          if grep -q "openshift.conf" /etc/sysconfig/openvswitch && [ "$ovs_ipsec_restart_needed" = "true" ]; then
+            chroot /proc/1/root systemctl restart openvswitch-ipsec
+          fi
         env:
         - name: K8S_NODE
           valueFrom:
@@ -196,8 +205,8 @@ spec:
           name: host-var-run
         - mountPath: /signer-ca
           name: signer-ca
-        - mountPath: /etc/openvswitch
-          name: etc-openvswitch
+        - mountPath: /var/lib
+          name: host-var-lib
         - mountPath: /etc
           name: host-etc
         resources:
@@ -240,6 +249,36 @@ spec:
           if ! pgrep pluto; then
             echo "pluto is not running, enable the service and/or check system logs"
             exit 2
+          fi
+
+          # When openvswitch-ipsec service exists on the node, then reuse it to
+          # configure IPsec for the pod traffic. Otherwise fall back to configuring
+          # IPsec by spinning up ovs-monitor-ipsec process within the container.
+          ovsipsecservice="openvswitch-ipsec"
+          if chroot /proc/1/root systemctl list-unit-files --type=service | grep "$ovsipsecservice"; then
+            if ! grep -q "openshift.conf" /etc/sysconfig/openvswitch; then
+              sed -i 's|OPTIONS=\"\"|OPTIONS=\"--no-restart-ike-daemon --ovs-monitor-ipsec-options='\''--ipsec-conf=\/etc\/ipsec.d\/openshift.conf --root-ipsec-conf=\/etc\/ipsec.conf --ipsec-d=\/var\/lib\/ipsec\/nss --use-default-crypto'\''\"|' /etc/sysconfig/openvswitch
+              chroot /proc/1/root systemctl enable --now $ovsipsecservice
+              counter=0
+              until [ -r /var/run/openvswitch/ovs-monitor-ipsec.pid ]; do
+                counter=$((counter+1))
+                sleep 1
+                if [ $counter -gt 300 ];
+                then
+                  echo "$ovsipsecservice service has not started after $counter seconds"
+                  exit 1
+                fi
+              done
+            fi
+            if ! chroot /proc/1/root systemctl is-active --quiet $ovsipsecservice; then
+                echo "$ovsipsecservice service is not running, check system logs"
+                exit 1
+            fi
+            while true; do
+              tail -F /var/log/openvswitch/ovs-monitor-ipsec.log
+              echo "tail on ovs-monitor-ipsec.log failed. attempting again"
+              sleep 2s
+            done
           fi
 
           # The ovs-monitor-ipsec doesn't set authby, so when it calls ipsec auto --start
@@ -295,6 +334,10 @@ spec:
                  - |
                    #!/bin/bash
                    set -exuo pipefail
+                   if chroot /proc/1/root systemctl is-active --quiet openvswitch-ipsec; then
+                     echo "openvswitch-ipsec service is running on the host, no action needed in pre stop"
+                     exit 0
+                   fi
                    # In order to maintain traffic flows during container restart, we
                    # need to ensure that xfrm state and policies are not flushed.
 
@@ -322,8 +365,6 @@ spec:
           name: host-var-run
         - mountPath: /var/log/openvswitch/
           name: host-var-log-ovs
-        - mountPath: /etc/openvswitch
-          name: etc-openvswitch
         - mountPath: /var/lib
           name: host-var-lib
         - mountPath: /etc
@@ -430,7 +471,15 @@ spec:
 
           # Function to handle SIGTERM
           cleanup() {
-            echo "received SIGTERM, flushing ipsec config"
+            echo "received SIGTERM, flushing ipsec config if required"
+            # When IPsec connections are managed by openvswitch-ipsec systemd service,
+            # It means ovs-monitor-ipsec process is running on the host always, so ip
+            # xfrm state and policy entries are managed properly according to ipsec
+            # configuration on the OVN. so skip flushing ipsec for this case.
+            if chroot /proc/1/root systemctl is-active --quiet openvswitch-ipsec; then
+              echo "openvswitch-ipsec service is running on the host, no ipsec flush needed"
+              exit 0
+            fi
             # Wait upto 15 seconds for ovs-monitor-ipsec process to terminate before
             # cleaning up ipsec entries.
             counter=0
@@ -462,14 +511,19 @@ spec:
           done
           echo "ovs-monitor-ipsec is started"
 
-          # Monitor the ovs-monitor-ipsec process.
-          while kill -0 "$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)"; do
-            sleep 1
-          done
+          # When ovs-monitor-ipsec process is not running via openvswitch-ipsec systemd
+          # service, then keep monitoring ovn-ipsec container process until it terminates
+          # in the ovn-ipsec container's pre stop hook.
+          if ! chroot /proc/1/root systemctl is-active --quiet openvswitch-ipsec; then
+            # Monitor the ovs-monitor-ipsec process.
+            while kill -0 "$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)"; do
+              sleep 1
+            done
 
-          # Once the ovs-monitor-ipsec process terminates, execute the cleanup command.
-          echo "ovs-monitor-ipsec is terminated, flushing ipsec config"
-          ipsecflush
+            # Once the ovs-monitor-ipsec process terminates, execute the cleanup command.
+            echo "ovs-monitor-ipsec is terminated, flushing ipsec config"
+            ipsecflush
+          fi
 
           # Continue running until SIGTERM is received (or exit naturally)
           while true; do
@@ -508,10 +562,6 @@ spec:
           defaultMode: 420
           name: signer-ca
         name: signer-ca
-      - hostPath:
-          path: /var/lib/openvswitch/etc
-          type: DirectoryOrCreate
-        name: etc-openvswitch
       - hostPath:
           path: "{{.CNIConfDir}}"
         name: host-cni-netd
