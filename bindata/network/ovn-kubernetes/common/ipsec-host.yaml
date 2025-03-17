@@ -48,9 +48,9 @@ spec:
         - |
           #!/bin/bash
           set -exuo pipefail
-{{ if .IPsecCheckForLibreswan }}
-          if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
-            echo "host doesnt have libreswan, therefore ipsec will be configured by ipsec-containerized daemonset, this ovn ipsec container has nothing to init"
+{{ if .IPsecServiceCheckOnHost }}
+          if ! chroot /proc/1/root systemctl is-active --quiet ipsec.service; then
+            echo "host doesn't have ipsec.service running, therefore ipsec will be configured by ipsec-containerized daemonset, this ovn ipsec container has nothing to init"
             exit 0
           fi
 {{ end }}
@@ -198,9 +198,6 @@ spec:
           name: etc-openvswitch
         - mountPath: /etc
           name: host-etc
-        - mountPath: /usr/share/rpm
-          name: host-usr-share-rpm
-          readOnly: true
         resources:
           requests:
             cpu: 10m
@@ -217,9 +214,9 @@ spec:
           #!/bin/bash
           set -exuo pipefail
 
-{{ if .IPsecCheckForLibreswan }}
-          if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
-            echo "host doesnt have libreswan, therefore ipsec will be configured by ipsec-containerized daemonset, this ovn ipsec container will sleep to infinity"
+{{ if .IPsecServiceCheckOnHost }}
+          if ! chroot /proc/1/root systemctl is-active --quiet ipsec.service; then
+            echo "host doesn't have ipsec.service running, therefore ipsec will be configured by ipsec-containerized daemonset, this ovn ipsec container will sleep to infinity"
             sleep infinity
           fi
 {{ end }}
@@ -299,9 +296,9 @@ spec:
                    # In order to maintain traffic flows during container restart, we
                    # need to ensure that xfrm state and policies are not flushed.
 
-{{ if .IPsecCheckForLibreswan }}
-                   if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
-                     echo "host doesnt have libreswan, therefore ipsec will be configured by ipsec-containerized daemonset, preStop wont do anything"
+{{ if .IPsecServiceCheckOnHost }}
+                   if ! chroot /proc/1/root systemctl is-active --quiet ipsec.service; then
+                     echo "host doesn't have ipsec.service running, therefore ipsec will be configured by ipsec-containerized daemonset, preStop wont do anything"
                      exit 0
                    fi
 {{ end }}
@@ -333,9 +330,6 @@ spec:
           name: usr-sbin
         - mountPath: /usr/libexec
           name: usr-libexec
-        - mountPath: /usr/share/rpm
-          name: host-usr-share-rpm
-          readOnly: true
         resources:
           requests:
             cpu: 10m
@@ -348,9 +342,9 @@ spec:
             - -c
             - |
               #!/bin/bash
-{{ if .IPsecCheckForLibreswan }}
-              if ! rpm --dbpath=/usr/share/rpm -q libreswan; then
-                echo "host doesnt have libreswan, therefore ipsec will be configured by ipsec-containerized daemonset, this ovn ipsec container is always \"alive\""
+{{ if .IPsecServiceCheckOnHost }}
+              if ! chroot /proc/1/root systemctl is-active --quiet ipsec.service; then
+                echo "host doesn't have ipsec.service running, therefore ipsec will be configured by ipsec-containerized daemonset, this ovn ipsec container is always \"alive\""
                 exit 0
               fi
 {{ end }}
@@ -540,10 +534,6 @@ spec:
           path: /usr/libexec
           type: Directory
         name: usr-libexec
-      - name: host-usr-share-rpm
-        hostPath:
-          path: /usr/share/rpm
-          type: DirectoryOrCreate
       tolerations:
       - operator: "Exists"
 {{end}}

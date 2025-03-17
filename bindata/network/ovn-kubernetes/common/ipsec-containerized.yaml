@@ -35,6 +35,9 @@ spec:
               - key: network.operator.openshift.io/dpu-host
                 operator: DoesNotExist
       serviceAccountName: ovn-kubernetes-node
+{{ if .IPsecServiceCheckOnHost }}
+      hostPID: true
+{{ end }}
       hostNetwork: true
       dnsPolicy: Default
       priorityClassName: "system-node-critical"
@@ -48,9 +51,9 @@ spec:
           #!/bin/bash
           set -exuo pipefail
 
-{{ if .IPsecCheckForLibreswan }}
-          if rpm --dbpath=/usr/share/rpm -q libreswan; then
-            echo "host has libreswan and therefore ipsec will be configured by ipsec host daemonset, this ovn ipsec container doesnt need to init anything"
+{{ if .IPsecServiceCheckOnHost }}
+          if chroot /proc/1/root systemctl is-active --quiet ipsec.service; then
+            echo "host has ipsec.service running and therefore ipsec will be configured by ipsec host daemonset, this ovn ipsec container doesnt need to init anything"
             exit 0
           fi
 {{ end }}
@@ -195,9 +198,6 @@ spec:
           name: signer-ca
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
-        - mountPath: /usr/share/rpm
-          name: host-usr-share-rpm
-          readOnly: true
         resources:
           requests:
             cpu: 10m
@@ -229,9 +229,9 @@ spec:
           }
           trap cleanup SIGTERM
 
-{{ if .IPsecCheckForLibreswan }}
-          if rpm --dbpath=/usr/share/rpm -q libreswan; then
-            echo "host has libreswan and therefore ipsec will be configured by ipsec host daemonset, this ovn ipsec container will sleep to infinity"
+{{ if .IPsecServiceCheckOnHost }}
+          if chroot /proc/1/root systemctl is-active --quiet ipsec.service; then
+            echo "host has ipsec.service running and therefore ipsec will be configured by ipsec host daemonset, this ovn ipsec container will sleep to infinity"
             sleep infinity
           fi
 {{ end }}
@@ -292,9 +292,6 @@ spec:
           name: host-var-log-ovs
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
-        - mountPath: /usr/share/rpm
-          name: host-usr-share-rpm
-          readOnly: true
         resources:
           requests:
             cpu: 10m
@@ -307,9 +304,9 @@ spec:
             - -c
             - |
               #!/bin/bash
-{{ if .IPsecCheckForLibreswan }}
-              if rpm --dbpath=/usr/share/rpm -q libreswan; then
-                echo "host has libreswan and therefore ipsec will be configured by ipsec host daemonset, this ovn ipsec container is always \"alive\""
+{{ if .IPsecServiceCheckOnHost }}
+              if chroot /proc/1/root systemctl is-active --quiet ipsec.service; then
+                echo "host has ipsec.service running and therefore ipsec will be configured by ipsec host daemonset, this ovn ipsec container is always \"alive\""
                 exit 0
               fi
 {{ end }}
@@ -346,10 +343,6 @@ spec:
       - name: host-cni-netd
         hostPath:
           path: "{{.CNIConfDir}}"
-      - name: host-usr-share-rpm
-        hostPath:
-          path: /usr/share/rpm
-          type: DirectoryOrCreate
       tolerations:
       - operator: "Exists"
 {{end}}
