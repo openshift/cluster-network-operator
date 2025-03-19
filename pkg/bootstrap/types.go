@@ -2,7 +2,7 @@ package bootstrap
 
 import (
 	configv1 "github.com/openshift/api/config/v1"
-	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 )
