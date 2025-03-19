@@ -242,6 +242,37 @@ spec:
             exit 2
           fi
 
+          # When openvswitch-ipsec service exists on the node, then reuse it to
+          # configure IPsec for the pod traffic. Otherwise fall back to configuring
+          # IPsec by spinning up ovs-monitor-ipsec process within the container.
+          ovsipsecservice="openvswitch-ipsec"
+          if chroot /proc/1/root systemctl list-unit-files --type=service | grep -q "^$ovsipsecservice"; then
+            if ! grep -q "openshift.conf" /etc/sysconfig/openvswitch; then
+              sed -i 's|OPTIONS=\"\"|OPTIONS=\"--no-restart-ike-daemon --ovs-monitor-ipsec-options='\''--ipsec-conf=\/etc\/ipsec.d\/openshift.conf --root-ipsec-conf=\/etc\/ipsec.conf --use-default-crypto'\''\"|' /etc/sysconfig/openvswitch
+              chroot /proc/1/root systemctl enable $ovsipsecservice
+              chroot /proc/1/root systemctl start $ovsipsecservice
+              counter=0
+              until [ -r /var/run/openvswitch/ovs-monitor-ipsec.pid ]; do
+                counter=$((counter+1))
+                sleep 1
+                if [ $counter -gt 300 ];
+                then
+                  echo "$ovsipsecservice service has not started after $counter seconds"
+                  exit 1
+                fi
+              done
+            fi
+            if ! chroot /proc/1/root systemctl is-active --quiet $ovsipsecservice; then
+                echo "$ovsipsecservice service is not running, check system logs"
+                exit 1
+            fi
+            while true; do
+              tail -F /var/log/openvswitch/ovs-monitor-ipsec.log
+              echo "tail on ovs-monitor-ipsec.log failed. attempting again"
+              sleep 2s
+            done
+          fi
+
           # The ovs-monitor-ipsec doesn't set authby, so when it calls ipsec auto --start
           # the default ones defined at Libreswan's compile time will be used. On restart,
           # Libreswan will use authby from libreswan.config. If libreswan.config is
@@ -295,6 +326,10 @@ spec:
                  - |
                    #!/bin/bash
                    set -exuo pipefail
+                   if chroot /proc/1/root systemctl is-active --quiet openvswitch-ipsec; then
+                     echo "openvswitch-ipsec service is running on the host, no action needed in pre stop"
+                     exit 0
+                   fi
                    # In order to maintain traffic flows during container restart, we
                    # need to ensure that xfrm state and policies are not flushed.
 
@@ -430,7 +465,15 @@ spec:
 
           # Function to handle SIGTERM
           cleanup() {
-            echo "received SIGTERM, flushing ipsec config"
+            echo "received SIGTERM, flushing ipsec config if required"
+            # When IPsec connections are managed by openvswitch-ipsec systemd service,
+            # It means ovs-monitor-ipsec process is running on the host always, so ip
+            # xfrm state and policy entries are managed properly according to ipsec
+            # configuration on the OVN. so skip flushing ipsec for this case.
+            if chroot /proc/1/root systemctl is-active --quiet openvswitch-ipsec; then
+              echo "openvswitch-ipsec service is running on the host, no ipsec flush needed"
+              exit 0
+            fi
             # Wait upto 15 seconds for ovs-monitor-ipsec process to terminate before
             # cleaning up ipsec entries.
             counter=0
@@ -462,14 +505,19 @@ spec:
           done
           echo "ovs-monitor-ipsec is started"
 
-          # Monitor the ovs-monitor-ipsec process.
-          while kill -0 "$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)"; do
-            sleep 1
-          done
+          # When ovs-monitor-ipsec process is not running via openvswitch-ipsec systemd
+          # service, then keep monitoring ovn-ipsec container process until it terminates
+          # in the ovn-ipsec container's pre stop hook.
+          if ! chroot /proc/1/root systemctl is-active --quiet openvswitch-ipsec; then
+            # Monitor the ovs-monitor-ipsec process.
+            while kill -0 "$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)"; do
+              sleep 1
+            done
 
-          # Once the ovs-monitor-ipsec process terminates, execute the cleanup command.
-          echo "ovs-monitor-ipsec is terminated, flushing ipsec config"
-          ipsecflush
+            # Once the ovs-monitor-ipsec process terminates, execute the cleanup command.
+            echo "ovs-monitor-ipsec is terminated, flushing ipsec config"
+            ipsecflush
+          fi
 
           # Continue running until SIGTERM is received (or exit naturally)
           while true; do
