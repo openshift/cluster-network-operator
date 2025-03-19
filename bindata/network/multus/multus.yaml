@@ -174,7 +174,7 @@ data:
           "enabled": true,
           "bootstrapKubeconfig": "{{ .KubeletKubeconfigPath }}",
           "certDir": "/etc/cni/multus/certs",
-          "certDuration"nodeName
+          "certDuration": "24h"
 {{ end }}
         "cniConfigDir": "/host/etc/cni/net.d",
         "multusConfigFile": "auto",
@@ -830,7 +830,7 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-            - name: WHEREABOUTS
+            - name: WHEREABOUTS_NAMESPACE
               valueFrom:
                 fieldRef:
                   apiVersion: v1

@@ -109,6 +109,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		data.Data["AzureManagedTenantID"] = os.Getenv("ARO_HCP_TENANT_ID")
 		data.Data["AzureManagedCertDirectory"] = azureCertPath
 		data.Data["AzureManagedCertPath"] = filepath.Join(azureCertPath, os.Getenv("ARO_HCP_CLIENT_CERTIFICATE_NAME"))
+		data.Data["AzureManagedCredsPath"] = filepath.Join(azureCertPath, os.Getenv("MANAGED_AZURE_HCP_CREDENTIALS_FILE_PATH"))
 		data.Data["AzureManagedSecretProviderClass"] = os.Getenv("ARO_HCP_SECRET_PROVIDER_CLASS")
 		caOverride.ObjectMeta = metav1.ObjectMeta{
 			Namespace:   hcpCfg.Namespace,
