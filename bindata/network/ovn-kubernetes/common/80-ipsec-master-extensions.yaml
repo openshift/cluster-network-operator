@@ -20,6 +20,7 @@ spec:
 
          [Service]
          Type=oneshot
+         ExecStartPre=rm -f /etc/ipsec.d/cno.conf
          ExecStart=systemctl enable --now ipsec.service
 
          [Install]
