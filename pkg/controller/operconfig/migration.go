@@ -25,13 +25,14 @@ import (
 	"k8s.io/klog/v2"
 
 	configv1 "github.com/openshift/api/config/v1"
+	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/util"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
-	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	mcomcfgv1 "github.com/openshift/machine-config-operator/pkg/apihelpers"
 	ctrlcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 )
 
@@ -921,7 +922,7 @@ func (r *ReconcileOperConfig) ensureMachineConfigPools(ctx context.Context, clus
 		return
 	}
 	for _, pool := range pools.Items {
-		if mcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolDegraded) {
+		if mcomcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolDegraded) {
 			*condition = metav1.Condition{
 				Type:               condType,
 				Status:             metav1.ConditionFalse,
@@ -933,7 +934,7 @@ func (r *ReconcileOperConfig) ensureMachineConfigPools(ctx context.Context, clus
 		}
 	}
 	for _, pool := range pools.Items {
-		if mcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolUpdating) {
+		if mcomcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolUpdating) {
 			*condition = metav1.Condition{
 				Type:               condType,
 				Status:             metav1.ConditionFalse,

@@ -16,6 +16,7 @@ import (
 
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	"k8s.io/utils/clock"
 )
 
 func main() {
@@ -47,7 +48,7 @@ func newNetworkOperatorCommand() *cobra.Command {
 	var inClusterClientName *string
 	cmdcfg := controllercmd.NewControllerCommandConfig("network-operator", version.Get(), func(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
 		return operator.RunOperator(ctx, controllerConfig, *inClusterClientName, *extraClusters)
-	})
+	}, clock.RealClock{})
 
 	cmd2 := cmdcfg.NewCommand()
 	cmd2.Use = "start"
