@@ -726,7 +726,6 @@ spec:
         - name: whereabouts-configmap
           configMap:
             name: whereabouts-config
-{{if .RenderWhereaboutsAuxillary}}
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -805,6 +804,7 @@ spec:
             items:
             - key: reconciler_cron_expression
               path: config
+{{if .RenderWhereaboutsAuxillary}}
 ---
 apiVersion: apps/v1
 kind: Deployment
