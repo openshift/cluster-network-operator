@@ -50,6 +50,12 @@ spec:
         - |
           #!/bin/bash
           set -exuo pipefail
+{{ if .IPsecServiceCheckOnHost }}
+          if ! chroot /proc/1/root systemctl is-active --quiet ipsec.service; then
+            echo "host doesn't have ipsec.service running, therefore ipsec will be configured by ipsec-containerized daemonset, this ovn ipsec container has nothing to init"
+            exit 0
+          fi
+{{ end }}
 {{ if .NETWORK_NODE_IDENTITY_ENABLE }}
           # When NETWORK_NODE_IDENTITY_ENABLE is true, use the per-node certificate to create a kubeconfig
           # that will be used to talk to the API
@@ -210,6 +216,13 @@ spec:
           #!/bin/bash
           set -exuo pipefail
 
+{{ if .IPsecServiceCheckOnHost }}
+          if ! chroot /proc/1/root systemctl is-active --quiet ipsec.service; then
+            echo "host doesn't have ipsec.service running, therefore ipsec will be configured by ipsec-containerized daemonset, this ovn ipsec container will sleep to infinity"
+            sleep infinity
+          fi
+{{ end }}
+
           # Don't start IPsec until ovnkube-node has finished setting up the node
           counter=0
           until [ -f /etc/cni/net.d/10-ovn-kubernetes.conf ]
@@ -239,37 +252,22 @@ spec:
           defaultcpinclude="include \/etc\/crypto-policies\/back-ends\/libreswan.config"
           if ! grep -q "# ${defaultcpinclude}" /etc/ipsec.conf; then
             sed -i "/${defaultcpinclude}/s/^/# /" /etc/ipsec.conf
+            # since pluto is on the host, we need to restart it after changing connection
+            # parameters.
+            chroot /proc/1/root ipsec restart
+
+            counter=0
+            until [ -r /run/pluto/pluto.ctl ]; do
+              counter=$((counter+1))
+              sleep 1
+              if [ $counter -gt 300 ];
+              then
+                echo "ipsec has not started after $counter seconds"
+                exit 1
+              fi
+            done
+            echo "ipsec service is restarted"
           fi
-
-          # Use /etc/ipsec.d/cno.conf file to write our own default IPsec connection parameters.
-          # The /etc/ipsec.d/openshift.conf file can not be used because it is managed by openvswitch.
-          touch /etc/ipsec.d/cno.conf
-          if ! grep -q "narrowing=yes" /etc/ipsec.d/cno.conf; then
-          cat <<EOF > /etc/ipsec.d/cno.conf
-          # Default IPsec connection parameters rendered by network operator.
-          # The narrowing=yes is needed to narrow down the proposals exchanged
-          # by two peers to a mutually acceptable set, otherwise it sometimes
-          # have traffic hit between peer nodes.
-          conn %default
-              narrowing=yes
-          EOF
-          fi
-
-          # since pluto is on the host, we need to restart it after changing connection
-          # parameters.
-          chroot /proc/1/root ipsec restart
-
-          counter=0
-          until [ -r /run/pluto/pluto.ctl ]; do
-            counter=$((counter+1))
-            sleep 1
-            if [ $counter -gt 300 ];
-            then
-              echo "ipsec has not started after $counter seconds"
-              exit 1
-            fi
-          done
-          echo "ipsec service is restarted"
 
           # Workaround for https://github.com/libreswan/libreswan/issues/373
           ulimit -n 1024
@@ -300,6 +298,13 @@ spec:
                    # In order to maintain traffic flows during container restart, we
                    # need to ensure that xfrm state and policies are not flushed.
 
+{{ if .IPsecServiceCheckOnHost }}
+                   if ! chroot /proc/1/root systemctl is-active --quiet ipsec.service; then
+                     echo "host doesn't have ipsec.service running, therefore ipsec will be configured by ipsec-containerized daemonset, preStop wont do anything"
+                     exit 0
+                   fi
+{{ end }}
+
                    # Don't allow ovs monitor to cleanup persistent state
                    kill "$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)" 2>/dev/null || true
         env:
@@ -323,10 +328,10 @@ spec:
           name: host-var-lib
         - mountPath: /etc
           name: host-etc
-        - mountPath: /usr/sbin/ipsec
-          name: ipsec-bin
-        - mountPath: /usr/libexec/ipsec
-          name: ipsec-lib
+        - mountPath: /usr/sbin
+          name: usr-sbin
+        - mountPath: /usr/libexec
+          name: usr-libexec
         resources:
           requests:
             cpu: 10m
@@ -339,6 +344,12 @@ spec:
             - -c
             - |
               #!/bin/bash
+{{ if .IPsecServiceCheckOnHost }}
+              if ! chroot /proc/1/root systemctl is-active --quiet ipsec.service; then
+                echo "host doesn't have ipsec.service running, therefore ipsec will be configured by ipsec-containerized daemonset, this ovn ipsec container is always \"alive\""
+                exit 0
+              fi
+{{ end }}
               if [[ $(ipsec whack --trafficstatus | wc -l) -eq 0 ]]; then
                 echo "no ipsec traffic configured"
                 exit 10
@@ -407,7 +418,7 @@ spec:
           # When east-west ipsec is not disabled, then do not flush xfrm states and
           # policies in order to maintain traffic flows during container restart.
           ipsecflush() {
-            if [ "$(kubectl get networks.operator.openshift.io cluster -ojsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig.mode}')" != "Full" ] || \
+            if [ "$(kubectl get networks.operator.openshift.io cluster -ojsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig.mode}')" != "Full" ] && \
                [ "$(kubectl get networks.operator.openshift.io cluster -ojsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig}')" != "{}" ]; then
               ip x s flush
               ip x p flush
@@ -517,13 +528,13 @@ spec:
           type: Directory
         name: host-etc
       - hostPath:
-          path: /usr/sbin/ipsec
-          type: File
-        name: ipsec-bin
-      - hostPath:
-          path: /usr/libexec/ipsec
+          path: /usr/sbin
           type: Directory
-        name: ipsec-lib
+        name: usr-sbin
+      - hostPath:
+          path: /usr/libexec
+          type: Directory
+        name: usr-libexec
       tolerations:
       - operator: "Exists"
 {{end}}
