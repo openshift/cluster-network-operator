@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"reflect"
 	"strings"
 	"sync"
@@ -42,6 +43,7 @@ const egressAssignable = "k8s.ovn.org/egress-assignable"
 const multicastEnabledSDN = "netnamespace.network.openshift.io/multicast-enabled"
 const multicastEnabledOVN = "k8s.ovn.org/multicast-enabled"
 const ovnAnnotationPrefix = "k8s.ovn.org"
+const ovnAnnotationNodeIfAddr = ovnAnnotationPrefix + "/node-primary-ifaddr"
 
 var networkTypeMigrationConditionTypes = []string{
 	names.NetworkTypeMigrationMTUReady,
@@ -399,7 +401,7 @@ func convertOvnEgressIpToSdnEgressIp(ctx context.Context, client cnoclient.Clien
 		if _, ok := node.Labels[egressAssignable]; ok {
 			// generate egressCIDRs field
 			// if "egressCIDRAnnotationName" node annotation exists, automatic sdn config was used and we shall reuse old config
-			// else, manual sdn config was used and we shall use node's subnet CIDR (cannot restore egressIPs)
+			// else, manual sdn config was used or on non-cloud platforms we shall use node's subnet CIDR (cannot restore egressIPs)
 			var egressCIDRsArr []string
 			if _, ok := node.Annotations[egressCIDRAnnotationName]; ok {
 				ovnMigrationNodeAnnotation := OVNMigrationNodeAnnotation{}
@@ -408,18 +410,41 @@ func convertOvnEgressIpToSdnEgressIp(ctx context.Context, client cnoclient.Clien
 				}
 				egressCIDRsArr = ovnMigrationNodeAnnotation.EgressCIDRs
 			} else {
-				egressIpConfig := node.Annotations[egressIPNodeConfig]
-				egressIpConfigArr := make([]NodeEgressIpConfig, 0)
-				if err := json.Unmarshal([]byte(egressIpConfig), &egressIpConfigArr); err != nil {
-					return err
+				egressIpConfig, ok := node.Annotations[egressIPNodeConfig]
+				var nodeSubnet string
+				if ok {
+					egressIpConfigArr := make([]NodeEgressIpConfig, 0)
+					if err := json.Unmarshal([]byte(egressIpConfig), &egressIpConfigArr); err != nil {
+						return err
+					}
+					if len(egressIpConfigArr) <= 0 {
+						return fmt.Errorf("unexpected error: egress-ipconfig annotation is empty")
+					}
+					nodeSubnet, ok = egressIpConfigArr[0].IfAddr["ipv4"]
+					if !ok {
+						return fmt.Errorf("unexpected error: egress-ipconfig annotation missing ipv4 entry")
+					}
+				} else {
+					// on non-cloud platforms there's no egressIpConfig annotation, use node's primary ifaddr annotation
+					nodeIfAddrAnno, ok := node.Annotations[ovnAnnotationNodeIfAddr]
+					if !ok {
+						return fmt.Errorf("unexpected error: node annotation missing node subnet entry")
+					}
+					nodeIfAddr := make(map[string]string)
+					if err := json.Unmarshal([]byte(nodeIfAddrAnno), &nodeIfAddr); err != nil {
+						return err
+					}
+					address, ok := nodeIfAddr["ipv4"]
+					if !ok {
+						return fmt.Errorf("unexpected error: node annotation missing ipv4 entry")
+					}
+					_, cidr, err := net.ParseCIDR(address)
+					if err != nil {
+						return fmt.Errorf("unexpected error: node annotation ipv4 entry is not a valid CIDR")
+					}
+					nodeSubnet = cidr.String()
 				}
-				if len(egressIpConfigArr) <= 0 {
-					return fmt.Errorf("unexpected error: egress-ipconfig annotation is empty")
-				}
-				nodeSubnet, ok := egressIpConfigArr[0].IfAddr["ipv4"]
-				if !ok {
-					return fmt.Errorf("unexpected error: egress-ipconfig annotation missing ipv4 entry")
-				}
+
 				egressCIDRsArr = []string{nodeSubnet}
 			}
 
@@ -516,8 +541,8 @@ func netNamespaceHasEgressIpConfig(nns uns.Unstructured) bool {
 }
 
 func hostSubnetHasEgressIpConfigAutomatic(hsn uns.Unstructured) bool {
-	if hsn.Object["egressIPs"] != nil && hsn.Object["egressCIDRs"] != nil {
-		return len(hsn.Object["egressIPs"].([]interface{})) > 0 && len(hsn.Object["egressCIDRs"].([]interface{})) > 0
+	if hsn.Object["egressCIDRs"] != nil {
+		return len(hsn.Object["egressCIDRs"].([]interface{})) > 0
 	}
 	return false
 }
