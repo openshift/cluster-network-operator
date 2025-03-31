@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
@@ -88,6 +89,8 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
+			// restore network status when CSR is deleted.
+			r.status.SetNotDegraded(statusmanager.CertificateSigner)
 			// Return and don't requeue as the CSR has been deleted.
 			return reconcile.Result{}, nil
 		}
@@ -227,7 +230,7 @@ func signerFailure(r *ReconcileCSR, csr *csrv1.CertificateSigningRequest, reason
 
 // Update the status conditions on the CSR object
 func updateCSRStatusConditions(r *ReconcileCSR, csr *csrv1.CertificateSigningRequest, reason string, message string) {
-	csr.Status.Conditions = append(csr.Status.Conditions, csrv1.CertificateSigningRequestCondition{
+	setCertificateSigningRequestCondition(&csr.Status.Conditions, csrv1.CertificateSigningRequestCondition{
 		Type:    csrv1.CertificateFailed,
 		Status:  "True",
 		Reason:  reason,
@@ -239,4 +242,27 @@ func updateCSRStatusConditions(r *ReconcileCSR, csr *csrv1.CertificateSigningReq
 		r.status.SetDegraded(statusmanager.CertificateSigner, "UpdateFailure",
 			fmt.Sprintf("Unable to update csr: %v", err))
 	}
+}
+
+func setCertificateSigningRequestCondition(conditions *[]csrv1.CertificateSigningRequestCondition, newCondition csrv1.CertificateSigningRequestCondition) {
+	if conditions == nil {
+		conditions = &[]csrv1.CertificateSigningRequestCondition{}
+	}
+	var existingCondition *csrv1.CertificateSigningRequestCondition
+	for i := range *conditions {
+		if (*conditions)[i].Type == newCondition.Type {
+			existingCondition = &(*conditions)[i]
+		}
+	}
+	if existingCondition == nil {
+		newCondition.LastTransitionTime = metav1.NewTime(time.Now())
+		*conditions = append(*conditions, newCondition)
+		return
+	}
+	if existingCondition.Status != newCondition.Status {
+		existingCondition.Status = newCondition.Status
+		existingCondition.LastTransitionTime = metav1.NewTime(time.Now())
+	}
+	existingCondition.Reason = newCondition.Reason
+	existingCondition.Message = newCondition.Message
 }
