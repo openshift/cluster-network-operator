@@ -117,7 +117,19 @@ func (c *OperatorHelperClient) ApplyOperatorStatus(ctx context.Context, fieldMan
 		return fmt.Errorf("desiredStatus must have a value")
 	}
 
-	desired := v1.Network(names.CLUSTER_CONFIG)
+	var conditions []*v1.OperatorConditionApplyConfiguration
+	for _, condVal := range desiredStatus.Conditions {
+		cond := &condVal
+		if cond.LastTransitionTime == nil {
+			now := metav1.Now()
+			cond = cond.WithLastTransitionTime(now)
+		}
+		conditions = append(conditions, cond)
+	}
+
+	desired := v1.Network(names.CLUSTER_CONFIG).WithStatus(
+		v1.NetworkStatus().WithConditions(conditions...),
+	)
 
 	_, err := c.client.ApplyStatus(ctx, desired, metav1.ApplyOptions{
 		Force:        true,
