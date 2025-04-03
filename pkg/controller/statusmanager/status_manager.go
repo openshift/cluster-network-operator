@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -484,7 +485,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 				Status:  configv1.ConditionTrue,
 				Reason:  "NoOperConfig",
 				Message: "No networks.operator.openshift.io cluster found",
-			})
+			}, clock.RealClock{})
 		} else {
 			if reachedAvailableLevel {
 				co.Status.Versions = []configv1.OperandVersion{
@@ -493,7 +494,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 			}
 
 			for _, cond := range operStatus.Conditions {
-				cohelpers.SetStatusCondition(&co.Status.Conditions, operstatus.OperatorConditionToClusterOperatorCondition(cond))
+				cohelpers.SetStatusCondition(&co.Status.Conditions, operstatus.OperatorConditionToClusterOperatorCondition(cond), clock.RealClock{})
 			}
 		}
 
