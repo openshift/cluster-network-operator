@@ -641,7 +641,7 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 					},
 				},
 			},
-			want:        18,
+			want:        19,
 			expectedErr: nil,
 		},
 	}
