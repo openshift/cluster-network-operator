@@ -3,6 +3,7 @@ package operconfig
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -46,6 +47,48 @@ func TestEgressIpMigration(t *testing.T) {
 					},
 					EgressCIDRs: []v1.HostSubnetEgressCIDR{"10.0.128.0/17"},
 					EgressIPs:   []v1.HostSubnetEgressIP{"10.0.128.5"},
+					Host:        testMigrationHost,
+				},
+				&uns.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "network.openshift.io/v1",
+						"kind":       "NetNamespace",
+						"egressIPs":  nnsEgressIpsIfcArrSingle,
+						"netname":    testMigrationNamespace,
+						"metadata": map[string]interface{}{
+							"name": testMigrationNamespace,
+						},
+					},
+				},
+				&corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: testMigrationHost,
+					},
+				},
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: testMigrationNamespace,
+					},
+				},
+			},
+			expectedEgressIpList: nnsEgressIpsStrArrSingle,
+		},
+		{
+			name: "Two hostsubnets have automatic config and netnamespace has one egressIP",
+			objects: []crclient.Object{
+				&v1.HostSubnet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: testMigrationHost,
+					},
+					EgressCIDRs: []v1.HostSubnetEgressCIDR{"10.0.128.0/17"},
+					EgressIPs:   []v1.HostSubnetEgressIP{"10.0.128.5"},
+					Host:        testMigrationHost,
+				},
+				&v1.HostSubnet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "no-egressip-node",
+					},
+					EgressCIDRs: []v1.HostSubnetEgressCIDR{"10.0.128.0/17"},
 					Host:        testMigrationHost,
 				},
 				&uns.Unstructured{
@@ -206,8 +249,10 @@ func TestEgressIpMigration(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if _, ok := nodeObj.Labels[egressAssignable]; !ok {
-				t.Errorf("expect node to be marked with egress-assignable annotation")
+			g.Expect(nodeObj.Labels).To(HaveKey(egressAssignable), "expected node to have egress-assignable label")
+			if !strings.Contains(tc.name, "manual config") {
+				g.Expect(nodeObj.Annotations).To(HaveKey(egressCIDRAnnotationName), "expected node to have migration annotation")
+				g.Expect(nodeObj.Annotations[egressCIDRAnnotationName]).To(Equal("{\"EgressCIDRs\":[\"10.0.128.0/17\"]}"))
 			}
 		})
 	}
@@ -227,6 +272,8 @@ func TestEgressIpRollbackMigration(t *testing.T) {
 	nodeAnnotationMapWithEgressCidrAnnotation := make(map[string]string, 0)
 	nodeAnnotationMapWithEgressCidrAnnotation[egressIPNodeConfig] = "[{\"interface\":\"nic0\",\"ifaddr\":{\"ipv4\":\"10.0.128.0/17\"},\"capacity\":{\"ip\":10}}]"
 	nodeAnnotationMapWithEgressCidrAnnotation[egressCIDRAnnotationName] = "{\"EgressCIDRs\":[\"10.0.128.0/18\"]}"
+	nodeAnnotationMapWithoutEgressCidrAnnotation := make(map[string]string, 0)
+	nodeAnnotationMapWithoutEgressCidrAnnotation[ovnAnnotationNodeIfAddr] = "{\"ipv4\":\"10.0.128.17/17\"}"
 
 	nodeLabelMap := make(map[string]string)
 	nodeLabelMap[egressAssignable] = ""
@@ -238,7 +285,7 @@ func TestEgressIpRollbackMigration(t *testing.T) {
 		expectedEgressCIDRsList []string
 	}{
 		{
-			name: "egressIP has one IP listed",
+			name: "[reverse migration] egressIP has one IP listed",
 			objects: []crclient.Object{
 				&v1.HostSubnet{
 					ObjectMeta: metav1.ObjectMeta{
@@ -290,7 +337,7 @@ func TestEgressIpRollbackMigration(t *testing.T) {
 			expectedEgressCIDRsList: egressCIDRsStrArr,
 		},
 		{
-			name: "egressIP has multiple IPs listed",
+			name: "[reverse migration] egressIP has multiple IPs listed",
 			objects: []crclient.Object{
 				&v1.HostSubnet{
 					ObjectMeta: metav1.ObjectMeta{
@@ -342,7 +389,72 @@ func TestEgressIpRollbackMigration(t *testing.T) {
 			expectedEgressCIDRsList: egressCIDRsStrArr,
 		},
 		{
-			name: "egressIP has one IP listed and node has egressCIDR rollback annotation",
+			name: "[reverse migration] egressIP has one IP listed, with 2nd node with egressIP allocable on a non-cloud platform",
+			objects: []crclient.Object{
+				&v1.HostSubnet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: testMigrationHost,
+					},
+					Host: testMigrationHost,
+				},
+				&v1.HostSubnet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "no-egressip-node",
+					},
+					Host: "no-egressip-node",
+				},
+				&uns.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "network.openshift.io/v1",
+						"kind":       "NetNamespace",
+						"netname":    testMigrationNamespace,
+						"metadata": map[string]interface{}{
+							"name": testMigrationNamespace,
+						},
+					},
+				},
+				&corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        testMigrationHost,
+						Annotations: nodeAnnotationMapWithEgressCidrAnnotation,
+						Labels:      nodeLabelMap,
+					},
+				},
+				&corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "no-egressip-node",
+						Annotations: nodeAnnotationMapWithoutEgressCidrAnnotation,
+						Labels:      nodeLabelMap,
+					},
+				},
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: testMigrationNamespace,
+					},
+				},
+				&uns.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "k8s.ovn.org/v1",
+						"kind":       "EgressIP",
+						"metadata": map[string]interface{}{
+							"name": "egress-group1",
+						},
+						"spec": map[string]interface{}{
+							"egressIPs": egressIpsIfcArrSingle,
+							"namespaceSelector": map[string]interface{}{
+								"matchLabels": map[string]interface{}{
+									"kubernetes.io/metadata.name": testMigrationNamespace,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEgressIpsList:   egressIpsStrArrSingle,
+			expectedEgressCIDRsList: egressCIDRsStrArrWithEgressCidrAnnotation,
+		},
+		{
+			name: "[rollback] egressIP has one IP listed and node has egressCIDR rollback annotation",
 			objects: []crclient.Object{
 				&v1.HostSubnet{
 					ObjectMeta: metav1.ObjectMeta{
@@ -394,7 +506,7 @@ func TestEgressIpRollbackMigration(t *testing.T) {
 			expectedEgressCIDRsList: egressCIDRsStrArrWithEgressCidrAnnotation,
 		},
 		{
-			name: "egressIP has multiple IPs listed and node has egressCIDR rollback annotation",
+			name: "[rollback] egressIP has multiple IPs listed and node has egressCIDR rollback annotation",
 			objects: []crclient.Object{
 				&v1.HostSubnet{
 					ObjectMeta: metav1.ObjectMeta{
