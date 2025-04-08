@@ -336,6 +336,57 @@ func Test_SpecStatusSynchronizer(t *testing.T) {
 			},
 		},
 		{
+			name: "succeed: duplicate vips outside machine network with ELB",
+			givenInfra: configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						BareMetal: &configv1.BareMetalPlatformSpec{
+							APIServerInternalIPs: []configv1.IP{"224.0.2.1"},
+							IngressIPs:           []configv1.IP{"224.0.2.1"},
+							MachineNetworks:      []configv1.CIDR{"224.0.0.1/24", "224.0.1.1/24"},
+						},
+					},
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform: configv1.BareMetalPlatformType,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: "BareMetal",
+						BareMetal: &configv1.BareMetalPlatformStatus{
+							APIServerInternalIPs: []string{"224.0.2.1"},
+							IngressIPs:           []string{"224.0.2.1"},
+							MachineNetworks:      []configv1.CIDR{"224.0.0.1/24"},
+							LoadBalancer:         &configv1.BareMetalPlatformLoadBalancer{Type: configv1.LoadBalancerTypeUserManaged},
+						},
+					},
+				},
+			},
+			wantedInfra: configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						BareMetal: &configv1.BareMetalPlatformSpec{
+							APIServerInternalIPs: []configv1.IP{"224.0.2.1"},
+							IngressIPs:           []configv1.IP{"224.0.2.1"},
+							MachineNetworks:      []configv1.CIDR{"224.0.0.1/24", "224.0.1.1/24"},
+						},
+					},
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform: configv1.BareMetalPlatformType,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: "BareMetal",
+						BareMetal: &configv1.BareMetalPlatformStatus{
+							APIServerInternalIPs: []string{"224.0.2.1"},
+							IngressIPs:           []string{"224.0.2.1"},
+							MachineNetworks:      []configv1.CIDR{"224.0.0.1/24", "224.0.1.1/24"},
+							LoadBalancer:         &configv1.BareMetalPlatformLoadBalancer{Type: configv1.LoadBalancerTypeUserManaged},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "fail: non-equal number of vips",
 			givenInfra: configv1.Infrastructure{
 				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
