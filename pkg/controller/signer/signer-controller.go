@@ -4,19 +4,29 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"time"
 
+	features "github.com/openshift/api/features"
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/library-go/pkg/crypto"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
+	"github.com/openshift/library-go/pkg/operator/events"
 	csrv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -38,7 +48,62 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, client cnocli
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(client cnoclient.Client, mgr manager.Manager, status *statusmanager.StatusManager) (reconcile.Reconciler, error) {
-	return &ReconcileCSR{client: client, scheme: mgr.GetScheme(), status: status}, nil
+	kubeConfig := client.Default().Config()
+	kubeClient := client.Default().Kubernetes()
+	configClient, err := configclient.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, err
+	}
+	configInformers := configinformers.NewSharedInformerFactory(configClient, 10*time.
+		Minute)
+
+	desiredVersion := os.Getenv("RELEASE_VERSION")
+	missingVersion := "0.0.1-snapshot"
+
+	eventRecorder := events.NewKubeRecorder(kubeClient.CoreV1().Events("openshift-network-operator"), "cluster-network-operator", &corev1.ObjectReference{
+		APIVersion: "apps/v1",
+		Kind:       "Deployment",
+		Namespace:  "openshift-network-operator",
+		Name:       "network-operator",
+	}, clock.RealClock{})
+
+	// By default, this will exit(0) the process if the featuregates ever change to a different set of values.
+	featureGateAccessor := featuregates.NewFeatureGateAccess(
+		desiredVersion, missingVersion,
+		configInformers.Config().V1().ClusterVersions(), configInformers.Config().
+			V1().FeatureGates(),
+		eventRecorder,
+	)
+	// TODO: 1) If other controllers in CNO also want to use featureGates then we should move this code to outside
+	// operconfig-controller 2) For now we pass the neverStop channel; FIXME: use c.Default().AddCustomInformer and
+	// change this to pass a proper stop channel and context which are closed and cancelled properly upon exit.
+	go featureGateAccessor.Run(context.TODO())
+	go configInformers.Start(wait.NeverStop)
+
+	klog.Infof("Waiting for feature gates initialization...")
+	select {
+	case <-featureGateAccessor.InitialFeatureGatesObserved():
+		featureGates, err := featureGateAccessor.CurrentFeatureGates()
+		if err != nil {
+			return nil, err
+		} else {
+			klog.Infof("FeatureGates initialized: knownFeatureGates=%v", featureGates.KnownFeatures())
+		}
+	case <-time.After(1 * time.Minute):
+		return nil, fmt.Errorf("timed out waiting for FeatureGate detection")
+	}
+
+	featureGates, err := featureGateAccessor.CurrentFeatureGates()
+	if err != nil {
+		return nil, err
+	}
+
+	certDuration := 5 * 365 * 24 * time.Hour
+	if featureGates.Enabled(features.FeatureShortCertRotation) {
+		certDuration = 3 * time.Hour
+	}
+	return &ReconcileCSR{client: client, scheme: mgr.GetScheme(), status: status, certDuration: certDuration}, nil
+
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -75,9 +140,10 @@ var _ reconcile.Reconciler = &ReconcileCSR{}
 type ReconcileCSR struct {
 	// This client, initialized using mgr.GetClient() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client cnoclient.Client
-	scheme *runtime.Scheme
-	status *statusmanager.StatusManager
+	client       cnoclient.Client
+	scheme       *runtime.Scheme
+	status       *statusmanager.StatusManager
+	certDuration time.Duration
 }
 
 // Reconcile CSR
@@ -183,7 +249,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 
 	// Create a new certificate using the certificate template and certificate.
 	// We can then sign this using the CA.
-	signedCert, err := signCSR(newCertificateTemplate(certReq), certReq.PublicKey, caCert, caKey)
+	signedCert, err := signCSR(newCertificateTemplate(certReq, r.certDuration), certReq.PublicKey, caCert, caKey)
 	if err != nil {
 		signerFailure(r, csr, "SigningFailure",
 			fmt.Sprintf("Unable to sign certificate for %v and signer %v: %v", request.Name, signerName, err))
