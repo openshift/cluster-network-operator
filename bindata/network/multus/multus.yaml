@@ -159,7 +159,8 @@ data:
         "readinessindicatorfile": "/host/run/multus/cni/net.d/10-ovn-kubernetes.conf",
 {{- end}}
         "daemonSocketDir": "/run/multus/socket",
-        "socketDir": "/host{{ .MultusSocketParentDir }}/socket"
+        "socketDir": "/host{{ .MultusSocketParentDir }}/socket",
+        "auxiliaryCNIChainName": "vendor-cni-chain"
     }
 {{- if .IsNetworkTypeLiveMigration}}
   daemon-config-lm-ovn.json: |
