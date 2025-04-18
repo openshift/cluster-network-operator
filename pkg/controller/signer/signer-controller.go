@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
@@ -251,7 +252,7 @@ func signerFailure(r *ReconcileCSR, csr *csrv1.CertificateSigningRequest, reason
 
 // Update the status conditions on the CSR object
 func updateCSRStatusConditions(r *ReconcileCSR, csr *csrv1.CertificateSigningRequest, reason string, message string) {
-	csr.Status.Conditions = append(csr.Status.Conditions, csrv1.CertificateSigningRequestCondition{
+	setCertificateSigningRequestCondition(&csr.Status.Conditions, csrv1.CertificateSigningRequestCondition{
 		Type:    csrv1.CertificateFailed,
 		Status:  "True",
 		Reason:  reason,
@@ -263,4 +264,25 @@ func updateCSRStatusConditions(r *ReconcileCSR, csr *csrv1.CertificateSigningReq
 		r.status.SetDegraded(statusmanager.CertificateSigner, "UpdateFailure",
 			fmt.Sprintf("Unable to update csr: %v", err))
 	}
+}
+
+func setCertificateSigningRequestCondition(conditions *[]csrv1.CertificateSigningRequestCondition, newCondition csrv1.CertificateSigningRequestCondition) {
+	if conditions == nil {
+		conditions = &[]csrv1.CertificateSigningRequestCondition{}
+	}
+	var existingCondition *csrv1.CertificateSigningRequestCondition
+	for i := range *conditions {
+		if (*conditions)[i].Type == newCondition.Type {
+			existingCondition = &(*conditions)[i]
+		}
+	}
+	if existingCondition == nil {
+		newCondition.LastTransitionTime = metav1.NewTime(time.Now())
+		*conditions = append(*conditions, newCondition)
+		return
+	}
+	existingCondition.Status = newCondition.Status
+	existingCondition.Reason = newCondition.Reason
+	existingCondition.Message = newCondition.Message
+	existingCondition.LastTransitionTime = metav1.NewTime(time.Now())
 }
