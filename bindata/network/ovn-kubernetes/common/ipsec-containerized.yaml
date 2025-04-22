@@ -194,12 +194,14 @@ spec:
         - mountPath: /etc/ovn/
           name: etc-ovn
 {{ end }}
-        - mountPath: /var/run/openvswitch
-          name: host-var-run-ovs
+        - mountPath: /var/run
+          name: host-var-run
         - mountPath: /signer-ca
           name: signer-ca
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
+        - mountPath: /etc
+          name: host-etc
         resources:
           requests:
             cpu: 10m
@@ -261,6 +263,18 @@ spec:
           # Workaround for https://github.com/libreswan/libreswan/issues/373
           ulimit -n 1024
 
+          # The ovs-monitor-ipsec doesn't set authby, so when it calls ipsec auto --start
+          # the default ones defined at Libreswan's compile time will be used. On restart,
+          # Libreswan will use authby from libreswan.config. If libreswan.config is
+          # incompatible with the Libreswan's compiled-in defaults, then we'll have an
+          # authentication problem. But OTOH, ovs-monitor-ipsec does set ike and esp algorithms,
+          # so those may be incompatible with libreswan.config as well. Hence commenting out the
+          # "include" from libreswan.conf to avoid such conflicts.
+          defaultcpinclude="include \/etc\/crypto-policies\/back-ends\/libreswan.config"
+          if ! grep -q "# ${defaultcpinclude}" /etc/ipsec.conf; then
+            sed -i "/${defaultcpinclude}/s/^/# /" /etc/ipsec.conf
+          fi
+
           /usr/libexec/ipsec/addconn --config /etc/ipsec.conf --checkconfig
           # Check kernel modules
           /usr/libexec/ipsec/_stackmanager start
@@ -275,7 +289,7 @@ spec:
           # We are running this in the foreground so that the container will be restarted when ovs-monitor-ipsec fails.
           /usr/libexec/platform-python /usr/share/openvswitch/scripts/ovs-monitor-ipsec \
             --pidfile=/var/run/openvswitch/ovs-monitor-ipsec.pid --ike-daemon=libreswan --no-restart-ike-daemon \
-            --ipsec-d /var/lib/ipsec/nss \
+            --ipsec-conf /etc/ipsec.d/openshift.conf --ipsec-d /var/lib/ipsec/nss \
             --log-file --monitor unix:/var/run/openvswitch/db.sock
         env:
         - name: K8S_NODE
@@ -288,12 +302,16 @@ spec:
         # To check that network setup is complete
         - mountPath: /etc/cni/net.d
           name: host-cni-netd
-        - mountPath: /var/run/openvswitch
-          name: host-var-run-ovs
+        - mountPath: /var/run
+          name: host-var-run
         - mountPath: /var/log/openvswitch/
           name: host-var-log-ovs
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
+        - mountPath: /etc
+          name: host-etc
+        - mountPath: /var/lib
+          name: host-var-lib
         resources:
           requests:
             cpu: 10m
@@ -331,10 +349,10 @@ spec:
         hostPath:
           path: /var/log/openvswitch
           type: DirectoryOrCreate
-      - name: host-var-run-ovs
-        hostPath:
-          path: /var/run/openvswitch
+      - hostPath:
+          path: /var/run
           type: DirectoryOrCreate
+        name: host-var-run
       - name: signer-ca
         configMap:
           name: signer-ca
@@ -345,6 +363,14 @@ spec:
       - name: host-cni-netd
         hostPath:
           path: "{{.CNIConfDir}}"
+      - hostPath:
+          path: /var/lib
+          type: DirectoryOrCreate
+        name: host-var-lib
+      -  name: host-etc
+         hostPath:
+          path: /etc
+          type: Directory
       tolerations:
       - operator: "Exists"
 {{end}}
