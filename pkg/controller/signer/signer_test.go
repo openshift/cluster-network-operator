@@ -158,6 +158,13 @@ func TestSigner_reconciler_withInvalidUserName(t *testing.T) {
 	g.Expect(len(csrConditions)).To(Equal(1))
 	g.Expect(csrConditions[0].Reason).To(Equal("CSRInvalidUser"))
 	g.Expect(csrConditions[0].Type).To(Equal(certificatev1.CertificateFailed))
+
+	co, _, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting network.operator: %v", err)
+	}
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(len(co.Status.Conditions)).To(BeZero())
 }
 
 func generateCSR() (string, error) {
