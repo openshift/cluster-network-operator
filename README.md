@@ -13,6 +13,7 @@ $ oc get -o yaml network.operator cluster
 
 When the controller has reconciled and all its dependent resources have converged, the cluster should have an installed network plugin and a working service network. In OpenShift, the Cluster Network Operator runs very early in the install process -- while the boostrap API server is still running.
 
+
 # Configuring
 The network operator gets its configuration from two objects: the Cluster and the Operator configuration. Most users only need to create the Cluster configuration - the operator will generate its configuration automatically. If you need finer-grained configuration of your network, you will need to create both configurations.
 
