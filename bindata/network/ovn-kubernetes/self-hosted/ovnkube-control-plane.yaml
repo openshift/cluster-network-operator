@@ -148,6 +148,15 @@ spec:
             route_advertisements_enable_flag="--enable-route-advertisements"
           fi
 
+          if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
+            gateway_mode_flags="--gateway-mode shared"
+          elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
+            gateway_mode_flags="--gateway-mode local"
+          else
+            echo "Invalid OVN_GATEWAY_MODE: \"{{.OVN_GATEWAY_MODE}}\". Must be \"local\" or \"shared\"."
+            exit 1
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
@@ -165,6 +174,7 @@ spec:
             ${persistent_ips_enabled_flag} \
             ${multi_network_enabled_flag} \
             ${network_segmentation_enabled_flag} \
+            ${gateway_mode_flags} \
             ${route_advertisements_enable_flag}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
