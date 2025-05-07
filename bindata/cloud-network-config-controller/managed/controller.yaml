@@ -189,12 +189,6 @@ spec:
           value: "{{ .NO_PROXY}}"
 {{ end }}
 {{- if not (eq .AzureManagedSecretProviderClass "")}}
-        - name: "ARO_HCP_MI_CLIENT_ID"
-          value: "{{ .AzureManagedClientID }}"
-        - name: "ARO_HCP_TENANT_ID"
-          value: "{{ .AzureManagedTenantID }}"
-        - name: "ARO_HCP_CLIENT_CERTIFICATE_PATH"
-          value: "{{ .AzureManagedCertPath}}"
         - name: "ARO_HCP_CLIENT_CREDENTIALS_PATH"
           value: "{{ .AzureManagedCredsPath}}"
 {{ end }}
