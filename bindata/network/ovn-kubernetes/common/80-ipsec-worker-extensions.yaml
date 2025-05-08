@@ -22,7 +22,6 @@ spec:
          Type=oneshot
          ExecStartPre=rm -f /etc/ipsec.d/cno.conf
          ExecStart=systemctl enable --now ipsec.service
-         ExecStartPost=/bin/bash -c 'if grep -q "openshift.conf" /etc/sysconfig/openvswitch; then systemctl enable --now openvswitch-ipsec.service; fi'
 
          [Install]
          WantedBy=multi-user.target
