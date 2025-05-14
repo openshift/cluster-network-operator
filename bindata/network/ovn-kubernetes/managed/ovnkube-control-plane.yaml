@@ -103,6 +103,7 @@ spec:
             This allows for pod-pod connectivity in postStart hooks the first time they run.
             EOF
         image: "{{.OvnControlPlaneImage}}"
+        terminationMessagePolicy: FallbackToLogsOnError
       automountServiceAccountToken: false
       containers:
       # token-minter creates a token with the default service account path
@@ -125,6 +126,7 @@ spec:
           name: admin-kubeconfig
         - mountPath: /var/run/secrets/hosted_cluster
           name: hosted-cluster-api-access
+        terminationMessagePolicy: FallbackToLogsOnError
       # ovnkube-control-plane: central component that allocates IPAM for each node in the cluster
       - name: ovnkube-control-plane
         image: "{{.OvnControlPlaneImage}}"

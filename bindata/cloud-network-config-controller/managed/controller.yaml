@@ -97,6 +97,7 @@ spec:
             value: "{{.KubernetesServicePort}}"
           - name: KUBERNETES_SERVICE_HOST
             value: "{{.KubernetesServiceHost}}"
+        terminationMessagePolicy: FallbackToLogsOnError
       containers:
       # hosted-cluster-token creates a token with a custom path(/var/run/secrets/hosted_cluster/token)
       # The token path is included in the kubeconfig used by cncc containers to talk to the hosted clusters API server
@@ -118,6 +119,7 @@ spec:
             name: admin-kubeconfig
           - mountPath: /var/run/secrets/hosted_cluster
             name: hosted-cluster-api-access
+        terminationMessagePolicy: FallbackToLogsOnError
         # cloud-token creates a token with the default service account path
         # The token is read by cncc containers to authenticate against the cloud services
       - name: cloud-token
@@ -137,6 +139,7 @@ spec:
             name: admin-kubeconfig
           - mountPath: /var/run/secrets/openshift/serviceaccount
             name: cloud-token
+        terminationMessagePolicy: FallbackToLogsOnError
       - name: controller
         securityContext:
           allowPrivilegeEscalation: false
