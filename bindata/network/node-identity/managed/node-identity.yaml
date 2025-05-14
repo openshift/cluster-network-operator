@@ -98,6 +98,7 @@ spec:
           volumeMounts:
             - mountPath: /var/run/secrets/hosted_cluster
               name: hosted-cluster-api-access
+          terminationMessagePolicy: FallbackToLogsOnError
       automountServiceAccountToken: false
       containers:
       - name: webhook
@@ -244,6 +245,7 @@ spec:
             name: admin-kubeconfig
           - mountPath: /var/run/secrets/hosted_cluster
             name: hosted-cluster-api-access
+        terminationMessagePolicy: FallbackToLogsOnError
       {{ if .HCPNodeSelector }}
       nodeSelector:
         {{ range $key, $value := .HCPNodeSelector }}
