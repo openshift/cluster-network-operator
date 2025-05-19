@@ -274,8 +274,6 @@ github.com/onsi/ginkgo/v2 v2.20.2 h1:7NVCeyIWROIAheY21RLS+3j2bb52W0W82tkberYytp4
 github.com/onsi/ginkgo/v2 v2.20.2/go.mod h1:K9gyxPIlb+aIvnZ8bd9Ak+YP18w3APlR+5coaZoE2ag=
 github.com/onsi/gomega v1.34.2 h1:pNCwDkzrsv7MS9kpaQvVb1aVLahQXyJ/Tv5oAZMI3i8=
 github.com/onsi/gomega v1.34.2/go.mod h1:v1xfxRgk0KIsG+QOdm7p8UosrOzPYRo60fd3B/1Dukc=
-github.com/openshift/api v0.0.0-20241004095111-b1f700bdd8d2 h1:wCRdyt+nHnJsfuLMJF9RW1JK8G4Gvo//gBy6bZI5USE=
-github.com/openshift/api v0.0.0-20241004095111-b1f700bdd8d2/go.mod h1:Shkl4HanLwDiiBzakv+con/aMGnVE2MAGvoKp5oyYUo=
 github.com/openshift/build-machinery-go v0.0.0-20240910153727-5725581bdf8f h1:JMEDso3xFUIDULgFJmcrTfyPpigF3NyyaP07Yy8tHmI=
 github.com/openshift/build-machinery-go v0.0.0-20240910153727-5725581bdf8f/go.mod h1:8jcm8UPtg2mCAsxfqKil1xrmRMI3a+XU2TZ9fF8A7TE=
 github.com/openshift/client-go v0.0.0-20241001162912-da6d55e4611f h1:FRc0bVNWprihWS0GqQWzb3dY4dkCwpOP3mDw5NwSoR4=
@@ -293,6 +291,8 @@ github.com/pkg/profile v1.7.0/go.mod h1:8Uer0jas47ZQMJ7VD+OHknK4YDY07LPUC6dEvqDj
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/pperiyasamy/api v0.0.0-20250516100757-f6c354a4e11b h1:KvfjBqG50GhRox+6guUyAMb5iwYf35pnK4sGBc5bTQk=
+github.com/pperiyasamy/api v0.0.0-20250516100757-f6c354a4e11b/go.mod h1:Shkl4HanLwDiiBzakv+con/aMGnVE2MAGvoKp5oyYUo=
 github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.74.0 h1:AHzMWDxNiAVscJL6+4wkvFRTpMnJqiaZFEKA/osaBXE=
 github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.74.0/go.mod h1:wAR5JopumPtAZnu0Cjv2PSqV4p4QB09LMhc6fZZTXuA=
 github.com/prometheus/client_golang v1.20.4 h1:Tgh3Yr67PaOv/uTqloMsCEdeuFTatm5zIq5+qNN23vI=
