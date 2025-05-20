@@ -611,3 +611,138 @@ func Test_renderNetworkDiagnostics(t *testing.T) {
 		})
 	}
 }
+
+func TestIsMigrationChangeSafe(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	// Helper function to create NetworkSpec with migration config
+	makeNetSpec := func(networkType string, mode operv1.NetworkMigrationMode) *operv1.NetworkSpec {
+		return &operv1.NetworkSpec{
+			Migration: &operv1.NetworkMigration{
+				NetworkType: networkType,
+				Mode:        mode,
+			},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		prev        *operv1.NetworkSpec
+		next        *operv1.NetworkSpec
+		infraStatus *bootstrap.InfraStatus
+		wantErr     bool
+		errMsg      string
+	}{
+		{
+			name:        "nil migration configs should be valid",
+			prev:        &operv1.NetworkSpec{},
+			next:        &operv1.NetworkSpec{},
+			infraStatus: &bootstrap.InfraStatus{},
+			wantErr:     false,
+		},
+		{
+			name: "live migration in hypershift should error",
+			prev: makeNetSpec("OVNKubernetes", operv1.LiveNetworkMigrationMode),
+			next: makeNetSpec("OVNKubernetes", operv1.LiveNetworkMigrationMode),
+			infraStatus: &bootstrap.InfraStatus{
+				HostedControlPlane: &hypershift.HostedControlPlane{},
+			},
+			wantErr: true,
+			errMsg:  "live migration is unsupported in a HyperShift environment",
+		},
+		{
+			name:        "changing network type during offline migration should error",
+			prev:        makeNetSpec("OpenShiftSDN", ""),
+			next:        makeNetSpec("OVNKubernetes", ""),
+			infraStatus: &bootstrap.InfraStatus{},
+			wantErr:     true,
+			errMsg:      "cannot change migration network type after migration has started",
+		},
+		{
+			name:        "changing migration mode should error",
+			prev:        makeNetSpec("OVNKubernetes", ""),
+			next:        makeNetSpec("OVNKubernetes", operv1.LiveNetworkMigrationMode),
+			infraStatus: &bootstrap.InfraStatus{},
+			wantErr:     true,
+			errMsg:      "cannot change migration network type after migration has started",
+		},
+		{
+			name:        "changing network type during live migration should error",
+			prev:        makeNetSpec("OpenShiftSDN", operv1.LiveNetworkMigrationMode),
+			next:        makeNetSpec("OVNKubernetes", operv1.LiveNetworkMigrationMode),
+			infraStatus: &bootstrap.InfraStatus{},
+			wantErr:     true,
+			errMsg:      "cannot change migration network type after migration has started",
+		},
+		{
+			name:        "keeping same network type should be valid",
+			prev:        makeNetSpec("OVNKubernetes", ""),
+			next:        makeNetSpec("OVNKubernetes", ""),
+			infraStatus: &bootstrap.InfraStatus{},
+			wantErr:     false,
+		},
+		{
+			name: "start live migration with feature migration configured should be valid",
+			prev: &operv1.NetworkSpec{
+				Migration: &operv1.NetworkMigration{
+					Features: &operv1.FeaturesMigration{
+						EgressIP:       false,
+						Multicast:      false,
+						EgressFirewall: false,
+					},
+				},
+			},
+			next: &operv1.NetworkSpec{
+				Migration: &operv1.NetworkMigration{
+					NetworkType: "OVNKubernetes",
+					Mode:        operv1.LiveNetworkMigrationMode,
+					Features: &operv1.FeaturesMigration{
+						EgressIP:       false,
+						Multicast:      false,
+						EgressFirewall: false,
+					},
+				},
+			},
+			infraStatus: &bootstrap.InfraStatus{},
+			wantErr:     false,
+		},
+		{
+			name: "finish live migration with feature migration configured should be valid",
+			prev: &operv1.NetworkSpec{
+				Migration: &operv1.NetworkMigration{
+					NetworkType: "OVNKubernetes",
+					Mode:        operv1.LiveNetworkMigrationMode,
+					Features: &operv1.FeaturesMigration{
+						EgressIP:       false,
+						Multicast:      false,
+						EgressFirewall: false,
+					},
+				},
+			},
+			next: &operv1.NetworkSpec{
+				Migration: &operv1.NetworkMigration{
+					Features: &operv1.FeaturesMigration{
+						EgressIP:       false,
+						Multicast:      false,
+						EgressFirewall: false,
+					},
+				},
+			},
+			infraStatus: &bootstrap.InfraStatus{},
+			wantErr:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := isMigrationChangeSafe(tt.prev, tt.next, tt.infraStatus)
+
+			if tt.wantErr {
+				g.Expect(errs).To(HaveLen(1))
+				g.Expect(errs[0].Error()).To(Equal(tt.errMsg))
+			} else {
+				g.Expect(errs).To(BeEmpty())
+			}
+		})
+	}
+}
