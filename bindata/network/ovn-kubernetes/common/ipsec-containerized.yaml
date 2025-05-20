@@ -261,6 +261,38 @@ spec:
           # Workaround for https://github.com/libreswan/libreswan/issues/373
           ulimit -n 1024
 
+          # The ovs-monitor-ipsec doesn't set authby, so when it calls ipsec auto --start
+          # the default ones defined at Libreswan's compile time will be used. On restart,
+          # Libreswan will use authby from libreswan.config. If libreswan.config is
+          # incompatible with the Libreswan's compiled-in defaults, then we'll have an
+          # authentication problem. But OTOH, ovs-monitor-ipsec does set ike and esp algorithms,
+          # so those may be incompatible with libreswan.config as well. Hence commenting out the
+          # "include" from libreswan.conf to avoid such conflicts.
+          defaultcpinclude="include \/etc\/crypto-policies\/back-ends\/libreswan.config"
+          if ! grep -q "# ${defaultcpinclude}" /etc/ipsec.conf; then
+            sed -i "/${defaultcpinclude}/s/^/# /" /etc/ipsec.conf
+            # Copy the modified ipsec.conf into host's /etc directory as it needs to be
+            # used by host wait-for-ipsec-connect systemd service upon ipsec os extension
+            # is installed, otherwise it uses default /etc/ipsec.conf file installed by
+            # libreswan rpm.
+            cp /etc/ipsec.conf /host/etc/ipsec.conf
+          fi
+
+          # When node is in selinux enforcing mode, then modify and apply the SELinux policy
+          # for nss db directory (/var/lib/ipsec/nss) with label ipsec_var_lib_t.
+          # This will make host ipsec deployment also have access to same nss db directory
+          # used container deployment with both write and read access. So when IPsec is moved
+          # from container to host, the host pluto process will just reuse certificates and
+          # private keys created by container ipsec deployment.
+          # The write and ready access to nss db directory remains to be available for
+          # container deployment since its ovn-ipse container is already running with
+          # privileged mode.
+          if chroot /proc/1/root selinuxenabled && [ "$(chroot /proc/1/root getenforce)" = "Enforcing" ]; then
+            chroot /proc/1/root semanage fcontext -a -t ipsec_var_run_t '/var/lib/ipsec/nss(/.*)?'
+            chroot /proc/1/root restorecon -Rv /var/lib/ipsec/nss
+            ls -lZ /var/lib/ipsec/nss
+          fi
+
           /usr/libexec/ipsec/addconn --config /etc/ipsec.conf --checkconfig
           # Check kernel modules
           /usr/libexec/ipsec/_stackmanager start
@@ -275,7 +307,7 @@ spec:
           # We are running this in the foreground so that the container will be restarted when ovs-monitor-ipsec fails.
           /usr/libexec/platform-python /usr/share/openvswitch/scripts/ovs-monitor-ipsec \
             --pidfile=/var/run/openvswitch/ovs-monitor-ipsec.pid --ike-daemon=libreswan --no-restart-ike-daemon \
-            --ipsec-d /var/lib/ipsec/nss \
+            --ipsec-conf /etc/ipsec.d/openshift.conf --ipsec-d /var/lib/ipsec/nss \
             --log-file --monitor unix:/var/run/openvswitch/db.sock
         env:
         - name: K8S_NODE
@@ -294,6 +326,12 @@ spec:
           name: host-var-log-ovs
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
+        - mountPath: /etc/ipsec.d
+          name: host-etc-ipsec-d
+        - mountPath: /var/lib/ipsec/nss
+          name: host-ipsec-nss-db
+        - mountPath: /host/etc
+          name: host-etc
         resources:
           requests:
             cpu: 10m
@@ -345,6 +383,17 @@ spec:
       - name: host-cni-netd
         hostPath:
           path: "{{.CNIConfDir}}"
+      -  name: host-etc-ipsec-d
+         hostPath:
+          path: /etc/ipsec.d
+          type: DirectoryOrCreate
+      -  name: host-ipsec-nss-db
+         hostPath:
+          path: /var/lib/ipsec/nss
+          type: DirectoryOrCreate
+      - name: host-etc
+        hostPath:
+          path: /etc
       tolerations:
       - operator: "Exists"
 {{end}}
