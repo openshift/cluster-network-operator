@@ -180,6 +180,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = bootstrapResult.Infra.NetworkNodeIdentityEnabled
 	data.Data["NodeIdentityCertDuration"] = OVN_NODE_IDENTITY_CERT_DURATION
 	data.Data["IsNetworkTypeLiveMigration"] = false
+	data.Data["IsLooseUDNIsolationEnabled"] = bootstrapResult.Infra.LooseUDNIsolationModeEnabled
 
 	if conf.Migration != nil {
 		if conf.Migration.MTU != nil && conf.Migration.Mode != operv1.LiveNetworkMigrationMode {
