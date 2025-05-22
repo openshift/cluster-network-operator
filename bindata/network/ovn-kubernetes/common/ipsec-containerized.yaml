@@ -53,6 +53,7 @@ spec:
           #!/bin/bash
           set -exuo pipefail
 
+          echo "ovn-keys init container starting at $(date +'%H:%M:%S')"
 {{ if .IPsecServiceCheckOnHost }}
           if chroot /proc/1/root systemctl is-active --quiet ipsec.service; then
             echo "host has ipsec.service running and therefore ipsec will be configured by ipsec host daemonset, this ovn ipsec container doesnt need to init anything"
@@ -60,6 +61,7 @@ spec:
           fi
 {{ end }}
 
+          echo "ovn-keys init container config starting at $(date +'%H:%M:%S')"
 {{ if .NETWORK_NODE_IDENTITY_ENABLE }}
           # When NETWORK_NODE_IDENTITY_ENABLE is true, use the per-node certificate to create a kubeconfig
           # that will be used to talk to the API
@@ -216,6 +218,8 @@ spec:
           #!/bin/bash
           set -exuo pipefail
 
+          echo "ovn-ipsec container starting at $(date +'%H:%M:%S')"
+
           function cleanup()
           {
             # In order to maintain traffic flows during container restart, we
@@ -237,6 +241,7 @@ spec:
             sleep infinity
           fi
 {{ end }}
+          echo "ovn-ipsec ipsec config starting at $(date +'%H:%M:%S')"
 
           # Don't start IPsec until ovnkube-node has finished setting up the node
           counter=0
