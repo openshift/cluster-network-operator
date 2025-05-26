@@ -109,7 +109,7 @@ require (
 )
 
 require (
-	github.com/openshift/api v0.0.0-20241004095111-b1f700bdd8d2
+	github.com/openshift/api v0.0.0-20250526081612-f0bde93b0cff
 	github.com/openshift/client-go v0.0.0-20241001162912-da6d55e4611f
 	github.com/openshift/library-go v0.0.0-20241022153911-4c1f8b43679f
 	github.com/openshift/machine-config-operator v0.0.1-0.20231002195040-a2469941c0dc

@@ -2,28 +2,25 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    api-approved.openshift.io: https://github.com/openshift/api/pull/752
+    api-approved.openshift.io: https://github.com/openshift/api/pull/1504
     api.openshift.io/merged-by-featuregates: "true"
-    include.release.openshift.io/ibm-cloud-managed: "true"
+    capability.openshift.io/name: OperatorLifecycleManagerV1
     include.release.openshift.io/self-managed-high-availability: "true"
-    release.openshift.io/feature-set: CustomNoUpgrade
-  name: etcds.operator.openshift.io
+  name: olms.operator.openshift.io
 spec:
   group: operator.openshift.io
   names:
-    categories:
-    - coreoperators
-    kind: Etcd
-    listKind: EtcdList
-    plural: etcds
-    singular: etcd
+    kind: OLM
+    listKind: OLMList
+    plural: olms
+    singular: olm
   scope: Cluster
   versions:
   - name: v1
     schema:
       openAPIV3Schema:
         description: |-
-          Etcd provides information to configure an operator to manage etcd.
+          OLM provides information to configure an operator to manage the OLM controllers
 
           Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
         properties:
@@ -45,45 +42,8 @@ spec:
           metadata:
             type: object
           spec:
+            description: spec holds user settable values for configuration
             properties:
-              backendQuotaGiB:
-                default: 8
-                description: |-
-                  backendQuotaGiB sets the etcd backend storage size limit in gibibytes.
-                  The value should be an integer not less than 8 and not more than 32.
-                  When not specified, the default value is 8.
-                format: int32
-                maximum: 32
-                minimum: 8
-                type: integer
-                x-kubernetes-validations:
-                - message: etcd backendQuotaGiB may not be decreased
-                  rule: self>=oldSelf
-              controlPlaneHardwareSpeed:
-                description: "HardwareSpeed allows user to change the etcd tuning
-                  profile which configures\nthe latency parameters for heartbeat interval
-                  and leader election timeouts\nallowing the cluster to tolerate longer
-                  round-trip-times between etcd members.\nValid values are \"\", \"Standard\"
-                  and \"Slower\".\n\t\"\" means no opinion and the platform is left
-                  to choose a reasonable default\n\twhich is subject to change without
-                  notice."
-                enum:
-                - ""
-                - Standard
-                - Slower
-                type: string
-              failedRevisionLimit:
-                description: |-
-                  failedRevisionLimit is the number of failed static pod installer revisions to keep on disk and in the api
-                  -1 = unlimited, 0 or unset = 5 (default)
-                format: int32
-                type: integer
-              forceRedeploymentReason:
-                description: |-
-                  forceRedeploymentReason can be used to force the redeployment of the operand by providing a unique string.
-                  This provides a mechanism to kick a previously failed deployment and provide a reason why you think it will work
-                  this time instead of failing again on the same config.
-                type: string
               logLevel:
                 default: Normal
                 description: |-
@@ -126,12 +86,6 @@ spec:
                 - Trace
                 - TraceAll
                 type: string
-              succeededRevisionLimit:
-                description: |-
-                  succeededRevisionLimit is the number of successful static pod installer revisions to keep on disk and in the api
-                  -1 = unlimited, 0 or unset = 5 (default)
-                format: int32
-                type: integer
               unsupportedConfigOverrides:
                 description: |-
                   unsupportedConfigOverrides overrides the final configuration that was computed by the operator.
@@ -144,6 +98,8 @@ spec:
                 x-kubernetes-preserve-unknown-fields: true
             type: object
           status:
+            description: status holds observed values from the cluster. They may not
+              be overridden.
             properties:
               conditions:
                 description: conditions is a list of conditions and their status
@@ -181,14 +137,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
-              controlPlaneHardwareSpeed:
-                description: ControlPlaneHardwareSpeed declares valid hardware speed
-                  tolerance levels
-                enum:
-                - ""
-                - Standard
-                - Slower
-                type: string
               generations:
                 description: generations are used to determine when an item needs
                   to be reconciled or has changed in a way that needs a reaction.
@@ -240,87 +188,6 @@ spec:
                 x-kubernetes-validations:
                 - message: must only increase
                   rule: self >= oldSelf
-              latestAvailableRevisionReason:
-                description: latestAvailableRevisionReason describe the detailed reason
-                  for the most recent deployment
-                type: string
-              nodeStatuses:
-                description: nodeStatuses track the deployment values and errors across
-                  individual nodes
-                items:
-                  description: NodeStatus provides information about the current state
-                    of a particular node managed by this operator.
-                  properties:
-                    currentRevision:
-                      description: |-
-                        currentRevision is the generation of the most recently successful deployment.
-                        Can not be set on creation of a nodeStatus. Updates must only increase the value.
-                      format: int32
-                      type: integer
-                      x-kubernetes-validations:
-                      - message: must only increase
-                        rule: self >= oldSelf
-                    lastFailedCount:
-                      description: lastFailedCount is how often the installer pod
-                        of the last failed revision failed.
-                      type: integer
-                    lastFailedReason:
-                      description: lastFailedReason is a machine readable failure
-                        reason string.
-                      type: string
-                    lastFailedRevision:
-                      description: lastFailedRevision is the generation of the deployment
-                        we tried and failed to deploy.
-                      format: int32
-                      type: integer
-                    lastFailedRevisionErrors:
-                      description: lastFailedRevisionErrors is a list of human readable
-                        errors during the failed deployment referenced in lastFailedRevision.
-                      items:
-                        type: string
-                      type: array
-                      x-kubernetes-list-type: atomic
-                    lastFailedTime:
-                      description: lastFailedTime is the time the last failed revision
-                        failed the last time.
-                      format: date-time
-                      type: string
-                    lastFallbackCount:
-                      description: lastFallbackCount is how often a fallback to a
-                        previous revision happened.
-                      type: integer
-                    nodeName:
-                      description: nodeName is the name of the node
-                      type: string
-                    targetRevision:
-                      description: |-
-                        targetRevision is the generation of the deployment we're trying to apply.
-                        Can not be set on creation of a nodeStatus.
-                      format: int32
-                      type: integer
-                  required:
-                  - nodeName
-                  type: object
-                  x-kubernetes-validations:
-                  - fieldPath: .currentRevision
-                    message: cannot be unset once set
-                    rule: has(self.currentRevision) || !has(oldSelf.currentRevision)
-                  - fieldPath: .currentRevision
-                    message: currentRevision can not be set on creation of a nodeStatus
-                    optionalOldSelf: true
-                    rule: oldSelf.hasValue() || !has(self.currentRevision)
-                  - fieldPath: .targetRevision
-                    message: targetRevision can not be set on creation of a nodeStatus
-                    optionalOldSelf: true
-                    rule: oldSelf.hasValue() || !has(self.targetRevision)
-                type: array
-                x-kubernetes-list-map-keys:
-                - nodeName
-                x-kubernetes-list-type: map
-                x-kubernetes-validations:
-                - message: no more than 1 node status may have a nonzero targetRevision
-                  rule: size(self.filter(status, status.?targetRevision.orValue(0)
-                    != 0)) <= 1
               observedGeneration:
                 description: observedGeneration is the last generation change you've
                   dealt with
@@ -338,6 +205,9 @@ spec:
         required:
         - spec
         type: object
+        x-kubernetes-validations:
+        - message: olm is a singleton, .metadata.name must be 'cluster'
+          rule: self.metadata.name == 'cluster'
     served: true
     storage: true
     subresources:
