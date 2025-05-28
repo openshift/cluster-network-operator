@@ -339,9 +339,12 @@ github.com/openshift/client-go/operator/applyconfigurations/internal
 github.com/openshift/client-go/operator/applyconfigurations/operator/v1
 github.com/openshift/client-go/operator/applyconfigurations/operator/v1alpha1
 github.com/openshift/client-go/operator/clientset/versioned
+github.com/openshift/client-go/operator/clientset/versioned/fake
 github.com/openshift/client-go/operator/clientset/versioned/scheme
 github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1
+github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1/fake
 github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1alpha1
+github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1alpha1/fake
 github.com/openshift/client-go/operator/informers/externalversions
 github.com/openshift/client-go/operator/informers/externalversions/internalinterfaces
 github.com/openshift/client-go/operator/informers/externalversions/operator
