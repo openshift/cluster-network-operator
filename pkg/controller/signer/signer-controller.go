@@ -6,9 +6,11 @@ import (
 	"log"
 	"time"
 
+	features "github.com/openshift/api/features"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/library-go/pkg/crypto"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	csrv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -29,8 +31,8 @@ import (
 const signerName = "network.openshift.io/signer"
 
 // Add controller and start it when the Manager is started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, client cnoclient.Client) error {
-	reconciler, err := newReconciler(client, mgr, status)
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, client cnoclient.Client, featureGates featuregates.FeatureGate) error {
+	reconciler, err := newReconciler(client, mgr, status, featureGates)
 	if err != nil {
 		return err
 	}
@@ -38,8 +40,13 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, client cnocli
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(client cnoclient.Client, mgr manager.Manager, status *statusmanager.StatusManager) (reconcile.Reconciler, error) {
-	return &ReconcileCSR{client: client, scheme: mgr.GetScheme(), status: status}, nil
+func newReconciler(client cnoclient.Client, mgr manager.Manager, status *statusmanager.StatusManager, featureGates featuregates.FeatureGate) (reconcile.Reconciler, error) {
+	certDuration := 5 * 365 * 24 * time.Hour
+	if featureGates.Enabled(features.FeatureShortCertRotation) {
+		certDuration = 3 * time.Hour
+	}
+	return &ReconcileCSR{client: client, scheme: mgr.GetScheme(), status: status, certDuration: certDuration}, nil
+
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -76,9 +83,10 @@ var _ reconcile.Reconciler = &ReconcileCSR{}
 type ReconcileCSR struct {
 	// This client, initialized using mgr.GetClient() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client cnoclient.Client
-	scheme *runtime.Scheme
-	status *statusmanager.StatusManager
+	client       cnoclient.Client
+	scheme       *runtime.Scheme
+	status       *statusmanager.StatusManager
+	certDuration time.Duration
 }
 
 // Reconcile CSR
@@ -184,7 +192,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 
 	// Create a new certificate using the certificate template and certificate.
 	// We can then sign this using the CA.
-	signedCert, err := signCSR(newCertificateTemplate(certReq), certReq.PublicKey, caCert, caKey)
+	signedCert, err := signCSR(newCertificateTemplate(certReq, r.certDuration), certReq.PublicKey, caCert, caKey)
 	if err != nil {
 		signerFailure(r, csr, "SigningFailure",
 			fmt.Sprintf("Unable to sign certificate for %v and signer %v: %v", request.Name, signerName, err))
