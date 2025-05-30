@@ -82,6 +82,8 @@ spec:
         ports:
         - containerPort: 7572
           name: monitoring
+        - containerPort: 9443
+          name: webhook          
         securityContext:
          runAsNonRoot: true
         resources:
@@ -91,15 +93,17 @@ spec:
         terminationMessagePolicy: FallbackToLogsOnError
         livenessProbe:
           httpGet:
-            path: /metrics
-            port: monitoring
+            path: /healthz
+            port: webhook
+            scheme: HTTPS
           initialDelaySeconds: 10
           periodSeconds: 10
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /metrics
-            port: monitoring
+            path: /healthz
+            port: webhook
+            scheme: HTTPS
           initialDelaySeconds: 10
           periodSeconds: 10
           failureThreshold: 3
