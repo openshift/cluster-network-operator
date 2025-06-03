@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
@@ -101,9 +105,45 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	o.StatusManager = statusmanager.New(o.client, "network", cluster)
 	defer utilruntime.HandleCrash(o.StatusManager.SetDegradedOnPanicAndCrash)
 
+	klog.Infof("Fetching cluster feature gates...")
+	kubeConfig := o.client.Default().Config()
+	configClient, err := configclient.NewForConfig(kubeConfig)
+	if err != nil {
+		return err
+	}
+	configInformers := configinformers.NewSharedInformerFactory(configClient, 10*time.Minute)
+	desiredVersion := os.Getenv("RELEASE_VERSION")
+	missingVersion := "0.0.1-snapshot"
+
+	featureGateAccessor := featuregates.NewFeatureGateAccess(
+		desiredVersion, missingVersion,
+		configInformers.Config().V1().ClusterVersions(), configInformers.Config().V1().FeatureGates(),
+		controllerConfig.EventRecorder,
+	)
+
+	go featureGateAccessor.Run(context.TODO())
+	go configInformers.Start(wait.NeverStop)
+	klog.Infof("Waiting for feature gates initialization...")
+	select {
+	case <-featureGateAccessor.InitialFeatureGatesObserved():
+		featureGates, err := featureGateAccessor.CurrentFeatureGates()
+		if err != nil {
+			return err
+		} else {
+			klog.Infof("FeatureGates initialized: knownFeatureGates=%v", featureGates.KnownFeatures())
+		}
+	case <-time.After(1 * time.Minute):
+		return fmt.Errorf("timed out waiting for FeatureGate detection")
+	}
+
+	featureGates, err := featureGateAccessor.CurrentFeatureGates()
+	if err != nil {
+		return err
+	}
+
 	// Add controller-runtime controllers
 	klog.Info("Adding controller-runtime controllers")
-	if err := controller.AddToManager(o.manager, o.StatusManager, o.client); err != nil {
+	if err := controller.AddToManager(o.manager, o.StatusManager, o.client, featureGates); err != nil {
 		return fmt.Errorf("failed to add controllers to manager: %w", err)
 	}
 

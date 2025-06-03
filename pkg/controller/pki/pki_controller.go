@@ -26,6 +26,8 @@ import (
 	"github.com/openshift/library-go/pkg/operator/certrotation"
 	"github.com/pkg/errors"
 
+	features "github.com/openshift/api/features"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -44,8 +46,8 @@ const (
 )
 
 // Add attaches our control loop to the manager and watches for PKI objects
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client) error {
-	r, err := newPKIReconciler(mgr, status)
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client, featureGates featuregates.FeatureGate) error {
+	r, err := newPKIReconciler(mgr, status, featureGates)
 	if err != nil {
 		return err
 	}
@@ -77,6 +79,8 @@ type PKIReconciler struct {
 	pkis map[types.NamespacedName]*pki
 	// For computing status
 	pkiErrs map[types.NamespacedName]error
+
+	certDuration time.Duration
 }
 
 // The periodic resync interval.
@@ -86,10 +90,15 @@ var ResyncPeriod = 5 * time.Minute
 
 // newPKIReconciler creates the toplevel reconciler that receives PKI updates
 // and configures the CertRotationController accordingly
-func newPKIReconciler(mgr manager.Manager, status *statusmanager.StatusManager) (reconcile.Reconciler, error) {
+func newPKIReconciler(mgr manager.Manager, status *statusmanager.StatusManager, featureGates featuregates.FeatureGate) (reconcile.Reconciler, error) {
 	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		return nil, err
+	}
+
+	certDuration := 365 * 24 * time.Hour / 2
+	if featureGates.Enabled(features.FeatureShortCertRotation) {
+		certDuration = 2 * time.Hour
 	}
 
 	return &PKIReconciler{
@@ -97,8 +106,9 @@ func newPKIReconciler(mgr manager.Manager, status *statusmanager.StatusManager) 
 		status:    status,
 		clientset: clientset,
 
-		pkis:    map[types.NamespacedName]*pki{},
-		pkiErrs: map[types.NamespacedName]error{},
+		pkis:         map[types.NamespacedName]*pki{},
+		pkiErrs:      map[types.NamespacedName]error{},
+		certDuration: certDuration,
 	}, nil
 }
 
@@ -129,7 +139,7 @@ func (r *PKIReconciler) Reconcile(ctx context.Context, request reconcile.Request
 		}
 	}
 	if existing == nil {
-		existing, err = newPKI(obj, r.clientset, r.mgr)
+		existing, err = newPKI(obj, r.clientset, r.mgr, r.certDuration)
 		if err != nil {
 			log.Println(err)
 			r.pkiErrs[request.NamespacedName] =
@@ -177,7 +187,7 @@ type pki struct {
 }
 
 // newPKI creates a CertRotationController for the supplied configuration
-func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr manager.Manager) (*pki, error) {
+func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr manager.Manager, certDuration time.Duration) (*pki, error) {
 	spec := config.Spec
 
 	// Ugly: the existing cache + informers used as part of the controller-manager
@@ -223,8 +233,8 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			AdditionalAnnotations: certrotation.AdditionalAnnotations{
 				JiraComponent: names.ClusterNetworkOperatorJiraComponent,
 			},
-			Validity: OneYear / 2,
-			Refresh:  OneYear / 4,
+			Validity: certDuration,
+			Refresh:  certDuration / 2,
 			CertCreator: &certrotation.ServingRotation{
 				Hostnames: func() []string { return []string{spec.TargetCert.CommonName} },
 
