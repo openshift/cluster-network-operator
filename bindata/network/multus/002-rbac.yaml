@@ -230,26 +230,32 @@ kind: ClusterRole
 metadata:
   name: whereabouts-cni
 rules:
-- apiGroups:
-  - whereabouts.cni.cncf.io
+- apiGroups: ["whereabouts.cni.cncf.io"]
   resources:
-  - ippools
-  - overlappingrangeipreservations
-  - nodesliceippools
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
+  - "nodeslicepools"
+  - "nodeslicepools/status"
+  - "nodeslicepools/finalizers"
+  - "ippools"
+  - "overlappingrangeipreservations"
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: [""]
   resources:
   - pods
-  verbs:
-  - list
-
+  - nodes
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["k8s.cni.cncf.io"]
+  resources:
+  - "network-attachment-definitions"
+  - "network-attachment-definitions/finalizers"
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["", "events.k8s.io"]
+  resources:
+  - events
+  verbs: ["create", "patch", "update"]
+- apiGroups: ["coordination.k8s.io"]
+  resources:
+  - leases
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
