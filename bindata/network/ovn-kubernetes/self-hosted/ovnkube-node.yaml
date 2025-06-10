@@ -169,6 +169,9 @@ spec:
           name: node-log
         - mountPath: /dev/log
           name: log-socket
+        - mountPath: /run/ovn-kubernetes
+          name: host-run-ovn-kubernetes
+          readOnly: True
         terminationMessagePolicy: FallbackToLogsOnError
         resources:
           requests:
