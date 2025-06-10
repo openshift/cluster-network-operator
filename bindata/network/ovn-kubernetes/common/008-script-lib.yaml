@@ -59,6 +59,17 @@ data:
         exit 1
       fi
 
+      echo "$(date -Iseconds) - waiting for 10 minutes for ovnkube-controller to sync once post reboot by ensuring a file exits..."
+      local retries=0
+      # ten minutes timeout
+      while [[ 3000 -gt "${retries}" ]]; do
+        (( retries += 1 ))
+        if [[ -f /tmp/ovnkube-controller-sync-post-boot ]]; then
+          break
+        fi
+        sleep .2
+      done
+
       echo "$(date -Iseconds) - starting ovn-controller"
       exec ovn-controller \
         unix:${vswitch_dbsock} \
