@@ -27,6 +27,10 @@ webhooks:
         apiGroups: ["k8s.cni.cncf.io"]
         apiVersions: ["v1"]
         resources: ["network-attachment-definitions"]
+    matchConditions:
+      # On updates, only validate if the Spec changes
+      - name: CreateDeleteOrUpdatedSpec
+        expression: oldObject == null || object == null || object.spec != oldObject.spec
     sideEffects: NoneOnDryRun
     admissionReviewVersions:
     - v1
