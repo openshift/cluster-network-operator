@@ -430,6 +430,10 @@ spec:
         - name: "NO_PROXY"
           value: "{{ .NO_PROXY}}"
 {{ end }}
+        {{ if .IsLooseUDNIsolationEnabled }}
+        - name: UDN_ISOLATION_MODE
+          value: "loose"
+        {{ end }}
         - name: K8S_NODE
           valueFrom:
             fieldRef:
