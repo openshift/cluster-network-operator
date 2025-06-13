@@ -507,6 +507,10 @@ spec:
           name: ovnkube-config
         - mountPath: /env
           name: env-overrides
+{{ if .OVNIPsecEnable }}
+        - mountPath: /var/run/pluto
+          name: run-pluto
+{{ end }}
         resources:
           requests:
             cpu: 10m
@@ -713,5 +717,11 @@ spec:
         configMap:
           name: ovnkube-script-lib
           defaultMode: 0744
+{{ if .OVNIPsecEnable }}
+      - name: run-pluto
+        hostPath:
+          path: /var/run/pluto
+          type: DirectoryOrCreate
+{{ end }}
       tolerations:
       - operator: "Exists"
