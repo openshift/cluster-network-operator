@@ -24,21 +24,3 @@ roleRef:
   kind: ClusterRole
   name: cluster-admin
   apiGroup: rbac.authorization.k8s.io
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: default-account-cluster-network-operator
-  annotations:
-    release.openshift.io/delete: "true"
-    include.release.openshift.io/self-managed-high-availability: "false"
-    include.release.openshift.io/ibm-cloud-managed: "false"
-    include.release.openshift.io/single-node-developer: "false"
-subjects:
-- kind: ServiceAccount
-  name: default
-  namespace: openshift-network-operator
-roleRef: 
-  kind: ClusterRole
-  name: cluster-admin
-  apiGroup: rbac.authorization.k8s.io
