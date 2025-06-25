@@ -9,7 +9,7 @@ metadata:
 spec:
   ports:
   - port: 443
-    targetPort: 9443
+    targetPort: webhook
   selector:
     component: frr-k8s-webhook-server
 ---
@@ -71,8 +71,7 @@ spec:
         - --webhook-mode=onlywebhook
         - --disable-cert-rotation=true
         - --namespace=$(NAMESPACE)
-        - --metrics-bind-address=:7572
-        - --webhook-port=9443
+        - --webhook-port=9123
         env:
         - name: NAMESPACE
           valueFrom:
@@ -81,9 +80,7 @@ spec:
         image: {{.FRRK8sImage}}
         name: frr-k8s-webhook-server
         ports:
-        - containerPort: 7572
-          name: monitoring
-        - containerPort: 9443
+        - containerPort: 9123
           name: webhook          
         securityContext:
          runAsNonRoot: true
@@ -127,3 +124,4 @@ spec:
       serviceAccountName: frr-k8s-daemon
       priorityClassName: system-cluster-critical
       terminationGracePeriodSeconds: 10
+      hostNetwork: true
