@@ -2,14 +2,17 @@ package ingressconfig
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
 	operv1 "github.com/openshift/api/operator/v1"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
+	"k8s.io/apimachinery/pkg/api/meta"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,8 +49,55 @@ func newIngressConfigReconciler(client crclient.Client, status *statusmanager.St
 	return &ReconcileIngressConfigs{client: client, status: status}
 }
 
+// isIngressCapabilityEnabled checks if the Ingress capability is enabled in the cluster
+func isIngressCapabilityEnabled(client crclient.Client) (bool, error) {
+	hcpCfg := hypershift.NewHyperShiftConfig()
+	return isIngressCapabilityEnabledWithConfig(client, hcpCfg)
+}
+
+// isIngressCapabilityEnabledWithConfig checks if the Ingress capability is enabled in the cluster
+func isIngressCapabilityEnabledWithConfig(client crclient.Client, hcpCfg *hypershift.HyperShiftConfig) (bool, error) {
+	// Handle nil client
+	if client == nil {
+		return false, fmt.Errorf("client cannot be nil")
+	}
+
+	// Check if this is a hypershift cluster
+	if !hcpCfg.Enabled {
+		// For non-hypershift clusters, assume ingress capability is always enabled
+		return true, nil
+	}
+
+	// For hypershift clusters, check if the IngressController CRD exists
+	gvk := operv1.SchemeGroupVersion.WithKind("IngressController")
+	mapping, err := client.RESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		if meta.IsNoMatchError(err) {
+			log.Printf("IngressController CRD not found, assuming Ingress capability is disabled: %v", err)
+			return false, nil
+		}
+		return false, err
+	}
+
+	// If we got a mapping, the CRD exists
+	log.Printf("IngressController CRD found, Ingress capability is enabled (Resource: %v)", mapping.Resource)
+	return true, nil
+}
+
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r *ReconcileIngressConfigs) error {
+	// Check if Ingress capability is enabled before setting up the controller
+	ingressEnabled, err := isIngressCapabilityEnabled(mgr.GetClient())
+	if err != nil {
+		log.Printf("Error checking if Ingress capability is enabled: %v", err)
+		return err
+	}
+
+	if !ingressEnabled {
+		log.Printf("Ingress capability is disabled, skipping ingress-config-controller creation entirely")
+		return nil
+	}
+
 	// create a controller and register watcher for ingresscontroller resource
 	c, err := controller.New("ingress-config-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
