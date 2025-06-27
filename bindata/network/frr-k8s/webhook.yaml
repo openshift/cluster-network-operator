@@ -9,7 +9,7 @@ metadata:
 spec:
   ports:
   - port: 443
-    targetPort: 9443
+    targetPort: webhook
   selector:
     component: frr-k8s-webhook-server
 ---
@@ -61,7 +61,7 @@ spec:
         component: frr-k8s-webhook-server
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        openshift.io/required-scc: restricted-v2
+        openshift.io/required-scc: privileged
     spec:
       containers:
       - command:
@@ -71,8 +71,7 @@ spec:
         - --webhook-mode=onlywebhook
         - --disable-cert-rotation=true
         - --namespace=$(NAMESPACE)
-        - --metrics-bind-address=:7572
-        - --webhook-port=9443
+        - --webhook-port=9123
         env:
         - name: NAMESPACE
           valueFrom:
@@ -81,12 +80,8 @@ spec:
         image: {{.FRRK8sImage}}
         name: frr-k8s-webhook-server
         ports:
-        - containerPort: 7572
-          name: monitoring
-        - containerPort: 9443
-          name: webhook          
-        securityContext:
-         runAsNonRoot: true
+        - containerPort: 9123
+          name: webhook
         resources:
           requests:
             cpu: 10m
@@ -127,3 +122,4 @@ spec:
       serviceAccountName: frr-k8s-daemon
       priorityClassName: system-cluster-critical
       terminationGracePeriodSeconds: 10
+      hostNetwork: true
