@@ -46,7 +46,7 @@ data:
     #
     vtysh_enable=yes
     zebra_options="  -A 127.0.0.1 -s 90000000 --limit-fds 100000"
-    bgpd_options="   -A 127.0.0.1 --limit-fds 100000"
+    bgpd_options="   -A 127.0.0.1 -p 0 --limit-fds 100000"
     ospfd_options="  -A 127.0.0.1"
     ospf6d_options=" -A ::1"
     ripd_options="   -A 127.0.0.1"
