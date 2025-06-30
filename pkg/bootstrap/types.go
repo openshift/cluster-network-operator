@@ -126,6 +126,11 @@ type InfraStatus struct {
 
 	// ConsolePluginCRDExists set to true when the consoleplugins.console.openshift.io has been deployed.
 	ConsolePluginCRDExists bool
+
+	// LooseUDNIsolationModeEnabled set to true when loose isolation mode is enabled between two BGP advertised
+	// UDN networks. In loose isolation mode, those network pods can communicate with each other accoding to
+	// provider network configuration.
+	LooseUDNIsolationModeEnabled bool
 }
 
 // APIServer is the hostname & port of a given APIServer. (This is the

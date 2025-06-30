@@ -562,6 +562,10 @@ spec:
         - name: OVNKUBE_NODE_MGMT_PORT_DP_RESOURCE_NAME
           value: {{ .MgmtPortResourceName }}
         {{ end }}
+        {{ if .IsLooseUDNIsolationEnabled }}
+        - name: UDN_ISOLATION_MODE
+          value: "loose"
+        {{ end }}
         - name: K8S_NODE
           valueFrom:
             fieldRef:
