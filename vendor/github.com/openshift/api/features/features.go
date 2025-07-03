@@ -66,9 +66,9 @@ var (
 
 	FeatureGateOpenShiftPodSecurityAdmission = newFeatureGate("OpenShiftPodSecurityAdmission").
 							reportProblemsToJiraComponent("auth").
-							contactPerson("stlaz").
+							contactPerson("ibihim").
 							productScope(ocpSpecific).
-							enableIn(configv1.Default, configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
+							enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 							mustRegister()
 
 	FeatureGateExternalCloudProvider = newFeatureGate("ExternalCloudProvider").
@@ -609,7 +609,7 @@ var (
 						reportProblemsToJiraComponent("Storage / Kubernetes External Components").
 						contactPerson("fbertina").
 						productScope(ocpSpecific).
-						enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
+						enableIn(configv1.Default, configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 						mustRegister()
 
 	FeatureGateUserNamespacesSupport = newFeatureGate("UserNamespacesSupport").
