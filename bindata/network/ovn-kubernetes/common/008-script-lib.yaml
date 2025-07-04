@@ -322,6 +322,11 @@ data:
       # let northd sleep so it takes less CPU
       NORTHD_SLEEP_OPTION="options:northd-backoff-interval-ms={{.OVN_NORTHD_BACKOFF_MS}}"
 
+      NORTHD_CT_INV_OPTION=""
+
+{{ if and (.OVN_ROUTE_ADVERTISEMENTS_ENABLE) (eq .OVN_GATEWAY_MODE "local") }}
+      NORTHD_CT_INV_OPTION="options:use_ct_inv_match=false"
+{{ end }}
       local ipsec=false
       local ipsec_encapsulation=false
 {{ if .OVNIPsecEnable }}
@@ -342,7 +347,7 @@ data:
       IPSEC_OPTION="ipsec=${ipsec} options:ipsec_encapsulation=${ipsec_encapsulation}"
 
       # set all the NB_GLOBAL options
-      if ! retry 20 "nb-global options" "ovn-nbctl -t 5 set nb_global . ${IC_OPTION} ${NORTHD_PROBE_OPTION} ${NORTHD_SLEEP_OPTION} ${IPSEC_OPTION}"; then
+      if ! retry 20 "nb-global options" "ovn-nbctl -t 5 set nb_global . ${IC_OPTION} ${NORTHD_PROBE_OPTION} ${NORTHD_SLEEP_OPTION} ${IPSEC_OPTION} ${NORTHD_CT_INV_OPTION}"; then
         exit 1
       fi
     }
