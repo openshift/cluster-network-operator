@@ -155,3 +155,5 @@ require (
 	k8s.io/kms v0.29.0 // indirect
 	k8s.io/kube-aggregator v0.28.2 // indirect
 )
+
+replace github.com/openshift/api => github.com/pperiyasamy/api v0.0.0-20250704115842-ad2d574fc173
