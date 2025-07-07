@@ -150,7 +150,6 @@ rules:
   - network-attachment-definitions
   verbs:
   - patch
-{{- if .OVN_PERSISTENT_IPS_ENABLE }}
 - apiGroups:
     - k8s.cni.cncf.io
   resources:
@@ -161,7 +160,6 @@ rules:
   resources:
     - ipamclaims/status
   verbs: [ "patch", "update" ]
-{{- end}}
 {{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
 - apiGroups:
     - discovery.k8s.io
