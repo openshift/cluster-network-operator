@@ -129,10 +129,7 @@ spec:
             dns_name_resolver_enabled_flag="--enable-dns-name-resolver"
           fi
 
-          persistent_ips_enabled_flag=
-          if [[ "{{.OVN_PERSISTENT_IPS_ENABLE}}" == "true" ]]; then
-            persistent_ips_enabled_flag="--enable-persistent-ips"
-          fi
+          persistent_ips_enabled_flag="--enable-persistent-ips"
 
           # This is needed so that converting clusters from GA to TP
           # will rollout control plane pods as well
