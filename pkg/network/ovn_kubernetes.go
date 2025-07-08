@@ -20,6 +20,7 @@ import (
 
 	yaml "github.com/ghodss/yaml"
 	configv1 "github.com/openshift/api/config/v1"
+	apifeatures "github.com/openshift/api/features"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
@@ -276,6 +277,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNIPsecDaemonsetEnable"] = OVNIPsecDaemonsetEnable
 	data.Data["OVNIPsecEnable"] = OVNIPsecEnable
 	data.Data["IPsecServiceCheckOnHost"] = renderIPsecHostDaemonSet && renderIPsecContainerizedDaemonSet
+	data.Data["OVNIPsecEncap"] = operv1.EncapsulationAuto
+	if OVNIPsecEnable && c.IPsecConfig.Full != nil {
+		data.Data["OVNIPsecEncap"] = c.IPsecConfig.Full.Encapsulation
+	}
 
 	klog.V(5).Infof("IPsec: is MachineConfig enabled: %v, is East-West DaemonSet enabled: %v", data.Data["IPsecMachineConfigEnable"], data.Data["OVNIPsecDaemonsetEnable"])
 
@@ -298,8 +303,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	// leverage feature gates
-	data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(configv1.FeatureGateAdminNetworkPolicy)
-	data.Data["DNS_NAME_RESOLVER_ENABLE"] = featureGates.Enabled(configv1.FeatureGateDNSNameResolver)
+	data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateAdminNetworkPolicy)
+	data.Data["DNS_NAME_RESOLVER_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateDNSNameResolver)
 
 	data.Data["ReachabilityTotalTimeoutSeconds"] = c.EgressIPConfig.ReachabilityTotalTimeoutSeconds
 
