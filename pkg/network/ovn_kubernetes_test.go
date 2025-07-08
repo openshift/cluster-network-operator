@@ -24,6 +24,7 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	configv1 "github.com/openshift/api/config/v1"
+	apifeatures "github.com/openshift/api/features"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnofake "github.com/openshift/cluster-network-operator/pkg/client/fake"
@@ -93,7 +94,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 		},
 	}
 	featureGatesCNO := featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver},
 		[]configv1.FeatureGateName{},
 	)
 	fakeClient := cnofake.NewFakeClient()
@@ -154,7 +155,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 		},
 	}
 	featureGatesCNO := featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver},
 		[]configv1.FeatureGateName{},
 	)
 	fakeClient := cnofake.NewFakeClient()
@@ -739,7 +740,7 @@ logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
 
 			enableMultiNetPolicies: true,
-			enabledFeatureGates:    []configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy},
+			enabledFeatureGates:    []configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy},
 		},
 		{
 			desc: "enable multi-network policies without multi-network support",
@@ -783,7 +784,7 @@ logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
 			disableMultiNet:          true,
 			enableMultiNetPolicies:   true,
-			enabledFeatureGates:      []configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy},
+			enabledFeatureGates:      []configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy},
 		},
 		{
 			desc: "enable dns-name resolver feature",
@@ -826,7 +827,7 @@ logfile-maxsize=100
 logfile-maxbackups=5
 logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
-			enabledFeatureGates:      []configv1.FeatureGateName{configv1.FeatureGateDNSNameResolver},
+			enabledFeatureGates:      []configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver},
 		},
 	}
 	g := NewGomegaWithT(t)
@@ -879,8 +880,8 @@ logfile-maxage=0`,
 			}
 
 			knownFeatureGates := []configv1.FeatureGateName{
-				configv1.FeatureGateAdminNetworkPolicy,
-				configv1.FeatureGateDNSNameResolver,
+				apifeatures.FeatureGateAdminNetworkPolicy,
+				apifeatures.FeatureGateDNSNameResolver,
 			}
 			s := sets.New[configv1.FeatureGateName](tc.enabledFeatureGates...)
 			enabled := []configv1.FeatureGateName{}
@@ -2038,7 +2039,7 @@ metadata:
 				PrePullerUpdateStatus: prepullerStatus,
 			}
 			featureGatesCNO := featuregates.NewFeatureGate(
-				[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+				[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver},
 				[]configv1.FeatureGateName{},
 			)
 			fakeClient := cnofake.NewFakeClient()
@@ -2347,7 +2348,7 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 
 	// At the 1st pass, ensure IPsec MachineConfigs are not rolled out until MCO is ready.
 	featureGatesCNO := featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver},
 		[]configv1.FeatureGateName{},
 	)
 	fakeClient := cnofake.NewFakeClient()
@@ -2576,7 +2577,7 @@ func TestRenderOVNKubernetesEnableIPsecForHostedControlPlane(t *testing.T) {
 	}
 
 	featureGatesCNO := featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver},
 		[]configv1.FeatureGateName{},
 	)
 	fakeClient := cnofake.NewFakeClient()
@@ -2691,7 +2692,7 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
 	featureGatesCNO := featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver},
 		[]configv1.FeatureGateName{},
 	)
 	fakeClient := cnofake.NewFakeClient()
@@ -2796,7 +2797,7 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 
 	// Upgrade starts and it's going to rollout IPsec Machine Configs without making any changes into existing IPsec configs.
 	featureGatesCNO := featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver},
 		[]configv1.FeatureGateName{},
 	)
 	fakeClient := cnofake.NewFakeClient()
@@ -2950,7 +2951,7 @@ func TestRenderOVNKubernetesIPsecUpgradeWithHypershiftHostedCluster(t *testing.T
 	bootstrapResult.Infra.HostedControlPlane = &hypershift.HostedControlPlane{}
 	// Upgrade starts and it's going to get only ovn-ipsec-containerized DS.
 	featureGatesCNO := featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver},
 		[]configv1.FeatureGateName{},
 	)
 	fakeClient := cnofake.NewFakeClient()
@@ -3051,7 +3052,7 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 		},
 	}
 	featureGatesCNO := featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver},
 		[]configv1.FeatureGateName{},
 	)
 
@@ -3265,7 +3266,7 @@ func TestRenderOVNKubernetesEnableIPsecWithUserInstalledIPsecMachineConfigs(t *t
 	}
 
 	featureGatesCNO := featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver},
 		[]configv1.FeatureGateName{},
 	)
 
@@ -3413,7 +3414,7 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 		},
 	}
 	featureGatesCNO := featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver},
 		[]configv1.FeatureGateName{},
 	)
 
@@ -3555,7 +3556,7 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 		},
 	}
 	featureGatesCNO := featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver},
 		[]configv1.FeatureGateName{},
 	)
 
@@ -3656,7 +3657,7 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 				FlowsConfig: tc.FlowsConfig,
 			}
 			featureGatesCNO := featuregates.NewFeatureGate(
-				[]configv1.FeatureGateName{configv1.FeatureGateAdminNetworkPolicy, configv1.FeatureGateDNSNameResolver},
+				[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver},
 				[]configv1.FeatureGateName{},
 			)
 			fakeClient := cnofake.NewFakeClient()

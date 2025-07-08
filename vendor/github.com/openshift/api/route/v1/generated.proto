@@ -199,6 +199,8 @@ message RouteIngress {
   optional string routerName = 2;
 
   // Conditions is the state of the route, may be empty.
+  // +listType=map
+  // +listMapKey=type
   repeated RouteIngressCondition conditions = 3;
 
   // Wildcard policy is the wildcard policy that was allowed where this route is exposed.
@@ -331,6 +333,9 @@ message RouteSpec {
   // Use the weight field in RouteTargetReference object to specify relative preference.
   //
   // +kubebuilder:validation:MaxItems=3
+  // +listType=map
+  // +listMapKey=name
+  // +listMapKey=kind
   repeated RouteTargetReference alternateBackends = 4;
 
   // If specified, the port to be used by the router. Most routers will use all
@@ -360,6 +365,7 @@ message RouteStatus {
   // ingress describes the places where the route may be exposed. The list of
   // ingress points may contain duplicate Host or RouterName values. Routes
   // are considered live once they are `Ready`
+  // +listType=atomic
   repeated RouteIngress ingress = 1;
 }
 
@@ -404,7 +410,7 @@ message RouterShard {
 // TLSConfig defines config used to secure a route and provide termination
 //
 // +kubebuilder:validation:XValidation:rule="has(self.termination) && has(self.insecureEdgeTerminationPolicy) ? !((self.termination=='passthrough') && (self.insecureEdgeTerminationPolicy=='Allow')) : true", message="cannot have both spec.tls.termination: passthrough and spec.tls.insecureEdgeTerminationPolicy: Allow"
-// +openshift:validation:FeatureGateAwareXValidation:featureGate=ExternalRouteCertificate,rule="!(has(self.certificate) && has(self.externalCertificate))", message="cannot have both spec.tls.certificate and spec.tls.externalCertificate"
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=RouteExternalCertificate,rule="!(has(self.certificate) && has(self.externalCertificate))", message="cannot have both spec.tls.certificate and spec.tls.externalCertificate"
 message TLSConfig {
   // termination indicates termination type.
   //
@@ -436,8 +442,12 @@ message TLSConfig {
   // insecureEdgeTerminationPolicy indicates the desired behavior for insecure connections to a route. While
   // each router may make its own decisions on which ports to expose, this is normally port 80.
   //
-  // * Allow - traffic is sent to the server on the insecure port (edge/reencrypt terminations only) (default).
-  // * None - no traffic is allowed on the insecure port.
+  // If a route does not specify insecureEdgeTerminationPolicy, then the default behavior is "None".
+  //
+  // * Allow - traffic is sent to the server on the insecure port (edge/reencrypt terminations only).
+  //
+  // * None - no traffic is allowed on the insecure port (default).
+  //
   // * Redirect - clients are redirected to the secure port.
   //
   // +kubebuilder:validation:Enum=Allow;None;Redirect;""
@@ -449,7 +459,7 @@ message TLSConfig {
   // be present in the same namespace as that of the Route.
   // Forbidden when `certificate` is set.
   //
-  // +openshift:enable:FeatureGate=ExternalRouteCertificate
+  // +openshift:enable:FeatureGate=RouteExternalCertificate
   // +optional
   optional LocalObjectReference externalCertificate = 7;
 }
