@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -329,6 +330,120 @@ func TestStatusManager_set_OpenShiftSDN(t *testing.T) {
 	}
 	if !conditionsEqual(oc.Status.Conditions, []operv1.OperatorCondition{condAvailable, condUpdateBlocked, condNoProgress}) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+}
+
+func TestStatusManager_set_UpgradeableCases(t *testing.T) {
+	tests := []struct {
+		name                string
+		specType            operv1.NetworkType
+		migrationInProgress bool
+		wantUpgradeable     operv1.ConditionStatus
+		wantReason          string
+		wantMessageContains string
+	}{
+		{
+			name:            "SDN only",
+			specType:        operv1.NetworkTypeOpenShiftSDN,
+			wantUpgradeable: operv1.ConditionFalse,
+			wantReason:      "OpenShiftSDNConfigured",
+			wantMessageContains: "Cluster is configured with OpenShiftSDN, which is not supported in the next version. Please " +
+				"follow the documented steps to migrate from OpenShiftSDN to OVN-Kubernetes in order to be able to upgrade. " +
+				"https://docs.openshift.com/container-platform/4.16/networking/ovn_kubernetes_network_provider/migrate-from-openshift-sdn.html",
+		},
+		{
+			name:                "OVN only",
+			specType:            operv1.NetworkTypeOVNKubernetes,
+			wantUpgradeable:     operv1.ConditionTrue,
+			wantReason:          "",
+			wantMessageContains: "",
+		},
+		{
+			name:                "Migration only",
+			specType:            operv1.NetworkTypeOVNKubernetes,
+			migrationInProgress: true,
+			wantUpgradeable:     operv1.ConditionFalse,
+			wantReason:          "NetworkMigrationInProgress",
+			wantMessageContains: "A CNI migration is in progress; upgrade is blocked until that finishes.",
+		},
+		{
+			name:                "SDN and migration",
+			specType:            operv1.NetworkTypeOpenShiftSDN,
+			migrationInProgress: true,
+			wantUpgradeable:     operv1.ConditionFalse,
+			wantReason:          "OpenShiftSDNConfiguredAndMigrating",
+			wantMessageContains: "Cluster is still using OpenShiftSDN, and a CNI migration is in progress. " +
+				"Upgrade is blocked until you complete the migration and switch to OVNKubernetes.",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// seed operator.Network
+			no := &operv1.Network{
+				ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+				Spec: operv1.NetworkSpec{
+					DefaultNetwork: operv1.DefaultNetworkDefinition{Type: tc.specType},
+				},
+			}
+			objs := []crclient.Object{no}
+
+			if tc.migrationInProgress {
+				cn := &configv1.Network{
+					ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+					Status: configv1.NetworkStatus{
+						Conditions: []metav1.Condition{{
+							Type:               names.NetworkTypeMigrationInProgress,
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: metav1.Now(),
+						}},
+					},
+				}
+				objs = append(objs, cn)
+			}
+			client := fake.NewFakeClient(objs...)
+			status := New(client, names.OPERATOR_CONFIG, "")
+			setOC(t, client, no)
+
+			condNoProgress := operv1.OperatorCondition{
+				Type:   operv1.OperatorStatusTypeProgressing,
+				Status: operv1.ConditionFalse,
+			}
+			condAvailable := operv1.OperatorCondition{
+				Type:   operv1.OperatorStatusTypeAvailable,
+				Status: operv1.ConditionTrue,
+			}
+			status.set(true, condNoProgress, condAvailable)
+
+			oc, err := getOC(client)
+			if err != nil {
+				t.Fatalf("error getting network.operator: %v", err)
+			}
+
+			// find the Upgradeable condition
+			var upg operv1.OperatorCondition
+			for _, c := range oc.Status.Conditions {
+				if c.Type == operv1.OperatorStatusTypeUpgradeable {
+					upg = c
+					break
+				}
+			}
+
+			// assert Status
+			if upg.Status != tc.wantUpgradeable {
+				t.Errorf("got Upgradeable.Status=%v, want %v", upg.Status, tc.wantUpgradeable)
+			}
+			// assert Reason and Message for SDN case
+			if tc.wantReason != "" {
+				if upg.Reason != tc.wantReason {
+					t.Errorf("got Upgradeable.Reason=%q, want %q", upg.Reason, tc.wantReason)
+				}
+				if !strings.Contains(upg.Message, tc.wantMessageContains) {
+					t.Errorf("got Upgradeable.Message=%q, want it to contain %q",
+						upg.Message, tc.wantMessageContains)
+				}
+			}
+		})
 	}
 }
 
