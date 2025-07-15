@@ -241,6 +241,37 @@ data:
         --tls-cert-file=${clientcert}
     }
 
+      # Adds drop flows for ARP replies and IPv6 router advertisements on patch ports of specified bridge. If the bridge doesn't
+      # exist, do nothing and return
+      add_drop_flows_bridge_ports_arp_rpl_route_adv()
+      {
+        local bridge="$1"
+        local cookie="0x0305"
+        local priority="499"
+        # nothing to do if the external bridge isn't created.
+        if ! ovs-vsctl br-exists "$bridge"; then
+          return 0
+        fi
+        # Get all patch ports and their port_name numbers and add drop flows for all IP families (v4/v6). gateway sync will clean any stale ports.
+        for port_name in $(ovs-vsctl list-ports $bridge); do
+          if ovs-vsctl get interface $port_name type 2>/dev/null | grep -q "patch-"; then
+            local of_port=$(ovs-vsctl get interface $port_name ofport)
+            ovs-ofctl add-flow $bridge "cookie=$cookie,table=0,priority=$priority,in_port=$of_port,arp,arp_op=2,actions=drop"
+            local ret1=$?
+            ovs-ofctl add-flow $bridge "cookie=$cookie,table=0,priority=$priority,in_port=$of_port,icmpv6_type=134,actions=drop"
+            local ret2=$?
+            if [[ $ret1 -ne 0 ]]; then
+              return $ret1
+            fi
+            if [[ $ret2 -ne 0 ]]; then
+              return $ret2
+            fi
+            echo "added drop flows for port name '$port_name' ofport '$of_port'"
+          fi
+        done
+        return 0
+    }
+
     # quit-nbdb() will cleanly shut down the northbound dbserver. It is intended
     # to be run from a bash 'trap' like so:
     #
@@ -489,6 +520,9 @@ data:
         echo "Expected three arguments but got $#"
         exit 1
       fi
+
+      # remove when https://issues.redhat.com/browse/FDP-1537 merges and EIP OVN controller refactored to use it
+      retry add_drop_flows_bridge_ports_arp_rpl_route_adv "br-ex"
 
       # copy the right CNI shim for the host OS
       cni-bin-copy
