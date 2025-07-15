@@ -4187,11 +4187,11 @@ func Test_renderOVNKubernetes(t *testing.T) {
 					config.DefaultNetwork.OVNKubernetesConfig.RouteAdvertisements = operv1.RouteAdvertisementsEnabled
 					return config
 				}, bootstrapResult: fakeBootstrapResultOVN,
-				manifestDir:  manifestDirOvn,
-				client:       cnofake.NewFakeClient(),
-				featureGates: preDefUDNFeatureGates,
+				manifestDir:        manifestDirOvn,
+				client:             cnofake.NewFakeClient(),
+				featureGates:       preDefUDNFeatureGates,
 			},
-			expectNumObjs: 45,
+			expectNumObjs: 47,
 		},
 	}
 	for _, tt := range tests {
