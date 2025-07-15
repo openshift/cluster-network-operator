@@ -49,6 +49,9 @@ data:
     {{- end }}
     enable-network-segmentation=true
 {{- end }}
+{{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
+    enable-preconfigured-udn-addresses=true
+{{- end }}
 {{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
     enable-multi-networkpolicy=true
 {{- end }}
@@ -140,6 +143,9 @@ data:
     enable-multi-network=true
     {{- end }}
     enable-network-segmentation=true
+{{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
+    enable-preconfigured-udn-addresses=true
+{{- end }}
 {{- end }}
 {{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
     enable-multi-networkpolicy=true
