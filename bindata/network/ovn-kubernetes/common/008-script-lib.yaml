@@ -241,6 +241,23 @@ data:
         --tls-cert-file=${clientcert}
     }
 
+    # Adds drop flows for GARPs coming from patch port to br-int for fn arg bridge name.
+    # Remove when https://issues.redhat.com/browse/FDP-1537 lands in OVN core.
+    add_garp_drop_flow() {
+      local bridge="$1"
+      local cookie="0x0305"
+      local priority="499"
+      # FIXME: can we generate the exact name. Its possible we add these flows to the incorrect port when selecting on substring
+      for port_name in $(ovs-vsctl list-ports "$bridge"); do
+        if [[ "$port_name" == *to-br-int ]]; then
+          local of_port
+          of_port=$(ovs-vsctl get interface "$port_name" ofport)
+          ovs-ofctl add-flow "$bridge" "cookie=$cookie,table=0,priority=$priority,in_port=$of_port,arp,arp_op=1,actions=drop" > /dev/null
+          break
+        fi
+      done
+    }
+
     # quit-nbdb() will cleanly shut down the northbound dbserver. It is intended
     # to be run from a bash 'trap' like so:
     #
@@ -497,6 +514,13 @@ data:
         echo "Expected three arguments but got $#"
         exit 1
       fi
+
+      # start temp work around
+      # remove when https://issues.redhat.com/browse/FDP-1537 is available
+      if ovs-vsctl br-exists "br-ex"; then
+          add_garp_drop_flow br-ex
+      fi
+      # end temp work around
 
       # copy the right CNI shim for the host OS
       cni-bin-copy
