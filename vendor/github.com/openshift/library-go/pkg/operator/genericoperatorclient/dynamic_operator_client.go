@@ -347,15 +347,6 @@ func (c dynamicOperatorClient) applyOperatorStatus(ctx context.Context, fieldMan
 		}
 	}
 
-	for _, curr := range desiredConfiguration.Conditions {
-		if len(ptr.Deref(curr.Reason, "")) == 0 {
-			klog.Warningf(".status.conditions[%q].reason is missing; this will eventually be fatal", *curr.Type)
-		}
-		if len(ptr.Deref(curr.Message, "")) == 0 {
-			klog.Warningf(".status.conditions[%q].message is missing; this will eventually be fatal", *curr.Type)
-		}
-	}
-
 	desiredStatus, err := runtime.DefaultUnstructuredConverter.ToUnstructured(desiredConfiguration)
 	if err != nil {
 		return fmt.Errorf("failed to convert to unstructured: %w", err)
