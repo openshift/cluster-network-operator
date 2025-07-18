@@ -23,6 +23,10 @@ spec:
       expr: max by(direction, action)(ovnkube_controller_admin_network_policies_rules)
     - record: cluster:ovnkube_controller_baseline_admin_network_policies_rules:max
       expr: max by(direction, action)(ovnkube_controller_baseline_admin_network_policies_rules)
+    - record: cluster:ovnkube_clustermanager_user_defined_networks:max
+      expr: max by(role, topology)(ovnkube_clustermanager_user_defined_networks)
+    - record: cluster:ovnkube_clustermanager_cluster_user_defined_networks:max
+      expr: max by(role, topology)(ovnkube_clustermanager_cluster_user_defined_networks)
     # OVN kubernetes cluster manager functional alerts
     - alert: V4SubnetAllocationThresholdExceeded
       annotations:
