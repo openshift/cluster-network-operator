@@ -62,6 +62,22 @@ func isNetworkNodeIdentityEnabled(client cnoclient.Client, infra *bootstrap.Infr
 	return true, nil
 }
 
+// isLooseUDNIsolationEnabled determines if loose udn isolation mode should be enabled.
+// It checks the `force-loose-isolation` key in the openshift-network-operator/udn-config-overrides configmap.
+// If the configmap doesn't exist, it returns false (the UDN isolation is protected by default).
+func isLooseUDNIsolationEnabled(client cnoclient.Client) (bool, error) {
+	configMap := &corev1.ConfigMap{}
+	if err := client.ClientFor("").CRClient().Get(context.TODO(),
+		types.NamespacedName{Name: "udn-config-overrides", Namespace: names.APPLIED_NAMESPACE}, configMap); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("unable to bootstrap OVN, unable to retrieve udn-config-overrides config: %s", err)
+	}
+	isLooseIsolationEnabled := configMap.Data["force-loose-isolation"]
+	return isLooseIsolationEnabled == "true", nil
+}
+
 func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	infraConfig := &configv1.Infrastructure{}
 	if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
@@ -147,6 +163,12 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		return nil, fmt.Errorf("failed to determine if network node identity should be enabled: %w", err)
 	}
 	res.NetworkNodeIdentityEnabled = netIDEnabled
+
+	isLooseUDNIsolationEnabled, err := isLooseUDNIsolationEnabled(client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine if loose udn isolation should be enabled: %w", err)
+	}
+	res.LooseUDNIsolationModeEnabled = isLooseUDNIsolationEnabled
 
 	res.ConsolePluginCRDExists, err = consolePluginCRDExists(client)
 	if err != nil {
