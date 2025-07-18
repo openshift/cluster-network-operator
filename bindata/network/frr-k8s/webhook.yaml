@@ -71,6 +71,7 @@ spec:
         - --webhook-mode=onlywebhook
         - --disable-cert-rotation=true
         - --namespace=$(NAMESPACE)
+        - --metrics-bind-address=0
         - --webhook-port=9123
         env:
         - name: NAMESPACE
