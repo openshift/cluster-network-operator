@@ -7,7 +7,7 @@ linters:
   disable-all: true #so that lint version bumps don't change results
   enable:
     - errcheck
-    - exportloopref
+    - copyloopvar
     - gosimple
     - govet
     - ineffassign
