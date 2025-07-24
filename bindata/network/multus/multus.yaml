@@ -871,6 +871,8 @@ spec:
       app: whereabouts-controller
   template:
     metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: whereabouts-controller
     spec:
@@ -891,9 +893,6 @@ spec:
           image: {{.WhereaboutsImage}}
           name: whereabouts
           resources:
-            limits:
-              cpu: 100m
-              memory: 200Mi
             requests:
               cpu: 100m
               memory: 100Mi
