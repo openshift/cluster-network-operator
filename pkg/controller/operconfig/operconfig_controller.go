@@ -503,36 +503,6 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, degradedErr
 	}
 
-	if operConfig.Spec.Migration != nil && operConfig.Spec.Migration.NetworkType != "" {
-		if !(operConfig.Spec.Migration.NetworkType == string(operv1.NetworkTypeOpenShiftSDN) || operConfig.Spec.Migration.NetworkType == string(operv1.NetworkTypeOVNKubernetes)) {
-			err = fmt.Errorf("Error: operConfig.Spec.Migration.NetworkType: %s is not equal to either \"OpenshiftSDN\" or \"OVNKubernetes\"", operConfig.Spec.Migration.NetworkType)
-			return reconcile.Result{}, err
-		}
-
-		migration := operConfig.Spec.Migration
-		if migration.Features == nil || migration.Features.EgressFirewall {
-			err = migrateEgressFirewallCRs(ctx, operConfig, r.client)
-			if err != nil {
-				log.Printf("Could not migrate EgressFirewall CRs: %v", err)
-				return reconcile.Result{}, err
-			}
-		}
-		if migration.Features == nil || migration.Features.Multicast {
-			err = migrateMulticastEnablement(ctx, operConfig, r.client)
-			if err != nil {
-				log.Printf("Could not migrate Multicast settings: %v", err)
-				return reconcile.Result{}, err
-			}
-		}
-		if migration.Features == nil || migration.Features.EgressIP {
-			err = migrateEgressIpCRs(ctx, operConfig, r.client)
-			if err != nil {
-				log.Printf("Could not migrate EgressIP CRs: %v", err)
-				return reconcile.Result{}, err
-			}
-		}
-	}
-
 	// Update Network.config.openshift.io.Status
 	status, err := r.ClusterNetworkStatus(ctx, operConfig, bootstrapResult)
 	if err != nil {
