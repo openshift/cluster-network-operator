@@ -77,7 +77,9 @@ func getDefaultFeatureGates() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
 		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver,
 			apifeatures.FeatureGateNetworkSegmentation, apifeatures.FeatureGateOVNObservability},
-		[]configv1.FeatureGateName{},
+		[]configv1.FeatureGateName{
+			apifeatures.FeatureGatePreconfiguredUDNAddresses,
+		},
 	)
 }
 
@@ -910,6 +912,55 @@ logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
 			enabledFeatureGates:      []configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver},
 		},
+		{
+			desc: "enable PreconfiguredUDNAddresses, UDN, and static-IPs",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://testing.test:8443"
+host-network-namespace="openshift-host-network"
+platform-type="GCP"
+healthz-bind-address="0.0.0.0:10256"
+dns-service-namespace="openshift-dns"
+dns-service-name="dns-default"
+
+[ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
+enable-multi-external-gateway=true
+
+[gateway]
+mode=shared
+nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0`,
+			controlPlaneReplicaCount: 2,
+			enabledFeatureGates: []configv1.FeatureGateName{
+				apifeatures.FeatureGateNetworkSegmentation,
+				apifeatures.FeatureGatePreconfiguredUDNAddresses,
+				apifeatures.FeatureGatePersistentIPsForVirtualization,
+			},
+		},
 	}
 	g := NewGomegaWithT(t)
 
@@ -965,6 +1016,7 @@ logfile-maxage=0`,
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateNetworkSegmentation,
 				apifeatures.FeatureGateOVNObservability,
+				apifeatures.FeatureGatePreconfiguredUDNAddresses,
 			}
 			s := sets.New[configv1.FeatureGateName](tc.enabledFeatureGates...)
 			enabled := []configv1.FeatureGateName{}
@@ -3861,7 +3913,9 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 			apifeatures.FeatureGateNetworkSegmentation,
 			apifeatures.FeatureGateOVNObservability,
 		},
-		[]configv1.FeatureGateName{},
+		[]configv1.FeatureGateName{
+			apifeatures.FeatureGatePreconfiguredUDNAddresses,
+		},
 	)
 	fakeClient := cnofake.NewFakeClient()
 
@@ -4034,6 +4088,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateNetworkSegmentation,
 				apifeatures.FeatureGateOVNObservability,
+				apifeatures.FeatureGatePreconfiguredUDNAddresses,
 			},
 		)
 	}
@@ -4041,6 +4096,20 @@ func Test_renderOVNKubernetes(t *testing.T) {
 		return featuregates.NewFeatureGate(
 			[]configv1.FeatureGateName{
 				apifeatures.FeatureGateNetworkSegmentation,
+			},
+			[]configv1.FeatureGateName{
+				apifeatures.FeatureGateAdminNetworkPolicy,
+				apifeatures.FeatureGateDNSNameResolver,
+				apifeatures.FeatureGateOVNObservability,
+				apifeatures.FeatureGatePreconfiguredUDNAddresses,
+			},
+		)
+	}
+	preDefUDNFeatureGates := func() featuregates.FeatureGate {
+		return featuregates.NewFeatureGate(
+			[]configv1.FeatureGateName{
+				apifeatures.FeatureGateNetworkSegmentation,
+				apifeatures.FeatureGatePreconfiguredUDNAddresses,
 			},
 			[]configv1.FeatureGateName{
 				apifeatures.FeatureGateAdminNetworkPolicy,
@@ -4098,6 +4167,20 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				featureGates:    udnFeatureGate,
 			},
 			expectNumObjs: 44,
+		},
+		{
+			name: "render with PreconfiguredUDNAddresses, UDN, persistent-IP, and RA",
+			args: args{
+				conf: func() *operv1.NetworkSpec {
+					config := fakeNetworkConf()
+					config.DefaultNetwork.OVNKubernetesConfig.RouteAdvertisements = operv1.RouteAdvertisementsEnabled
+					return config
+				}, bootstrapResult: fakeBootstrapResultOVN,
+				manifestDir:  manifestDirOvn,
+				client:       cnofake.NewFakeClient(),
+				featureGates: preDefUDNFeatureGates,
+			},
+			expectNumObjs: 45,
 		},
 	}
 	for _, tt := range tests {
