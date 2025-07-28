@@ -490,6 +490,9 @@ data:
       local metrics_port=$2
       local ovn_metrics_port=$3
 
+      # Ensure ovn_advertised_udn_isolation_mode_flag is always defined
+      ovn_advertised_udn_isolation_mode_flag=
+
       if [[ $# -ne 3 ]]; then
         echo "Expected three arguments but got $#"
         exit 1
@@ -605,6 +608,10 @@ data:
         sysctl -w net.ipv6.conf.all.forwarding=0
       fi
 
+      if [[ "{{.AdvertisedUDNIsolationMode}}" != "" ]]; then
+        ovn_advertised_udn_isolation_mode_flag="--advertised-udn-isolation-mode={{.AdvertisedUDNIsolationMode}}"
+      fi
+
       NETWORK_NODE_IDENTITY_ENABLE=
       if [[ "{{.NETWORK_NODE_IDENTITY_ENABLE}}" == "true" ]]; then
         NETWORK_NODE_IDENTITY_ENABLE="
@@ -673,6 +680,7 @@ data:
         --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}" \
         ${gw_interface_flag} \
         ${ip_forwarding_flag} \
+        ${ovn_advertised_udn_isolation_mode_flag} \
         ${NETWORK_NODE_IDENTITY_ENABLE} \
         ${ovn_v4_join_subnet_opt} \
         ${ovn_v6_join_subnet_opt} \

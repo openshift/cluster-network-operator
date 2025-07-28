@@ -32,6 +32,11 @@ type OVNConfigBoostrapResult struct {
 	SmartNicModeLabel     string
 	SmartNicModeNodes     []string
 	MgmtPortResourceName  string
+	// ConfigOverrides contains the overrides for the OVN Kubernetes configuration
+	// This is used to set the hidden OVN Kubernetes configuration in the cluster
+	// It is a map of key-value pairs where the key is the configuration option and the
+	// value is the configuration value.
+	ConfigOverrides map[string]string
 }
 
 // OVNUpdateStatus contains the status of existing daemonset
