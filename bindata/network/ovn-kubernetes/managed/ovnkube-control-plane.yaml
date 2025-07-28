@@ -193,6 +193,11 @@ spec:
           if [[ "{{.OVN_ROUTE_ADVERTISEMENTS_ENABLE}}" == "true" ]]; then
             route_advertisements_enable_flag="--enable-route-advertisements"
           fi
+          
+          preconfigured_udn_addresses_enable_flag=
+          if [[ "{{.OVN_PRE_CONF_UDN_ADDR_ENABLE}}" == "true" ]]; then
+            preconfigured_udn_addresses_enable_flag="--enable-preconfigured-udn-addresses"
+          fi
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
@@ -214,7 +219,8 @@ spec:
             ${persistent_ips_enabled_flag} \
             ${multi_network_enabled_flag} \
             ${network_segmentation_enabled_flag} \
-            ${route_advertisements_enable_flag}
+            ${route_advertisements_enable_flag} \
+            ${preconfigured_udn_addresses_enable_flag}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config

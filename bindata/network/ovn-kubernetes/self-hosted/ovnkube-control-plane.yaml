@@ -144,7 +144,12 @@ spec:
           if [[ "{{.OVN_ROUTE_ADVERTISEMENTS_ENABLE}}" == "true" ]]; then
             route_advertisements_enable_flag="--enable-route-advertisements"
           fi
-
+  
+          preconfigured_udn_addresses_enable_flag=
+          if [[ "{{.OVN_PRE_CONF_UDN_ADDR_ENABLE}}" == "true" ]]; then
+            preconfigured_udn_addresses_enable_flag="--enable-preconfigured-udn-addresses"
+          fi
+          
           if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
             gateway_mode_flags="--gateway-mode shared"
           elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
@@ -172,7 +177,8 @@ spec:
             ${multi_network_enabled_flag} \
             ${network_segmentation_enabled_flag} \
             ${gateway_mode_flags} \
-            ${route_advertisements_enable_flag}
+            ${route_advertisements_enable_flag} \
+            ${preconfigured_udn_addresses_enable_flag}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
