@@ -3926,6 +3926,18 @@ func extractOVNKubeConfig(g *WithT, objs []*uns.Unstructured) string {
 	return ""
 }
 
+func extractOVNScriptLib(g *WithT, objs []*uns.Unstructured) string {
+	for _, obj := range objs {
+		if obj.GetKind() == "ConfigMap" && obj.GetName() == "ovnkube-script-lib" {
+			val, ok, err := uns.NestedString(obj.Object, "data", "ovnkube-lib.sh")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(ok).To(BeTrue())
+			return val
+		}
+	}
+	return ""
+}
+
 // checkDaemonsetAnnotation check that all the daemonset have the annotation with the
 // same key and value
 func checkDaemonsetAnnotation(g *WithT, objs []*uns.Unstructured, key, value string) bool {
