@@ -36,6 +36,7 @@ import (
 	cnofake "github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/render"
 )
 
 var (
@@ -4244,4 +4245,96 @@ func TestRenderOVNKubernetes_AdvertisedUDNIsolationModeOverride(t *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(nil)
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--advertised-udn-isolation-mode="`))
 	})
+}
+
+func TestOVNKubernetesScriptLibGatewayInterface(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	testCases := []struct {
+		name                     string
+		ovnNodeMode              string
+		expectedGatewayInterface string
+	}{
+		{
+			name:                     "dpu-host mode uses derive-from-mgmt-port",
+			ovnNodeMode:              "dpu-host",
+			expectedGatewayInterface: "derive-from-mgmt-port",
+		},
+		{
+			name:                     "non-dpu-host mode uses br-ex",
+			ovnNodeMode:              "full",
+			expectedGatewayInterface: "br-ex",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create render data
+			data := render.MakeRenderData()
+			data.Data["OVN_NODE_MODE"] = tc.ovnNodeMode
+			data.Data["OVN_GATEWAY_MODE"] = "shared"
+
+			// Set all required template variables for 008-script-lib.yaml
+			data.Data["ReleaseVersion"] = "4.15.0"
+			data.Data["OVNPolicyAuditDestination"] = "null"
+			data.Data["OVNPolicyAuditSyslogFacility"] = "local0"
+			data.Data["OVN_LOG_PATTERN_CONSOLE"] = "%D{%Y-%m-%dT%H:%M:%S.###Z}|%05N|%c%T|%p|%m"
+			data.Data["NorthdThreads"] = "1"
+			data.Data["OVNPolicyAuditMaxFileSize"] = "50"
+			data.Data["OVNPolicyAuditMaxLogFiles"] = "5"
+			data.Data["OVN_NB_INACTIVITY_PROBE"] = "60000"
+			data.Data["OVN_NORTHD_BACKOFF_MS"] = "300"
+			data.Data["PlatformType"] = "AWS"
+			data.Data["OVN_CONTROLLER_INACTIVITY_PROBE"] = "30000"
+			data.Data["GenevePort"] = "8061"
+			data.Data["OVNHybridOverlayVXLANPort"] = ""
+			data.Data["OVN_MULTI_NETWORK_ENABLE"] = "false"
+			data.Data["OVN_NETWORK_SEGMENTATION_ENABLE"] = "false"
+			data.Data["OVN_ROUTE_ADVERTISEMENTS_ENABLE"] = "false"
+			data.Data["OVN_OBSERVABILITY_ENABLE"] = "false"
+			data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = "false"
+			data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = "false"
+			data.Data["DNS_NAME_RESOLVER_ENABLE"] = "false"
+			data.Data["IP_FORWARDING_MODE"] = "Restricted"
+			data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = "false"
+			data.Data["NodeIdentityCertDuration"] = "24h"
+			data.Data["V4JoinSubnet"] = ""
+			data.Data["V6JoinSubnet"] = ""
+			data.Data["V4MasqueradeSubnet"] = ""
+			data.Data["V6MasqueradeSubnet"] = ""
+			data.Data["V4TransitSwitchSubnet"] = ""
+			data.Data["V6TransitSwitchSubnet"] = ""
+			data.Data["OVNPolicyAuditRateLimit"] = "20"
+			data.Data["IsNetworkTypeLiveMigration"] = false
+			data.Data["OVNIPsecEnable"] = false
+			data.Data["OVNIPsecEncap"] = "Auto"
+			data.Data["OVN_PRE_CONF_UDN_ADDR_ENABLE"] = false
+			data.Data["AdvertisedUDNIsolationMode"] = ""
+
+			// Render the script-lib template
+			scriptLibPath := "../../bindata/network/ovn-kubernetes/common/008-script-lib.yaml"
+			objs, err := render.RenderTemplate(scriptLibPath, &data)
+			g.Expect(err).NotTo(HaveOccurred(), "Template rendering should succeed for %s", tc.name)
+			g.Expect(objs).To(HaveLen(1), "Should render exactly one object")
+
+			// Verify it's a ConfigMap with the expected name
+			obj := objs[0]
+			g.Expect(obj.GetKind()).To(Equal("ConfigMap"))
+			g.Expect(obj.GetName()).To(Equal("ovnkube-script-lib"))
+
+			// Extract the script content from the ConfigMap
+			scriptData, found, err := uns.NestedString(obj.Object, "data", "ovnkube-lib.sh")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(found).To(BeTrue(), "Should find ovnkube-lib.sh in ConfigMap data")
+
+			// Validate gateway interface assignment
+			expectedGatewayAssignment := fmt.Sprintf("gateway_interface=%s", tc.expectedGatewayInterface)
+			g.Expect(scriptData).To(ContainSubstring(expectedGatewayAssignment),
+				"Script should contain correct gateway interface assignment for %s mode", tc.ovnNodeMode)
+
+			// Validate that gateway_mode_flags uses the variable
+			g.Expect(scriptData).To(ContainSubstring("--gateway-interface ${gateway_interface}"),
+				"Script should use gateway_interface variable in gateway_mode_flags")
+		})
+	}
 }
