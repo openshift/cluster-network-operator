@@ -512,10 +512,19 @@ data:
 
       echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node"
 
+
+      if [ "{{.OVN_NODE_MODE}}" == "dpu-host" ]; then
+        // this is required for the dpu-host mode to configure right gateway interface
+        // https://github.com/ovn-kubernetes/ovn-kubernetes/pull/5327/files
+        gateway_interface=derive-from-mgmt-port
+      else
+        gateway_interface=br-ex
+      fi
+
       if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
-        gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
+        gateway_mode_flags="--gateway-mode shared --gateway-interface ${gateway_interface}"
       elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
-        gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
+        gateway_mode_flags="--gateway-mode local --gateway-interface ${gateway_interface}"
       else
         echo "Invalid OVN_GATEWAY_MODE: \"{{.OVN_GATEWAY_MODE}}\". Must be \"local\" or \"shared\"."
         exit 1
