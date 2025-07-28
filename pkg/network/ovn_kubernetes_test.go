@@ -4280,7 +4280,321 @@ func TestOVNKubernetesScriptLibGatewayInterface(t *testing.T) {
 			// Validate that gateway_mode_flags uses the variable
 			g.Expect(scriptData).To(ContainSubstring("--gateway-interface ${gateway_interface}"),
 				"Script should use gateway_interface variable in gateway_mode_flags")
-				
+
 		})
 	}
+}
+
+func TestGetNodeListByLabel(t *testing.T) {
+	tests := []struct {
+		name          string
+		labelSelector string
+		nodes         []v1.Node
+		expectedNodes []string
+		expectError   bool
+		errorOnList   bool
+	}{
+		{
+			name:          "nodes with specific label and value",
+			labelSelector: "feature.node.kubernetes.io/dpu-enabled=true",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node1",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "true",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node2",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "false",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node3",
+						Labels: map[string]string{},
+					},
+				},
+			},
+			expectedNodes: []string{"node1"},
+			expectError:   false,
+		},
+		{
+			name:          "nodes with label key (any value)",
+			labelSelector: "feature.node.kubernetes.io/dpu-enabled",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node1",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "true",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node2",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "false",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node3",
+						Labels: map[string]string{},
+					},
+				},
+			},
+			expectedNodes: []string{"node1", "node2"},
+			expectError:   false,
+		},
+		{
+			name:          "nodes with label key only (no equals)",
+			labelSelector: "feature.node.kubernetes.io/dpu-enabled",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node1",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "true",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node2",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "false",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node3",
+						Labels: map[string]string{},
+					},
+				},
+			},
+			expectedNodes: []string{"node1", "node2"},
+			expectError:   false,
+		},
+		{
+			name:          "no nodes with matching label",
+			labelSelector: "feature.node.kubernetes.io/dpu-enabled=true",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node1",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "false",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node2",
+						Labels: map[string]string{},
+					},
+				},
+			},
+			expectedNodes: []string{},
+			expectError:   false,
+		},
+		{
+			name:          "no nodes at all",
+			labelSelector: "feature.node.kubernetes.io/dpu-enabled=true",
+			nodes:         []v1.Node{},
+			expectedNodes: []string{},
+			expectError:   false,
+		},
+		{
+			name:          "multiple nodes with different DPU labels",
+			labelSelector: "network.operator.openshift.io/dpu-host",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "dpu-host-1",
+						Labels: map[string]string{
+							"network.operator.openshift.io/dpu-host": "",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "dpu-host-2",
+						Labels: map[string]string{
+							"network.operator.openshift.io/dpu-host": "enabled",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "regular-node",
+						Labels: map[string]string{
+							"kubernetes.io/os": "linux",
+						},
+					},
+				},
+			},
+			expectedNodes: []string{"dpu-host-1", "dpu-host-2"},
+			expectError:   false,
+		},
+		{
+			name:          "nodes with empty label values",
+			labelSelector: "feature.node.kubernetes.io/empty-label",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-with-empty-value",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/empty-label": "",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-with-value",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/empty-label": "some-value",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-without-label",
+						Labels: map[string]string{
+							"other-label": "other-value",
+						},
+					},
+				},
+			},
+			expectedNodes: []string{"node-with-empty-value", "node-with-value"},
+			expectError:   false,
+		},
+		{
+			name:          "nodes with specific empty label value",
+			labelSelector: "feature.node.kubernetes.io/empty-label=",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-with-empty-value",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/empty-label": "",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-with-value",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/empty-label": "some-value",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-without-label",
+						Labels: map[string]string{
+							"other-label": "other-value",
+						},
+					},
+				},
+			},
+			expectedNodes: []string{"node-with-empty-value"},
+			expectError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create fake client with test nodes - pass nodes to constructor
+			// so they're available in both the typed and controller-runtime clients
+			nodeObjs := make([]crclient.Object, len(tt.nodes))
+			for i, node := range tt.nodes {
+				nodeObjs[i] = &node
+			}
+			client := cnofake.NewFakeClient(nodeObjs...)
+
+			// Call function under test
+			result, err := getNodeListByLabel(client, tt.labelSelector)
+
+			// Verify results
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				assert.ElementsMatch(t, tt.expectedNodes, result)
+			}
+		})
+	}
+}
+
+func TestGetNodeListByLabel_RealWorldScenarios(t *testing.T) {
+	t.Run("OpenShift DPU node scenarios", func(t *testing.T) {
+		nodes := []v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "master-1",
+					Labels: map[string]string{
+						"node-role.kubernetes.io/master":         "",
+						"node-role.kubernetes.io/control-plane":  "",
+						"network.operator.openshift.io/dpu-host": "",
+						"feature.node.kubernetes.io/dpu-enabled": "true",
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "worker-1",
+					Labels: map[string]string{
+						"node-role.kubernetes.io/worker":         "",
+						"network.operator.openshift.io/dpu":      "",
+						"feature.node.kubernetes.io/dpu-enabled": "true",
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "worker-2",
+					Labels: map[string]string{
+						"node-role.kubernetes.io/worker": "",
+						"kubernetes.io/os":               "linux",
+					},
+				},
+			},
+		}
+
+		// Create fake client with test nodes - pass nodes to constructor
+		nodeObjs := make([]crclient.Object, len(nodes))
+		for i, node := range nodes {
+			nodeObjs[i] = &node
+		}
+		client := cnofake.NewFakeClient(nodeObjs...)
+
+		// Test various DPU-related label selectors
+		testCases := []struct {
+			selector string
+			expected []string
+		}{
+			{"feature.node.kubernetes.io/dpu-enabled=true", []string{"master-1", "worker-1"}},
+			{"feature.node.kubernetes.io/dpu-enabled", []string{"master-1", "worker-1"}},
+			{"network.operator.openshift.io/dpu-host", []string{"master-1"}},
+			{"network.operator.openshift.io/dpu", []string{"worker-1"}},
+			{"node-role.kubernetes.io/worker", []string{"worker-1", "worker-2"}},
+			{"nonexistent-label", []string{}},
+		}
+
+		for _, tc := range testCases {
+			result, err := getNodeListByLabel(client, tc.selector)
+			assert.NoError(t, err, "Failed for selector: %s", tc.selector)
+			assert.ElementsMatch(t, tc.expected, result, "Failed for selector: %s", tc.selector)
+		}
+	})
 }
