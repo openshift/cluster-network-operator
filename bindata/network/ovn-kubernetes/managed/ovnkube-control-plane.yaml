@@ -288,6 +288,10 @@ spec:
         "{{$key}}": "{{$value}}"
         {{ end }}
       {{ end }}
+      {{- if .OVNRunAsUser }}
+      securityContext:
+        runAsUser: {{.OVNRunAsUser}}
+      {{- end }}
       volumes:
       - name: ovnkube-config
         configMap:
