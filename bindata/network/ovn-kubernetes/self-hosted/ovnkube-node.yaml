@@ -538,6 +538,8 @@ spec:
           value: "{{.OVN_CONTROLLER_INACTIVITY_PROBE}}"
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
+        - name: OVN_NODE_MODE
+          value: "{{.OVN_NODE_MODE}}"
         {{ if .NetFlowCollectors }}
         - name: NETFLOW_COLLECTORS
           value: "{{.NetFlowCollectors}}"
@@ -565,6 +567,7 @@ spec:
         {{ if and (.MgmtPortResourceName) (or (eq .OVN_NODE_MODE "smart-nic") (eq .OVN_NODE_MODE "dpu-host")) }}
         - name: OVNKUBE_NODE_MGMT_PORT_DP_RESOURCE_NAME
           value: {{ .MgmtPortResourceName }}
+        {{ end }}
         {{ end }}
         - name: K8S_NODE
           valueFrom:
