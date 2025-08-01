@@ -185,6 +185,7 @@ spec:
         - name: ovn-node-metrics-cert
           mountPath: /etc/pki/tls/metrics-cert
           readOnly: True
+{{ if ne .OVN_NODE_MODE "dpu-host" }}
       - name: kube-rbac-proxy-ovn-metrics
         image: {{.KubeRBACProxyImage}}
         command:
@@ -209,6 +210,8 @@ spec:
         - name: ovn-node-metrics-cert
           mountPath: /etc/pki/tls/metrics-cert
           readOnly: True
+{{ end }}
+{{ if ne .OVN_NODE_MODE "dpu-host" }}
       # ovn-northd: convert network objects in nbdb to flows in sbdb
       - name: northd
         image: "{{.OvnImage}}"
@@ -369,6 +372,7 @@ spec:
             cpu: 10m
             memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
+{{ end }}
 
       # ovnkube-controller: does node-level bookkeeping and configuration
       - name: ovnkube-controller
@@ -390,6 +394,8 @@ spec:
           value: "{{.OVN_CONTROLLER_INACTIVITY_PROBE}}"
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
+        - name: OVN_NODE_MODE
+          value: "{{.OVN_NODE_MODE}}"
         {{ if .NetFlowCollectors }}
         - name: NETFLOW_COLLECTORS
           value: "{{.NetFlowCollectors}}"
