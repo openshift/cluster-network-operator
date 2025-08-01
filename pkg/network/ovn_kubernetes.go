@@ -255,16 +255,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	} else {
 		data.Data["OVNPlatformAzure"] = false
 	}
-	if bootstrapResult.Infra.PlatformType == configv1.IBMCloudPlatformType { // TODO: Find a way to exclude IPI clusters from this???
-		// OVN is only supported in IBMCloud on Hypershift clusters, so get RunAsUser from HyperShiftConfig
-		if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.RunAsUser != "" {
-			data.Data["OVNRunAsUser"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.RunAsUser
-		} else {
-			data.Data["OVNRunAsUser"] = "1001" // We do not want to run this as root, so if nothing is specified, use 1001
-		}
-	} else {
-		data.Data["OVNRunAsUser"] = ""
-	}
 
 	var ippools string
 	for _, net := range conf.ClusterNetwork {
@@ -430,6 +420,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		productFlavor = "managed"
 		data.Data["CAConfigMap"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.CAConfigMap
 		data.Data["CAConfigMapKey"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.CAConfigMapKey
+		data.Data["RunAsUser"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.RunAsUser
 	}
 	manifestSubDir := filepath.Join(manifestDir, "network/ovn-kubernetes", productFlavor)
 	manifestDirs = append(manifestDirs, manifestSubDir)
