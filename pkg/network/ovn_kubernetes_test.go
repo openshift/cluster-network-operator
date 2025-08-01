@@ -958,7 +958,6 @@ logfile-maxage=0`,
 			enabledFeatureGates: []configv1.FeatureGateName{
 				apifeatures.FeatureGateNetworkSegmentation,
 				apifeatures.FeatureGatePreconfiguredUDNAddresses,
-				apifeatures.FeatureGatePersistentIPsForVirtualization,
 			},
 		},
 	}
