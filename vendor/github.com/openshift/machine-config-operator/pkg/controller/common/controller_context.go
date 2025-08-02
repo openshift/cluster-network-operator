@@ -6,10 +6,11 @@ import (
 	"time"
 
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
+	imageinformers "github.com/openshift/client-go/image/informers/externalversions"
 	machineinformersv1beta1 "github.com/openshift/client-go/machine/informers/externalversions"
 	mcfginformers "github.com/openshift/client-go/machineconfiguration/informers/externalversions"
-
 	operatorinformers "github.com/openshift/client-go/operator/informers/externalversions"
+	routeinformers "github.com/openshift/client-go/route/informers/externalversions"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/machine-config-operator/internal/clients"
@@ -21,6 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
+	corev1informers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -50,7 +53,7 @@ type ControllerContext struct {
 
 	NamespacedInformerFactory                           mcfginformers.SharedInformerFactory
 	InformerFactory                                     mcfginformers.SharedInformerFactory
-	TechPreviewInformerFactory                          mcfginformers.SharedInformerFactory
+	OCLInformerFactory                                  mcfginformers.SharedInformerFactory
 	KubeInformerFactory                                 informers.SharedInformerFactory
 	KubeNamespacedInformerFactory                       informers.SharedInformerFactory
 	OpenShiftConfigKubeNamespacedInformerFactory        informers.SharedInformerFactory
@@ -61,8 +64,10 @@ type ControllerContext struct {
 	OperatorInformerFactory                             operatorinformers.SharedInformerFactory
 	KubeMAOSharedInformer                               informers.SharedInformerFactory
 	MachineInformerFactory                              machineinformersv1beta1.SharedInformerFactory
+	ImageInformerFactory                                imageinformers.SharedInformerFactory
+	RouteInformerFactory                                routeinformers.SharedInformerFactory
 
-	FeatureGateAccess featuregates.FeatureGateAccess
+	FeatureGatesHandler FeatureGatesHandler
 
 	AvailableResources map[schema.GroupVersionResource]bool
 
@@ -77,6 +82,8 @@ type ControllerContext struct {
 func CreateControllerContext(ctx context.Context, cb *clients.Builder) *ControllerContext {
 	client := cb.MachineConfigClientOrDie("machine-config-shared-informer")
 	kubeClient := cb.KubeClientOrDie("kube-shared-informer")
+	imageClient := cb.ImageClientOrDie("image-shared-informer")
+	routeClient := cb.RouteClientOrDie("route-shared-informer")
 	apiExtClient := cb.APIExtClientOrDie("apiext-shared-informer")
 	configClient := cb.ConfigClientOrDie("config-shared-informer")
 	operatorClient := cb.OperatorClientOrDie("operator-shared-informer")
@@ -97,6 +104,8 @@ func CreateControllerContext(ctx context.Context, cb *clients.Builder) *Controll
 	)
 	// this is needed to listen for changes in MAO user data secrets to re-apply the ones we define in the MCO (since we manage them)
 	kubeMAOSharedInformer := informers.NewFilteredSharedInformerFactory(kubeClient, resyncPeriod()(), "openshift-machine-api", nil)
+	imageSharedInformer := imageinformers.NewSharedInformerFactory(imageClient, resyncPeriod()())
+	routeSharedInformer := routeinformers.NewSharedInformerFactory(routeClient, resyncPeriod()())
 
 	// filter out CRDs that do not have the MCO label
 	assignFilterLabels := func(opts *metav1.ListOptions) {
@@ -129,14 +138,13 @@ func CreateControllerContext(ctx context.Context, cb *clients.Builder) *Controll
 		configSharedInformer.Config().V1().ClusterVersions(), configSharedInformer.Config().V1().FeatureGates(),
 		recorder,
 	)
-
 	go featureGateAccessor.Run(ctx)
 
 	return &ControllerContext{
 		ClientBuilder:                                       cb,
 		NamespacedInformerFactory:                           sharedNamespacedInformers,
 		InformerFactory:                                     sharedInformers,
-		TechPreviewInformerFactory:                          sharedTechPreviewInformers,
+		OCLInformerFactory:                                  sharedTechPreviewInformers,
 		KubeInformerFactory:                                 kubeSharedInformer,
 		KubeNamespacedInformerFactory:                       kubeNamespacedSharedInformer,
 		OpenShiftConfigKubeNamespacedInformerFactory:        openShiftConfigKubeNamespacedSharedInformer,
@@ -150,6 +158,38 @@ func CreateControllerContext(ctx context.Context, cb *clients.Builder) *Controll
 		InformersStarted:                                    make(chan struct{}),
 		ResyncPeriod:                                        resyncPeriod(),
 		KubeMAOSharedInformer:                               kubeMAOSharedInformer,
-		FeatureGateAccess:                                   featureGateAccessor,
+		FeatureGatesHandler:                                 NewFeatureGatesAccessHandler(featureGateAccessor),
+		ImageInformerFactory:                                imageSharedInformer,
+		RouteInformerFactory:                                routeSharedInformer,
 	}
+}
+
+// Creates a NodeInformer that is bound to a single node. This is for use by
+// the MCD to ensure that the MCD only receives watch events for the node that
+// it is running on as opposed to all cluster nodes. Doing this helps reduce
+// the load on the apiserver. Because the filters are applied to *all*
+// informers constructed by the informer factory, we want to ensure that this
+// factory is only used to construct a NodeInformer.
+//
+// Therefore, to ensure that this informer factory is only used for
+// constructing a NodeInformer with this specific filter, we only return the
+// instantiated NodeInformer instance and a start function.
+func NewScopedNodeInformer(kubeclient kubernetes.Interface, nodeName string) (corev1informers.NodeInformer, func(<-chan struct{})) {
+	sif := informers.NewSharedInformerFactoryWithOptions(
+		kubeclient,
+		resyncPeriod()(),
+		informers.WithTweakListOptions(func(opts *metav1.ListOptions) {
+			opts.FieldSelector = fields.OneTermEqualSelector("metadata.name", nodeName).String()
+		}),
+	)
+
+	return sif.Core().V1().Nodes(), sif.Start
+}
+
+// Creates a scoped node informer that is bound to a single node from a
+// clients.Builder instance. It sets the user-agent for the client to
+// node-scoped-informer before instantiating the node informer. Returns the
+// instantiated NodeInformer and a start function.
+func NewScopedNodeInformerFromClientBuilder(cb *clients.Builder, nodeName string) (corev1informers.NodeInformer, func(<-chan struct{})) {
+	return NewScopedNodeInformer(cb.KubeClientOrDie("node-scoped-informer"), nodeName)
 }
