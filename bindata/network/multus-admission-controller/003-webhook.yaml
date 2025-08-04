@@ -31,6 +31,9 @@ webhooks:
       # On updates, only validate if the Spec changes
       - name: CreateDeleteOrUpdatedSpec
         expression: oldObject == null || object == null || object.spec != oldObject.spec
+      # Ignore default/openshift-ovn-kubernetes NAD to avoid a race between ovn-kubernetes and the multus webhook on install
+      - name: IgnoreDefaultOVNKubernetesNAD
+        expression: object == null || object.metadata.namespace != "openshift-ovn-kubernetes" || object.metadata.name != "default"
     sideEffects: NoneOnDryRun
     admissionReviewVersions:
     - v1
