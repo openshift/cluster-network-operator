@@ -291,6 +291,9 @@ spec:
       {{- if .RunAsUser }}
       securityContext:
         runAsUser: {{.RunAsUser}}
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       {{- end }}
       volumes:
       - name: ovnkube-config
