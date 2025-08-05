@@ -1,11 +1,13 @@
 package hypershift
 
 import (
+	"testing"
+
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"testing"
 )
 
 func TestParseHostedControlPlane(t *testing.T) {
@@ -101,5 +103,115 @@ spec:
 		actualOutput, err := ParseHostedControlPlane(hcpUnstructured)
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(actualOutput).To(Equal(tc.expectedOutput))
+	}
+}
+
+func TestTolerationsToStringSliceYaml(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	testCases := []struct {
+		name        string
+		tolerations []corev1.Toleration
+		expected    []string
+	}{
+		{
+			name: "operator Exists with no key or value should generate valid YAML",
+			tolerations: []corev1.Toleration{
+				{
+					Operator: corev1.TolerationOpExists,
+				},
+			},
+			expected: []string{
+				"- operator: Exists",
+			},
+		},
+		{
+			name: "operator Equal with key and value should include all fields",
+			tolerations: []corev1.Toleration{
+				{
+					Key:      "node-role.kubernetes.io/master",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			},
+			expected: []string{
+				"- effect: NoSchedule",
+				"  key: node-role.kubernetes.io/master",
+				"  operator: Equal",
+				"  value: \"true\"",
+			},
+		},
+		{
+			name: "empty string values should be filtered out",
+			tolerations: []corev1.Toleration{
+				{
+					Key:      "test-key",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			},
+			expected: []string{
+				"- effect: NoSchedule",
+				"  key: test-key",
+				"  operator: Equal",
+			},
+		},
+		{
+			name: "operator Exists with key should not include null value",
+			tolerations: []corev1.Toleration{
+				{
+					Key:      "node.kubernetes.io/unreachable",
+					Operator: corev1.TolerationOpExists,
+					Effect:   corev1.TaintEffectNoExecute,
+				},
+			},
+			expected: []string{
+				"- effect: NoExecute",
+				"  key: node.kubernetes.io/unreachable",
+				"  operator: Exists",
+			},
+		},
+		{
+			name: "multiple tolerations should generate proper YAML array",
+			tolerations: []corev1.Toleration{
+				{
+					Key:      "node-role.kubernetes.io/master",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+				{
+					Operator: corev1.TolerationOpExists,
+				},
+				{
+					Key:      "node.kubernetes.io/unreachable",
+					Operator: corev1.TolerationOpExists,
+					Effect:   corev1.TaintEffectNoExecute,
+				},
+			},
+			expected: []string{
+				"- effect: NoSchedule",
+				"  key: node-role.kubernetes.io/master",
+				"  operator: Equal",
+				"  value: \"true\"",
+				"- operator: Exists",
+				"- effect: NoExecute",
+				"  key: node.kubernetes.io/unreachable",
+				"  operator: Exists",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := tolerationsToStringSliceYaml(tc.tolerations)
+			g.Expect(err).NotTo(HaveOccurred())
+			if result[len(result)-1] == "" {
+				result = result[:len(result)-1]
+			}
+			g.Expect(result).To(Equal(tc.expected), "Expected exact YAML format match")
+		})
 	}
 }
