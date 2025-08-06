@@ -234,6 +234,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["HCPNodeSelector"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.HCPNodeSelector
 	data.Data["HCPLabels"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.HCPLabels
 	data.Data["HCPTolerations"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.HCPTolerations
+	data.Data["PriorityClass"] = bootstrapResult.Infra.HostedControlPlane.PriorityClass
 	data.Data["OVN_NB_INACTIVITY_PROBE"] = nb_inactivity_probe
 	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
 	data.Data["OVN_NORTHD_PROBE_INTERVAL"] = os.Getenv("OVN_NORTHD_PROBE_INTERVAL")
