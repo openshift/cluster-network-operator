@@ -420,6 +420,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		productFlavor = "managed"
 		data.Data["CAConfigMap"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.CAConfigMap
 		data.Data["CAConfigMapKey"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.CAConfigMapKey
+		data.Data["PriorityClass"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.PriorityClass
 	}
 	manifestSubDir := filepath.Join(manifestDir, "network/ovn-kubernetes", productFlavor)
 	manifestDirs = append(manifestDirs, manifestSubDir)
@@ -732,6 +733,7 @@ func bootstrapOVNHyperShiftConfig(hc *hypershift.HyperShiftConfig, kubeClient cn
 	ovnHypershiftResult.HCPNodeSelector = hcp.NodeSelector
 	ovnHypershiftResult.HCPLabels = hcp.Labels
 	ovnHypershiftResult.HCPTolerations = hcp.Tolerations
+	ovnHypershiftResult.PriorityClass = hcp.PriorityClass
 
 	switch hcp.ControllerAvailabilityPolicy {
 	case hypershift.HighlyAvailable:
