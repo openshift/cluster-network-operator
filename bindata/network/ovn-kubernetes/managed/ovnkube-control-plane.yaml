@@ -288,6 +288,13 @@ spec:
         "{{$key}}": "{{$value}}"
         {{ end }}
       {{ end }}
+      {{- if .RunAsUser }}
+      securityContext:
+        runAsUser: {{.RunAsUser}}
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      {{- end }}
       volumes:
       - name: ovnkube-config
         configMap:
