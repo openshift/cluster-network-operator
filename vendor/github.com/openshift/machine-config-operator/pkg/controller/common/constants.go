@@ -83,10 +83,13 @@ const (
 
 	// InternalMCOIgnitionVersion is the ignition version that the MCO converts everything to internally. The intent here is that
 	// we should be able to update this constant when we bump the internal ignition version instead of having to hunt down all of
-	// the version references and figure out "was this supposed to be explicitly 3.4.0 or just the default version which happens
-	// to be 3.4.0 currently". Ideally if you find an explicit "3.4.0", it's supposed to be "3.4.0" version. If it's this constant,
+	// the version references and figure out "was this supposed to be explicitly 3.5.0 or just the default version which happens
+	// to be 3.5.0 currently". Ideally if you find an explicit "3.5.0", it's supposed to be "3.5.0" version. If it's this constant,
 	// it's supposed to be the internal default version.
-	InternalMCOIgnitionVersion = "3.4.0"
+	InternalMCOIgnitionVersion = "3.5.0"
+
+	// This is the minimum acceptable ignition spec required for boot image updates. This should be updated to be in line with the above.
+	MinimumAcceptableStubIgnitionSpec = "3"
 
 	// MachineConfigRoleLabel is the role on MachineConfigs, used to select for pools
 	MachineConfigRoleLabel = "machineconfiguration.openshift.io/role"
@@ -100,8 +103,14 @@ const (
 	// MCOReleaseImageVersionKey is the key for indexing the MCO release version stored in the bootimages configmap
 	MCOReleaseImageVersionKey = "MCOReleaseImageVersion"
 
+	// MCOReleaseImageVersionKey is the key for indexing the OCP release version stored in the bootimages configmap
+	OCPReleaseVersionKey = "releaseVersion"
+
 	// MCOOperatorKnobsObjectName is the name of the global MachineConfiguration "knobs" object that the MCO watches.
 	MCOOperatorKnobsObjectName = "cluster"
+
+	// BootImageOptedInAnnotation is used for book keeping when the MCO applies a default boot image configuration
+	BootImageOptedInAnnotation = "machineconfiguration.openshift.io/boot-image-updates-opted-in-at"
 
 	ServiceCARotateAnnotation = "machineconfiguration.openshift.io/service-ca-rotate"
 
@@ -119,6 +128,18 @@ const (
 
 	// This is the label applied to *-user-data-managed secrets
 	MachineConfigServerCAManagedByConfigMapKey = "machineconfiguration.openshift.io/managed-ca-bundle-derived-from-configmap"
+
+	// This is used to key in to the user-data secret
+	UserDataKey = "userData"
+
+	// ign* are for the user-data ignition fields
+	IgnFieldIgnition = "ignition"
+	IgnFieldSource   = "source"
+	IgnFieldVersion  = "version"
+
+	// Stub Ignition upgrade related annotation keys
+	StubIgnitionVersionAnnotation   = "machineconfiguration.openshift.io/stub-ignition-upgraded-to"
+	StubIgnitionTimestampAnnotation = "machineconfiguration.openshift.io/stub-ignition-upgraded-at"
 )
 
 // Commonly-used MCO ConfigMap names
