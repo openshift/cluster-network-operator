@@ -11,6 +11,7 @@ type OVNHyperShiftBootstrapResult struct {
 	Enabled              bool
 	ClusterID            string
 	Namespace            string
+	RunAsUser            string
 	HCPNodeSelector      map[string]string
 	HCPLabels            map[string]string
 	HCPTolerations       []string
