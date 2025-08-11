@@ -312,14 +312,17 @@ spec:
           optional: true
       - name: ovn-control-plane-metrics-cert
         secret:
+          defaultMode: 0640
           secretName: ovn-control-plane-metrics-cert
       - name: admin-kubeconfig
         secret:
+          defaultMode: 0640
           secretName: service-network-admin-kubeconfig
       - name: hosted-cluster-api-access
         emptyDir: {}
       - name: hosted-ca-cert
         secret:
+          defaultMode: 0640
           secretName: root-ca
           items:
             - key: ca.crt
