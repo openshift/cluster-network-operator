@@ -234,6 +234,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["HCPNodeSelector"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.HCPNodeSelector
 	data.Data["HCPLabels"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.HCPLabels
 	data.Data["HCPTolerations"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.HCPTolerations
+	data.Data["CAConfigMap"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.CAConfigMap
+	data.Data["CAConfigMapKey"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.CAConfigMapKey
+	data.Data["RunAsUser"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.RunAsUser
+	data.Data["PriorityClass"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.PriorityClass
 	data.Data["OVN_NB_INACTIVITY_PROBE"] = nb_inactivity_probe
 	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
 	data.Data["OVN_NORTHD_PROBE_INTERVAL"] = os.Getenv("OVN_NORTHD_PROBE_INTERVAL")
@@ -418,10 +422,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	productFlavor := "self-hosted"
 	if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled {
 		productFlavor = "managed"
-		data.Data["CAConfigMap"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.CAConfigMap
-		data.Data["CAConfigMapKey"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.CAConfigMapKey
-		data.Data["RunAsUser"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.RunAsUser
-		data.Data["PriorityClass"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.PriorityClass
 	}
 	manifestSubDir := filepath.Join(manifestDir, "network/ovn-kubernetes", productFlavor)
 	manifestDirs = append(manifestDirs, manifestSubDir)
