@@ -36,6 +36,14 @@ var dualStackPlatforms = sets.NewString(
 	string(configv1.NonePlatformType),
 	string(configv1.VSpherePlatformType),
 	string(configv1.OpenStackPlatformType),
+	string(configv1.AWSPlatformType),
+	string(configv1.AzurePlatformType),
+)
+
+var conversionToDualStackPlatforms = sets.NewString(
+	string(configv1.BareMetalPlatformType),
+	string(configv1.NonePlatformType),
+	string(configv1.VSpherePlatformType),
 )
 
 const (
@@ -400,13 +408,13 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 		return isClusterNetworkChangeSafe(prev, next)
 	}
 
-	// Validate that this is either a BareMetal or None PlatformType. For all other
-	// PlatformTypes, migration to DualStack is prohibited
+	// Validate that this is a platform that supports DualStack. If it does, then check if
+	// migration to DualStack on day-2 is allowed.
 	if len(prev.ServiceNetwork) < len(next.ServiceNetwork) {
 		if !isSupportedDualStackPlatform(infraRes.PlatformType) {
 			return errors.Errorf("%s is not one of the supported platforms for dual stack (%s)", infraRes.PlatformType,
 				strings.Join(dualStackPlatforms.List(), ", "))
-		} else if string(configv1.OpenStackPlatformType) == string(infraRes.PlatformType) {
+		} else if !isConversionSupportedDualStackPlatform(infraRes.PlatformType) {
 			return errors.Errorf("%s does not allow conversion to dual-stack cluster", infraRes.PlatformType)
 		}
 	}
@@ -975,6 +983,10 @@ func registerNetworkingConsolePlugin(bootstrapResult *bootstrap.BootstrapResult,
 
 func isSupportedDualStackPlatform(platformType configv1.PlatformType) bool {
 	return dualStackPlatforms.Has(string(platformType))
+}
+
+func isConversionSupportedDualStackPlatform(platformType configv1.PlatformType) bool {
+	return conversionToDualStackPlatforms.Has(string(platformType))
 }
 
 func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
