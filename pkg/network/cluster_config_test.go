@@ -371,8 +371,11 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	// You can't use dual-stack if this is anything else but BareMetal or NonePlatformType
-	infrastructure.Status.PlatformStatus.Type = configv1.AzurePlatformType
+	// You can't use dual-stack if enabled on an unsupported platform
+	infrastructure.Status.PlatformStatus.Type = configv1.GCPPlatformType
+	infrastructure.Status.PlatformStatus.GCP = &configv1.GCPPlatformStatus{
+		Region: "us-west1",
+	}
 	client = fake.NewFakeClient(infrastructure)
 	err = createProxy(client)
 	g.Expect(err).NotTo(HaveOccurred())

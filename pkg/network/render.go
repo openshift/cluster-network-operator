@@ -38,6 +38,12 @@ var dualStackPlatforms = sets.NewString(
 	string(configv1.OpenStackPlatformType),
 )
 
+var conversionToDualStackPlatforms = sets.NewString(
+	string(configv1.BareMetalPlatformType),
+	string(configv1.NonePlatformType),
+	string(configv1.VSpherePlatformType),
+)
+
 const (
 	pluginName = "networking-console-plugin"
 )
@@ -165,6 +171,8 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	if err != nil {
 		return nil, progressing, err
 	}
+
+	updateDualStackPlatforms(featureGates)
 
 	log.Printf("Render phase done, rendered %d objects", len(objs))
 	return objs, progressing, nil
@@ -400,13 +408,13 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 		return isClusterNetworkChangeSafe(prev, next)
 	}
 
-	// Validate that this is either a BareMetal or None PlatformType. For all other
-	// PlatformTypes, migration to DualStack is prohibited
+	// Validate that this is a platform that supports DualStack. If it does, then check if
+	// migration to DualStack on day-2 is allowed.
 	if len(prev.ServiceNetwork) < len(next.ServiceNetwork) {
 		if !isSupportedDualStackPlatform(infraRes.PlatformType) {
 			return errors.Errorf("%s is not one of the supported platforms for dual stack (%s)", infraRes.PlatformType,
 				strings.Join(dualStackPlatforms.List(), ", "))
-		} else if string(configv1.OpenStackPlatformType) == string(infraRes.PlatformType) {
+		} else if !isConversionSupportedDualStackPlatform(infraRes.PlatformType) {
 			return errors.Errorf("%s does not allow conversion to dual-stack cluster", infraRes.PlatformType)
 		}
 	}
@@ -977,6 +985,10 @@ func isSupportedDualStackPlatform(platformType configv1.PlatformType) bool {
 	return dualStackPlatforms.Has(string(platformType))
 }
 
+func isConversionSupportedDualStackPlatform(platformType configv1.PlatformType) bool {
+	return conversionToDualStackPlatforms.Has(string(platformType))
+}
+
 func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	if conf == nil || conf.AdditionalRoutingCapabilities == nil {
 		return nil, nil
@@ -998,4 +1010,15 @@ func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir s
 	}
 
 	return out, nil
+}
+
+func updateDualStackPlatforms(featureGates featuregates.FeatureGate) {
+	for _, fg := range featureGates.KnownFeatures() {
+		if fg == apifeatures.FeatureGateAWSDualStackInstall && featureGates.Enabled(apifeatures.FeatureGateAWSDualStackInstall) {
+			dualStackPlatforms.Insert(string(configv1.AWSPlatformType))
+		}
+		if fg == apifeatures.FeatureGateAzureDualStackInstall && featureGates.Enabled(apifeatures.FeatureGateAzureDualStackInstall) {
+			dualStackPlatforms.Insert(string(configv1.AzurePlatformType))
+		}
+	}
 }
