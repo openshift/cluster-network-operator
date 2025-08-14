@@ -36,6 +36,9 @@ var dualStackPlatforms = sets.NewString(
 	string(configv1.NonePlatformType),
 	string(configv1.VSpherePlatformType),
 	string(configv1.OpenStackPlatformType),
+	string(configv1.AWSPlatformType),
+	string(configv1.AzurePlatformType),
+	string(configv1.GCPPlatformType),
 )
 
 const (
