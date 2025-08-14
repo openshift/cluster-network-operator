@@ -30,7 +30,7 @@ webhooks:
     matchConditions:
       # On updates, only validate if the Spec changes
       - name: CreateDeleteOrUpdatedSpec
-        expression: oldObject == null || object == null || object.spec != oldObject.spec
+        expression: oldObject == null || object == null || has(object.spec) != has(oldObject.spec) || (has(object.spec) && object.spec != oldObject.spec)
     sideEffects: NoneOnDryRun
     admissionReviewVersions:
     - v1
