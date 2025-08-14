@@ -102,6 +102,7 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 		data.Data["HCPNodeSelector"] = bootstrapResult.Infra.HostedControlPlane.NodeSelector
 		data.Data["HCPLabels"] = bootstrapResult.Infra.HostedControlPlane.Labels
 		data.Data["HCPTolerations"] = bootstrapResult.Infra.HostedControlPlane.Tolerations
+		data.Data["PriorityClass"] = bootstrapResult.Infra.HostedControlPlane.PriorityClass
 
 		data.Data["NetworkNodeIdentityImage"] = hcpCfg.ControlPlaneImage // OVN_CONTROL_PLANE_IMAGE
 		localAPIServer := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal]

@@ -66,7 +66,7 @@ spec:
                   matchLabels:
                     hypershift.openshift.io/hosted-control-plane: {{.HostedClusterNamespace}}
                 topologyKey: kubernetes.io/hostname
-      priorityClassName: hypershift-control-plane
+      priorityClassName: {{ .PriorityClass | default "hypershift-control-plane" }}
       securityContext:
 {{- if not (eq .RunAsUser "")}}
         runAsUser: {{.RunAsUser}}
