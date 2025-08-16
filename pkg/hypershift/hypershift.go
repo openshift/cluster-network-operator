@@ -331,19 +331,52 @@ func tolerationsToStringSliceYaml(tolerations []corev1.Toleration) ([]string, er
 		return nil, nil
 	}
 
-	yamlBytes, err := yaml.Marshal(tolerations)
-	if err != nil {
-		return nil, err
-	}
+	var result []string
 
-	yamlStrs := []string{}
-	for _, arg := range strings.Split(string(yamlBytes), "\n") {
-
-		// filter out null and empty strings
-		if strings.Contains(arg, ": null") || strings.Contains(arg, ": \"\"") {
-			continue
+	for _, toleration := range tolerations {
+		// Marshal single toleration
+		yamlBytes, err := yaml.Marshal(toleration)
+		if err != nil {
+			return nil, err
 		}
-		yamlStrs = append(yamlStrs, arg)
+
+		// Process the single toleration's YAML lines
+		lines := strings.Split(string(yamlBytes), "\n")
+		var tolerationLines []string
+
+		for _, line := range lines {
+			// Skip empty lines
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+
+			// filter out empty strings but keep null values as they are valid for tolerations
+			if strings.Contains(line, ": \"\"") {
+				continue
+			}
+
+			// filter out null values including tolerationseconds: null
+			if strings.Contains(line, ": null") {
+				continue
+			}
+
+			tolerationLines = append(tolerationLines, line)
+		}
+
+		// Add array marker to the first line and proper indentation to all lines
+		for i := range tolerationLines {
+			if i == 0 {
+				// First line gets the array marker
+				tolerationLines[i] = "- " + strings.TrimSpace(tolerationLines[i])
+			} else {
+				// Subsequent lines get proper indentation (2 spaces)
+				tolerationLines[i] = "  " + strings.TrimSpace(tolerationLines[i])
+			}
+		}
+
+		// Add all lines from this toleration to the result
+		result = append(result, tolerationLines...)
 	}
-	return yamlStrs, nil
+
+	return result, nil
 }
