@@ -36,6 +36,7 @@ import (
 	cnofake "github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/cluster-network-operator/pkg/render"
 )
 
 var (
@@ -4191,4 +4192,409 @@ func Test_renderOVNKubernetes(t *testing.T) {
 			assert.Equalf(t, tt.expectNumObjs, len(got), "renderOVNKubernetes() got %d objects, want %d", len(got), tt.expectNumObjs)
 		})
 	}
+}
+
+func TestOVNKubernetesScriptLibGatewayInterface(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	testCases := []struct {
+		name                     string
+		ovnNodeMode              string
+		expectedGatewayInterface string
+	}{
+		{
+			name:                     "dpu-host mode uses derive-from-mgmt-port",
+			ovnNodeMode:              "dpu-host",
+			expectedGatewayInterface: "derive-from-mgmt-port",
+		},
+		{
+			name:                     "non-dpu-host mode uses br-ex",
+			ovnNodeMode:              "full",
+			expectedGatewayInterface: "br-ex",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create render data
+			data := render.MakeRenderData()
+			data.Data["OVN_NODE_MODE"] = tc.ovnNodeMode
+			data.Data["OVN_GATEWAY_MODE"] = "shared"
+
+			// Set all required template variables for 008-script-lib.yaml
+			data.Data["ReleaseVersion"] = "4.15.0"
+			data.Data["OVNPolicyAuditDestination"] = "null"
+			data.Data["OVNPolicyAuditSyslogFacility"] = "local0"
+			data.Data["OVN_LOG_PATTERN_CONSOLE"] = "%D{%Y-%m-%dT%H:%M:%S.###Z}|%05N|%c%T|%p|%m"
+			data.Data["NorthdThreads"] = "1"
+			data.Data["OVNPolicyAuditMaxFileSize"] = "50"
+			data.Data["OVNPolicyAuditMaxLogFiles"] = "5"
+			data.Data["OVN_NB_INACTIVITY_PROBE"] = "60000"
+			data.Data["OVN_NORTHD_BACKOFF_MS"] = "300"
+			data.Data["PlatformType"] = "AWS"
+			data.Data["OVN_CONTROLLER_INACTIVITY_PROBE"] = "30000"
+			data.Data["GenevePort"] = "8061"
+			data.Data["OVNHybridOverlayVXLANPort"] = ""
+			data.Data["OVN_MULTI_NETWORK_ENABLE"] = "false"
+			data.Data["OVN_NETWORK_SEGMENTATION_ENABLE"] = "false"
+			data.Data["OVN_ROUTE_ADVERTISEMENTS_ENABLE"] = "false"
+			data.Data["OVN_OBSERVABILITY_ENABLE"] = "false"
+			data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = "false"
+			data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = "false"
+			data.Data["DNS_NAME_RESOLVER_ENABLE"] = "false"
+			data.Data["IP_FORWARDING_MODE"] = "Restricted"
+			data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = "false"
+			data.Data["NodeIdentityCertDuration"] = "24h"
+			data.Data["V4JoinSubnet"] = ""
+			data.Data["V6JoinSubnet"] = ""
+			data.Data["V4MasqueradeSubnet"] = ""
+			data.Data["V6MasqueradeSubnet"] = ""
+			data.Data["V4TransitSwitchSubnet"] = ""
+			data.Data["V6TransitSwitchSubnet"] = ""
+			data.Data["OVNPolicyAuditRateLimit"] = "20"
+			data.Data["IsNetworkTypeLiveMigration"] = false
+			data.Data["OVNIPsecEnable"] = false
+			data.Data["OVNIPsecEncap"] = "Auto"
+
+			// Render the script-lib template
+			scriptLibPath := "../../bindata/network/ovn-kubernetes/common/008-script-lib.yaml"
+			objs, err := render.RenderTemplate(scriptLibPath, &data)
+			g.Expect(err).NotTo(HaveOccurred(), "Template rendering should succeed for %s", tc.name)
+			g.Expect(objs).To(HaveLen(1), "Should render exactly one object")
+
+			// Verify it's a ConfigMap with the expected name
+			obj := objs[0]
+			g.Expect(obj.GetKind()).To(Equal("ConfigMap"))
+			g.Expect(obj.GetName()).To(Equal("ovnkube-script-lib"))
+
+			// Extract the script content from the ConfigMap
+			scriptData, found, err := uns.NestedString(obj.Object, "data", "ovnkube-lib.sh")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(found).To(BeTrue(), "Should find ovnkube-lib.sh in ConfigMap data")
+
+			// Validate gateway interface assignment
+			expectedGatewayAssignment := fmt.Sprintf("gateway_interface=%s", tc.expectedGatewayInterface)
+			g.Expect(scriptData).To(ContainSubstring(expectedGatewayAssignment),
+				"Script should contain correct gateway interface assignment for %s mode", tc.ovnNodeMode)
+
+			// Validate that gateway_mode_flags uses the variable
+			g.Expect(scriptData).To(ContainSubstring("--gateway-interface ${gateway_interface}"),
+				"Script should use gateway_interface variable in gateway_mode_flags")
+
+		})
+	}
+}
+
+func TestGetNodeListByLabel(t *testing.T) {
+	tests := []struct {
+		name          string
+		labelSelector string
+		nodes         []v1.Node
+		expectedNodes []string
+		expectError   bool
+		errorOnList   bool
+	}{
+		{
+			name:          "nodes with specific label and value",
+			labelSelector: "feature.node.kubernetes.io/dpu-enabled=true",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node1",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "true",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node2",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "false",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node3",
+						Labels: map[string]string{},
+					},
+				},
+			},
+			expectedNodes: []string{"node1"},
+			expectError:   false,
+		},
+		{
+			name:          "nodes with label key (any value)",
+			labelSelector: "feature.node.kubernetes.io/dpu-enabled",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node1",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "true",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node2",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "false",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node3",
+						Labels: map[string]string{},
+					},
+				},
+			},
+			expectedNodes: []string{"node1", "node2"},
+			expectError:   false,
+		},
+		{
+			name:          "nodes with label key only (no equals)",
+			labelSelector: "feature.node.kubernetes.io/dpu-enabled",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node1",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "true",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node2",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "false",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node3",
+						Labels: map[string]string{},
+					},
+				},
+			},
+			expectedNodes: []string{"node1", "node2"},
+			expectError:   false,
+		},
+		{
+			name:          "no nodes with matching label",
+			labelSelector: "feature.node.kubernetes.io/dpu-enabled=true",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node1",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/dpu-enabled": "false",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node2",
+						Labels: map[string]string{},
+					},
+				},
+			},
+			expectedNodes: []string{},
+			expectError:   false,
+		},
+		{
+			name:          "no nodes at all",
+			labelSelector: "feature.node.kubernetes.io/dpu-enabled=true",
+			nodes:         []v1.Node{},
+			expectedNodes: []string{},
+			expectError:   false,
+		},
+		{
+			name:          "multiple nodes with different DPU labels",
+			labelSelector: "network.operator.openshift.io/dpu-host",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "dpu-host-1",
+						Labels: map[string]string{
+							"network.operator.openshift.io/dpu-host": "",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "dpu-host-2",
+						Labels: map[string]string{
+							"network.operator.openshift.io/dpu-host": "enabled",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "regular-node",
+						Labels: map[string]string{
+							"kubernetes.io/os": "linux",
+						},
+					},
+				},
+			},
+			expectedNodes: []string{"dpu-host-1", "dpu-host-2"},
+			expectError:   false,
+		},
+		{
+			name:          "nodes with empty label values",
+			labelSelector: "feature.node.kubernetes.io/empty-label",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-with-empty-value",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/empty-label": "",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-with-value",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/empty-label": "some-value",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-without-label",
+						Labels: map[string]string{
+							"other-label": "other-value",
+						},
+					},
+				},
+			},
+			expectedNodes: []string{"node-with-empty-value", "node-with-value"},
+			expectError:   false,
+		},
+		{
+			name:          "nodes with specific empty label value",
+			labelSelector: "feature.node.kubernetes.io/empty-label=",
+			nodes: []v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-with-empty-value",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/empty-label": "",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-with-value",
+						Labels: map[string]string{
+							"feature.node.kubernetes.io/empty-label": "some-value",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-without-label",
+						Labels: map[string]string{
+							"other-label": "other-value",
+						},
+					},
+				},
+			},
+			expectedNodes: []string{"node-with-empty-value"},
+			expectError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create fake client with test nodes - pass nodes to constructor
+			// so they're available in both the typed and controller-runtime clients
+			nodeObjs := make([]crclient.Object, len(tt.nodes))
+			for i, node := range tt.nodes {
+				nodeObjs[i] = &node
+			}
+			client := cnofake.NewFakeClient(nodeObjs...)
+
+			// Call function under test
+			result, err := getNodeListByLabel(client, tt.labelSelector)
+
+			// Verify results
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				assert.ElementsMatch(t, tt.expectedNodes, result)
+			}
+		})
+	}
+}
+
+func TestGetNodeListByLabel_RealWorldScenarios(t *testing.T) {
+	t.Run("OpenShift DPU node scenarios", func(t *testing.T) {
+		nodes := []v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "master-1",
+					Labels: map[string]string{
+						"node-role.kubernetes.io/master":         "",
+						"node-role.kubernetes.io/control-plane":  "",
+						"network.operator.openshift.io/dpu-host": "",
+						"feature.node.kubernetes.io/dpu-enabled": "true",
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "worker-1",
+					Labels: map[string]string{
+						"node-role.kubernetes.io/worker":         "",
+						"network.operator.openshift.io/dpu":      "",
+						"feature.node.kubernetes.io/dpu-enabled": "true",
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "worker-2",
+					Labels: map[string]string{
+						"node-role.kubernetes.io/worker": "",
+						"kubernetes.io/os":               "linux",
+					},
+				},
+			},
+		}
+
+		// Create fake client with test nodes - pass nodes to constructor
+		nodeObjs := make([]crclient.Object, len(nodes))
+		for i, node := range nodes {
+			nodeObjs[i] = &node
+		}
+		client := cnofake.NewFakeClient(nodeObjs...)
+
+		// Test various DPU-related label selectors
+		testCases := []struct {
+			selector string
+			expected []string
+		}{
+			{"feature.node.kubernetes.io/dpu-enabled=true", []string{"master-1", "worker-1"}},
+			{"feature.node.kubernetes.io/dpu-enabled", []string{"master-1", "worker-1"}},
+			{"network.operator.openshift.io/dpu-host", []string{"master-1"}},
+			{"network.operator.openshift.io/dpu", []string{"worker-1"}},
+			{"node-role.kubernetes.io/worker", []string{"worker-1", "worker-2"}},
+			{"nonexistent-label", []string{}},
+		}
+
+		for _, tc := range testCases {
+			result, err := getNodeListByLabel(client, tc.selector)
+			assert.NoError(t, err, "Failed for selector: %s", tc.selector)
+			assert.ElementsMatch(t, tc.expected, result, "Failed for selector: %s", tc.selector)
+		}
+	})
 }

@@ -512,10 +512,26 @@ data:
 
       echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node"
 
+      # Use OVN_NODE_MODE environment variable, default to "full" if not set
+      OVN_NODE_MODE=${OVN_NODE_MODE:-full}
+      # We check only dpu-host mode and not smart-nic mode here as currently we do not support it yet
+      # Once we support it, we will need to check for it here and add relevant code.
+      if [ "${OVN_NODE_MODE}" == "dpu-host" ]; then
+        # this is required for the dpu-host mode to configure right gateway interface
+        # https://github.com/ovn-kubernetes/ovn-kubernetes/pull/5327/files
+        gateway_interface="derive-from-mgmt-port"
+        ovnkube_node_mode="--ovnkube-node-mode dpu-host"
+      else
+        # init-ovnkube-controller is not supported in dpu-host mode
+        # as there is no databases to connect to
+        init_ovnkube_controller="--init-ovnkube-controller ${K8S_NODE}"
+        gateway_interface=br-ex
+      fi
+
       if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
-        gateway_mode_flags="--gateway-mode shared --gateway-interface br-ex"
+        gateway_mode_flags="--gateway-mode shared --gateway-interface ${gateway_interface}"
       elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
-        gateway_mode_flags="--gateway-mode local --gateway-interface br-ex"
+        gateway_mode_flags="--gateway-mode local --gateway-interface ${gateway_interface}"
       else
         echo "Invalid OVN_GATEWAY_MODE: \"{{.OVN_GATEWAY_MODE}}\". Must be \"local\" or \"shared\"."
         exit 1
@@ -647,7 +663,7 @@ data:
       fi
 
       exec /usr/bin/ovnkube \
-        --init-ovnkube-controller "${K8S_NODE}" \
+        ${init_ovnkube_controller} \
         --init-node "${K8S_NODE}" \
         --config-file=/run/ovnkube-config/ovnkube.conf \
         --ovn-empty-lb-events \
@@ -655,9 +671,7 @@ data:
         --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
         ${gateway_mode_flags} \
         ${node_mgmt_port_netdev_flags} \
-{{- if eq .OVN_NODE_MODE "dpu-host" }}
-        --ovnkube-node-mode dpu-host \
-{{- end }}
+        ${ovnkube_node_mode} \
         --metrics-bind-address "127.0.0.1:${metrics_port}" \
         --ovn-metrics-bind-address "127.0.0.1:${ovn_metrics_port}" \
         --metrics-enable-pprof \
