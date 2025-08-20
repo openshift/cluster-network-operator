@@ -82,6 +82,7 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 
 		data.Data["CAConfigMap"] = hcpCfg.CAConfigMap
 		data.Data["CAConfigMapKey"] = hcpCfg.CAConfigMapKey
+		data.Data["RunAsUser"] = hcpCfg.RunAsUser
 
 		webhookCALookup = types.NamespacedName{Name: hcpCfg.CAConfigMap, Namespace: hcpCfg.Namespace}
 		caKey = hcpCfg.CAConfigMapKey
