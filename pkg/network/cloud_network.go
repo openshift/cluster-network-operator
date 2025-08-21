@@ -98,6 +98,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		data.Data["HCPLabels"] = cloudBootstrapResult.HostedControlPlane.Labels
 		data.Data["HCPTolerations"] = cloudBootstrapResult.HostedControlPlane.Tolerations
 		data.Data["RunAsUser"] = hcpCfg.RunAsUser
+		data.Data["PriorityClass"] = cloudBootstrapResult.HostedControlPlane.PriorityClass
 		// In HyperShift CloudNetworkConfigController is deployed as a part of the hosted cluster controlplane
 		// which means that it is created in the management cluster.
 		// CloudNetworkConfigController should use the proxy settings configured by hypershift controlplane operator
