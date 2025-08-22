@@ -68,7 +68,9 @@ const OVN_NODE_IDENTITY_CERT_DURATION = "24h"
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
 
 const (
-	OVSFlowsConfigMapName        = "ovs-flows-config"
+	OVSFlowsConfigMapName              = "ovs-flows-config"
+	OVNKubernetesConfigOverridesCMName = "ovn-kubernetes-config-overrides"
+
 	OVSFlowsConfigNamespace      = names.APPLIED_NAMESPACE
 	defaultV4InternalSubnet      = "100.64.0.0/16"
 	defaultV6InternalSubnet      = "fd98::/64"
@@ -180,6 +182,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = bootstrapResult.Infra.NetworkNodeIdentityEnabled
 	data.Data["NodeIdentityCertDuration"] = OVN_NODE_IDENTITY_CERT_DURATION
 	data.Data["IsNetworkTypeLiveMigration"] = false
+	data.Data["AdvertisedUDNIsolationMode"] = bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["advertised-udn-isolation-mode"]
 
 	if conf.Migration != nil {
 		if conf.Migration.MTU != nil && conf.Migration.Mode != operv1.LiveNetworkMigrationMode {
@@ -866,6 +869,11 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 	found, nodeName := findCommonNode(ovnConfigResult.DpuHostModeNodes, ovnConfigResult.DpuModeNodes, ovnConfigResult.SmartNicModeNodes)
 	if found {
 		return nil, fmt.Errorf("Node %s has multiple hardware offload labels.", nodeName)
+	}
+
+	ovnConfigResult.ConfigOverrides, err = getOVNKubernetesConfigOverrides(kubeClient)
+	if err != nil {
+		return nil, fmt.Errorf("Could not get OVN Kubernetes config overrides: %w", err)
 	}
 
 	klog.Infof("OVN configuration is now %+v", ovnConfigResult)
@@ -1973,4 +1981,22 @@ func GetMasqueradeSubnet(conf *operv1.OVNKubernetesConfig) (v4Subnet, v6Subnet s
 		}
 	}
 	return
+}
+
+// getOVNKubernetesConfigOverrides retrieves OVN Kubernetes configuration overrides from the
+// openshift-network-operator/ovn-kubernetes-config-overrides configmap.
+// If the configmap exists, it returns the data as a map.
+// If the configmap does not exist, it returns nil, indicating that no overrides are set
+// and no error.
+// If there is an error retrieving the configmap, it returns an error.
+func getOVNKubernetesConfigOverrides(client cnoclient.Client) (map[string]string, error) {
+	configMap := &corev1.ConfigMap{}
+	if err := client.Default().CRClient().Get(context.TODO(),
+		types.NamespacedName{Name: OVNKubernetesConfigOverridesCMName, Namespace: names.APPLIED_NAMESPACE}, configMap); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("unable to retrieve config from configmap %v: %s", OVNKubernetesConfigOverridesCMName, err)
+	}
+	return configMap.Data, nil
 }

@@ -3926,6 +3926,18 @@ func extractOVNKubeConfig(g *WithT, objs []*uns.Unstructured) string {
 	return ""
 }
 
+func extractOVNScriptLib(g *WithT, objs []*uns.Unstructured) string {
+	for _, obj := range objs {
+		if obj.GetKind() == "ConfigMap" && obj.GetName() == "ovnkube-script-lib" {
+			val, ok, err := uns.NestedString(obj.Object, "data", "ovnkube-lib.sh")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(ok).To(BeTrue())
+			return val
+		}
+	}
+	return ""
+}
+
 // checkDaemonsetAnnotation check that all the daemonset have the annotation with the
 // same key and value
 func checkDaemonsetAnnotation(g *WithT, objs []*uns.Unstructured, key, value string) bool {
@@ -4113,4 +4125,45 @@ func Test_renderOVNKubernetes(t *testing.T) {
 			assert.Equalf(t, tt.expectNumObjs, len(got), "renderOVNKubernetes() got %d objects, want %d", len(got), tt.expectNumObjs)
 		})
 	}
+}
+
+func TestRenderOVNKubernetes_AdvertisedUDNIsolationModeOverride(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+	fillDefaults(config, nil)
+
+	renderWithOverrides := func(overrides map[string]string) string {
+		bootstrapResult := fakeBootstrapResult()
+		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+			ControlPlaneReplicaCount: 3,
+			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+				DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+				DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+				SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+				MgmtPortResourceName: "",
+				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+					Enabled: false,
+				},
+				ConfigOverrides: overrides,
+			},
+		}
+		featureGatesCNO := getDefaultFeatureGates()
+		fakeClient := cnofake.NewFakeClient()
+
+		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+		g.Expect(err).NotTo(HaveOccurred())
+		return extractOVNScriptLib(g, objs)
+	}
+
+	t.Run("with advertised-udn-isolation-mode override", func(t *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"advertised-udn-isolation-mode": "loose"})
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--advertised-udn-isolation-mode=loose"`))
+	})
+
+	t.Run("without advertised-udn-isolation-mode override", func(t *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(nil)
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--advertised-udn-isolation-mode="`))
+	})
 }
