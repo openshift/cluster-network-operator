@@ -21,6 +21,8 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/pkg/errors"
 
+	apifeatures "github.com/openshift/api/features"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
@@ -54,7 +56,7 @@ func getOpenshiftNamespaces(client cnoclient.Client) (string, error) {
 }
 
 // renderMultusAdmissonControllerConfig returns the manifests of Multus Admisson Controller
-func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client, hsc *hypershift.HyperShiftConfig, clientName string) ([]*uns.Unstructured, error) {
+func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client, hsc *hypershift.HyperShiftConfig, clientName string, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 	var err error
 
@@ -83,6 +85,8 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	data.Data["ResourceRequestCPU"] = nil
 	data.Data["ResourceRequestMemory"] = nil
 	data.Data["PriorityClass"] = nil
+	data.Data["OVN_PRE_CONF_UDN_ADDR_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGatePreconfiguredUDNAddresses)
+
 	if hsc.Enabled {
 		data.Data["AdmissionControllerNamespace"] = hsc.Namespace
 		data.Data["KubernetesServiceHost"] = bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal].Host

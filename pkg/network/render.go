@@ -65,7 +65,7 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 
 	// render MultusAdmissionController
 	o, err = renderMultusAdmissionController(operConf, manifestDir,
-		bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode, bootstrapResult, client)
+		bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode, bootstrapResult, client, featureGates)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -805,7 +805,7 @@ func getMultusAdmissionControllerReplicas(bootstrapResult *bootstrap.BootstrapRe
 }
 
 // renderMultusAdmissionController generates the manifests of Multus Admission Controller
-func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client) ([]*uns.Unstructured, error) {
+func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, error) {
 	if *conf.DisableMultiNetwork {
 		return nil, nil
 	}
@@ -815,7 +815,7 @@ func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir strin
 
 	hsc := hypershift.NewHyperShiftConfig()
 	objs, err := renderMultusAdmissonControllerConfig(manifestDir, externalControlPlane,
-		bootstrapResult, client, hsc, names.ManagementClusterName)
+		bootstrapResult, client, hsc, names.ManagementClusterName, featureGates)
 	if err != nil {
 		return nil, err
 	}

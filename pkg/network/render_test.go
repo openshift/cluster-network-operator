@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
-	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/kubernetes/scheme"
 
@@ -401,9 +400,7 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	bootstrapResult, err := Bootstrap(&config, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	featureGatesCNO := featuregates.NewFeatureGate([]configv1.FeatureGateName{}, []configv1.FeatureGateName{})
-
-	objs, _, err := Render(prev, &configv1.NetworkSpec{}, manifestDir, client, featureGatesCNO, bootstrapResult)
+	objs, _, err := Render(prev, &configv1.NetworkSpec{}, manifestDir, client, getDefaultFeatureGates(), bootstrapResult)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Validate that openshift-sdn isn't rendered

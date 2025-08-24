@@ -62,14 +62,14 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	bootstrap := fakeBootstrapResult()
 
 	// disable MultusAdmissionController
-	objs, err := renderMultusAdmissionController(config, manifestDir, false, bootstrap, fakeClient)
+	objs, err := renderMultusAdmissionController(config, manifestDir, false, bootstrap, fakeClient, getDefaultFeatureGates())
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 
 	// enable MultusAdmissionController
 	enabled := false
 	config.DisableMultiNetwork = &enabled
-	objs, err = renderMultusAdmissionController(config, manifestDir, false, bootstrap, fakeClient)
+	objs, err = renderMultusAdmissionController(config, manifestDir, false, bootstrap, fakeClient, getDefaultFeatureGates())
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 
@@ -143,7 +143,7 @@ func TestRenderMultusAdmissonControllerConfigForHyperShift(t *testing.T) {
 	hsc.ReleaseImage = "MyImage"
 	hsc.ControlPlaneImage = "MyCPOImage"
 
-	objs, err := renderMultusAdmissonControllerConfig(manifestDir, false, bootstrap, fakeClient, hsc, "")
+	objs, err := renderMultusAdmissonControllerConfig(manifestDir, false, bootstrap, fakeClient, hsc, "", getDefaultFeatureGates())
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Check rendered object

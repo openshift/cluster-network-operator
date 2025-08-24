@@ -4193,7 +4193,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				client:       cnofake.NewFakeClient(),
 				featureGates: preDefUDNFeatureGates,
 			},
-			expectNumObjs: 45,
+			expectNumObjs: 47,
 		},
 	}
 	for _, tt := range tests {
