@@ -65,14 +65,14 @@ func TestSigner_reconciler(t *testing.T) {
 		Reason:  "AutoApproved",
 		Message: "Automatically approved by " + signerName})
 
-	err = client.Default().CRClient().Create(context.TODO(), csrObj)
+	err = client.Default().CRClient().Create(t.Context(), csrObj)
 	g.Expect(err).NotTo(HaveOccurred())
-	_, err = client.Default().Kubernetes().CertificatesV1().CertificateSigningRequests().Create(context.TODO(), csrObj, metav1.CreateOptions{})
+	_, err = client.Default().Kubernetes().CertificatesV1().CertificateSigningRequests().Create(t.Context(), csrObj, metav1.CreateOptions{})
 	g.Expect(err).NotTo(HaveOccurred())
 
 	node := &corev1.Node{}
 	node.Name = nodeName
-	_, err = client.Default().Kubernetes().CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	_, err = client.Default().Kubernetes().CoreV1().Nodes().Create(t.Context(), node, metav1.CreateOptions{})
 	g.Expect(err).NotTo(HaveOccurred())
 
 	ca, err := crypto.MakeSelfSignedCAConfigForDuration(signerName, 10*time.Minute)
@@ -87,14 +87,14 @@ func TestSigner_reconciler(t *testing.T) {
 	caSecret.Data = make(map[string][]byte)
 	caSecret.Data["tls.crt"] = certBytes.Bytes()
 	caSecret.Data["tls.key"] = keyBytes.Bytes()
-	err = client.Default().CRClient().Create(context.TODO(), caSecret)
+	err = client.Default().CRClient().Create(t.Context(), caSecret)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	_, err = signer.Reconcile(context.TODO(),
+	_, err = signer.Reconcile(t.Context(),
 		reconcile.Request{NamespacedName: types.NamespacedName{Name: csrName}})
 	g.Expect(err).NotTo(HaveOccurred())
 
-	err = client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: csrName}, csrObj)
+	err = client.Default().CRClient().Get(t.Context(), types.NamespacedName{Name: csrName}, csrObj)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(csrObj.Status.Certificate).ShouldNot(BeEmpty())
 
@@ -137,21 +137,21 @@ func TestSigner_reconciler_withInvalidUserName(t *testing.T) {
 	csrObj.Spec.Usages = []certificatev1.KeyUsage{"ipsec tunnel"}
 	csrObj.Spec.Username = fmt.Sprintf("system:ovn-node:%s", "suspicious-node")
 
-	err = client.Default().CRClient().Create(context.TODO(), csrObj)
+	err = client.Default().CRClient().Create(t.Context(), csrObj)
 	g.Expect(err).NotTo(HaveOccurred())
-	_, err = client.Default().Kubernetes().CertificatesV1().CertificateSigningRequests().Create(context.TODO(), csrObj, metav1.CreateOptions{})
+	_, err = client.Default().Kubernetes().CertificatesV1().CertificateSigningRequests().Create(t.Context(), csrObj, metav1.CreateOptions{})
 	g.Expect(err).NotTo(HaveOccurred())
 
 	node := &corev1.Node{}
 	node.Name = nodeName
-	_, err = client.Default().Kubernetes().CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	_, err = client.Default().Kubernetes().CoreV1().Nodes().Create(t.Context(), node, metav1.CreateOptions{})
 	g.Expect(err).NotTo(HaveOccurred())
 
-	_, err = signer.Reconcile(context.TODO(),
+	_, err = signer.Reconcile(t.Context(),
 		reconcile.Request{NamespacedName: types.NamespacedName{Name: csrName}})
 	g.Expect(err).NotTo(HaveOccurred())
 
-	err = client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: csrName}, csrObj)
+	err = client.Default().CRClient().Get(t.Context(), types.NamespacedName{Name: csrName}, csrObj)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(csrObj.Status.Certificate).Should(BeEmpty())
 	csrConditions := csrObj.Status.Conditions
@@ -189,9 +189,9 @@ func generateCSR() (string, error) {
 func setOC(t *testing.T, client cnoclient.Client, oc *operv1.Network) {
 	t.Helper()
 	g := NewGomegaWithT(t)
-	_, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Update(context.TODO(), oc, metav1.UpdateOptions{})
+	_, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Update(t.Context(), oc, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) {
-		_, err = client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Create(context.TODO(), oc, metav1.CreateOptions{})
+		_, err = client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Create(t.Context(), oc, metav1.CreateOptions{})
 	}
 	g.Expect(err).NotTo(HaveOccurred())
 }
@@ -199,9 +199,9 @@ func setOC(t *testing.T, client cnoclient.Client, oc *operv1.Network) {
 func setCO(t *testing.T, client cnoclient.Client, co *configv1.ClusterOperator) {
 	t.Helper()
 	g := NewGomegaWithT(t)
-	err := client.Default().CRClient().Update(context.TODO(), co)
+	err := client.Default().CRClient().Update(t.Context(), co)
 	if apierrors.IsNotFound(err) {
-		err = client.Default().CRClient().Create(context.TODO(), co)
+		err = client.Default().CRClient().Create(t.Context(), co)
 	}
 	g.Expect(err).NotTo(HaveOccurred())
 }

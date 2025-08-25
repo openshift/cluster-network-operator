@@ -1,7 +1,6 @@
 package operconfig
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -182,7 +181,7 @@ func TestEgressIpMigration(t *testing.T) {
 			g := NewWithT(t)
 			client := fake.NewFakeClient(tc.objects...)
 
-			egressIpList, _, err := convertSdnEgressIpToOvnEgressIp(context.Background(), client)
+			egressIpList, _, err := convertSdnEgressIpToOvnEgressIp(t.Context(), client)
 			if err != nil {
 				t.Fatalf("convertSdnEgressIpToOvnEgressIp: %v", err)
 			}
@@ -202,7 +201,7 @@ func TestEgressIpMigration(t *testing.T) {
 			g.Expect(egressIpValueList).To(ConsistOf(expectedEgressIpList...), "expected applied OVN egressIPs to have egressIP list matching input SDN config")
 
 			// Check that node annotation has been added
-			nodeObj, err := client.Default().Kubernetes().CoreV1().Nodes().Get(context.Background(), testMigrationHost, metav1.GetOptions{})
+			nodeObj, err := client.Default().Kubernetes().CoreV1().Nodes().Get(t.Context(), testMigrationHost, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -452,17 +451,17 @@ func TestEgressIpRollbackMigration(t *testing.T) {
 			g := NewWithT(t)
 			client := fake.NewFakeClient(tc.objects...)
 
-			err := convertOvnEgressIpToSdnEgressIp(context.Background(), client)
+			err := convertOvnEgressIpToSdnEgressIp(t.Context(), client)
 			if err != nil {
 				t.Fatalf("convertOvnEgressIpToSdnEgressIp: %v", err)
 			}
 
 			// Get the Hostsubnet and Netnamespace that should be updated
-			hsn, err := client.Default().Dynamic().Resource(gvrHostSubnet).Get(context.Background(), testMigrationHost, metav1.GetOptions{})
+			hsn, err := client.Default().Dynamic().Resource(gvrHostSubnet).Get(t.Context(), testMigrationHost, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("failed to get hostsubnet: %v", err)
 			}
-			nns, err := client.Default().Dynamic().Resource(gvrNetnamespace).Get(context.Background(), testMigrationNamespace, metav1.GetOptions{})
+			nns, err := client.Default().Dynamic().Resource(gvrNetnamespace).Get(t.Context(), testMigrationNamespace, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("failed to get netnamespace: %v", err)
 			}
@@ -521,12 +520,12 @@ func TestMulticastMigration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := fake.NewFakeClient(tc.objects...)
 
-			err := enableMulticastOVN(context.Background(), client)
+			err := enableMulticastOVN(t.Context(), client)
 			if err != nil {
 				t.Fatalf("enableMulticastOVN: %v", err)
 			}
 
-			ns, err := client.Default().Kubernetes().CoreV1().Namespaces().Get(context.Background(), testMigrationNamespace, metav1.GetOptions{})
+			ns, err := client.Default().Kubernetes().CoreV1().Namespaces().Get(t.Context(), testMigrationNamespace, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -576,12 +575,12 @@ func TestMulticastMigrationRollback(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := fake.NewFakeClient(tc.objects...)
 
-			err := enableMulticastSDN(context.Background(), client)
+			err := enableMulticastSDN(t.Context(), client)
 			if err != nil {
 				t.Fatalf("enableMulticastOVN: %v", err)
 			}
 
-			nns, err := client.Default().Dynamic().Resource(gvrNetnamespace).Get(context.Background(), testMigrationNamespace, metav1.GetOptions{})
+			nns, err := client.Default().Dynamic().Resource(gvrNetnamespace).Get(t.Context(), testMigrationNamespace, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -697,7 +696,7 @@ func TestEnsureMachineConfigPools(t *testing.T) {
 			condType := "sampleConditionType"
 			nowTimestamp := metav1.Now()
 			// call the ensureMachineConfigPools method
-			isDesired, isStable, err := r.ensureMachineConfigPools(context.Background(), clusterConfig, condType, tc.isMatch, nowTimestamp)
+			isDesired, isStable, err := r.ensureMachineConfigPools(t.Context(), clusterConfig, condType, tc.isMatch, nowTimestamp)
 
 			g.Expect(err).To(BeNil())
 			g.Expect(isDesired).To(Equal(tc.result.isDesired))

@@ -1,7 +1,6 @@
 package operconfig
 
 import (
-	"context"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -88,7 +87,7 @@ func TestProbeMTU(t *testing.T) {
 					},
 				},
 			}
-			actual, err := r.probeMTU(context.Background(), &operv1.Network{}, tc.infra)
+			actual, err := r.probeMTU(t.Context(), &operv1.Network{}, tc.infra)
 			if err != nil {
 				t.Fatalf("probeMTU: %v", err)
 			}
