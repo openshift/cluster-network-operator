@@ -50,9 +50,9 @@ func getCO(client cnoclient.Client, name string) (*configv1.ClusterOperator, err
 
 func setCO(t *testing.T, client cnoclient.Client, name string) {
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: name}}
-	err := client.ClientFor("").CRClient().Update(context.TODO(), co)
+	err := client.ClientFor("").CRClient().Update(t.Context(), co)
 	if apierrors.IsNotFound(err) {
-		err = client.ClientFor("").CRClient().Create(context.TODO(), co)
+		err = client.ClientFor("").CRClient().Create(t.Context(), co)
 	}
 	if err != nil {
 		t.Fatalf("Failed to set: %v", err)
@@ -75,9 +75,9 @@ func getStatuses(client cnoclient.Client, name string) (*configv1.ClusterOperato
 
 func setOC(t *testing.T, client cnoclient.Client, oc *operv1.Network) {
 	t.Helper()
-	_, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Update(context.TODO(), oc, metav1.UpdateOptions{})
+	_, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Update(t.Context(), oc, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) {
-		_, err = client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Create(context.TODO(), oc, metav1.CreateOptions{})
+		_, err = client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Create(t.Context(), oc, metav1.CreateOptions{})
 	}
 	if err != nil {
 		t.Fatalf("Failed to set: %v", err)
@@ -86,9 +86,9 @@ func setOC(t *testing.T, client cnoclient.Client, oc *operv1.Network) {
 
 func set(t *testing.T, client cnoclient.Client, obj crclient.Object) {
 	t.Helper()
-	err := client.ClientFor("").CRClient().Update(context.TODO(), obj)
+	err := client.ClientFor("").CRClient().Update(t.Context(), obj)
 	if apierrors.IsNotFound(err) {
-		err = client.ClientFor("").CRClient().Create(context.TODO(), obj)
+		err = client.ClientFor("").CRClient().Create(t.Context(), obj)
 
 	}
 	if err != nil {
@@ -98,7 +98,7 @@ func set(t *testing.T, client cnoclient.Client, obj crclient.Object) {
 
 func setStatus(t *testing.T, client cnoclient.Client, obj crclient.Object) {
 	t.Helper()
-	err := client.ClientFor("").CRClient().Status().Update(context.TODO(), obj)
+	err := client.ClientFor("").CRClient().Status().Update(t.Context(), obj)
 	if err != nil {
 		t.Fatalf("Failed to set status: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestStatusManager_set(t *testing.T) {
 		},
 	}
 	status.deleteRelatedObjectsNotRendered(co)
-	err = status.client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Name: "current"}, obj)
+	err = status.client.ClientFor("").CRClient().Get(t.Context(), types.NamespacedName{Name: "current"}, obj)
 	if err == nil {
 		t.Fatalf("unexpected related object in ClusterOperator object was not deleted")
 	}
@@ -455,7 +455,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		Labels:          names.MasterRoleMachineConfigLabel(),
 		OwnerReferences: networkOwnerRef()},
 		Spec: mcfgv1.MachineConfigSpec{Extensions: []string{"ipsec"}}}
-	err = status.SetMachineConfigs(context.TODO(), []mcfgv1.MachineConfig{masterIPsecMachineConfig})
+	err = status.SetMachineConfigs(t.Context(), []mcfgv1.MachineConfig{masterIPsecMachineConfig})
 	if err != nil {
 		t.Fatalf("error setting machine configs: %v", err)
 	}
@@ -499,7 +499,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		Labels:          names.WorkerRoleMachineConfigLabel(),
 		OwnerReferences: networkOwnerRef()},
 		Spec: mcfgv1.MachineConfigSpec{Extensions: []string{"ipsec"}}}
-	err = status.SetMachineConfigs(context.TODO(), []mcfgv1.MachineConfig{masterIPsecMachineConfig, workerIPsecMachineConfig})
+	err = status.SetMachineConfigs(t.Context(), []mcfgv1.MachineConfig{masterIPsecMachineConfig, workerIPsecMachineConfig})
 	if err != nil {
 		t.Fatalf("error setting machine configs: %v", err)
 	}
@@ -588,7 +588,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 
 	// Remove worker machine configs and check network operator status condition is updated
 	// accordingly.
-	err = status.SetMachineConfigs(context.TODO(), []mcfgv1.MachineConfig{masterIPsecMachineConfig})
+	err = status.SetMachineConfigs(t.Context(), []mcfgv1.MachineConfig{masterIPsecMachineConfig})
 	if err != nil {
 		t.Fatalf("error setting machine configs: %v", err)
 	}
@@ -647,7 +647,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	}
 	// Remove master machine config, set master mcp into degraded state, check network operator
 	// status condition is updated accordingly.
-	err = status.SetMachineConfigs(context.TODO(), []mcfgv1.MachineConfig{})
+	err = status.SetMachineConfigs(t.Context(), []mcfgv1.MachineConfig{})
 	if err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
 	}
@@ -1189,7 +1189,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 
 	// check hung annotation is set (also, need to refresh objects since they were updated)
-	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, dsA)
+	err = client.ClientFor("").CRClient().Get(t.Context(), types.NamespacedName{Namespace: "one", Name: "alpha"}, dsA)
 	if err != nil {
 		t.Fatalf("error getting DaemonSet: %v", err)
 	}
@@ -1240,7 +1240,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
-	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: "one", Name: "alpha"}, dsA)
+	err = client.ClientFor("").CRClient().Get(t.Context(), types.NamespacedName{Namespace: "one", Name: "alpha"}, dsA)
 	if err != nil {
 		t.Fatalf("error getting DaemonSet: %v", err)
 	}
@@ -1552,7 +1552,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		t.Fatalf("Didn't find %s in pod state", nsn)
 	}
 
-	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: depB.Namespace, Name: depB.Name}, depB)
+	err = client.ClientFor("").CRClient().Get(t.Context(), types.NamespacedName{Namespace: depB.Namespace, Name: depB.Name}, depB)
 	if err != nil {
 		t.Fatalf("error getting Deployment: %v", err)
 	}
@@ -1637,7 +1637,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
-	err = client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: depB.Namespace, Name: depB.Name}, depB)
+	err = client.ClientFor("").CRClient().Get(t.Context(), types.NamespacedName{Namespace: depB.Namespace, Name: depB.Name}, depB)
 	if err != nil {
 		t.Fatalf("error getting Deployment: %v", err)
 	}
@@ -1707,7 +1707,7 @@ func setLastPodState(t *testing.T, client cnoclient.Client, name string, ps podS
 		t.Fatal(err)
 	}
 	co.Annotations[lastSeenAnnotation] = string(lsBytes)
-	err = client.ClientFor("").CRClient().Update(context.Background(), co)
+	err = client.ClientFor("").CRClient().Update(t.Context(), co)
 	if err != nil {
 		t.Fatal(err)
 	}
