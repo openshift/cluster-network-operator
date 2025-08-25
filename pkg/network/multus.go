@@ -1,6 +1,10 @@
 package network
 
 import (
+	"os"
+	"path/filepath"
+	"strconv"
+
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
@@ -8,9 +12,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/pkg/errors"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"os"
-	"path/filepath"
-	"strconv"
 )
 
 const (
@@ -81,7 +82,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 		data.Data["KUBERNETES_SERVICE_PORT"] = apiport
 	}
 	data.Data["RenderDHCP"] = useDHCP
-	data.Data["RenderIpReconciler"] = useWhereabouts
+	data.Data["RenderWhereaboutsAuxillary"] = useWhereabouts
 	data.Data["MultusCNIConfDir"] = MultusCNIConfDir
 	data.Data["SystemCNIConfDir"] = SystemCNIConfDir
 	data.Data["DefaultNetworkType"] = defaultNetworkType
