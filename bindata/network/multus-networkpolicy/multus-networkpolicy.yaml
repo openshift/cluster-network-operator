@@ -16,6 +16,8 @@ spec:
       app: multus-networkpolicy
   updateStrategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
   template:
     metadata:
       annotations:
