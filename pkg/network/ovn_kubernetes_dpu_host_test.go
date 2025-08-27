@@ -1,11 +1,13 @@
 package network
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -155,8 +157,11 @@ func createTestRenderData(ovnNodeMode string) render.RenderData {
 	data.Data["DefaultMasqueradeNetworkCIDRs"] = ""
 	data.Data["OVNIPsecEnable"] = false
 	data.Data["DpuHostModeLabel"] = ""
+	data.Data["DpuHostModeValues"] = []string{}
 	data.Data["SmartNicModeLabel"] = ""
+	data.Data["SmartNicModeValues"] = []string{}
 	data.Data["DpuModeLabel"] = ""
+	data.Data["DpuModeValues"] = []string{}
 	data.Data["MgmtPortResourceName"] = ""
 	data.Data["HTTP_PROXY"] = ""
 	data.Data["HTTPS_PROXY"] = ""
@@ -181,4 +186,185 @@ func createTestRenderData(ovnNodeMode string) render.RenderData {
 	data.Data["NodeIdentityCertDuration"] = "24h"
 
 	return data
+}
+
+func getMatchExpression(g *WithT, ds *appsv1.DaemonSet, label string) (corev1.NodeSelectorOperator, string) {
+	g.Expect(ds.Spec.Template.Spec.Affinity).NotTo(BeNil(), "Should have affinity")
+	g.Expect(ds.Spec.Template.Spec.Affinity.NodeAffinity).NotTo(BeNil(), "Should have node affinity")
+	g.Expect(ds.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution).NotTo(BeNil(), "Should have required node affinity")
+
+	terms := ds.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+	g.Expect(terms).NotTo(BeEmpty(), "Should have node selector terms")
+
+	matchExpressions := terms[0].MatchExpressions
+	g.Expect(matchExpressions).NotTo(BeEmpty(), "Should have match expressions")
+
+	for _, expr := range matchExpressions {
+		if expr.Key == label {
+			if expr.Operator == corev1.NodeSelectorOpIn {
+				g.Expect(len(expr.Values)).To(Equal(1), "In operator should have exactly one value")
+				return expr.Operator, expr.Values[0]
+			} else {
+				return expr.Operator, ""
+			}
+		}
+	}
+
+	return corev1.NodeSelectorOpDoesNotExist, ""
+}
+
+// TestOVNKubernetesInOperatorWithValues tests that the In operator works correctly with label values
+func TestOVNKubernetesInOperatorWithValues(t *testing.T) {
+	templates := []struct {
+		name         string
+		templatePath string
+	}{
+		{
+			name:         "managed",
+			templatePath: "../../bindata/network/ovn-kubernetes/managed/ovnkube-node.yaml",
+		},
+		{
+			name:         "self-hosted",
+			templatePath: "../../bindata/network/ovn-kubernetes/self-hosted/ovnkube-node.yaml",
+		},
+	}
+
+	testCases := []struct {
+		name                 string
+		ovnNodeMode          string
+		dpuHostModeLabel     string
+		smartNicModeLabel    string
+		dpuModeLabel         string
+		expectedOperatorType corev1.NodeSelectorOperator
+		expectedValue        string // Expected value for In operator
+	}{
+		{
+			name:                 "dpu-host mode with key+value labels",
+			ovnNodeMode:          "dpu-host",
+			dpuHostModeLabel:     "network.operator.openshift.io/dpu-host=true",
+			smartNicModeLabel:    "network.operator.openshift.io/smart-nic=true",
+			dpuModeLabel:         "network.operator.openshift.io/dpu=true",
+			expectedOperatorType: corev1.NodeSelectorOpIn,
+			expectedValue:        "true",
+		},
+		{
+			name:                 "smart-nic mode with key+value labels",
+			ovnNodeMode:          "smart-nic",
+			dpuHostModeLabel:     "network.operator.openshift.io/dpu-host=true",
+			smartNicModeLabel:    "network.operator.openshift.io/smart-nic=true",
+			dpuModeLabel:         "network.operator.openshift.io/dpu=true",
+			expectedOperatorType: corev1.NodeSelectorOpIn,
+			expectedValue:        "true",
+		},
+		{
+			name:                 "dpu mode with key+value labels",
+			ovnNodeMode:          "dpu",
+			dpuHostModeLabel:     "network.operator.openshift.io/dpu-host=true",
+			smartNicModeLabel:    "network.operator.openshift.io/smart-nic=true",
+			dpuModeLabel:         "network.operator.openshift.io/dpu=true",
+			expectedOperatorType: corev1.NodeSelectorOpDoesNotExist,
+			expectedValue:        "",
+		},
+		{
+			name:                 "dpu-host mode with key only labels",
+			ovnNodeMode:          "dpu-host",
+			dpuHostModeLabel:     "network.operator.openshift.io/dpu-host=",
+			smartNicModeLabel:    "network.operator.openshift.io/smart-nic=",
+			dpuModeLabel:         "network.operator.openshift.io/dpu=",
+			expectedOperatorType: corev1.NodeSelectorOpExists,
+			expectedValue:        "",
+		},
+		{
+			name:                 "smart-nic mode with key only labels",
+			ovnNodeMode:          "smart-nic",
+			dpuHostModeLabel:     "network.operator.openshift.io/dpu-host=",
+			smartNicModeLabel:    "network.operator.openshift.io/smart-nic=",
+			dpuModeLabel:         "network.operator.openshift.io/dpu=",
+			expectedOperatorType: corev1.NodeSelectorOpExists,
+			expectedValue:        "",
+		},
+		{
+			name:                 "dpu mode with key labels",
+			ovnNodeMode:          "dpu",
+			dpuHostModeLabel:     "network.operator.openshift.io/dpu-host=true",
+			smartNicModeLabel:    "network.operator.openshift.io/smart-nic=true",
+			dpuModeLabel:         "network.operator.openshift.io/dpu=true",
+			expectedOperatorType: corev1.NodeSelectorOpDoesNotExist,
+			expectedValue:        "",
+		},
+	}
+
+	for _, template := range templates {
+		for _, tc := range testCases {
+			testName := template.name + "_" + tc.name
+			t.Run(testName, func(t *testing.T) {
+				g := NewGomegaWithT(t)
+
+				// Create render data
+				data := createTestRenderData(tc.ovnNodeMode)
+				data.Data["DpuHostModeLabel"] = tc.dpuHostModeLabel
+				data.Data["SmartNicModeLabel"] = tc.smartNicModeLabel
+				data.Data["DpuModeLabel"] = tc.dpuModeLabel
+
+				// Extract values from labels for template data
+				extractLabelValues := func(label string) []string {
+					if label == "" {
+						return []string{}
+					}
+					parts := strings.SplitN(label, "=", 2)
+					if len(parts) == 2 && parts[1] != "" {
+						return []string{parts[1]}
+					}
+					return []string{}
+				}
+
+				data.Data["DpuHostModeValues"] = extractLabelValues(tc.dpuHostModeLabel)
+				data.Data["SmartNicModeValues"] = extractLabelValues(tc.smartNicModeLabel)
+				data.Data["DpuModeValues"] = extractLabelValues(tc.dpuModeLabel)
+
+				// Render the template
+				objs, err := render.RenderTemplate(template.templatePath, &data)
+				g.Expect(err).NotTo(HaveOccurred(), "Template rendering should succeed")
+				g.Expect(objs).To(HaveLen(1), "Should render exactly one object")
+
+				// Verify it's a DaemonSet
+				obj := objs[0]
+				g.Expect(obj.GetKind()).To(Equal("DaemonSet"))
+
+				// Verify YAML validity
+				yamlBytes, err := yaml.Marshal(obj)
+				g.Expect(err).NotTo(HaveOccurred(), "Object should be valid YAML")
+				g.Expect(yamlBytes).NotTo(BeEmpty(), "YAML should not be empty")
+
+				// Verify it can be unmarshaled back to a DaemonSet
+				ds := &appsv1.DaemonSet{}
+				err = yaml.Unmarshal(yamlBytes, ds)
+				g.Expect(err).NotTo(HaveOccurred(), "Should be able to unmarshal to DaemonSet")
+				g.Expect(ds.Kind).To(Equal("DaemonSet"))
+
+				operator, value := getMatchExpression(g, ds, tc.dpuHostModeLabel)
+				if tc.ovnNodeMode == "dpu-host" {
+					g.Expect(operator).To(Equal(tc.expectedOperatorType), "Should have expected operator")
+					g.Expect(value).To(Equal(tc.expectedValue), "Should have expected value")
+				} else if tc.ovnNodeMode == "smart-nic" {
+					g.Expect(operator).To(Equal(corev1.NodeSelectorOpDoesNotExist), "Should have expected DoesNotExist operator")
+				} else if tc.ovnNodeMode == "dpu" {
+					g.Expect(operator).To(Equal(corev1.NodeSelectorOpDoesNotExist), "Should have expected DoesNotExist operator")
+				}
+
+				operator, value = getMatchExpression(g, ds, tc.smartNicModeLabel)
+				if tc.ovnNodeMode == "dpu-host" {
+					g.Expect(operator).To(Equal(corev1.NodeSelectorOpDoesNotExist), "Should have expected DoesNotExist operator")
+				} else if tc.ovnNodeMode == "smart-nic" {
+					g.Expect(operator).To(Equal(tc.expectedOperatorType), "Should have expected operator")
+					g.Expect(value).To(Equal(tc.expectedValue), "Should have expected value")
+				} else if tc.ovnNodeMode == "dpu" {
+					g.Expect(operator).To(Equal(corev1.NodeSelectorOpDoesNotExist), "Should have expected DoesNotExist operator")
+				}
+
+				operator, _ = getMatchExpression(g, ds, tc.dpuModeLabel)
+				g.Expect(operator).To(Equal(corev1.NodeSelectorOpDoesNotExist), "Should have expected DoesNotExist operator")
+			})
+		}
+	}
 }

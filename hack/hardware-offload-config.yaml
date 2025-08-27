@@ -5,7 +5,10 @@ metadata:
     name: hardware-offload-config
     namespace: openshift-network-operator
 data:
-    dpu-host-mode-label: "network.operator.openshift.io/dpu-host"
-    dpu-mode-label: "network.operator.openshift.io/dpu"
-    smart-nic-mode-label: "network.operator.openshift.io/smart-nic"
+    # Label format options:
+    # "key=" → operator: Exists (matches any node with this label, regardless of value)
+    # "key=value" → operator: In with values: ["value"] (matches only nodes with this specific value)
+    dpu-host-mode-label: "network.operator.openshift.io/dpu-host="
+    dpu-mode-label: "network.operator.openshift.io/dpu="
+    smart-nic-mode-label: "network.operator.openshift.io/smart-nic="
     mgmt-port-resource-name: "openshift.io/mgmtvf"
