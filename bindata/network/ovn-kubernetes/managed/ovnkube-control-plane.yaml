@@ -249,7 +249,6 @@ spec:
         - name: KUBECONFIG
           value: "/etc/kubernetes/kubeconfig"
         terminationMessagePolicy: FallbackToLogsOnError
-
       {{ if .HCPNodeSelector }}
       nodeSelector:
         {{ range $key, $value := .HCPNodeSelector }}
@@ -286,6 +285,11 @@ spec:
             - key: ca.crt
               path: ca.crt
       tolerations:
+      {{- if .HCPTolerations }}
+        {{- range $t := .HCPTolerations }}
+        {{ $t }}
+        {{- end }}
+      {{- end }}
         - key: "hypershift.openshift.io/control-plane"
           operator: "Equal"
           value: "true"
