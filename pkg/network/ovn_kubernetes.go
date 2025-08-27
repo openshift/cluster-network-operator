@@ -59,9 +59,9 @@ const OVN_NODE_MODE_FULL = "full"
 const OVN_NODE_MODE_DPU_HOST = "dpu-host"
 const OVN_NODE_MODE_DPU = "dpu"
 const OVN_NODE_MODE_SMART_NIC = "smart-nic"
-const OVN_NODE_SELECTOR_DEFAULT_DPU_HOST = "network.operator.openshift.io/dpu-host"
-const OVN_NODE_SELECTOR_DEFAULT_DPU = "network.operator.openshift.io/dpu"
-const OVN_NODE_SELECTOR_DEFAULT_SMART_NIC = "network.operator.openshift.io/smart-nic"
+const OVN_NODE_SELECTOR_DEFAULT_DPU_HOST = "network.operator.openshift.io/dpu-host="
+const OVN_NODE_SELECTOR_DEFAULT_DPU = "network.operator.openshift.io/dpu="
+const OVN_NODE_SELECTOR_DEFAULT_SMART_NIC = "network.operator.openshift.io/smart-nic="
 const OVN_NODE_IDENTITY_CERT_DURATION = "24h"
 
 // gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
@@ -210,8 +210,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["CNIBinDir"] = CNIBinDir
 	data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_FULL
 	data.Data["DpuHostModeLabel"] = bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeLabel
+	data.Data["DpuHostModeValue"] = bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeValue
 	data.Data["DpuModeLabel"] = bootstrapResult.OVN.OVNKubernetesConfig.DpuModeLabel
 	data.Data["SmartNicModeLabel"] = bootstrapResult.OVN.OVNKubernetesConfig.SmartNicModeLabel
+	data.Data["SmartNicModeValue"] = bootstrapResult.OVN.OVNKubernetesConfig.SmartNicModeValue
 	data.Data["MgmtPortResourceName"] = bootstrapResult.OVN.OVNKubernetesConfig.MgmtPortResourceName
 	data.Data["OVN_CONTROLLER_INACTIVITY_PROBE"] = os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
 	controller_inactivity_probe := os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
@@ -789,6 +791,21 @@ func getNodeListByLabel(kubeClient cnoclient.Client, label string) ([]string, er
 	return nodeNames, nil
 }
 
+// getKeyValueFromLabel returns specified label key and value (if any).
+// label format: "key=" (match any value, use operator: Exists) or "key=value" (match specific value, use operator: In)
+func getKeyValueFromLabel(label string) (string, string, error) {
+	// Parse labelKey to extract key and value - labels must contain "=" but can have an empty value
+	parts := strings.SplitN(label, "=", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid label format %s, expected format: key= or key=value", label)
+	}
+
+	key := parts[0]
+	value := parts[1]
+
+	return key, value, nil
+}
+
 // findCommonNode returns true if there is a common node in the node list.
 func findCommonNode(nodeLists ...[]string) (bool, string) {
 	exists := make(map[string]bool)
@@ -853,19 +870,31 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 	}
 
 	// We want to see if there are any nodes that are labeled for specific modes.
-	ovnConfigResult.DpuHostModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.DpuHostModeLabel+"=")
+	ovnConfigResult.DpuHostModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.DpuHostModeLabel)
 	if err != nil {
 		return nil, fmt.Errorf("Could not get node list with label %s : %w", ovnConfigResult.DpuHostModeLabel, err)
 	}
+	ovnConfigResult.DpuHostModeLabel, ovnConfigResult.DpuHostModeValue, err = getKeyValueFromLabel(ovnConfigResult.DpuHostModeLabel)
+	if err != nil {
+		return nil, fmt.Errorf("Could not get key and value from label %s : %w", ovnConfigResult.DpuHostModeLabel, err)
+	}
 
-	ovnConfigResult.DpuModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.DpuModeLabel+"=")
+	ovnConfigResult.DpuModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.DpuModeLabel)
 	if err != nil {
 		return nil, fmt.Errorf("Could not get node list with label %s : %w", ovnConfigResult.DpuModeLabel, err)
 	}
+	ovnConfigResult.DpuModeLabel, _, err = getKeyValueFromLabel(ovnConfigResult.DpuModeLabel)
+	if err != nil {
+		return nil, fmt.Errorf("Could not get key and value from label %s : %w", ovnConfigResult.DpuModeLabel, err)
+	}
 
-	ovnConfigResult.SmartNicModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.SmartNicModeLabel+"=")
+	ovnConfigResult.SmartNicModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.SmartNicModeLabel)
 	if err != nil {
 		return nil, fmt.Errorf("Could not get node list with label %s : %w", ovnConfigResult.SmartNicModeLabel, err)
+	}
+	ovnConfigResult.SmartNicModeLabel, ovnConfigResult.SmartNicModeValue, err = getKeyValueFromLabel(ovnConfigResult.SmartNicModeLabel)
+	if err != nil {
+		return nil, fmt.Errorf("Could not get key and value from label %s : %w", ovnConfigResult.SmartNicModeLabel, err)
 	}
 
 	// No node shall have any other label set. Each node should be ONLY be DPU, DPU Host, or Smart NIC.
