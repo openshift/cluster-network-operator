@@ -80,6 +80,14 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		data.Data["PlatformAzureEnvironment"] = cloudBootstrapResult.PlatformStatus.Azure.CloudName
 	}
 
+	if cloudBootstrapResult.PlatformType == v1.GCPPlatformType {
+		for _, ep := range cloudBootstrapResult.PlatformStatus.GCP.ServiceEndpoints {
+			if ep.Name == configv1.GCPServiceEndpointNameCompute {
+				apiurl = ep.URL
+			}
+		}
+	}
+
 	data.Data["PlatformAPIURL"] = apiurl
 
 	manifestDirs := make([]string, 0, 2)
