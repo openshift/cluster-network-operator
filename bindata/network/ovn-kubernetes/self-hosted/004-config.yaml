@@ -28,7 +28,7 @@ data:
     no-hostsubnet-nodes="kubernetes.io/os=windows"
 {{- end  }}
 {{- if .IsNetworkTypeLiveMigration }}
-    no-hostsubnet-nodes="migration.network.openshift.io/plugin="
+    no-hostsubnet-nodes="migration.network.openshift.io/plugin=ovn-kubernetes"
 {{- end }}
     platform-type="{{.PlatformType}}"
     healthz-bind-address="0.0.0.0:10256"
@@ -36,12 +36,21 @@ data:
     dns-service-name="dns-default"
  
     [ovnkubernetesfeature]
-
-    {{- if .ReachabilityTotalTimeoutSeconds }}
+{{- if not .DPU_HOST_MODE_ENABLED }}
+    enable-egress-ip=true
+    enable-egress-firewall=true
+    enable-egress-qos=true
+    enable-egress-service=true
+{{- end }}
+    enable-multi-external-gateway=true
+{{- if .ReachabilityTotalTimeoutSeconds }}
     egressip-reachability-total-timeout={{.ReachabilityTotalTimeoutSeconds}}
-    {{- end }}
+{{- end }}
 {{- if .ReachabilityNodePort }}
     egressip-node-healthcheck-port={{.ReachabilityNodePort}}
+{{- end }}
+{{- if .OVN_MULTI_NETWORK_ENABLE }}
+    enable-multi-network=true
 {{- end }}
 {{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
     {{- if not .OVN_MULTI_NETWORK_ENABLE }}
@@ -54,6 +63,9 @@ data:
 {{- end }}
 {{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
     enable-multi-networkpolicy=true
+{{- end }}
+{{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
+    enable-admin-network-policy=true
 {{- end }}
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
     enable-dns-name-resolver=true
