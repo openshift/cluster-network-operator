@@ -7,7 +7,6 @@ metadata:
     api.openshift.io/merged-by-featuregates: "true"
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
-    release.openshift.io/feature-set: Default
   name: networks.operator.openshift.io
 spec:
   group: operator.openshift.io
@@ -607,6 +606,22 @@ spec:
                               messages, e.g. "kern". Default is "local0"
                             type: string
                         type: object
+                      routeAdvertisements:
+                        description: |-
+                          routeAdvertisements determines if the functionality to advertise cluster
+                          network routes through a dynamic routing protocol, such as BGP, is
+                          enabled or not. This functionality is configured through the
+                          ovn-kubernetes RouteAdvertisements CRD. Requires the 'FRR' routing
+                          capability provider to be enabled as an additional routing capability.
+                          Allowed values are "Enabled", "Disabled" and ommited. When omitted, this
+                          means the user has no opinion and the platform is left to choose
+                          reasonable defaults. These defaults are subject to change over time. The
+                          current default is "Disabled".
+                        enum:
+                        - ""
+                        - Enabled
+                        - Disabled
+                        type: string
                       v4InternalSubnet:
                         description: |-
                           v4InternalSubnet is a v4 subnet used internally by ovn-kubernetes in case the
@@ -906,6 +921,13 @@ spec:
                 type: boolean
             type: object
             x-kubernetes-validations:
+            - message: Route advertisements cannot be Enabled if 'FRR' routing capability
+                provider is not available
+              rule: (has(self.additionalRoutingCapabilities) && ('FRR' in self.additionalRoutingCapabilities.providers))
+                || !has(self.defaultNetwork) || !has(self.defaultNetwork.ovnKubernetesConfig)
+                || !has(self.defaultNetwork.ovnKubernetesConfig.routeAdvertisements)
+                || self.defaultNetwork.ovnKubernetesConfig.routeAdvertisements !=
+                'Enabled'
             - message: invalid value for IPForwarding, valid values are 'Restricted'
                 or 'Global'
               rule: '!has(self.defaultNetwork) || !has(self.defaultNetwork.ovnKubernetesConfig)
