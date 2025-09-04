@@ -59,6 +59,17 @@ data:
         exit 1
       fi
 
+      echo "$(date -Iseconds) - waiting for 10 minutes for ovnkube-controller to sync and SB DB hot..."
+      local retries=0
+      # ten minutes timeout
+      while [[ 3000 -gt "${retries}" ]]; do
+        (( retries += 1 ))
+        if [[ -f /run/ovn-kubernetes/ovnkube-controller-sb-db-hot ]]; then
+          break
+        fi
+        sleep .2
+      done
+
       echo "$(date -Iseconds) - starting ovn-controller"
       exec ovn-controller \
         unix:${vswitch_dbsock} \
