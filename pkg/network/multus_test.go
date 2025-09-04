@@ -46,7 +46,7 @@ func TestRenderMultus(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus")))
 
 	// It's important that the namespace is first
-	g.Expect(len(objs)).To(Equal(31), "Expected 31 multus related objects") //this seems like not a great test imo
+	g.Expect(len(objs)).To(Equal(32), "Expected 32 multus related objects")
 	g.Expect(objs[0]).To(HaveKubernetesID("CustomResourceDefinition", "", "network-attachment-definitions.k8s.cni.cncf.io"))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Namespace", "", "openshift-multus")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceAccount", "openshift-multus", "multus-ancillary-tools")))
