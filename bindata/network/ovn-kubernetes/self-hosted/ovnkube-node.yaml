@@ -62,7 +62,13 @@ spec:
               {{ if .DpuHostModeLabel }}
               - key: {{ .DpuHostModeLabel }}
                 {{ if eq .OVN_NODE_MODE "dpu-host" }}
+                {{ if .DpuHostModeValue }}
+                operator: In
+                values:
+                - "{{ .DpuHostModeValue }}"
+                {{ else }}
                 operator: Exists
+                {{ end }}
                 {{ else if eq .OVN_NODE_MODE "smart-nic" }}
                 operator: DoesNotExist
                 {{ else }}
@@ -74,7 +80,13 @@ spec:
                 {{ if eq .OVN_NODE_MODE "dpu-host" }}
                 operator: DoesNotExist
                 {{ else if eq .OVN_NODE_MODE "smart-nic" }}
+                {{ if .SmartNicModeValue }}
+                operator: In
+                values:
+                - "{{ .SmartNicModeValue }}"
+                {{ else }}
                 operator: Exists
+                {{ end }}
                 {{ else }}
                 operator: DoesNotExist
                 {{ end }}
