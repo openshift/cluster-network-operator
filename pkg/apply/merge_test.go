@@ -1,7 +1,6 @@
 package apply
 
 import (
-	"context"
 	"reflect"
 	"testing"
 
@@ -73,7 +72,7 @@ func Test_Merge(t *testing.T) {
 			tt.expected.GetObjectKind().SetGroupVersionKind(tt.kind)
 			merge := getMergeForUpdate(tt.input)
 			g.Expect(merge).NotTo(BeNil())
-			uns, err := merge(context.Background(), client.Default())
+			uns, err := merge(t.Context(), client.Default())
 			g.Expect(err).NotTo(HaveOccurred())
 			output := reflect.New(reflect.ValueOf(tt.expected).Elem().Type()).Interface()
 			err = runtime.DefaultUnstructuredConverter.FromUnstructured(uns.Object, output)

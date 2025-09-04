@@ -1,8 +1,6 @@
 package clusterconfig
 
 import (
-	"context"
-
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -438,7 +436,7 @@ func TestPrepareOperatorConfigForNetworkTypeMigration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 			r := &ReconcileClusterConfig{
 				client: fake.NewFakeClient(),
 			}

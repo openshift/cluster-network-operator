@@ -1,13 +1,13 @@
-run:
-  skip-dirs:
+issues:
+  exclude-dirs:
     - vendor
   modules-download-mode: vendor
 
 linters:
   disable-all: true #so that lint version bumps don't change results
   enable:
-    - errcheck
     - copyloopvar
+    - errcheck
     - gosimple
     - govet
     - ineffassign
@@ -15,8 +15,8 @@ linters:
     - nolintlint
     - nosprintfhostport
     - staticcheck
-    - tenv
     - typecheck
     - unconvert
     - unused
+    - usetesting
     - wastedassign
