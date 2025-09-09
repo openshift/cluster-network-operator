@@ -869,7 +869,14 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 		}
 	}
 
-	// We want to see if there are any nodes that are labeled for specific modes.
+	// We want to see if there are any nodes that are labeled for specific modes such as Full/SmartNIC/DPU Host/DPU
+	// Currently dpu-host and smart-nic are modes that allow CNO to render the corresponding daemonset pods.
+	// For DPU-Host mode, CNO will set the DPU Host mode environment variable to render the OVN-Kubernetes pods in DPU Host mode.
+	//   Additionally the management port interface is set from a SR-IOV interface.
+	// For Smart NIC mode, CNO will set the mode to be Full mode and render the OVN-Kubernetes daemonset pods.
+	//   The difference is that the management port is set from a SR-IOV interface.
+	// For DPU mode, currently CNO does not render any OVN-Kubernetes daemonset pods (preventing any OVN-Kubernetes
+	//   daemonset pods in DPU mode from running), it is done by an external operator.
 	ovnConfigResult.DpuHostModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.DpuHostModeLabel)
 	if err != nil {
 		return nil, fmt.Errorf("Could not get node list with label %s : %w", ovnConfigResult.DpuHostModeLabel, err)
