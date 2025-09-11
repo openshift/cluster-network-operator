@@ -47,6 +47,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	mcutil "github.com/openshift/cluster-network-operator/pkg/util/machineconfig"
 	"github.com/openshift/cluster-network-operator/pkg/version"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 const CLUSTER_CONFIG_NAME = "cluster-config-v1"
@@ -791,6 +792,37 @@ func getNodeListByLabel(kubeClient cnoclient.Client, label string) ([]string, er
 	return nodeNames, nil
 }
 
+// validateLabel checks if a label string is valid according to Kubernetes label requirements.
+// It validates both the format (key=value or key=) and the key/value according to Kubernetes rules.
+// Returns true if valid, false if invalid.
+func validateLabel(label string) bool {
+	if label == "" {
+		return false
+	}
+
+	// Parse labelKey to extract key and value - labels must contain "=" but can have an empty value
+	parts := strings.SplitN(label, "=", 2)
+	if len(parts) != 2 {
+		return false
+	}
+
+	key := parts[0]
+	value := parts[1]
+
+	// Validate the key using Kubernetes validation
+	if errs := validation.IsQualifiedName(key); len(errs) > 0 {
+		return false
+	}
+
+	if value != "" {
+		if errs := validation.IsValidLabelValue(value); len(errs) > 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
 // getKeyValueFromLabel returns specified label key and value (if any).
 // label format: "key=" (match any value, use operator: Exists) or "key=value" (match specific value, use operator: In)
 func getKeyValueFromLabel(label string) (string, string, error) {
@@ -849,18 +881,24 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 		}
 	} else {
 		dpuHostModeLabel, exists := cm.Data["dpu-host-mode-label"]
-		if exists {
+		if exists && validateLabel(dpuHostModeLabel) {
 			ovnConfigResult.DpuHostModeLabel = dpuHostModeLabel
+		} else if exists {
+			klog.Warningf("Invalid dpu-host-mode-label format %q, using default %q", dpuHostModeLabel, OVN_NODE_SELECTOR_DEFAULT_DPU_HOST)
 		}
 
 		dpuModeLabel, exists := cm.Data["dpu-mode-label"]
-		if exists {
+		if exists && validateLabel(dpuModeLabel) {
 			ovnConfigResult.DpuModeLabel = dpuModeLabel
+		} else if exists {
+			klog.Warningf("Invalid dpu-mode-label format %q, using default %q", dpuModeLabel, OVN_NODE_SELECTOR_DEFAULT_DPU)
 		}
 
 		smartNicModeLabel, exists := cm.Data["smart-nic-mode-label"]
-		if exists {
+		if exists && validateLabel(smartNicModeLabel) {
 			ovnConfigResult.SmartNicModeLabel = smartNicModeLabel
+		} else if exists {
+			klog.Warningf("Invalid smart-nic-mode-label format %q, using default %q", smartNicModeLabel, OVN_NODE_SELECTOR_DEFAULT_SMART_NIC)
 		}
 
 		mgmtPortresourceName, exists := cm.Data["mgmt-port-resource-name"]
