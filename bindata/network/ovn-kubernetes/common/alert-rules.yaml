@@ -80,7 +80,8 @@ spec:
       for: 15m
       labels:
         severity: warning
-    - alert: OVNKubernetesNodeOVSOverflowKernel
+    - alert: OVNKubernetesNodeOVSDPLostPacket
+      # previously OVNKubernetesNodeOVSOverflowKernel
       annotations:
         summary: OVS kernel module drops packets due to buffer overflow.
         description: Netlink messages dropped by OVS kernel module due to netlink socket buffer overflow.
