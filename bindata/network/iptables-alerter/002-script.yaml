@@ -19,10 +19,36 @@ data:
     function ip {
         chroot /host /sbin/ip "$@"
     }
+    function nsenter {
+        chroot /host /bin/nsenter "$@"
+    }
 
-    while :; do
-        date
-        # Iterate over local pods
+    function check_pods {
+        # We need to use crictl to be able to map pod information to network namespace
+        # information, but there seems to be some bug in crictl that causes excessive CPU
+        # usage on some hosts, for unknown reasons. Since we expect that most nodes won't
+        # have any iptables-using pods anyway, do a pre-scan of all (non-hostnetwork)
+        # namespaces without using crictl, and bail out early if we don't find anything
+        iptables_output=""
+        for netns_pid in $(lsns -t net -o pid -nr | sort -u | grep -v '^1$'); do
+            # Set iptables_output to the first iptables rule in the network namespace, if any.
+            # (We use `awk` here rather than `grep` intentionally to avoid awkwardness with
+            # grep's exit status on no match.)
+            iptables_output=$(
+                (nsenter -n -t "${netns_pid}" iptables-save || true;
+                 nsenter -n -t "${netns_pid}" ip6tables-save || true) 2>/dev/null | \
+                awk '/^-A/ {print; exit}'
+            )
+            if [[ -n "${iptables_output}" ]]; then
+                break
+            fi
+        done
+        if [[ -z "${iptables_output}" ]]; then
+            # Nothing to see here
+            return 0
+        fi
+
+        # Somebody was using iptables, so now we have to figure out who.
         for id in $(crictl pods -q); do
             # Inspect the pod
             read pod_namespace pod_name pod_uid netns netns_path <<<$(
@@ -101,7 +127,12 @@ data:
     eventTime: ${event_time}
     EOF
         done
+    }
 
+    while :; do
+        date
+        check_pods
         echo ""
+
         sleep 3600
     done
