@@ -233,12 +233,8 @@ func TestDisallowMultipleClusterNetworksOfOldIPFamily(t *testing.T) {
 	g.Expect(err).To(MatchError(ContainSubstring("cannot add additional ClusterNetwork values of original IP family when migrating to dual stack")))
 }
 
-func TestAllowMigrationOnlyForBareMetalOrNoneType(t *testing.T) {
+func TestAllowMigrationOnlyForSupportedTypes(t *testing.T) {
 	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OVNKubernetesConfig, OVNKubernetesConfig)
-
-	// You can't migrate from single-stack to dual-stack if this is anything else but
-	// BareMetal or NonePlatformType
-	infra.PlatformType = configv1.AzurePlatformType
 
 	next.ServiceNetwork = append(next.ServiceNetwork, "fd02::/112")
 	next.ClusterNetwork = append(next.ClusterNetwork, operv1.ClusterNetworkEntry{
@@ -246,6 +242,10 @@ func TestAllowMigrationOnlyForBareMetalOrNoneType(t *testing.T) {
 		HostPrefix: 64,
 	},
 	)
+	// You can't migrate from single-stack to dual-stack if this is anything else but
+	// BareMetal, NonePlatformType, and VSphere
+	infra.PlatformType = configv1.GCPPlatformType
+
 	err := IsChangeSafe(prev, next, infra)
 	g.Expect(err).To(MatchError(ContainSubstring(fmt.Sprintf("%s is not one of the supported platforms for dual stack (%s)", infra.PlatformType,
 		strings.Join(dualStackPlatforms.List(), ", ")))))
