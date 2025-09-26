@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+
 	"github.com/ghodss/yaml"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 
@@ -21,7 +23,6 @@ import (
 	cohelpers "github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers"
 	operstatus "github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
-
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -379,8 +380,27 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 			)
 		}
 
-		if oc.Spec.DefaultNetwork.Type == operv1.NetworkTypeOpenShiftSDN {
-			// OpenShiftSDN is removed in 4.17, so block the upgrade if we have OpenShiftSDN in the spec.
+		netCfg := &configv1.Network{}
+		if err := status.client.ClientFor("").CRClient().
+			Get(context.Background(), types.NamespacedName{Name: names.OPERATOR_CONFIG}, netCfg); err != nil {
+			return fmt.Errorf("getting Network.config/cluster: %w", err)
+		}
+		migrationInProgress := meta.IsStatusConditionPresentAndEqual(
+			netCfg.Status.Conditions,
+			names.NetworkTypeMigrationInProgress,
+			metav1.ConditionTrue,
+		)
+
+		if migrationInProgress {
+			v1helpers.SetOperatorCondition(&oc.Status.Conditions,
+				operv1.OperatorCondition{
+					Type:    operv1.OperatorStatusTypeUpgradeable,
+					Status:  operv1.ConditionFalse,
+					Reason:  "NetworkMigrationInProgress",
+					Message: "A CNI migration is in progress; upgrade is blocked until that finishes.",
+				},
+			)
+		} else if oc.Spec.DefaultNetwork.Type == operv1.NetworkTypeOpenShiftSDN {
 			v1helpers.SetOperatorCondition(&oc.Status.Conditions,
 				operv1.OperatorCondition{
 					Type:   operv1.OperatorStatusTypeUpgradeable,
