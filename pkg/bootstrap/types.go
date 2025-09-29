@@ -29,10 +29,12 @@ type OVNConfigBoostrapResult struct {
 	DisableUDPAggregation bool
 	DpuHostModeLabel      string
 	DpuHostModeNodes      []string
+	DpuHostModeValue      string
 	DpuModeLabel          string
 	DpuModeNodes          []string
 	SmartNicModeLabel     string
 	SmartNicModeNodes     []string
+	SmartNicModeValue     string
 	MgmtPortResourceName  string
 	// ConfigOverrides contains the overrides for the OVN Kubernetes configuration
 	// This is used to set the hidden OVN Kubernetes configuration in the cluster
