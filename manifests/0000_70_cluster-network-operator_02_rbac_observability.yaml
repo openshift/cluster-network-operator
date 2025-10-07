@@ -1,0 +1,27 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cno-observability
+rules:
+  # Manage the netobserv namespace itself
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "create", "list"]
+
+  # Manage FlowCollector CRs
+  - apiGroups: ["flows.netobserv.io"]
+    resources: ["flowcollectors"]
+    verbs: ["get", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cno-observability
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cno-observability
+subjects:
+  - kind: ServiceAccount
+    name: cluster-network-operator
+    namespace: openshift-network-operator

@@ -10,3 +10,4 @@ spec:
       hostPrefix: 23
   defaultNetwork:
     type: OVNKubernetes
+  observabilityEnabled: true

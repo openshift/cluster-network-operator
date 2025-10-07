@@ -1,0 +1,15 @@
+apiVersion: flows.netobserv.io/v1beta2
+kind: FlowCollector
+metadata:
+  name: cluster
+spec:
+  agent:
+    ebpf:
+      features:
+        - PacketDrop
+      sampling: 400
+    type: eBPF
+  deploymentModel: Direct
+  loki:
+    enable: false
+  namespace: netobserv
