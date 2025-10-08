@@ -62,7 +62,6 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 	data.Data["RoutableMTU"] = nil
 	data.Data["MTU"] = nil
 
-	data.Data["IsNetworkTypeLiveMigration"] = false
 	if conf.Migration != nil {
 		if conf.Migration.MTU != nil {
 			if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
@@ -79,9 +78,6 @@ func renderOpenShiftSDN(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Boo
 			//  2. CNO sets the MTU as applied
 			//  3. User can then set the MTU as configured
 			c.MTU = conf.Migration.MTU.Network.To
-		}
-		if conf.Migration.Mode == operv1.LiveNetworkMigrationMode {
-			data.Data["IsNetworkTypeLiveMigration"] = true
 		}
 	}
 
