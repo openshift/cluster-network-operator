@@ -389,6 +389,42 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: com.github.openshift.api.operator.v1.BootImageSkewEnforcementConfig
+  map:
+    fields:
+    - name: manual
+      type:
+        namedType: com.github.openshift.api.operator.v1.ClusterBootImageManual
+      default: {}
+    - name: mode
+      type:
+        scalar: string
+    unions:
+    - discriminator: mode
+      fields:
+      - fieldName: manual
+        discriminatorValue: Manual
+- name: com.github.openshift.api.operator.v1.BootImageSkewEnforcementStatus
+  map:
+    fields:
+    - name: automatic
+      type:
+        namedType: com.github.openshift.api.operator.v1.ClusterBootImageAutomatic
+      default: {}
+    - name: manual
+      type:
+        namedType: com.github.openshift.api.operator.v1.ClusterBootImageManual
+      default: {}
+    - name: mode
+      type:
+        scalar: string
+    unions:
+    - discriminator: mode
+      fields:
+      - fieldName: automatic
+        discriminatorValue: Automatic
+      - fieldName: manual
+        discriminatorValue: Manual
 - name: com.github.openshift.api.operator.v1.CSIDriverConfigSpec
   map:
     fields:
@@ -614,6 +650,34 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: version
       type:
         scalar: string
+- name: com.github.openshift.api.operator.v1.ClusterBootImageAutomatic
+  map:
+    fields:
+    - name: ocpVersion
+      type:
+        scalar: string
+    - name: rhcosVersion
+      type:
+        scalar: string
+- name: com.github.openshift.api.operator.v1.ClusterBootImageManual
+  map:
+    fields:
+    - name: mode
+      type:
+        scalar: string
+    - name: ocpVersion
+      type:
+        scalar: string
+    - name: rhcosVersion
+      type:
+        scalar: string
+    unions:
+    - discriminator: mode
+      fields:
+      - fieldName: ocpVersion
+        discriminatorValue: OCPVersion
+      - fieldName: rhcosVersion
+        discriminatorValue: RHCOSVersion
 - name: com.github.openshift.api.operator.v1.ClusterCSIDriver
   map:
     fields:
@@ -2026,6 +2090,15 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: com.github.openshift.api.operator.v1.HealthCheck
           elementRelationship: atomic
+- name: com.github.openshift.api.operator.v1.IrreconcilableValidationOverrides
+  map:
+    fields:
+    - name: storage
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
 - name: com.github.openshift.api.operator.v1.KubeAPIServer
   map:
     fields:
@@ -2496,6 +2569,10 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.openshift.api.operator.v1.MachineConfigurationSpec
   map:
     fields:
+    - name: bootImageSkewEnforcement
+      type:
+        namedType: com.github.openshift.api.operator.v1.BootImageSkewEnforcementConfig
+      default: {}
     - name: failedRevisionLimit
       type:
         scalar: numeric
@@ -2503,6 +2580,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: irreconcilableValidationOverrides
+      type:
+        namedType: com.github.openshift.api.operator.v1.IrreconcilableValidationOverrides
+      default: {}
     - name: logLevel
       type:
         scalar: string
@@ -2533,6 +2614,10 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.openshift.api.operator.v1.MachineConfigurationStatus
   map:
     fields:
+    - name: bootImageSkewEnforcementStatus
+      type:
+        namedType: com.github.openshift.api.operator.v1.BootImageSkewEnforcementStatus
+      default: {}
     - name: conditions
       type:
         list:
