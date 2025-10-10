@@ -393,16 +393,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = true
 	}
 
-	// Disable all DPU-incompatible features when DPU host mode enabled
-	if dpuHostModeEnabled {
-		// Disable feature gates that are incompatible with DPU
-		data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = false
-		data.Data["OVN_NETWORK_SEGMENTATION_ENABLE"] = false
-		data.Data["OVN_MULTI_NETWORK_ENABLE"] = false
-		data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = false
-		data.Data["OVN_MULTICAST_ENABLE"] = false
-	}
-
 	//there only needs to be two cluster managers
 	clusterManagerReplicas := 2
 	if bootstrapResult.OVN.ControlPlaneReplicaCount < 2 {
@@ -477,6 +467,16 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			return nil, progressing, errors.Wrap(err, "failed to render manifests for dpu-host")
 		}
 		objs = append(objs, manifests...)
+	}
+
+	// Disable all DPU-incompatible features when DPU host mode enabled
+	if len(bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeNodes) > 0 {
+		// Disable feature gates that are incompatible with DPU
+		data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = false
+		data.Data["OVN_NETWORK_SEGMENTATION_ENABLE"] = false
+		data.Data["OVN_MULTI_NETWORK_ENABLE"] = false
+		data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = false
+		data.Data["OVN_MULTICAST_ENABLE"] = false
 	}
 
 	if len(bootstrapResult.OVN.OVNKubernetesConfig.DpuModeNodes) > 0 {

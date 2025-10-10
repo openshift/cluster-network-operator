@@ -41,8 +41,8 @@ data:
     enable-egress-firewall=true
     enable-egress-qos=true
     enable-egress-service=true
-{{- end }}
     enable-multi-external-gateway=true
+{{- end }}
 {{- if .ReachabilityTotalTimeoutSeconds }}
     egressip-reachability-total-timeout={{.ReachabilityTotalTimeoutSeconds}}
 {{- end }}

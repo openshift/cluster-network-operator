@@ -676,7 +676,7 @@ data:
       fi
 
       exec /usr/bin/ovnkube \
-        --init-ovnkube-controller "${K8S_NODE}" \
+        ${init_ovnkube_controller} \
         --init-node "${K8S_NODE}" \
         --config-file=/run/ovnkube-config/ovnkube.conf \
         --ovn-empty-lb-events \
@@ -702,7 +702,7 @@ data:
         ${admin_network_policy_enabled_flag} \
         ${dns_name_resolver_enabled_flag} \
         ${network_observability_enabled_flag} \
-        --enable-multicast \
+        ${enable_multicast_flag} \
         --zone ${K8S_NODE} \
         --enable-interconnect \
         --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}" \

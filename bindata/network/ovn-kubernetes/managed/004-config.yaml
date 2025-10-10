@@ -38,8 +38,8 @@ data:
     enable-egress-firewall=true
     enable-egress-qos=true
     enable-egress-service=true
-{{- end }}
     enable-multi-external-gateway=true
+{{- end }}
 {{- if .ReachabilityNodePort }}
     egressip-node-healthcheck-port={{.ReachabilityNodePort}}
 {{- end }}
@@ -164,7 +164,6 @@ data:
 {{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
     enable-admin-network-policy=true
 {{- end }}
-    enable-multi-external-gateway=true
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
     enable-dns-name-resolver=true
 {{- end }}
