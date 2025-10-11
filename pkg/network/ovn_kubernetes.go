@@ -470,7 +470,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	// Disable all DPU-incompatible features when DPU host mode enabled
-	if len(bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeNodes) > 0 {
+	if true {
 		// Disable feature gates that are incompatible with DPU
 		data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = false
 		data.Data["OVN_NETWORK_SEGMENTATION_ENABLE"] = false
