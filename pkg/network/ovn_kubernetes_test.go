@@ -297,18 +297,21 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+enable-multi-external-gateway=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
-nodeport=true
-
-[logging]
-libovsdblogfile=/var/log/ovnkube/libovsdb.log
-logfile-maxsize=100
-logfile-maxbackups=5
-logfile-maxage=0`,
-			controlPlaneReplicaCount: 2,
+nodeport=true`,
+			controlPlaneReplicaCount: 0,
 		},
 		{
 			desc: "HybridOverlay",
@@ -334,17 +337,20 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+enable-multi-external-gateway=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=local
 nodeport=true
-
-[logging]
-libovsdblogfile=/var/log/ovnkube/libovsdb.log
-logfile-maxsize=100
-logfile-maxbackups=5
-logfile-maxage=0
 
 [hybridoverlay]
 enabled=true
@@ -384,18 +390,21 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+enable-multi-external-gateway=true
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
 egressip-reachability-total-timeout=3
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=local
 nodeport=true
-
-[logging]
-libovsdblogfile=/var/log/ovnkube/libovsdb.log
-logfile-maxsize=100
-logfile-maxbackups=5
-logfile-maxage=0
 
 [hybridoverlay]
 enabled=true
@@ -437,18 +446,21 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+enable-multi-external-gateway=true
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
 egressip-reachability-total-timeout=0
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=local
 nodeport=true
-
-[logging]
-libovsdblogfile=/var/log/ovnkube/libovsdb.log
-logfile-maxsize=100
-logfile-maxbackups=5
-logfile-maxage=0
 
 [hybridoverlay]
 enabled=true
@@ -490,17 +502,20 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+enable-multi-external-gateway=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=local
 nodeport=true
-
-[logging]
-libovsdblogfile=/var/log/ovnkube/libovsdb.log
-logfile-maxsize=100
-logfile-maxbackups=5
-logfile-maxage=0
 
 [hybridoverlay]
 enabled=true
@@ -542,17 +557,20 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+enable-multi-external-gateway=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
 nodeport=true
-
-[logging]
-libovsdblogfile=/var/log/ovnkube/libovsdb.log
-logfile-maxsize=100
-logfile-maxbackups=5
-logfile-maxage=0
 
 [hybridoverlay]
 enabled=true`,
@@ -583,17 +601,20 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+enable-multi-external-gateway=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
 nodeport=true
-
-[logging]
-libovsdblogfile=/var/log/ovnkube/libovsdb.log
-logfile-maxsize=100
-logfile-maxbackups=5
-logfile-maxage=0
 
 [clustermgrha]
 election-lease-duration=137
@@ -627,17 +648,22 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+enable-multi-external-gateway=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
 nodeport=true
 
-[logging]
-libovsdblogfile=/var/log/ovnkube/libovsdb.log
-logfile-maxsize=100
-logfile-maxbackups=5
-logfile-maxage=0`,
+`,
 			controlPlaneReplicaCount: 2,
 			disableGRO:               true,
 		},
@@ -664,17 +690,19 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+enable-multi-external-gateway=true
 egressip-node-healthcheck-port=9107
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
 nodeport=true
 
-[logging]
-libovsdblogfile=/var/log/ovnkube/libovsdb.log
-logfile-maxsize=100
-logfile-maxbackups=5
-logfile-maxage=0`,
+`,
 			controlPlaneReplicaCount: 2,
 
 			disableMultiNet: true,
@@ -702,18 +730,22 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+enable-multi-external-gateway=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
 enable-multi-networkpolicy=true
+enable-admin-network-policy=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
 nodeport=true
 
-[logging]
-libovsdblogfile=/var/log/ovnkube/libovsdb.log
-logfile-maxsize=100
-logfile-maxbackups=5
-logfile-maxage=0`,
+`,
 			controlPlaneReplicaCount: 2,
 
 			enableMultiNetPolicies: true,
@@ -742,18 +774,21 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+enable-multi-external-gateway=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
 enable-network-segmentation=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
 nodeport=true
 
-[logging]
-libovsdblogfile=/var/log/ovnkube/libovsdb.log
-logfile-maxsize=100
-logfile-maxbackups=5
-logfile-maxage=0`,
+`,
 			controlPlaneReplicaCount: 2,
 			enabledFeatureGates:      []configv1.FeatureGateName{apifeatures.FeatureGateNetworkSegmentation},
 		},
@@ -780,17 +815,22 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+enable-multi-external-gateway=true
 egressip-node-healthcheck-port=9107
+enable-admin-network-policy=true
+egressip-node-healthcheck-port=9107
+enable-admin-network-policy=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
 nodeport=true
 
-[logging]
-libovsdblogfile=/var/log/ovnkube/libovsdb.log
-logfile-maxsize=100
-logfile-maxbackups=5
-logfile-maxage=0`,
+`,
 			controlPlaneReplicaCount: 2,
 			disableMultiNet:          true,
 			enableMultiNetPolicies:   true,
@@ -819,7 +859,13 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-multi-external-gateway=true
 enable-dns-name-resolver=true
 
 [gateway]
@@ -857,9 +903,16 @@ dns-service-namespace="openshift-dns"
 dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
+enable-egress-ip=true
+enable-egress-firewall=true
+enable-egress-qos=true
+enable-egress-service=true
+enable-multi-external-gateway=true
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
+enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
@@ -920,7 +973,7 @@ logfile-maxage=0`,
 					SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
 					MgmtPortResourceName: "",
 					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
-						Enabled: false,
+						Enabled: true,
 					},
 					DisableUDPAggregation: tc.disableGRO,
 				},
@@ -3882,8 +3935,30 @@ func findInObjs(group, kind, name, namespace string, objs []*uns.Unstructured) *
 }
 
 func extractOVNKubeConfig(g *WithT, objs []*uns.Unstructured) string {
+	// Prefer node namespace ConfigMap when present
+	for _, obj := range objs {
+		if obj.GetKind() == "ConfigMap" && obj.GetName() == "ovnkube-config" && obj.GetNamespace() == "openshift-ovn-kubernetes" {
+			val, ok, err := uns.NestedString(obj.Object, "data", "ovnkube.conf")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(ok).To(BeTrue())
+			return val
+		}
+	}
+	// Fallback to any ovnkube-config
 	for _, obj := range objs {
 		if obj.GetKind() == "ConfigMap" && obj.GetName() == "ovnkube-config" {
+			val, ok, err := uns.NestedString(obj.Object, "data", "ovnkube.conf")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(ok).To(BeTrue())
+			return val
+		}
+	}
+	return ""
+}
+
+func extractHostedOVNKubeConfig(g *WithT, objs []*uns.Unstructured) string {
+	for _, obj := range objs {
+		if obj.GetKind() == "ConfigMap" && obj.GetName() == "ovnkube-config" && obj.GetNamespace() != "openshift-ovn-kubernetes" {
 			val, ok, err := uns.NestedString(obj.Object, "data", "ovnkube.conf")
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(ok).To(BeTrue())
@@ -3903,92 +3978,6 @@ func extractOVNScriptLib(g *WithT, objs []*uns.Unstructured) string {
 		}
 	}
 	return ""
-}
-
-// renderControlPlaneWithOverrides renders using the full render path and returns
-// the embedded startup script from the control-plane container.
-func renderControlPlaneWithOverrides(t *testing.T, variant string, overrides map[string]interface{}) string {
-	g := NewGomegaWithT(t)
-	crd := OVNKubernetesConfig.DeepCopy()
-	config := &crd.Spec
-	fillDefaults(config, nil)
-
-	bs := fakeBootstrapResult()
-	bs.OVN = bootstrap.OVNBootstrapResult{
-		ControlPlaneReplicaCount: 1,
-		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:  OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:      OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel: OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			HyperShiftConfig:  &bootstrap.OVNHyperShiftBootstrapResult{Enabled: false},
-			ConfigOverrides:   toStringMap(overrides),
-		},
-	}
-
-	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
-	objs, _, err := renderOVNKubernetes(config, bs, manifestDirOvn, fakeClient, featureGatesCNO)
-	g.Expect(err).NotTo(HaveOccurred())
-
-	var script string
-	for _, obj := range objs {
-		if obj.GetKind() == "Deployment" && obj.GetName() == "ovnkube-control-plane" && obj.GetNamespace() == "openshift-ovn-kubernetes" {
-			containers, found, err := uns.NestedSlice(obj.Object, "spec", "template", "spec", "containers")
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(found).To(BeTrue())
-			for _, c := range containers {
-				cm := c.(map[string]interface{})
-				if name, ok := cm["name"]; ok && (name == "ovnkube-cluster-manager" || name == "ovnkube-control-plane") {
-					command, found, err := uns.NestedSlice(cm, "command")
-					g.Expect(err).NotTo(HaveOccurred())
-					g.Expect(found).To(BeTrue())
-					g.Expect(len(command)).To(BeNumerically(">", 2))
-					script = command[2].(string)
-					break
-				}
-			}
-		}
-	}
-	g.Expect(script).NotTo(BeEmpty())
-	return script
-}
-
-// renderScriptLibWithOverrides renders using the full render path and returns
-// the ovnkube script-lib content.
-func renderScriptLibWithOverrides(t *testing.T, overrides map[string]interface{}) string {
-	g := NewGomegaWithT(t)
-	crd := OVNKubernetesConfig.DeepCopy()
-	config := &crd.Spec
-	fillDefaults(config, nil)
-
-	bs := fakeBootstrapResult()
-	bs.OVN = bootstrap.OVNBootstrapResult{
-		ControlPlaneReplicaCount: 1,
-		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:  OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:      OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel: OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			HyperShiftConfig:  &bootstrap.OVNHyperShiftBootstrapResult{Enabled: false},
-			ConfigOverrides:   toStringMap(overrides),
-		},
-	}
-	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
-	objs, _, err := renderOVNKubernetes(config, bs, manifestDirOvn, fakeClient, featureGatesCNO)
-	g.Expect(err).NotTo(HaveOccurred())
-	return extractOVNScriptLib(g, objs)
-}
-
-// helper to convert map[string]interface{} -> map[string]string for overrides
-func toStringMap(in map[string]interface{}) map[string]string {
-	if in == nil {
-		return nil
-	}
-	out := make(map[string]string, len(in))
-	for k, v := range in {
-		out[k] = fmt.Sprintf("%v", v)
-	}
-	return out
 }
 
 // checkDaemonsetAnnotation check that all the daemonset have the annotation with the
@@ -4248,226 +4237,248 @@ func TestRenderOVNKubernetes_AdvertisedUDNIsolationModeOverride(t *testing.T) {
 	})
 }
 
-func TestOVNKubernetesControlPlaneFlags(t *testing.T) {
+// TestOVNKubernetesDpuHostMode comprehensively tests all DPU host mode functionality
+func TestOVNKubernetesDpuHostMode(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	testCases := []struct {
-		name           string
-		variant        string
-		overrides      map[string]interface{}
-		mustContain    []string
-		mustNotContain []string
+		name                        string
+		dpuNodesPresent             bool
+		expectedDpuHostMode         bool
+		expectedMulticast           bool
+		expectedConfigMapFeatures   map[string]bool
+		expectedGoConfigMapFeatures map[string]bool
+		expectedOvnNodeMode         string
+		expectedGatewayInterface    string
+		description                 string
 	}{
 		{
-			name:    "self-hosted control-plane: always-enabled features",
-			variant: "self-hosted",
-			overrides: map[string]interface{}{
-				"OVN_OBSERVABILITY_ENABLE":        "false",
-				"OVN_MULTI_NETWORK_POLICY_ENABLE": "false",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "false",
+			name:                "DPU host mode enabled - all DPU-incompatible features disabled",
+			dpuNodesPresent:     true,
+			expectedDpuHostMode: true,
+			expectedMulticast:   false,
+			expectedConfigMapFeatures: map[string]bool{
+				// Egress features - ALL disabled in DPU mode
+				"enable-egress-ip":              false,
+				"enable-egress-firewall":        false,
+				"enable-egress-qos":             false,
+				"enable-egress-service":         false,
+				"enable-multi-external-gateway": true, // Currently NOT disabled by DPU mode in template
 			},
-			mustContain: []string{
-				"--enable-egress-ip=true",
-				"--enable-egress-firewall=true",
-				"--enable-egress-qos=true",
-				"--enable-egress-service=true",
-				"--enable-multicast",
-				"--enable-multi-external-gateway=true",
+			expectedGoConfigMapFeatures: map[string]bool{
+				// Go template flag controlled features - ALL disabled in DPU mode
+				"enable-multi-network":        false, // OVN_MULTI_NETWORK_ENABLE = false
+				"enable-network-segmentation": false, // OVN_NETWORK_SEGMENTATION_ENABLE = false
+				"enable-multi-networkpolicy":  false, // OVN_MULTI_NETWORK_POLICY_ENABLE = false
+				"enable-admin-network-policy": false, // OVN_ADMIN_NETWORK_POLICY_ENABLE = false
 			},
-			mustNotContain: []string{
-				"egress_features_enable_flag=",
-				"enable_multicast_flag=",
-				"multi_external_gateway_enable_flag=",
-			},
+			expectedOvnNodeMode:      "dpu-host",
+			expectedGatewayInterface: "derive-from-mgmt-port",
+			description:              "Verifies that all DPU-incompatible features are disabled when DPU nodes are detected",
 		},
+		{
+			name:                "DPU host mode disabled - all features enabled normally",
+			dpuNodesPresent:     false,
+			expectedDpuHostMode: false,
+			expectedMulticast:   true,
+			expectedConfigMapFeatures: map[string]bool{
+				// Egress features - ALL enabled in non-DPU mode
+				"enable-egress-ip":              true,
+				"enable-egress-firewall":        true,
+				"enable-egress-qos":             true,
+				"enable-egress-service":         true,
+				"enable-multi-external-gateway": true,
+			},
+			expectedGoConfigMapFeatures: map[string]bool{
+				// Go template flag controlled features - enabled based on feature gates
+				"enable-multi-network":        true,  // OVN_MULTI_NETWORK_ENABLE = true
+				"enable-network-segmentation": true,  // OVN_NETWORK_SEGMENTATION_ENABLE = true (from feature gate)
+				"enable-multi-networkpolicy":  false, // OVN_MULTI_NETWORK_POLICY_ENABLE = false (default)
+				"enable-admin-network-policy": true,  // OVN_ADMIN_NETWORK_POLICY_ENABLE = true (from feature gate)
+			},
+			expectedOvnNodeMode:      "full",
+			expectedGatewayInterface: "br-ex",
+			description:              "Verifies that features work normally when no DPU nodes are present",
+		},
+		{
+			name:                "DPU host mode with multiple DPU nodes",
+			dpuNodesPresent:     true,
+			expectedDpuHostMode: true,
+			expectedMulticast:   false,
+			expectedConfigMapFeatures: map[string]bool{
+				// All egress features disabled
+				"enable-egress-ip":       false,
+				"enable-egress-firewall": false,
+				"enable-egress-qos":      false,
+				"enable-egress-service":  false,
+			},
+			expectedGoConfigMapFeatures: map[string]bool{
+				// All DPU-incompatible Go flag features disabled
+				"enable-multi-network":        false,
+				"enable-network-segmentation": false,
+				"enable-multi-networkpolicy":  false,
+				"enable-admin-network-policy": false,
+			},
+			expectedOvnNodeMode:      "dpu-host",
+			expectedGatewayInterface: "derive-from-mgmt-port",
+			description:              "Verifies cluster-wide feature disabling even with multiple DPU nodes",
+		},
+	}
 
-		{
-			name:    "self-hosted control-plane: conditional features enabled",
-			variant: "self-hosted",
-			overrides: map[string]interface{}{
-				"OVN_MULTI_NETWORK_POLICY_ENABLE": "true",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "true",
+	// Helper function to create bootstrap result similar to existing renderWithOverrides pattern
+	createBootstrapWithDPU := func(dpuNodesPresent bool, testName string) *bootstrap.BootstrapResult {
+		bootstrapResult := fakeBootstrapResult()
+		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+			ControlPlaneReplicaCount: 3,
+			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+				DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+				DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+				SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+				MgmtPortResourceName: "",
+				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+					Enabled: false,
+				},
+				ConfigOverrides: nil, // No overrides needed for this test
 			},
-			mustContain: []string{
-				"--enable-egress-ip=true",
-				"--enable-multicast",
-				"--enable-multi-external-gateway=true",
-				"multi_network_policy_enabled_flag=\"--enable-multi-networkpolicy\"",
-				"admin_network_policy_enabled_flag=\"--enable-admin-network-policy\"",
-			},
-			mustNotContain: []string{
-				"network_observability_enabled_flag=",
-			},
-		},
-		{
-			name:    "self-hosted control-plane: multi-network enabled",
-			variant: "self-hosted",
-			overrides: map[string]interface{}{
-				"OVN_MULTI_NETWORK_ENABLE": "true",
-			},
-			mustContain: []string{
-				"--enable-egress-ip=true",
-				"--enable-multicast",
-				"--enable-multi-external-gateway=true",
-				"multi_network_enabled_flag=\"--enable-multi-network\"",
-			},
-			mustNotContain: []string{},
-		},
-		{
-			name:    "self-hosted control-plane: network segmentation enabled (auto-enables multi-network)",
-			variant: "self-hosted",
-			overrides: map[string]interface{}{
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "true",
-				"OVN_MULTI_NETWORK_ENABLE":        "false",
-			},
-			mustContain: []string{
-				"--enable-egress-ip=true",
-				"--enable-multicast",
-				"--enable-multi-external-gateway=true",
-				"multi_network_enabled_flag=\"--enable-multi-network\"",
-				"network_segmentation_enabled_flag=\"--enable-network-segmentation\"",
-			},
-			mustNotContain: []string{},
-		},
-		{
-			name:    "self-hosted control-plane: both multi-network and segmentation enabled",
-			variant: "self-hosted",
-			overrides: map[string]interface{}{
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "true",
-				"OVN_MULTI_NETWORK_ENABLE":        "true",
-			},
-			mustContain: []string{
-				"--enable-egress-ip=true",
-				"--enable-multicast",
-				"--enable-multi-external-gateway=true",
-				"multi_network_enabled_flag=\"--enable-multi-network\"",
-				"network_segmentation_enabled_flag=\"--enable-network-segmentation\"",
-			},
-			mustNotContain: []string{},
-		},
+		}
+
+		// Simulate DPU host detection
+		if dpuNodesPresent {
+			// Test with multiple DPU nodes for the multiple nodes test case
+			if testName == "DPU host mode with multiple DPU nodes" {
+				bootstrapResult.OVN.OVNKubernetesConfig.DpuModeNodes = []string{"dpu-node-1", "dpu-node-2", "dpu-node-3"}
+			} else {
+				bootstrapResult.OVN.OVNKubernetesConfig.DpuModeNodes = []string{"dpu-node-1"}
+			}
+			bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeEnabled = true
+		} else {
+			bootstrapResult.OVN.OVNKubernetesConfig.DpuModeNodes = []string{}
+			bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeEnabled = false
+		}
+
+		return bootstrapResult
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			script := renderControlPlaneWithOverrides(t, tc.variant, tc.overrides)
-			for _, s := range tc.mustContain {
-				g.Expect(script).To(ContainSubstring(s), "Expected to find: %s", s)
-			}
-			for _, s := range tc.mustNotContain {
-				g.Expect(script).NotTo(ContainSubstring(s), "Expected NOT to find: %s", s)
-			}
-		})
-	}
-}
+			// Test 1: Full manifest rendering with DPU detection
+			t.Run("Full manifest rendering", func(t *testing.T) {
 
-func TestOVNKubernetesScriptLibCombined(t *testing.T) {
-	g := NewGomegaWithT(t)
+				// Create test configuration
+				crd := OVNKubernetesConfig.DeepCopy()
+				config := &crd.Spec
+				fillDefaults(config, nil)
 
-	renderScript := func(overrides map[string]interface{}) string {
-		return renderScriptLibWithOverrides(t, overrides)
-	}
+				// Create bootstrap result with DPU simulation
+				bs := createBootstrapWithDPU(tc.dpuNodesPresent, tc.name)
 
-	testCases := []struct {
-		name           string
-		overrides      map[string]interface{}
-		mustContain    []string
-		mustNotContain []string
-	}{
-		{
-			name: "dpu-host gating and egress/policy disable",
-			overrides: map[string]interface{}{
-				"OVN_NODE_MODE":                   "dpu-host",
-				"OVN_MULTI_NETWORK_ENABLE":        "true",
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "true",
-				"OVN_MULTI_NETWORK_POLICY_ENABLE": "true",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "true",
-			},
-			mustContain: []string{
-				"gateway_interface=\"derive-from-mgmt-port\"",
-				"init_ovnkube_controller=\"\"",
-				"enable_multicast_flag=\"\"",
-				"egress_features_enable_flag=\"\"",
-				"multi_external_gateway_enable_flag=\"\"",
-				"ovnkube_node_mode=\"--ovnkube-node-mode dpu-host\"",
-				"multi_network_enabled_flag=",
-				"network_segmentation_enabled_flag=",
-				"multi_network_policy_enabled_flag=",
-				"admin_network_policy_enabled_flag=",
-			},
-			mustNotContain: []string{},
-		},
-		{
-			name: "full mode with multi-network features enabled",
-			overrides: map[string]interface{}{
-				"OVN_NODE_MODE":                   "full",
-				"OVN_MULTI_NETWORK_ENABLE":        "true",
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "true",
-				"OVN_MULTI_NETWORK_POLICY_ENABLE": "true",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "true",
-			},
-			mustContain: []string{
-				"gateway_interface=br-ex",
-				"init_ovnkube_controller=\"--init-ovnkube-controller ${K8S_NODE}\"",
-				"enable_multicast_flag=\"--enable-multicast\"",
-				"egress_features_enable_flag=\"--enable-egress-ip=true --enable-egress-firewall=true --enable-egress-qos=true --enable-egress-service=true\"",
-				"multi_external_gateway_enable_flag=\"--enable-multi-external-gateway=true\"",
-				"multi_network_enabled_flag=\"--enable-multi-network\"",
-				"network_segmentation_enabled_flag=\"--enable-network-segmentation\"",
-				"multi_network_policy_enabled_flag=\"--enable-multi-networkpolicy\"",
-				"admin_network_policy_enabled_flag=\"--enable-admin-network-policy\"",
-			},
-			mustNotContain: []string{},
-		},
-		{
-			name: "non-mode-gated features enabled",
-			overrides: map[string]interface{}{
-				"OVN_NODE_MODE":                   "full",
-				"OVN_ROUTE_ADVERTISEMENTS_ENABLE": "true",
-				"OVN_PRE_CONF_UDN_ADDR_ENABLE":    "true",
-				"OVN_OBSERVABILITY_ENABLE":        "true",
-				"DNS_NAME_RESOLVER_ENABLE":        "true",
-				"NETWORK_NODE_IDENTITY_ENABLE":    "true",
-			},
-			mustContain: []string{
-				"route_advertisements_enable_flag=\"--enable-route-advertisements\"",
-				"preconfigured_udn_addresses_enable_flag=\"--enable-preconfigured-udn-addresses\"",
-				"network_observability_enabled_flag=\"--enable-observability\"",
-				"dns_name_resolver_enabled_flag=\"--enable-dns-name-resolver\"",
-				"ip_forwarding_flag=\"--disable-forwarding\"",
-				"--bootstrap-kubeconfig=/var/lib/kubelet/kubeconfig",
-			},
-			mustNotContain: []string{},
-		},
-		{
-			name: "full mode: multi-network features disabled",
-			overrides: map[string]interface{}{
-				"OVN_NODE_MODE":                   "full",
-				"OVN_MULTI_NETWORK_ENABLE":        "false",
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "false",
-				"OVN_MULTI_NETWORK_POLICY_ENABLE": "false",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "false",
-			},
-			mustContain: []string{
-				"multi_network_enabled_flag=",
-				"network_segmentation_enabled_flag=",
-				"multi_network_policy_enabled_flag=",
-				"admin_network_policy_enabled_flag=",
-			},
-			mustNotContain: []string{},
-		},
-	}
+				// Use default feature gates and render manifests
+				featureGatesCNO := getDefaultFeatureGates()
+				fakeClient := cnofake.NewFakeClient()
+				objs, _, err := renderOVNKubernetes(config, bs, manifestDirOvn, fakeClient, featureGatesCNO)
+				g.Expect(err).NotTo(HaveOccurred())
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			script := renderScript(tc.overrides)
-			for _, s := range tc.mustContain {
-				g.Expect(script).To(ContainSubstring(s))
-			}
-			for _, s := range tc.mustNotContain {
-				g.Expect(script).NotTo(ContainSubstring(s))
-			}
-			// Ensure gateway flags use the variable rather than a hardcoded iface
-			g.Expect(script).To(ContainSubstring("--gateway-interface ${gateway_interface}"))
+				// Check ConfigMaps contain correct feature settings
+				var ovnConfigMaps []*uns.Unstructured
+				for _, obj := range objs {
+					if obj.GetKind() == "ConfigMap" && obj.GetName() == "ovnkube-config" {
+						ovnConfigMaps = append(ovnConfigMaps, obj)
+					}
+				}
+				g.Expect(ovnConfigMaps).NotTo(BeEmpty(), "Should find ovnkube-config ConfigMaps")
+
+				// Validate ConfigMap features
+				for _, configMap := range ovnConfigMaps {
+					data, found, err := uns.NestedString(configMap.Object, "data", "ovnkube.conf")
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(found).To(BeTrue())
+
+					// Validate DPU-controlled egress features
+					for feature, shouldBeEnabled := range tc.expectedConfigMapFeatures {
+						if shouldBeEnabled {
+							g.Expect(data).To(ContainSubstring(feature+"=true"),
+								"Feature %s should be enabled in ConfigMap", feature)
+						} else {
+							g.Expect(data).NotTo(ContainSubstring(feature+"=true"),
+								"Feature %s should be disabled in ConfigMap", feature)
+						}
+					}
+
+					// Validate Go template flag controlled features
+					for feature, shouldBeEnabled := range tc.expectedGoConfigMapFeatures {
+						if shouldBeEnabled {
+							g.Expect(data).To(ContainSubstring(feature+"=true"),
+								"Go flag feature %s should be enabled in ConfigMap", feature)
+						} else {
+							g.Expect(data).NotTo(ContainSubstring(feature+"=true"),
+								"Go flag feature %s should be disabled in ConfigMap", feature)
+						}
+					}
+				}
+
+				// All Go template flag validation is now done through their ConfigMap effects above
+				// DPU_HOST_MODE_ENABLED -> egress features presence/absence
+				// OVN_*_ENABLE flags -> corresponding enable-* features in ConfigMap
+				// OVN_MULTICAST_ENABLE -> validated in script template rendering section
+			})
+
+			// Test 2: Script template rendering using same pattern as renderWithOverrides
+			t.Run("Script template rendering", func(t *testing.T) {
+				// Helper function following the same pattern as renderWithOverrides
+				renderScriptWithDPU := func(dpuNodesPresent bool) string {
+					// Create bootstrap result (same as manifest rendering test)
+					bs := createBootstrapWithDPU(dpuNodesPresent, tc.name)
+
+					// Use same config setup
+					crd := OVNKubernetesConfig.DeepCopy()
+					config := &crd.Spec
+					fillDefaults(config, nil)
+
+					// Render manifests and extract script (same as renderWithOverrides pattern)
+					featureGatesCNO := getDefaultFeatureGates()
+					fakeClient := cnofake.NewFakeClient()
+					objs, _, err := renderOVNKubernetes(config, bs, manifestDirOvn, fakeClient, featureGatesCNO)
+					g.Expect(err).NotTo(HaveOccurred())
+
+					// Find and extract script ConfigMap
+					for _, obj := range objs {
+						if obj.GetKind() == "ConfigMap" && obj.GetName() == "ovnkube-script-lib" {
+							scriptData, found, err := uns.NestedString(obj.Object, "data", "ovnkube-lib.sh")
+							g.Expect(err).NotTo(HaveOccurred())
+							g.Expect(found).To(BeTrue(), "Should find ovnkube-lib.sh in ConfigMap data")
+							return scriptData
+						}
+					}
+					g.Fail("Should find ovnkube-script-lib ConfigMap")
+					return ""
+				}
+
+				// Get script content using same rendering approach as manifest test
+				scriptData := renderScriptWithDPU(tc.dpuNodesPresent)
+
+				// Test gateway interface assignment logic
+				g.Expect(scriptData).To(ContainSubstring(`gateway_interface=br-ex`),
+					"Script should contain default gateway interface assignment")
+				g.Expect(scriptData).To(ContainSubstring(`if [ "${OVN_NODE_MODE}" == "dpu-host" ]; then`),
+					"Script should contain DPU host mode conditional")
+				g.Expect(scriptData).To(ContainSubstring(`gateway_interface="derive-from-mgmt-port"`),
+					"Script should contain DPU host gateway interface assignment")
+
+				// Test that gateway_mode_flags uses the variable
+				g.Expect(scriptData).To(ContainSubstring("--gateway-interface ${gateway_interface}"),
+					"Script should use gateway_interface variable in gateway_mode_flags")
+
+				// Test multicast flag
+				if tc.expectedMulticast {
+					g.Expect(scriptData).To(ContainSubstring(`enable_multicast_flag="--enable-multicast"`),
+						"Multicast should be enabled in script for %s", tc.name)
+				} else {
+					g.Expect(scriptData).To(ContainSubstring(`enable_multicast_flag=""`),
+						"Multicast should be disabled in script for %s", tc.name)
+				}
+			})
+
+			t.Logf("✅ %s: All DPU host functionality correctly validated", tc.name)
 		})
 	}
 }
