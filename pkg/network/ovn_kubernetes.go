@@ -403,6 +403,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVN_MULTICAST_ENABLE"] = false
 		data.Data["DPU_HOST_MODE_ENABLED"] = false
 	}
+	klog.Infof("OVN configuration is now %+v", data.Data)
+
 
 	//there only needs to be two cluster managers
 	clusterManagerReplicas := 2
