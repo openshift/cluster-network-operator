@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -145,7 +146,6 @@ func TestStatusManager_set(t *testing.T) {
 
 	// No operator config yet; should reflect this in the cluster operator
 	status.set(false)
-
 	co, err := getCO(client, "testing")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -155,10 +155,11 @@ func TestStatusManager_set(t *testing.T) {
 		t.Fatalf("Expected a single Condition with reason NoOperConfig, got %v", co.Status.Conditions)
 	}
 
-	// make the network.operator object
-	log.Print("Creating Network Operator Config")
+	log.Print("Creating Network Operator + Config CRs")
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	setOC(t, client, no)
+	cfg := &configv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	set(t, client, cfg)
 
 	condUpdate := operv1.OperatorCondition{
 		Type:   operv1.OperatorStatusTypeUpgradeable,
@@ -295,6 +296,8 @@ func TestStatusManager_set_OpenShiftSDN(t *testing.T) {
 	}
 
 	setOC(t, client, no)
+	cfg := &configv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	set(t, client, cfg)
 
 	condNoProgress := operv1.OperatorCondition{
 		Type:   operv1.OperatorStatusTypeProgressing,
@@ -332,9 +335,129 @@ func TestStatusManager_set_OpenShiftSDN(t *testing.T) {
 	}
 }
 
+func TestStatusManager_set_UpgradeableCases(t *testing.T) {
+	tests := []struct {
+		name                string
+		specType            operv1.NetworkType
+		migrationInProgress bool
+		wantUpgradeable     operv1.ConditionStatus
+		wantReason          string
+		wantMessageContains string
+	}{
+		{
+			name:            "SDN only",
+			specType:        operv1.NetworkTypeOpenShiftSDN,
+			wantUpgradeable: operv1.ConditionFalse,
+			wantReason:      "OpenShiftSDNConfigured",
+			wantMessageContains: "Cluster is configured with OpenShiftSDN, which is not supported in the next version. Please " +
+				"follow the documented steps to migrate from OpenShiftSDN to OVN-Kubernetes in order to be able to upgrade. " +
+				"https://docs.openshift.com/container-platform/4.16/networking/ovn_kubernetes_network_provider/migrate-from-openshift-sdn.html",
+		},
+		{
+			name:                "OVN only",
+			specType:            operv1.NetworkTypeOVNKubernetes,
+			wantUpgradeable:     operv1.ConditionTrue,
+			wantReason:          "",
+			wantMessageContains: "",
+		},
+		{
+			name:                "Migration only",
+			specType:            operv1.NetworkTypeOVNKubernetes,
+			migrationInProgress: true,
+			wantUpgradeable:     operv1.ConditionFalse,
+			wantReason:          "NetworkMigrationInProgress",
+			wantMessageContains: "A CNI migration is in progress; upgrade is blocked until that finishes.",
+		},
+		{
+			name:                "SDN and migration",
+			specType:            operv1.NetworkTypeOpenShiftSDN,
+			migrationInProgress: true,
+			wantUpgradeable:     operv1.ConditionFalse,
+			wantReason:          "NetworkMigrationInProgress",
+			wantMessageContains: "A CNI migration is in progress; upgrade is blocked until that finishes.",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// seed operator.Network
+			no := &operv1.Network{
+				ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+				Spec: operv1.NetworkSpec{
+					DefaultNetwork: operv1.DefaultNetworkDefinition{Type: tc.specType},
+				},
+			}
+			objs := []crclient.Object{no}
+
+			if tc.migrationInProgress {
+				cn := &configv1.Network{
+					ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+					Status: configv1.NetworkStatus{
+						Conditions: []metav1.Condition{{
+							Type:               names.NetworkTypeMigrationInProgress,
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: metav1.Now(),
+						}},
+					},
+				}
+				objs = append(objs, cn)
+			}
+			client := fake.NewFakeClient(objs...)
+			status := New(client, names.OPERATOR_CONFIG, "")
+			setOC(t, client, no)
+			if !tc.migrationInProgress {
+				// Only create empty cfg when not testing migration, so we don’t clobber cn’s Status.
+				cfg := &configv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+				set(t, client, cfg)
+			}
+
+			condNoProgress := operv1.OperatorCondition{
+				Type:   operv1.OperatorStatusTypeProgressing,
+				Status: operv1.ConditionFalse,
+			}
+			condAvailable := operv1.OperatorCondition{
+				Type:   operv1.OperatorStatusTypeAvailable,
+				Status: operv1.ConditionTrue,
+			}
+			status.set(true, condNoProgress, condAvailable)
+
+			oc, err := getOC(client)
+			if err != nil {
+				t.Fatalf("error getting network.operator: %v", err)
+			}
+
+			// find the Upgradeable condition
+			var upg operv1.OperatorCondition
+			for _, c := range oc.Status.Conditions {
+				if c.Type == operv1.OperatorStatusTypeUpgradeable {
+					upg = c
+					break
+				}
+			}
+
+			// assert Status
+			if upg.Status != tc.wantUpgradeable {
+				t.Errorf("got Upgradeable.Status=%v, want %v", upg.Status, tc.wantUpgradeable)
+			}
+			// assert Reason and Message for SDN case
+			if tc.wantReason != "" {
+				if upg.Reason != tc.wantReason {
+					t.Errorf("got Upgradeable.Reason=%q, want %q", upg.Reason, tc.wantReason)
+				}
+				if !strings.Contains(upg.Message, tc.wantMessageContains) {
+					t.Errorf("got Upgradeable.Message=%q, want it to contain %q",
+						upg.Message, tc.wantMessageContains)
+				}
+			}
+		})
+	}
+}
+
 func TestStatusManagerSetDegraded(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
+	cfg := &configv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	set(t, client, cfg)
 
 	_, err := getOC(client)
 	if !errors.IsNotFound(err) {
@@ -427,6 +550,9 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
+	cfg := &configv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	set(t, client, cfg)
+
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
 		Spec: operv1.NetworkSpec{DefaultNetwork: operv1.DefaultNetworkDefinition{
@@ -778,6 +904,8 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	setOC(t, client, no)
+	cfg := &configv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	set(t, client, cfg)
 
 	status.SetFromPods()
 	co, oc, err := getStatuses(client, "testing")
@@ -1380,6 +1508,8 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	setOC(t, client, no)
+	cfg := &configv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	set(t, client, cfg)
 
 	status.SetFromPods()
 
@@ -1719,6 +1849,8 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	setOC(t, client, no)
+	cfg := &configv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	set(t, client, cfg)
 
 	dsA := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1961,6 +2093,8 @@ func TestStatusManagerHyperShift(t *testing.T) {
 	setFakeListers(mgmtStatus)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	setOC(t, mgmtClient, no)
+	cfg := &configv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	set(t, mgmtClient, cfg)
 	mgmtStatus.set(true, validConditions...)
 
 	// Create valid minimal Deployment in the management cluster
@@ -2021,6 +2155,8 @@ func TestStatusManagerSetFromDeploymentsWithExcluded(t *testing.T) {
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	setOC(t, client, no)
+	cfg := &configv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	set(t, client, cfg)
 
 	status.SetFromPods()
 
