@@ -911,6 +911,53 @@ func Test_SpecStatusSynchronizer(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "should handle vSphere UPI: empty unset apiServerInternalIPs and ingressIPs",
+			givenInfra: configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						VSphere: &configv1.VSpherePlatformSpec{
+							APIServerInternalIPs: []configv1.IP{},
+							IngressIPs:           []configv1.IP{},
+							MachineNetworks:      []configv1.CIDR{"224.0.0.1/24", "224.0.1.1/24"},
+						},
+					},
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform: configv1.VSpherePlatformType,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: "VSphere",
+						VSphere: &configv1.VSpherePlatformStatus{
+							MachineNetworks: []configv1.CIDR{"224.0.0.1/24", "224.0.1.1/24"},
+						},
+					},
+				},
+			},
+			wantedInfra: configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						VSphere: &configv1.VSpherePlatformSpec{
+							APIServerInternalIPs: []configv1.IP{},
+							IngressIPs:           []configv1.IP{},
+							MachineNetworks:      []configv1.CIDR{"224.0.0.1/24", "224.0.1.1/24"},
+						},
+					},
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform: configv1.VSpherePlatformType,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: "VSphere",
+						VSphere: &configv1.VSpherePlatformStatus{
+							APIServerInternalIPs: []string{},
+							IngressIPs:           []string{},
+							MachineNetworks:      []configv1.CIDR{"224.0.0.1/24", "224.0.1.1/24"},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
