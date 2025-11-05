@@ -2,7 +2,7 @@
 
 # run-locally.sh is some scaffolding around running a local instance of the
 # network operator with the installer.
-# See HACKING.md
+# See https://github.com/openshift/cluster-network-operator/wiki/Running-a-local-cluster-network-operator-for-plugin-development#run-hackrun-locallysh-to-start-a-cluster-with-your-custom-image
 
 set -o errexit
 set -o nounset
