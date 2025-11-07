@@ -548,6 +548,9 @@ data:
       # enable multicast
       enable_multicast_flag="--enable-multicast"
 
+      # set ip_forwarding_mode to the value of IP_FORWARDING_MODE
+      ip_forwarding_mode="{{.IP_FORWARDING_MODE}}"
+
       # Use OVN_NODE_MODE environment variable, default to "full" if not set
       OVN_NODE_MODE=${OVN_NODE_MODE:-full}
       # We check only dpu-host mode and not smart-nic mode here as currently we do not support it yet
@@ -568,6 +571,28 @@ data:
 
         # disable multi-external-gateway for dpu-host mode as it is not supported
         multi_external_gateway_enable_flag=""
+
+        # Force ip_forwarding_mode to Global for dpu-host mode.
+        # DPU hosts require IP forwarding to be enabled at all times to allow proper 
+        # traffic flow between the host management interface and the DPU's data plane 
+        # interfaces. This overrides any cluster-wide IPForwarding configuration.
+        # See docs/ovn_node_mode.md for more details.
+        ip_forwarding_mode="Global"
+      fi
+
+      # If IP Forwarding mode is global set it in the host here. IPv6 IP Forwarding shuld be
+      # enabled for all interfaces at all times if cluster is configured as single stack IPv6
+      # or dual stack. This will be taken care by ovn-kubernetes(ovn-org/ovn-kubernetes#4376).
+      # Setting net.ipv6.conf.all.forwarding to '0' when ipForwarding is Restricted to make 
+      # sure IPv6 IP Forwarding is disabled when cluster is configured as single stack IPv4.
+      ip_forwarding_flag=
+      if [ ${ip_forwarding_mode} == "Global" ]; then
+        sysctl -w net.ipv4.ip_forward=1
+        sysctl -w net.ipv6.conf.all.forwarding=1
+      else
+        ip_forwarding_flag="--disable-forwarding"
+        sysctl -w net.ipv4.ip_forward=0
+        sysctl -w net.ipv6.conf.all.forwarding=0
       fi
 
       if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
@@ -651,21 +676,6 @@ data:
       dns_name_resolver_enabled_flag=
       if [[ "{{.DNS_NAME_RESOLVER_ENABLE}}" == "true" ]]; then
         dns_name_resolver_enabled_flag="--enable-dns-name-resolver"
-      fi
-
-      # If IP Forwarding mode is global set it in the host here. IPv6 IP Forwarding shuld be
-      # enabled for all interfaces at all times if cluster is configured as single stack IPv6
-      # or dual stack. This will be taken care by ovn-kubernetes(ovn-org/ovn-kubernetes#4376).
-      # Setting net.ipv6.conf.all.forwarding to '0' when ipForwarding is Restricted to make 
-      # sure IPv6 IP Forwarding is disabled when cluster is configured as single stack IPv4.
-      ip_forwarding_flag=
-      if [ "{{.IP_FORWARDING_MODE}}" == "Global" ]; then
-        sysctl -w net.ipv4.ip_forward=1
-        sysctl -w net.ipv6.conf.all.forwarding=1
-      else
-        ip_forwarding_flag="--disable-forwarding"
-        sysctl -w net.ipv4.ip_forward=0
-        sysctl -w net.ipv6.conf.all.forwarding=0
       fi
 
       if [[ "{{.AdvertisedUDNIsolationMode}}" != "" ]]; then

@@ -167,7 +167,9 @@ OVN-Kubernetes supports specialized hardware deployments such as DPU (Data Proce
 - Multi-network policies and admin network policies
 - Network segmentation features
 
-This per-node feature enforcement is implemented through conditional logic in the startup scripts, allowing the same cluster configuration to work across heterogeneous node types. For detailed information about node modes and the technical implementation, see `docs/ovn_node_mode.md`.
+Additionally, **IP forwarding is always forced to Global mode** on DPU host nodes, regardless of the cluster-wide `IPForwarding` setting in `gatewayConfig`. This is required for DPU hosts to properly forward traffic across management and data plane interfaces.
+
+This per-node feature enforcement is implemented through conditional logic in the startup scripts, allowing the same cluster configuration to work across heterogeneous node types. For detailed information about node modes, IP forwarding behavior, and the technical implementation, see `docs/ovn_node_mode.md`.
 
 These configuration flags are only in the Operator configuration object.
 

@@ -24,6 +24,7 @@ This change introduces `OVN_NODE_MODE` as an environment variable injected into 
   - `enable_multicast_flag=""` (disabled)
   - `egress_features_enable_flag=""` (egress IP and related features disabled)
   - `multi_external_gateway_enable_flag=""` (multi-external gateway disabled)
+  - `ip_forwarding_mode="Global"` (forced to Global to allow traffic forwarding across interfaces)
   - Multi-network, network segmentation, and multi-network policy/admin network policy are gated and not enabled in this mode.
 
 ### Manifests
@@ -87,6 +88,24 @@ The following table shows how cluster-wide configuration translates to per-node 
   - Correct multi-network enablement logic (OVN_MULTI_NETWORK_ENABLE or OVN_NETWORK_SEGMENTATION_ENABLE)
 - Tests verify both positive cases (features enabled in full mode) and negative cases (features disabled in DPU host mode).
 
+### IP Forwarding Mode Behavior
+
+IP forwarding configuration is handled differently based on the node mode:
+
+#### Full Mode (default)
+- Respects the cluster-wide `IPForwarding` configuration from `gatewayConfig`
+- When set to `Global`: enables IP forwarding (`net.ipv4.ip_forward=1`, `net.ipv6.conf.all.forwarding=1`)
+- When set to `Restricted` or empty (default): disables IP forwarding and passes `--disable-forwarding` flag to ovnkube
+
+#### DPU Host Mode
+- **Always forces IP forwarding to `Global` mode**, regardless of cluster-wide configuration
+- This is required for DPU hosts to properly forward traffic across management and data plane interfaces
+- The script automatically overrides `ip_forwarding_mode="Global"` when `OVN_NODE_MODE="dpu-host"`
+- System-level IP forwarding is enabled: `net.ipv4.ip_forward=1` and `net.ipv6.conf.all.forwarding=1`
+- The `--disable-forwarding` flag is never passed to ovnkube on DPU host nodes
+
+**Rationale**: DPU hosts require IP forwarding to be enabled at all times to allow proper traffic flow between the host management interface and the DPU's data plane interfaces. Disabling IP forwarding on these nodes would break connectivity and prevent proper operation of the DPU hardware offload.
+
 ### Migration Notes
 
 When upgrading clusters that previously relied on ConfigMap-based feature control:
@@ -95,6 +114,7 @@ When upgrading clusters that previously relied on ConfigMap-based feature contro
 2. The startup scripts (both node and control-plane) now contain the authoritative feature enablement logic
 3. Control-plane components automatically enable all features (always run in "full" mode)
 4. DPU host nodes will automatically have incompatible features disabled regardless of previous ConfigMap settings
-5. No manual intervention is required - the migration is handled automatically during the upgrade process
+5. DPU host nodes will have IP forwarding forced to Global mode regardless of the cluster-wide `IPForwarding` setting
+6. No manual intervention is required - the migration is handled automatically during the upgrade process
 
 

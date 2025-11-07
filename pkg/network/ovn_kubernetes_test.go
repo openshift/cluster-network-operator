@@ -4455,6 +4455,16 @@ func TestOVNKubernetesScriptLibCombined(t *testing.T) {
 			},
 			mustNotContain: []string{},
 		},
+		{
+			name: "IP forwarding logic present in script",
+			overrides: map[string]interface{}{
+				"OVN_NODE_MODE": "dpu-host",
+			},
+			mustContain: []string{
+				"ip_forwarding_mode=\"Global\"",
+			},
+			mustNotContain: []string{},
+		},
 	}
 
 	for _, tc := range testCases {
