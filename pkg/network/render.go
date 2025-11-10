@@ -31,13 +31,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 )
 
-var dualStackPlatforms = sets.NewString(
-	string(configv1.BareMetalPlatformType),
-	string(configv1.NonePlatformType),
-	string(configv1.VSpherePlatformType),
-	string(configv1.OpenStackPlatformType),
-)
-
 const (
 	pluginName = "networking-console-plugin"
 )
@@ -400,13 +393,9 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 		return isClusterNetworkChangeSafe(prev, next)
 	}
 
-	// Validate that this is either a BareMetal or None PlatformType. For all other
-	// PlatformTypes, migration to DualStack is prohibited
+	// Check if migration to DualStack is prohibited
 	if len(prev.ServiceNetwork) < len(next.ServiceNetwork) {
-		if !isSupportedDualStackPlatform(infraRes.PlatformType) {
-			return errors.Errorf("%s is not one of the supported platforms for dual stack (%s)", infraRes.PlatformType,
-				strings.Join(dualStackPlatforms.List(), ", "))
-		} else if string(configv1.OpenStackPlatformType) == string(infraRes.PlatformType) {
+		if !isConversionToDualStackSupported(infraRes.PlatformType) {
 			return errors.Errorf("%s does not allow conversion to dual-stack cluster", infraRes.PlatformType)
 		}
 	}
@@ -973,10 +962,6 @@ func registerNetworkingConsolePlugin(bootstrapResult *bootstrap.BootstrapResult,
 	})
 }
 
-func isSupportedDualStackPlatform(platformType configv1.PlatformType) bool {
-	return dualStackPlatforms.Has(string(platformType))
-}
-
 func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
 	if conf == nil || conf.AdditionalRoutingCapabilities == nil {
 		return nil, nil
@@ -998,4 +983,26 @@ func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir s
 	}
 
 	return out, nil
+}
+
+func isSupportedDualStackPlatform(platformType configv1.PlatformType, featureGates featuregates.FeatureGate) bool {
+	switch platformType {
+	case configv1.BareMetalPlatformType, configv1.NonePlatformType, configv1.VSpherePlatformType, configv1.OpenStackPlatformType:
+		return true
+	case configv1.AWSPlatformType:
+		return featureGates.Enabled(apifeatures.FeatureGateAWSDualStackInstall)
+	case configv1.AzurePlatformType:
+		return featureGates.Enabled(apifeatures.FeatureGateAzureDualStackInstall)
+	default:
+		return false
+	}
+}
+
+func isConversionToDualStackSupported(platformType configv1.PlatformType) bool {
+	switch platformType {
+	case configv1.BareMetalPlatformType, configv1.NonePlatformType, configv1.VSpherePlatformType:
+		return true
+	default:
+		return false
+	}
 }
