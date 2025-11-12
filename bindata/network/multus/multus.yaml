@@ -109,7 +109,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: whereabouts-config
+  name: whereabouts-flatfile-config
   namespace: openshift-multus
 data:
   whereabouts.conf: |
@@ -119,8 +119,7 @@ data:
         "kubeconfig": "/etc/kubernetes/cni/net.d/whereabouts.d/whereabouts.kubeconfig"
       },
       "reconciler_cron_expression": "30 4 * * *",
-      "log_level": "debug",
-      "log_file": "/tmp/whereabouts.log",
+      "log_level": "verbose",
       "configuration_path": "/etc/kubernetes/cni/net.d/whereabouts.d"
     }
 ---
@@ -714,7 +713,7 @@ spec:
           name: cnibin
         - name: system-cni-dir
           mountPath: /host/etc/cni/net.d
-        - name: whereabouts-configmap
+        - name: whereabouts-flatfile-configmap
           mountPath: /etc/whereabouts/config
         env:
         - name: NODENAME
@@ -775,9 +774,9 @@ spec:
           configMap:
             name: {{.CniSysctlAllowlist}}
             defaultMode: 0744
-        - name: whereabouts-configmap
+        - name: whereabouts-flatfile-configmap
           configMap:
-            name: whereabouts-config
+            name: whereabouts-flatfile-config
 {{if .RenderWhereaboutsAuxillary}}
 ---
 apiVersion: apps/v1
@@ -905,7 +904,7 @@ spec:
             - mountPath: /host/etc/cni/net.d
               name: cni-net-dir
             - mountPath: /host/etc/cni/net.d/whereabouts.d/whereabouts.conf
-              name: whereabouts-configmap
+              name: whereabouts-flatfile-configmap
               subPath: whereabouts.conf
       preemptionPolicy: PreemptLowerPriority
       priorityClassName: "system-node-critical"
@@ -921,9 +920,9 @@ spec:
             path: {{ .SystemCNIConfDir }}
             type: Directory          
           name: cni-net-dir
-        - name: whereabouts-configmap
+        - name: whereabouts-flatfile-configmap
           configMap:
-            name: whereabouts-config
+            name: whereabouts-flatfile-config
             items:
             - key: whereabouts.conf
               path: whereabouts.conf
@@ -1071,8 +1070,8 @@ spec:
             memory: 10Mi
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
-        - name: whereabouts-configmap
-          mountPath: /etc/wherabouts/config
+        - name: whereabouts-flatfile-configmap
+          mountPath: /etc/whereabouts/config
         env:
         - name: KUBERNETES_SERVICE_PORT
           value: "{{.KUBERNETES_SERVICE_PORT}}"
@@ -1087,8 +1086,8 @@ spec:
         - name: WHEREABOUTS_NAMESPACE
           value: "openshift-multus"
       volumes:
-        - name: whereabouts-configmap
+        - name: whereabouts-flatfile-configmap
           configMap:
-            name: whereabouts-config
+            name: whereabouts-flatfile-config
 {{- end}}
 ---
