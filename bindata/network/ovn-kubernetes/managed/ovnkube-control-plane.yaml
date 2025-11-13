@@ -119,8 +119,8 @@ spec:
         - --kubeconfig=/etc/kubernetes/kubeconfig
         resources:
           requests:
-            cpu: 10m
-            memory: 30Mi
+            cpu: {{ .TokenMinterResourceRequestCPU | default "10" }}m
+            memory: {{ .TokenMinterResourceRequestMemory | default "30" }}Mi
         volumeMounts:
         - mountPath: /etc/kubernetes
           name: admin-kubeconfig
@@ -260,8 +260,8 @@ spec:
           readOnly: True
         resources:
           requests:
-            cpu: 10m
-            memory: 200Mi
+            cpu: {{ .OVNControlPlaneResourceRequestCPU | default "10" }}m
+            memory: {{ .OVNControlPlaneResourceRequestMemory | default "200" }}Mi
         env:
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
@@ -301,8 +301,8 @@ spec:
           readOnly: true
         resources:
           requests:
-            cpu: 10m
-            memory: 10Mi
+            cpu: {{ .Socks5ProxyResourceRequestCPU | default "10" }}m
+            memory: {{ .Socks5ProxyResourceRequestMemory | default "10" }}Mi
         env:
         - name: KUBECONFIG
           value: "/etc/kubernetes/kubeconfig"
