@@ -8,19 +8,25 @@ import (
 )
 
 type OVNHyperShiftBootstrapResult struct {
-	Enabled              bool
-	ClusterID            string
-	Namespace            string
-	RunAsUser            string
-	HCPNodeSelector      map[string]string
-	HCPLabels            map[string]string
-	HCPTolerations       []string
-	ControlPlaneReplicas int
-	ReleaseImage         string
-	ControlPlaneImage    string
-	CAConfigMap          string
-	CAConfigMapKey       string
-	PriorityClass        string
+	Enabled                              bool
+	ClusterID                            string
+	Namespace                            string
+	RunAsUser                            string
+	HCPNodeSelector                      map[string]string
+	HCPLabels                            map[string]string
+	HCPTolerations                       []string
+	ControlPlaneReplicas                 int
+	ReleaseImage                         string
+	ControlPlaneImage                    string
+	CAConfigMap                          string
+	CAConfigMapKey                       string
+	PriorityClass                        string
+	TokenMinterResourceRequestCPU        string
+	TokenMinterResourceRequestMemory     string
+	OVNControlPlaneResourceRequestCPU    string
+	OVNControlPlaneResourceRequestMemory string
+	Socks5ProxyResourceRequestCPU        string
+	Socks5ProxyResourceRequestMemory     string
 }
 
 type OVNConfigBoostrapResult struct {
