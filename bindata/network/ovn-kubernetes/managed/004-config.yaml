@@ -33,8 +33,18 @@ data:
     dns-service-name="dns-default"
  
     [ovnkubernetesfeature]
+{{- if not .DPU_HOST_MODE_ENABLED }}
+    enable-egress-ip=false
+    enable-egress-firewall=false
+    enable-egress-qos=false
+    enable-egress-service=false
+    enable-multi-external-gateway=false
+{{- end }}
 {{- if .ReachabilityNodePort }}
     egressip-node-healthcheck-port={{.ReachabilityNodePort}}
+{{- end }}
+{{- if .OVN_MULTI_NETWORK_ENABLE }}
+    enable-multi-network=true
 {{- end }}
 {{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
     {{- if not .OVN_MULTI_NETWORK_ENABLE }}
@@ -44,6 +54,12 @@ data:
 {{- end }}
 {{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
     enable-preconfigured-udn-addresses=true
+{{- end }}
+{{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
+    enable-multi-networkpolicy=true
+{{- end }}
+{{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
+    enable-admin-network-policy=true
 {{- end }}
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
     enable-dns-name-resolver=true
@@ -114,10 +130,13 @@ data:
     dns-service-name="dns-default"
 
     [ovnkubernetesfeature]
+{{- if not .DPU_HOST_MODE_ENABLED }}
     enable-egress-ip=true
     enable-egress-firewall=true
     enable-egress-qos=true
     enable-egress-service=true
+    enable-multi-external-gateway=true
+{{- end }}
 {{- if .ReachabilityNodePort }}
     egressip-node-healthcheck-port={{.ReachabilityNodePort}}
 {{- end }}
@@ -129,9 +148,21 @@ data:
     enable-multi-network=true
     {{- end }}
     enable-network-segmentation=true
+{{- end }}
 {{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
     enable-preconfigured-udn-addresses=true
 {{- end }}
+{{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
+    enable-multi-networkpolicy=true
+{{- end }}
+{{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
+    enable-admin-network-policy=true
+{{- end }}
+{{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
+    enable-multi-networkpolicy=true
+{{- end }}
+{{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
+    enable-admin-network-policy=true
 {{- end }}
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
     enable-dns-name-resolver=true
@@ -140,7 +171,6 @@ data:
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
     nodeport=true
-
 
     [logging]
     libovsdblogfile=/var/log/ovnkube/libovsdb.log

@@ -329,12 +329,20 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	// leverage feature gates
+	// Detect if DPU host mode is enabled cluster-wide
+	dpuHostModeEnabled := bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeEnabled
+
+	// Single flag to control all DPU-incompatible features
+	data.Data["DPU_HOST_MODE_ENABLED"] = dpuHostModeEnabled
+
+	// Feature gates
 	data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateAdminNetworkPolicy)
 	data.Data["DNS_NAME_RESOLVER_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateDNSNameResolver)
 	data.Data["OVN_NETWORK_SEGMENTATION_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateNetworkSegmentation)
 	data.Data["OVN_OBSERVABILITY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateOVNObservability)
 	data.Data["OVN_ROUTE_ADVERTISEMENTS_ENABLE"] = c.RouteAdvertisements == operv1.RouteAdvertisementsEnabled
 	data.Data["OVN_PRE_CONF_UDN_ADDR_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGatePreconfiguredUDNAddresses)
+	data.Data["OVN_MULTICAST_ENABLE"] = true
 
 	data.Data["ReachabilityTotalTimeoutSeconds"] = c.EgressIPConfig.ReachabilityTotalTimeoutSeconds
 
@@ -384,6 +392,19 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		// enabled
 		data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = true
 	}
+
+	// Disable all DPU-incompatible features when DPU host mode enabled
+	if true {
+		// Disable feature gates that are incompatible with DPU
+		data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = false
+		data.Data["OVN_NETWORK_SEGMENTATION_ENABLE"] = false
+		data.Data["OVN_MULTI_NETWORK_ENABLE"] = false
+		data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = false
+		data.Data["OVN_MULTICAST_ENABLE"] = false
+		data.Data["DPU_HOST_MODE_ENABLED"] = false
+	}
+	klog.Infof("OVN configuration is now %+v", data.Data)
+
 
 	//there only needs to be two cluster managers
 	clusterManagerReplicas := 2
@@ -460,6 +481,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		}
 		objs = append(objs, manifests...)
 	}
+
+
 
 	if len(bootstrapResult.OVN.OVNKubernetesConfig.DpuModeNodes) > 0 {
 		// "OVN_NODE_MODE" not set when render.RenderDir() called above,
@@ -951,6 +974,12 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 	ovnConfigResult.ConfigOverrides, err = getOVNKubernetesConfigOverrides(kubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("Could not get OVN Kubernetes config overrides: %w", err)
+	}
+
+	// Detect if DPU nodes are present in cluster
+	ovnConfigResult.DpuHostModeEnabled = len(ovnConfigResult.DpuModeNodes) > 0
+	if ovnConfigResult.DpuHostModeEnabled {
+		klog.Infof("DPU host mode enabled - DPU-incompatible features will be disabled cluster-wide (%d DPU nodes found)", len(ovnConfigResult.DpuModeNodes))
 	}
 
 	klog.Infof("OVN configuration is now %+v", ovnConfigResult)
