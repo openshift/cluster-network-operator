@@ -445,7 +445,6 @@ clusterNetworks:
 hostsubnetlength: 9
 kind: ClusterNetwork
 metadata:
-  creationTimestamp: null
   name: default
 mtu: 1450
 network: 10.128.0.0/15
