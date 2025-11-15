@@ -261,6 +261,11 @@ spec:
         runAsUser: {{.RunAsUser}}
 {{- end }}
       tolerations:
+{{- if .HCPTolerations }}
+        {{- range $t := .HCPTolerations }}
+        {{ $t }}
+        {{- end }}
+{{- end }}
         - key: "hypershift.openshift.io/control-plane"
           operator: "Equal"
           value: "true"
