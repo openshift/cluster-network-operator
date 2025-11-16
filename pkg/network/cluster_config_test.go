@@ -2,10 +2,10 @@ package network
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
+	apifeatures "github.com/openshift/api/features"
 	v1 "github.com/openshift/api/network/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -17,6 +17,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
 	. "github.com/onsi/gomega"
 )
@@ -35,6 +36,20 @@ var ClusterConfig = configv1.NetworkSpec{
 	ServiceNetwork: []string{"192.168.0.0/20"},
 
 	NetworkType: "None",
+}
+
+func getFeatureGatesWithDualStack() featuregates.FeatureGate {
+	return featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy,
+			apifeatures.FeatureGateDNSNameResolver,
+			apifeatures.FeatureGateNetworkSegmentation,
+			apifeatures.FeatureGateOVNObservability,
+			apifeatures.FeatureGateAWSDualStackInstall,
+			apifeatures.FeatureGateAzureDualStackInstall},
+		[]configv1.FeatureGateName{
+			apifeatures.FeatureGatePreconfiguredUDNAddresses,
+		},
+	)
 }
 
 func TestValidateClusterConfig(t *testing.T) {
@@ -57,12 +72,13 @@ func TestValidateClusterConfig(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 
 	cc := *ClusterConfig.DeepCopy()
-	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client)
+	featureGates := getFeatureGatesWithDualStack()
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client, featureGates)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	haveError := func(cfg configv1.NetworkSpec, substr string) {
 		t.Helper()
-		err = ValidateClusterConfig(&configv1.Network{Spec: cfg}, client)
+		err = ValidateClusterConfig(&configv1.Network{Spec: cfg}, client, featureGates)
 		g.Expect(err).To(MatchError(ContainSubstring(substr)))
 	}
 
@@ -88,7 +104,7 @@ func TestValidateClusterConfig(t *testing.T) {
 
 	cc = *ClusterConfig.DeepCopy()
 	cc.ClusterNetwork[1].HostPrefix = 0
-	res := ValidateClusterConfig(&configv1.Network{Spec: cc}, client)
+	res := ValidateClusterConfig(&configv1.Network{Spec: cc}, client, featureGates)
 	// Since the NetworkType is None, and the hostprefix is unset we don't validate it
 	g.Expect(res).Should(BeNil())
 
@@ -289,7 +305,8 @@ func TestValidClusterConfigLiveMigration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := fake.NewFakeClient(tt.objects...)
-			err := validateClusterConfig(tt.config, tt.infraRes, client)
+			fg := getFeatureGatesWithDualStack()
+			err := validateClusterConfig(tt.config, tt.infraRes, client, fg)
 			if tt.expectErr {
 				g.Expect(err).To(HaveOccurred())
 				if tt.expectedErrorMsg != "" {
@@ -301,6 +318,21 @@ func TestValidClusterConfigLiveMigration(t *testing.T) {
 			}
 		})
 	}
+}
+
+func getFeatureGatesWithIncompleteDualStack() featuregates.FeatureGate {
+	return featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy,
+			apifeatures.FeatureGateDNSNameResolver,
+			apifeatures.FeatureGateNetworkSegmentation,
+			apifeatures.FeatureGateOVNObservability,
+			apifeatures.FeatureGateAWSDualStackInstall,
+		},
+		[]configv1.FeatureGateName{
+			apifeatures.FeatureGatePreconfiguredUDNAddresses,
+			apifeatures.FeatureGateAzureDualStackInstall,
+		},
+	)
 }
 
 func TestValidateClusterConfigDualStack(t *testing.T) {
@@ -323,12 +355,13 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 
 	cc := *ClusterConfig.DeepCopy()
-	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client)
+	featureGates := getFeatureGatesWithDualStack()
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client, featureGates)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	haveError := func(cfg configv1.NetworkSpec, substr string) {
 		t.Helper()
-		err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client)
+		err = ValidateClusterConfig(&configv1.Network{Spec: cfg}, client, featureGates)
 		g.Expect(err).To(MatchError(ContainSubstring(substr)))
 	}
 
@@ -368,11 +401,14 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 		CIDR:       "fd01::/48",
 		HostPrefix: 64,
 	})
-	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client)
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client, featureGates)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	// You can't use dual-stack if this is anything else but BareMetal or NonePlatformType
-	infrastructure.Status.PlatformStatus.Type = configv1.AzurePlatformType
+	// You can't use dual-stack if enabled on an unsupported platform
+	infrastructure.Status.PlatformStatus.Type = configv1.GCPPlatformType
+	infrastructure.Status.PlatformStatus.GCP = &configv1.GCPPlatformStatus{
+		Region: "us-west1",
+	}
 	client = fake.NewFakeClient(infrastructure)
 	err = createProxy(client)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -382,8 +418,42 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 		CIDR:       "fd01::/48",
 		HostPrefix: 64,
 	})
-	haveError(cc, fmt.Sprintf("%s is not one of the supported platforms for dual stack (%s)",
-		infrastructure.Status.PlatformStatus.Type, strings.Join(dualStackPlatforms.List(), ", ")))
+	haveError(cc, fmt.Sprintf("%s is not one of the supported platforms for dual stack",
+		infrastructure.Status.PlatformStatus.Type))
+
+	// DualStack supported only with featuregates
+	infrastructure.Status.PlatformStatus.Type = configv1.AWSPlatformType
+	infrastructure.Status.PlatformStatus.AWS = &configv1.AWSPlatformStatus{
+		Region: "us-east-1",
+	}
+	client = fake.NewFakeClient(infrastructure)
+	err = createProxy(client)
+	g.Expect(err).NotTo(HaveOccurred())
+	cc = *ClusterConfig.DeepCopy()
+	cc.ServiceNetwork = append(cc.ServiceNetwork, "fd02::/112")
+	cc.ClusterNetwork = append(cc.ClusterNetwork, configv1.ClusterNetworkEntry{
+		CIDR:       "fd01::/48",
+		HostPrefix: 64,
+	})
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client, featureGates)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	// DualStack with supported platform but missing featuregate
+	featureGates = getFeatureGatesWithIncompleteDualStack()
+	infrastructure.Status.PlatformStatus.Type = configv1.AzurePlatformType
+	infrastructure.Status.PlatformStatus.Azure = &configv1.AzurePlatformStatus{}
+	client = fake.NewFakeClient(infrastructure)
+	err = createProxy(client)
+	g.Expect(err).NotTo(HaveOccurred())
+	cc = *ClusterConfig.DeepCopy()
+	cc.ServiceNetwork = append(cc.ServiceNetwork, "fd02::/112")
+	cc.ClusterNetwork = append(cc.ClusterNetwork, configv1.ClusterNetworkEntry{
+		CIDR:       "fd01::/48",
+		HostPrefix: 64,
+	})
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client, featureGates)
+	haveError(cc, fmt.Sprintf("%s is not one of the supported platforms for dual stack",
+		infrastructure.Status.PlatformStatus.Type))
 }
 
 func TestMergeClusterConfig(t *testing.T) {
