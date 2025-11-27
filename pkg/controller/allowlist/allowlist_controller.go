@@ -19,7 +19,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -45,7 +44,7 @@ const (
 )
 
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, client cnoclient.Client, _ featuregates.FeatureGate) error {
-	r:= &ReconcileAllowlist{client: client, status: status}
+	r := &ReconcileAllowlist{client: client, status: status}
 	c, err := controller.New("allowlist-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
@@ -159,9 +158,8 @@ func createObjectsFrom(ctx context.Context, client cnoclient.Client, manifestPat
 		return err
 	}
 	for _, obj := range manifests {
-		err = createObject(ctx, client, obj)
-		if err != nil {
-			return err
+		if err := client.Default().CRClient().Create(ctx, obj); err != nil {
+			return errors.Wrapf(err, "error creating %s %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
 		}
 	}
 	return nil
@@ -177,14 +175,6 @@ func getConfigMap(ctx context.Context, client cnoclient.Client, namespacedName t
 		return nil, err
 	}
 	return configMap, nil
-}
-
-func createObject(ctx context.Context, client cnoclient.Client, obj *unstructured.Unstructured) error {
-	err := client.Default().CRClient().Create(ctx, obj)
-	if err != nil {
-		return errors.Wrapf(err, "error creating %s %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
-	}
-	return nil
 }
 
 func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
@@ -228,20 +218,12 @@ func cleanupDaemonSet(ctx context.Context, client cnoclient.Client) {
 		return
 	}
 	if ds != nil {
-		err = deleteDaemonSet(ctx, client)
+		err := client.Default().Kubernetes().AppsV1().DaemonSets(names.MultusNamespace).Delete(
+			ctx, dsName, metav1.DeleteOptions{})
 		if err != nil {
 			klog.Errorf("Error cleaning up allow list daemonset: %+v", err)
 		}
 	}
-}
-
-func deleteDaemonSet(ctx context.Context, client cnoclient.Client) error {
-	err := client.Default().Kubernetes().AppsV1().DaemonSets(names.MultusNamespace).Delete(
-		ctx, dsName, metav1.DeleteOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func getDaemonSet(ctx context.Context, client cnoclient.Client) (*appsv1.DaemonSet, error) {
