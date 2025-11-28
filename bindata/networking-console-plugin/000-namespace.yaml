@@ -7,3 +7,4 @@ metadata:
   annotations:
     openshift.io/description: "Namespace for running the networking-console-plugin pods that enables the Networking console section"
     workload.openshift.io/allowed: "management"
+    openshift.io/node-selector: ""
