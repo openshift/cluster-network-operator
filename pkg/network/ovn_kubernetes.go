@@ -333,6 +333,59 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["IP_FORWARDING_MODE"] = c.GatewayConfig.IPForwarding
 	}
 
+	// No-overlay mode configuration
+	// The NoOverlayMode feature gate enables no-overlay networking for both the default network
+	// and CUDNs (Cluster User-Defined Networks). BGP managed configuration is cluster-wide and
+	// applies to any network using no-overlay mode with managed routing.
+	data.Data["DefaultNetworkTransport"] = ""
+	data.Data["NoOverlayEnabled"] = false
+	data.Data["NoOverlayOutboundSNAT"] = ""
+	data.Data["NoOverlayRouting"] = ""
+	data.Data["NoOverlayManagedEnabled"] = false
+	data.Data["NoOverlayManagedASNumber"] = ""
+	data.Data["NoOverlayManagedTopology"] = ""
+
+	noOverlayFeatureEnabled := featureGates.Enabled(apifeatures.FeatureGateNoOverlayMode)
+
+	// Parse default network no-overlay configuration if the feature is enabled and default network uses it
+	if noOverlayFeatureEnabled && c.DefaultNetworkTransport == operv1.TransportOptionNoOverlay {
+		data.Data["DefaultNetworkTransport"] = "no-overlay"
+		data.Data["NoOverlayEnabled"] = true
+
+		// No-overlay specific options for the default network
+		if c.DefaultNetworkNoOverlayOptions.OutboundSNAT != "" {
+			// Convert API value (e.g., "Enabled") to lowercase for ovn-kubernetes config (e.g., "enable")
+			data.Data["NoOverlayOutboundSNAT"] = strings.ToLower(string(c.DefaultNetworkNoOverlayOptions.OutboundSNAT))
+		}
+		if c.DefaultNetworkNoOverlayOptions.Routing != "" {
+			// Convert API value (e.g., "Managed") to lowercase for ovn-kubernetes config (e.g., "managed")
+			data.Data["NoOverlayRouting"] = strings.ToLower(string(c.DefaultNetworkNoOverlayOptions.Routing))
+		}
+	}
+
+	// BGP managed configuration is cluster-wide and applies to any network (default or CUDN)
+	// using no-overlay mode with managed routing. Parse it whenever the feature gate is enabled.
+	// BGPTopology is required when BGPManagedConfig is specified, so we check for it.
+	if noOverlayFeatureEnabled && c.BGPManagedConfig.BGPTopology != "" {
+		data.Data["NoOverlayManagedEnabled"] = true
+		klog.V(2).Infof("BGP managed configuration enabled for no-overlay mode")
+
+		// ASNumber is optional, will have a default if not set
+		if c.BGPManagedConfig.ASNumber > 0 {
+			data.Data["NoOverlayManagedASNumber"] = c.BGPManagedConfig.ASNumber
+		}
+
+		// Convert API value "FullMesh" to ovn-kubernetes config value "full-mesh"
+		var topology string
+		switch c.BGPManagedConfig.BGPTopology {
+		case operv1.BGPTopologyFullMesh:
+			topology = "full-mesh"
+		default:
+			return nil, progressing, fmt.Errorf("unsupported BGP topology: %s", c.BGPManagedConfig.BGPTopology)
+		}
+		data.Data["NoOverlayManagedTopology"] = topology
+	}
+
 	// leverage feature gates
 	data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateAdminNetworkPolicy)
 	data.Data["DNS_NAME_RESOLVER_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateDNSNameResolver)
@@ -1203,6 +1256,15 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 	if sc.PolicyAuditConfig.SyslogFacility == "" {
 		var syslogfacility string = "local0"
 		sc.PolicyAuditConfig.SyslogFacility = syslogfacility
+	}
+
+	// Default DefaultNetworkTransport to Geneve if not specified.
+	// Note: During Tech Preview, the CRD doesn't have a default value for this field
+	// (to avoid breaking existing ungated tests). CNO handles the default here.
+	// TODO(NoOverlayMode GA): When this feature graduates to GA, the CRD will have
+	// '+kubebuilder:default=Geneve' and this code can be removed.
+	if sc.DefaultNetworkTransport == "" {
+		sc.DefaultNetworkTransport = operv1.TransportOptionGeneve
 	}
 
 }
