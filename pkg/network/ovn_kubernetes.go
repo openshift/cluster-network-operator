@@ -244,6 +244,12 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["CAConfigMapKey"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.CAConfigMapKey
 	data.Data["RunAsUser"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.RunAsUser
 	data.Data["PriorityClass"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.PriorityClass
+	data.Data["TokenMinterResourceRequestCPU"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.TokenMinterResourceRequestCPU
+	data.Data["TokenMinterResourceRequestMemory"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.TokenMinterResourceRequestMemory
+	data.Data["OVNControlPlaneResourceRequestCPU"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNControlPlaneResourceRequestCPU
+	data.Data["OVNControlPlaneResourceRequestMemory"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNControlPlaneResourceRequestMemory
+	data.Data["Socks5ProxyResourceRequestCPU"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Socks5ProxyResourceRequestCPU
+	data.Data["Socks5ProxyResourceRequestMemory"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Socks5ProxyResourceRequestMemory
 	data.Data["OVN_NB_INACTIVITY_PROBE"] = nb_inactivity_probe
 	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
 	data.Data["OVN_NORTHD_PROBE_INTERVAL"] = os.Getenv("OVN_NORTHD_PROBE_INTERVAL")
@@ -749,7 +755,65 @@ func bootstrapOVNHyperShiftConfig(hc *hypershift.HyperShiftConfig, kubeClient cn
 	default:
 		ovnHypershiftResult.ControlPlaneReplicas = 1
 	}
+
+	// Preserve any customizations to the resource requests on the three containers in the ovn-control-plane pod
+	controlPlaneClient := kubeClient.ClientFor(names.ManagementClusterName)
+	tokenMinterCPURequest, tokenMinterMemoryRequest := getResourceRequestsForDeployment(controlPlaneClient.CRClient(), hc.Namespace, util.OVN_CONTROL_PLANE, "token-minter")
+	if tokenMinterCPURequest > 0 {
+		ovnHypershiftResult.TokenMinterResourceRequestCPU = strconv.FormatInt(tokenMinterCPURequest, 10)
+	}
+	if tokenMinterMemoryRequest > 0 {
+		ovnHypershiftResult.TokenMinterResourceRequestMemory = strconv.FormatInt(tokenMinterMemoryRequest, 10)
+	}
+
+	ovnControlPlaneCPURequest, ovnControlPlaneMemoryRequest := getResourceRequestsForDeployment(controlPlaneClient.CRClient(), hc.Namespace, util.OVN_CONTROL_PLANE, "ovnkube-control-plane")
+	if ovnControlPlaneCPURequest > 0 {
+		ovnHypershiftResult.OVNControlPlaneResourceRequestCPU = strconv.FormatInt(ovnControlPlaneCPURequest, 10)
+	}
+	if ovnControlPlaneMemoryRequest > 0 {
+		ovnHypershiftResult.OVNControlPlaneResourceRequestMemory = strconv.FormatInt(ovnControlPlaneMemoryRequest, 10)
+	}
+
+	socksProxyCPURequest, socksProxyMemoryRequest := getResourceRequestsForDeployment(controlPlaneClient.CRClient(), hc.Namespace, util.OVN_CONTROL_PLANE, "socks-proxy")
+	if socksProxyCPURequest > 0 {
+		ovnHypershiftResult.Socks5ProxyResourceRequestCPU = strconv.FormatInt(socksProxyCPURequest, 10)
+	}
+	if socksProxyMemoryRequest > 0 {
+		ovnHypershiftResult.Socks5ProxyResourceRequestMemory = strconv.FormatInt(socksProxyMemoryRequest, 10)
+	}
+
 	return ovnHypershiftResult, nil
+}
+
+// getResourceRequestsForDeployment gets the cpu and memory resource requests for the specified deployment
+// If the deployment or container is not found, or if the container doesn't have a cpu or memory resource request, then 0 is returned
+func getResourceRequestsForDeployment(cl crclient.Reader, namespace string, deploymentName string, containerName string) (cpu int64, memory int64) {
+	deployment := &appsv1.Deployment{}
+	if err := cl.Get(context.TODO(), types.NamespacedName{
+		Namespace: namespace,
+		Name:      deploymentName,
+	}, deployment); err != nil {
+		if !apierrors.IsNotFound(err) {
+			klog.Warningf("Error fetching %s deployment: %v", deploymentName, err)
+		}
+		return cpu, memory
+	}
+
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		if container.Name == containerName {
+			if container.Resources.Requests != nil {
+				if !container.Resources.Requests.Cpu().IsZero() {
+					cpu = container.Resources.Requests.Cpu().MilliValue()
+				}
+				if !container.Resources.Requests.Memory().IsZero() {
+					memory = container.Resources.Requests.Memory().Value() / bytesInMiB
+				}
+			}
+			break
+		}
+	}
+
+	return cpu, memory
 }
 
 func getDisableUDPAggregation(cl crclient.Reader) bool {
