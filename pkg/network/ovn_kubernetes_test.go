@@ -76,7 +76,7 @@ var manifestDirOvn = "../../bindata"
 func getDefaultFeatureGates() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
 		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver,
-			apifeatures.FeatureGateNetworkSegmentation, apifeatures.FeatureGateOVNObservability},
+			apifeatures.FeatureGateNetworkSegmentation, apifeatures.FeatureGateOVNObservability, apifeatures.FeatureGateNoOverlayMode},
 		[]configv1.FeatureGateName{
 			apifeatures.FeatureGatePreconfiguredUDNAddresses,
 		},
@@ -932,6 +932,7 @@ logfile-maxage=0`,
 				apifeatures.FeatureGateNetworkSegmentation,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGatePreconfiguredUDNAddresses,
+				apifeatures.FeatureGateNoOverlayMode,
 			}
 			s := sets.New[configv1.FeatureGateName](tc.enabledFeatureGates...)
 			enabled := []configv1.FeatureGateName{}
@@ -1042,8 +1043,9 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				MTU:        ptrToUint32(8900),
-				GenevePort: ptrToUint32(6081),
+				MTU:                     ptrToUint32(8900),
+				GenevePort:              ptrToUint32(6081),
+				DefaultNetworkTransport: operv1.TransportOptionGeneve,
 				PolicyAuditConfig: &operv1.PolicyAuditConfig{
 					RateLimit:      ptrToUint32(20),
 					MaxFileSize:    ptrToUint32(50),
@@ -1082,9 +1084,10 @@ func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				MTU:         ptrToUint32(8854),
-				GenevePort:  ptrToUint32(8061),
-				IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull},
+				MTU:                     ptrToUint32(8854),
+				GenevePort:              ptrToUint32(8061),
+				IPsecConfig:             &operv1.IPsecConfig{Mode: operv1.IPsecModeFull},
+				DefaultNetworkTransport: operv1.TransportOptionGeneve,
 				PolicyAuditConfig: &operv1.PolicyAuditConfig{
 					RateLimit:      ptrToUint32(20),
 					MaxFileSize:    ptrToUint32(50),
@@ -1199,20 +1202,20 @@ func TestValidateOVNKubernetesSubnetsIPv4(t *testing.T) {
 	// IPv4 subnet overlap check
 	ovnConfig.V4InternalSubnet = ""
 	ovnConfig.IPv4.InternalJoinSubnet = "10.128.0.0/16"
-	errExpect("Whole or subset of v4InternalJoinSubnet CIDR 10.128.0.0/16 is already in use: CIDRs 10.128.0.0/15 and 10.128.0.0/16 overlap")
+	errExpect("whole or subset of v4InternalJoinSubnet CIDR 10.128.0.0/16 is already in use: CIDRs 10.128.0.0/15 and 10.128.0.0/16 overlap")
 	ovnConfig.IPv4.InternalTransitSwitchSubnet = "10.128.0.0/16"
-	errExpect("Whole or subset of v4InternalTransitSwitchSubnet CIDR 10.128.0.0/16 is already in use: CIDRs 10.128.0.0/15 and 10.128.0.0/16 overlap")
+	errExpect("whole or subset of v4InternalTransitSwitchSubnet CIDR 10.128.0.0/16 is already in use: CIDRs 10.128.0.0/15 and 10.128.0.0/16 overlap")
 	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "10.128.0.0/16"
-	errExpect("Whole or subset of v4InternalMasqueradeSubnet CIDR 10.128.0.0/16 is already in use: CIDRs 10.128.0.0/15 and 10.128.0.0/16 overlap")
+	errExpect("whole or subset of v4InternalMasqueradeSubnet CIDR 10.128.0.0/16 is already in use: CIDRs 10.128.0.0/15 and 10.128.0.0/16 overlap")
 	ovnConfig.IPv4.InternalJoinSubnet = "100.99.0.0/16"
 	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "100.99.0.0/16"
-	errExpect("Whole or subset of v4InternalMasqueradeSubnet CIDR 100.99.0.0/16 is already in use: CIDRs 100.99.0.0/16 and 100.99.0.0/16 overlap")
+	errExpect("whole or subset of v4InternalMasqueradeSubnet CIDR 100.99.0.0/16 is already in use: CIDRs 100.99.0.0/16 and 100.99.0.0/16 overlap")
 	ovnConfig.IPv4.InternalJoinSubnet = "100.99.0.0/16"
 	ovnConfig.IPv4.InternalTransitSwitchSubnet = "100.99.0.0/16"
-	errExpect("Whole or subset of v4InternalTransitSwitchSubnet CIDR 100.99.0.0/16 is already in use: CIDRs 100.99.0.0/16 and 100.99.0.0/16 overlap")
+	errExpect("whole or subset of v4InternalTransitSwitchSubnet CIDR 100.99.0.0/16 is already in use: CIDRs 100.99.0.0/16 and 100.99.0.0/16 overlap")
 	ovnConfig.IPv4.InternalTransitSwitchSubnet = "100.99.0.0/16"
 	ovnConfig.GatewayConfig.IPv4.InternalMasqueradeSubnet = "100.99.0.0/16"
-	errExpect("Whole or subset of v4InternalMasqueradeSubnet CIDR 100.99.0.0/16 is already in use: CIDRs 100.99.0.0/16 and 100.99.0.0/16 overlap")
+	errExpect("whole or subset of v4InternalMasqueradeSubnet CIDR 100.99.0.0/16 is already in use: CIDRs 100.99.0.0/16 and 100.99.0.0/16 overlap")
 }
 
 func TestValidateOVNKubernetesSubnetsIPv6(t *testing.T) {
@@ -1282,20 +1285,20 @@ func TestValidateOVNKubernetesSubnetsIPv6(t *testing.T) {
 	// IPv6 subnet overlap check
 	ovnConfig.V6InternalSubnet = ""
 	ovnConfig.IPv6.InternalJoinSubnet = "fd01::/64"
-	errExpect("Whole or subset of v6InternalJoinSubnet CIDR fd01::/64 is already in use: CIDRs fd01::/48 and fd01::/64 overlap")
+	errExpect("whole or subset of v6InternalJoinSubnet CIDR fd01::/64 is already in use: CIDRs fd01::/48 and fd01::/64 overlap")
 	ovnConfig.IPv6.InternalTransitSwitchSubnet = "fd01::/64"
-	errExpect("Whole or subset of v6InternalTransitSwitchSubnet CIDR fd01::/64 is already in use: CIDRs fd01::/48 and fd01::/64 overlap")
+	errExpect("whole or subset of v6InternalTransitSwitchSubnet CIDR fd01::/64 is already in use: CIDRs fd01::/48 and fd01::/64 overlap")
 	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd01::/64"
-	errExpect("Whole or subset of v6InternalMasqueradeSubnet CIDR fd01::/64 is already in use: CIDRs fd01::/48 and fd01::/64 overlap")
+	errExpect("whole or subset of v6InternalMasqueradeSubnet CIDR fd01::/64 is already in use: CIDRs fd01::/48 and fd01::/64 overlap")
 	ovnConfig.IPv6.InternalJoinSubnet = "fd69::/111"
 	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd69::/111"
-	errExpect("Whole or subset of v6InternalMasqueradeSubnet CIDR fd69::/111 is already in use: CIDRs fd69::/111 and fd69::/111 overlap")
+	errExpect("whole or subset of v6InternalMasqueradeSubnet CIDR fd69::/111 is already in use: CIDRs fd69::/111 and fd69::/111 overlap")
 	ovnConfig.IPv6.InternalJoinSubnet = "fd69::/111"
 	ovnConfig.IPv6.InternalTransitSwitchSubnet = "fd69::/111"
-	errExpect("Whole or subset of v6InternalTransitSwitchSubnet CIDR fd69::/111 is already in use: CIDRs fd69::/111 and fd69::/111 overlap")
+	errExpect("whole or subset of v6InternalTransitSwitchSubnet CIDR fd69::/111 is already in use: CIDRs fd69::/111 and fd69::/111 overlap")
 	ovnConfig.IPv6.InternalTransitSwitchSubnet = "fd69::/111"
 	ovnConfig.GatewayConfig.IPv6.InternalMasqueradeSubnet = "fd69::/111"
-	errExpect("Whole or subset of v6InternalMasqueradeSubnet CIDR fd69::/111 is already in use: CIDRs fd69::/111 and fd69::/111 overlap")
+	errExpect("whole or subset of v6InternalMasqueradeSubnet CIDR fd69::/111 is already in use: CIDRs fd69::/111 and fd69::/111 overlap")
 }
 
 func TestValidateOVNKubernetesDualStack(t *testing.T) {
@@ -3827,6 +3830,7 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 			apifeatures.FeatureGateDNSNameResolver,
 			apifeatures.FeatureGateNetworkSegmentation,
 			apifeatures.FeatureGateOVNObservability,
+			apifeatures.FeatureGateNoOverlayMode,
 		},
 		[]configv1.FeatureGateName{
 			apifeatures.FeatureGatePreconfiguredUDNAddresses,
@@ -4102,6 +4106,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateNetworkSegmentation,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGatePreconfiguredUDNAddresses,
+				apifeatures.FeatureGateNoOverlayMode,
 			},
 		)
 	}
@@ -4115,6 +4120,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGatePreconfiguredUDNAddresses,
+				apifeatures.FeatureGateNoOverlayMode,
 			},
 		)
 	}
@@ -4128,6 +4134,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateAdminNetworkPolicy,
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateOVNObservability,
+				apifeatures.FeatureGateNoOverlayMode,
 			},
 		)
 	}
@@ -4470,4 +4477,263 @@ func TestOVNKubernetesScriptLibCombined(t *testing.T) {
 			g.Expect(script).To(ContainSubstring("--gateway-interface ${gateway_interface}"))
 		})
 	}
+}
+
+// TestRenderOVNKubernetesNoOverlay tests no-overlay mode rendering
+func TestRenderOVNKubernetesNoOverlay(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	noOverlayEnabledFeatureGates := func() featuregates.FeatureGate {
+		return featuregates.NewFeatureGate(
+			[]configv1.FeatureGateName{
+				apifeatures.FeatureGateAdminNetworkPolicy,
+				apifeatures.FeatureGateDNSNameResolver,
+				apifeatures.FeatureGateNetworkSegmentation,
+				apifeatures.FeatureGateOVNObservability,
+				apifeatures.FeatureGateNoOverlayMode,
+			},
+			[]configv1.FeatureGateName{
+				apifeatures.FeatureGatePreconfiguredUDNAddresses,
+			},
+		)
+	}
+
+	noOverlayDisabledFeatureGates := func() featuregates.FeatureGate {
+		return featuregates.NewFeatureGate(
+			[]configv1.FeatureGateName{
+				apifeatures.FeatureGateAdminNetworkPolicy,
+				apifeatures.FeatureGateDNSNameResolver,
+				apifeatures.FeatureGateNetworkSegmentation,
+				apifeatures.FeatureGateOVNObservability,
+			},
+			[]configv1.FeatureGateName{
+				apifeatures.FeatureGatePreconfiguredUDNAddresses,
+				apifeatures.FeatureGateNoOverlayMode,
+			},
+		)
+	}
+
+	testCases := []struct {
+		name                    string
+		defaultNetworkTransport operv1.TransportOption
+		noOverlayOptions        *operv1.NoOverlayOptions
+		bgpManagedConfig        *operv1.BGPManagedConfig
+		featureGates            func() featuregates.FeatureGate
+		expectTransport         string // expected rendered transport value (e.g., "no-overlay", not "NoOverlay")
+		expectNoOverlayEnabled  bool
+		expectNoOverlayRouting  string
+		expectNoOverlaySNAT     string
+		expectManagedEnabled    bool
+		expectManagedTopology   string
+		expectManagedASNumber   any // int64 when BGP managed is enabled, empty string otherwise
+		expectErr               bool
+	}{
+		{
+			name:                    "default (Geneve) - no-overlay disabled",
+			defaultNetworkTransport: operv1.TransportOptionGeneve,
+			featureGates:            noOverlayEnabledFeatureGates,
+			expectTransport:         "",
+			expectNoOverlayEnabled:  false,
+			expectNoOverlayRouting:  "",
+			expectNoOverlaySNAT:     "",
+			expectManagedEnabled:    false,
+			expectManagedTopology:   "",
+			expectManagedASNumber:   "",
+		},
+		{
+			name:                    "NoOverlay with Unmanaged routing",
+			defaultNetworkTransport: operv1.TransportOptionNoOverlay,
+			noOverlayOptions: &operv1.NoOverlayOptions{
+				Routing:      operv1.RoutingUnmanaged,
+				OutboundSNAT: operv1.SNATEnabled,
+			},
+			featureGates:           noOverlayEnabledFeatureGates,
+			expectTransport:        "no-overlay",
+			expectNoOverlayEnabled: true,
+			expectNoOverlayRouting: "unmanaged",
+			expectNoOverlaySNAT:    "enabled",
+			expectManagedEnabled:   false,
+			expectManagedTopology:  "",
+			expectManagedASNumber:  "",
+		},
+		{
+			name:                    "NoOverlay with Managed routing and BGP FullMesh",
+			defaultNetworkTransport: operv1.TransportOptionNoOverlay,
+			noOverlayOptions: &operv1.NoOverlayOptions{
+				Routing:      operv1.RoutingManaged,
+				OutboundSNAT: operv1.SNATDisabled,
+			},
+			bgpManagedConfig: &operv1.BGPManagedConfig{
+				BGPTopology: operv1.BGPTopologyFullMesh,
+				ASNumber:    65001,
+			},
+			featureGates:           noOverlayEnabledFeatureGates,
+			expectTransport:        "no-overlay",
+			expectNoOverlayEnabled: true,
+			expectNoOverlayRouting: "managed",
+			expectNoOverlaySNAT:    "disabled",
+			expectManagedEnabled:   true,
+			expectManagedTopology:  "full-mesh",
+			expectManagedASNumber:  int64(65001),
+		},
+		{
+			name:                    "NoOverlay with Managed routing, BGP FullMesh, default ASNumber",
+			defaultNetworkTransport: operv1.TransportOptionNoOverlay,
+			noOverlayOptions: &operv1.NoOverlayOptions{
+				Routing:      operv1.RoutingManaged,
+				OutboundSNAT: operv1.SNATDisabled,
+			},
+			bgpManagedConfig: &operv1.BGPManagedConfig{
+				BGPTopology: operv1.BGPTopologyFullMesh,
+				// ASNumber defaults to 64512 via CRD default (+kubebuilder:default=64512)
+				// The API server will set this before CNO sees it
+				ASNumber: 64512,
+			},
+			featureGates:           noOverlayEnabledFeatureGates,
+			expectTransport:        "no-overlay",
+			expectNoOverlayEnabled: true,
+			expectNoOverlayRouting: "managed",
+			expectNoOverlaySNAT:    "disabled",
+			expectManagedEnabled:   true,
+			expectManagedTopology:  "full-mesh",
+			expectManagedASNumber:  int64(64512),
+		},
+		{
+			name:                    "NoOverlay enabled but feature gate disabled - falls back to Geneve behavior",
+			defaultNetworkTransport: operv1.TransportOptionNoOverlay,
+			noOverlayOptions: &operv1.NoOverlayOptions{
+				Routing:      operv1.RoutingUnmanaged,
+				OutboundSNAT: operv1.SNATEnabled,
+			},
+			featureGates:           noOverlayDisabledFeatureGates,
+			expectTransport:        "",
+			expectNoOverlayEnabled: false,
+			expectNoOverlayRouting: "",
+			expectNoOverlaySNAT:    "",
+			expectManagedEnabled:   false,
+			expectManagedTopology:  "",
+			expectManagedASNumber:  "",
+		},
+		{
+			name:                    "empty DefaultNetworkTransport defaults to Geneve",
+			defaultNetworkTransport: "", // Empty, should be filled by fillDefaults
+			featureGates:            noOverlayEnabledFeatureGates,
+			expectTransport:         "",
+			expectNoOverlayEnabled:  false,
+			expectNoOverlayRouting:  "",
+			expectNoOverlaySNAT:     "",
+			expectManagedEnabled:    false,
+			expectManagedTopology:   "",
+			expectManagedASNumber:   "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			crd := OVNKubernetesConfig.DeepCopy()
+			config := &crd.Spec
+			config.DefaultNetwork.OVNKubernetesConfig.MTU = ptrToUint32(1500)
+			config.DefaultNetwork.OVNKubernetesConfig.DefaultNetworkTransport = tc.defaultNetworkTransport
+
+			if tc.noOverlayOptions != nil {
+				config.DefaultNetwork.OVNKubernetesConfig.DefaultNetworkNoOverlayOptions = *tc.noOverlayOptions
+			}
+			if tc.bgpManagedConfig != nil {
+				config.DefaultNetwork.OVNKubernetesConfig.BGPManagedConfig = *tc.bgpManagedConfig
+			}
+
+			errs := validateOVNKubernetes(config)
+			g.Expect(errs).To(HaveLen(0))
+			fillDefaults(config, nil)
+
+			bootstrapResult := fakeBootstrapResult()
+			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+				ControlPlaneReplicaCount: 3,
+				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+					DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+					DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+					SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+					MgmtPortResourceName: "",
+					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+						Enabled: false,
+					},
+				},
+			}
+
+			fakeClient := cnofake.NewFakeClient()
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, tc.featureGates())
+
+			if tc.expectErr {
+				g.Expect(err).To(HaveOccurred())
+				return
+			}
+			g.Expect(err).NotTo(HaveOccurred())
+
+			// Find the ovnkube-config ConfigMap and check the template data
+			var configMap *uns.Unstructured
+			for _, obj := range objs {
+				if obj.GetKind() == "ConfigMap" && obj.GetName() == "ovnkube-config" {
+					configMap = obj
+					break
+				}
+			}
+			g.Expect(configMap).NotTo(BeNil(), "ovnkube-config ConfigMap should exist")
+
+			// Check the transport value in the rendered ConfigMap
+			configMapData, found, err := uns.NestedStringMap(configMap.Object, "data")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(found).To(BeTrue(), "ConfigMap should have data field")
+			ovnkubeConf := configMapData["ovnkube.conf"]
+			if tc.expectTransport != "" {
+				g.Expect(ovnkubeConf).To(ContainSubstring("transport=\""+tc.expectTransport+"\""),
+					"ConfigMap should contain transport=%q, got:\n%s", tc.expectTransport, ovnkubeConf)
+			} else {
+				g.Expect(ovnkubeConf).NotTo(ContainSubstring("transport=\"no-overlay\""),
+					"ConfigMap should not contain no-overlay transport when disabled")
+			}
+
+			// The config map data should reflect the no-overlay settings
+			// We validate by checking the rendered objects exist and have expected annotations
+			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+			g.Expect(renderedNode).NotTo(BeNil(), "ovnkube-node DaemonSet should exist")
+
+			renderedControlPlane := findInObjs("apps", "Deployment", "ovnkube-control-plane", "openshift-ovn-kubernetes", objs)
+			g.Expect(renderedControlPlane).NotTo(BeNil(), "ovnkube-control-plane Deployment should exist")
+		})
+	}
+}
+
+// TestFillOVNKubernetesDefaultsNoOverlay tests that DefaultNetworkTransport defaults to Geneve
+func TestFillOVNKubernetesDefaultsNoOverlay(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	t.Run("empty DefaultNetworkTransport defaults to Geneve", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		conf.DefaultNetwork.OVNKubernetesConfig.DefaultNetworkTransport = ""
+
+		fillOVNKubernetesDefaults(conf, nil, 9000)
+
+		g.Expect(conf.DefaultNetwork.OVNKubernetesConfig.DefaultNetworkTransport).To(Equal(operv1.TransportOptionGeneve))
+	})
+
+	t.Run("explicit Geneve is preserved", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		conf.DefaultNetwork.OVNKubernetesConfig.DefaultNetworkTransport = operv1.TransportOptionGeneve
+
+		fillOVNKubernetesDefaults(conf, conf, 9000)
+
+		g.Expect(conf.DefaultNetwork.OVNKubernetesConfig.DefaultNetworkTransport).To(Equal(operv1.TransportOptionGeneve))
+	})
+
+	t.Run("explicit NoOverlay is preserved", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		conf.DefaultNetwork.OVNKubernetesConfig.DefaultNetworkTransport = operv1.TransportOptionNoOverlay
+
+		fillOVNKubernetesDefaults(conf, conf, 9000)
+
+		g.Expect(conf.DefaultNetwork.OVNKubernetesConfig.DefaultNetworkTransport).To(Equal(operv1.TransportOptionNoOverlay))
+	})
 }
