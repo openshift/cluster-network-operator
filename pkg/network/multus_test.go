@@ -6,6 +6,7 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 
 	. "github.com/onsi/gomega"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var MultusConfig = operv1.Network{
@@ -54,4 +55,54 @@ func TestRenderMultus(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "multus-ancillary-tools")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "multus")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus")))
+}
+
+// TestMultusServiceAccountAlwaysSet tests service account is set with and without node identity
+func TestMultusServiceAccountAlwaysSet(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := MultusConfig.DeepCopy()
+	config := &crd.Spec
+	enabled := false
+	config.DisableMultiNetwork = &enabled
+	fillDefaults(config, nil)
+
+	// Test without node identity
+	bootstrapWithoutNodeIdentity := fakeBootstrapResult()
+	bootstrapWithoutNodeIdentity.Infra.NetworkNodeIdentityEnabled = false
+
+	objs, err := renderMultus(config, bootstrapWithoutNodeIdentity, manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	daemonSet := findDaemonSet(objs, "openshift-multus", "multus")
+	g.Expect(daemonSet).NotTo(BeNil())
+
+	serviceAccount, found, err := uns.NestedString(daemonSet.Object, "spec", "template", "spec", "serviceAccountName")
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(found).To(BeTrue())
+	g.Expect(serviceAccount).To(Equal("multus"))
+
+	// Test with node identity
+	bootstrapWithNodeIdentity := fakeBootstrapResult()
+	bootstrapWithNodeIdentity.Infra.NetworkNodeIdentityEnabled = true
+
+	objs, err = renderMultus(config, bootstrapWithNodeIdentity, manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	daemonSet = findDaemonSet(objs, "openshift-multus", "multus")
+	g.Expect(daemonSet).NotTo(BeNil())
+
+	serviceAccount, found, err = uns.NestedString(daemonSet.Object, "spec", "template", "spec", "serviceAccountName")
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(found).To(BeTrue())
+	g.Expect(serviceAccount).To(Equal("multus"))
+}
+
+func findDaemonSet(objs []*uns.Unstructured, namespace, name string) *uns.Unstructured {
+	for _, obj := range objs {
+		if obj.GetKind() == "DaemonSet" && obj.GetNamespace() == namespace && obj.GetName() == name {
+			return obj
+		}
+	}
+	return nil
 }
