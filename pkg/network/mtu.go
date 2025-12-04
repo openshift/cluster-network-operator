@@ -5,6 +5,8 @@ package network
 
 import (
 	"fmt"
+	"net"
+
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
 )
@@ -30,8 +32,19 @@ func GetDefaultMTU() (int, error) {
 	const maxMTU = 65536
 	mtu := maxMTU + 1
 	for _, route := range routes {
-		// Skip non-default routes
+		// Check if this is a default route
+		// In netlink v1.1.0: default routes have Dst == nil
+		// In netlink v1.3.1+: default routes have Dst == 0.0.0.0/0 or ::/0
+		isDefault := route.Dst == nil
 		if route.Dst != nil {
+			// Check if Dst represents a default route (0.0.0.0/0 or ::/0)
+			ones, _ := route.Dst.Mask.Size()
+			ip := route.Dst.IP
+			isDefault = (ip.Equal(net.IPv4zero) || ip.Equal(net.IPv6zero)) && ones == 0
+		}
+
+		// Skip non-default routes
+		if !isDefault {
 			continue
 		}
 		if route.LinkIndex == 0 {
