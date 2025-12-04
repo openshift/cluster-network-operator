@@ -142,12 +142,6 @@ data:
     nodeport=true
 
 
-    [logging]
-    libovsdblogfile=/var/log/ovnkube/libovsdb.log
-    logfile-maxsize=100
-    logfile-maxbackups=5
-    logfile-maxage=0
-
 {{- if .OVNHybridOverlayEnable }}
     [hybridoverlay]
     enabled=true
