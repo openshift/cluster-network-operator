@@ -31,17 +31,18 @@ type ConnectionChecker interface {
 type GetCheckFunc func() *operatorcontrolplanev1alpha1.PodNetworkConnectivityCheck
 
 // NewConnectionChecker returns a ConnectionChecker.
-func NewConnectionChecker(name, podName, podNamespace string, getCheck GetCheckFunc, client v1alpha1helpers.PodNetworkConnectivityCheckClient, clientCertGetter CertificatesGetter, recorder Recorder) ConnectionChecker {
+func NewConnectionChecker(name, podName, podNamespace string, getCheck GetCheckFunc, client v1alpha1helpers.PodNetworkConnectivityCheckClient, clientCertGetter CertificatesGetter, tlsConfigProvider TLSConfigProvider, recorder Recorder) ConnectionChecker {
 	return &connectionChecker{
-		name:             name,
-		podName:          podName,
-		getCheck:         getCheck,
-		client:           client,
-		clientCertGetter: clientCertGetter,
-		recorder:         recorder,
-		updates:          NewUpdatesManager(checkPeriod, checkTimeout, newUpdatesProcessor(client, name)),
-		stop:             make(chan interface{}),
-		metrics:          NewMetricsContext(podNamespace, name),
+		name:              name,
+		podName:           podName,
+		getCheck:          getCheck,
+		client:            client,
+		clientCertGetter:  clientCertGetter,
+		tlsConfigProvider: tlsConfigProvider,
+		recorder:          recorder,
+		updates:           NewUpdatesManager(checkPeriod, checkTimeout, newUpdatesProcessor(client, name)),
+		stop:              make(chan interface{}),
+		metrics:           NewMetricsContext(podNamespace, name),
 	}
 }
 
@@ -59,12 +60,13 @@ type connectionChecker struct {
 	podName  string
 	getCheck GetCheckFunc
 
-	client           v1alpha1helpers.PodNetworkConnectivityCheckClient
-	clientCertGetter CertificatesGetter
-	recorder         Recorder
-	updates          UpdatesManager
-	stop             chan interface{}
-	metrics          MetricsContext
+	client            v1alpha1helpers.PodNetworkConnectivityCheckClient
+	clientCertGetter  CertificatesGetter
+	tlsConfigProvider TLSConfigProvider
+	recorder          Recorder
+	updates           UpdatesManager
+	stop              chan interface{}
+	metrics           MetricsContext
 }
 
 // checkConnection checks the connection periodically, updating status as needed
@@ -156,7 +158,11 @@ func (c *connectionChecker) getTCPConnectLatency(ctx context.Context, address st
 
 	// perform tls handshake to avoid spamming the logs of tls endpoints
 	host, _, _ := net.SplitHostPort(address)
-	tlsConn := tls.Client(tcpConn, &tls.Config{Certificates: c.clientCertGetter(), ServerName: host, InsecureSkipVerify: true})
+
+	// Get TLS config from the provider (which uses the observed APIServer TLS security profile)
+	tlsConfig := c.tlsConfigProvider.GetTLSConfig(host, c.clientCertGetter())
+
+	tlsConn := tls.Client(tcpConn, tlsConfig)
 	if err = tlsConn.Handshake(); err != nil {
 		// ignore any error. most likely non-tls connection, plus we're not really testing tls
 		klog.V(4).Infof("%s: tls error ignored: %v", address, err)

@@ -31,12 +31,13 @@ type PodNetworkConnectivityCheckController interface {
 // the connectivity checks.
 type controller struct {
 	factory.Controller
-	podName      string
-	podNamespace string
-	checksGetter operatorcontrolplaneclientv1alpha1.PodNetworkConnectivityCheckInterface
-	checkLister  v1alpha1.PodNetworkConnectivityCheckNamespaceLister
-	secretLister corelistersv1.SecretLister
-	recorder     Recorder
+	podName           string
+	podNamespace      string
+	checksGetter      operatorcontrolplaneclientv1alpha1.PodNetworkConnectivityCheckInterface
+	checkLister       v1alpha1.PodNetworkConnectivityCheckNamespaceLister
+	secretLister      corelistersv1.SecretLister
+	tlsConfigProvider TLSConfigProvider
+	recorder          Recorder
 	// each PodNetworkConnectivityCheck gets its own ConnectionChecker
 	updaters map[string]ConnectionChecker
 }
@@ -46,15 +47,18 @@ type controller struct {
 func NewPodNetworkConnectivityCheckController(podName, podNamespace string,
 	checksGetter operatorcontrolplaneclientv1alpha1.PodNetworkConnectivityChecksGetter,
 	checkInformer alpha1.PodNetworkConnectivityCheckInformer,
-	secretInformer coreinformersv1.SecretInformer, recorder events.Recorder) PodNetworkConnectivityCheckController {
+	secretInformer coreinformersv1.SecretInformer,
+	tlsConfigProvider TLSConfigProvider,
+	recorder events.Recorder) PodNetworkConnectivityCheckController {
 	c := &controller{
-		podName:      podName,
-		podNamespace: podNamespace,
-		checksGetter: checksGetter.PodNetworkConnectivityChecks(podNamespace),
-		checkLister:  checkInformer.Lister().PodNetworkConnectivityChecks(podNamespace),
-		secretLister: secretInformer.Lister(),
-		recorder:     NewBackoffEventRecorder(recorder),
-		updaters:     map[string]ConnectionChecker{},
+		podName:           podName,
+		podNamespace:      podNamespace,
+		checksGetter:      checksGetter.PodNetworkConnectivityChecks(podNamespace),
+		checkLister:       checkInformer.Lister().PodNetworkConnectivityChecks(podNamespace),
+		secretLister:      secretInformer.Lister(),
+		tlsConfigProvider: tlsConfigProvider,
+		recorder:          NewBackoffEventRecorder(recorder),
+		updaters:          map[string]ConnectionChecker{},
 	}
 	c.Controller = factory.New().
 		WithSync(c.Sync).
@@ -83,7 +87,7 @@ func (c *controller) Sync(ctx context.Context, syncContext factory.SyncContext) 
 	// create & start status updaters if needed
 	for _, check := range checks {
 		if updater := c.updaters[check.Name]; updater == nil {
-			c.updaters[check.Name] = NewConnectionChecker(check.Name, c.podName, c.podNamespace, c.newCheckFunc(check.Name), c, c.getClientCerts(check), c.recorder)
+			c.updaters[check.Name] = NewConnectionChecker(check.Name, c.podName, c.podNamespace, c.newCheckFunc(check.Name), c, c.getClientCerts(check), c.tlsConfigProvider, c.recorder)
 			go c.updaters[check.Name].Run(ctx)
 		}
 	}
