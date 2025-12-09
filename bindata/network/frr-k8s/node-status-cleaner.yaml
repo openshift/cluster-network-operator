@@ -24,11 +24,11 @@ spec:
       - command:
         - /statuscleaner
         args:
-        - $(LOG_LEVEL)
         - --disable-cert-rotation=true
         - --namespace=$(NAMESPACE)
         - --webhook-port=9123
         - --frrk8s-selector=component=frr-k8s
+        - $(LOG_LEVEL)
         env:
         - name: NAMESPACE
           valueFrom:
