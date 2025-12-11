@@ -8,7 +8,7 @@ metadata:
     name: frr-k8s-monitor-service
   annotations:
     prometheus.io/scrape: "true"
-    service.beta.openshift.io/serving-cert-secret-name: frr-k8s-certs-secret
+    service.beta.openshift.io/serving-cert-secret-name: frr-k8s-metrics-certs
 spec:
   selector:
     app: frr-k8s
