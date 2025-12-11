@@ -648,7 +648,7 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	isHypershiftHostedCluster := bootstrapResult.Infra.HostedControlPlane != nil
 	isOVNIPsecActiveOrRollingOut := bootstrapResult.OVN.IPsecUpdateStatus != nil && bootstrapResult.OVN.IPsecUpdateStatus.IsOVNIPsecActiveOrRollingOut
 	isCNOIPsecMachineConfigPresent := isCNOIPsecMachineConfigPresent(bootstrapResult.Infra)
-	isUserDefinedIPsecMachineConfigPresent := isUserDefinedIPsecMachineConfigPresent(bootstrapResult.Infra)
+	//isUserDefinedIPsecMachineConfigPresent := isUserDefinedIPsecMachineConfigPresent(bootstrapResult.Infra)
 	isIPsecMachineConfigActive := isIPsecMachineConfigActive(bootstrapResult.Infra)
 	isMachineConfigClusterOperatorReady := bootstrapResult.Infra.MachineConfigClusterOperatorReady
 
@@ -656,7 +656,7 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 
 	// When OVN is rolling out, OVN IPsec might be fully or partially active or inactive.
 	// If MachineConfigs are not present, we know its inactive since we only stop rendering them once inactive.
-	isOVNIPsecActive := isOVNIPsecActiveOrRollingOut && (isCNOIPsecMachineConfigPresent || isUserDefinedIPsecMachineConfigPresent || isHypershiftHostedCluster)
+	isOVNIPsecActive := isOVNIPsecActiveOrRollingOut && (isCNOIPsecMachineConfigPresent || isHypershiftHostedCluster)
 
 	// We render the ipsec deployment if IPsec is already active in OVN
 	// or if EW IPsec config is enabled.
@@ -667,8 +667,7 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// - not needed for the containerized deployment is used in hypershift
 	// hosted clusters
 	// - not needed if the user already created their own
-	renderCNOIPsecMachineConfig = (mode != operv1.IPsecModeDisabled || renderIPsecDaemonSet) && !isHypershiftHostedCluster &&
-		!isUserDefinedIPsecMachineConfigPresent
+	renderCNOIPsecMachineConfig = (mode != operv1.IPsecModeDisabled || renderIPsecDaemonSet) && !isHypershiftHostedCluster
 	// Wait for MCO to be ready unless we had already rendered the IPsec MachineConfig.
 	renderCNOIPsecMachineConfig = renderCNOIPsecMachineConfig && (isCNOIPsecMachineConfigPresent || isMachineConfigClusterOperatorReady)
 
