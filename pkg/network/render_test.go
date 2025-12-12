@@ -638,13 +638,13 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 					},
 				},
 			},
-			want:        19,
+			want:        21, // 19 original + 2 OperatorPKI (webhook + metrics)
 			expectedErr: nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := renderAdditionalRoutingCapabilities(tt.args.operConf, manifestDir)
+			got, err := renderAdditionalRoutingCapabilities(tt.args.operConf, manifestDir, nil, fakeBootstrapResult())
 			if !reflect.DeepEqual(tt.expectedErr, err) {
 				t.Errorf("renderAdditionalRoutingCapabilities() err = %v, want %v", err, tt.expectedErr)
 			}

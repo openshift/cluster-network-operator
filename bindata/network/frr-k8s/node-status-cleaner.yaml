@@ -30,6 +30,10 @@ spec:
         - --frrk8s-selector=component=frr-k8s
         - $(LOG_LEVEL)
         env:
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: NAMESPACE
           valueFrom:
             fieldRef:
@@ -77,11 +81,14 @@ spec:
       - key: node-role.kubernetes.io/control-plane
         effect: NoSchedule
         operator: Exists
+      - key: node.kubernetes.io/not-ready
+        effect: NoSchedule
+        operator: Exists
       volumes:
       - name: cert
         secret:
           defaultMode: 420
-          secretName: frr-k8s-webhook-server-cert
+          secretName: frr-k8s-webhook-cert
       serviceAccountName: frr-k8s-daemon
       priorityClassName: system-cluster-critical
       terminationGracePeriodSeconds: 10
