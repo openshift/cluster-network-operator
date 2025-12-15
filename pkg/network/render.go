@@ -236,7 +236,7 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	}
 	objs = append(objs, o...)
 
-	o, err = renderAdditionalRoutingCapabilities(operConf, manifestDir, client)
+	o, err = renderAdditionalRoutingCapabilities(operConf, manifestDir, client, bootstrapResult)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -1075,7 +1075,7 @@ func isSupportedDualStackPlatform(platformType configv1.PlatformType) bool {
 	return dualStackPlatforms.Has(string(platformType))
 }
 
-func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir string, client cnoclient.Client) ([]*uns.Unstructured, error) {
+func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir string, client cnoclient.Client, bootstrapResult *bootstrap.BootstrapResult) ([]*uns.Unstructured, error) {
 	if conf == nil || conf.AdditionalRoutingCapabilities == nil {
 		return nil, nil
 	}
@@ -1087,6 +1087,16 @@ func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir s
 			data.Data["FRRK8sImage"] = os.Getenv("FRR_K8S_IMAGE")
 			data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 			data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
+
+			// Add Kubernetes API server host/port for hostNetwork pods.
+			// During bootstrap, the service IP (172.30.0.1) is not routable because
+			// the CNI is not yet running. These env vars allow FRR pods to connect
+			// to the API server directly using the actual API server address.
+			if bootstrapResult != nil {
+				apiServer := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault]
+				data.Data["KUBERNETES_SERVICE_HOST"] = apiServer.Host
+				data.Data["KUBERNETES_SERVICE_PORT"] = apiServer.Port
+			}
 
 			// Fetch the webhook CA bundle from the ConfigMap created by OperatorPKI
 			caBundle := getFRRK8sWebhookCABundle(client)
