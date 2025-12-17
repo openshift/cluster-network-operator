@@ -9,6 +9,7 @@ spec:
     targetPort: webhook
   selector:
     component: frr-k8s-statuscleaner
+{{- if .FRRK8sWebhookCABundle }}
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -36,3 +37,4 @@ webhooks:
     resources:
     - frrconfigurations
   sideEffects: None
+{{- end }}
