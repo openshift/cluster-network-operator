@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -26,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -97,7 +97,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// For now, return an error since we don't have any master nodes to run the ovnkube-control-plane deployment.
 	externalControlPlane := bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode
 	if externalControlPlane && !bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled {
-		return nil, progressing, fmt.Errorf("Unable to render OVN in a cluster with an external control plane")
+		return nil, progressing, fmt.Errorf("unable to render OVN in a cluster with an external control plane")
 	}
 
 	c := conf.DefaultNetwork.OVNKubernetesConfig
@@ -332,6 +332,57 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["IP_FORWARDING_MODE"] = ""
 	if c.GatewayConfig != nil && c.GatewayConfig.IPForwarding == operv1.IPForwardingGlobal {
 		data.Data["IP_FORWARDING_MODE"] = c.GatewayConfig.IPForwarding
+	}
+
+	// No-overlay mode configuration
+	// The NoOverlayMode feature gate enables no-overlay networking for both the default network
+	// and CUDNs (Cluster User-Defined Networks). BGP managed configuration is cluster-wide and
+	// applies to any network using no-overlay mode with managed routing.
+	data.Data["DefaultNetworkTransport"] = ""
+	data.Data["NoOverlayEnabled"] = false
+	data.Data["NoOverlayOutboundSNAT"] = ""
+	data.Data["NoOverlayRouting"] = ""
+	data.Data["NoOverlayManagedEnabled"] = false
+	data.Data["NoOverlayManagedASNumber"] = ""
+	data.Data["NoOverlayManagedTopology"] = ""
+
+	noOverlayFeatureEnabled := isFeatureGateEnabled(featureGates, apifeatures.FeatureGateNoOverlayMode)
+
+	if noOverlayFeatureEnabled && c.DefaultNetworkTransport == operv1.TransportOptionNoOverlay {
+		data.Data["DefaultNetworkTransport"] = "no-overlay"
+		data.Data["NoOverlayEnabled"] = true
+
+		// No-overlay specific options for the default network
+		if c.DefaultNetworkNoOverlayOptions.OutboundSNAT != "" {
+			// Convert API value (e.g., "Enabled") to lowercase for ovn-kubernetes config ("enable", "disabled")
+			data.Data["NoOverlayOutboundSNAT"] = strings.ToLower(string(c.DefaultNetworkNoOverlayOptions.OutboundSNAT))
+		}
+		if c.DefaultNetworkNoOverlayOptions.Routing != "" {
+			// Convert API value (e.g., "Managed") to lowercase for ovn-kubernetes config ("managed", "unmanaged")
+			data.Data["NoOverlayRouting"] = strings.ToLower(string(c.DefaultNetworkNoOverlayOptions.Routing))
+		}
+	}
+
+	// BGP managed configuration is cluster-wide and applies to any network (default or CUDN)
+	// using no-overlay mode with managed routing.
+	// BGPTopology is required when BGPManagedConfig is specified.
+	if noOverlayFeatureEnabled && c.BGPManagedConfig.BGPTopology != "" {
+		data.Data["NoOverlayManagedEnabled"] = true
+		klog.V(2).Infof("BGP managed configuration enabled for no-overlay mode")
+
+		// ASNumber is optional, will have a default if not set
+		if c.BGPManagedConfig.ASNumber > 0 {
+			data.Data["NoOverlayManagedASNumber"] = c.BGPManagedConfig.ASNumber
+		}
+
+		var topology string
+		switch c.BGPManagedConfig.BGPTopology {
+		case operv1.BGPTopologyFullMesh:
+			topology = "full-mesh"
+		default:
+			return nil, progressing, fmt.Errorf("unsupported BGP topology: %s", c.BGPManagedConfig.BGPTopology)
+		}
+		data.Data["NoOverlayManagedTopology"] = topology
 	}
 
 	// leverage feature gates
@@ -941,7 +992,7 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("Could not determine Node Mode: %w", err)
+			return nil, fmt.Errorf("could not determine Node Mode: %w", err)
 		}
 	} else {
 		dpuHostModeLabel, exists := cm.Data["dpu-host-mode-label"]
@@ -981,40 +1032,40 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 	//   daemonset pods in DPU mode from running), it is done by an external operator.
 	ovnConfigResult.DpuHostModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.DpuHostModeLabel)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get node list with label %s : %w", ovnConfigResult.DpuHostModeLabel, err)
+		return nil, fmt.Errorf("could not get node list with label %s : %w", ovnConfigResult.DpuHostModeLabel, err)
 	}
 	ovnConfigResult.DpuHostModeLabel, ovnConfigResult.DpuHostModeValue, err = getKeyValueFromLabel(ovnConfigResult.DpuHostModeLabel)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get key and value from label %s : %w", ovnConfigResult.DpuHostModeLabel, err)
+		return nil, fmt.Errorf("could not get key and value from label %s : %w", ovnConfigResult.DpuHostModeLabel, err)
 	}
 
 	ovnConfigResult.DpuModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.DpuModeLabel)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get node list with label %s : %w", ovnConfigResult.DpuModeLabel, err)
+		return nil, fmt.Errorf("could not get node list with label %s : %w", ovnConfigResult.DpuModeLabel, err)
 	}
 	ovnConfigResult.DpuModeLabel, _, err = getKeyValueFromLabel(ovnConfigResult.DpuModeLabel)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get key and value from label %s : %w", ovnConfigResult.DpuModeLabel, err)
+		return nil, fmt.Errorf("could not get key and value from label %s : %w", ovnConfigResult.DpuModeLabel, err)
 	}
 
 	ovnConfigResult.SmartNicModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.SmartNicModeLabel)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get node list with label %s : %w", ovnConfigResult.SmartNicModeLabel, err)
+		return nil, fmt.Errorf("could not get node list with label %s : %w", ovnConfigResult.SmartNicModeLabel, err)
 	}
 	ovnConfigResult.SmartNicModeLabel, ovnConfigResult.SmartNicModeValue, err = getKeyValueFromLabel(ovnConfigResult.SmartNicModeLabel)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get key and value from label %s : %w", ovnConfigResult.SmartNicModeLabel, err)
+		return nil, fmt.Errorf("could not get key and value from label %s : %w", ovnConfigResult.SmartNicModeLabel, err)
 	}
 
 	// No node shall have any other label set. Each node should be ONLY be DPU, DPU Host, or Smart NIC.
 	found, nodeName := findCommonNode(ovnConfigResult.DpuHostModeNodes, ovnConfigResult.DpuModeNodes, ovnConfigResult.SmartNicModeNodes)
 	if found {
-		return nil, fmt.Errorf("Node %s has multiple hardware offload labels.", nodeName)
+		return nil, fmt.Errorf("node %s has multiple hardware offload labels", nodeName)
 	}
 
 	ovnConfigResult.ConfigOverrides, err = getOVNKubernetesConfigOverrides(kubeClient)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get OVN Kubernetes config overrides: %w", err)
+		return nil, fmt.Errorf("could not get OVN Kubernetes config overrides: %w", err)
 	}
 
 	klog.Infof("OVN configuration is now %+v", ovnConfigResult)
@@ -1089,6 +1140,40 @@ func getOVNEncapOverhead(conf *operv1.NetworkSpec) uint32 {
 		encapOverhead += ipsecOverhead
 	}
 	return encapOverhead
+}
+
+// ValidateMTUForNoOverlay validates that the configured MTU does not exceed the host MTU
+// when no-overlay mode is enabled for the default network. In no-overlay mode, there is
+// no encapsulation overhead, so the MTU can be set up to the host MTU but not higher.
+// This validation must be called after FillDefaults since it requires the hostMTU value.
+func ValidateMTUForNoOverlay(conf *operv1.NetworkSpec, hostMTU int) error {
+	if conf.DefaultNetwork.OVNKubernetesConfig == nil {
+		return nil
+	}
+
+	oc := conf.DefaultNetwork.OVNKubernetesConfig
+
+	// Only validate for no-overlay mode
+	if oc.DefaultNetworkTransport != operv1.TransportOptionNoOverlay {
+		return nil
+	}
+
+	// If MTU is not set, nothing to validate (fillDefaults will set it)
+	if oc.MTU == nil {
+		return nil
+	}
+
+	// hostMTU of 0 means we couldn't probe it - skip validation
+	if hostMTU == 0 {
+		klog.Warningf("Cannot validate MTU for no-overlay mode: host MTU is unknown")
+		return nil
+	}
+
+	if *oc.MTU > uint32(hostMTU) {
+		return errors.Errorf("invalid MTU %d for no-overlay mode: cannot exceed host MTU %d", *oc.MTU, hostMTU)
+	}
+
+	return nil
 }
 
 // isOVNKubernetesChangeSafe currently returns an error if any changes to immutable
@@ -1176,7 +1261,13 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 					panic("BUG: Probed MTU wasn't supplied, host MTU invalid")
 				}
 			}
-			mtu = uint32(hostMTU) - getOVNEncapOverhead(conf)
+			// In no-overlay mode, use the host MTU directly since there's no encapsulation overhead.
+			// In overlay mode (Geneve), subtract the encapsulation overhead.
+			if sc.DefaultNetworkTransport == operv1.TransportOptionNoOverlay {
+				mtu = uint32(hostMTU)
+			} else {
+				mtu = uint32(hostMTU) - getOVNEncapOverhead(conf)
+			}
 		}
 		sc.MTU = &mtu
 	}
@@ -1249,18 +1340,18 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
 
 	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), clusterConfigLookup, clusterConfig); err != nil {
-		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to retrieve cluster config: %s", err)
+		return nil, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %s", err)
 	}
 
 	rcD := replicaCountDecoder{}
 	if err := yaml.Unmarshal([]byte(clusterConfig.Data["install-config"]), &rcD); err != nil {
-		return nil, fmt.Errorf("Unable to bootstrap OVN, unable to unmarshal install-config: %s", err)
+		return nil, fmt.Errorf("unable to bootstrap OVN, unable to unmarshal install-config: %s", err)
 	}
 
 	hc := hypershift.NewHyperShiftConfig()
 	ovnConfigResult, err := bootstrapOVNConfig(conf, kubeClient, hc, infraStatus)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to bootstrap OVN config, err: %v", err)
+		return nil, fmt.Errorf("unable to bootstrap OVN config, err: %v", err)
 	}
 
 	var controlPlaneReplicaCount int
@@ -1295,7 +1386,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	nsn = types.NamespacedName{Namespace: namespaceForControlPlane, Name: util.OVN_CONTROL_PLANE}
 	if err := clusterClientForControlPlane.CRClient().Get(context.TODO(), nsn, controlPlaneDeployment); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("Failed to retrieve %s deployment: %w", util.OVN_CONTROL_PLANE, err)
+			return nil, fmt.Errorf("failed to retrieve %s deployment: %w", util.OVN_CONTROL_PLANE, err)
 		} else {
 			klog.Infof("%s deployment not running", util.OVN_CONTROL_PLANE)
 			controlPlaneStatus = nil
@@ -1324,7 +1415,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: util.OVN_NODE}
 	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, nodeDaemonSet); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("Failed to retrieve existing ovnkube-node DaemonSet: %w", err)
+			return nil, fmt.Errorf("failed to retrieve existing ovnkube-node DaemonSet: %w", err)
 		} else {
 			nodeStatus = nil
 			klog.Infof("ovnkube-node DaemonSet not running")
@@ -1353,7 +1444,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovnkube-upgrades-prepuller"}
 	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, prePullerDaemonSet); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("Failed to retrieve existing prepuller DaemonSet: %w", err)
+			return nil, fmt.Errorf("failed to retrieve existing prepuller DaemonSet: %w", err)
 		} else {
 			prepullerStatus = nil
 		}
@@ -1891,7 +1982,7 @@ func isOVNIPsecNotActiveInDaemonSet(ds *appsv1.DaemonSet) bool {
 	return true
 }
 
-func isIPSecEnabledInPod(pod v1.PodTemplateSpec, containerName string) bool {
+func isIPSecEnabledInPod(pod corev1.PodTemplateSpec, containerName string) bool {
 	for _, container := range pod.Spec.Containers {
 		if container.Name == containerName {
 			for _, c := range container.Lifecycle.PostStart.Exec.Command {
@@ -2042,7 +2133,7 @@ func validateOVNKubernetesSubnet(name, subnet string, otherSubnets *iputil.IPPoo
 		}
 	}
 	if err := otherSubnets.Add(*cidr); err != nil {
-		return fmt.Errorf("Whole or subset of %s CIDR %s is already in use: %s", name, subnet, err)
+		return fmt.Errorf("whole or subset of %s CIDR %s is already in use: %s", name, subnet, err)
 	}
 	return nil
 }
@@ -2140,4 +2231,14 @@ func getOVNKubernetesConfigOverrides(client cnoclient.Client) (map[string]string
 		return nil, fmt.Errorf("unable to retrieve config from configmap %v: %s", OVNKubernetesConfigOverridesCMName, err)
 	}
 	return configMap.Data, nil
+}
+
+// isFeatureGateEnabled safely checks if a feature gate is enabled.
+// It returns false if the feature gate is not known (not registered in the cluster's feature gates)
+// to avoid panics from calling Enabled() on unknown feature gates.
+func isFeatureGateEnabled(fg featuregates.FeatureGate, name configv1.FeatureGateName) bool {
+	if !slices.Contains(fg.KnownFeatures(), name) {
+		return false
+	}
+	return fg.Enabled(name)
 }
