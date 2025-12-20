@@ -4153,7 +4153,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				client:          cnofake.NewFakeClient(),
 				featureGates:    noFeatureGates,
 			},
-			expectNumObjs: 38,
+			expectNumObjs: 42,
 		},
 		{
 			name: "render routeadvertisements",
@@ -4168,7 +4168,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				client:          cnofake.NewFakeClient(),
 				featureGates:    noFeatureGates,
 			},
-			expectNumObjs: 39,
+			expectNumObjs: 43,
 		},
 		{
 			name: "render with UDN",
@@ -4179,7 +4179,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				client:          cnofake.NewFakeClient(),
 				featureGates:    udnFeatureGate,
 			},
-			expectNumObjs: 44,
+			expectNumObjs: 48,
 		},
 		{
 			name: "render with PreconfiguredUDNAddresses, UDN, persistent-IP, and RA",
@@ -4193,7 +4193,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				client:       cnofake.NewFakeClient(),
 				featureGates: preDefUDNFeatureGates,
 			},
-			expectNumObjs: 47,
+			expectNumObjs: 51,
 		},
 	}
 	for _, tt := range tests {
