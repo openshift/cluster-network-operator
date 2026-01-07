@@ -1,4 +1,4 @@
-apiVersion: rbac.authorization.k8s.io
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: networking-console-plugin
