@@ -55,6 +55,7 @@ spec:
               topologyKey: kubernetes.io/hostname
             weight: 90
 {{- end }}
+      serviceAccount: networking-console-plugin
       automountServiceAccountToken: false
       containers:
       - command:
