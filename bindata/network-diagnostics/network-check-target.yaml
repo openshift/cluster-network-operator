@@ -63,7 +63,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-      serviceAccount: default
+      serviceAccount: network-check-target
       terminationGracePeriodSeconds: 10
       {{ if .NetworkCheckTargetNodeSelector }}
       nodeSelector:
