@@ -1,0 +1,5 @@
+apiVersion: rbac.authorization.k8s.io
+kind: ServiceAccount
+metadata:
+  name: networking-console-plugin
+  namespace: openshift-network-console
