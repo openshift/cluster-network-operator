@@ -11,6 +11,11 @@ data:
   ovnkube-lib.sh: |-
     #!/bin/bash
     set -x
+
+    # No-overlay outbound SNAT: {{.NoOverlayOutboundSNAT}}
+    # The line above ensures ovnkube pods restart when outboundSNAT changes.
+    # CNO hashes this file to detect config changes that require a rollout.
+
 {{- if .IsNetworkTypeLiveMigration }}
     if ip link show br-ex; then
       echo "br-ex exists"
