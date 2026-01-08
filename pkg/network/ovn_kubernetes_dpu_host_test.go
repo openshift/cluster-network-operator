@@ -153,6 +153,9 @@ func createTestRenderData(ovnNodeMode string) render.RenderData {
 	data.Data["OVNPlatformAzure"] = false
 	data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = false
 	data.Data["OVN_NETWORK_SEGMENTATION_ENABLE"] = false
+	data.Data["OVN_MULTICAST_ENABLE"] = true
+	data.Data["OVN_EGRESS_FEATURES_ENABLE"] = true
+	data.Data["OVN_MULTI_EXTERNAL_GATEWAY_ENABLE"] = true
 	data.Data["DefaultMasqueradeNetworkCIDRs"] = ""
 	data.Data["OVNIPsecEnable"] = false
 	data.Data["DpuHostModeLabel"] = ""

@@ -539,14 +539,8 @@ data:
 
       echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node"
 
-      # enable egress ip, egress firewall, egress qos, egress service
-      egress_features_enable_flag="--enable-egress-ip=true --enable-egress-firewall=true --enable-egress-qos=true --enable-egress-service=true"
       init_ovnkube_controller="--init-ovnkube-controller ${K8S_NODE}"
-      multi_external_gateway_enable_flag="--enable-multi-external-gateway=true"
       gateway_interface=br-ex
-
-      # enable multicast
-      enable_multicast_flag="--enable-multicast"
 
       # Use OVN_NODE_MODE environment variable, default to "full" if not set
       OVN_NODE_MODE=${OVN_NODE_MODE:-full}
@@ -557,17 +551,9 @@ data:
         # https://github.com/ovn-kubernetes/ovn-kubernetes/pull/5327/files
         gateway_interface="derive-from-mgmt-port"
         ovnkube_node_mode="--ovnkube-node-mode dpu-host"
-        # disable egress ip for dpu-host mode as it is not supported
-        egress_features_enable_flag=""
-
-        # disable multicast for dpu-host mode as it is not supported
-        enable_multicast_flag=""
 
         # disable init-ovnkube-controller for dpu-host mode as it is not supported
         init_ovnkube_controller=""
-
-        # disable multi-external-gateway for dpu-host mode as it is not supported
-        multi_external_gateway_enable_flag=""
       fi
 
       if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
@@ -613,12 +599,12 @@ data:
       fi
 
       multi_network_enabled_flag=
-      if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" && "${OVN_NODE_MODE}" != "dpu-host" ]]; then
+      if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" ]]; then
         multi_network_enabled_flag="--enable-multi-network"
       fi
 
       network_segmentation_enabled_flag=
-      if [[ "{{.OVN_NETWORK_SEGMENTATION_ENABLE}}" == "true" && "${OVN_NODE_MODE}" != "dpu-host" ]]; then
+      if [[ "{{.OVN_NETWORK_SEGMENTATION_ENABLE}}" == "true" ]]; then
         multi_network_enabled_flag="--enable-multi-network"
         network_segmentation_enabled_flag="--enable-network-segmentation"
       fi
@@ -639,18 +625,23 @@ data:
       fi
 
       multi_network_policy_enabled_flag=
-      if [[ "{{.OVN_MULTI_NETWORK_POLICY_ENABLE}}" == "true"&& "${OVN_NODE_MODE}" != "dpu-host" ]]; then
+      if [[ "{{.OVN_MULTI_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
         multi_network_policy_enabled_flag="--enable-multi-networkpolicy"
       fi
 
       admin_network_policy_enabled_flag=
-      if [[ "{{.OVN_ADMIN_NETWORK_POLICY_ENABLE}}" == "true" && "${OVN_NODE_MODE}" != "dpu-host" ]]; then
+      if [[ "{{.OVN_ADMIN_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
         admin_network_policy_enabled_flag="--enable-admin-network-policy"
       fi
 
       dns_name_resolver_enabled_flag=
       if [[ "{{.DNS_NAME_RESOLVER_ENABLE}}" == "true" ]]; then
         dns_name_resolver_enabled_flag="--enable-dns-name-resolver"
+      fi
+
+      enable_multicast_flag=""
+      if [[ "{{.OVN_MULTICAST_ENABLE}}" == "true" ]]; then
+        enable_multicast_flag="--enable-multicast"
       fi
 
       # If IP Forwarding mode is global set it in the host here. IPv6 IP Forwarding shuld be
@@ -746,7 +737,5 @@ data:
         ${ovn_v4_masquerade_subnet_opt} \
         ${ovn_v6_masquerade_subnet_opt} \
         ${ovn_v4_transit_switch_subnet_opt} \
-        ${ovn_v6_transit_switch_subnet_opt} \
-        ${egress_features_enable_flag} \
-        ${multi_external_gateway_enable_flag}
+        ${ovn_v6_transit_switch_subnet_opt}
     }

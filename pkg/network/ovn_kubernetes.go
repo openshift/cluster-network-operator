@@ -334,13 +334,26 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["IP_FORWARDING_MODE"] = c.GatewayConfig.IPForwarding
 	}
 
-	// leverage feature gates
+	// Feature gates
 	data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateAdminNetworkPolicy)
 	data.Data["DNS_NAME_RESOLVER_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateDNSNameResolver)
 	data.Data["OVN_NETWORK_SEGMENTATION_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateNetworkSegmentation)
 	data.Data["OVN_OBSERVABILITY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateOVNObservability)
 	data.Data["OVN_ROUTE_ADVERTISEMENTS_ENABLE"] = c.RouteAdvertisements == operv1.RouteAdvertisementsEnabled
 	data.Data["OVN_PRE_CONF_UDN_ADDR_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGatePreconfiguredUDNAddresses)
+
+	// Feature disabling via API fields
+	// Egress features (Egress IP, Egress Firewall, Egress QoS, Egress Service)
+	disableEgressFeatures := c.DisableEgressFeatures != nil && *c.DisableEgressFeatures
+	data.Data["OVN_EGRESS_FEATURES_ENABLE"] = !disableEgressFeatures
+
+	// Multicast support
+	disableMulticast := c.DisableMulticast != nil && *c.DisableMulticast
+	data.Data["OVN_MULTICAST_ENABLE"] = !disableMulticast
+
+	// Multi-external gateway support
+	disableMultiExternalGateway := c.DisableMultiExternalGateway != nil && *c.DisableMultiExternalGateway
+	data.Data["OVN_MULTI_EXTERNAL_GATEWAY_ENABLE"] = !disableMultiExternalGateway
 
 	data.Data["ReachabilityTotalTimeoutSeconds"] = c.EgressIPConfig.ReachabilityTotalTimeoutSeconds
 

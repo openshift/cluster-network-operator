@@ -468,6 +468,27 @@ type OVNKubernetesConfig struct {
 	// +openshift:enable:FeatureGate=RouteAdvertisements
 	// +optional
 	RouteAdvertisements RouteAdvertisementsEnablement `json:"routeAdvertisements,omitempty"`
+
+	// disableEgressFeatures disables all OVN egress traffic features including
+	// Egress IP, Egress Firewall, Egress QoS, and Egress Service.
+	// When set to true, all egress features will be disabled cluster-wide.
+	// When not specified or set to false, all egress features are enabled (default).
+	// This is useful for specialized deployments where egress features are not
+	// supported or desired.
+	// +optional
+	DisableEgressFeatures *bool `json:"disableEgressFeatures,omitempty"`
+
+	// disableMulticast disables OVN multicast support.
+	// When set to true, multicast will be disabled cluster-wide.
+	// When not specified or set to false, multicast is enabled (default).
+	// +optional
+	DisableMulticast *bool `json:"disableMulticast,omitempty"`
+
+	// disableMultiExternalGateway disables OVN multi-external gateway support.
+	// When set to true, multi-external gateway will be disabled cluster-wide.
+	// When not specified or set to false, multi-external gateway is enabled (default).
+	// +optional
+	DisableMultiExternalGateway *bool `json:"disableMultiExternalGateway,omitempty"`
 }
 
 type IPv4OVNKubernetesConfig struct {
