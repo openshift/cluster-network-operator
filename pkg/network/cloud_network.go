@@ -1,6 +1,7 @@
 package network
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 
@@ -43,8 +44,8 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 	data.Data["PlatformTypeAzure"] = v1.AzurePlatformType
 	data.Data["PlatformTypeGCP"] = v1.GCPPlatformType
 	data.Data["CloudNetworkConfigControllerImage"] = os.Getenv("CLOUD_NETWORK_CONFIG_CONTROLLER_IMAGE")
-	data.Data["KubernetesServiceHost"] = cloudBootstrapResult.APIServers[bootstrap.APIServerDefaultLocal].Host
-	data.Data["KubernetesServicePort"] = cloudBootstrapResult.APIServers[bootstrap.APIServerDefaultLocal].Port
+	localAPIServer := cloudBootstrapResult.APIServers[bootstrap.APIServerDefaultLocal]
+	data.Data["KubernetesServiceURL"] = "https://" + net.JoinHostPort(localAPIServer.Host, localAPIServer.Port)
 	data.Data["ExternalControlPlane"] = cloudBootstrapResult.ControlPlaneTopology == configv1.ExternalTopologyMode
 	data.Data["PlatformAzureEnvironment"] = ""
 	data.Data["PlatformAWSCAPath"] = ""
