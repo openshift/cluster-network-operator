@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,8 +90,8 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 
 	if hsc.Enabled {
 		data.Data["AdmissionControllerNamespace"] = hsc.Namespace
-		data.Data["KubernetesServiceHost"] = bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal].Host
-		data.Data["KubernetesServicePort"] = bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal].Port
+		localAPIServer := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal]
+		data.Data["KubernetesServiceURL"] = "https://" + net.JoinHostPort(localAPIServer.Host, localAPIServer.Port)
 		data.Data["CLIImage"] = os.Getenv("CLI_IMAGE")
 		if os.Getenv("CLI_CONTROL_PLANE_IMAGE") != "" {
 			data.Data["CLIImage"] = os.Getenv("CLI_CONTROL_PLANE_IMAGE")
