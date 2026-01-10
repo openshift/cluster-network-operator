@@ -41,6 +41,12 @@ spec:
         - "--network-plugins=macvlan,sriov,ipvlan,bond"
         - "--custom-v6-ingress-rule-file=/etc/multi-networkpolicy/rules/custom-v6-rules.txt"
         - "--custom-v6-egress-rule-file=/etc/multi-networkpolicy/rules/custom-v6-rules.txt"
+        - "--hostname-override=$(K8S_NODE_NAME)"
+        env:
+        - name: K8S_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         resources:
           requests:
             cpu: "100m"
