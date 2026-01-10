@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -16,6 +17,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 	utilpointer "k8s.io/utils/ptr"
 )
 
@@ -123,8 +126,29 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 		return fmt.Errorf("could not encode for patching: %w", err)
 	}
 
-	_, err = clusterClient.Dynamic().Resource(rm.Resource).Namespace(namespace).Patch(ctx, name, types.ApplyPatchType, data, patchOptions, subresources...)
+	// Retry with backoff to handle transient API server issues.
+	var backoff = wait.Backoff{
+		Steps:    6,
+		Duration: 5 * time.Second,
+		Factor:   1.0,
+		Jitter:   0.1,
+	}
+
+	var attempt int
+	err = retry.OnError(backoff, func(err error) bool {
+		// Don't retry on context cancellation (graceful shutdown)
+		return !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
+	}, func() error {
+		attempt++
+		_, err := clusterClient.Dynamic().Resource(rm.Resource).Namespace(namespace).Patch(ctx, name, types.ApplyPatchType, data, patchOptions, subresources...)
+		if err != nil {
+			log.Printf("Error applying %s (attempt %d/%d): %v", objDesc, attempt, backoff.Steps, err)
+		}
+		return err
+	})
+
 	if err != nil {
+		log.Printf("Failed to apply %s after %d attempts", objDesc, attempt)
 		return fmt.Errorf("failed to apply / update %s: %w", objDesc, err)
 	}
 
