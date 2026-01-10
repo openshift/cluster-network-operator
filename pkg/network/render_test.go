@@ -594,7 +594,7 @@ func Test_renderNetworkDiagnostics(t *testing.T) {
 				operConf:    &operv1.NetworkSpec{DisableNetworkDiagnostics: true},
 				clusterConf: &configv1.NetworkSpec{NetworkDiagnostics: configv1.NetworkDiagnostics{Mode: configv1.NetworkDiagnosticsAll}},
 			},
-			want:        14,
+			want:        15,
 			expectedErr: nil,
 		},
 	}
