@@ -96,11 +96,6 @@ spec:
         - -c
         - |
           set -xe
-{{- if .IsNetworkTypeLiveMigration }}
-          echo "wait for node-subnets node annotation in live migration mode"
-          # The node-subnets node annotation needs to be created according to the openshift-sdn hostsubnet CRs by ovnkube-node pods before running ovnkube-cluster-manager.
-          while kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.annotations.k8s\.ovn\.org/node-subnets}{"\n"}{end}'| grep -v -q "default"; do echo "subnet annotation is missing for some nodes" && sleep 3; done
-{{- end }}
           if [[ -f "/env/_master" ]]; then
             set -o allexport
             source "/env/_master"
