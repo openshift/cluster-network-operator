@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"strings"
 	"sync"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -15,6 +14,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,16 +32,16 @@ import (
 var pluginsUsingHostPrefix = sets.NewString(string(operv1.NetworkTypeOpenShiftSDN), string(operv1.NetworkTypeOVNKubernetes))
 
 // ValidateClusterConfig ensures the cluster config is valid.
-func ValidateClusterConfig(clusterConfig *configv1.Network, client cnoclient.Client) error {
+func ValidateClusterConfig(clusterConfig *configv1.Network, client cnoclient.Client, featureGates featuregates.FeatureGate) error {
 	// If for whatever reason it is not possible to get the platform type, fail
 	infraRes, err := platform.InfraStatus(client)
 	if err != nil {
 		return err
 	}
-	return validateClusterConfig(clusterConfig, infraRes, client)
+	return validateClusterConfig(clusterConfig, infraRes, client, featureGates)
 }
 
-func validateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.InfraStatus, client cnoclient.Client) error {
+func validateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.InfraStatus, client cnoclient.Client, featureGates featuregates.FeatureGate) error {
 
 	// Check all networks for overlaps
 	pool := iputil.IPPool{}
@@ -117,12 +117,9 @@ func validateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.
 		return errors.Errorf("spec.networkType is required")
 	}
 
-	// Validate that this is either a BareMetal or None PlatformType. For all other
-	// PlatformTypes, migration to DualStack is prohibited
 	if ipv4Service && ipv6Service || ipv4Cluster && ipv6Cluster {
-		if !isSupportedDualStackPlatform(infraRes.PlatformType) {
-			return errors.Errorf("%s is not one of the supported platforms for dual stack (%s)", infraRes.PlatformType,
-				strings.Join(dualStackPlatforms.List(), ", "))
+		if !isSupportedDualStackPlatform(infraRes.PlatformType, featureGates) {
+			return errors.Errorf("%s is not one of the supported platforms for dual stack", infraRes.PlatformType)
 		}
 	}
 

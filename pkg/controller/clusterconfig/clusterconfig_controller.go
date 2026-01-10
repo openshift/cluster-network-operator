@@ -27,13 +27,13 @@ import (
 )
 
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, _ featuregates.FeatureGate) error {
-	return add(mgr, newReconciler(mgr, status, c))
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, featureGates featuregates.FeatureGate) error {
+	return add(mgr, newReconciler(mgr, status, c, featureGates))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) reconcile.Reconciler {
-	return &ReconcileClusterConfig{client: c, scheme: mgr.GetScheme(), status: status}
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, featureGates featuregates.FeatureGate) reconcile.Reconciler {
+	return &ReconcileClusterConfig{client: c, scheme: mgr.GetScheme(), status: status, featureGates: featureGates}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -57,9 +57,10 @@ var _ reconcile.Reconciler = &ReconcileClusterConfig{}
 
 // ReconcileClusterConfig reconciles a cluster Network object
 type ReconcileClusterConfig struct {
-	client cnoclient.Client
-	scheme *runtime.Scheme
-	status *statusmanager.StatusManager
+	client       cnoclient.Client
+	scheme       *runtime.Scheme
+	status       *statusmanager.StatusManager
+	featureGates featuregates.FeatureGate
 }
 
 // Reconcile propagates changes from the cluster config to the operator config.
@@ -92,7 +93,7 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	}
 
 	// Validate the cluster config
-	if err := network.ValidateClusterConfig(clusterConfig, r.client); err != nil {
+	if err := network.ValidateClusterConfig(clusterConfig, r.client, r.featureGates); err != nil {
 		log.Printf("Failed to validate Network CR: %v", err)
 		r.status.SetDegraded(statusmanager.ClusterConfig, "InvalidClusterConfig",
 			fmt.Sprintf("The cluster configuration is invalid (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))
