@@ -3,17 +3,18 @@ package network
 import (
 	"fmt"
 	"reflect"
-	"strings"
 
 	. "github.com/onsi/gomega"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
+	apifeatures "github.com/openshift/api/features"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -233,12 +234,8 @@ func TestDisallowMultipleClusterNetworksOfOldIPFamily(t *testing.T) {
 	g.Expect(err).To(MatchError(ContainSubstring("cannot add additional ClusterNetwork values of original IP family when migrating to dual stack")))
 }
 
-func TestAllowMigrationOnlyForBareMetalOrNoneType(t *testing.T) {
+func TestAllowMigrationOnlyForSupportedTypes(t *testing.T) {
 	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OVNKubernetesConfig, OVNKubernetesConfig)
-
-	// You can't migrate from single-stack to dual-stack if this is anything else but
-	// BareMetal or NonePlatformType
-	infra.PlatformType = configv1.AzurePlatformType
 
 	next.ServiceNetwork = append(next.ServiceNetwork, "fd02::/112")
 	next.ClusterNetwork = append(next.ClusterNetwork, operv1.ClusterNetworkEntry{
@@ -246,9 +243,12 @@ func TestAllowMigrationOnlyForBareMetalOrNoneType(t *testing.T) {
 		HostPrefix: 64,
 	},
 	)
+	// You can't migrate from single-stack to dual-stack if this is anything else but
+	// BareMetal, NonePlatformType, and VSphere
+	infra.PlatformType = configv1.GCPPlatformType
+
 	err := IsChangeSafe(prev, next, infra)
-	g.Expect(err).To(MatchError(ContainSubstring(fmt.Sprintf("%s is not one of the supported platforms for dual stack (%s)", infra.PlatformType,
-		strings.Join(dualStackPlatforms.List(), ", ")))))
+	g.Expect(err).To(MatchError(ContainSubstring(fmt.Sprintf("%s does not allow conversion to dual-stack cluster", infra.PlatformType))))
 	// ... but the migration in the other direction should work
 	err = IsChangeSafe(next, prev, infra)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -349,6 +349,20 @@ func TestDisallowCIDRMaskChangeInDualStackUpdate(t *testing.T) {
 	g.Expect(err).To(MatchError(ContainSubstring("cannot add additional ClusterNetwork values of original IP family when migrating to dual stack")))
 }
 
+func getDefaultFeatureGatesWithDualStack() featuregates.FeatureGate {
+	return featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy,
+			apifeatures.FeatureGateDNSNameResolver,
+			apifeatures.FeatureGateNetworkSegmentation,
+			apifeatures.FeatureGateOVNObservability,
+			apifeatures.FeatureGateAWSDualStackInstall,
+			apifeatures.FeatureGateAzureDualStackInstall},
+		[]configv1.FeatureGateName{
+			apifeatures.FeatureGatePreconfiguredUDNAddresses,
+		},
+	)
+}
+
 func TestRenderUnknownNetwork(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -400,7 +414,9 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	bootstrapResult, err := Bootstrap(&config, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	objs, _, err := Render(prev, &configv1.NetworkSpec{}, manifestDir, client, getDefaultFeatureGates(), bootstrapResult)
+	featureGatesCNO := getDefaultFeatureGatesWithDualStack()
+
+	objs, _, err := Render(prev, &configv1.NetworkSpec{}, manifestDir, client, featureGatesCNO, bootstrapResult)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Validate that openshift-sdn isn't rendered
