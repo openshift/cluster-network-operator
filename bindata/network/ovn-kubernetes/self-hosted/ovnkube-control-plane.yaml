@@ -155,6 +155,11 @@ spec:
             network_segmentation_enabled_flag="--enable-network-segmentation"
           fi
 
+          network_connect_enabled_flag=
+          if [[ "{{.OVN_NETWORK_CONNECT_ENABLE}}" == "true" ]]; then
+            network_connect_enabled_flag="--enable-network-connect"
+          fi
+
           route_advertisements_enable_flag=
           if [[ "{{.OVN_ROUTE_ADVERTISEMENTS_ENABLE}}" == "true" ]]; then
             route_advertisements_enable_flag="--enable-route-advertisements"
@@ -205,6 +210,7 @@ spec:
             ${persistent_ips_enabled_flag} \
             ${multi_network_enabled_flag} \
             ${network_segmentation_enabled_flag} \
+            ${network_connect_enabled_flag} \
             ${gateway_mode_flags} \
             ${route_advertisements_enable_flag} \
             ${preconfigured_udn_addresses_enable_flag} \
