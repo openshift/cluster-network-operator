@@ -605,6 +605,11 @@ data:
         evpn_enable_flag="--enable-evpn"
       fi
 
+      network_connect_enabled_flag=
+      if [[ "{{.OVN_NETWORK_CONNECT_ENABLE}}" == "true" ]]; then
+        network_connect_enabled_flag="--enable-network-connect"
+      fi
+
       network_observability_enabled_flag=
       if [[ "{{.OVN_OBSERVABILITY_ENABLE}}" == "true" ]]; then
         network_observability_enabled_flag="--enable-observability"
@@ -686,6 +691,7 @@ data:
         --export-ovs-metrics \
         --disable-snat-multiple-gws \
         ${export_network_flows_flags} \
+        ${network_connect_enabled_flag} \
         ${route_advertisements_enable_flag} \
         ${evpn_enable_flag} \
         ${network_observability_enabled_flag} \
