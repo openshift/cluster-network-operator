@@ -40,7 +40,9 @@ func getFeatureGatesWithDualStack() featuregates.FeatureGate {
 			apifeatures.FeatureGateOVNObservability,
 			apifeatures.FeatureGateAWSDualStackInstall,
 			apifeatures.FeatureGateAzureDualStackInstall},
-		[]configv1.FeatureGateName{},
+		[]configv1.FeatureGateName{
+			apifeatures.FeatureGateNetworkConnect,
+		},
 	)
 }
 
@@ -125,6 +127,7 @@ func getFeatureGatesWithIncompleteDualStack() featuregates.FeatureGate {
 			apifeatures.FeatureGateAWSDualStackInstall,
 		},
 		[]configv1.FeatureGateName{
+			apifeatures.FeatureGateNetworkConnect,
 			apifeatures.FeatureGateAzureDualStackInstall,
 		},
 	)

@@ -665,6 +665,11 @@ data:
   
       preconfigured_udn_addresses_enable_flag="--enable-preconfigured-udn-addresses"
 
+      network_connect_enabled_flag=
+      if [[ "{{.OVN_NETWORK_CONNECT_ENABLE}}" == "true" ]]; then
+        network_connect_enabled_flag="--enable-network-connect"
+      fi
+
       network_observability_enabled_flag=
       if [[ "{{.OVN_OBSERVABILITY_ENABLE}}" == "true" ]]; then
         network_observability_enabled_flag="--enable-observability"
@@ -767,6 +772,7 @@ data:
         ${export_network_flows_flags} \
         ${multi_network_enabled_flag} \
         ${network_segmentation_enabled_flag} \
+        ${network_connect_enabled_flag} \
         ${route_advertisements_enable_flag} \
         ${evpn_enable_flag} \
         ${preconfigured_udn_addresses_enable_flag} \

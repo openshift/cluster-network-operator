@@ -404,6 +404,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	// leverage feature gates
 	data.Data["DNS_NAME_RESOLVER_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateDNSNameResolver)
+	data.Data["OVN_NETWORK_CONNECT_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateNetworkConnect)
 	data.Data["OVN_OBSERVABILITY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateOVNObservability)
 	data.Data["OVN_ROUTE_ADVERTISEMENTS_ENABLE"] = c.RouteAdvertisements == operv1.RouteAdvertisementsEnabled
 	// OVN_EVPN_ENABLE_API depends only on the feature gate and controls whether EVPN fields

@@ -44,6 +44,9 @@ data:
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
     enable-dns-name-resolver=true
 {{- end }}
+{{- if .OVN_NETWORK_CONNECT_ENABLE }}
+    enable-network-connect=true
+{{- end }}
 
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
@@ -127,6 +130,9 @@ data:
     enable-preconfigured-udn-addresses=true
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
     enable-dns-name-resolver=true
+{{- end }}
+{{- if .OVN_NETWORK_CONNECT_ENABLE }}
+    enable-network-connect=true
 {{- end }}
 
     [gateway]
