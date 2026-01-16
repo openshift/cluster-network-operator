@@ -302,6 +302,14 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// Fill all defaults explicitly
 	network.FillDefaults(&newOperConfig.Spec, prev, mtu)
 
+	// Validate MTU for no-overlay mode (must be done after FillDefaults since we need hostMTU)
+	if err := network.ValidateMTUForNoOverlay(&newOperConfig.Spec, mtu); err != nil {
+		log.Printf("Failed to validate MTU for no-overlay mode: %v", err)
+		r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
+			fmt.Sprintf("Invalid MTU configuration for no-overlay mode: %v. Use 'oc edit network.operator.openshift.io cluster' to fix.", err))
+		return reconcile.Result{}, err
+	}
+
 	// Compare against previous applied configuration to see if this change
 	// is safe.
 	if prev != nil {

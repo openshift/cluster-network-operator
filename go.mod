@@ -102,7 +102,7 @@ require (
 )
 
 require (
-	github.com/openshift/api v0.0.0-20251111013132-5c461e21bdb7
+	github.com/openshift/api v0.0.0-20260107103503-6d35063ca179
 	github.com/openshift/client-go v0.0.0-20251015124057-db0dee36e235
 	github.com/openshift/library-go v0.0.0-20251222131241-289839b3ffe8
 	github.com/openshift/machine-config-operator v0.0.1-0.20250724162154-ab14c8e2843b
@@ -174,3 +174,7 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 )
+
+replace github.com/openshift/api => github.com/ricky-rav/api v0.0.0-20260116181308-162b45b5f908
+
+replace github.com/openshift/client-go => github.com/ricky-rav/client-go v0.0.0-20260116183722-afb33cbd53f8
