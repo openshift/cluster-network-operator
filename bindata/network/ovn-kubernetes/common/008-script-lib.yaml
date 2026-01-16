@@ -622,6 +622,11 @@ data:
         multi_network_enabled_flag="--enable-multi-network"
         network_segmentation_enabled_flag="--enable-network-segmentation"
       fi
+
+      network_connect_enabled_flag=
+      if [[ "{{.OVN_NETWORK_CONNECT_ENABLE}}" == "true" && "${OVN_NODE_MODE}" != "dpu-host" ]]; then
+        network_connect_enabled_flag="--enable-network-connect"
+      fi
       
       route_advertisements_enable_flag=
       if [[ "{{.OVN_ROUTE_ADVERTISEMENTS_ENABLE}}" == "true" ]]; then
@@ -727,6 +732,7 @@ data:
         ${export_network_flows_flags} \
         ${multi_network_enabled_flag} \
         ${network_segmentation_enabled_flag} \
+        ${network_connect_enabled_flag} \
         ${route_advertisements_enable_flag} \
         ${preconfigured_udn_addresses_enable_flag} \
         ${multi_network_policy_enabled_flag} \

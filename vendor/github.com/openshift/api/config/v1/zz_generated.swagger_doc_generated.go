@@ -1214,17 +1214,6 @@ func (ImageDigestMirrors) SwaggerDoc() map[string]string {
 	return map_ImageDigestMirrors
 }
 
-var map_FulcioCAWithRekor = map[string]string{
-	"":              "FulcioCAWithRekor defines the root of trust based on the Fulcio certificate and the Rekor public key.",
-	"fulcioCAData":  "fulcioCAData is a required field contains inline base64-encoded data for the PEM format fulcio CA. fulcioCAData must be at most 8192 characters. ",
-	"rekorKeyData":  "rekorKeyData is a required field contains inline base64-encoded data for the PEM format from the Rekor public key. rekorKeyData must be at most 8192 characters. ",
-	"fulcioSubject": "fulcioSubject is a required field specifies OIDC issuer and the email of the Fulcio authentication configuration.",
-}
-
-func (FulcioCAWithRekor) SwaggerDoc() map[string]string {
-	return map_FulcioCAWithRekor
-}
-
 var map_ImagePolicy = map[string]string{
 	"":         "ImagePolicy holds namespace-wide configuration for image signature verification\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
@@ -1236,6 +1225,17 @@ func (ImagePolicy) SwaggerDoc() map[string]string {
 	return map_ImagePolicy
 }
 
+var map_ImagePolicyFulcioCAWithRekorRootOfTrust = map[string]string{
+	"":              "ImagePolicyFulcioCAWithRekorRootOfTrust defines the root of trust based on the Fulcio certificate and the Rekor public key.",
+	"fulcioCAData":  "fulcioCAData is a required field contains inline base64-encoded data for the PEM format fulcio CA. fulcioCAData must be at most 8192 characters. ",
+	"rekorKeyData":  "rekorKeyData is a required field contains inline base64-encoded data for the PEM format from the Rekor public key. rekorKeyData must be at most 8192 characters. ",
+	"fulcioSubject": "fulcioSubject is a required field specifies OIDC issuer and the email of the Fulcio authentication configuration.",
+}
+
+func (ImagePolicyFulcioCAWithRekorRootOfTrust) SwaggerDoc() map[string]string {
+	return map_ImagePolicyFulcioCAWithRekorRootOfTrust
+}
+
 var map_ImagePolicyList = map[string]string{
 	"":         "ImagePolicyList is a list of ImagePolicy resources\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
@@ -1244,6 +1244,27 @@ var map_ImagePolicyList = map[string]string{
 
 func (ImagePolicyList) SwaggerDoc() map[string]string {
 	return map_ImagePolicyList
+}
+
+var map_ImagePolicyPKIRootOfTrust = map[string]string{
+	"":                      "ImagePolicyPKIRootOfTrust defines the root of trust based on Root CA(s) and corresponding intermediate certificates.",
+	"caRootsData":           "caRootsData contains base64-encoded data of a certificate bundle PEM file, which contains one or more CA roots in the PEM format. The total length of the data must not exceed 8192 characters. ",
+	"caIntermediatesData":   "caIntermediatesData contains base64-encoded data of a certificate bundle PEM file, which contains one or more intermediate certificates in the PEM format. The total length of the data must not exceed 8192 characters. caIntermediatesData requires caRootsData to be set. ",
+	"pkiCertificateSubject": "pkiCertificateSubject defines the requirements imposed on the subject to which the certificate was issued.",
+}
+
+func (ImagePolicyPKIRootOfTrust) SwaggerDoc() map[string]string {
+	return map_ImagePolicyPKIRootOfTrust
+}
+
+var map_ImagePolicyPublicKeyRootOfTrust = map[string]string{
+	"":             "ImagePolicyPublicKeyRootOfTrust defines the root of trust based on a sigstore public key.",
+	"keyData":      "keyData is a required field contains inline base64-encoded data for the PEM format public key. keyData must be at most 8192 characters. ",
+	"rekorKeyData": "rekorKeyData is an optional field contains inline base64-encoded data for the PEM format from the Rekor public key. rekorKeyData must be at most 8192 characters. ",
+}
+
+func (ImagePolicyPublicKeyRootOfTrust) SwaggerDoc() map[string]string {
+	return map_ImagePolicyPublicKeyRootOfTrust
 }
 
 var map_ImagePolicySpec = map[string]string{
@@ -1264,15 +1285,14 @@ func (ImagePolicyStatus) SwaggerDoc() map[string]string {
 	return map_ImagePolicyStatus
 }
 
-var map_PKI = map[string]string{
-	"":                      "PKI defines the root of trust based on Root CA(s) and corresponding intermediate certificates.",
-	"caRootsData":           "caRootsData contains base64-encoded data of a certificate bundle PEM file, which contains one or more CA roots in the PEM format. The total length of the data must not exceed 8192 characters. ",
-	"caIntermediatesData":   "caIntermediatesData contains base64-encoded data of a certificate bundle PEM file, which contains one or more intermediate certificates in the PEM format. The total length of the data must not exceed 8192 characters. caIntermediatesData requires caRootsData to be set. ",
-	"pkiCertificateSubject": "pkiCertificateSubject defines the requirements imposed on the subject to which the certificate was issued.",
+var map_ImageSigstoreVerificationPolicy = map[string]string{
+	"":               "ImageSigstoreVerificationPolicy defines the verification policy for the items in the scopes list.",
+	"rootOfTrust":    "rootOfTrust is a required field that defines the root of trust for verifying image signatures during retrieval. This allows image consumers to specify policyType and corresponding configuration of the policy, matching how the policy was generated.",
+	"signedIdentity": "signedIdentity is an optional field specifies what image identity the signature claims about the image. This is useful when the image identity in the signature differs from the original image spec, such as when mirror registry is configured for the image scope, the signature from the mirror registry contains the image identity of the mirror instead of the original scope. The required matchPolicy field specifies the approach used in the verification process to verify the identity in the signature and the actual image identity, the default matchPolicy is \"MatchRepoDigestOrExact\".",
 }
 
-func (PKI) SwaggerDoc() map[string]string {
-	return map_PKI
+func (ImageSigstoreVerificationPolicy) SwaggerDoc() map[string]string {
+	return map_ImageSigstoreVerificationPolicy
 }
 
 var map_PKICertificateSubject = map[string]string{
@@ -1283,16 +1303,6 @@ var map_PKICertificateSubject = map[string]string{
 
 func (PKICertificateSubject) SwaggerDoc() map[string]string {
 	return map_PKICertificateSubject
-}
-
-var map_Policy = map[string]string{
-	"":               "Policy defines the verification policy for the items in the scopes list.",
-	"rootOfTrust":    "rootOfTrust is a required field that defines the root of trust for verifying image signatures during retrieval. This allows image consumers to specify policyType and corresponding configuration of the policy, matching how the policy was generated.",
-	"signedIdentity": "signedIdentity is an optional field specifies what image identity the signature claims about the image. This is useful when the image identity in the signature differs from the original image spec, such as when mirror registry is configured for the image scope, the signature from the mirror registry contains the image identity of the mirror instead of the original scope. The required matchPolicy field specifies the approach used in the verification process to verify the identity in the signature and the actual image identity, the default matchPolicy is \"MatchRepoDigestOrExact\".",
-}
-
-func (Policy) SwaggerDoc() map[string]string {
-	return map_Policy
 }
 
 var map_PolicyFulcioSubject = map[string]string{
@@ -1335,7 +1345,7 @@ func (PolicyMatchRemapIdentity) SwaggerDoc() map[string]string {
 
 var map_PolicyRootOfTrust = map[string]string{
 	"":                  "PolicyRootOfTrust defines the root of trust based on the selected policyType.",
-	"policyType":        "policyType is a required field specifies the type of the policy for verification. This field must correspond to how the policy was generated. Allowed values are \"PublicKey\", \"FulcioCAWithRekor\", and \"PKI\". When set to \"PublicKey\", the policy relies on a sigstore publicKey and may optionally use a Rekor verification. When set to \"FulcioCAWithRekor\", the policy is based on the Fulcio certification and incorporates a Rekor verification. When set to \"PKI\", the policy is based on the certificates from Bring Your Own Public Key Infrastructure (BYOPKI). This value is enabled by turning on the SigstoreImageVerificationPKI feature gate.",
+	"policyType":        "policyType is a required field specifies the type of the policy for verification. This field must correspond to how the policy was generated. Allowed values are \"PublicKey\", \"FulcioCAWithRekor\", and \"PKI\". When set to \"PublicKey\", the policy relies on a sigstore publicKey and may optionally use a Rekor verification. When set to \"FulcioCAWithRekor\", the policy is based on the Fulcio certification and incorporates a Rekor verification. When set to \"PKI\", the policy is based on the certificates from Bring Your Own Public Key Infrastructure (BYOPKI).",
 	"publicKey":         "publicKey defines the root of trust configuration based on a sigstore public key. Optionally include a Rekor public key for Rekor verification. publicKey is required when policyType is PublicKey, and forbidden otherwise.",
 	"fulcioCAWithRekor": "fulcioCAWithRekor defines the root of trust configuration based on the Fulcio certificate and the Rekor public key. fulcioCAWithRekor is required when policyType is FulcioCAWithRekor, and forbidden otherwise For more information about Fulcio and Rekor, please refer to the document at: https://github.com/sigstore/fulcio and https://github.com/sigstore/rekor",
 	"pki":               "pki defines the root of trust configuration based on Bring Your Own Public Key Infrastructure (BYOPKI) Root CA(s) and corresponding intermediate certificates. pki is required when policyType is PKI, and forbidden otherwise.",
@@ -1343,16 +1353,6 @@ var map_PolicyRootOfTrust = map[string]string{
 
 func (PolicyRootOfTrust) SwaggerDoc() map[string]string {
 	return map_PolicyRootOfTrust
-}
-
-var map_PublicKey = map[string]string{
-	"":             "PublicKey defines the root of trust based on a sigstore public key.",
-	"keyData":      "keyData is a required field contains inline base64-encoded data for the PEM format public key. keyData must be at most 8192 characters. ",
-	"rekorKeyData": "rekorKeyData is an optional field contains inline base64-encoded data for the PEM format from the Rekor public key. rekorKeyData must be at most 8192 characters. ",
-}
-
-func (PublicKey) SwaggerDoc() map[string]string {
-	return map_PublicKey
 }
 
 var map_ImageTagMirrorSet = map[string]string{
@@ -1527,6 +1527,7 @@ var map_BareMetalPlatformStatus = map[string]string{
 	"ingressIPs":           "ingressIPs are the external IPs which route to the default ingress controller. The IPs are suitable targets of a wildcard DNS record used to resolve default route host names. In dual stack clusters this list contains two IPs otherwise only one.",
 	"nodeDNSIP":            "nodeDNSIP is the IP address for the internal DNS used by the nodes. Unlike the one managed by the DNS operator, `NodeDNSIP` provides name resolution for the nodes themselves. There is no DNS-as-a-service for BareMetal deployments. In order to minimize necessary changes to the datacenter DNS, a DNS service is hosted as a static pod to serve those hostnames to the nodes in the cluster.",
 	"loadBalancer":         "loadBalancer defines how the load balancer used by the cluster is configured.",
+	"dnsRecordsType":       "dnsRecordsType determines whether records for api, api-int, and ingress are provided by the internal DNS service or externally. Allowed values are `Internal`, `External`, and omitted. When set to `Internal`, records are provided by the internal infrastructure and no additional user configuration is required for the cluster to function. When set to `External`, records are not provided by the internal infrastructure and must be configured by the user on a DNS server outside the cluster. Cluster nodes must use this external server for their upstream DNS requests. This value may only be set when loadBalancer.type is set to UserManaged. When omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default is `Internal`.",
 	"machineNetworks":      "machineNetworks are IP networks used to connect all the OpenShift cluster nodes.",
 }
 
@@ -1615,7 +1616,6 @@ var map_GCPPlatformStatus = map[string]string{
 	"resourceLabels":          "resourceLabels is a list of additional labels to apply to GCP resources created for the cluster. See https://cloud.google.com/compute/docs/labeling-resources for information on labeling GCP resources. GCP supports a maximum of 64 labels per resource. OpenShift reserves 32 labels for internal use, allowing 32 labels for user configuration.",
 	"resourceTags":            "resourceTags is a list of additional tags to apply to GCP resources created for the cluster. See https://cloud.google.com/resource-manager/docs/tags/tags-overview for information on tagging GCP resources. GCP supports a maximum of 50 tags per resource.",
 	"cloudLoadBalancerConfig": "cloudLoadBalancerConfig holds configuration related to DNS and cloud load balancers. It allows configuration of in-cluster DNS as an alternative to the platform default DNS implementation. When using the ClusterHosted DNS type, Load Balancer IP addresses must be provided for the API and internal API load balancers as well as the ingress load balancer.",
-	"serviceEndpoints":        "serviceEndpoints specifies endpoints that override the default endpoints used when creating clients to interact with GCP services. When not specified, the default endpoint for the GCP region will be used. Only 1 endpoint override is permitted for each GCP service. The maximum number of endpoint overrides allowed is 11.",
 }
 
 func (GCPPlatformStatus) SwaggerDoc() map[string]string {
@@ -1641,16 +1641,6 @@ var map_GCPResourceTag = map[string]string{
 
 func (GCPResourceTag) SwaggerDoc() map[string]string {
 	return map_GCPResourceTag
-}
-
-var map_GCPServiceEndpoint = map[string]string{
-	"":     "GCPServiceEndpoint store the configuration of a custom url to override existing defaults of GCP Services.",
-	"name": "name is the name of the GCP service whose endpoint is being overridden. This must be provided and cannot be empty.\n\nAllowed values are Compute, Container, CloudResourceManager, DNS, File, IAM, ServiceUsage, Storage, and TagManager.\n\nAs an example, when setting the name to Compute all requests made by the caller to the GCP Compute Service will be directed to the endpoint specified in the url field.",
-	"url":  "url is a fully qualified URI that overrides the default endpoint for a client using the GCP service specified in the name field. url is required, must use the scheme https, must not be more than 253 characters in length, and must be a valid URL according to Go's net/url package (https://pkg.go.dev/net/url#URL)\n\nAn example of a valid endpoint that overrides the Compute Service: \"https://compute-myendpoint1.p.googleapis.com\"",
-}
-
-func (GCPServiceEndpoint) SwaggerDoc() map[string]string {
-	return map_GCPServiceEndpoint
 }
 
 var map_IBMCloudPlatformSpec = map[string]string{
@@ -1789,6 +1779,7 @@ var map_NutanixPlatformStatus = map[string]string{
 	"ingressIP":            "ingressIP is an external IP which routes to the default ingress controller. The IP is a suitable target of a wildcard DNS record used to resolve default route host names.\n\nDeprecated: Use IngressIPs instead.",
 	"ingressIPs":           "ingressIPs are the external IPs which route to the default ingress controller. The IPs are suitable targets of a wildcard DNS record used to resolve default route host names. In dual stack clusters this list contains two IPs otherwise only one.",
 	"loadBalancer":         "loadBalancer defines how the load balancer used by the cluster is configured.",
+	"dnsRecordsType":       "dnsRecordsType determines whether records for api, api-int, and ingress are provided by the internal DNS service or externally. Allowed values are `Internal`, `External`, and omitted. When set to `Internal`, records are provided by the internal infrastructure and no additional user configuration is required for the cluster to function. When set to `External`, records are not provided by the internal infrastructure and must be configured by the user on a DNS server outside the cluster. Cluster nodes must use this external server for their upstream DNS requests. This value may only be set when loadBalancer.type is set to UserManaged. When omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default is `Internal`.",
 }
 
 func (NutanixPlatformStatus) SwaggerDoc() map[string]string {
@@ -1855,6 +1846,7 @@ var map_OpenStackPlatformStatus = map[string]string{
 	"ingressIPs":           "ingressIPs are the external IPs which route to the default ingress controller. The IPs are suitable targets of a wildcard DNS record used to resolve default route host names. In dual stack clusters this list contains two IPs otherwise only one.",
 	"nodeDNSIP":            "nodeDNSIP is the IP address for the internal DNS used by the nodes. Unlike the one managed by the DNS operator, `NodeDNSIP` provides name resolution for the nodes themselves. There is no DNS-as-a-service for OpenStack deployments. In order to minimize necessary changes to the datacenter DNS, a DNS service is hosted as a static pod to serve those hostnames to the nodes in the cluster.",
 	"loadBalancer":         "loadBalancer defines how the load balancer used by the cluster is configured.",
+	"dnsRecordsType":       "dnsRecordsType determines whether records for api, api-int, and ingress are provided by the internal DNS service or externally. Allowed values are `Internal`, `External`, and omitted. When set to `Internal`, records are provided by the internal infrastructure and no additional user configuration is required for the cluster to function. When set to `External`, records are not provided by the internal infrastructure and must be configured by the user on a DNS server outside the cluster. Cluster nodes must use this external server for their upstream DNS requests. This value may only be set when loadBalancer.type is set to UserManaged. When omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default is `Internal`.",
 	"machineNetworks":      "machineNetworks are IP networks used to connect all the OpenShift cluster nodes.",
 }
 
@@ -1887,6 +1879,7 @@ var map_OvirtPlatformStatus = map[string]string{
 	"ingressIPs":           "ingressIPs are the external IPs which route to the default ingress controller. The IPs are suitable targets of a wildcard DNS record used to resolve default route host names. In dual stack clusters this list contains two IPs otherwise only one.",
 	"nodeDNSIP":            "deprecated: as of 4.6, this field is no longer set or honored.  It will be removed in a future release.",
 	"loadBalancer":         "loadBalancer defines how the load balancer used by the cluster is configured.",
+	"dnsRecordsType":       "dnsRecordsType determines whether records for api, api-int, and ingress are provided by the internal DNS service or externally. Allowed values are `Internal`, `External`, and omitted. When set to `Internal`, records are provided by the internal infrastructure and no additional user configuration is required for the cluster to function. When set to `External`, records are not provided by the internal infrastructure and must be configured by the user on a DNS server outside the cluster. Cluster nodes must use this external server for their upstream DNS requests. This value may only be set when loadBalancer.type is set to UserManaged. When omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default is `Internal`.",
 }
 
 func (OvirtPlatformStatus) SwaggerDoc() map[string]string {
@@ -2069,6 +2062,7 @@ var map_VSpherePlatformStatus = map[string]string{
 	"ingressIPs":           "ingressIPs are the external IPs which route to the default ingress controller. The IPs are suitable targets of a wildcard DNS record used to resolve default route host names. In dual stack clusters this list contains two IPs otherwise only one.",
 	"nodeDNSIP":            "nodeDNSIP is the IP address for the internal DNS used by the nodes. Unlike the one managed by the DNS operator, `NodeDNSIP` provides name resolution for the nodes themselves. There is no DNS-as-a-service for vSphere deployments. In order to minimize necessary changes to the datacenter DNS, a DNS service is hosted as a static pod to serve those hostnames to the nodes in the cluster.",
 	"loadBalancer":         "loadBalancer defines how the load balancer used by the cluster is configured.",
+	"dnsRecordsType":       "dnsRecordsType determines whether records for api, api-int, and ingress are provided by the internal DNS service or externally. Allowed values are `Internal`, `External`, and omitted. When set to `Internal`, records are provided by the internal infrastructure and no additional user configuration is required for the cluster to function. When set to `External`, records are not provided by the internal infrastructure and must be configured by the user on a DNS server outside the cluster. Cluster nodes must use this external server for their upstream DNS requests. This value may only be set when loadBalancer.type is set to UserManaged. When omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time. The current default is `Internal`.",
 	"machineNetworks":      "machineNetworks are IP networks used to connect all the OpenShift cluster nodes.",
 }
 
@@ -2896,7 +2890,7 @@ func (SchedulerList) SwaggerDoc() map[string]string {
 var map_SchedulerSpec = map[string]string{
 	"policy":                "DEPRECATED: the scheduler Policy API has been deprecated and will be removed in a future release. policy is a reference to a ConfigMap containing scheduler policy which has user specified predicates and priorities. If this ConfigMap is not available scheduler will default to use DefaultAlgorithmProvider. The namespace for this configmap is openshift-config.",
 	"profile":               "profile sets which scheduling profile should be set in order to configure scheduling decisions for new pods.\n\nValid values are \"LowNodeUtilization\", \"HighNodeUtilization\", \"NoScoring\" Defaults to \"LowNodeUtilization\"",
-	"profileCustomizations": "profileCustomizations contains configuration for modifying the default behavior of existing scheduler profiles.",
+	"profileCustomizations": "profileCustomizations contains configuration for modifying the default behavior of existing scheduler profiles. Deprecated: no longer needed, since DRA is GA starting with 4.21, and is enabled by' default in the cluster, this field will be removed in 4.24.",
 	"defaultNodeSelector":   "defaultNodeSelector helps set the cluster-wide default node selector to restrict pod placement to specific nodes. This is applied to the pods created in all namespaces and creates an intersection with any existing nodeSelectors already set on a pod, additionally constraining that pod's selector. For example, defaultNodeSelector: \"type=user-node,region=east\" would set nodeSelector field in pod spec to \"type=user-node,region=east\" to all pods created in all namespaces. Namespaces having project-wide node selectors won't be impacted even if this field is set. This adds an annotation section to the namespace. For example, if a new namespace is created with node-selector='type=user-node,region=east', the annotation openshift.io/node-selector: type=user-node,region=east gets added to the project. When the openshift.io/node-selector annotation is set on the project the value is used in preference to the value we are setting for defaultNodeSelector field. For instance, openshift.io/node-selector: \"type=user-node,region=west\" means that the default of \"type=user-node,region=east\" set in defaultNodeSelector would not be applied.",
 	"mastersSchedulable":    "mastersSchedulable allows masters nodes to be schedulable. When this flag is turned on, all the master nodes in the cluster will be made schedulable, so that workload pods can run on them. The default value for this field is false, meaning none of the master nodes are schedulable. Important Note: Once the workload pods start running on the master nodes, extreme care must be taken to ensure that cluster-critical control plane components are not impacted. Please turn on this field after doing due diligence.",
 }

@@ -78,6 +78,7 @@ func getDefaultFeatureGates() featuregates.FeatureGate {
 		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver,
 			apifeatures.FeatureGateNetworkSegmentation, apifeatures.FeatureGateOVNObservability},
 		[]configv1.FeatureGateName{
+			apifeatures.FeatureGateNetworkConnect, // only in DevPreview
 			apifeatures.FeatureGatePreconfiguredUDNAddresses,
 		},
 	)
@@ -876,6 +877,47 @@ logfile-maxage=0`,
 				apifeatures.FeatureGatePreconfiguredUDNAddresses,
 			},
 		},
+		{
+			desc: "enable network connect (DevPreview)",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://testing.test:8443"
+host-network-namespace="openshift-host-network"
+platform-type="GCP"
+healthz-bind-address="0.0.0.0:10256"
+dns-service-namespace="openshift-dns"
+dns-service-name="dns-default"
+
+[ovnkubernetesfeature]
+egressip-node-healthcheck-port=9107
+enable-network-segmentation=true
+enable-network-connect=true
+
+[gateway]
+mode=shared
+nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0`,
+			enabledFeatureGates: []configv1.FeatureGateName{
+				apifeatures.FeatureGateNetworkSegmentation,
+				apifeatures.FeatureGateNetworkConnect,
+			},
+		},
 	}
 	g := NewGomegaWithT(t)
 
@@ -929,6 +971,7 @@ logfile-maxage=0`,
 			knownFeatureGates := []configv1.FeatureGateName{
 				apifeatures.FeatureGateAdminNetworkPolicy,
 				apifeatures.FeatureGateDNSNameResolver,
+				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateNetworkSegmentation,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGatePreconfiguredUDNAddresses,
@@ -3829,6 +3872,7 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 			apifeatures.FeatureGateOVNObservability,
 		},
 		[]configv1.FeatureGateName{
+			apifeatures.FeatureGateNetworkConnect,
 			apifeatures.FeatureGatePreconfiguredUDNAddresses,
 		},
 	)
@@ -4099,6 +4143,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 			[]configv1.FeatureGateName{
 				apifeatures.FeatureGateAdminNetworkPolicy,
 				apifeatures.FeatureGateDNSNameResolver,
+				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateNetworkSegmentation,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGatePreconfiguredUDNAddresses,
@@ -4113,6 +4158,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 			[]configv1.FeatureGateName{
 				apifeatures.FeatureGateAdminNetworkPolicy,
 				apifeatures.FeatureGateDNSNameResolver,
+				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGatePreconfiguredUDNAddresses,
 			},
@@ -4127,6 +4173,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 			[]configv1.FeatureGateName{
 				apifeatures.FeatureGateAdminNetworkPolicy,
 				apifeatures.FeatureGateDNSNameResolver,
+				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
 			},
 		)

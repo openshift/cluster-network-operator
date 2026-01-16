@@ -47,6 +47,7 @@ func getFeatureGatesWithDualStack() featuregates.FeatureGate {
 			apifeatures.FeatureGateAWSDualStackInstall,
 			apifeatures.FeatureGateAzureDualStackInstall},
 		[]configv1.FeatureGateName{
+			apifeatures.FeatureGateNetworkConnect,
 			apifeatures.FeatureGatePreconfiguredUDNAddresses,
 		},
 	)
@@ -329,6 +330,7 @@ func getFeatureGatesWithIncompleteDualStack() featuregates.FeatureGate {
 			apifeatures.FeatureGateAWSDualStackInstall,
 		},
 		[]configv1.FeatureGateName{
+			apifeatures.FeatureGateNetworkConnect,
 			apifeatures.FeatureGatePreconfiguredUDNAddresses,
 			apifeatures.FeatureGateAzureDualStackInstall,
 		},

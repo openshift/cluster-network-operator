@@ -45,6 +45,9 @@ data:
 {{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
     enable-preconfigured-udn-addresses=true
 {{- end }}
+{{- if .OVN_NETWORK_CONNECT_ENABLE }}
+    enable-network-connect=true
+{{- end }}
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
     enable-dns-name-resolver=true
 {{- end }}
@@ -131,6 +134,9 @@ data:
     enable-network-segmentation=true
 {{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
     enable-preconfigured-udn-addresses=true
+{{- end }}
+{{- if .OVN_NETWORK_CONNECT_ENABLE }}
+    enable-network-connect=true
 {{- end }}
 {{- end }}
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
