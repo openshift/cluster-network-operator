@@ -78,6 +78,7 @@ var keepCRDs = sets.New(
 	// were to destroy frrconfigurations.
 	"frrconfigurations.frrk8s.metallb.io",
 	"routeadvertisements.k8s.ovn.org",
+	"vteps.k8s.ovn.org",
 )
 
 type ClusteredName struct {

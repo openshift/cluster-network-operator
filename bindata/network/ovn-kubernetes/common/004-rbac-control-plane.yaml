@@ -240,6 +240,23 @@ rules:
   - update
   - patch
 {{- end}}
+{{- if .OVN_EVPN_ENABLE }}
+- apiGroups:
+  - k8s.ovn.org
+  resources:
+  - vteps
+  verbs:
+  - list
+  - get
+  - watch
+- apiGroups:
+  - k8s.ovn.org
+  resources:
+  - vteps/status
+  verbs:
+  - patch
+  - update
+{{- end}}
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
