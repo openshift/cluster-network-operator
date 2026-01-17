@@ -78,16 +78,6 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	}
 	objs = append(objs, o...)
 
-	if operConf.Migration != nil && operConf.Migration.NetworkType != "" {
-		// During SDN Migration, CNO needs to convert the custom resources of
-		// egressIP, egressFirewall, etc. Therefore we need to render the CRDs for
-		// both OpenShiftSDN and OVNKubernetes.
-		o, err = renderCRDForMigration(operConf, manifestDir, featureGates)
-		if err != nil {
-			return nil, progressing, err
-		}
-		objs = append(objs, o...)
-	}
 	// render kube-proxy
 	// DPU_DEV_PREVIEW
 	// There is currently a restriction that renderStandaloneKubeProxy() is
@@ -311,9 +301,6 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec, infraStatus *bootstrap.InfraSt
 	if err := isNetworkChangeSafe(prev, next, infraStatus); err != nil {
 		errs = append(errs, err)
 	}
-
-	// Check the network migration
-	errs = append(errs, isMigrationChangeSafe(prev, next, infraStatus)...)
 
 	// Check the default network
 	errs = append(errs, isDefaultNetworkChangeSafe(prev, next)...)
@@ -595,7 +582,17 @@ func validateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 
 // validateMigration validates if migration path is possible
 func validateMigration(conf *operv1.NetworkSpec) []error {
-	return []error{}
+	var errs []error
+
+	if conf.Migration != nil {
+		if conf.Migration.NetworkType != "" {
+			errs = append(errs, errors.Errorf("network type migration is not supported"))
+		}
+		if conf.Migration.Features != nil {
+			errs = append(errs, errors.Errorf("network feature migration is not supported"))
+		}
+	}
+	return errs
 }
 
 // renderDefaultNetwork generates the manifests corresponding to the requested
@@ -605,19 +602,6 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 	dn := conf.DefaultNetwork
 	if errs := validateDefaultNetwork(conf); len(errs) > 0 {
 		return nil, false, errors.Errorf("invalid Default Network configuration: %v", errs)
-	}
-
-	if conf.Migration != nil && conf.Migration.Mode == operv1.LiveNetworkMigrationMode {
-		log.Printf("Render both CNIs for live migration")
-		ovnObjs, ovnProgressing, err := renderOVNKubernetes(conf, bootstrapResult, manifestDir, client, featureGates)
-		if err != nil {
-			return nil, false, err
-		}
-		objs, sdnProgressing, err := renderOpenShiftSDN(conf, bootstrapResult, manifestDir)
-		if err != nil {
-			return nil, false, err
-		}
-		return append(objs, ovnObjs...), sdnProgressing || ovnProgressing, nil
 	}
 
 	switch dn.Type {
@@ -631,45 +615,7 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 	}
 }
 
-// renderCRDForMigration generates OpenShiftSDN CRDs when default network is OVNKubernetes,
-// and generates OVNKubernetes CRDs when default network is OpenShiftSDN.
-func renderCRDForMigration(conf *operv1.NetworkSpec, manifestDir string, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, error) {
-	switch conf.DefaultNetwork.Type {
-	case operv1.NetworkTypeOpenShiftSDN:
-		// When we migrate from SDN to OVNK, we must set the feature gate values so that
-		// the CRD installation can happen according to whether the feature gate is enabled or not
-		// in the cluster
-		data := render.MakeRenderData()
-		data.Data["OVN_ADMIN_NETWORK_POLICY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateAdminNetworkPolicy)
-		data.Data["OVN_NETWORK_SEGMENTATION_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateNetworkSegmentation)
-		data.Data["OVN_OBSERVABILITY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateOVNObservability)
-		data.Data["OVN_ROUTE_ADVERTISEMENTS_ENABLE"] = conf.DefaultNetwork.OVNKubernetesConfig != nil &&
-			conf.DefaultNetwork.OVNKubernetesConfig.RouteAdvertisements == operv1.RouteAdvertisementsEnabled
-
-		manifests, err := render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/common/001-crd.yaml"), &data)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to render OVNKubernetes CRDs")
-		}
-		return manifests, err
-	case operv1.NetworkTypeOVNKubernetes:
-		manifests, err := render.RenderTemplate(filepath.Join(manifestDir, "network/openshift-sdn/001-crd.yaml"), &render.RenderData{})
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to render OpenShiftSDN CRDs")
-		}
-		return manifests, err
-	default:
-		log.Printf("NOTICE: Unsupported network type %s, ignoring", conf.DefaultNetwork.Type)
-		return nil, nil
-	}
-}
-
 func fillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
-	if conf.Migration != nil && conf.Migration.Mode == operv1.LiveNetworkMigrationMode {
-		log.Printf("fill default for both sdn and ovnkube during live migration")
-		fillOpenShiftSDNDefaults(conf, previous, hostMTU)
-		fillOVNKubernetesDefaults(conf, previous, hostMTU)
-		return
-	}
 	switch conf.DefaultNetwork.Type {
 	case operv1.NetworkTypeOpenShiftSDN:
 		fillOpenShiftSDNDefaults(conf, previous, hostMTU)
@@ -682,37 +628,15 @@ func fillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int)
 }
 
 func isDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
-
 	if prev.DefaultNetwork.Type != next.DefaultNetwork.Type {
-		if prev.Migration == nil {
-			return []error{errors.Errorf("cannot change default network type when not doing migration")}
-		} else {
-			if operv1.NetworkType(prev.Migration.NetworkType) != next.DefaultNetwork.Type {
-				return []error{errors.Errorf("can only change default network type to the target migration network type")}
-			}
-		}
+		return []error{errors.Errorf("cannot change default network type")}
 	}
 
-	if prev.Migration == nil || prev.Migration.NetworkType == "" {
-		switch prev.DefaultNetwork.Type {
-		case operv1.NetworkTypeOpenShiftSDN:
-			return isOpenShiftSDNChangeSafe(prev, next)
-		case operv1.NetworkTypeOVNKubernetes:
-			return isOVNKubernetesChangeSafe(prev, next)
-		default:
-			return nil
-		}
-	}
-	return nil
-}
-
-func isMigrationChangeSafe(prev, next *operv1.NetworkSpec, infraStatus *bootstrap.InfraStatus) []error {
-	// infra.HostedControlPlane is not nil only when HyperShift is enabled
-	if next.Migration != nil && next.Migration.Mode == operv1.LiveNetworkMigrationMode && infraStatus.HostedControlPlane != nil {
-		return []error{errors.Errorf("live migration is unsupported in a HyperShift environment")}
-	}
-	if prev.Migration != nil && next.Migration != nil && prev.Migration.NetworkType != next.Migration.NetworkType && next.Migration.Mode != operv1.LiveNetworkMigrationMode {
-		return []error{errors.Errorf("cannot change migration network type after migration has started")}
+	switch prev.DefaultNetwork.Type {
+	case operv1.NetworkTypeOpenShiftSDN:
+		return isOpenShiftSDNChangeSafe(prev, next)
+	case operv1.NetworkTypeOVNKubernetes:
+		return isOVNKubernetesChangeSafe(prev, next)
 	}
 	return nil
 }

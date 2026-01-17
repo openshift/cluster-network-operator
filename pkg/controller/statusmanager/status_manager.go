@@ -222,12 +222,6 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 				status.relatedObjects = append(status.relatedObjects, currentObj)
 				continue
 			}
-			if gvk.Kind == "Namespace" && gvk.Group == "" {
-				// BZ 1820472: During SDN migration, deleting a namespace object may get stuck in 'Terminating' forever if the cluster network doesn't working as expected.
-				// We choose to not delete the namespace here but to ask user do it manually after the cluster is back to normal state.
-				log.Printf("Object Kind is Namespace, skip")
-				continue
-			}
 			// @aconstan: remove this after having the PR implementing this change, integrated.
 			if gvk.Kind == "Network" && gvk.Group == "operator.openshift.io" {
 				log.Printf("Object Kind is network.operator.openshift.io, skip")

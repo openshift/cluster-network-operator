@@ -11,15 +11,6 @@ data:
   ovnkube-lib.sh: |-
     #!/bin/bash
     set -x
-{{- if .IsNetworkTypeLiveMigration }}
-    if ip link show br-ex; then
-      echo "br-ex exists"
-    else
-      echo "br-ex doesn't exist, sleep..."
-      trap : TERM INT; sleep infinity & wait
-      exit
-    fi
-{{- end }}
     # Add node-specific overrides if the container has mounted any
     K8S_NODE=${K8S_NODE:-}
     if [[ -n "${K8S_NODE}" && -f "/env/${K8S_NODE}" ]]; then

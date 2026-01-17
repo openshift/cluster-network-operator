@@ -7,7 +7,6 @@ import (
 	"reflect"
 
 	configv1 "github.com/openshift/api/config/v1"
-	apifeatures "github.com/openshift/api/features"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
@@ -16,7 +15,6 @@ import (
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -25,10 +23,6 @@ import (
 // MergeClusterConfig merges in the existing cluster config in to the
 // operator config, overwriting any changes to the managed fields.
 func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig *operv1.Network, clusterConfig *configv1.Network) error {
-	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok && r.featureGates.Enabled(apifeatures.FeatureGateNetworkLiveMigration) {
-		// During network type live migration, all the update to network.operator shall only be handled by the clusterconfig controller
-		return nil
-	}
 	// Validate cluster config
 	// If invalid just warn and proceed.
 	if err := network.ValidateClusterConfig(clusterConfig, r.client, r.featureGates); err != nil {
@@ -91,28 +85,8 @@ func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConf
 	if status == nil {
 		return nil, nil
 	}
-	// Sync status.conditions when live migration is processing
-	clusterConfigWithConditions := clusterConfig.DeepCopy()
-	nowTimestamp := metav1.Now()
-	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok && r.featureGates.Enabled(apifeatures.FeatureGateNetworkLiveMigration) {
-		if meta.IsStatusConditionPresentAndEqual(clusterConfig.Status.Conditions, names.NetworkTypeMigrationInProgress, metav1.ConditionTrue) {
-			err = r.syncNetworkTypeMigrationConditions(ctx, operConfig, clusterConfigWithConditions)
-			if err != nil {
-				return nil, err
-			}
-		} else if clusterConfig.Spec.NetworkType != clusterConfig.Status.NetworkType {
-			// Do not initialize live migration if it is not valid
-			if err := network.ValidateLiveMigration(clusterConfig, &bootstrapResult.Infra, r.client); err != nil {
-				return nil, err
-			}
-			initMigrationConditions(&clusterConfigWithConditions.Status.Conditions, nowTimestamp)
-		} else {
-			resetMigrationConditions(&clusterConfigWithConditions.Status.Conditions, nowTimestamp)
-		}
-		syncLiveMigrationConditionMetric(clusterConfigWithConditions.Status.Conditions)
-	}
 
-	status.Conditions = clusterConfigWithConditions.Status.Conditions
+	status.Conditions = clusterConfig.Status.Conditions
 	if reflect.DeepEqual(*status, clusterConfig.Status) {
 		return nil, nil
 	}
