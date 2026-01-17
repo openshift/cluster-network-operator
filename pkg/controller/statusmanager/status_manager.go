@@ -394,26 +394,12 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 			)
 		}
 
-		if oc.Spec.DefaultNetwork.Type == operv1.NetworkTypeOpenShiftSDN {
-			// OpenShiftSDN is removed in 4.17, so block the upgrade if we have OpenShiftSDN in the spec.
-			v1helpers.SetOperatorCondition(&oc.Status.Conditions,
-				operv1.OperatorCondition{
-					Type:   operv1.OperatorStatusTypeUpgradeable,
-					Status: operv1.ConditionFalse,
-					Reason: "OpenShiftSDNConfigured",
-					Message: "Cluster is configured with OpenShiftSDN, which is not supported in the next version. Please " +
-						"follow the documented steps to migrate from OpenShiftSDN to OVN-Kubernetes in order to be able to upgrade. " +
-						"https://docs.openshift.com/container-platform/4.16/networking/ovn_kubernetes_network_provider/migrate-from-openshift-sdn.html",
-				},
-			)
-		} else {
-			v1helpers.SetOperatorCondition(&oc.Status.Conditions,
-				operv1.OperatorCondition{
-					Type:   operv1.OperatorStatusTypeUpgradeable,
-					Status: operv1.ConditionTrue,
-				},
-			)
-		}
+		v1helpers.SetOperatorCondition(&oc.Status.Conditions,
+			operv1.OperatorCondition{
+				Type:   operv1.OperatorStatusTypeUpgradeable,
+				Status: operv1.ConditionTrue,
+			},
+		)
 
 		operStatus = &oc.Status
 

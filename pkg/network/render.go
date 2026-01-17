@@ -198,23 +198,8 @@ func DeprecatedCanonicalize(conf *operv1.NetworkSpec) {
 	orig := conf.DeepCopy()
 
 	switch strings.ToLower(string(conf.DefaultNetwork.Type)) {
-	case strings.ToLower(string(operv1.NetworkTypeOpenShiftSDN)):
-		conf.DefaultNetwork.Type = operv1.NetworkTypeOpenShiftSDN
 	case strings.ToLower(string(operv1.NetworkTypeOVNKubernetes)):
 		conf.DefaultNetwork.Type = operv1.NetworkTypeOVNKubernetes
-	}
-
-	if conf.DefaultNetwork.Type == operv1.NetworkTypeOpenShiftSDN &&
-		conf.DefaultNetwork.OpenShiftSDNConfig != nil {
-		sdnc := conf.DefaultNetwork.OpenShiftSDNConfig
-		switch strings.ToLower(string(sdnc.Mode)) {
-		case strings.ToLower(string(operv1.SDNModeMultitenant)):
-			sdnc.Mode = operv1.SDNModeMultitenant
-		case strings.ToLower(string(operv1.SDNModeNetworkPolicy)):
-			sdnc.Mode = operv1.SDNModeNetworkPolicy
-		case strings.ToLower(string(operv1.SDNModeSubnet)):
-			sdnc.Mode = operv1.SDNModeSubnet
-		}
 	}
 
 	for idx, an := range conf.AdditionalNetworks {
@@ -260,7 +245,7 @@ func Validate(conf *operv1.NetworkSpec) error {
 // can change defaults as we move forward, but won't disrupt existing clusters.
 //
 // We may need to know the MTU of nodes in the cluster, so we can compute the correct
-// underlay MTU (for OVN-K and OSDN).
+// underlay MTU for OVN-K.
 func FillDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 	// DisableMultiNetwork defaults to false
 	if conf.DisableMultiNetwork == nil {
@@ -334,8 +319,6 @@ func NeedMTUProbe(prev, next *operv1.NetworkSpec) bool {
 		switch d.Type {
 		case operv1.NetworkTypeOVNKubernetes:
 			return d.OVNKubernetesConfig == nil || d.OVNKubernetesConfig.MTU == nil || *d.OVNKubernetesConfig.MTU == 0
-		case operv1.NetworkTypeOpenShiftSDN:
-			return d.OpenShiftSDNConfig == nil || d.OpenShiftSDNConfig.MTU == nil || *d.OpenShiftSDNConfig.MTU == 0
 		}
 		// other network types don't need MTU
 		return false
@@ -571,8 +554,6 @@ func validateMultus(conf *operv1.NetworkSpec) []error {
 // as the default network.
 func validateDefaultNetwork(conf *operv1.NetworkSpec) []error {
 	switch conf.DefaultNetwork.Type {
-	case operv1.NetworkTypeOpenShiftSDN:
-		return []error{errors.Errorf("unsupported network type %q", conf.DefaultNetwork.Type)}
 	case operv1.NetworkTypeOVNKubernetes:
 		return validateOVNKubernetes(conf)
 	default:
@@ -605,8 +586,6 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 	}
 
 	switch dn.Type {
-	case operv1.NetworkTypeOpenShiftSDN:
-		return renderOpenShiftSDN(conf, bootstrapResult, manifestDir)
 	case operv1.NetworkTypeOVNKubernetes:
 		return renderOVNKubernetes(conf, bootstrapResult, manifestDir, client, featureGates)
 	default:
@@ -617,12 +596,8 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 
 func fillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 	switch conf.DefaultNetwork.Type {
-	case operv1.NetworkTypeOpenShiftSDN:
-		fillOpenShiftSDNDefaults(conf, previous, hostMTU)
-		conf.DefaultNetwork.OVNKubernetesConfig = nil
 	case operv1.NetworkTypeOVNKubernetes:
 		fillOVNKubernetesDefaults(conf, previous, hostMTU)
-		conf.DefaultNetwork.OpenShiftSDNConfig = nil
 	default:
 	}
 }
@@ -633,8 +608,6 @@ func isDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	}
 
 	switch prev.DefaultNetwork.Type {
-	case operv1.NetworkTypeOpenShiftSDN:
-		return isOpenShiftSDNChangeSafe(prev, next)
 	case operv1.NetworkTypeOVNKubernetes:
 		return isOVNKubernetesChangeSafe(prev, next)
 	}
