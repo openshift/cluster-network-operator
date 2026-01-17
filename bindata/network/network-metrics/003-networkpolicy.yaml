@@ -1,0 +1,15 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: network-metrics
+  namespace: openshift-multus
+spec:
+  podSelector:
+    matchLabels:
+      app: network-metrics-daemon
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow ingress to metrics
+    - ports:
+      - port: 8443
