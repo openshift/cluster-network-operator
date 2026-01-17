@@ -14,3 +14,16 @@ metadata:
     openshift.io/node-selector: ""
     openshift.io/description: "OpenShift network node identity namespace - a controller used to manage node identity components"
     workload.openshift.io/allowed: "management"
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: default-deny
+  namespace: openshift-network-node-identity
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []

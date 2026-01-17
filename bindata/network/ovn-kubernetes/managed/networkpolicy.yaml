@@ -1,0 +1,18 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: ovn-kubernetes
+  namespace: openshift-ovn-kubernetes
+spec:
+  podSelector:
+    matchLabels:
+      app: ovnkube-control-plane
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # FIXME
+    - {}
+  egress:
+    # FIXME
+    - {}
