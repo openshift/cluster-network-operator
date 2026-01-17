@@ -1,0 +1,19 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: ovn-kubernetes
+  namespace: openshift-ovn-kubernetes
+spec:
+  podSelector:
+    matchLabels:
+      app: ovnkube-control-plane
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow ingress to metrics
+    - ports:
+        - port: 9108
+  egress:
+    # Allow egress to apiserver, and to ovnkube-node's egressip-node-healthcheck-port
+    - {}

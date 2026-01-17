@@ -413,7 +413,7 @@ func TestRenderKubeProxy(t *testing.T) {
 	objs, err := renderStandaloneKubeProxy(c, &FakeKubeProxyBootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	g.Expect(objs).To(HaveLen(10))
+	g.Expect(objs).To(HaveLen(11))
 
 	// Make sure the arguments to kube-proxy are reasonable
 	found := false
