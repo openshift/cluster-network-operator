@@ -1,0 +1,19 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: network-node-identity
+  namespace: {{.HostedClusterNamespace}}
+spec:
+  podSelector:
+    matchLabels:
+      app: network-node-identity
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow to webhook
+    - ports:
+      - port: {{.NetworkNodeIdentityPort}}
+  egress:
+    # Allow to apiserver
+    - {}
