@@ -175,7 +175,7 @@ spec:
       - name: config
         configMap:
           name: proxy-config
-      # Must be optional because the sdn-metrics-certs is a service serving
+      # Must be optional because the kube-proxy-metrics-certs is a service serving
       # certificate and those cannot be generated without the service proxy
       # running
       - name: kube-proxy-metrics-certs
