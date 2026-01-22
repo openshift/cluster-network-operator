@@ -107,7 +107,7 @@ func TestValidateClusterConfig(t *testing.T) {
 	haveError(cc, "hostPrefix 21 is larger than its cidr 10.2.0.0/22")
 
 	cc = *ClusterConfig.DeepCopy()
-	cc.NetworkType = "OpenShiftSDN"
+	cc.NetworkType = "OVNKubernetes"
 	cc.ClusterNetwork[1].HostPrefix = 0
 	haveError(cc, "hostPrefix 0 is larger than its cidr 10.2.0.0/22")
 
