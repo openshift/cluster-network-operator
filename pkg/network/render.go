@@ -197,8 +197,7 @@ func deprecatedCanonicalizeSimpleMacvlanConfig(conf *operv1.SimpleMacvlanConfig)
 func DeprecatedCanonicalize(conf *operv1.NetworkSpec) {
 	orig := conf.DeepCopy()
 
-	switch strings.ToLower(string(conf.DefaultNetwork.Type)) {
-	case strings.ToLower(string(operv1.NetworkTypeOVNKubernetes)):
+	if strings.EqualFold(string(conf.DefaultNetwork.Type), string(operv1.NetworkTypeOVNKubernetes)) {
 		conf.DefaultNetwork.Type = operv1.NetworkTypeOVNKubernetes
 	}
 
@@ -316,8 +315,7 @@ func NeedMTUProbe(prev, next *operv1.NetworkSpec) bool {
 			return true
 		}
 		d := c.DefaultNetwork
-		switch d.Type {
-		case operv1.NetworkTypeOVNKubernetes:
+		if d.Type == operv1.NetworkTypeOVNKubernetes {
 			return d.OVNKubernetesConfig == nil || d.OVNKubernetesConfig.MTU == nil || *d.OVNKubernetesConfig.MTU == 0
 		}
 		// other network types don't need MTU
@@ -409,7 +407,7 @@ func isClusterNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
 	}
 
 	// Only support changing ClusterNetwork CIDR if it's OVNK
-	if !reflect.DeepEqual(next.DefaultNetwork.Type, operv1.NetworkTypeOVNKubernetes) {
+	if next.DefaultNetwork.Type != operv1.NetworkTypeOVNKubernetes {
 		return errors.Errorf("network type is %v. changing clusterNetwork entries is only supported for OVNKubernetes", next.DefaultNetwork.Type)
 	}
 
@@ -553,12 +551,10 @@ func validateMultus(conf *operv1.NetworkSpec) []error {
 // validateDefaultNetwork validates whichever network is specified
 // as the default network.
 func validateDefaultNetwork(conf *operv1.NetworkSpec) []error {
-	switch conf.DefaultNetwork.Type {
-	case operv1.NetworkTypeOVNKubernetes:
+	if conf.DefaultNetwork.Type == operv1.NetworkTypeOVNKubernetes {
 		return validateOVNKubernetes(conf)
-	default:
-		return nil
 	}
+	return nil
 }
 
 // validateMigration validates if migration path is possible
@@ -585,20 +581,17 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 		return nil, false, errors.Errorf("invalid Default Network configuration: %v", errs)
 	}
 
-	switch dn.Type {
-	case operv1.NetworkTypeOVNKubernetes:
+	if dn.Type == operv1.NetworkTypeOVNKubernetes {
 		return renderOVNKubernetes(conf, bootstrapResult, manifestDir, client, featureGates)
-	default:
-		log.Printf("NOTICE: Unknown network type %s, ignoring", dn.Type)
-		return nil, false, nil
 	}
+
+	log.Printf("NOTICE: Unknown network type %s, ignoring", dn.Type)
+	return nil, false, nil
 }
 
 func fillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
-	switch conf.DefaultNetwork.Type {
-	case operv1.NetworkTypeOVNKubernetes:
+	if conf.DefaultNetwork.Type == operv1.NetworkTypeOVNKubernetes {
 		fillOVNKubernetesDefaults(conf, previous, hostMTU)
-	default:
 	}
 }
 
@@ -607,8 +600,7 @@ func isDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 		return []error{errors.Errorf("cannot change default network type")}
 	}
 
-	switch prev.DefaultNetwork.Type {
-	case operv1.NetworkTypeOVNKubernetes:
+	if prev.DefaultNetwork.Type == operv1.NetworkTypeOVNKubernetes {
 		return isOVNKubernetesChangeSafe(prev, next)
 	}
 	return nil

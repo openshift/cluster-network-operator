@@ -40,16 +40,10 @@ func kubeProxyConfiguration(pluginDefaults map[string]operv1.ProxyArgumentList, 
 	return k8sutil.GenerateKubeProxyConfiguration(args)
 }
 
-// acceptsKubeProxyConfig determines if the desired network type allows
-// conf.KubeProxyConfig to be set. OVNKubernetes do not allow Kubernetes to be used. All
-// other types are assumed to use an external kube-proxy.
-func acceptsKubeProxyConfig(conf *operv1.NetworkSpec) bool {
-	switch conf.DefaultNetwork.Type {
-	case operv1.NetworkTypeOVNKubernetes:
-		return false
-	default:
-		return true
-	}
+// usesKubeProxy determines if the desired network type uses kube-proxy.
+// All network types except ovn-kubernetes are assumed to require kube-proxy by default.
+func usesKubeProxy(conf *operv1.NetworkSpec) bool {
+	return conf.DefaultNetwork.Type != operv1.NetworkTypeOVNKubernetes
 }
 
 func noKubeProxyConfig(conf *operv1.NetworkSpec) bool {
@@ -74,7 +68,7 @@ func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 	if p == nil {
 		return out
 	}
-	if !acceptsKubeProxyConfig(conf) {
+	if !usesKubeProxy(conf) {
 		if noKubeProxyConfig(conf) {
 			return out
 		}
@@ -117,23 +111,11 @@ func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 	return out
 }
 
-// defaultDeployKubeProxy determines if kube-proxy is deployed by default for the given
-// network type. OVNKubernetes handles services on its own. All other network providers
-// are assumed to require a standalone kube-proxy
-func defaultDeployKubeProxy(conf *operv1.NetworkSpec) bool {
-	switch conf.DefaultNetwork.Type {
-	case operv1.NetworkTypeOVNKubernetes:
-		return false
-	default:
-		return true
-	}
-}
-
 // fillKubeProxyDefaults inserts kube-proxy defaults, if kube-proxy will be deployed
 // explicitly.
 func fillKubeProxyDefaults(conf, previous *operv1.NetworkSpec) {
 	if conf.DeployKubeProxy == nil {
-		v := defaultDeployKubeProxy(conf)
+		v := usesKubeProxy(conf)
 		conf.DeployKubeProxy = &v
 	}
 
