@@ -1603,6 +1603,17 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 	status := ds.Status
 
+	// CORENET-6064: If no nodes are scheduled for this DaemonSet, it cannot
+	// be progressing. This handles zero-worker HyperShift clusters where the
+	// ovnkube-node DaemonSet has no pods to roll out. Without this check,
+	// the control-plane upgrade would be blocked waiting for a node rollout
+	// that will never complete.
+	if status.DesiredNumberScheduled == 0 {
+		klog.V(2).Infof("daemonset %s/%s has 0 nodes scheduled; considering rollout complete",
+			ds.Namespace, ds.Name)
+		return false
+	}
+
 	// Copy-pasted from status_manager: Determine if a DaemonSet is progressing
 	progressing := (status.UpdatedNumberScheduled < status.DesiredNumberScheduled ||
 		status.NumberUnavailable > 0 ||
