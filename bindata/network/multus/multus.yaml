@@ -865,7 +865,7 @@ metadata:
     kubernetes.io/description: |
       This deamon watches over the whereabouts service account token and CA
       file for changes and will regenerate a kubeconfig if changes are seen
-    relase.openshift.io.version: "{{.ReleaseVersion}}"
+    release.openshift.io/version: "{{.ReleaseVersion}}"
 spec:
   selector:
     matchLabels:
