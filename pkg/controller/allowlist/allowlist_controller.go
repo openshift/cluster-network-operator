@@ -36,8 +36,8 @@ import (
 )
 
 const (
-	dsName       = "cni-sysctl-allowlist-ds"
-	dsAnnotation = "app=cni-sysctl-allowlist-ds"
+	dsName        = "cni-sysctl-allowlist-ds"
+	dsAnnotation  = "app=cni-sysctl-allowlist-ds"
 	dsManifestDir = "../../bindata/allowlist/daemonset"
 	// Note: The default values come from default-cni-sysctl-allowlist which multus creates.
 	defaultCMManifest = "../../bindata/network/multus/004-sysctl-configmap.yaml"
@@ -83,15 +83,17 @@ type ReconcileAllowlist struct {
 
 func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
-	if exists, err := allowlistConfigMapExists(ctx, r.client); !exists {
+	exists, err := allowlistConfigMapExists(ctx, r.client)
+	if err != nil {
+		klog.Errorf("Failed to look up allowlist config map: %v", err)
+		return reconcile.Result{}, err
+	}
+	if !exists {
 		err = createObjectsFrom(ctx, r.client, defaultCMManifest)
 		if err != nil {
 			klog.Errorf("Failed to create allowlist config map: %v", err)
 			return reconcile.Result{}, err
 		}
-	} else if err != nil {
-		klog.Errorf("Failed to look up allowlist config map: %v", err)
-		return reconcile.Result{}, err
 	}
 
 	if request.Name != names.AllowlistConfigName {
