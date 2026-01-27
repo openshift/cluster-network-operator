@@ -34,15 +34,12 @@ var ClusterConfig = configv1.NetworkSpec{
 
 func getFeatureGatesWithDualStack() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy,
+		[]configv1.FeatureGateName{
 			apifeatures.FeatureGateDNSNameResolver,
-			apifeatures.FeatureGateNetworkSegmentation,
 			apifeatures.FeatureGateOVNObservability,
 			apifeatures.FeatureGateAWSDualStackInstall,
 			apifeatures.FeatureGateAzureDualStackInstall},
-		[]configv1.FeatureGateName{
-			apifeatures.FeatureGatePreconfiguredUDNAddresses,
-		},
+		[]configv1.FeatureGateName{},
 	)
 }
 
@@ -119,14 +116,11 @@ func TestValidateClusterConfig(t *testing.T) {
 
 func getFeatureGatesWithIncompleteDualStack() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy,
-			apifeatures.FeatureGateDNSNameResolver,
-			apifeatures.FeatureGateNetworkSegmentation,
+		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver,
 			apifeatures.FeatureGateOVNObservability,
 			apifeatures.FeatureGateAWSDualStackInstall,
 		},
 		[]configv1.FeatureGateName{
-			apifeatures.FeatureGatePreconfiguredUDNAddresses,
 			apifeatures.FeatureGateAzureDualStackInstall,
 		},
 	)
