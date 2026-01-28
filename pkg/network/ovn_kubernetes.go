@@ -822,11 +822,12 @@ func getDisableUDPAggregation(cl crclient.Reader) bool {
 	}
 
 	disableUDPAggregation := cm.Data["disable-udp-aggregation"]
-	if disableUDPAggregation == "true" {
+	switch disableUDPAggregation {
+	case "true":
 		disable = true
-	} else if disableUDPAggregation == "false" {
+	case "false":
 		disable = false
-	} else {
+	default:
 		klog.Warningf("Ignoring unexpected udp-aggregation-config override value disable-udp-aggregation=%q", disableUDPAggregation)
 	}
 
@@ -1172,7 +1173,7 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 		sc.MTU = &mtu
 	}
 	if sc.GenevePort == nil {
-		var geneve uint32 = uint32(6081)
+		geneve := uint32(6081)
 		sc.GenevePort = &geneve
 	}
 
@@ -1181,20 +1182,18 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 	}
 
 	if sc.PolicyAuditConfig.RateLimit == nil {
-		var ratelimit uint32 = uint32(20)
+		ratelimit := uint32(20)
 		sc.PolicyAuditConfig.RateLimit = &ratelimit
 	}
 	if sc.PolicyAuditConfig.MaxFileSize == nil {
-		var maxfilesize uint32 = uint32(50)
+		maxfilesize := uint32(50)
 		sc.PolicyAuditConfig.MaxFileSize = &maxfilesize
 	}
 	if sc.PolicyAuditConfig.Destination == "" {
-		var destination string = "null"
-		sc.PolicyAuditConfig.Destination = destination
+		sc.PolicyAuditConfig.Destination = "null"
 	}
 	if sc.PolicyAuditConfig.SyslogFacility == "" {
-		var syslogfacility string = "local0"
-		sc.PolicyAuditConfig.SyslogFacility = syslogfacility
+		sc.PolicyAuditConfig.SyslogFacility = "local0"
 	}
 
 }

@@ -34,7 +34,7 @@ func WithSource(source string) func(*applyconfigv1alpha1.PodNetworkConnectivityC
 		if check.Name == nil {
 			return
 		}
-		name := strings.Replace(*check.Name, "$(SOURCE)", source, -1)
+		name := strings.ReplaceAll(*check.Name, "$(SOURCE)", source)
 		check.Name = &name
 	}
 }
@@ -45,7 +45,7 @@ func WithTarget(target string) func(*applyconfigv1alpha1.PodNetworkConnectivityC
 		if check.Name == nil {
 			return
 		}
-		name := strings.Replace(*check.Name, "$(TARGET)", target, -1)
+		name := strings.ReplaceAll(*check.Name, "$(TARGET)", target)
 		check.Name = &name
 	}
 }

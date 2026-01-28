@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 
 	configv1 "github.com/openshift/api/config/v1"
-	v1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -29,7 +28,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 	pt := cloudBootstrapResult.PlatformType
 
 	// Do not render the CNCC for platforms that the CNCC does not support.
-	if !(pt == v1.AWSPlatformType || pt == v1.AzurePlatformType || pt == v1.GCPPlatformType || pt == v1.OpenStackPlatformType) {
+	if pt != configv1.AWSPlatformType && pt != configv1.AzurePlatformType && pt != configv1.GCPPlatformType && pt != configv1.OpenStackPlatformType {
 		return nil, nil
 	}
 	// Do not render the CNCC for network plugins that do not support the CNCC.
@@ -40,9 +39,9 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["PlatformType"] = cloudBootstrapResult.PlatformType
 	data.Data["PlatformRegion"] = cloudBootstrapResult.PlatformRegion
-	data.Data["PlatformTypeAWS"] = v1.AWSPlatformType
-	data.Data["PlatformTypeAzure"] = v1.AzurePlatformType
-	data.Data["PlatformTypeGCP"] = v1.GCPPlatformType
+	data.Data["PlatformTypeAWS"] = configv1.AWSPlatformType
+	data.Data["PlatformTypeAzure"] = configv1.AzurePlatformType
+	data.Data["PlatformTypeGCP"] = configv1.GCPPlatformType
 	data.Data["CloudNetworkConfigControllerImage"] = os.Getenv("CLOUD_NETWORK_CONFIG_CONTROLLER_IMAGE")
 	localAPIServer := cloudBootstrapResult.APIServers[bootstrap.APIServerDefaultLocal]
 	data.Data["KubernetesServiceURL"] = "https://" + net.JoinHostPort(localAPIServer.Host, localAPIServer.Port)
@@ -65,7 +64,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		},
 		Data: cloudBootstrapResult.KubeCloudConfig,
 	}
-	if cloudBootstrapResult.PlatformType == v1.AWSPlatformType {
+	if cloudBootstrapResult.PlatformType == configv1.AWSPlatformType {
 		for _, ep := range cloudBootstrapResult.PlatformStatus.AWS.ServiceEndpoints {
 			if ep.Name == "ec2" {
 				apiurl = ep.URL
@@ -76,7 +75,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		}
 	}
 
-	if cloudBootstrapResult.PlatformType == v1.AzurePlatformType {
+	if cloudBootstrapResult.PlatformType == configv1.AzurePlatformType {
 		apiurl = cloudBootstrapResult.PlatformStatus.Azure.ARMEndpoint
 		data.Data["PlatformAzureEnvironment"] = cloudBootstrapResult.PlatformStatus.Azure.CloudName
 	}

@@ -329,22 +329,24 @@ func TestOVNKubernetesNodeSelectorOperator(t *testing.T) {
 				g.Expect(ds.Kind).To(Equal("DaemonSet"))
 
 				operator, value := getMatchExpression(g, ds, data.Data["DpuHostModeLabel"].(string))
-				if tc.ovnNodeMode == "dpu-host" {
+				switch tc.ovnNodeMode {
+				case "dpu-host":
 					g.Expect(operator).To(Equal(tc.expectedOperatorType), "Should have expected operator")
 					g.Expect(value).To(Equal(tc.expectedValue), "Should have expected value")
-				} else if tc.ovnNodeMode == "smart-nic" {
+				case "smart-nic":
 					g.Expect(operator).To(Equal(corev1.NodeSelectorOpDoesNotExist), "Should have expected DoesNotExist operator")
-				} else if tc.ovnNodeMode == "dpu" {
+				case "dpu":
 					g.Expect(operator).To(Equal(corev1.NodeSelectorOpDoesNotExist), "Should have expected DoesNotExist operator")
 				}
 
 				operator, value = getMatchExpression(g, ds, data.Data["SmartNicModeLabel"].(string))
-				if tc.ovnNodeMode == "dpu-host" {
+				switch tc.ovnNodeMode {
+				case "dpu-host":
 					g.Expect(operator).To(Equal(corev1.NodeSelectorOpDoesNotExist), "Should have expected DoesNotExist operator")
-				} else if tc.ovnNodeMode == "smart-nic" {
+				case "smart-nic":
 					g.Expect(operator).To(Equal(tc.expectedOperatorType), "Should have expected operator")
 					g.Expect(value).To(Equal(tc.expectedValue), "Should have expected value")
-				} else if tc.ovnNodeMode == "dpu" {
+				case "dpu":
 					g.Expect(operator).To(Equal(corev1.NodeSelectorOpDoesNotExist), "Should have expected DoesNotExist operator")
 				}
 

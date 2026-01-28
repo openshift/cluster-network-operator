@@ -33,7 +33,6 @@ import (
 
 	ctlog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	ctmanager "sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 // Operator is the higher-level manager that builds a client and starts the controllers.
@@ -41,7 +40,7 @@ import (
 // that use the controller-tools scaffolding.
 type Operator struct {
 	client  cnoclient.Client
-	manager ctmanager.Manager
+	manager manager.Manager
 
 	StatusManager *statusmanager.StatusManager
 }
@@ -162,7 +161,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	// Start informers
 	if err := o.client.Start(ctx); err != nil {
-		return fmt.Errorf("Failed to start client: %w", err)
+		return fmt.Errorf("failed to start client: %w", err)
 	}
 
 	// Start controllers

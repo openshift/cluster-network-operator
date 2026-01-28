@@ -146,8 +146,8 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 			predicate.ResourceVersionChangedPredicate{},
 			predicate.NewPredicateFuncs(func(object crclient.Object) bool {
 				// Ignore ConfigMaps we manage as part of this loop
-				return !(object.GetName() == "network-operator-lock" ||
-					object.GetName() == "applied-cluster")
+				return object.GetName() != "network-operator-lock" &&
+					object.GetName() != "applied-cluster"
 			}),
 		},
 	}); err != nil {
@@ -213,7 +213,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			r.status.SetDegraded(statusmanager.OperatorConfig, "NoOperatorConfig",
-				fmt.Sprintf("Operator configuration %s was deleted", request.NamespacedName.String()))
+				fmt.Sprintf("Operator configuration %s was deleted", request.String()))
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected, since we set
 			// the ownerReference (see https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/).
@@ -262,7 +262,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// Retrieve the previously applied operator configuration
-	prev, err := GetAppliedConfiguration(ctx, r.client.Default().CRClient(), operConfig.ObjectMeta.Name)
+	prev, err := GetAppliedConfiguration(ctx, r.client.Default().CRClient(), operConfig.Name)
 	if err != nil {
 		log.Printf("Failed to retrieve previously applied configuration: %v", err)
 		// FIXME: operator status?

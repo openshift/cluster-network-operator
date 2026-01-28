@@ -14,7 +14,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -156,11 +155,11 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	return objs, nil
 }
 
-func findContainer(conts []v1.Container, name string) (v1.Container, bool) {
+func findContainer(conts []corev1.Container, name string) (corev1.Container, bool) {
 	for _, cont := range conts {
 		if cont.Name == name {
 			return cont, true
 		}
 	}
-	return v1.Container{}, false
+	return corev1.Container{}, false
 }

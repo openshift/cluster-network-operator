@@ -95,7 +95,7 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		err = fmt.Errorf("Error while reading infrastructures.%s/cluster: %w", configv1.GroupName, err)
+		err = fmt.Errorf("error while reading infrastructures.%s/cluster: %w", configv1.GroupName, err)
 		log.Println(err)
 		return reconcile.Result{}, err
 	}
@@ -107,7 +107,7 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 
 	updatedInfraConfig, err = r.fieldSyncer.SpecStatusSynchronize(updatedInfraConfig)
 	if err != nil {
-		err = fmt.Errorf("Error while synchronizing spec and status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
+		err = fmt.Errorf("error while synchronizing spec and status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
 		log.Println(err)
 
 		r.status.SetDegraded(statusmanager.InfrastructureConfig, "SyncInfrastructureSpecAndStatus", err.Error())
@@ -121,7 +121,7 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 	// explicit marker that "status" subresource should be updated.
 	if !reflect.DeepEqual(updatedInfraConfig.Spec, infraConfig.Spec) {
 		if err = r.updateInfrastructureConfig(ctx, updatedInfraConfig); err != nil {
-			err = fmt.Errorf("Error while updating infrastructures.%s/cluster: %w", configv1.GroupName, err)
+			err = fmt.Errorf("error while updating infrastructures.%s/cluster: %w", configv1.GroupName, err)
 			log.Println(err)
 
 			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureSpecOrStatus", err.Error())
@@ -132,7 +132,7 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 
 	if !reflect.DeepEqual(updatedInfraConfig.Status, infraConfig.Status) {
 		if err = r.updateInfrastructureConfig(ctx, updatedInfraConfig, "status"); err != nil {
-			err = fmt.Errorf("Error while updating status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
+			err = fmt.Errorf("error while updating status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
 			log.Println(err)
 
 			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureStatus", err.Error())

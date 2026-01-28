@@ -18,7 +18,6 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -337,7 +336,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 
 	_, err := getOC(client)
-	if !errors.IsNotFound(err) {
+	if !apierrors.IsNotFound(err) {
 		t.Fatalf("unexpected error (expected Not Found): %v", err)
 	}
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
