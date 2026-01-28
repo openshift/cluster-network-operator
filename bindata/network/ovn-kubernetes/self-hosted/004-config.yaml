@@ -40,15 +40,11 @@ data:
 {{- if .ReachabilityNodePort }}
     egressip-node-healthcheck-port={{.ReachabilityNodePort}}
 {{- end }}
-{{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
     {{- if not .OVN_MULTI_NETWORK_ENABLE }}
     enable-multi-network=true
     {{- end }}
     enable-network-segmentation=true
-{{- end }}
-{{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
     enable-preconfigured-udn-addresses=true
-{{- end }}
 {{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
     enable-multi-networkpolicy=true
 {{- end }}

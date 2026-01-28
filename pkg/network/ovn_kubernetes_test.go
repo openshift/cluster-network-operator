@@ -4267,7 +4267,6 @@ func TestOVNKubernetesControlPlaneFlags(t *testing.T) {
 			overrides: map[string]interface{}{
 				"OVN_OBSERVABILITY_ENABLE":        "false",
 				"OVN_MULTI_NETWORK_POLICY_ENABLE": "false",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "false",
 			},
 			mustContain: []string{
 				"--enable-egress-ip=true",
@@ -4289,7 +4288,6 @@ func TestOVNKubernetesControlPlaneFlags(t *testing.T) {
 			variant: "self-hosted",
 			overrides: map[string]interface{}{
 				"OVN_MULTI_NETWORK_POLICY_ENABLE": "true",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "true",
 			},
 			mustContain: []string{
 				"--enable-egress-ip=true",
@@ -4320,8 +4318,7 @@ func TestOVNKubernetesControlPlaneFlags(t *testing.T) {
 			name:    "self-hosted control-plane: network segmentation enabled (auto-enables multi-network)",
 			variant: "self-hosted",
 			overrides: map[string]interface{}{
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "true",
-				"OVN_MULTI_NETWORK_ENABLE":        "false",
+				"OVN_MULTI_NETWORK_ENABLE": "false",
 			},
 			mustContain: []string{
 				"--enable-egress-ip=true",
@@ -4336,8 +4333,7 @@ func TestOVNKubernetesControlPlaneFlags(t *testing.T) {
 			name:    "self-hosted control-plane: both multi-network and segmentation enabled",
 			variant: "self-hosted",
 			overrides: map[string]interface{}{
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "true",
-				"OVN_MULTI_NETWORK_ENABLE":        "true",
+				"OVN_MULTI_NETWORK_ENABLE": "true",
 			},
 			mustContain: []string{
 				"--enable-egress-ip=true",
@@ -4381,9 +4377,7 @@ func TestOVNKubernetesScriptLibCombined(t *testing.T) {
 			overrides: map[string]interface{}{
 				"OVN_NODE_MODE":                   "dpu-host",
 				"OVN_MULTI_NETWORK_ENABLE":        "true",
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "true",
 				"OVN_MULTI_NETWORK_POLICY_ENABLE": "true",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "true",
 			},
 			mustContain: []string{
 				"gateway_interface=\"derive-from-mgmt-port\"",
@@ -4404,9 +4398,7 @@ func TestOVNKubernetesScriptLibCombined(t *testing.T) {
 			overrides: map[string]interface{}{
 				"OVN_NODE_MODE":                   "full",
 				"OVN_MULTI_NETWORK_ENABLE":        "true",
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "true",
 				"OVN_MULTI_NETWORK_POLICY_ENABLE": "true",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "true",
 			},
 			mustContain: []string{
 				"gateway_interface=br-ex",
@@ -4446,9 +4438,7 @@ func TestOVNKubernetesScriptLibCombined(t *testing.T) {
 			overrides: map[string]interface{}{
 				"OVN_NODE_MODE":                   "full",
 				"OVN_MULTI_NETWORK_ENABLE":        "false",
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "false",
 				"OVN_MULTI_NETWORK_POLICY_ENABLE": "false",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "false",
 			},
 			mustContain: []string{
 				"multi_network_enabled_flag=",

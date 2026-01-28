@@ -609,7 +609,7 @@ data:
       fi
 
       network_segmentation_enabled_flag=
-      if [[ "{{.OVN_NETWORK_SEGMENTATION_ENABLE}}" == "true" && "${OVN_NODE_MODE}" != "dpu-host" ]]; then
+      if [[ "${OVN_NODE_MODE}" != "dpu-host" ]]; then
         multi_network_enabled_flag="--enable-multi-network"
         network_segmentation_enabled_flag="--enable-network-segmentation"
       fi
@@ -619,10 +619,7 @@ data:
         route_advertisements_enable_flag="--enable-route-advertisements"
       fi
   
-      preconfigured_udn_addresses_enable_flag=
-      if [[ "{{.OVN_PRE_CONF_UDN_ADDR_ENABLE}}" == "true" ]]; then
-        preconfigured_udn_addresses_enable_flag="--enable-preconfigured-udn-addresses"
-      fi
+      preconfigured_udn_addresses_enable_flag="--enable-preconfigured-udn-addresses"
 
       network_observability_enabled_flag=
       if [[ "{{.OVN_OBSERVABILITY_ENABLE}}" == "true" ]]; then
@@ -635,7 +632,7 @@ data:
       fi
 
       admin_network_policy_enabled_flag=
-      if [[ "{{.OVN_ADMIN_NETWORK_POLICY_ENABLE}}" == "true" && "${OVN_NODE_MODE}" != "dpu-host" ]]; then
+      if [[ "${OVN_NODE_MODE}" != "dpu-host" ]]; then
         admin_network_policy_enabled_flag="--enable-admin-network-policy"
       fi
 

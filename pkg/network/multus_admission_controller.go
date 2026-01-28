@@ -85,7 +85,6 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	data.Data["ResourceRequestCPU"] = nil
 	data.Data["ResourceRequestMemory"] = nil
 	data.Data["PriorityClass"] = nil
-	data.Data["OVN_PRE_CONF_UDN_ADDR_ENABLE"] = true
 
 	if hsc.Enabled {
 		data.Data["AdmissionControllerNamespace"] = hsc.Namespace
