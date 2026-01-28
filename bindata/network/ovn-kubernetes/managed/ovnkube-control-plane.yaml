@@ -193,26 +193,15 @@ spec:
           # This is needed so that converting clusters from GA to TP
           # will rollout control plane pods as well
           network_segmentation_enabled_flag=
-          multi_network_enabled_flag=
-          if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" ]]; then
-            multi_network_enabled_flag="--enable-multi-network"
-          fi
-          if [[ "{{.OVN_NETWORK_SEGMENTATION_ENABLE}}" == "true" ]]; then
-            if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" != "true" ]]; then
-              multi_network_enabled_flag="--enable-multi-network"
-            fi
-            network_segmentation_enabled_flag="--enable-network-segmentation"
-          fi
+          multi_network_enabled_flag="--enable-multi-network"
+          network_segmentation_enabled_flag="--enable-network-segmentation"
 
           route_advertisements_enable_flag=
           if [[ "{{.OVN_ROUTE_ADVERTISEMENTS_ENABLE}}" == "true" ]]; then
             route_advertisements_enable_flag="--enable-route-advertisements"
           fi
           
-          preconfigured_udn_addresses_enable_flag=
-          if [[ "{{.OVN_PRE_CONF_UDN_ADDR_ENABLE}}" == "true" ]]; then
-            preconfigured_udn_addresses_enable_flag="--enable-preconfigured-udn-addresses"
-          fi
+          preconfigured_udn_addresses_enable_flag="--enable-preconfigured-udn-addresses"
 
           # Enable multi-network policy if configured (control-plane always full mode)
           multi_network_policy_enabled_flag=
@@ -221,10 +210,7 @@ spec:
           fi
 
           # Enable admin network policy if configured (control-plane always full mode)
-          admin_network_policy_enabled_flag=
-          if [[ "{{.OVN_ADMIN_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
-            admin_network_policy_enabled_flag="--enable-admin-network-policy"
-          fi
+          admin_network_policy_enabled_flag="--enable-admin-network-policy"
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \

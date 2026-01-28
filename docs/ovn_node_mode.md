@@ -84,7 +84,7 @@ The following table shows how cluster-wide configuration translates to per-node 
 - The test `TestOVNKubernetesControlPlaneFlags` validates that control-plane scripts have:
   - Always-enabled features added directly to the command line (egress, multicast, multi-external-gateway)
   - Conditional features handled via script variables (multi-network, network policies, etc.)
-  - Correct multi-network enablement logic (OVN_MULTI_NETWORK_ENABLE or OVN_NETWORK_SEGMENTATION_ENABLE)
+  - Correct multi-network enablement logic (OVN_MULTI_NETWORK_ENABLE)
 - Tests verify both positive cases (features enabled in full mode) and negative cases (features disabled in DPU host mode).
 
 ### Migration Notes

@@ -516,14 +516,12 @@ spec:
           name: host-run-netns
           readOnly: true
           mountPropagation: HostToContainer
-{{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
         # host isolation from UDNs
         - mountPath: /run/systemd/private
           name: run-systemd
           subPath: private
           readOnly: true
           mountPropagation: HostToContainer
-{{ end }}
         # for installing the CNI plugin binary
         - mountPath: /cni-bin-dir
           name: host-cni-bin
@@ -681,11 +679,9 @@ spec:
       - name: host-run-netns
         hostPath:
           path: /run/netns
-{{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
       - name: run-systemd
         hostPath:
           path: /run/systemd
-{{ end }}
       - name: var-lib-openvswitch
         hostPath:
           path: /var/lib/openvswitch/data
