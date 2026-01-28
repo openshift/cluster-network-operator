@@ -1,0 +1,22 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: multus-admission-controller
+  namespace: openshift-multus
+spec:
+  podSelector:
+    matchLabels:
+      app: multus-admission-controller
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from apiserver to webhook port
+    - ports:
+        - port: 6443
+    # Allow all to metrics port
+    - ports:
+        - port: 8443
+  egress:
+    # Allow to apiserver; currently requires allow all
+    - {}
