@@ -23,8 +23,8 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 		return updatedInfraConfig, nil
 	}
 
-	switch {
-	case updatedInfraConfig.Status.PlatformStatus.Type == configv1.BareMetalPlatformType:
+	switch updatedInfraConfig.Status.PlatformStatus.Type {
+	case configv1.BareMetalPlatformType:
 		if updatedInfraConfig.Status.PlatformStatus.BareMetal == nil {
 			// This is a safeguard against strange platform combinations that do not fill the
 			// PlatformStatus (e.g. UPI under some circumstances).
@@ -51,7 +51,7 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 			elb = true
 		}
 
-	case updatedInfraConfig.Status.PlatformStatus.Type == configv1.VSpherePlatformType:
+	case configv1.VSpherePlatformType:
 		// vSphere UPI is a special type of platform that behaves differently than any other UPI.
 		// It sets the type, but does not populate Spec and Status fields, leaving them as `nil`.
 		// We need to keep it like that so that the API validations pass correctly (as empty struct
@@ -78,7 +78,7 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 			elb = true
 		}
 
-	case updatedInfraConfig.Status.PlatformStatus.Type == configv1.OpenStackPlatformType:
+	case configv1.OpenStackPlatformType:
 		if updatedInfraConfig.Status.PlatformStatus.OpenStack == nil {
 			log.Print("Detected nil platformstatus for OpenStack, aborting")
 			return updatedInfraConfig, nil
@@ -107,23 +107,23 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 	}
 
 	if err := syncMachineNetworks(specMachineNetworks, statusMachineNetworks); err != nil {
-		return nil, fmt.Errorf("Error on syncing machine networks: %v", err)
+		return nil, fmt.Errorf("error on syncing machine networks: %v", err)
 	}
 	if err := validateVipsWithVips(*specApiVips, *specIngressVips, elb); err != nil {
-		return nil, fmt.Errorf("Error on validating VIPs: %v", err)
+		return nil, fmt.Errorf("error on validating VIPs: %v", err)
 	}
 	if err := validateVipsWithMachineNetworks(*specApiVips, *specMachineNetworks); err != nil {
-		return nil, fmt.Errorf("Error on validating API VIPs and Machine Networks: %v", err)
+		return nil, fmt.Errorf("error on validating API VIPs and Machine Networks: %v", err)
 	}
 	if err := validateVipsWithMachineNetworks(*specIngressVips, *specMachineNetworks); err != nil {
-		return nil, fmt.Errorf("Error on validating Ingress VIPs and Machine Networks: %v", err)
+		return nil, fmt.Errorf("error on validating Ingress VIPs and Machine Networks: %v", err)
 	}
 
 	if err := syncVips(specApiVips, statusApiVips); err != nil {
-		return nil, fmt.Errorf("Error on syncing API VIPs: %v", err)
+		return nil, fmt.Errorf("error on syncing API VIPs: %v", err)
 	}
 	if err := syncVips(specIngressVips, statusIngressVips); err != nil {
-		return nil, fmt.Errorf("Error on syncing Ingress VIPs: %v", err)
+		return nil, fmt.Errorf("error on syncing Ingress VIPs: %v", err)
 	}
 
 	return updatedInfraConfig, nil

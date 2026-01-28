@@ -11,12 +11,11 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	v1coreinformers "k8s.io/client-go/informers/core/v1"
@@ -128,7 +127,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 
 	trustedCAbundleConfigMap, err := r.nsLister.ConfigMaps(names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS).Get(names.TRUSTED_CA_BUNDLE_CONFIGMAP)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS, names.TRUSTED_CA_BUNDLE_CONFIGMAP)
 			return reconcile.Result{}, nil
 		}
@@ -219,7 +218,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 			if len(errs) > 5 {
 				r.status.SetDegraded(statusmanager.InjectorConfig, "ConfigMapUpdateFailure",
 					"Too many errors seen when updating trusted CA configmaps")
-				return reconcile.Result{}, fmt.Errorf("Too many errors attempting to update configmaps with CA cert. data")
+				return reconcile.Result{}, fmt.Errorf("too many errors attempting to update configmaps with CA cert data")
 			}
 		}
 	}

@@ -56,7 +56,7 @@ func validateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.
 	// Validate count / dual-stack-ness
 	if len(clusterConfig.Spec.ServiceNetwork) == 0 {
 		return errors.Errorf("spec.serviceNetwork must have at least 1 entry")
-	} else if len(clusterConfig.Spec.ServiceNetwork) == 2 && !(ipv4Service && ipv6Service) {
+	} else if len(clusterConfig.Spec.ServiceNetwork) == 2 && (!ipv4Service || !ipv6Service) {
 		return errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network")
 	} else if len(clusterConfig.Spec.ServiceNetwork) > 2 {
 		return errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network")

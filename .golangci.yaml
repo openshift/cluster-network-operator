@@ -16,12 +16,6 @@ linters:
     - unused
     - usetesting
     - wastedassign
-  settings:
-    staticcheck:
-      checks:
-        - "all"
-        - "-QF*"  # Disable quickfix suggestions (new in v2)
-        - "-ST*"  # Disable style checks (new in v2)
   exclusions:
     generated: lax
     presets:
