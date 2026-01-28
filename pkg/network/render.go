@@ -501,7 +501,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 	// Validate count / dual-stack-ness
 	if len(conf.ServiceNetwork) == 0 {
 		errs = append(errs, errors.Errorf("spec.serviceNetwork must have at least 1 entry"))
-	} else if len(conf.ServiceNetwork) == 2 && (!ipv4Service || !ipv6Service) {
+	} else if len(conf.ServiceNetwork) == 2 && !iputil.IsDualStackIPPair(ipv4Service, ipv6Service) {
 		errs = append(errs, errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network"))
 	} else if len(conf.ServiceNetwork) > 2 {
 		errs = append(errs, errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network"))
