@@ -219,9 +219,10 @@ func TestAllowMigrationOnlyForSupportedTypes(t *testing.T) {
 		HostPrefix: 64,
 	},
 	)
+	// FIXME: Remove this ...
 	// You can't migrate from single-stack to dual-stack if this is anything else but
 	// BareMetal, NonePlatformType, and VSphere
-	infra.PlatformType = configv1.GCPPlatformType
+	//infra.PlatformType = configv1.GCPPlatformType
 
 	err := IsChangeSafe(prev, next, infra)
 	g.Expect(err).To(MatchError(ContainSubstring(fmt.Sprintf("%s does not allow conversion to dual-stack cluster", infra.PlatformType))))
@@ -332,7 +333,9 @@ func getDefaultFeatureGatesWithDualStack() featuregates.FeatureGate {
 			apifeatures.FeatureGateNetworkSegmentation,
 			apifeatures.FeatureGateOVNObservability,
 			apifeatures.FeatureGateAWSDualStackInstall,
-			apifeatures.FeatureGateAzureDualStackInstall},
+			apifeatures.FeatureGateAzureDualStackInstall,
+			apifeatures.FeatureGateGCPDualStackInstall,
+		},
 		[]configv1.FeatureGateName{
 			apifeatures.FeatureGatePreconfiguredUDNAddresses,
 		},
