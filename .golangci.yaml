@@ -1,22 +1,27 @@
-issues:
-  exclude-dirs:
-    - vendor
+version: "2"
+run:
   modules-download-mode: vendor
-
 linters:
-  disable-all: true #so that lint version bumps don't change results
+  default: none
   enable:
     - copyloopvar
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - misspell
     - nolintlint
     - nosprintfhostport
     - staticcheck
-    - typecheck
     - unconvert
     - unused
     - usetesting
     - wastedassign
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - vendor

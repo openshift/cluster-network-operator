@@ -198,7 +198,7 @@ func getAllowedDestinationsConfigJSON(RedirectRules []netopv1.L4RedirectRule) (s
 func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifestDir string, namespace string, router *netopv1.EgressRouter, EgressRouterOwnerReferences []metav1.OwnerReference) error {
 	var err error
 	if len(router.Spec.Addresses) == 0 {
-		return fmt.Errorf("Error: router without addresses")
+		return fmt.Errorf("router without addresses")
 	}
 	out := []*uns.Unstructured{}
 	data := render.MakeRenderData()

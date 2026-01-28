@@ -62,3 +62,9 @@ func StringsToIPs(ips []string) []configv1.IP {
 	}
 	return res
 }
+
+// IsDualStackIPPair returns true if both hasIPv4 and hasIPv6 are true,
+// indicating a valid dual-stack configuration with both address families.
+func IsDualStackIPPair(hasIPv4, hasIPv6 bool) bool {
+	return hasIPv4 && hasIPv6
+}

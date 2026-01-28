@@ -233,7 +233,7 @@ func (c *OperatorClusterClient) Config() *rest.Config {
 
 func (c *OperatorClusterClient) Start(ctx context.Context) error {
 	if c.started {
-		return fmt.Errorf("Trying to start ClusterClient twice")
+		return fmt.Errorf("trying to start ClusterClient twice")
 	}
 	c.started = true
 	c.donech = ctx.Done()

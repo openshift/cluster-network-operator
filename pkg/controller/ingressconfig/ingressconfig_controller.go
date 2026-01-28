@@ -138,7 +138,7 @@ func (r *ReconcileIngressConfigs) Reconcile(ctx context.Context, request reconci
 	err := r.client.Get(ctx, request.NamespacedName, ingressControllerConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Printf("Ingress Controller configuration %s was deleted", request.NamespacedName.String())
+			log.Printf("Ingress Controller configuration %s was deleted", request.String())
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected, since we set
 			// the ownerReference (see https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/).
