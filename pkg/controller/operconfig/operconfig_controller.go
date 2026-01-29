@@ -498,7 +498,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	if setDegraded {
-		r.status.SetDegraded(statusmanager.OperatorConfig, "ApplyOperatorConfig",
+		r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "ApplyOperatorConfig",
 			fmt.Sprintf("Error while updating operator configuration: %v", degradedErr))
 		return reconcile.Result{}, degradedErr
 	}
@@ -517,7 +517,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		if err := apply.ApplyObject(ctx, r.client, status, ControllerName); err != nil {
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", status.GroupVersionKind(), status.GetNamespace(), status.GetName())
 			log.Println(err)
-			r.status.SetDegraded(statusmanager.OperatorConfig, "StatusError",
+			r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "StatusError",
 				fmt.Sprintf("Could not update cluster configuration status: %v", err))
 			return reconcile.Result{}, err
 		}
