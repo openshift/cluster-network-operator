@@ -278,11 +278,11 @@ func SetHostedControlPlaneConditions(hcp *unstructured.Unstructured, operStatus 
 	var conditions []metav1.Condition
 	jsonData, err := json.Marshal(conditionsRaw)
 	if err != nil {
-		return nil, fmt.Errorf("error marshalling JSON: %v\n", err)
+		return nil, fmt.Errorf("error marshalling JSON: %w", err)
 	}
 	err = json.Unmarshal(jsonData, &conditions)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling JSON: %v\n", err)
+		return nil, fmt.Errorf("error unmarshalling JSON: %w", err)
 	}
 
 	oldConditions := make([]metav1.Condition, len(conditions))

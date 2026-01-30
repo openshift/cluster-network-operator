@@ -501,7 +501,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 	// Validate count / dual-stack-ness
 	if len(conf.ServiceNetwork) == 0 {
 		errs = append(errs, errors.Errorf("spec.serviceNetwork must have at least 1 entry"))
-	} else if len(conf.ServiceNetwork) == 2 && !(ipv4Service && ipv6Service) {
+	} else if len(conf.ServiceNetwork) == 2 && (!ipv4Service || !ipv6Service) {
 		errs = append(errs, errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network"))
 	} else if len(conf.ServiceNetwork) > 2 {
 		errs = append(errs, errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network"))
@@ -554,10 +554,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 // validateMultus validates the combination of DisableMultiNetwork and AddtionalNetworks
 func validateMultus(conf *operv1.NetworkSpec) []error {
 	// DisableMultiNetwork defaults to false
-	deployMultus := true
-	if conf.DisableMultiNetwork != nil && *conf.DisableMultiNetwork {
-		deployMultus = false
-	}
+	deployMultus := conf.DisableMultiNetwork == nil || !*conf.DisableMultiNetwork
 
 	// Additional Networks are useless without Multus, so don't let them
 	// exist without Multus and confuse things (for now)
@@ -701,7 +698,8 @@ func renderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 
 func getMultusAdmissionControllerReplicas(bootstrapResult *bootstrap.BootstrapResult, hyperShiftEnabled bool) int {
 	replicas := 2
-	if bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode {
+	switch bootstrapResult.Infra.ControlPlaneTopology {
+	case configv1.ExternalTopologyMode:
 		// In HyperShift check HostedControlPlane.ControllerAvailabilityPolicy, otherwise rely on Infra.InfrastructureTopology
 		if hyperShiftEnabled {
 			if bootstrapResult.Infra.HostedControlPlane.ControllerAvailabilityPolicy == hypershift.SingleReplica {
@@ -710,7 +708,7 @@ func getMultusAdmissionControllerReplicas(bootstrapResult *bootstrap.BootstrapRe
 		} else if bootstrapResult.Infra.InfrastructureTopology == configv1.SingleReplicaTopologyMode {
 			replicas = 1
 		}
-	} else if bootstrapResult.Infra.ControlPlaneTopology == configv1.SingleReplicaTopologyMode {
+	case configv1.SingleReplicaTopologyMode:
 		replicas = 1
 	}
 

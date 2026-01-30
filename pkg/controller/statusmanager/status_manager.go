@@ -215,7 +215,7 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 		return
 	}
 	for _, currentObj := range co.Status.RelatedObjects {
-		var found bool = false
+		found := false
 		for _, renderedObj := range status.relatedObjects {
 			found = reflect.DeepEqual(currentObj, renderedObj)
 			if found {
@@ -280,7 +280,7 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 		log.Printf("Error parsing related cluster objects: %v", err)
 	}
 	for _, currentObj := range currentObjs {
-		var found bool = false
+		found := false
 		for _, renderedObj := range status.hyperShiftConfig.RelatedObjects {
 			found = reflect.DeepEqual(currentObj, renderedObj)
 			if found {

@@ -97,7 +97,7 @@ func syncVIPs(newVIPs *[]string, oldVIP *string) error {
 			// included in `new`: new values take precedence over old
 			// values, so set `old` to value from `new[0]` (and return a
 			// warning)
-			err := fmt.Errorf("old (%s) and new VIPs (%s) were both set and differed. New VIPs field will take precedence.", *oldVIP, strings.Join(*newVIPs, ", "))
+			err := fmt.Errorf("old (%s) and new VIPs (%s) were both set and differed; new VIPs field will take precedence", *oldVIP, strings.Join(*newVIPs, ", "))
 			*oldVIP = (*newVIPs)[0]
 			return err
 		}
