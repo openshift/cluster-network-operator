@@ -76,9 +76,9 @@ var manifestDirOvn = "../../bindata"
 func getDefaultFeatureGates() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
 		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver,
-			apifeatures.FeatureGateNetworkSegmentation, apifeatures.FeatureGateOVNObservability},
+			apifeatures.FeatureGateNetworkSegmentation, apifeatures.FeatureGateOVNObservability, apifeatures.FeatureGatePreconfiguredUDNAddresses},
 		[]configv1.FeatureGateName{
-			apifeatures.FeatureGatePreconfiguredUDNAddresses,
+			apifeatures.FeatureGateEVPN,
 		},
 	)
 }
@@ -932,6 +932,7 @@ logfile-maxage=0`,
 				apifeatures.FeatureGateNetworkSegmentation,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGatePreconfiguredUDNAddresses,
+				apifeatures.FeatureGateEVPN,
 			}
 			s := sets.New[configv1.FeatureGateName](tc.enabledFeatureGates...)
 			enabled := []configv1.FeatureGateName{}
@@ -3829,6 +3830,7 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 			apifeatures.FeatureGateOVNObservability,
 		},
 		[]configv1.FeatureGateName{
+			apifeatures.FeatureGateEVPN,
 			apifeatures.FeatureGatePreconfiguredUDNAddresses,
 		},
 	)
@@ -4102,6 +4104,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateNetworkSegmentation,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGatePreconfiguredUDNAddresses,
+				apifeatures.FeatureGateEVPN,
 			},
 		)
 	}
@@ -4115,6 +4118,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGatePreconfiguredUDNAddresses,
+				apifeatures.FeatureGateEVPN,
 			},
 		)
 	}
@@ -4128,6 +4132,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateAdminNetworkPolicy,
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateOVNObservability,
+				apifeatures.FeatureGateEVPN,
 			},
 		)
 	}

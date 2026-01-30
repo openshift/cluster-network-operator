@@ -618,6 +618,12 @@ data:
       if [[ "{{.OVN_ROUTE_ADVERTISEMENTS_ENABLE}}" == "true" ]]; then
         route_advertisements_enable_flag="--enable-route-advertisements"
       fi
+
+      evpn_enable_flag=
+      # OVN_EVPN_ENABLE represents a feature gate which is static; OVN_ROUTE_ADVERTISEMENTS_ENABLE is runtime-togglable and we need it for EVPN to work.
+      if [[ "{{.OVN_EVPN_ENABLE}}" == "true" && "{{.OVN_ROUTE_ADVERTISEMENTS_ENABLE}}" == "true" ]]; then
+        evpn_enable_flag="--enable-evpn"
+      fi
   
       preconfigured_udn_addresses_enable_flag=
       if [[ "{{.OVN_PRE_CONF_UDN_ADDR_ENABLE}}" == "true" ]]; then
@@ -719,6 +725,7 @@ data:
         ${multi_network_enabled_flag} \
         ${network_segmentation_enabled_flag} \
         ${route_advertisements_enable_flag} \
+        ${evpn_enable_flag} \
         ${preconfigured_udn_addresses_enable_flag} \
         ${multi_network_policy_enabled_flag} \
         ${admin_network_policy_enabled_flag} \
