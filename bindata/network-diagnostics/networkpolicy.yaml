@@ -1,0 +1,41 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: network-check-source
+  namespace: openshift-network-diagnostics
+spec:
+  podSelector:
+    matchLabels:
+      app: network-check-source
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow ingress to metrics
+    - ports:
+        - port: 17698
+  egress:
+    # Allow egress to network-check-target pods.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: network-check-target
+    # Allow egress to apiserver
+    - {}
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: network-check-target
+  namespace: openshift-network-diagnostics
+spec:
+  podSelector:
+    matchLabels:
+      app: network-check-target
+  policyTypes:
+    # network-check-target does no egress
+    - Ingress
+  ingress:
+    # Allow to the check-target port. For debuggability we don't restrict the source.
+    - ports:
+        - port: 8080

@@ -1,0 +1,14 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: iptables-alerter
+  namespace: openshift-network-operator
+spec:
+  podSelector:
+    matchLabels:
+      app: iptables-alerter
+  policyTypes:
+    - Egress
+  egress:
+    # Allow to apiserver
+    - {}
