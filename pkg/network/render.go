@@ -908,7 +908,7 @@ func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir s
 }
 
 // isSupportedDualStackPlatform returns true if the platform supports dual-stack networking
-// on Day-0 (initial cluster installation). Some platforms (AWS, Azure) require feature gates
+// on Day-0 (initial cluster installation). Some platforms (AWS, Azure, GCP) require feature gates
 // to be enabled to support dual-stack.
 func isSupportedDualStackPlatform(platformType configv1.PlatformType, featureGates featuregates.FeatureGate) bool {
 	switch platformType {
@@ -918,6 +918,8 @@ func isSupportedDualStackPlatform(platformType configv1.PlatformType, featureGat
 		return featureGates.Enabled(apifeatures.FeatureGateAWSDualStackInstall)
 	case configv1.AzurePlatformType:
 		return featureGates.Enabled(apifeatures.FeatureGateAzureDualStackInstall)
+	case configv1.GCPPlatformType:
+		return featureGates.Enabled(apifeatures.FeatureGateGCPDualStackInstall)
 	default:
 		return false
 	}
