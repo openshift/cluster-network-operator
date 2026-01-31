@@ -152,9 +152,7 @@ data:
         "multusAutoconfigDir": "/host/run/multus/cni/net.d",
         "namespaceIsolation": true,
         "globalNamespaces": "default,openshift-multus,openshift-sriov-network-operator,openshift-cnv",
-{{- if eq .DefaultNetworkType "OpenShiftSDN"}}
-        "readinessindicatorfile": "/host/run/multus/cni/net.d/80-openshift-network.conf",
-{{- else if eq .DefaultNetworkType "OVNKubernetes"}}
+{{- if eq .DefaultNetworkType "OVNKubernetes"}}
         "readinessindicatorfile": "/host/run/multus/cni/net.d/10-ovn-kubernetes.conf",
 {{- end}}
         "daemonSocketDir": "/run/multus/socket",
