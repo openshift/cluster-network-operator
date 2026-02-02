@@ -958,7 +958,6 @@ spec:
     storage: true
     subresources:
       status: {}
-{{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -3100,7 +3099,6 @@ status:
     plural: ""
   conditions: null
   storedVersions: null
-{{- end }}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -3156,7 +3154,6 @@ spec:
             status:
               description: IPAMClaimStatus contains the observed status of the IPAMClaim.
               properties:
-{{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
                 conditions:
                   description: Conditions contains details for one aspect of the current
                     state of this API Resource
@@ -3215,21 +3212,18 @@ spec:
                       - type
                     type: object
                   type: array
-{{- end }}
                 ips:
                   description: The list of IP addresses (v4, v6) that were allocated
                     for the pod interface
                   items:
                     type: string
                   type: array
-{{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
                 ownerPod:
                   description: The name of the pod holding the IPAMClaim
                   properties:
                     name:
                       type: string
                   type: object
-{{- end }}
               required:
                 - ips
               type: object
@@ -3238,7 +3232,6 @@ spec:
       storage: true
       subresources:
         status: {}
-{{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -3283,7 +3276,6 @@ spec:
               layer2:
                 description: Layer2 is the Layer2 topology configuration.
                 properties:
-{{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
                   defaultGatewayIPs:
                     description: |-
                       defaultGatewayIPs specifies the default gateway IP used in the internal OVN topology.
@@ -3326,7 +3318,6 @@ spec:
                     maxItems: 4
                     minItems: 1
                     type: array
-{{- end }}
                   ipam:
                     description: IPAM section contains IPAM-related configuration
                       for the network.
@@ -3393,7 +3384,6 @@ spec:
                     maximum: 65536
                     minimum: 576
                     type: integer
-{{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
                   reservedSubnets:
                     description: |-
                       reservedSubnets specifies a list of CIDRs reserved for static IP assignment, excluded from automatic allocation.
@@ -3412,7 +3402,6 @@ spec:
                     maxItems: 25
                     minItems: 1
                     type: array
-{{- end }}
                   role:
                     description: |-
                       Role describes the network role in the pod.
@@ -3464,7 +3453,6 @@ spec:
                     is used
                   rule: '!has(self.subnets) || !has(self.mtu) || !self.subnets.exists_one(i,
                     isCIDR(i) && cidr(i).ip().family() == 6) || self.mtu >= 1280'
-{{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
                 - message: defaultGatewayIPs is only supported for Primary network
                   rule: '!has(self.defaultGatewayIPs) || has(self.role) && self.role
                     == ''Primary'''
@@ -3511,7 +3499,6 @@ spec:
                     host bits set)
                   rule: '!has(self.reservedSubnets) || self.reservedSubnets.all(s,
                     isCIDR(s) && cidr(s) == cidr(s).masked())'
-{{- end }}
               layer3:
                 description: Layer3 is the Layer3 topology configuration.
                 properties:
@@ -3805,7 +3792,6 @@ spec:
                   layer2:
                     description: Layer2 is the Layer2 topology configuration.
                     properties:
-{{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
                       defaultGatewayIPs:
                         description: |-
                           defaultGatewayIPs specifies the default gateway IP used in the internal OVN topology.
@@ -3848,7 +3834,6 @@ spec:
                         maxItems: 4
                         minItems: 1
                         type: array
-{{- end }}
                       ipam:
                         description: IPAM section contains IPAM-related configuration
                           for the network.
@@ -3915,7 +3900,6 @@ spec:
                         maximum: 65536
                         minimum: 576
                         type: integer
-{{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
                       reservedSubnets:
                         description: |-
                           reservedSubnets specifies a list of CIDRs reserved for static IP assignment, excluded from automatic allocation.
@@ -3934,7 +3918,6 @@ spec:
                         maxItems: 25
                         minItems: 1
                         type: array
-{{- end }}
                       role:
                         description: |-
                           Role describes the network role in the pod.
@@ -3987,7 +3970,6 @@ spec:
                         subnet is used
                       rule: '!has(self.subnets) || !has(self.mtu) || !self.subnets.exists_one(i,
                         isCIDR(i) && cidr(i).ip().family() == 6) || self.mtu >= 1280'
-{{- if .OVN_PRE_CONF_UDN_ADDR_ENABLE }}
                     - message: defaultGatewayIPs is only supported for Primary network
                       rule: '!has(self.defaultGatewayIPs) || has(self.role) && self.role
                         == ''Primary'''
@@ -4037,7 +4019,6 @@ spec:
                         host bits set)
                       rule: '!has(self.reservedSubnets) || self.reservedSubnets.all(s,
                         isCIDR(s) && cidr(s) == cidr(s).masked())'
-{{- end }}
                   layer3:
                     description: Layer3 is the Layer3 topology configuration.
                     properties:
@@ -4444,7 +4425,6 @@ spec:
     storage: true
     subresources:
       status: {}
-{{- end }}
 {{- if .OVN_ROUTE_ADVERTISEMENTS_ENABLE }}
 ---
 apiVersion: apiextensions.k8s.io/v1

@@ -75,11 +75,8 @@ var manifestDirOvn = "../../bindata"
 
 func getDefaultFeatureGates() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy, apifeatures.FeatureGateDNSNameResolver,
-			apifeatures.FeatureGateNetworkSegmentation, apifeatures.FeatureGateOVNObservability},
-		[]configv1.FeatureGateName{
-			apifeatures.FeatureGatePreconfiguredUDNAddresses,
-		},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver, apifeatures.FeatureGateOVNObservability},
+		[]configv1.FeatureGateName{},
 	)
 }
 
@@ -298,6 +295,8 @@ dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
 egressip-node-healthcheck-port=9107
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
 
 [gateway]
 mode=shared
@@ -335,6 +334,8 @@ dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
 egressip-node-healthcheck-port=9107
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
 
 [gateway]
 mode=local
@@ -386,6 +387,8 @@ dns-service-name="dns-default"
 [ovnkubernetesfeature]
 egressip-reachability-total-timeout=3
 egressip-node-healthcheck-port=9107
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
 
 [gateway]
 mode=local
@@ -439,6 +442,8 @@ dns-service-name="dns-default"
 [ovnkubernetesfeature]
 egressip-reachability-total-timeout=0
 egressip-node-healthcheck-port=9107
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
 
 [gateway]
 mode=local
@@ -491,6 +496,8 @@ dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
 egressip-node-healthcheck-port=9107
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
 
 [gateway]
 mode=local
@@ -543,6 +550,8 @@ dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
 egressip-node-healthcheck-port=9107
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
 
 [gateway]
 mode=shared
@@ -584,6 +593,8 @@ dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
 egressip-node-healthcheck-port=9107
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
 
 [gateway]
 mode=shared
@@ -628,6 +639,8 @@ dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
 egressip-node-healthcheck-port=9107
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
 
 [gateway]
 mode=shared
@@ -665,6 +678,9 @@ dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
 
 [gateway]
 mode=shared
@@ -703,6 +719,8 @@ dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
 egressip-node-healthcheck-port=9107
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
 enable-multi-networkpolicy=true
 
 [gateway]
@@ -717,7 +735,7 @@ logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
 
 			enableMultiNetPolicies: true,
-			enabledFeatureGates:    []configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy},
+			enabledFeatureGates:    []configv1.FeatureGateName{},
 		},
 		{
 			desc: "enable network segmentation and multi-network",
@@ -744,6 +762,7 @@ dns-service-name="dns-default"
 [ovnkubernetesfeature]
 egressip-node-healthcheck-port=9107
 enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
 
 [gateway]
 mode=shared
@@ -755,7 +774,7 @@ logfile-maxsize=100
 logfile-maxbackups=5
 logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
-			enabledFeatureGates:      []configv1.FeatureGateName{apifeatures.FeatureGateNetworkSegmentation},
+			enabledFeatureGates:      []configv1.FeatureGateName{},
 		},
 		{
 			desc: "enable multi-network policies without multi-network support",
@@ -781,6 +800,9 @@ dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
 egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
 
 [gateway]
 mode=shared
@@ -794,7 +816,7 @@ logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
 			disableMultiNet:          true,
 			enableMultiNetPolicies:   true,
-			enabledFeatureGates:      []configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy},
+			enabledFeatureGates:      []configv1.FeatureGateName{},
 		},
 		{
 			desc: "enable dns-name resolver feature",
@@ -820,6 +842,8 @@ dns-service-name="dns-default"
 
 [ovnkubernetesfeature]
 egressip-node-healthcheck-port=9107
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
 enable-dns-name-resolver=true
 
 [gateway]
@@ -871,10 +895,7 @@ logfile-maxsize=100
 logfile-maxbackups=5
 logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
-			enabledFeatureGates: []configv1.FeatureGateName{
-				apifeatures.FeatureGateNetworkSegmentation,
-				apifeatures.FeatureGatePreconfiguredUDNAddresses,
-			},
+			enabledFeatureGates:      []configv1.FeatureGateName{},
 		},
 	}
 	g := NewGomegaWithT(t)
@@ -927,11 +948,8 @@ logfile-maxage=0`,
 			}
 
 			knownFeatureGates := []configv1.FeatureGateName{
-				apifeatures.FeatureGateAdminNetworkPolicy,
 				apifeatures.FeatureGateDNSNameResolver,
-				apifeatures.FeatureGateNetworkSegmentation,
 				apifeatures.FeatureGateOVNObservability,
-				apifeatures.FeatureGatePreconfiguredUDNAddresses,
 			}
 			s := sets.New[configv1.FeatureGateName](tc.enabledFeatureGates...)
 			enabled := []configv1.FeatureGateName{}
@@ -3823,14 +3841,10 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 	}
 	featureGatesCNO := featuregates.NewFeatureGate(
 		[]configv1.FeatureGateName{
-			apifeatures.FeatureGateAdminNetworkPolicy,
 			apifeatures.FeatureGateDNSNameResolver,
-			apifeatures.FeatureGateNetworkSegmentation,
 			apifeatures.FeatureGateOVNObservability,
 		},
-		[]configv1.FeatureGateName{
-			apifeatures.FeatureGatePreconfiguredUDNAddresses,
-		},
+		[]configv1.FeatureGateName{},
 	)
 	fakeClient := cnofake.NewFakeClient()
 
@@ -4097,35 +4111,24 @@ func Test_renderOVNKubernetes(t *testing.T) {
 		return featuregates.NewFeatureGate(
 			[]configv1.FeatureGateName{},
 			[]configv1.FeatureGateName{
-				apifeatures.FeatureGateAdminNetworkPolicy,
 				apifeatures.FeatureGateDNSNameResolver,
-				apifeatures.FeatureGateNetworkSegmentation,
 				apifeatures.FeatureGateOVNObservability,
-				apifeatures.FeatureGatePreconfiguredUDNAddresses,
 			},
 		)
 	}
 	udnFeatureGate := func() featuregates.FeatureGate {
 		return featuregates.NewFeatureGate(
+			[]configv1.FeatureGateName{},
 			[]configv1.FeatureGateName{
-				apifeatures.FeatureGateNetworkSegmentation,
-			},
-			[]configv1.FeatureGateName{
-				apifeatures.FeatureGateAdminNetworkPolicy,
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateOVNObservability,
-				apifeatures.FeatureGatePreconfiguredUDNAddresses,
 			},
 		)
 	}
 	preDefUDNFeatureGates := func() featuregates.FeatureGate {
 		return featuregates.NewFeatureGate(
+			[]configv1.FeatureGateName{},
 			[]configv1.FeatureGateName{
-				apifeatures.FeatureGateNetworkSegmentation,
-				apifeatures.FeatureGatePreconfiguredUDNAddresses,
-			},
-			[]configv1.FeatureGateName{
-				apifeatures.FeatureGateAdminNetworkPolicy,
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateOVNObservability,
 			},
@@ -4153,7 +4156,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				client:          cnofake.NewFakeClient(),
 				featureGates:    noFeatureGates,
 			},
-			expectNumObjs: 38,
+			expectNumObjs: 48,
 		},
 		{
 			name: "render routeadvertisements",
@@ -4168,7 +4171,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				client:          cnofake.NewFakeClient(),
 				featureGates:    noFeatureGates,
 			},
-			expectNumObjs: 39,
+			expectNumObjs: 49,
 		},
 		{
 			name: "render with UDN",
@@ -4179,7 +4182,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				client:          cnofake.NewFakeClient(),
 				featureGates:    udnFeatureGate,
 			},
-			expectNumObjs: 44,
+			expectNumObjs: 48,
 		},
 		{
 			name: "render with PreconfiguredUDNAddresses, UDN, persistent-IP, and RA",
@@ -4193,7 +4196,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				client:       cnofake.NewFakeClient(),
 				featureGates: preDefUDNFeatureGates,
 			},
-			expectNumObjs: 47,
+			expectNumObjs: 49,
 		},
 	}
 	for _, tt := range tests {
@@ -4264,7 +4267,6 @@ func TestOVNKubernetesControlPlaneFlags(t *testing.T) {
 			overrides: map[string]interface{}{
 				"OVN_OBSERVABILITY_ENABLE":        "false",
 				"OVN_MULTI_NETWORK_POLICY_ENABLE": "false",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "false",
 			},
 			mustContain: []string{
 				"--enable-egress-ip=true",
@@ -4286,7 +4288,6 @@ func TestOVNKubernetesControlPlaneFlags(t *testing.T) {
 			variant: "self-hosted",
 			overrides: map[string]interface{}{
 				"OVN_MULTI_NETWORK_POLICY_ENABLE": "true",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "true",
 			},
 			mustContain: []string{
 				"--enable-egress-ip=true",
@@ -4317,8 +4318,7 @@ func TestOVNKubernetesControlPlaneFlags(t *testing.T) {
 			name:    "self-hosted control-plane: network segmentation enabled (auto-enables multi-network)",
 			variant: "self-hosted",
 			overrides: map[string]interface{}{
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "true",
-				"OVN_MULTI_NETWORK_ENABLE":        "false",
+				"OVN_MULTI_NETWORK_ENABLE": "false",
 			},
 			mustContain: []string{
 				"--enable-egress-ip=true",
@@ -4333,8 +4333,7 @@ func TestOVNKubernetesControlPlaneFlags(t *testing.T) {
 			name:    "self-hosted control-plane: both multi-network and segmentation enabled",
 			variant: "self-hosted",
 			overrides: map[string]interface{}{
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "true",
-				"OVN_MULTI_NETWORK_ENABLE":        "true",
+				"OVN_MULTI_NETWORK_ENABLE": "true",
 			},
 			mustContain: []string{
 				"--enable-egress-ip=true",
@@ -4378,9 +4377,7 @@ func TestOVNKubernetesScriptLibCombined(t *testing.T) {
 			overrides: map[string]interface{}{
 				"OVN_NODE_MODE":                   "dpu-host",
 				"OVN_MULTI_NETWORK_ENABLE":        "true",
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "true",
 				"OVN_MULTI_NETWORK_POLICY_ENABLE": "true",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "true",
 			},
 			mustContain: []string{
 				"gateway_interface=\"derive-from-mgmt-port\"",
@@ -4401,9 +4398,7 @@ func TestOVNKubernetesScriptLibCombined(t *testing.T) {
 			overrides: map[string]interface{}{
 				"OVN_NODE_MODE":                   "full",
 				"OVN_MULTI_NETWORK_ENABLE":        "true",
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "true",
 				"OVN_MULTI_NETWORK_POLICY_ENABLE": "true",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "true",
 			},
 			mustContain: []string{
 				"gateway_interface=br-ex",
@@ -4443,9 +4438,7 @@ func TestOVNKubernetesScriptLibCombined(t *testing.T) {
 			overrides: map[string]interface{}{
 				"OVN_NODE_MODE":                   "full",
 				"OVN_MULTI_NETWORK_ENABLE":        "false",
-				"OVN_NETWORK_SEGMENTATION_ENABLE": "false",
 				"OVN_MULTI_NETWORK_POLICY_ENABLE": "false",
-				"OVN_ADMIN_NETWORK_POLICY_ENABLE": "false",
 			},
 			mustContain: []string{
 				"multi_network_enabled_flag=",

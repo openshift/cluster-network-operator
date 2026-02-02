@@ -1,4 +1,3 @@
-{{if .OVN_NETWORK_SEGMENTATION_ENABLE}}
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
@@ -29,4 +28,3 @@ spec:
         apiVersions: ["v1"]
         operations:  ["UPDATE"]
         resources:   ["namespaces"]
-{{end}}

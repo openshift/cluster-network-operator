@@ -327,15 +327,11 @@ func TestDisallowCIDRMaskChangeInDualStackUpdate(t *testing.T) {
 
 func getDefaultFeatureGatesWithDualStack() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy,
-			apifeatures.FeatureGateDNSNameResolver,
-			apifeatures.FeatureGateNetworkSegmentation,
+		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver,
 			apifeatures.FeatureGateOVNObservability,
 			apifeatures.FeatureGateAWSDualStackInstall,
 			apifeatures.FeatureGateAzureDualStackInstall},
-		[]configv1.FeatureGateName{
-			apifeatures.FeatureGatePreconfiguredUDNAddresses,
-		},
+		[]configv1.FeatureGateName{},
 	)
 }
 
