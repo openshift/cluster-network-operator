@@ -34,6 +34,7 @@ spec:
         hypershift.openshift.io/release-image: {{.ReleaseImage}}
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
         kubectl.kubernetes.io/default-container: ovnkube-control-plane
+        network.operator.openshift.io/ovnkube-control-plane-config-hash: "{{.OVNKubeControlPlaneConfigHash}}"
       labels:
         app: ovnkube-control-plane
         component: network
