@@ -77,6 +77,9 @@ spec:
       - key: node-role.kubernetes.io/control-plane
         effect: NoSchedule
         operator: Exists
+      - key: node.kubernetes.io/not-ready
+        effect: NoSchedule
+        operator: Exists
       volumes:
       - name: cert
         secret:
