@@ -6,8 +6,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
-	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
-	"github.com/openshift/cluster-network-operator/pkg/platform"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
@@ -21,16 +19,7 @@ import (
 var pluginsUsingHostPrefix = sets.NewString(string(operv1.NetworkTypeOpenShiftSDN), string(operv1.NetworkTypeOVNKubernetes))
 
 // ValidateClusterConfig ensures the cluster config is valid.
-func ValidateClusterConfig(clusterConfig *configv1.Network, client cnoclient.Client, featureGates featuregates.FeatureGate) error {
-	// If for whatever reason it is not possible to get the platform type, fail
-	infraRes, err := platform.InfraStatus(client)
-	if err != nil {
-		return err
-	}
-	return validateClusterConfig(clusterConfig, infraRes, client, featureGates)
-}
-
-func validateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.InfraStatus, client cnoclient.Client, featureGates featuregates.FeatureGate) error {
+func ValidateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.InfraStatus, featureGates featuregates.FeatureGate) error {
 
 	// Check all networks for overlaps
 	pool := iputil.IPPool{}

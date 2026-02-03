@@ -242,9 +242,8 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// This will also commit the change back to the apiserver.
 	if err := r.MergeClusterConfig(ctx, operConfig, clusterConfig); err != nil {
 		log.Printf("Failed to merge the cluster configuration: %v", err)
-		// not set degraded if the err is a version conflict, but return a reconcile err for retry.
 		if !apierrors.IsConflict(err) {
-			r.status.SetDegraded(statusmanager.OperatorConfig, "MergeClusterConfig",
+			r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "MergeClusterConfig",
 				fmt.Sprintf("Internal error while merging cluster configuration and operator configuration: %v", err))
 		}
 		return reconcile.Result{}, err
@@ -286,7 +285,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		mtu, err = r.probeMTU(ctx, operConfig, infraStatus)
 		if err != nil {
 			log.Printf("Failed to probe MTU: %v", err)
-			r.status.SetDegraded(statusmanager.OperatorConfig, "MTUProbeFailed",
+			r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "MTUProbeFailed",
 				fmt.Sprintf("Failed to probe MTU: %v", err))
 			return reconcile.Result{}, fmt.Errorf("could not probe MTU -- maybe no available nodes: %w", err)
 		}
@@ -320,7 +319,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	bootstrapResult, err := network.Bootstrap(newOperConfig, r.client)
 	if err != nil {
 		log.Printf("Failed to reconcile platform networking resources: %v", err)
-		r.status.SetDegraded(statusmanager.OperatorConfig, "BootstrapError",
+		r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "BootstrapError",
 			fmt.Sprintf("Internal error while reconciling platform networking resources: %v", err))
 		return reconcile.Result{}, err
 	}
@@ -328,9 +327,8 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if !reflect.DeepEqual(operConfig, newOperConfig) {
 		if err := r.UpdateOperConfig(ctx, newOperConfig); err != nil {
 			log.Printf("Failed to update the operator configuration: %v", err)
-			// not set degraded if the err is a version conflict, but return a reconcile err for retry.
 			if !apierrors.IsConflict(err) {
-				r.status.SetDegraded(statusmanager.OperatorConfig, "UpdateOperatorConfig",
+				r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "UpdateOperatorConfig",
 					fmt.Sprintf("Internal error while updating operator configuration: %v", err))
 			}
 			return reconcile.Result{}, err
@@ -347,7 +345,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	objs, progressing, err := network.Render(&operConfig.Spec, &clusterConfig.Spec, ManifestPath, r.client, r.featureGates, bootstrapResult)
 	if err != nil {
 		log.Printf("Failed to render: %v", err)
-		r.status.SetDegraded(statusmanager.OperatorConfig, "RenderError",
+		r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "RenderError",
 			fmt.Sprintf("Internal error while rendering operator configuration: %v", err))
 		return reconcile.Result{}, err
 	}
@@ -452,7 +450,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	err = r.status.SetMachineConfigs(ctx, renderedMachineConfigs)
 	if err != nil {
 		log.Printf("Failed to process machine configs: %v", err)
-		r.status.SetDegraded(statusmanager.OperatorConfig, "MachineConfigError",
+		r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "MachineConfigError",
 			fmt.Sprintf("Internal error while processing rendered Machine Configs: %v", err))
 		return reconcile.Result{}, err
 	}
@@ -507,7 +505,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	status, err := r.ClusterNetworkStatus(ctx, operConfig, bootstrapResult)
 	if err != nil {
 		log.Printf("Could not generate network status: %v", err)
-		r.status.SetDegraded(statusmanager.OperatorConfig, "StatusError",
+		r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "StatusError",
 			fmt.Sprintf("Could not update cluster configuration status: %v", err))
 		return reconcile.Result{}, err
 	}

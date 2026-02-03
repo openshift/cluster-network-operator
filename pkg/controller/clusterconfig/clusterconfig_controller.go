@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,8 +93,17 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 		return reconcile.Result{}, err
 	}
 
-	// Validate the cluster config
-	if err := network.ValidateClusterConfig(clusterConfig, r.client, r.featureGates); err != nil {
+	// Fetch infrastructure status for validation
+	infraRes, err := platform.InfraStatus(r.client)
+	if err != nil {
+		log.Printf("Failed to get infrastructure status: %v", err)
+		r.status.MaybeSetDegraded(statusmanager.ClusterConfig, "InfraStatusError",
+			fmt.Sprintf("Failed to get infrastructure status: %v", err))
+		return reconcile.Result{}, err
+	}
+
+	// Validate the cluster config - degrade immediately since bad config won't recover on its own
+	if err := network.ValidateClusterConfig(clusterConfig, infraRes, r.featureGates); err != nil {
 		log.Printf("Failed to validate Network CR: %v", err)
 		r.status.SetDegraded(statusmanager.ClusterConfig, "InvalidClusterConfig",
 			fmt.Sprintf("The cluster configuration is invalid (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))

@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	k8sutil "github.com/openshift/cluster-network-operator/pkg/util/k8s"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,7 +26,12 @@ import (
 func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig *operv1.Network, clusterConfig *configv1.Network) error {
 	// Validate cluster config
 	// If invalid just warn and proceed.
-	if err := network.ValidateClusterConfig(clusterConfig, r.client, r.featureGates); err != nil {
+	infraRes, err := platform.InfraStatus(r.client)
+	if err != nil {
+		log.Printf("WARNING: ignoring Network.config.openshift.io/v1/cluster - failed to get infrastructure status: %v", err)
+		return nil
+	}
+	if err := network.ValidateClusterConfig(clusterConfig, infraRes, r.featureGates); err != nil {
 		log.Printf("WARNING: ignoring Network.config.openshift.io/v1/cluster - failed validation: %v", err)
 		return nil
 	}

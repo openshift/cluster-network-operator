@@ -175,7 +175,7 @@ func (r *PKIReconciler) setStatus() {
 		for _, e := range r.pkiErrs {
 			msgs = append(msgs, e.Error())
 		}
-		r.status.SetDegraded(statusmanager.PKIConfig, "PKIError", strings.Join(msgs, ", "))
+		r.status.MaybeSetDegraded(statusmanager.PKIConfig, "PKIError", strings.Join(msgs, ", "))
 	}
 }
 
