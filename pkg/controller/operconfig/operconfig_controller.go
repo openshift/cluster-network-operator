@@ -146,8 +146,8 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 			predicate.ResourceVersionChangedPredicate{},
 			predicate.NewPredicateFuncs(func(object crclient.Object) bool {
 				// Ignore ConfigMaps we manage as part of this loop
-				return !(object.GetName() == "network-operator-lock" ||
-					object.GetName() == "applied-cluster")
+				return object.GetName() != "network-operator-lock" &&
+					object.GetName() != "applied-cluster"
 			}),
 		},
 	}); err != nil {
@@ -213,7 +213,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			r.status.SetDegraded(statusmanager.OperatorConfig, "NoOperatorConfig",
-				fmt.Sprintf("Operator configuration %s was deleted", request.NamespacedName.String()))
+				fmt.Sprintf("Operator configuration %s was deleted", request.String()))
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected, since we set
 			// the ownerReference (see https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/).
@@ -262,7 +262,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// Retrieve the previously applied operator configuration
-	prev, err := GetAppliedConfiguration(ctx, r.client.Default().CRClient(), operConfig.ObjectMeta.Name)
+	prev, err := GetAppliedConfiguration(ctx, r.client.Default().CRClient(), operConfig.Name)
 	if err != nil {
 		log.Printf("Failed to retrieve previously applied configuration: %v", err)
 		// FIXME: operator status?
@@ -498,39 +498,9 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	if setDegraded {
-		r.status.SetDegraded(statusmanager.OperatorConfig, "ApplyOperatorConfig",
+		r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "ApplyOperatorConfig",
 			fmt.Sprintf("Error while updating operator configuration: %v", degradedErr))
 		return reconcile.Result{}, degradedErr
-	}
-
-	if operConfig.Spec.Migration != nil && operConfig.Spec.Migration.NetworkType != "" {
-		if !(operConfig.Spec.Migration.NetworkType == string(operv1.NetworkTypeOpenShiftSDN) || operConfig.Spec.Migration.NetworkType == string(operv1.NetworkTypeOVNKubernetes)) {
-			err = fmt.Errorf("Error: operConfig.Spec.Migration.NetworkType: %s is not equal to either \"OpenshiftSDN\" or \"OVNKubernetes\"", operConfig.Spec.Migration.NetworkType)
-			return reconcile.Result{}, err
-		}
-
-		migration := operConfig.Spec.Migration
-		if migration.Features == nil || migration.Features.EgressFirewall {
-			err = migrateEgressFirewallCRs(ctx, operConfig, r.client)
-			if err != nil {
-				log.Printf("Could not migrate EgressFirewall CRs: %v", err)
-				return reconcile.Result{}, err
-			}
-		}
-		if migration.Features == nil || migration.Features.Multicast {
-			err = migrateMulticastEnablement(ctx, operConfig, r.client)
-			if err != nil {
-				log.Printf("Could not migrate Multicast settings: %v", err)
-				return reconcile.Result{}, err
-			}
-		}
-		if migration.Features == nil || migration.Features.EgressIP {
-			err = migrateEgressIpCRs(ctx, operConfig, r.client)
-			if err != nil {
-				log.Printf("Could not migrate EgressIP CRs: %v", err)
-				return reconcile.Result{}, err
-			}
-		}
 	}
 
 	// Update Network.config.openshift.io.Status
@@ -547,7 +517,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		if err := apply.ApplyObject(ctx, r.client, status, ControllerName); err != nil {
 			err = errors.Wrapf(err, "could not apply (%s) %s/%s", status.GroupVersionKind(), status.GetNamespace(), status.GetName())
 			log.Println(err)
-			r.status.SetDegraded(statusmanager.OperatorConfig, "StatusError",
+			r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "StatusError",
 				fmt.Sprintf("Could not update cluster configuration status: %v", err))
 			return reconcile.Result{}, err
 		}

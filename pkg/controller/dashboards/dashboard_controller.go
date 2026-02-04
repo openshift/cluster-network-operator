@@ -120,7 +120,7 @@ func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Re
 	operConfig := &operv1.Network{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}}
 	err := r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, operConfig)
 	if err != nil {
-		err = fmt.Errorf("Unable to retrieve Network.operator.openshift.io object: %w", err)
+		err = fmt.Errorf("unable to retrieve Network.operator.openshift.io object: %w", err)
 		klog.Error(err)
 		r.status.SetDegraded(statusmanager.DashboardConfig, "DashboardError", err.Error())
 		return reconcile.Result{}, err
@@ -128,7 +128,7 @@ func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Re
 
 	err = r.applyManifests(ctx, operConfig)
 	if err != nil {
-		err = fmt.Errorf("Failed to apply dashboard manifests: %w", err)
+		err = fmt.Errorf("failed to apply dashboard manifests: %w", err)
 		klog.Error(err)
 		r.status.SetDegraded(statusmanager.DashboardConfig, "DashboardError", err.Error())
 		return reconcile.Result{}, err

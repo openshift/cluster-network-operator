@@ -18,13 +18,13 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	testingclock "k8s.io/utils/clock/testing"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -337,7 +337,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 
 	_, err := getOC(client)
-	if !errors.IsNotFound(err) {
+	if !apierrors.IsNotFound(err) {
 		t.Fatalf("unexpected error (expected Not Found): %v", err)
 	}
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
@@ -363,7 +363,8 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 		Reason: "Pods",
 	}
 
-	// Initial failure status
+	// Initial failure status - backdate so it sets Degraded immediately
+	status.failureFirstSeen[OperatorConfig] = time.Now().Add(-3 * time.Minute)
 	status.SetDegraded(OperatorConfig, "Operator", "")
 	oc, err := getOC(client)
 	if err != nil {
@@ -373,7 +374,8 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
 	}
 
-	// Setting a higher-level status should override it
+	// Setting a higher-level status should override it - backdate this one too
+	status.failureFirstSeen[ClusterConfig] = time.Now().Add(-3 * time.Minute)
 	status.SetDegraded(ClusterConfig, "Cluster", "")
 	oc, err = getOC(client)
 	if err != nil {
@@ -383,7 +385,8 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
 	}
 
-	// Setting a lower-level status should be ignored
+	// Setting a lower-level status should be ignored - backdate
+	status.failureFirstSeen[PodDeployment] = time.Now().Add(-3 * time.Minute)
 	status.SetDegraded(PodDeployment, "Pods", "")
 	oc, err = getOC(client)
 	if err != nil {
@@ -424,10 +427,54 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	}
 }
 
+func TestStatusManagerMaybeSetDegradedDebouncing(t *testing.T) {
+	client := fake.NewFakeClient()
+	status := New(client, "testing", names.StandAloneClusterName)
+	status.clock = testingclock.NewFakeClock(time.Now())
+
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	setOC(t, client, no)
+	setCO(t, client, "testing")
+
+	status.SetNotDegraded(OperatorConfig)
+
+	// First call should not set Degraded
+	status.MaybeSetDegraded(OperatorConfig, "TestFailure", "Test failure message")
+	oc, err := getOC(client)
+	if err != nil {
+		t.Fatalf("error getting OperatorConfig: %v", err)
+	}
+	if !v1helpers.IsOperatorConditionFalse(oc.Status.Conditions, operv1.OperatorStatusTypeDegraded) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+
+	// After debounce threshold, should set Degraded
+	status.clock.(*testingclock.FakeClock).Step(3 * time.Minute)
+	status.MaybeSetDegraded(OperatorConfig, "TestFailure", "Test failure message")
+	oc, err = getOC(client)
+	if err != nil {
+		t.Fatalf("error getting OperatorConfig: %v", err)
+	}
+	if !v1helpers.IsOperatorConditionTrue(oc.Status.Conditions, operv1.OperatorStatusTypeDegraded) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+
+	// Clearing the status should work
+	status.SetNotDegraded(OperatorConfig)
+	oc, err = getOC(client)
+	if err != nil {
+		t.Fatalf("error getting OperatorConfig: %v", err)
+	}
+	if !v1helpers.IsOperatorConditionFalse(oc.Status.Conditions, operv1.OperatorStatusTypeDegraded) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+}
+
 func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
+	status.clock = testingclock.NewFakeClock(time.Now())
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
 		Spec: operv1.NetworkSpec{DefaultNetwork: operv1.DefaultNetworkDefinition{
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}}}}}
@@ -775,6 +822,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
+	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	setOC(t, client, no)
@@ -1377,6 +1425,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 func TestStatusManagerSetFromDeployments(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
+	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
 	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
 	setOC(t, client, no)
@@ -1909,7 +1958,16 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	}
 	set(t, client, podC)
 
+	// First call to SetFromPods() will record the failure but not set Degraded yet
 	status.SetFromPods()
+
+	// Simulate time passing beyond the degraded threshold by setting failure first-seen time
+	// to 3 minutes ago
+	status.failureFirstSeen[RolloutHung] = time.Now().Add(-3 * time.Minute)
+
+	// Second call to SetFromPods() will now set Degraded since the failure has persisted
+	status.SetFromPods()
+
 	oc, err = getOC(client)
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)

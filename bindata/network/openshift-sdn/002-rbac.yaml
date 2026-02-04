@@ -14,13 +14,6 @@ rules:
   - get
   - list
   - watch
-{{- if .IsNetworkTypeLiveMigration }}
-- apiGroups: ["network.openshift.io"]
-  resources:
-  - hostsubnets
-  verbs:
-  - create
-{{ end }}
 - apiGroups: [""]
   resources:
   - namespaces

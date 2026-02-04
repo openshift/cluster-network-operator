@@ -100,9 +100,10 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		}
 	}
 
-	if res.PlatformType == configv1.AWSPlatformType {
+	switch res.PlatformType {
+	case configv1.AWSPlatformType:
 		res.PlatformRegion = infraConfig.Status.PlatformStatus.AWS.Region
-	} else if res.PlatformType == configv1.GCPPlatformType {
+	case configv1.GCPPlatformType:
 		res.PlatformRegion = infraConfig.Status.PlatformStatus.GCP.Region
 	}
 

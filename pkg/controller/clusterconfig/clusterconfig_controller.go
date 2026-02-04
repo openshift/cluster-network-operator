@@ -108,20 +108,10 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	}
 	network.MergeClusterConfig(&operConfig.Spec, clusterConfig.Spec)
 
-	if _, ok := clusterConfig.Annotations[names.NetworkTypeMigrationAnnotation]; ok {
-		// https://github.com/openshift/enhancements/blob/master/enhancements/network/sdn-live-migration.md#api
-		if err := r.processNetworkTypeLiveMigration(ctx, request, clusterConfig, operConfig); err != nil {
-			log.Printf("Failed to process SDN live migration: %v", err)
-			r.status.SetDegraded(statusmanager.ClusterConfig, "NetworkTypeMigrationFailed",
-				fmt.Sprintf("Failed to process SDN live migration (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))
-			return reconcile.Result{}, err
-		}
-	}
-
 	if err := apply.ApplyObject(ctx, r.client, operConfig, "clusterconfig"); err != nil {
 		// not set degraded if the err is a version conflict, but return a reconcile err for retry.
 		if !apierrors.IsConflict(err) {
-			r.status.SetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",
+			r.status.MaybeSetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",
 				fmt.Sprintf("Error while trying to update operator configuration: %v", err))
 		}
 		log.Printf("Could not propagate configuration from network.config.openshift.io to network.operator.openshift.io: %v", err)

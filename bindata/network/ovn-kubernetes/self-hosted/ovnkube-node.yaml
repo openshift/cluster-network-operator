@@ -305,12 +305,6 @@ spec:
         - -c
         - |
           set -xem
-{{- if .IsNetworkTypeLiveMigration }}
-          if ! ip link show br-ex; then
-            # clean up the OVN dbs if the node is running with OpenShiftSDN
-            rm -f /etc/ovn/ovnnb_db.db /etc/ovn/ovnsb_db.db
-          fi
-{{- end }}
           if [[ -f /env/_master ]]; then
             set -o allexport
             source /env/_master
@@ -328,11 +322,6 @@ spec:
               - -c
               - |
                 set -x
-{{- if .IsNetworkTypeLiveMigration }}
-                if ! ip link show br-ex; then
-                  exit 0
-                fi
-{{- end }}
                 . /ovnkube-lib/ovnkube-lib.sh || exit 1
                 nbdb-post-start {{.OVN_NORTHD_PROBE_INTERVAL}}
         readinessProbe:
@@ -345,11 +334,6 @@ spec:
             - /bin/bash
             - -c
             - |
-{{- if .IsNetworkTypeLiveMigration }}
-              if ! ip link show br-ex; then
-                exit 0
-              fi
-{{- end }}
               set -xeo pipefail
               . /ovnkube-lib/ovnkube-lib.sh || exit 1
               ovndb-readiness-probe "nb"
@@ -402,11 +386,6 @@ spec:
               - -c
               - |
                 set -x
-{{- if .IsNetworkTypeLiveMigration }}
-                if ! ip link show br-ex; then
-                  exit 0
-                fi
-{{- end }}
                 . /ovnkube-lib/ovnkube-lib.sh || exit 1
                 sbdb-post-start
         readinessProbe:
@@ -420,11 +399,6 @@ spec:
             - -c
             - |
               set -xeo pipefail
-{{- if .IsNetworkTypeLiveMigration }}
-              if ! ip link show br-ex; then
-                exit 0
-              fi
-{{- end }}
               . /ovnkube-lib/ovnkube-lib.sh || exit 1
               ovndb-readiness-probe "sb"
         env:
@@ -456,89 +430,6 @@ spec:
         - -c
         - |
           set -xe
-{{- if .IsNetworkTypeLiveMigration }}
-          NODE_CNI="OVNKubernetes"
-          if ip link show br-ex; then
-            echo "br-ex exists"
-            kubectl label node --overwrite ${K8S_NODE} migration.network.openshift.io/plugin-
-          else
-            echo "br-ex doesn't exist"
-            NODE_CNI="OpenShiftSDN"
-            kubectl label node --overwrite ${K8S_NODE} migration.network.openshift.io/plugin=
-          fi
-          export NODE_CNI
-
-          RETRY_INTERVAL=3
-          MAX_RETRIES=100
-          for ((retry_count=1; retry_count<=MAX_RETRIES; retry_count++)); do
-            # Align the node subnet with SDN
-            SDN_SUBNET=$(kubectl get hostsubnet ${K8S_NODE} -o jsonpath="{.subnet}"||true)
-            if [ -z "${SDN_SUBNET}" ]; then
-              echo "SDN node subnet is not found, retry..."
-              sleep $RETRY_INTERVAL
-            else
-              echo "use SDN node subnet ${SDN_SUBNET}"
-              SUBNET=${SDN_SUBNET}
-              break
-            fi
-          done
-          if [ ${retry_count} -gt ${MAX_RETRIES} ]; then
-            echo "All retries failed. Exiting."
-            exit 1
-          fi
-
-          kubectl annotate node ${K8S_NODE} --overwrite k8s.ovn.org/node-subnets={\"default\":[\"${SUBNET}\"]}
-          kubectl annotate node ${K8S_NODE} --overwrite k8s.ovn.org/hybrid-overlay-node-subnet=${SUBNET}
-
-          if [ "${NODE_CNI}" == "OpenShiftSDN" ]; then
-            echo "run hybrid-overlay-node"
-            NETWORK_NODE_IDENTITY_ENABLE=
-            if [[ "{{.NETWORK_NODE_IDENTITY_ENABLE}}" == "true" ]]; then
-              NETWORK_NODE_IDENTITY_ENABLE="
-                --bootstrap-kubeconfig=/var/lib/kubelet/kubeconfig
-                --cert-dir=/etc/ovn/ovnkube-node-certs
-                --cert-duration={{.NodeIdentityCertDuration}}
-              "
-            fi
-
-            ovn_v4_masquerade_subnet_opt=
-            if [[ "{{.V4MasqueradeSubnet}}" != "" ]]; then
-              ovn_v4_masquerade_subnet_opt="--gateway-v4-masquerade-subnet {{.V4MasqueradeSubnet}}"
-            fi
-            ovn_v6_masquerade_subnet_opt=
-            if [[ "{{.V6MasqueradeSubnet}}" != "" ]]; then
-              ovn_v6_masquerade_subnet_opt="--gateway-v6-masquerade-subnet {{.V6MasqueradeSubnet}}"
-            fi
-
-            ovn_v4_join_subnet_opt=
-            if [[ "{{.V4JoinSubnet}}" != "" ]]; then
-              ovn_v4_join_subnet_opt="--gateway-v4-join-subnet {{.V4JoinSubnet}}"
-            fi
-            ovn_v6_join_subnet_opt=
-            if [[ "{{.V6JoinSubnet}}" != "" ]]; then
-              ovn_v6_join_subnet_opt="--gateway-v6-join-subnet {{.V6JoinSubnet}}"
-            fi
-
-            ovn_v4_transit_switch_subnet_opt=
-            if [[ "{{.V4TransitSwitchSubnet}}" != "" ]]; then
-              ovn_v4_transit_switch_subnet_opt="--cluster-manager-v4-transit-subnet {{.V4TransitSwitchSubnet}}"
-            fi
-            ovn_v6_transit_switch_subnet_opt=
-            if [[ "{{.V6TransitSwitchSubnet}}" != "" ]]; then
-              ovn_v6_transit_switch_subnet_opt="--cluster-manager-v6-transit-subnet {{.V6TransitSwitchSubnet}}"
-            fi
-
-            exec /usr/bin/hybrid-overlay-node --node "${K8S_NODE}" \
-              --config-file=/run/ovnkube-config/ovnkube.conf \
-              ${NETWORK_NODE_IDENTITY_ENABLE} \
-              ${ovn_v4_masquerade_subnet_opt} \
-              ${ovn_v6_masquerade_subnet_opt} \
-              ${ovn_v4_join_subnet_opt} \
-              ${ovn_v6_join_subnet_opt} \
-              ${ovn_v4_transit_switch_subnet_opt} \
-              ${ovn_v6_transit_switch_subnet_opt}
-          fi
-{{- end }}
           . /ovnkube-lib/ovnkube-lib.sh || exit 1
           start-ovnkube-node ${OVN_KUBE_LOG_LEVEL} 29103 29105
         env:
@@ -625,14 +516,12 @@ spec:
           name: host-run-netns
           readOnly: true
           mountPropagation: HostToContainer
-{{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
         # host isolation from UDNs
         - mountPath: /run/systemd/private
           name: run-systemd
           subPath: private
           readOnly: true
           mountPropagation: HostToContainer
-{{ end }}
         # for installing the CNI plugin binary
         - mountPath: /cni-bin-dir
           name: host-cni-bin
@@ -680,11 +569,6 @@ spec:
             - -c
             - |
               #!/bin/bash
-{{- if .IsNetworkTypeLiveMigration }}
-              if ! ip link show br-ex; then
-                exit 0
-              fi
-{{- end }}
               test -f /etc/cni/net.d/10-ovn-kubernetes.conf
           initialDelaySeconds: 5
           periodSeconds: 30
@@ -712,15 +596,6 @@ spec:
           export KUBECONFIG=/etc/ovn/kubeconfig
 {{ end }}
 
-{{- if .IsNetworkTypeLiveMigration }}
-          if ip link show br-ex; then
-            echo "br-ex exists, run"
-          else
-            echo "br-ex doesn't exist, sleep..."
-            trap : TERM INT; sleep infinity & wait
-            exit
-          fi
-{{- end }}
           touch /var/run/ovn/add_iptables.sh
           chmod 0755 /var/run/ovn/add_iptables.sh
           cat <<'EOF' > /var/run/ovn/add_iptables.sh
@@ -804,11 +679,9 @@ spec:
       - name: host-run-netns
         hostPath:
           path: /run/netns
-{{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
       - name: run-systemd
         hostPath:
           path: /run/systemd
-{{ end }}
       - name: var-lib-openvswitch
         hostPath:
           path: /var/lib/openvswitch/data

@@ -44,7 +44,7 @@ func signCSR(template *x509.Certificate, requestKey c.PublicKey, issuer *x509.Ce
 		return nil, err
 	}
 	if len(certs) != 1 {
-		return nil, errors.New("Expected a single certificate")
+		return nil, errors.New("expected a single certificate")
 	}
 	return certs[0], nil
 }

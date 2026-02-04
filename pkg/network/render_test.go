@@ -62,23 +62,19 @@ func TestNoErrorOnIdenticalConfigs(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 }
 
-// Migration from OpenShiftSDN to OVNKubernetes validation
+// Migration validation
 // =================================
-func TestClusterNetworkChangeOkOnMigration(t *testing.T) {
-	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OVNKubernetesConfig)
-
-	prev.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
-
-	// You can change cluster network during migration.
-	next.ClusterNetwork = append(next.ClusterNetwork,
-		operv1.ClusterNetworkEntry{
-			CIDR:       "1.2.0.0/16",
-			HostPrefix: 24,
-		},
-	)
-	err := IsChangeSafe(prev, next, infra)
+func TestClusterNetworkNoMigration(t *testing.T) {
+	g := NewGomegaWithT(t)
+	config := OVNKubernetesConfig.DeepCopy()
+	err := Validate(&config.Spec)
 	g.Expect(err).NotTo(HaveOccurred())
 
+	config.Spec.Migration = &operv1.NetworkMigration{
+		NetworkType: "Whatever",
+	}
+	err = Validate(&config.Spec)
+	g.Expect(err).To(MatchError(ContainSubstring("network type migration is not supported")))
 }
 
 // Invalid miscellaneous migration validation
@@ -86,7 +82,7 @@ func TestClusterNetworkChangeOkOnMigration(t *testing.T) {
 func TestServiceNetworkChangeNotOkOnMigration(t *testing.T) {
 	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
 
-	prev.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
+	prev.Migration = &operv1.NetworkMigration{MTU: &operv1.MTUMigration{}}
 
 	// You can't change service network during migration.
 	next.ServiceNetwork = []string{"1.2.3.0/24"}
@@ -100,36 +96,16 @@ func TestDisallowNetworkTypeChangeWithoutMigration(t *testing.T) {
 	// You can't change default network type when not doing migration.
 	next.DefaultNetwork.Type = "OVN-Kubernetes"
 	err := IsChangeSafe(prev, next, infra)
-	g.Expect(err).To(MatchError(ContainSubstring("cannot change default network type when not doing migration")))
+	g.Expect(err).To(MatchError(ContainSubstring("cannot change default network type")))
 }
 
-func TestDisallowNonTargetTypeForMigration(t *testing.T) {
+func TestDisallowNetworkTypeChangeWithMigration(t *testing.T) {
 	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
 
-	// You can't change default network type to non-target migration network type.
 	prev.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
-	next.DefaultNetwork.Type = "Raw"
+	next.DefaultNetwork.Type = "OVNKubernetes"
 	err := IsChangeSafe(prev, next, infra)
-	g.Expect(err).To(MatchError(ContainSubstring("can only change default network type to the target migration network type")))
-}
-
-func TestDisallowLiveMigrationHyperShiftCluster(t *testing.T) {
-	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
-	// fake that we are in HyperShift hosted cluster
-	infra.HostedControlPlane = &hypershift.HostedControlPlane{}
-	next.Migration = &operv1.NetworkMigration{Mode: operv1.LiveNetworkMigrationMode}
-	err := IsChangeSafe(prev, next, infra)
-	g.Expect(err).To(MatchError(ContainSubstring("live migration is unsupported in a HyperShift environment")))
-}
-
-func TestDisallowMigrationTypeChangeWhenNotNull(t *testing.T) {
-	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OVNKubernetesConfig)
-
-	// You can't change the migration network type when it is not null.
-	next.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
-	prev.Migration = &operv1.NetworkMigration{NetworkType: "OpenShiftSDN"}
-	err := IsChangeSafe(prev, next, infra)
-	g.Expect(err).To(MatchError(ContainSubstring("cannot change migration network type after migration has started")))
+	g.Expect(err).To(MatchError(ContainSubstring("cannot change default network type")))
 }
 
 // OVNKubernetes DualStack validation
@@ -351,15 +327,11 @@ func TestDisallowCIDRMaskChangeInDualStackUpdate(t *testing.T) {
 
 func getDefaultFeatureGatesWithDualStack() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{apifeatures.FeatureGateAdminNetworkPolicy,
-			apifeatures.FeatureGateDNSNameResolver,
-			apifeatures.FeatureGateNetworkSegmentation,
+		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver,
 			apifeatures.FeatureGateOVNObservability,
 			apifeatures.FeatureGateAWSDualStackInstall,
 			apifeatures.FeatureGateAzureDualStackInstall},
-		[]configv1.FeatureGateName{
-			apifeatures.FeatureGatePreconfiguredUDNAddresses,
-		},
+		[]configv1.FeatureGateName{},
 	)
 }
 

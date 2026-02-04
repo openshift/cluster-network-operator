@@ -11,15 +11,6 @@ data:
   ovnkube-lib.sh: |-
     #!/bin/bash
     set -x
-{{- if .IsNetworkTypeLiveMigration }}
-    if ip link show br-ex; then
-      echo "br-ex exists"
-    else
-      echo "br-ex doesn't exist, sleep..."
-      trap : TERM INT; sleep infinity & wait
-      exit
-    fi
-{{- end }}
     # Add node-specific overrides if the container has mounted any
     K8S_NODE=${K8S_NODE:-}
     if [[ -n "${K8S_NODE}" && -f "/env/${K8S_NODE}" ]]; then
@@ -618,7 +609,7 @@ data:
       fi
 
       network_segmentation_enabled_flag=
-      if [[ "{{.OVN_NETWORK_SEGMENTATION_ENABLE}}" == "true" && "${OVN_NODE_MODE}" != "dpu-host" ]]; then
+      if [[ "${OVN_NODE_MODE}" != "dpu-host" ]]; then
         multi_network_enabled_flag="--enable-multi-network"
         network_segmentation_enabled_flag="--enable-network-segmentation"
       fi
@@ -628,10 +619,7 @@ data:
         route_advertisements_enable_flag="--enable-route-advertisements"
       fi
   
-      preconfigured_udn_addresses_enable_flag=
-      if [[ "{{.OVN_PRE_CONF_UDN_ADDR_ENABLE}}" == "true" ]]; then
-        preconfigured_udn_addresses_enable_flag="--enable-preconfigured-udn-addresses"
-      fi
+      preconfigured_udn_addresses_enable_flag="--enable-preconfigured-udn-addresses"
 
       network_observability_enabled_flag=
       if [[ "{{.OVN_OBSERVABILITY_ENABLE}}" == "true" ]]; then
@@ -644,7 +632,7 @@ data:
       fi
 
       admin_network_policy_enabled_flag=
-      if [[ "{{.OVN_ADMIN_NETWORK_POLICY_ENABLE}}" == "true" && "${OVN_NODE_MODE}" != "dpu-host" ]]; then
+      if [[ "${OVN_NODE_MODE}" != "dpu-host" ]]; then
         admin_network_policy_enabled_flag="--enable-admin-network-policy"
       fi
 

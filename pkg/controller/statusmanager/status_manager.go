@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
@@ -61,6 +62,9 @@ const (
 const (
 	ClusteredNameSeparator = '/'
 	fieldManager           = "cluster-network-operator/status-manager"
+
+	// degradedFailureDurationThreshold is duration for failures before setting the Degraded status
+	degradedFailureDurationThreshold = 2 * time.Minute
 )
 
 // keepCRDs is a list of CRD names that won't be removed from the system even if
@@ -105,6 +109,11 @@ type StatusManager struct {
 	failing         [maxStatusLevel]*operv1.OperatorCondition
 	installComplete bool
 
+	// failureFirstSeen tracks when each StatusLevel first started failing.
+	failureFirstSeen map[StatusLevel]time.Time
+
+	clock clock.PassiveClock
+
 	// All our informers and listers
 	dsInformers map[string]cache.SharedIndexInformer
 	dsListers   map[string]DaemonSetLister
@@ -135,6 +144,8 @@ func New(client cnoclient.Client, name, cluster string) *StatusManager {
 		name:             name,
 		hyperShiftConfig: hypershift.NewHyperShiftConfig(),
 
+		failureFirstSeen:           map[StatusLevel]time.Time{},
+		clock:                      clock.RealClock{},
 		dsInformers:                map[string]cache.SharedIndexInformer{},
 		dsListers:                  map[string]DaemonSetLister{},
 		depInformers:               map[string]cache.SharedIndexInformer{},
@@ -204,7 +215,7 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 		return
 	}
 	for _, currentObj := range co.Status.RelatedObjects {
-		var found bool = false
+		found := false
 		for _, renderedObj := range status.relatedObjects {
 			found = reflect.DeepEqual(currentObj, renderedObj)
 			if found {
@@ -220,12 +231,6 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 			if err != nil {
 				log.Printf("Error getting GVK of object for deletion: %v", err)
 				status.relatedObjects = append(status.relatedObjects, currentObj)
-				continue
-			}
-			if gvk.Kind == "Namespace" && gvk.Group == "" {
-				// BZ 1820472: During SDN migration, deleting a namespace object may get stuck in 'Terminating' forever if the cluster network doesn't working as expected.
-				// We choose to not delete the namespace here but to ask user do it manually after the cluster is back to normal state.
-				log.Printf("Object Kind is Namespace, skip")
 				continue
 			}
 			// @aconstan: remove this after having the PR implementing this change, integrated.
@@ -275,7 +280,7 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 		log.Printf("Error parsing related cluster objects: %v", err)
 	}
 	for _, currentObj := range currentObjs {
-		var found bool = false
+		found := false
 		for _, renderedObj := range status.hyperShiftConfig.RelatedObjects {
 			found = reflect.DeepEqual(currentObj, renderedObj)
 			if found {
@@ -551,13 +556,30 @@ func (status *StatusManager) setDegraded(statusLevel StatusLevel, reason, messag
 		Reason:  reason,
 		Message: message,
 	}
+	delete(status.failureFirstSeen, statusLevel) // Clear any debounce tracking
 	status.syncDegraded()
 }
 
-func (status *StatusManager) setNotDegraded(statusLevel StatusLevel) {
-	if status.failing[statusLevel] != nil {
-		status.failing[statusLevel] = nil
+// maybeSetDegraded sets degraded ONLY after the failure persists for 2+ minutes
+func (status *StatusManager) maybeSetDegraded(statusLevel StatusLevel, reason, message string) {
+	// Track when we first saw this failure
+	if _, exists := status.failureFirstSeen[statusLevel]; !exists {
+		status.failureFirstSeen[statusLevel] = status.clock.Now()
+		return // Don't set Degraded on first failure
 	}
+
+	// Check if failure has persisted long enough
+	if status.clock.Since(status.failureFirstSeen[statusLevel]) < degradedFailureDurationThreshold {
+		return // Not persistent enough yet
+	}
+
+	// Set Degraded - failure has persisted for 2+ minutes
+	status.setDegraded(statusLevel, reason, message)
+}
+
+func (status *StatusManager) setNotDegraded(statusLevel StatusLevel) {
+	status.failing[statusLevel] = nil
+	delete(status.failureFirstSeen, statusLevel) // Clear failure tracking
 	status.syncDegraded()
 }
 
@@ -565,6 +587,12 @@ func (status *StatusManager) SetDegraded(statusLevel StatusLevel, reason, messag
 	status.Lock()
 	defer status.Unlock()
 	status.setDegraded(statusLevel, reason, message)
+}
+
+func (status *StatusManager) MaybeSetDegraded(statusLevel StatusLevel, reason, message string) {
+	status.Lock()
+	defer status.Unlock()
+	status.maybeSetDegraded(statusLevel, reason, message)
 }
 
 func (status *StatusManager) SetDegradedOnPanicAndCrash(panicVal interface{}) {

@@ -142,10 +142,8 @@ rules:
     - egressips
     - egressqoses
     - egressservices
-{{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
     - userdefinednetworks
     - clusteruserdefinednetworks
-{{- end }}
   verbs:
     - get
     - list
@@ -166,7 +164,6 @@ rules:
   - list
   - watch
 {{- end }}
-{{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
 - apiGroups: ["policy.networking.k8s.io"]
   resources:
   - adminnetworkpolicies
@@ -181,7 +178,6 @@ rules:
   - baselineadminnetworkpolicies/status
   verbs:
   - patch
-{{- end }}
 - apiGroups:
   - k8s.cni.cncf.io
   resources:
@@ -229,41 +225,6 @@ subjects:
   name: system:ovn-nodes
   apiGroup: rbac.authorization.k8s.io
 {{ else }}
-- kind: ServiceAccount
-  name: ovn-kubernetes-node
-  namespace: openshift-ovn-kubernetes
-{{ end }}
-
-{{ if .IsNetworkTypeLiveMigration }}
-# we need to kubectl command to patch nodes and pods before running ovnkube-node
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: openshift-ovn-kubernetes-network-type-live-migration
-rules:
-- apiGroups: [""]
-  resources:
-  - nodes
-  - pods
-  verbs:
-  - get
-  - patch
-- apiGroups: ['network.openshift.io']
-  resources:
-  - hostsubnets
-  verbs:
-  - get
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: openshift-ovn-kubernetes-network-type-live-migration
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: openshift-ovn-kubernetes-network-type-live-migration
-subjects:
 - kind: ServiceAccount
   name: ovn-kubernetes-node
   namespace: openshift-ovn-kubernetes

@@ -82,7 +82,6 @@ rules:
   - egressqoses/status
   verbs:
   - patch
-{{- if .OVN_ADMIN_NETWORK_POLICY_ENABLE }}
 - apiGroups: ["policy.networking.k8s.io"]
   resources:
   - adminnetworkpolicies
@@ -95,7 +94,6 @@ rules:
   - baselineadminnetworkpolicies/status
   verbs:
   - patch
-{{- end }}
 - apiGroups: ["k8s.ovn.org"]
   resources:
     - egressservices/status
@@ -160,7 +158,6 @@ rules:
   resources:
     - ipamclaims/status
   verbs: [ "patch", "update" ]
-{{- if .OVN_NETWORK_SEGMENTATION_ENABLE }}
 - apiGroups:
     - discovery.k8s.io
   resources:
@@ -214,15 +211,6 @@ rules:
     - get
     - list
     - watch
-{{- end}}
-{{- if .OVN_ROUTE_ADVERTISEMENTS_ENABLE | and (not .OVN_NETWORK_SEGMENTATION_ENABLE) }}
-- apiGroups:
-  - k8s.cni.cncf.io
-  resources:
-  - network-attachment-definitions
-  verbs: 
-  - create
-{{- end}}
 {{- if .OVN_ROUTE_ADVERTISEMENTS_ENABLE }}
 - apiGroups:
   - k8s.ovn.org
