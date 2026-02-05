@@ -8,7 +8,6 @@ metadata:
     name: frr-k8s-monitor-service
   annotations:
     prometheus.io/scrape: "true"
-    service.beta.openshift.io/serving-cert-secret-name: frr-k8s-certs-secret
 spec:
   selector:
     app: frr-k8s
@@ -41,15 +40,13 @@ spec:
     port: metricshttps
     scheme: https
     tlsConfig:
-      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
-      serverName: frr-k8s-monitor-service.openshift-frr-k8s.svc
+      insecureSkipVerify: true
   - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
     honorLabels: true
     port: frrmetricshttps
     scheme: https
     tlsConfig:
-      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
-      serverName: frr-k8s-monitor-service.openshift-frr-k8s.svc
+      insecureSkipVerify: true
   jobLabel: app
   namespaceSelector:
     matchNames:
