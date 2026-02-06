@@ -5,8 +5,10 @@ package network
 
 import (
 	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netlink/nl"
 )
 
 const (
@@ -19,7 +21,7 @@ const (
 func GetDefaultMTU() (int, error) {
 	// Get the interface with the default route
 	// TODO(cdc) handle v6-only nodes
-	routes, err := netlink.RouteList(nil, netlink.FAMILY_ALL)
+	routes, err := netlink.RouteList(nil, nl.FAMILY_ALL)
 	if err != nil {
 		return 0, errors.Wrapf(err, "could not list routes")
 	}
