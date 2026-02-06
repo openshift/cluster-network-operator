@@ -205,6 +205,16 @@ rules:
   - get
   - watch
 {{- end}}
+{{- if .OVN_EVPN_ENABLE }}
+- apiGroups:
+  - k8s.ovn.org
+  resources:
+  - vteps
+  verbs:
+  - list
+  - get
+  - watch
+{{- end}}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
