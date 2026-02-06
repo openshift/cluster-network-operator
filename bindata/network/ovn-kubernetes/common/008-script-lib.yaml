@@ -117,6 +117,9 @@ data:
     #   /run/ovn/
     start-audit-log-rotation()
     {
+      if [[ "${OVNKUBE_SH_VERBOSE:-}" != "true" ]]; then
+        set +x 
+      fi
       # Rotate audit log files when then get to max size (in bytes)
       MAXFILESIZE=$(( "{{.OVNPolicyAuditMaxFileSize}}"*1000000 ))
       MAXLOGFILES="{{.OVNPolicyAuditMaxLogFiles}}"
