@@ -110,7 +110,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 			return nil, fmt.Errorf("(%s) %s/%s missing CA ConfigMap key", serviceCA.GroupVersionKind(), serviceCA.Namespace, serviceCA.Name)
 		}
 
-		data.Data["ManagementServiceCABundle"] = base64.URLEncoding.EncodeToString([]byte(ca))
+		data.Data["ManagementServiceCABundle"] = base64.StdEncoding.EncodeToString([]byte(ca))
 
 		data.Data["ClusterIDLabel"] = hypershift.ClusterIDLabel
 		data.Data["ClusterID"] = bootstrapResult.Infra.HostedControlPlane.ClusterID
