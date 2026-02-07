@@ -95,7 +95,7 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	// Validate the cluster config
 	if err := network.ValidateClusterConfig(clusterConfig, r.client, r.featureGates); err != nil {
 		log.Printf("Failed to validate Network CR: %v", err)
-		r.status.SetDegraded(statusmanager.ClusterConfig, "InvalidClusterConfig",
+		r.status.MaybeSetDegraded(statusmanager.ClusterConfig, "InvalidClusterConfig",
 			fmt.Sprintf("The cluster configuration is invalid (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))
 		return reconcile.Result{}, err
 	}

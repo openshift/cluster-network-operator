@@ -274,7 +274,7 @@ func (status *StatusManager) SetFromPods() {
 	}
 
 	if len(hung) > 0 {
-		status.setDegraded(RolloutHung, "RolloutHung", strings.Join(hung, "\n"))
+		status.maybeSetDegraded(RolloutHung, "RolloutHung", strings.Join(hung, "\n"))
 	} else {
 		status.setNotDegraded(RolloutHung)
 	}

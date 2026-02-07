@@ -124,7 +124,7 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 			err = fmt.Errorf("error while updating infrastructures.%s/cluster: %w", configv1.GroupName, err)
 			log.Println(err)
 
-			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureSpecOrStatus", err.Error())
+			r.status.MaybeSetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureSpecOrStatus", err.Error())
 			return reconcile.Result{}, err
 		}
 		log.Printf("Successfully synchronized infrastructure config.")
@@ -135,7 +135,7 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 			err = fmt.Errorf("error while updating status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
 			log.Println(err)
 
-			r.status.SetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureStatus", err.Error())
+			r.status.MaybeSetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureStatus", err.Error())
 			return reconcile.Result{}, err
 		}
 		log.Printf("Successfully synchronized infrastructure config status")

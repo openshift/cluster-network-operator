@@ -255,7 +255,7 @@ func getCertApprovalCondition(status *csrv1.CertificateSigningRequestStatus) (ap
 func signerFailure(r *ReconcileCSR, csr *csrv1.CertificateSigningRequest, reason string, message string) {
 	log.Printf("%s: %s", reason, message)
 	updateCSRStatusConditions(r, csr, reason, message)
-	r.status.SetDegraded(statusmanager.CertificateSigner, reason, message)
+	r.status.MaybeSetDegraded(statusmanager.CertificateSigner, reason, message)
 }
 
 // Update the status conditions on the CSR object
@@ -269,7 +269,7 @@ func updateCSRStatusConditions(r *ReconcileCSR, csr *csrv1.CertificateSigningReq
 	err := r.client.Default().CRClient().Status().Update(context.TODO(), csr)
 	if err != nil {
 		log.Printf("Could not update CSR status: %v", err)
-		r.status.SetDegraded(statusmanager.CertificateSigner, "UpdateFailure",
+		r.status.MaybeSetDegraded(statusmanager.CertificateSigner, "UpdateFailure",
 			fmt.Sprintf("Unable to update csr: %v", err))
 	}
 }
