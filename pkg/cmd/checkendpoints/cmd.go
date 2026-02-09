@@ -5,6 +5,9 @@ import (
 	"os"
 	"time"
 
+	operatorv1 "github.com/openshift/api/operator/v1"
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	operatorcontrolplaneclient "github.com/openshift/client-go/operatorcontrolplane/clientset/versioned"
 	operatorcontrolplaneinformers "github.com/openshift/client-go/operatorcontrolplane/informers/externalversions"
 	"github.com/openshift/cluster-network-operator/pkg/cmd/checkendpoints/controller"
@@ -12,6 +15,8 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/retry"
+	"github.com/openshift/library-go/pkg/operator/resourcesynccontroller"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -29,9 +34,11 @@ func NewCheckEndpointsCommand() *cobra.Command {
 		kubeClient := kubernetes.NewForConfigOrDie(cctx.ProtoKubeConfig)
 		apiextensionsClient := apiextensionsclient.NewForConfigOrDie(cctx.KubeConfig)
 		operatorcontrolplaneClient := operatorcontrolplaneclient.NewForConfigOrDie(cctx.KubeConfig)
+		configClient := configclient.NewForConfigOrDie(cctx.KubeConfig)
 		kubeInformers := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute, informers.WithNamespace(namespace))
 		operatorcontrolplaneInformers := operatorcontrolplaneinformers.NewSharedInformerFactoryWithOptions(operatorcontrolplaneClient, 10*time.Minute, operatorcontrolplaneinformers.WithNamespace(namespace))
 		apiextensionsInformers := apiextensionsinformers.NewSharedInformerFactory(apiextensionsClient, 10*time.Minute)
+		configInformers := configinformers.NewSharedInformerFactory(configClient, 10*time.Minute)
 
 		// create a recorder that sets the pod node as the involved object in events
 		var involvedObjectRef *corev1.ObjectReference
@@ -58,12 +65,48 @@ func NewCheckEndpointsCommand() *cobra.Command {
 		}
 		recorder := events.NewRecorder(kubeClient.CoreV1().Events(namespace), "check-endpoint", involvedObjectRef, clock.RealClock{})
 
+		// Create a no-op operator client for the config observer
+		operatorClient := v1helpers.NewFakeOperatorClient(
+			&operatorv1.OperatorSpec{},
+			&operatorv1.OperatorStatus{},
+			nil,
+		)
+
+		// Create KubeInformersForNamespaces for the resource syncer
+		kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, namespace)
+
+		// Create a no-op resource syncer
+		resourceSyncer := resourcesynccontroller.NewResourceSyncController(
+			"network-check-source",
+			operatorClient,
+			kubeInformersForNamespaces,
+			kubeClient.CoreV1(),
+			kubeClient.CoreV1(),
+			recorder,
+		)
+
+		// Create the APIServer config observer controller
+		apiServerConfigObserver, err := controller.NewAPIServerConfigObserverController(
+			operatorClient,
+			configInformers.Config().V1().APIServers(),
+			resourceSyncer,
+			recorder,
+		)
+		if err != nil {
+			return err
+		}
+
+		// Create TLS config provider from the config observer
+		tlsConfigProvider := controller.NewTLSConfigProvider(apiServerConfigObserver)
+
+		// Create the network connectivity check controller with TLS config provider
 		check := controller.NewPodNetworkConnectivityCheckController(
 			podName,
 			namespace,
 			operatorcontrolplaneClient.ControlplaneV1alpha1(),
 			operatorcontrolplaneInformers.Controlplane().V1alpha1().PodNetworkConnectivityChecks(),
 			kubeInformers.Core().V1().Secrets(),
+			tlsConfigProvider,
 			recorder,
 		)
 
@@ -95,9 +138,11 @@ func NewCheckEndpointsCommand() *cobra.Command {
 		}
 
 		// continue startup
+		configInformers.Start(ctx.Done())
 		operatorcontrolplaneInformers.Start(ctx.Done())
 		kubeInformers.Start(ctx.Done())
 		go check.Run(ctx, 1)
+		go apiServerConfigObserver.Run(ctx, 1)
 		go stopController.Run(ctx, 1)
 		<-ctx.Done()
 		return nil
