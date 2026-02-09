@@ -389,6 +389,16 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: com.github.openshift.api.operator.v1.BGPManagedConfig
+  map:
+    fields:
+    - name: asNumber
+      type:
+        scalar: numeric
+      default: 64512
+    - name: bgpTopology
+      type:
+        scalar: string
 - name: com.github.openshift.api.operator.v1.BootImageSkewEnforcementConfig
   map:
     fields:
@@ -1860,6 +1870,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.openshift.api.operator.v1.ClientTLS
       default: {}
+    - name: closedClientConnectionPolicy
+      type:
+        scalar: string
+      default: Continue
     - name: defaultCertificate
       type:
         namedType: io.k8s.api.core.v1.LocalObjectReference
@@ -1972,6 +1986,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
     - name: healthCheckInterval
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
+    - name: httpKeepAliveTimeout
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
     - name: maxConnections
@@ -2830,6 +2847,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: version
       type:
         scalar: string
+- name: com.github.openshift.api.operator.v1.NoOverlayOptions
+  map:
+    fields:
+    - name: outboundSNAT
+      type:
+        scalar: string
+    - name: routing
+      type:
+        scalar: string
 - name: com.github.openshift.api.operator.v1.NodeDisruptionPolicyClusterStatus
   map:
     fields:
@@ -3129,6 +3155,17 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.openshift.api.operator.v1.OVNKubernetesConfig
   map:
     fields:
+    - name: bgpManagedConfig
+      type:
+        namedType: com.github.openshift.api.operator.v1.BGPManagedConfig
+      default: {}
+    - name: defaultNetworkNoOverlayOptions
+      type:
+        namedType: com.github.openshift.api.operator.v1.NoOverlayOptions
+      default: {}
+    - name: defaultNetworkTransport
+      type:
+        scalar: string
     - name: egressIPConfig
       type:
         namedType: com.github.openshift.api.operator.v1.EgressIPConfig
