@@ -157,18 +157,6 @@ OVNKubernetes supports the following configuration options, all of which are opt
 * `egressIPConfig`: holds the configuration for EgressIP options.
   * `reachabilityTotalTimeoutSeconds`: Set EgressIP node reachability total timeout in seconds, 0 means disable reachability check and the default is 1 second.
 
-#### DPU Host Mode Support
-
-OVN-Kubernetes supports specialized hardware deployments such as DPU (Data Processing Unit) hosts through the `OVN_NODE_MODE` environment variable. In `dpu-host` mode, certain features are automatically disabled on those nodes regardless of cluster-wide configuration:
-
-- Egress IP and related features (egress firewall, egress QoS, egress service)
-- Multicast support
-- Multi-external gateway support
-- Multi-network policies and admin network policies
-- Network segmentation features
-
-This per-node feature enforcement is implemented through conditional logic in the startup scripts, allowing the same cluster configuration to work across heterogeneous node types. For detailed information about node modes and the technical implementation, see `docs/ovn_node_mode.md`.
-
 These configuration flags are only in the Operator configuration object.
 
 Example from the `manifests/cluster-network-03-config.yml` file:
