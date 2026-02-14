@@ -352,19 +352,6 @@ spec:
                 set -x
                 . /ovnkube-lib/ovnkube-lib.sh || exit 1
                 sbdb-post-start
-        readinessProbe:
-{{ if not .IsSNO }}
-          initialDelaySeconds: 10
-{{ end }}
-          timeoutSeconds: 5
-          exec:
-            command:
-            - /bin/bash
-            - -c
-            - |
-              set -xeo pipefail
-              . /ovnkube-lib/ovnkube-lib.sh || exit 1
-              ovndb-readiness-probe "sb"
         env:
         - name: OVN_LOG_LEVEL
           value: info
