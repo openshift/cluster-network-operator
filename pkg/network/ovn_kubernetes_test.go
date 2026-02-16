@@ -292,6 +292,85 @@ func TestAzureHyperShiftDropICMPUsesWritableKubeconfigPath(t *testing.T) {
 	g.Expect(hasRunOVNMount).To(BeTrue(), "drop-icmp must have a writable run-ovn volume mount")
 }
 
+func TestRenderOVNKubernetesHyperShiftControlPlaneAntiAffinity(t *testing.T) {
+	selector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{"app": "ovnkube-control-plane"},
+	}
+
+	for _, tc := range []struct {
+		name                     string
+		controlPlaneReplicaCount int
+		expectAntiAffinity       bool
+	}{
+		{
+			name:                     "single replica control plane",
+			controlPlaneReplicaCount: 1,
+			expectAntiAffinity:       false,
+		},
+		{
+			name:                     "highly available control plane",
+			controlPlaneReplicaCount: 3,
+			expectAntiAffinity:       true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+
+			crd := OVNKubernetesConfig.DeepCopy()
+			config := &crd.Spec
+			fillDefaults(config, nil)
+
+			bootstrapResult := fakeBootstrapResultWithHyperShift()
+			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+				ControlPlaneReplicaCount: tc.controlPlaneReplicaCount,
+				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+						Enabled: true,
+					},
+				},
+			}
+
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, getDefaultFeatureGates())
+			g.Expect(err).NotTo(HaveOccurred(), "failed to render HyperShift ovnkube-control-plane for %s", tc.name)
+
+			deployment := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "ovnkube-control-plane")
+			affinity := deployment.Spec.Template.Spec.Affinity
+			g.Expect(affinity).NotTo(BeNil(),
+				"Affinity should be set for %s", tc.name)
+
+			antiAffinity := affinity.PodAntiAffinity
+
+			if !tc.expectAntiAffinity {
+				g.Expect(antiAffinity).To(BeNil(),
+					"PodAntiAffinity should not be set when there is only 1 replica")
+				return
+			}
+
+			g.Expect(antiAffinity).NotTo(BeNil(),
+				"PodAntiAffinity should be set when there are multiple replicas")
+
+			// ConsistOf pins the whole set: it asserts the hostname rule is present and,
+			// just as importantly, that no required zone rule came back.
+			g.Expect(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).To(ConsistOf(
+				v1.PodAffinityTerm{
+					LabelSelector: selector,
+					TopologyKey:   v1.LabelHostname,
+				},
+			), "incorrect required PodAntiAffinity")
+
+			g.Expect(antiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).To(ConsistOf(
+				v1.WeightedPodAffinityTerm{
+					Weight: 100,
+					PodAffinityTerm: v1.PodAffinityTerm{
+						LabelSelector: selector,
+						TopologyKey:   v1.LabelTopologyZone,
+					},
+				},
+			), "incorrect preferred PodAntiAffinity")
+		})
+	}
+}
+
 func expectReadOnlyRootFilesystems(t *testing.T, objs []*uns.Unstructured, namespace string) {
 	t.Helper()
 	g := NewGomegaWithT(t)
