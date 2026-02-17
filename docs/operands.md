@@ -93,26 +93,6 @@ configuration object (which in turn is copied there from the
 configuration) is "`OVNKubernetes`". If the specified network type is
 not "`OVNKubernetes`", the CNO will not render any network plugin.
 
-### OVN-Kubernetes Node Modes
-
-OVN-Kubernetes supports different node operational modes through the `OVN_NODE_MODE` 
-environment variable. This allows per-node feature enforcement, particularly for 
-specialized hardware like DPU (Data Processing Unit) hosts where certain features 
-must be disabled.
-
-The startup script (`008-script-lib.yaml`) contains conditional logic that adjusts 
-feature enablement based on the node mode:
-
-- **`full` mode (default)**: All features enabled as configured
-- **`dpu-host` mode**: Certain features like egress IP, multicast, multi-network 
-  policies, and admin network policies are automatically disabled regardless of 
-  cluster-wide configuration
-
-This approach was necessary because ConfigMap values (`004-config.yaml`) cannot be 
-reliably overridden on a per-node basis, but startup script logic can be conditional.
-
-For detailed information, see `docs/ovn_node_mode.md`.
-
 ## Multus
 
 Multus is deployed as long as `.spec.disableMultiNetwork` is not set.
