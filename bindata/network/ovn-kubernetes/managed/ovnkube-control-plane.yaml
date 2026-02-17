@@ -72,7 +72,14 @@ spec:
           - labelSelector:
               matchLabels:
                 app: ovnkube-control-plane
-            topologyKey: topology.kubernetes.io/zone
+            topologyKey: kubernetes.io/hostname
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: ovnkube-control-plane
+              topologyKey: topology.kubernetes.io/zone
 {{- end }}
         podAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
