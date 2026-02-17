@@ -329,6 +329,13 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["DNS_NAME_RESOLVER_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateDNSNameResolver)
 	data.Data["OVN_OBSERVABILITY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateOVNObservability)
 	data.Data["OVN_ROUTE_ADVERTISEMENTS_ENABLE"] = c.RouteAdvertisements == operv1.RouteAdvertisementsEnabled
+	// OVN_EVPN_ENABLE_API depends only on the feature gate and controls whether EVPN fields
+	// are present in the CUDN CRD schema. It must remain stable regardless of runtime config
+	// to avoid removing API fields and potentially losing data from existing custom resources.
+	// OVN_EVPN_ENABLE depends on both the feature gate and route advertisements being enabled,
+	// and controls deployment of EVPN runtime components (VTEP CRD, RBAC, FRR containers).
+	data.Data["OVN_EVPN_ENABLE_API"] = featureGates.Enabled(apifeatures.FeatureGateEVPN)
+	data.Data["OVN_EVPN_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateEVPN) && c.RouteAdvertisements == operv1.RouteAdvertisementsEnabled
 
 	data.Data["ReachabilityTotalTimeoutSeconds"] = c.EgressIPConfig.ReachabilityTotalTimeoutSeconds
 

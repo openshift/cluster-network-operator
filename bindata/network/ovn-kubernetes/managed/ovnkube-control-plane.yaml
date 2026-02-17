@@ -201,6 +201,11 @@ spec:
             route_advertisements_enable_flag="--enable-route-advertisements"
           fi
           
+          evpn_enable_flag=
+          if [[ "{{.OVN_EVPN_ENABLE}}" == "true" ]]; then
+            evpn_enable_flag="--enable-evpn"
+          fi
+
           preconfigured_udn_addresses_enable_flag="--enable-preconfigured-udn-addresses"
 
           # Enable multi-network policy if configured (control-plane always full mode)
@@ -235,6 +240,7 @@ spec:
             ${multi_network_enabled_flag} \
             ${network_segmentation_enabled_flag} \
             ${route_advertisements_enable_flag} \
+            ${evpn_enable_flag} \
             ${preconfigured_udn_addresses_enable_flag} \
             --enable-egress-ip=true \
             --enable-egress-firewall=true \
