@@ -32,7 +32,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		return nil, nil
 	}
 	// Do not render the CNCC for network plugins that do not support the CNCC.
-	if conf.DefaultNetwork.Type != operv1.NetworkTypeOpenShiftSDN && conf.DefaultNetwork.Type != operv1.NetworkTypeOVNKubernetes {
+	if conf.DefaultNetwork.Type != operv1.NetworkTypeOVNKubernetes {
 		return nil, nil
 	}
 	data := render.MakeRenderData()

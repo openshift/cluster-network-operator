@@ -247,21 +247,14 @@ func TestShouldDeployKubeProxy(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	c := &operv1.NetworkSpec{
-		DefaultNetwork: operv1.DefaultNetworkDefinition{
-			Type: operv1.NetworkTypeOpenShiftSDN,
-		},
+		DefaultNetwork: operv1.DefaultNetworkDefinition{},
 	}
 
-	g.Expect(acceptsKubeProxyConfig(c)).To(BeTrue())
-	g.Expect(defaultDeployKubeProxy(c)).To(BeFalse())
-
 	c.DefaultNetwork.Type = operv1.NetworkTypeOVNKubernetes
-	g.Expect(acceptsKubeProxyConfig(c)).To(BeFalse())
-	g.Expect(defaultDeployKubeProxy(c)).To(BeFalse())
+	g.Expect(usesKubeProxy(c)).To(BeFalse())
 
 	c.DefaultNetwork.Type = "Flannel"
-	g.Expect(acceptsKubeProxyConfig(c)).To(BeTrue())
-	g.Expect(defaultDeployKubeProxy(c)).To(BeTrue())
+	g.Expect(usesKubeProxy(c)).To(BeTrue())
 }
 
 func TestValidateKubeProxy(t *testing.T) {
@@ -270,9 +263,6 @@ func TestValidateKubeProxy(t *testing.T) {
 	// Check that the empty case validates
 	c := &operv1.NetworkSpec{}
 	g.Expect(validateKubeProxy(c)).To(BeEmpty())
-
-	// Check that the default openshift-sdn config validates
-	g.Expect(validateKubeProxy(&OpenShiftSDNConfig.Spec)).To(BeEmpty())
 
 	// Check that some reasonable values validate
 	c = &operv1.NetworkSpec{

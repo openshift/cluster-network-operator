@@ -36,14 +36,12 @@ combined status of those objects. Specifically:
           status: "True"
           reason: Deploying
           message: |-
-            DaemonSet "openshift-multus/multus" is not available (awaiting 3 nodes)
-            DaemonSet "openshift-multus/network-metrics-daemon" is waiting for other operators to become ready
-            DaemonSet "openshift-multus/multus-admission-controller" is waiting for other operators to become ready
-            DaemonSet "openshift-sdn/sdn-controller" is not available (awaiting 3 nodes)
-            DaemonSet "openshift-sdn/ovs" is not available (awaiting 3 nodes)
-            DaemonSet "openshift-sdn/sdn" is not available (awaiting 3 nodes)
-            DaemonSet "openshift-network-diagnostics/network-check-target" is not available (awaiting 3 nodes)
-            Deployment "openshift-network-diagnostics/network-check-source" is waiting for other operators to become ready
+            DaemonSet "/openshift-multus/multus" is not available (awaiting 1 nodes)
+            DaemonSet "/openshift-multus/multus-additional-cni-plugins" update is rolling out (5 out of 6 updated)
+            DaemonSet "/openshift-multus/network-metrics-daemon" update is rolling out (5 out of 6 updated)
+            DaemonSet "/openshift-network-operator/iptables-alerter" update is rolling out (5 out of 6 updated)
+            DaemonSet "/openshift-ovn-kubernetes/ovnkube-node" update is rolling out (5 out of 6 updated)
+            Deployment "/openshift-network-console/networking-console-plugin" is waiting for other operators to become ready
           lastTransitionTime: "2020-12-11T14:24:32Z"
 
   - If an operand fails to roll out for too long, the operator will
