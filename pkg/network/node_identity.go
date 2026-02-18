@@ -188,7 +188,7 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 			return nil, err
 		}
 	}
-	data.Data["NetworkNodeIdentityCABundle"] = base64.URLEncoding.EncodeToString(webhookCA)
+	data.Data["NetworkNodeIdentityCABundle"] = base64.StdEncoding.EncodeToString(webhookCA)
 
 	manifests, err := render.RenderDirs(manifestDirs, &data)
 	if err != nil {
