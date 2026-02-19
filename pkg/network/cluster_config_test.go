@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
+	"github.com/openshift/cluster-network-operator/pkg/platform"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
 	. "github.com/onsi/gomega"
@@ -62,14 +63,17 @@ func TestValidateClusterConfig(t *testing.T) {
 	err := createProxy(client)
 	g.Expect(err).NotTo(HaveOccurred())
 
+	infraRes, err := platform.InfraStatus(client)
+	g.Expect(err).NotTo(HaveOccurred())
+
 	cc := *ClusterConfig.DeepCopy()
 	featureGates := getFeatureGatesWithDualStack()
-	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client, featureGates)
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, infraRes, featureGates)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	haveError := func(cfg configv1.NetworkSpec, substr string) {
 		t.Helper()
-		err = ValidateClusterConfig(&configv1.Network{Spec: cfg}, client, featureGates)
+		err = ValidateClusterConfig(&configv1.Network{Spec: cfg}, infraRes, featureGates)
 		g.Expect(err).To(MatchError(ContainSubstring(substr)))
 	}
 
@@ -95,7 +99,7 @@ func TestValidateClusterConfig(t *testing.T) {
 
 	cc = *ClusterConfig.DeepCopy()
 	cc.ClusterNetwork[1].HostPrefix = 0
-	res := ValidateClusterConfig(&configv1.Network{Spec: cc}, client, featureGates)
+	res := ValidateClusterConfig(&configv1.Network{Spec: cc}, infraRes, featureGates)
 	// Since the NetworkType is None, and the hostprefix is unset we don't validate it
 	g.Expect(res).Should(BeNil())
 
@@ -145,14 +149,17 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 	err := createProxy(client)
 	g.Expect(err).NotTo(HaveOccurred())
 
+	infraRes, err := platform.InfraStatus(client)
+	g.Expect(err).NotTo(HaveOccurred())
+
 	cc := *ClusterConfig.DeepCopy()
 	featureGates := getFeatureGatesWithDualStack()
-	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client, featureGates)
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, infraRes, featureGates)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	haveError := func(cfg configv1.NetworkSpec, substr string) {
 		t.Helper()
-		err = ValidateClusterConfig(&configv1.Network{Spec: cfg}, client, featureGates)
+		err = ValidateClusterConfig(&configv1.Network{Spec: cfg}, infraRes, featureGates)
 		g.Expect(err).To(MatchError(ContainSubstring(substr)))
 	}
 
@@ -192,7 +199,7 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 		CIDR:       "fd01::/48",
 		HostPrefix: 64,
 	})
-	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client, featureGates)
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, infraRes, featureGates)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// You can't use dual-stack if enabled on an unsupported platform
@@ -202,6 +209,8 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 	}
 	client = fake.NewFakeClient(infrastructure)
 	err = createProxy(client)
+	g.Expect(err).NotTo(HaveOccurred())
+	infraRes, err = platform.InfraStatus(client)
 	g.Expect(err).NotTo(HaveOccurred())
 	cc = *ClusterConfig.DeepCopy()
 	cc.ServiceNetwork = append(cc.ServiceNetwork, "fd02::/112")
@@ -220,13 +229,15 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 	client = fake.NewFakeClient(infrastructure)
 	err = createProxy(client)
 	g.Expect(err).NotTo(HaveOccurred())
+	infraRes, err = platform.InfraStatus(client)
+	g.Expect(err).NotTo(HaveOccurred())
 	cc = *ClusterConfig.DeepCopy()
 	cc.ServiceNetwork = append(cc.ServiceNetwork, "fd02::/112")
 	cc.ClusterNetwork = append(cc.ClusterNetwork, configv1.ClusterNetworkEntry{
 		CIDR:       "fd01::/48",
 		HostPrefix: 64,
 	})
-	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client, featureGates)
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, infraRes, featureGates)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// DualStack with supported platform but missing featuregate
@@ -236,13 +247,15 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 	client = fake.NewFakeClient(infrastructure)
 	err = createProxy(client)
 	g.Expect(err).NotTo(HaveOccurred())
+	infraRes, err = platform.InfraStatus(client)
+	g.Expect(err).NotTo(HaveOccurred())
 	cc = *ClusterConfig.DeepCopy()
 	cc.ServiceNetwork = append(cc.ServiceNetwork, "fd02::/112")
 	cc.ClusterNetwork = append(cc.ClusterNetwork, configv1.ClusterNetworkEntry{
 		CIDR:       "fd01::/48",
 		HostPrefix: 64,
 	})
-	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, client, featureGates)
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, infraRes, featureGates)
 	haveError(cc, fmt.Sprintf("%s is not one of the supported platforms for dual stack",
 		infrastructure.Status.PlatformStatus.Type))
 }

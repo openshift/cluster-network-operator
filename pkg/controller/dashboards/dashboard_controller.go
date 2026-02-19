@@ -122,7 +122,7 @@ func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Re
 	if err != nil {
 		err = fmt.Errorf("unable to retrieve Network.operator.openshift.io object: %w", err)
 		klog.Error(err)
-		r.status.SetDegraded(statusmanager.DashboardConfig, "DashboardError", err.Error())
+		r.status.MaybeSetDegraded(statusmanager.DashboardConfig, "DashboardError", err.Error())
 		return reconcile.Result{}, err
 	}
 
@@ -130,7 +130,7 @@ func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Re
 	if err != nil {
 		err = fmt.Errorf("failed to apply dashboard manifests: %w", err)
 		klog.Error(err)
-		r.status.SetDegraded(statusmanager.DashboardConfig, "DashboardError", err.Error())
+		r.status.MaybeSetDegraded(statusmanager.DashboardConfig, "DashboardError", err.Error())
 		return reconcile.Result{}, err
 	}
 
