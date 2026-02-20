@@ -253,9 +253,38 @@ data:
           local of_port
           of_port=$(ovs-vsctl get interface "$port_name" ofport)
           ovs-ofctl add-flow "$bridge" "cookie=$cookie,table=0,priority=$priority,in_port=$of_port,arp,arp_op=1,actions=drop" > /dev/null
-          break
+          echo "$(date -Iseconds) - INFO - Added GARP drop flow on $bridge port $port_name (ofport=$of_port)"
+          return 0
         fi
       done
+
+      # Port not found
+      return 1
+    }
+
+    # Wait for patch port to exist and add GARP drop flow.
+    wait-and-add-garp-drop-flow() {
+      local bridge="$1"
+      local max_retries=90
+      local retries=0
+
+      while [[ "${retries}" -lt "${max_retries}" ]]; do
+        if add_garp_drop_flow "${bridge}"; then
+          return 0
+        fi
+
+        (( retries += 1 ))
+
+        # Log once after 30 seconds to indicate we're still waiting
+        if [[ "${retries}" -eq 15 ]]; then
+          echo "$(date -Iseconds) - INFO - Waiting for patch port on ${bridge} to be ready..."
+        fi
+
+        sleep 2
+      done
+
+      echo "$(date -Iseconds) - WARN - Failed to add GARP drop flow on ${bridge} after ${max_retries} attempts (best-effort workaround)"
+      return 1
     }
 
     # quit-nbdb() will cleanly shut down the northbound dbserver. It is intended
@@ -513,7 +542,7 @@ data:
       # start temp work around
       # remove when https://issues.redhat.com/browse/FDP-1537 is available
       if ovs-vsctl br-exists "br-ex"; then
-          add_garp_drop_flow br-ex
+          (wait-and-add-garp-drop-flow br-ex &)
       fi
       # end temp work around
 
