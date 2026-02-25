@@ -19,6 +19,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -29,11 +30,98 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	iputil "github.com/openshift/cluster-network-operator/pkg/util/ip"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
 	pluginName = "networking-console-plugin"
+
+	// FRR-k8s constants for webhook readiness check
+	frrK8sNamespace      = "openshift-frr-k8s"
+	frrK8sWebhookService = "frr-k8s-webhook-service"
 )
+
+// isFRRWebhookReady checks if the FRR-k8s webhook service has ready endpoints.
+// This is used to determine if the FRR webhook is ready to accept requests,
+// which is required before deploying OVN-Kubernetes when route advertisements are enabled.
+func isFRRWebhookReady(client cnoclient.Client) bool {
+	endpointSliceList := &discoveryv1.EndpointSliceList{}
+	if err := client.ClientFor("").CRClient().List(context.TODO(), endpointSliceList,
+		crclient.InNamespace(frrK8sNamespace),
+		crclient.MatchingLabels{"kubernetes.io/service-name": frrK8sWebhookService}); err != nil {
+		log.Printf("FRR webhook EndpointSlices for service %s/%s not found: %v", frrK8sNamespace, frrK8sWebhookService, err)
+		return false
+	}
+
+	if len(endpointSliceList.Items) == 0 {
+		log.Printf("FRR webhook service %s/%s has no EndpointSlices yet", frrK8sNamespace, frrK8sWebhookService)
+		return false
+	}
+
+	readyEndpoints := 0
+	for _, slice := range endpointSliceList.Items {
+		for _, endpoint := range slice.Endpoints {
+			if endpoint.Conditions.Ready != nil && *endpoint.Conditions.Ready {
+				readyEndpoints++
+			}
+		}
+	}
+
+	if readyEndpoints > 0 {
+		log.Printf("FRR webhook service %s/%s is ready with %d endpoints", frrK8sNamespace, frrK8sWebhookService, readyEndpoints)
+		return true
+	}
+	log.Printf("FRR webhook service %s/%s has no ready endpoints yet", frrK8sNamespace, frrK8sWebhookService)
+	return false
+}
+
+// shouldSkipOVNKUntilFRRReady determines if OVNK rendering should be skipped
+// until FRR-k8s webhook is ready. This prevents a race condition where OVNK
+// starts before FRR webhook is ready, causing RouteAdvertisements to fail.
+//
+// Returns true (skip OVNK) when ALL of these conditions are met:
+//   - OVNK is not running yet (fresh install)
+//   - FRR provider is enabled in additionalRoutingCapabilities
+//   - RouteAdvertisements is set to Enabled
+//   - FRR webhook is NOT ready yet
+//
+// Returns false (proceed with OVNK) in all other cases.
+func shouldSkipOVNKUntilFRRReady(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client) bool {
+	// If OVNK is already running, don't skip - apply everything normally
+	if bootstrapResult.OVN.NodeUpdateStatus != nil {
+		return false
+	}
+
+	// Check if FRR provider is enabled
+	if conf.AdditionalRoutingCapabilities == nil {
+		return false
+	}
+	hasFRR := false
+	for _, provider := range conf.AdditionalRoutingCapabilities.Providers {
+		if provider == operv1.RoutingCapabilitiesProviderFRR {
+			hasFRR = true
+			break
+		}
+	}
+	if !hasFRR {
+		return false
+	}
+
+	// Check if RouteAdvertisements is enabled
+	if conf.DefaultNetwork.OVNKubernetesConfig == nil ||
+		conf.DefaultNetwork.OVNKubernetesConfig.RouteAdvertisements != operv1.RouteAdvertisementsEnabled {
+		return false
+	}
+
+	// All conditions met - check if FRR webhook is ready
+	if isFRRWebhookReady(client) {
+		log.Printf("FRR webhook is ready, proceeding with OVNK deployment")
+		return false // FRR ready, proceed with OVNK
+	}
+
+	log.Printf("Skipping OVNK rendering: waiting for FRR-k8s webhook to be ready (OVNK not yet deployed, FRR enabled, RouteAdvertisements enabled)")
+	return true // Skip OVNK this iteration
+}
 
 func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, manifestDir string, client cnoclient.Client, featureGates featuregates.FeatureGate, bootstrapResult *bootstrap.BootstrapResult) ([]*uns.Unstructured, bool, error) {
 	log.Printf("Starting render phase")
@@ -576,6 +664,14 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 	dn := conf.DefaultNetwork
 	if errs := validateDefaultNetwork(conf); len(errs) > 0 {
 		return nil, false, errors.Errorf("invalid Default Network configuration: %v", errs)
+	}
+
+	// Check if we should skip OVNK rendering until FRR-k8s webhook is ready.
+	// This prevents a race condition during fresh installs where OVNK starts
+	// before FRR webhook is ready, causing RouteAdvertisements to fail validation.
+	if dn.Type == operv1.NetworkTypeOVNKubernetes && shouldSkipOVNKUntilFRRReady(conf, bootstrapResult, client) {
+		// Return progressing=true to signal CNO should keep reconciling
+		return nil, true, nil
 	}
 
 	if dn.Type == operv1.NetworkTypeOVNKubernetes {
