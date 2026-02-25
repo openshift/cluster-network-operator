@@ -31,7 +31,7 @@ data:
     healthz-bind-address="0.0.0.0:10256"
     dns-service-namespace="openshift-dns"
     dns-service-name="dns-default"
- 
+
     [ovnkubernetesfeature]
     enable-egress-ip=true
     enable-egress-firewall=true
@@ -142,8 +142,6 @@ data:
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
     nodeport=true
-
-
 {{- if .OVNHybridOverlayEnable }}
     [hybridoverlay]
     enabled=true
