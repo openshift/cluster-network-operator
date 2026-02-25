@@ -38,6 +38,7 @@ spec:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
         network.operator.openshift.io/ovnkube-script-lib-hash: "{{.OVNKubeConfigHash}}"
+        network.operator.openshift.io/ovnkube-node-config-hash: "{{.OVNKubeNodeConfigHash}}"
         # prevent blocks when node critical pods get evicted prior to workloads
         cluster-autoscaler.kubernetes.io/enable-ds-eviction: "false"
         kubectl.kubernetes.io/default-container: ovnkube-controller
