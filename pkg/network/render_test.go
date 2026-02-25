@@ -568,7 +568,8 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 					},
 				},
 			},
-			want:        21, // 19 original + 2 OperatorPKI (webhook + metrics)
+			// 19 original + 2 OperatorPKI (webhook + metrics) - 1 VWC (not rendered without CA bundle)
+			want:        20,
 			expectedErr: nil,
 		},
 	}
