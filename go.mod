@@ -1,8 +1,6 @@
 module github.com/openshift/cluster-network-operator
 
-go 1.24.0
-
-toolchain go1.24.4
+go 1.25.0
 
 require (
 	github.com/Masterminds/semver v1.5.0
@@ -10,7 +8,7 @@ require (
 	github.com/containernetworking/cni v0.8.0
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
-	github.com/onsi/gomega v1.38.1
+	github.com/onsi/gomega v1.38.2
 	github.com/openshift/build-machinery-go v0.0.0-20251023084048-5d77c1a5e5af
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
@@ -21,9 +19,9 @@ require (
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
 	golang.org/x/net v0.47.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.34.1
-	k8s.io/apimachinery v0.34.1
-	k8s.io/code-generator v0.34.1
+	k8s.io/api v0.35.1
+	k8s.io/apimachinery v0.35.1
+	k8s.io/code-generator v0.35.1
 	k8s.io/component-base v0.34.1
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-proxy v0.34.1
@@ -102,12 +100,12 @@ require (
 )
 
 require (
-	github.com/openshift/api v0.0.0-20260116192047-6fb7fdae95fd
+	github.com/openshift/api v0.0.0-20260306002634-d3bbdada155c
 	github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13
 	github.com/openshift/library-go v0.0.0-20251222131241-289839b3ffe8
 	github.com/openshift/machine-config-operator v0.0.1-0.20250724162154-ab14c8e2843b
 	k8s.io/apiextensions-apiserver v0.34.1
-	k8s.io/client-go v0.34.1
+	k8s.io/client-go v0.35.1
 	sigs.k8s.io/controller-tools v0.19.0
 )
 
@@ -162,3 +160,7 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 )
+
+replace github.com/openshift/api => github.com/ricky-rav/api v0.0.0-20260310142551-bebd4cb814e8
+
+replace github.com/openshift/client-go => github.com/ricky-rav/client-go v0.0.0-20260310153504-16db47cb1384
