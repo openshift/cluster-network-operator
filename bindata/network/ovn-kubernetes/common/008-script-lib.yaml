@@ -11,6 +11,11 @@ data:
   ovnkube-lib.sh: |-
     #!/bin/bash
     set -x
+
+    # No-overlay outbound SNAT: {{.NoOverlayOutboundSNAT}}
+    # The line above ensures ovnkube pods restart when outboundSNAT changes.
+    # CNO hashes this file to detect config changes that require a rollout.
+
     # Add node-specific overrides if the container has mounted any
     K8S_NODE=${K8S_NODE:-}
     if [[ -n "${K8S_NODE}" && -f "/env/${K8S_NODE}" ]]; then
