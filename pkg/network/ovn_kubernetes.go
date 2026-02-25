@@ -476,6 +476,18 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 	data.Data["OVNKubeConfigHash"] = hex.EncodeToString(h.Sum(nil))
 
+	// Compute a separate hash for control-plane config (bgpManagedConfig).
+	// This allows ovnkube-control-plane to restart when bgpManagedConfig changes,
+	// without restarting ovnkube-node pods.
+	cpHash := sha1.New()
+	cpHashData := fmt.Sprintf("asNumber=%v,topology=%v",
+		data.Data["NoOverlayManagedASNumber"],
+		data.Data["NoOverlayManagedTopology"])
+	if _, err := cpHash.Write([]byte(cpHashData)); err != nil {
+		return nil, progressing, errors.Wrap(err, "failed to hash control-plane config")
+	}
+	data.Data["OVNKubeControlPlaneConfigHash"] = hex.EncodeToString(cpHash.Sum(nil))
+
 	manifestDirs := make([]string, 0, 2)
 	manifestDirs = append(manifestDirs, commonManifestDir)
 

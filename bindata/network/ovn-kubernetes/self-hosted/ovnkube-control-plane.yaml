@@ -23,6 +23,7 @@ spec:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
         kubectl.kubernetes.io/default-container: ovnkube-cluster-manager
+        network.operator.openshift.io/ovnkube-control-plane-config-hash: "{{.OVNKubeControlPlaneConfigHash}}"
       labels:
         app: ovnkube-control-plane
         component: network
