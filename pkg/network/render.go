@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"net"
@@ -217,7 +218,7 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	}
 	objs = append(objs, o...)
 
-	o, err = renderAdditionalRoutingCapabilities(operConf, manifestDir)
+	o, err = renderAdditionalRoutingCapabilities(operConf, manifestDir, client)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -945,7 +946,7 @@ func registerNetworkingConsolePlugin(bootstrapResult *bootstrap.BootstrapResult,
 	})
 }
 
-func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir string, client cnoclient.Client) ([]*uns.Unstructured, error) {
 	if conf == nil || conf.AdditionalRoutingCapabilities == nil {
 		return nil, nil
 	}
@@ -957,6 +958,11 @@ func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir s
 			data.Data["FRRK8sImage"] = os.Getenv("FRR_K8S_IMAGE")
 			data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 			data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
+
+			// Fetch the webhook CA bundle from the ConfigMap created by OperatorPKI
+			caBundle := getFRRK8sWebhookCABundle(client)
+			data.Data["FRRK8sWebhookCABundle"] = caBundle
+
 			objs, err := render.RenderDir(filepath.Join(manifestDir, "network/frr-k8s"), &data)
 			if err != nil {
 				return nil, fmt.Errorf("failed to render frr-k8s manifests: %w", err)
@@ -966,6 +972,35 @@ func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir s
 	}
 
 	return out, nil
+}
+
+// getFRRK8sWebhookCABundle fetches the CA bundle from the ConfigMap created by OperatorPKI.
+// Returns base64-encoded CA bundle or empty string if not available yet.
+func getFRRK8sWebhookCABundle(client cnoclient.Client) string {
+	if client == nil {
+		return ""
+	}
+
+	cm := &corev1.ConfigMap{}
+	err := client.ClientFor("").CRClient().Get(context.TODO(), crclient.ObjectKey{
+		Namespace: frrK8sNamespace,
+		Name:      "frr-k8s-webhook-ca",
+	}, cm)
+	if err != nil {
+		log.Printf("FRR webhook CA ConfigMap not available yet: %v", err)
+		return ""
+	}
+
+	caBundle, ok := cm.Data["ca-bundle.crt"]
+	if !ok || caBundle == "" {
+		log.Printf("FRR webhook CA ConfigMap does not contain ca-bundle.crt")
+		return ""
+	}
+
+	// Base64 encode the CA bundle for the ValidatingWebhookConfiguration
+	encoded := base64.StdEncoding.EncodeToString([]byte(caBundle))
+	log.Printf("FRR webhook CA bundle loaded and encoded successfully")
+	return encoded
 }
 
 // isSupportedDualStackPlatform returns true if the platform supports dual-stack networking
