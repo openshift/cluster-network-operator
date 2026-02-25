@@ -4773,3 +4773,145 @@ func TestFillOVNKubernetesDefaultsNoOverlay(t *testing.T) {
 	})
 }
 
+// TestFillOVNKubernetesDefaultsMTUNoOverlay tests that MTU is set correctly for no-overlay mode
+func TestFillOVNKubernetesDefaultsMTUNoOverlay(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	t.Run("no-overlay mode sets MTU to hostMTU (no overhead subtraction)", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = nil // not set
+
+		hostMTU := 9000
+		fillOVNKubernetesDefaults(conf, nil, hostMTU)
+
+		g.Expect(conf.DefaultNetwork.OVNKubernetesConfig.MTU).NotTo(BeNil())
+		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(uint32(hostMTU)))
+	})
+
+	t.Run("Geneve mode subtracts encapsulation overhead from hostMTU", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionGeneve
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = nil // not set
+
+		hostMTU := 9000
+		fillOVNKubernetesDefaults(conf, nil, hostMTU)
+
+		g.Expect(conf.DefaultNetwork.OVNKubernetesConfig.MTU).NotTo(BeNil())
+		// Geneve overhead is 100 bytes
+		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(uint32(hostMTU - 100)))
+	})
+
+	t.Run("empty transport (defaults to Geneve) subtracts overhead", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = "" // empty
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = nil      // not set
+
+		hostMTU := 9000
+		fillOVNKubernetesDefaults(conf, nil, hostMTU)
+
+		g.Expect(conf.DefaultNetwork.OVNKubernetesConfig.MTU).NotTo(BeNil())
+		// Empty defaults to Geneve, so overhead is 100 bytes
+		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(uint32(hostMTU - 100)))
+	})
+
+	t.Run("previous MTU is preserved even in no-overlay mode", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = nil // not set
+
+		prev := crd.DeepCopy()
+		prevMTU := uint32(1500)
+		prev.Spec.DefaultNetwork.OVNKubernetesConfig.MTU = &prevMTU
+
+		hostMTU := 9000
+		fillOVNKubernetesDefaults(conf, &prev.Spec, hostMTU)
+
+		g.Expect(conf.DefaultNetwork.OVNKubernetesConfig.MTU).NotTo(BeNil())
+		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(prevMTU))
+	})
+}
+
+// TestValidateMTUForNoOverlay tests the MTU validation for no-overlay mode
+func TestValidateMTUForNoOverlay(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	t.Run("valid MTU equal to hostMTU", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		mtu := uint32(9000)
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
+
+		err := ValidateMTUForNoOverlay(conf, 9000)
+		g.Expect(err).To(BeNil())
+	})
+
+	t.Run("valid MTU less than hostMTU", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		mtu := uint32(1500)
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
+
+		err := ValidateMTUForNoOverlay(conf, 9000)
+		g.Expect(err).To(BeNil())
+	})
+
+	t.Run("invalid MTU greater than hostMTU", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		mtu := uint32(9001)
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
+
+		err := ValidateMTUForNoOverlay(conf, 9000)
+		g.Expect(err).NotTo(BeNil())
+		g.Expect(err.Error()).To(ContainSubstring("cannot exceed host MTU"))
+	})
+
+	t.Run("Geneve mode skips validation", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		mtu := uint32(9001) // MTU > hostMTU, but should be allowed for Geneve
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionGeneve
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
+
+		err := ValidateMTUForNoOverlay(conf, 9000)
+		g.Expect(err).To(BeNil())
+	})
+
+	t.Run("nil OVNKubernetesConfig returns no error", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		conf.DefaultNetwork.OVNKubernetesConfig = nil
+
+		err := ValidateMTUForNoOverlay(conf, 9000)
+		g.Expect(err).To(BeNil())
+	})
+
+	t.Run("nil MTU returns no error", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = nil
+
+		err := ValidateMTUForNoOverlay(conf, 9000)
+		g.Expect(err).To(BeNil())
+	})
+
+	t.Run("hostMTU of 0 skips validation", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		mtu := uint32(9001)
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
+
+		err := ValidateMTUForNoOverlay(conf, 0)
+		g.Expect(err).To(BeNil())
+	})
+}

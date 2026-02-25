@@ -1142,6 +1142,40 @@ func getOVNEncapOverhead(conf *operv1.NetworkSpec) uint32 {
 	return encapOverhead
 }
 
+// ValidateMTUForNoOverlay validates that the configured MTU does not exceed the host MTU
+// when no-overlay mode is enabled for the default network. In no-overlay mode, there is
+// no encapsulation overhead, so the MTU can be set up to the host MTU but not higher.
+// This validation must be called after FillDefaults since it requires the hostMTU value.
+func ValidateMTUForNoOverlay(conf *operv1.NetworkSpec, hostMTU int) error {
+	if conf.DefaultNetwork.OVNKubernetesConfig == nil {
+		return nil
+	}
+
+	oc := conf.DefaultNetwork.OVNKubernetesConfig
+
+	// Only validate for no-overlay mode
+	if oc.Transport != operv1.TransportOptionNoOverlay {
+		return nil
+	}
+
+	// If MTU is not set, nothing to validate (fillDefaults will set it)
+	if oc.MTU == nil {
+		return nil
+	}
+
+	// hostMTU of 0 means we couldn't probe it - skip validation
+	if hostMTU == 0 {
+		klog.Warningf("Cannot validate MTU for no-overlay mode: host MTU is unknown")
+		return nil
+	}
+
+	if *oc.MTU > uint32(hostMTU) {
+		return errors.Errorf("invalid MTU %d for no-overlay mode: cannot exceed host MTU %d", *oc.MTU, hostMTU)
+	}
+
+	return nil
+}
+
 // isOVNKubernetesChangeSafe currently returns an error if any changes to immutable
 // fields are made.
 // In the future, we may support rolling out MTU or other alterations.
@@ -1227,7 +1261,13 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 					panic("BUG: Probed MTU wasn't supplied, host MTU invalid")
 				}
 			}
-			mtu = uint32(hostMTU) - getOVNEncapOverhead(conf)
+			// In no-overlay mode, use the host MTU directly since there's no encapsulation overhead.
+			// In overlay mode (Geneve), subtract the encapsulation overhead.
+			if sc.Transport == operv1.TransportOptionNoOverlay {
+				mtu = uint32(hostMTU)
+			} else {
+				mtu = uint32(hostMTU) - getOVNEncapOverhead(conf)
+			}
 		}
 		sc.MTU = &mtu
 	}
