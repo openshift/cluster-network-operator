@@ -100,7 +100,7 @@ require (
 )
 
 require (
-	github.com/openshift/api v0.0.0-20260305140000-0790d2957f54
+	github.com/openshift/api v0.0.0-20260306002634-d3bbdada155c
 	github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13
 	github.com/openshift/library-go v0.0.0-20251222131241-289839b3ffe8
 	github.com/openshift/machine-config-operator v0.0.1-0.20250724162154-ab14c8e2843b
@@ -163,4 +163,4 @@ require (
 
 replace github.com/openshift/api => github.com/ricky-rav/api v0.0.0-20260304170033-541d8f4e42c0
 
-replace github.com/openshift/client-go => github.com/ricky-rav/client-go v0.0.0-20260305223512-dec75b1abc13
+replace github.com/openshift/client-go => github.com/ricky-rav/client-go v0.0.0-20260309120318-3c9aab93df88

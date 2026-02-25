@@ -236,8 +236,8 @@ github.com/prometheus/procfs v0.19.2 h1:zUMhqEW66Ex7OXIiDkll3tl9a1ZdilUOd/F6ZXw4
 github.com/prometheus/procfs v0.19.2/go.mod h1:M0aotyiemPhBCM0z5w87kL22CxfcH05ZpYlu+b4J7mw=
 github.com/ricky-rav/api v0.0.0-20260304170033-541d8f4e42c0 h1:gdQGqD3Kfj7RB9VixEdfJiESUVplZu5ZC4+5L2mKVrs=
 github.com/ricky-rav/api v0.0.0-20260304170033-541d8f4e42c0/go.mod h1:ZYAxo9t1AALeEotN07tNzIvqqqWSxcZIqMUKnY/xCeQ=
-github.com/ricky-rav/client-go v0.0.0-20260305223512-dec75b1abc13 h1:Q+egROL5Kx63j9Gjb8sicuLnZVMAjKXxahuvgHeP3II=
-github.com/ricky-rav/client-go v0.0.0-20260305223512-dec75b1abc13/go.mod h1:JBsRXM4kEl6Tl9MOUbe3LOZaSxa6RRbhrw/gyNOnZBo=
+github.com/ricky-rav/client-go v0.0.0-20260309120318-3c9aab93df88 h1:D3HI0/IJhEz+5XEBmvqrSJbh4dq+iDOtRD0xFRU4W1E=
+github.com/ricky-rav/client-go v0.0.0-20260309120318-3c9aab93df88/go.mod h1:GpEHCmPSs9RaQHJhLeE5mssmcFtN3mGjeFmXN8EoycY=
 github.com/robfig/cron v1.2.0 h1:ZjScXvvxeQ63Dbyxy76Fj3AT3Ut0aKsyd2/tl3DTMuQ=
 github.com/robfig/cron v1.2.0/go.mod h1:JGuDeoQd7Z6yL4zQhZ3OPEVHB7fL6Ka6skscFHfmt2k=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=

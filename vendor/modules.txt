@@ -247,7 +247,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20260305140000-0790d2957f54 => github.com/ricky-rav/api v0.0.0-20260304170033-541d8f4e42c0
+# github.com/openshift/api v0.0.0-20260306002634-d3bbdada155c => github.com/ricky-rav/api v0.0.0-20260304170033-541d8f4e42c0
 ## explicit; go 1.24.0
 github.com/openshift/api
 github.com/openshift/api/annotations
@@ -339,7 +339,7 @@ github.com/openshift/build-machinery-go/make/targets/golang
 github.com/openshift/build-machinery-go/make/targets/openshift
 github.com/openshift/build-machinery-go/make/targets/openshift/operator
 github.com/openshift/build-machinery-go/scripts
-# github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13 => github.com/ricky-rav/client-go v0.0.0-20260305223512-dec75b1abc13
+# github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13 => github.com/ricky-rav/client-go v0.0.0-20260309120318-3c9aab93df88
 ## explicit; go 1.25.0
 github.com/openshift/client-go/config/applyconfigurations/config/v1
 github.com/openshift/client-go/config/applyconfigurations/config/v1alpha1
@@ -1746,4 +1746,4 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 # github.com/openshift/api => github.com/ricky-rav/api v0.0.0-20260304170033-541d8f4e42c0
-# github.com/openshift/client-go => github.com/ricky-rav/client-go v0.0.0-20260305223512-dec75b1abc13
+# github.com/openshift/client-go => github.com/ricky-rav/client-go v0.0.0-20260309120318-3c9aab93df88
