@@ -389,6 +389,16 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: com.github.openshift.api.operator.v1.BGPManagedConfig
+  map:
+    fields:
+    - name: asNumber
+      type:
+        scalar: numeric
+      default: 64512
+    - name: bgpTopology
+      type:
+        scalar: string
 - name: com.github.openshift.api.operator.v1.BootImageSkewEnforcementConfig
   map:
     fields:
@@ -2837,6 +2847,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: version
       type:
         scalar: string
+- name: com.github.openshift.api.operator.v1.NoOverlayConfig
+  map:
+    fields:
+    - name: outboundSNAT
+      type:
+        scalar: string
+    - name: routing
+      type:
+        scalar: string
 - name: com.github.openshift.api.operator.v1.NodeDisruptionPolicyClusterStatus
   map:
     fields:
@@ -3136,6 +3155,10 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.openshift.api.operator.v1.OVNKubernetesConfig
   map:
     fields:
+    - name: bgpManagedConfig
+      type:
+        namedType: com.github.openshift.api.operator.v1.BGPManagedConfig
+      default: {}
     - name: egressIPConfig
       type:
         namedType: com.github.openshift.api.operator.v1.EgressIPConfig
@@ -3163,10 +3186,17 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: mtu
       type:
         scalar: numeric
+    - name: noOverlayConfig
+      type:
+        namedType: com.github.openshift.api.operator.v1.NoOverlayConfig
+      default: {}
     - name: policyAuditConfig
       type:
         namedType: com.github.openshift.api.operator.v1.PolicyAuditConfig
     - name: routeAdvertisements
+      type:
+        scalar: string
+    - name: transport
       type:
         scalar: string
     - name: v4InternalSubnet
@@ -4061,6 +4091,99 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: com.github.openshift.api.operator.v1alpha1.ClusterAPI
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: com.github.openshift.api.operator.v1alpha1.ClusterAPISpec
+    - name: status
+      type:
+        namedType: com.github.openshift.api.operator.v1alpha1.ClusterAPIStatus
+      default: {}
+- name: com.github.openshift.api.operator.v1alpha1.ClusterAPIInstallerComponent
+  map:
+    fields:
+    - name: image
+      type:
+        namedType: com.github.openshift.api.operator.v1alpha1.ClusterAPIInstallerComponentImage
+      default: {}
+    - name: type
+      type:
+        scalar: string
+    unions:
+    - discriminator: type
+      fields:
+      - fieldName: image
+        discriminatorValue: Image
+- name: com.github.openshift.api.operator.v1alpha1.ClusterAPIInstallerComponentImage
+  map:
+    fields:
+    - name: profile
+      type:
+        scalar: string
+    - name: ref
+      type:
+        scalar: string
+- name: com.github.openshift.api.operator.v1alpha1.ClusterAPIInstallerRevision
+  map:
+    fields:
+    - name: components
+      type:
+        list:
+          elementType:
+            namedType: com.github.openshift.api.operator.v1alpha1.ClusterAPIInstallerComponent
+          elementRelationship: atomic
+    - name: contentID
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+    - name: revision
+      type:
+        scalar: numeric
+    - name: unmanagedCustomResourceDefinitions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    elementRelationship: atomic
+- name: com.github.openshift.api.operator.v1alpha1.ClusterAPISpec
+  map:
+    fields:
+    - name: unmanagedCustomResourceDefinitions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+- name: com.github.openshift.api.operator.v1alpha1.ClusterAPIStatus
+  map:
+    fields:
+    - name: currentRevision
+      type:
+        scalar: string
+    - name: desiredRevision
+      type:
+        scalar: string
+    - name: revisions
+      type:
+        list:
+          elementType:
+            namedType: com.github.openshift.api.operator.v1alpha1.ClusterAPIInstallerRevision
+          elementRelationship: atomic
 - name: com.github.openshift.api.operator.v1alpha1.ClusterVersionOperator
   map:
     fields:
