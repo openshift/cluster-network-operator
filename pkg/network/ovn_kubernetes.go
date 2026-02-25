@@ -68,8 +68,6 @@ const OVN_NODE_IDENTITY_CERT_DURATION = "24h"
 // gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
 
-const frrK8sNamespace = "openshift-frr-k8s"
-
 const (
 	OVSFlowsConfigMapName              = "ovs-flows-config"
 	OVNKubernetesConfigOverridesCMName = "ovn-kubernetes-config-overrides"
