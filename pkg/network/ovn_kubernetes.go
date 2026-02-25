@@ -67,6 +67,8 @@ const OVN_NODE_IDENTITY_CERT_DURATION = "24h"
 // gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
 
+const frrK8sNamespace = "openshift-frr-k8s"
+
 const (
 	OVSFlowsConfigMapName              = "ovs-flows-config"
 	OVNKubernetesConfigOverridesCMName = "ovn-kubernetes-config-overrides"
@@ -334,6 +336,57 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["IP_FORWARDING_MODE"] = ""
 	if c.GatewayConfig != nil && c.GatewayConfig.IPForwarding == operv1.IPForwardingGlobal {
 		data.Data["IP_FORWARDING_MODE"] = c.GatewayConfig.IPForwarding
+	}
+
+	// No-overlay mode configuration
+	// The NoOverlayMode feature gate enables no-overlay networking for both the default network
+	// and CUDNs (Cluster User-Defined Networks). BGP managed configuration is cluster-wide and
+	// applies to any network using no-overlay mode with managed routing.
+	data.Data["DefaultNetworkTransport"] = ""
+	data.Data["NoOverlayEnabled"] = false
+	data.Data["NoOverlayOutboundSNAT"] = ""
+	data.Data["NoOverlayRouting"] = ""
+	data.Data["NoOverlayManagedEnabled"] = false
+	data.Data["NoOverlayManagedASNumber"] = ""
+	data.Data["NoOverlayManagedTopology"] = ""
+	data.Data["FRRK8sNamespace"] = frrK8sNamespace
+
+	if featureGates.Enabled(apifeatures.FeatureGateNoOverlayMode) {
+		if c.Transport == operv1.TransportOptionNoOverlay {
+			data.Data["DefaultNetworkTransport"] = "no-overlay"
+			data.Data["NoOverlayEnabled"] = true
+
+			// No-overlay specific options for the default network
+			if c.NoOverlayConfig.OutboundSNAT != "" {
+				// Convert API value (e.g., "Enabled") to lowercase for ovn-kubernetes config ("enabled", "disabled")
+				data.Data["NoOverlayOutboundSNAT"] = strings.ToLower(string(c.NoOverlayConfig.OutboundSNAT))
+			}
+			if c.NoOverlayConfig.Routing != "" {
+				// Convert API value (e.g., "Managed") to lowercase for ovn-kubernetes config ("managed", "unmanaged")
+				data.Data["NoOverlayRouting"] = strings.ToLower(string(c.NoOverlayConfig.Routing))
+			}
+		}
+
+		// BGP managed configuration is cluster-wide and applies to any network (default or CUDN)
+		// using no-overlay mode with managed routing.
+		// BGPTopology is required when BGPManagedConfig is specified.
+		if c.BGPManagedConfig.BGPTopology != "" {
+			data.Data["NoOverlayManagedEnabled"] = true
+
+			// ASNumber is optional, will have a default if not set
+			if c.BGPManagedConfig.ASNumber > 0 {
+				data.Data["NoOverlayManagedASNumber"] = c.BGPManagedConfig.ASNumber
+			}
+
+			var topology string
+			switch c.BGPManagedConfig.BGPTopology {
+			case operv1.BGPTopologyFullMesh:
+				topology = "full-mesh"
+			default:
+				return nil, progressing, fmt.Errorf("unsupported BGP topology: %s", c.BGPManagedConfig.BGPTopology)
+			}
+			data.Data["NoOverlayManagedTopology"] = topology
+		}
 	}
 
 	// leverage feature gates
