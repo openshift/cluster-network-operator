@@ -50,6 +50,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &operatorv1.AzureCSIDriverConfigSpecApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("AzureDiskEncryptionSet"):
 		return &operatorv1.AzureDiskEncryptionSetApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("BGPManagedConfig"):
+		return &operatorv1.BGPManagedConfigApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("BootImageSkewEnforcementConfig"):
 		return &operatorv1.BootImageSkewEnforcementConfigApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("BootImageSkewEnforcementStatus"):
@@ -318,6 +320,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &operatorv1.NodePortStrategyApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("NodeStatus"):
 		return &operatorv1.NodeStatusApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("NoOverlayConfig"):
+		return &operatorv1.NoOverlayConfigApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("OAuthAPIServerStatus"):
 		return &operatorv1.OAuthAPIServerStatusApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("OLM"):
@@ -438,6 +442,18 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		// Group=operator.openshift.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithKind("BackupJobReference"):
 		return &operatorv1alpha1.BackupJobReferenceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ClusterAPI"):
+		return &operatorv1alpha1.ClusterAPIApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ClusterAPIInstallerComponent"):
+		return &operatorv1alpha1.ClusterAPIInstallerComponentApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ClusterAPIInstallerComponentImage"):
+		return &operatorv1alpha1.ClusterAPIInstallerComponentImageApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ClusterAPIInstallerRevision"):
+		return &operatorv1alpha1.ClusterAPIInstallerRevisionApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ClusterAPISpec"):
+		return &operatorv1alpha1.ClusterAPISpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ClusterAPIStatus"):
+		return &operatorv1alpha1.ClusterAPIStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ClusterVersionOperator"):
 		return &operatorv1alpha1.ClusterVersionOperatorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ClusterVersionOperatorSpec"):
