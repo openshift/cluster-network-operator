@@ -568,7 +568,7 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 					},
 				},
 			},
-			want:        21, // 19 original + 1 OperatorPKI + 1 document separator
+			want:        22, // 19 original + 2 OperatorPKI (webhook + metrics) + 1 document separator
 			expectedErr: nil,
 		},
 	}
