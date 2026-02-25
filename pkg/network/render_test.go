@@ -20,13 +20,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var manifestDir = "../../bindata"
+
 // NOTE: IsChangeSafe() requires you to have called Validate() beforehand, so we
 // don't have to check that invalid configs are considered unsafe to change to.
 
-// OpenShiftSDN validation
-// =================================
 func TestDisallowCNAdditionOfSameType(t *testing.T) {
-	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
+	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OVNKubernetesConfig, OVNKubernetesConfig)
 
 	next.ClusterNetwork = append(next.ClusterNetwork, operv1.ClusterNetworkEntry{
 		CIDR:       "1.2.0.0/16",
@@ -37,7 +37,7 @@ func TestDisallowCNAdditionOfSameType(t *testing.T) {
 }
 
 func TestDisallowServiceNetworkChange(t *testing.T) {
-	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
+	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OVNKubernetesConfig, OVNKubernetesConfig)
 
 	// It is not supported to change the ServiceNetwork.
 	next.ServiceNetwork = []string{"1.2.3.0/24"}
@@ -45,17 +45,8 @@ func TestDisallowServiceNetworkChange(t *testing.T) {
 	g.Expect(err).To(MatchError(ContainSubstring("unsupported change to ServiceNetwork")))
 }
 
-func TestDisallowHostPrefixChangeOnSdn(t *testing.T) {
-	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
-
-	// Changes to the cluster network's prefix are not supported.
-	next.ClusterNetwork[0].HostPrefix = 31
-	err := IsChangeSafe(prev, next, infra)
-	g.Expect(err).To(MatchError(ContainSubstring("network type is OpenShiftSDN. changing clusterNetwork entries is only supported for OVNKubernetes")))
-}
-
 func TestNoErrorOnIdenticalConfigs(t *testing.T) {
-	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
+	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OVNKubernetesConfig, OVNKubernetesConfig)
 
 	// No error should occur when prev equals next.
 	err := IsChangeSafe(prev, next, infra)
@@ -75,37 +66,6 @@ func TestClusterNetworkNoMigration(t *testing.T) {
 	}
 	err = Validate(&config.Spec)
 	g.Expect(err).To(MatchError(ContainSubstring("network type migration is not supported")))
-}
-
-// Invalid miscellaneous migration validation
-// =================================
-func TestServiceNetworkChangeNotOkOnMigration(t *testing.T) {
-	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
-
-	prev.Migration = &operv1.NetworkMigration{MTU: &operv1.MTUMigration{}}
-
-	// You can't change service network during migration.
-	next.ServiceNetwork = []string{"1.2.3.0/24"}
-	err := IsChangeSafe(prev, next, infra)
-	g.Expect(err).To(MatchError(ContainSubstring("cannot change ServiceNetwork during migration")))
-}
-
-func TestDisallowNetworkTypeChangeWithoutMigration(t *testing.T) {
-	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
-
-	// You can't change default network type when not doing migration.
-	next.DefaultNetwork.Type = "OVN-Kubernetes"
-	err := IsChangeSafe(prev, next, infra)
-	g.Expect(err).To(MatchError(ContainSubstring("cannot change default network type")))
-}
-
-func TestDisallowNetworkTypeChangeWithMigration(t *testing.T) {
-	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
-
-	prev.Migration = &operv1.NetworkMigration{NetworkType: "OVNKubernetes"}
-	next.DefaultNetwork.Type = "OVNKubernetes"
-	err := IsChangeSafe(prev, next, infra)
-	g.Expect(err).To(MatchError(ContainSubstring("cannot change default network type")))
 }
 
 // OVNKubernetes DualStack validation
@@ -240,15 +200,6 @@ func TestAllowExpandingClusterNetworkCIDRMaskForOVN(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 }
 
-func TestDisallowExpandingClusterNetworkCIDRMaskForSDN(t *testing.T) {
-	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
-
-	// Changes to the cluster network's CIDR mask is not allowed for OpenShiftSDN.
-	next.ClusterNetwork[0].CIDR = "10.128.0.0/14"
-	err := IsChangeSafe(prev, next, infra)
-	g.Expect(err).To(MatchError(ContainSubstring("network type is OpenShiftSDN. changing clusterNetwork entries is only supported for OVNKubernetes")))
-}
-
 func TestDisallowHostPrefixChangeOnOvn(t *testing.T) {
 	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OVNKubernetesConfig, OVNKubernetesConfig)
 
@@ -265,15 +216,6 @@ func TestDisallowShrinkingClusterNetworkCIDRMaskForOVN(t *testing.T) {
 	next.ClusterNetwork[0].CIDR = "10.128.0.0/16"
 	err := IsChangeSafe(prev, next, infra)
 	g.Expect(err).To(MatchError(ContainSubstring("reducing IP range with a larger CIDR mask for clusterNetwork CIDR is unsupported")))
-}
-
-func TestDisallowShrinkingClusterNetworkCIDRMaskForSDN(t *testing.T) {
-	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OpenShiftSDNConfig, OpenShiftSDNConfig)
-
-	// Changes to the cluster network's CIDR mask is not allowed for OpenShiftSDN.
-	next.ClusterNetwork[0].CIDR = "10.128.0.0/14"
-	err := IsChangeSafe(prev, next, infra)
-	g.Expect(err).To(MatchError(ContainSubstring("network type is OpenShiftSDN. changing clusterNetwork entries is only supported for OVNKubernetes")))
 }
 
 func TestDisallowRemovalOfAllClusterNetworkCIDREntries(t *testing.T) {
@@ -391,8 +333,8 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	objs, _, err := Render(prev, &configv1.NetworkSpec{}, manifestDir, client, featureGatesCNO, bootstrapResult)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	// Validate that openshift-sdn isn't rendered
-	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-sdn", "ovs")))
+	// Validate that ovn-kubernetes isn't rendered
+	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
 
 	// validate that Multus is still rendered
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus")))

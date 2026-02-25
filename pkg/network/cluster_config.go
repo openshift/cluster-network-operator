@@ -18,7 +18,7 @@ import (
 )
 
 // list of known plugins that require hostPrefix to be set
-var pluginsUsingHostPrefix = sets.NewString(string(operv1.NetworkTypeOpenShiftSDN), string(operv1.NetworkTypeOVNKubernetes))
+var pluginsUsingHostPrefix = sets.NewString(string(operv1.NetworkTypeOVNKubernetes))
 
 // ValidateClusterConfig ensures the cluster config is valid.
 func ValidateClusterConfig(clusterConfig *configv1.Network, client cnoclient.Client, featureGates featuregates.FeatureGate) error {
@@ -141,12 +141,7 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec, oldStatus *configv1.
 	knownNetworkType := true
 	status := configv1.NetworkStatus{}
 
-	switch operConf.DefaultNetwork.Type {
-	case operv1.NetworkTypeOpenShiftSDN:
-		// continue
-	case operv1.NetworkTypeOVNKubernetes:
-		// continue
-	default:
+	if operConf.DefaultNetwork.Type != operv1.NetworkTypeOVNKubernetes {
 		knownNetworkType = false
 		// Preserve any status fields set by the unknown network plugin
 		status = *oldStatus
@@ -173,10 +168,7 @@ func StatusFromOperatorConfig(operConf *operv1.NetworkSpec, oldStatus *configv1.
 	}
 
 	// Determine the MTU from the provider
-	switch operConf.DefaultNetwork.Type {
-	case operv1.NetworkTypeOpenShiftSDN:
-		status.ClusterNetworkMTU = int(*operConf.DefaultNetwork.OpenShiftSDNConfig.MTU)
-	case operv1.NetworkTypeOVNKubernetes:
+	if operConf.DefaultNetwork.Type == operv1.NetworkTypeOVNKubernetes {
 		status.ClusterNetworkMTU = int(*operConf.DefaultNetwork.OVNKubernetesConfig.MTU)
 	}
 
