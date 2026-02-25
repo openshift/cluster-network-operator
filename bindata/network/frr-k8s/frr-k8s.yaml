@@ -100,6 +100,10 @@ spec:
         - --metrics-bind-address=127.0.0.1:7572
         - $(LOG_LEVEL)
         env:
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: FRR_CONFIG_FILE
           value: /etc/frr_reloader/frr.conf
         - name: FRR_RELOADER_PID_FILE
@@ -113,7 +117,7 @@ spec:
             configMapKeyRef:
               name: env-overrides
               key: frrk8s-loglevel
-              optional: true              
+              optional: true
         - name: NAMESPACE
           valueFrom:
             fieldRef:
@@ -249,6 +253,10 @@ spec:
         command:
         - /etc/frr_status/frr-status
         env:
+        - name: KUBERNETES_SERVICE_HOST
+          value: "{{.KUBERNETES_SERVICE_HOST}}"
+        - name: KUBERNETES_SERVICE_PORT
+          value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: NODE_NAME
           valueFrom:
             fieldRef:
