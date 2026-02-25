@@ -84,7 +84,7 @@ spec:
       - name: cert
         secret:
           defaultMode: 420
-          secretName: frr-k8s-webhook-server-cert
+          secretName: frr-k8s-webhook-cert
       serviceAccountName: frr-k8s-daemon
       priorityClassName: system-cluster-critical
       terminationGracePeriodSeconds: 10

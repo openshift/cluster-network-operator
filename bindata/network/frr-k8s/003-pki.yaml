@@ -1,0 +1,17 @@
+# Request that the cluster network operator PKI controller
+# creates certificates for the FRR-k8s webhook.
+# This avoids dependency on service-ca operator during bootstrap,
+# which is critical because the webhook must be ready before OVN-Kubernetes
+# starts when RouteAdvertisements are enabled.
+#
+# Both webhook and metrics need OperatorPKI because the FRR DaemonSet
+# requires the metrics TLS secret to start, and service-ca is not
+# available during bootstrap (it depends on CNI being ready).
+apiVersion: network.operator.openshift.io/v1
+kind: OperatorPKI
+metadata:
+  name: frr-k8s-webhook
+  namespace: openshift-frr-k8s
+spec:
+  targetCert:
+    commonName: frr-k8s-webhook-service.openshift-frr-k8s.svc
