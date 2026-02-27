@@ -123,6 +123,7 @@ spec:
         args:
           - --service-account-namespace=openshift-cloud-network-config-controller
           - --service-account-name=cloud-network-config-controller
+          - --token-audience=openshift
           - --token-file=/var/run/secrets/openshift/serviceaccount/token
           - --kubeconfig=/etc/kubernetes/kubeconfig
         resources:
@@ -189,6 +190,10 @@ spec:
 {{- if not (eq .AzureManagedSecretProviderClass "")}}
         - name: "ARO_HCP_CLIENT_CREDENTIALS_PATH"
           value: "{{ .AzureManagedCredsPath}}"
+{{ end }}
+{{- if not (eq .GCPCredentialsPath "")}}
+        - name: "GOOGLE_APPLICATION_CREDENTIALS"
+          value: "{{ .GCPCredentialsPath}}"
 {{ end }}
         resources:
           requests:
