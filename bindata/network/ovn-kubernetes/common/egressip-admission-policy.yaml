@@ -1,0 +1,39 @@
+# This ValidatingAdmissionPolicy must remain aligned with the CR in the OVNKubernetes repository
+# initially done via https://github.com/ovn-kubernetes/ovn-kubernetes/pull/5726 PR.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: egressip-mark-annotation-validation
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups: ["k8s.ovn.org"]
+      apiVersions: ["v1"]
+      operations: ["CREATE", "UPDATE"]
+      resources: ["egressips"]
+  validations:
+  # Prevent creating EgressIP with the annotation
+  - expression: 'request.operation != "CREATE" || !has(object.metadata.annotations) || !("k8s.ovn.org/egressip-mark" in object.metadata.annotations)'
+    message: 'EgressIP resources cannot be created with the "k8s.ovn.org/egressip-mark" annotation. This annotation is managed by the system.'
+    reason: Invalid
+  # Prevent modifying or removing the annotation once set
+  - expression: 'request.operation != "UPDATE" || !has(oldObject.metadata.annotations) || !("k8s.ovn.org/egressip-mark" in oldObject.metadata.annotations) ||
+      (has(object.metadata.annotations) && ("k8s.ovn.org/egressip-mark" in object.metadata.annotations) && oldObject.metadata.annotations["k8s.ovn.org/egressip-mark"] == object.metadata.annotations["k8s.ovn.org/egressip-mark"])'
+    message: 'The "k8s.ovn.org/egressip-mark" annotation cannot be modified or removed once set. This annotation is managed by the system.'
+    reason: Invalid
+  # Only ovnkube controller service account can add the annotation as an update to the EgressIP object
+  - expression: 'request.operation != "UPDATE" || !has(object.metadata.annotations) || !("k8s.ovn.org/egressip-mark" in 
+      object.metadata.annotations) || (has(oldObject.metadata.annotations) && ("k8s.ovn.org/egressip-mark" in oldObject.metadata.annotations)) || 
+      request.userInfo.username == "system:serviceaccount:openshift-ovn-kubernetes:ovn-kubernetes-control-plane"'
+    message: 'A regular user must not add "k8s.ovn.org/egressip-mark" annotation to an EgressIP custom resource.'
+    reason: Invalid
+
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: egressip-mark-annotation-validation-binding
+spec:
+  policyName: egressip-mark-annotation-validation
+  validationActions: [Deny]
