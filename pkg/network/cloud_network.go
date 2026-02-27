@@ -109,6 +109,13 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		data.Data["AzureManagedCertDirectory"] = azureCertPath
 		data.Data["AzureManagedCredsPath"] = filepath.Join(azureCertPath, os.Getenv("MANAGED_AZURE_HCP_CREDENTIALS_FILE_PATH"))
 		data.Data["AzureManagedSecretProviderClass"] = os.Getenv("ARO_HCP_SECRET_PROVIDER_CLASS")
+		// GCP WIF credential path for HCP deployments.
+		gcpCredsFile := os.Getenv("GCP_CNCC_CREDENTIALS_FILE")
+		if gcpCredsFile != "" {
+			data.Data["GCPCredentialsPath"] = filepath.Join("/etc/secret/cloudprovider", gcpCredsFile)
+		} else {
+			data.Data["GCPCredentialsPath"] = ""
+		}
 		caOverride.ObjectMeta = metav1.ObjectMeta{
 			Namespace:   hcpCfg.Namespace,
 			Name:        "cloud-network-config-controller-kube-cloud-config",
