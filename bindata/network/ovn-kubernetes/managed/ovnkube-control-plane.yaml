@@ -193,6 +193,7 @@ spec:
           # This is needed so that converting clusters from GA to TP
           # will rollout control plane pods as well
           network_segmentation_enabled_flag=
+          multi_network_enabled_flag=
           multi_network_enabled_flag="--enable-multi-network"
           network_segmentation_enabled_flag="--enable-network-segmentation"
 
@@ -240,16 +241,7 @@ spec:
             ${multi_network_enabled_flag} \
             ${network_segmentation_enabled_flag} \
             ${route_advertisements_enable_flag} \
-            ${evpn_enable_flag} \
-            ${preconfigured_udn_addresses_enable_flag} \
-            --enable-egress-ip=true \
-            --enable-egress-firewall=true \
-            --enable-egress-qos=true \
-            --enable-egress-service=true \
-            --enable-multicast \
-            --enable-multi-external-gateway=true \
-            ${multi_network_policy_enabled_flag} \
-            ${admin_network_policy_enabled_flag}
+            ${evpn_enable_flag}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config

@@ -193,16 +193,7 @@ spec:
             ${network_segmentation_enabled_flag} \
             ${gateway_mode_flags} \
             ${route_advertisements_enable_flag} \
-            ${evpn_enable_flag} \
-            ${preconfigured_udn_addresses_enable_flag} \
-            --enable-egress-ip=true \
-            --enable-egress-firewall=true \
-            --enable-egress-qos=true \
-            --enable-egress-service=true \
-            --enable-multicast \
-            --enable-multi-external-gateway=true \
-            ${multi_network_policy_enabled_flag} \
-            ${admin_network_policy_enabled_flag}
+            ${evpn_enable_flag}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
