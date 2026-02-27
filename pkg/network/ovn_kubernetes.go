@@ -373,7 +373,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 	renderOVNFlowsConfig(bootstrapResult, &data)
 
-	data.Data["NorthdThreads"] = 1
+	data.Data["NorthdThreads"] = 4
 	data.Data["IsSNO"] = bootstrapResult.OVN.ControlPlaneReplicaCount == 1
 
 	data.Data["OVN_MULTI_NETWORK_ENABLE"] = true
