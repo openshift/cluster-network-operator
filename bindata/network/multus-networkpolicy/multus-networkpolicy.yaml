@@ -33,11 +33,9 @@ spec:
       containers:
       - name: multus-networkpolicy
         image: {{.MultiNetworkPolicyImage}}
-        command: ["/usr/bin/multi-networkpolicy-iptables"]
         args:
         - "--host-prefix=/host"
         - "--container-runtime-endpoint=/run/crio/crio.sock"
-        - "--pod-iptables=/var/lib/multi-networkpolicy/iptables"
         - "--network-plugins=macvlan,sriov,ipvlan,bond"
         - "--custom-v6-ingress-rule-file=/etc/multi-networkpolicy/rules/custom-v6-rules.txt"
         - "--custom-v6-egress-rule-file=/etc/multi-networkpolicy/rules/custom-v6-rules.txt"
