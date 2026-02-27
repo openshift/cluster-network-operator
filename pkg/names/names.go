@@ -27,13 +27,16 @@ const APPLIED_PREFIX = "applied-"
 // Should match 00_namespace.yaml
 const APPLIED_NAMESPACE = "openshift-network-operator"
 
-// MULTUS_NAMESPACE is the namespace where applied configuration
+// MultusNamespace is the namespace where applied configuration
 // configmaps are stored.
 // Should match 00_namespace.yaml
-const MULTUS_NAMESPACE = "openshift-multus"
+const MultusNamespace = "openshift-multus"
 
-// ALLOWLIST_CONFIG_NAME is the name of the allowlist ConfigMap
-const ALLOWLIST_CONFIG_NAME = "cni-sysctl-allowlist"
+// AllowlistConfigName is the name of the allowlist ConfigMap
+const AllowlistConfigName = "cni-sysctl-allowlist"
+
+// DefaultAllowlistConfigName is the name of the default allowlist ConfigMap
+const DefaultAllowlistConfigName = "default-cni-sysctl-allowlist"
 
 // IgnoreObjectErrorAnnotation is an annotation we can set on objects
 // to signal to the reconciler that we don't care if they fail to create
