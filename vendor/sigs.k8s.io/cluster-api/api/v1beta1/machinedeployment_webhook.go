@@ -165,22 +165,22 @@ func (webhook *machineDeploymentDefaulter) Default(ctx context.Context, obj runt
 }
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
-func (m *MachineDeployment) ValidateCreate() error {
-	return m.validate(nil)
+func (m *MachineDeployment) ValidateCreate() (admission.Warnings, error) {
+	return nil, m.validate(nil)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (m *MachineDeployment) ValidateUpdate(old runtime.Object) error {
+func (m *MachineDeployment) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	oldMD, ok := old.(*MachineDeployment)
 	if !ok {
-		return apierrors.NewBadRequest(fmt.Sprintf("expected a MachineDeployment but got a %T", old))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a MachineDeployment but got a %T", old))
 	}
-	return m.validate(oldMD)
+	return nil, m.validate(oldMD)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
-func (m *MachineDeployment) ValidateDelete() error {
-	return nil
+func (m *MachineDeployment) ValidateDelete() (admission.Warnings, error) {
+	return nil, nil
 }
 
 func (m *MachineDeployment) validate(old *MachineDeployment) error {
