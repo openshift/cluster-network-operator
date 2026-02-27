@@ -380,6 +380,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = false
 	if conf.DisableMultiNetwork != nil && *conf.DisableMultiNetwork {
 		data.Data["OVN_MULTI_NETWORK_ENABLE"] = false
+		data.Data["OVN_NETWORK_SEGMENTATION_ENABLE"] = false
+		klog.Warningf("Forcing OVN_NETWORK_SEGMENTATION_ENABLE=false because DisableMultiNetwork=true in the operator config")
 	} else if conf.UseMultiNetworkPolicy != nil && *conf.UseMultiNetworkPolicy {
 		// Multi-network policy support requires multi-network support to be
 		// enabled
