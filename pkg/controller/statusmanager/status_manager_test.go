@@ -142,8 +142,19 @@ func conditionsEqual(oldConditions, newConditions []operv1.OperatorCondition) bo
 func TestStatusManager_set(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
+	status.clock = testingclock.NewFakeClock(time.Now())
 
 	// No operator config yet; should reflect this in the cluster operator
+	status.set(false)
+
+	// NoOperConfig doesn't get set degraded yet (debounced for 2 min)
+	_, err := getCO(client, "testing")
+	if err == nil {
+		t.Fatalf("ClusterOperator should not exist yet (NoOperConfig debounced)")
+	}
+
+	// Advance clock past the debounce threshold
+	status.clock.(*testingclock.FakeClock).Step(3 * time.Minute)
 	status.set(false)
 
 	co, err := getCO(client, "testing")
@@ -414,6 +425,63 @@ func TestStatusManagerMaybeSetDegradedDebouncing(t *testing.T) {
 	}
 	if !v1helpers.IsOperatorConditionFalse(oc.Status.Conditions, operv1.OperatorStatusTypeDegraded) {
 		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+}
+
+func TestStatusManagerMaybeSetDegradedMultipleLevels(t *testing.T) {
+	// Verify different StatusLevels have independent debounce timers
+	client := fake.NewFakeClient()
+	status := New(client, "testing", names.StandAloneClusterName)
+	status.clock = testingclock.NewFakeClock(time.Now())
+
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	setOC(t, client, no)
+	setCO(t, client, "testing")
+
+	status.SetNotDegraded(OperatorConfig)
+	status.SetNotDegraded(ProxyConfig)
+
+	status.MaybeSetDegraded(OperatorConfig, "TestFailure", "OperatorConfig failure")
+	oc, err := getOC(client)
+	if err != nil {
+		t.Fatalf("error getting OperatorConfig: %v", err)
+	}
+	if !v1helpers.IsOperatorConditionFalse(oc.Status.Conditions, operv1.OperatorStatusTypeDegraded) {
+		t.Fatalf("OperatorConfig should not be degraded yet")
+	}
+
+	status.clock.(*testingclock.FakeClock).Step(1 * time.Minute)
+	status.MaybeSetDegraded(ProxyConfig, "TestFailure", "ProxyConfig failure")
+
+	status.clock.(*testingclock.FakeClock).Step(1 * time.Minute)
+	status.MaybeSetDegraded(OperatorConfig, "TestFailure", "OperatorConfig failure")
+	oc, err = getOC(client)
+	if err != nil {
+		t.Fatalf("error getting OperatorConfig: %v", err)
+	}
+	if !v1helpers.IsOperatorConditionTrue(oc.Status.Conditions, operv1.OperatorStatusTypeDegraded) {
+		t.Fatalf("OperatorConfig should be degraded after 2 minutes")
+	}
+
+	status.clock.(*testingclock.FakeClock).Step(1 * time.Minute)
+	status.MaybeSetDegraded(ProxyConfig, "TestFailure", "ProxyConfig failure")
+	oc, err = getOC(client)
+	if err != nil {
+		t.Fatalf("error getting OperatorConfig: %v", err)
+	}
+	degradedCond := v1helpers.FindOperatorCondition(oc.Status.Conditions, operv1.OperatorStatusTypeDegraded)
+	if degradedCond == nil || degradedCond.Message != "OperatorConfig failure" {
+		t.Fatalf("OperatorConfig should still be the degraded reason, got: %v", degradedCond)
+	}
+
+	status.SetNotDegraded(OperatorConfig)
+	oc, err = getOC(client)
+	if err != nil {
+		t.Fatalf("error getting OperatorConfig: %v", err)
+	}
+	degradedCond = v1helpers.FindOperatorCondition(oc.Status.Conditions, operv1.OperatorStatusTypeDegraded)
+	if degradedCond == nil || degradedCond.Message != "ProxyConfig failure" {
+		t.Fatalf("ProxyConfig should now be degraded reason, got: %v", degradedCond)
 	}
 }
 
@@ -1155,6 +1223,10 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	setLastPodState(t, client, "testing", ps)
 	status.SetFromPods()
 
+	// RolloutHung is debounced for 2 min, so advance clock and call again
+	status.clock.(*testingclock.FakeClock).Step(3 * time.Minute)
+	status.SetFromPods()
+
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -1603,6 +1675,10 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	setLastPodState(t, client, "testing", ps)
 	status.SetFromPods()
 
+	// RolloutHung is debounced for 2 min, so advance clock and call again
+	status.clock.(*testingclock.FakeClock).Step(3 * time.Minute)
+	status.SetFromPods()
+
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -1910,7 +1986,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 
 	// Simulate time passing beyond the degraded threshold by setting failure first-seen time
 	// to 3 minutes ago
-	status.failureFirstSeen[RolloutHung] = time.Now().Add(-3 * time.Minute)
+	status.failureFirstSeen[PodCrashLoopBackOff] = time.Now().Add(-3 * time.Minute)
 
 	// Second call to SetFromPods() will now set Degraded since the failure has persisted
 	status.SetFromPods()
@@ -1924,7 +2000,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 		{
 			Type:    operv1.OperatorStatusTypeDegraded,
 			Status:  operv1.ConditionTrue,
-			Reason:  "RolloutHung",
+			Reason:  "CrashLoopBackOff",
 			Message: "Deployment \"/three/gamma\" rollout is not making progress - pod gamma-x0x0 is in CrashLoopBackOff State",
 		},
 		{

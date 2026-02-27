@@ -166,7 +166,7 @@ func (r *EgressRouterReconciler) setStatus() {
 		for _, e := range r.egressrouterErrs {
 			msgs = append(msgs, e.Error())
 		}
-		r.status.SetDegraded(statusmanager.EgressRouterConfig, "EgressRouterError", strings.Join(msgs, ", "))
+		r.status.MaybeSetDegraded(statusmanager.EgressRouterConfig, "EgressRouterError", strings.Join(msgs, ", "))
 	}
 }
 

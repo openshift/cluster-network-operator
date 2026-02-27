@@ -78,6 +78,7 @@ func (status *StatusManager) SetFromPods() {
 
 	progressing := []string{}
 	hung := []string{}
+	clbo := []string{}
 
 	daemonsetStates, deploymentStates, statefulsetStates := status.getLastPodState()
 
@@ -101,7 +102,7 @@ func (status *StatusManager) SetFromPods() {
 			dsProgressing = true
 			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
 			if !isNonCritical(ds) {
-				hung = append(hung, status.CheckCrashLoopBackOffPods(dsName, ds.Spec.Selector.MatchLabels, "DaemonSet")...)
+				clbo = append(clbo, status.CheckCrashLoopBackOffPods(dsName, ds.Spec.Selector.MatchLabels, "DaemonSet")...)
 			}
 		} else if ds.Status.NumberAvailable == 0 && ds.Status.DesiredNumberScheduled > 0 {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not yet scheduled on any nodes", dsName.String()))
@@ -157,7 +158,7 @@ func (status *StatusManager) SetFromPods() {
 			ssProgressing = true
 			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
 			if !isNonCritical(ss) {
-				hung = append(hung, status.CheckCrashLoopBackOffPods(ssName, ss.Spec.Selector.MatchLabels, "StatefulSet")...)
+				clbo = append(clbo, status.CheckCrashLoopBackOffPods(ssName, ss.Spec.Selector.MatchLabels, "StatefulSet")...)
 			}
 		} else if ss.Status.AvailableReplicas == 0 {
 			progressing = append(progressing, fmt.Sprintf("StatefulSet %q is not yet scheduled on any nodes", ssName.String()))
@@ -212,7 +213,7 @@ func (status *StatusManager) SetFromPods() {
 			depProgressing = true
 			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
 			if !isNonCritical(dep) {
-				hung = append(hung, status.CheckCrashLoopBackOffPods(depName, dep.Spec.Selector.MatchLabels, "Deployment")...)
+				clbo = append(clbo, status.CheckCrashLoopBackOffPods(depName, dep.Spec.Selector.MatchLabels, "Deployment")...)
 			}
 		} else if dep.Status.AvailableReplicas == 0 {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q is not yet scheduled on any nodes", depName.String()))
@@ -277,6 +278,12 @@ func (status *StatusManager) SetFromPods() {
 		status.setDegraded(RolloutHung, "RolloutHung", strings.Join(hung, "\n"))
 	} else {
 		status.setNotDegraded(RolloutHung)
+	}
+
+	if len(clbo) > 0 {
+		status.maybeSetDegraded(PodCrashLoopBackOff, "CrashLoopBackOff", strings.Join(clbo, "\n"))
+	} else {
+		status.setNotDegraded(PodCrashLoopBackOff)
 	}
 }
 
