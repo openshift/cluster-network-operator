@@ -21,6 +21,9 @@ type OVNKubernetesConfigApplyConfiguration struct {
 	IPv4                *IPv4OVNKubernetesConfigApplyConfiguration `json:"ipv4,omitempty"`
 	IPv6                *IPv6OVNKubernetesConfigApplyConfiguration `json:"ipv6,omitempty"`
 	RouteAdvertisements *operatorv1.RouteAdvertisementsEnablement  `json:"routeAdvertisements,omitempty"`
+	Transport           *operatorv1.TransportOption                `json:"transport,omitempty"`
+	NoOverlayConfig     *NoOverlayConfigApplyConfiguration         `json:"noOverlayConfig,omitempty"`
+	BGPManagedConfig    *BGPManagedConfigApplyConfiguration        `json:"bgpManagedConfig,omitempty"`
 }
 
 // OVNKubernetesConfigApplyConfiguration constructs a declarative configuration of the OVNKubernetesConfig type for use with
@@ -122,5 +125,29 @@ func (b *OVNKubernetesConfigApplyConfiguration) WithIPv6(value *IPv6OVNKubernete
 // If called multiple times, the RouteAdvertisements field is set to the value of the last call.
 func (b *OVNKubernetesConfigApplyConfiguration) WithRouteAdvertisements(value operatorv1.RouteAdvertisementsEnablement) *OVNKubernetesConfigApplyConfiguration {
 	b.RouteAdvertisements = &value
+	return b
+}
+
+// WithTransport sets the Transport field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Transport field is set to the value of the last call.
+func (b *OVNKubernetesConfigApplyConfiguration) WithTransport(value operatorv1.TransportOption) *OVNKubernetesConfigApplyConfiguration {
+	b.Transport = &value
+	return b
+}
+
+// WithNoOverlayConfig sets the NoOverlayConfig field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NoOverlayConfig field is set to the value of the last call.
+func (b *OVNKubernetesConfigApplyConfiguration) WithNoOverlayConfig(value *NoOverlayConfigApplyConfiguration) *OVNKubernetesConfigApplyConfiguration {
+	b.NoOverlayConfig = value
+	return b
+}
+
+// WithBGPManagedConfig sets the BGPManagedConfig field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the BGPManagedConfig field is set to the value of the last call.
+func (b *OVNKubernetesConfigApplyConfiguration) WithBGPManagedConfig(value *BGPManagedConfigApplyConfiguration) *OVNKubernetesConfigApplyConfiguration {
+	b.BGPManagedConfig = value
 	return b
 }

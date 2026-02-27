@@ -1,28 +1,25 @@
----
 apiVersion: v1
 kind: Service
 metadata:
   name: frr-k8s-webhook-service
   namespace: openshift-frr-k8s
-  annotations:
-    service.beta.openshift.io/serving-cert-secret-name: frr-k8s-webhook-server-cert
 spec:
   ports:
   - port: 443
     targetPort: webhook
   selector:
     component: frr-k8s-statuscleaner
+{{- if .FRRK8sWebhookCABundle }}
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: frr-k8s-validating-webhook-configuration-ocp
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
 webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
+    caBundle: "{{.FRRK8sWebhookCABundle}}"
     service:
       name: frr-k8s-webhook-service
       namespace: openshift-frr-k8s
@@ -40,4 +37,4 @@ webhooks:
     resources:
     - frrconfigurations
   sideEffects: None
----
+{{- end }}
