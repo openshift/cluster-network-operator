@@ -11,3 +11,16 @@ metadata:
     openshift.io/node-selector: ""
     openshift.io/description: "FRR-K8s components"
     workload.openshift.io/allowed: "management"
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: default-deny
+  namespace: openshift-frr-k8s
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []

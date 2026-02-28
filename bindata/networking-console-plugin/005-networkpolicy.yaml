@@ -1,0 +1,19 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: networking-console-plugin
+  namespace: openshift-network-console
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: networking-console-plugin
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from console
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-console
+      ports:
+      - port: 9443

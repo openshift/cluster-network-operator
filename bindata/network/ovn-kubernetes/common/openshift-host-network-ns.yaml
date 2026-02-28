@@ -8,4 +8,16 @@ metadata:
   annotations:
     openshift.io/description: "Namespace for enabling network policy specification for host network traffic. Can be used to allow access to or from host network components"
     workload.openshift.io/allowed: "management"
-
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: default-deny
+  namespace: openshift-host-network
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
