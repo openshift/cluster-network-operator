@@ -184,6 +184,17 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["NodeIdentityCertDuration"] = OVN_NODE_IDENTITY_CERT_DURATION
 	data.Data["IsNetworkTypeLiveMigration"] = false
 	data.Data["AdvertisedUDNIsolationMode"] = bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["advertised-udn-isolation-mode"]
+	data.Data["OpenFlowProbe"] = ""
+	if raw, ok := bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["openflow-probe"]; ok {
+		probe := strings.TrimSpace(raw)
+		if probe != "" {
+			if _, err := strconv.ParseUint(probe, 10, 32); err != nil {
+				klog.Warningf("Ignoring invalid openflow-probe override %q: expected non-negative integer", raw)
+			} else {
+				data.Data["OpenFlowProbe"] = probe
+			}
+		}
+	}
 
 	if conf.Migration != nil {
 		if conf.Migration.MTU != nil && conf.Migration.Mode != operv1.LiveNetworkMigrationMode {
