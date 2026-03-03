@@ -505,6 +505,9 @@ data:
       # Ensure ovn_advertised_udn_isolation_mode_flag is always defined
       ovn_advertised_udn_isolation_mode_flag=
 
+      # Ensure openflow_probe_flag is always defined
+      openflow_probe_flag=
+
       if [[ $# -ne 3 ]]; then
         echo "Expected three arguments but got $#"
         exit 1
@@ -669,6 +672,10 @@ data:
         ovn_advertised_udn_isolation_mode_flag="--advertised-udn-isolation-mode={{.AdvertisedUDNIsolationMode}}"
       fi
 
+      if [[ "{{.OpenFlowProbe}}" != "" ]]; then
+        openflow_probe_flag="--openflow-probe={{.OpenFlowProbe}}"
+      fi
+
       NETWORK_NODE_IDENTITY_ENABLE=
       if [[ "{{.NETWORK_NODE_IDENTITY_ENABLE}}" == "true" ]]; then
         NETWORK_NODE_IDENTITY_ENABLE="
@@ -738,6 +745,7 @@ data:
         ${gw_interface_flag} \
         ${ip_forwarding_flag} \
         ${ovn_advertised_udn_isolation_mode_flag} \
+        ${openflow_probe_flag} \
         ${NETWORK_NODE_IDENTITY_ENABLE} \
         ${ovn_v4_join_subnet_opt} \
         ${ovn_v6_join_subnet_opt} \
