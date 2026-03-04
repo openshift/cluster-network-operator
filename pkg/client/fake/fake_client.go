@@ -101,10 +101,10 @@ func NewFakeClient(objs ...crclient.Object) cnoclient.Client {
 	}
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: ""}}
 	fc := FakeClusterClient{
-		kClient:      faketyped.NewSimpleClientset(ooTyped...),
+		kClient:      faketyped.NewClientset(ooTyped...),
 		dynclient:    fakedynamic.NewSimpleDynamicClient(scheme.Scheme, oo...),
 		crclient:     crfake.NewClientBuilder().WithStatusSubresource(co).WithObjects(objs...).Build(),
-		osOperClient: osoperfakeclient.NewSimpleClientset(),
+		osOperClient: osoperfakeclient.NewClientset(),
 	}
 	return &FakeClient{
 		clusterClients: map[string]*FakeClusterClient{
