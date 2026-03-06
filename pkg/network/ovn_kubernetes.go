@@ -1734,7 +1734,7 @@ func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 	// Copy-pasted from status_manager: Determine if a DaemonSet is progressing
 	progressing := (status.UpdatedNumberScheduled < status.DesiredNumberScheduled ||
 		status.NumberUnavailable > 0 ||
-		status.NumberAvailable == 0 ||
+		(status.NumberAvailable == 0 && status.DesiredNumberScheduled > 0) ||
 		ds.Generation > status.ObservedGeneration)
 
 	s := "progressing"
