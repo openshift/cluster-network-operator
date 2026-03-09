@@ -4249,6 +4249,9 @@ func TestRenderOVNKubernetes_OpenFlowProbeOverride(t *testing.T) {
 	})
 }
 
+// TestDaemonSetProgressing verifies daemonSetProgressing returns the correct
+// result for a variety of DaemonSet status scenarios, including the zero-worker
+// HyperShift case where DesiredNumberScheduled==0 must not be treated as progressing.
 func TestDaemonSetProgressing(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
@@ -4346,7 +4349,8 @@ func TestDaemonSetProgressing(t *testing.T) {
 			ds.Status = tc.status
 			ds.Status.ObservedGeneration = tc.status.ObservedGeneration
 			result := daemonSetProgressing(ds, tc.allowHung)
-			g.Expect(result).To(Equal(tc.expectResult))
+			g.Expect(result).To(Equal(tc.expectResult),
+				"test case %q: daemonSetProgressing() = %v, want %v", tc.name, result, tc.expectResult)
 		})
 	}
 }
