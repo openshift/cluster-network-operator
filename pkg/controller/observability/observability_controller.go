@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -37,6 +38,7 @@ const (
 	NetObservNamespace   = "netobserv"
 	OperatorNamespace    = "openshift-netobserv-operator"
 	FlowCollectorVersion = "v1beta2"
+	FlowCollectorName    = "cluster"
 
 	checkInterval = 10 * time.Second
 	checkTimeout  = 10 * time.Minute
@@ -62,9 +64,15 @@ func add(mgr manager.Manager, r *ReconcileObservability) error {
 
 var _ reconcile.Reconciler = &ReconcileObservability{}
 
+// StatusReporter is an interface for reporting status
+type StatusReporter interface {
+	SetDegraded(level statusmanager.StatusLevel, reason, message string)
+	SetNotDegraded(level statusmanager.StatusLevel)
+}
+
 type ReconcileObservability struct {
 	client crclient.Client
-	status *statusmanager.StatusManager
+	status StatusReporter
 }
 
 // Reconcile reacts to changes in Network CR
@@ -82,14 +90,20 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Check if Network Observability should be enabled
-	enabled := network.Spec.ObservabilityEnabled
-	if !enabled {
+	shouldInstall, err := r.shouldInstallNetworkObservability(ctx, &network)
+	if err != nil {
+		r.status.SetDegraded(statusmanager.ObservabilityConfig, "CheckInstallError", fmt.Sprintf("Failed to determine if Network Observability should be installed: %v", err))
+		return ctrl.Result{}, err
+	}
+	if !shouldInstall {
+		r.status.SetNotDegraded(statusmanager.ObservabilityConfig)
 		return ctrl.Result{}, nil
 	}
 
 	// Now enable Network Observability
 	installed, err := r.isNetObservOperatorInstalled(ctx)
 	if err != nil {
+		r.status.SetDegraded(statusmanager.ObservabilityConfig, "CheckOperatorError", fmt.Sprintf("Failed to check if Network Observability Operator is installed: %v", err))
 		return ctrl.Result{}, err
 	}
 	if !installed {
@@ -98,15 +112,18 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req ctrl.Request
 		if err := r.client.Get(ctx, types.NamespacedName{Name: OperatorNamespace}, ns); err != nil {
 			if errors.IsNotFound(err) {
 				if err := r.client.Create(ctx, ns); err != nil {
+					r.status.SetDegraded(statusmanager.ObservabilityConfig, "CreateNamespaceError", fmt.Sprintf("Failed to create namespace %s: %v", OperatorNamespace, err))
 					return ctrl.Result{}, err
 				}
 			} else {
+				r.status.SetDegraded(statusmanager.ObservabilityConfig, "GetNamespaceError", fmt.Sprintf("Failed to get namespace %s: %v", OperatorNamespace, err))
 				return ctrl.Result{}, err
 			}
 		}
 
 		// Install Network Observability Operator
 		if err := r.installNetObservOperator(ctx); err != nil {
+			r.status.SetDegraded(statusmanager.ObservabilityConfig, "InstallOperatorError", fmt.Sprintf("Failed to install Network Observability Operator: %v", err))
 			return ctrl.Result{}, err
 		}
 	}
@@ -116,80 +133,93 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req ctrl.Request
 	if err := r.waitForNetObservOperator(ctx); err != nil {
 		if err == context.DeadlineExceeded {
 			klog.Errorf("Timed out waiting for Network Observability Operator to be ready after %v. Stopping reconciliation.", checkTimeout)
+			r.status.SetDegraded(statusmanager.ObservabilityConfig, "OperatorNotReady", fmt.Sprintf("Timed out waiting for Network Observability Operator to be ready after %v", checkTimeout))
 			return ctrl.Result{RequeueAfter: 0}, nil // Don't requeue
 		}
-		return ctrl.Result{}, err
-	}
-
-	// Wait for OpenShift web console to be available
-	klog.Info("Wait for OpenShift web console to be available")
-	if err := r.waitForConsole(ctx); err != nil {
-		if err == context.DeadlineExceeded {
-			klog.Errorf("Timed out waiting for OpenShift web console to be available after %v. Stopping reconciliation.", checkTimeout)
-			return ctrl.Result{RequeueAfter: 0}, nil // Don't requeue
-		}
+		r.status.SetDegraded(statusmanager.ObservabilityConfig, "WaitOperatorError", fmt.Sprintf("Failed waiting for Network Observability Operator: %v", err))
 		return ctrl.Result{}, err
 	}
 
 	// Check if FlowCollector exists
 	exists, err := r.isFlowCollectorExists(ctx)
 	if err != nil {
+		r.status.SetDegraded(statusmanager.ObservabilityConfig, "CheckFlowCollectorError", fmt.Sprintf("Failed to check if FlowCollector exists: %v", err))
 		return ctrl.Result{}, err
 	}
 	if exists {
+		r.status.SetNotDegraded(statusmanager.ObservabilityConfig)
 		return ctrl.Result{}, nil
 	}
 
 	// Create FlowCollector
 	if err := r.createFlowCollector(ctx); err != nil {
+		r.status.SetDegraded(statusmanager.ObservabilityConfig, "CreateFlowCollectorError", fmt.Sprintf("Failed to create FlowCollector: %v", err))
 		return ctrl.Result{}, err
 	}
 
+	r.status.SetNotDegraded(statusmanager.ObservabilityConfig)
 	return ctrl.Result{}, nil
 }
 
-// findObjectsByLabel returns all objects of a specific Group, Kind, and Namespace with the given label selector.
-// Accepts one or more versions to try in order
-func (r *ReconcileObservability) findObjectsByLabel(ctx context.Context, group, kind, namespace, labelKey, labelValue string, versions ...string) (*unstructured.UnstructuredList, error) {
-	objects := &unstructured.UnstructuredList{}
-
-	// Try each version until one matches
-	for _, version := range versions {
-		objects.SetGroupVersionKind(schema.GroupVersionKind{
-			Group:   group,
-			Version: version,
-			Kind:    kind,
-		})
-
-		listOptions := []crclient.ListOption{}
-		if namespace != "" {
-			listOptions = append(listOptions, crclient.InNamespace(namespace))
-		}
-		if labelKey != "" && labelValue != "" {
-			listOptions = append(listOptions, crclient.MatchingLabels(map[string]string{labelKey: labelValue}))
-		}
-
-		if err := r.client.List(ctx, objects, listOptions...); err == nil {
-			break // Success! This version matches
-		}
+// shouldInstallNetworkObservability returns true if Network Observability should be installed.
+// Explicit false: skip installation (user opted out)
+// Explicit true: install Network Observability
+// Default behavior (nil): install Network Observability (opt-out model), except for SNO clusters
+// SNO (Single Node OpenShift) clusters: skip installation unless explicitly set to true
+func (r *ReconcileObservability) shouldInstallNetworkObservability(ctx context.Context, network *configv1.Network) (bool, error) {
+	// Explicit value set - honor it regardless of topology
+	if network.Spec.InstallNetworkObservability != nil {
+		return *network.Spec.InstallNetworkObservability, nil
 	}
 
-	return objects, nil
-}
-
-// listNetObservOperatorDeployments returns all deployments with the "app=netobserv-operator" label
-func (r *ReconcileObservability) listNetObservOperatorDeployments(ctx context.Context) (*unstructured.UnstructuredList, error) {
-	return r.findObjectsByLabel(ctx, "apps", "Deployment", "", "app", "netobserv-operator", "v1")
-}
-
-// isNetObservOperatorInstalled returns true if there exists a deployment with the "app=netobserv-operator" label
-func (r *ReconcileObservability) isNetObservOperatorInstalled(ctx context.Context) (bool, error) {
-	deployments, err := r.listNetObservOperatorDeployments(ctx)
+	// Default behavior (nil): check if this is a SNO cluster
+	isSNO, err := r.isSingleNodeCluster(ctx)
 	if err != nil {
 		return false, err
 	}
 
-	return len(deployments.Items) > 0, nil
+	if isSNO {
+		// SNO clusters: don't install by default
+		return false, nil
+	}
+
+	// Non-SNO clusters: install by default (opt-out model)
+	return true, nil
+}
+
+// isSingleNodeCluster returns true if the cluster is a Single Node OpenShift (SNO) cluster.
+// A cluster is SNO if ControlPlaneTopology is SingleReplica.
+func (r *ReconcileObservability) isSingleNodeCluster(ctx context.Context) (bool, error) {
+	infra := &configv1.Infrastructure{}
+	if err := r.client.Get(ctx, types.NamespacedName{Name: "cluster"}, infra); err != nil {
+		return false, err
+	}
+
+	return infra.Status.ControlPlaneTopology == configv1.SingleReplicaTopologyMode, nil
+}
+
+// isNetObservOperatorInstalled returns true if the netobserv-operator Subscription exists
+func (r *ReconcileObservability) isNetObservOperatorInstalled(ctx context.Context) (bool, error) {
+	subscription := &unstructured.Unstructured{}
+	subscription.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "operators.coreos.com",
+		Version: "v1alpha1",
+		Kind:    "Subscription",
+	})
+
+	err := r.client.Get(ctx, types.NamespacedName{
+		Name:      "netobserv-operator",
+		Namespace: OperatorNamespace,
+	}, subscription)
+
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
 }
 
 // applyManifest reads a YAML file and applies all resources using server-side apply
@@ -211,7 +241,6 @@ func (r *ReconcileObservability) applyManifest(ctx context.Context, yamlPath, de
 		if obj.GetKind() == "" {
 			continue
 		}
-
 		obj.SetManagedFields(nil)
 		if err := r.client.Patch(ctx, obj, crclient.Apply, &crclient.PatchOptions{
 			Force:        ptr.To(true),
@@ -231,57 +260,31 @@ func (r *ReconcileObservability) installNetObservOperator(ctx context.Context) e
 
 func (r *ReconcileObservability) waitForNetObservOperator(ctx context.Context) error {
 	condition := func(ctx context.Context) (bool, error) {
-		deployments, err := r.listNetObservOperatorDeployments(ctx)
-		if err != nil {
+		// List ClusterServiceVersions in the operator namespace
+		csvs := &unstructured.UnstructuredList{}
+		csvs.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "operators.coreos.com",
+			Version: "v1alpha1",
+			Kind:    "ClusterServiceVersion",
+		})
+
+		if err := r.client.List(ctx, csvs, crclient.InNamespace(OperatorNamespace)); err != nil {
 			return false, err
 		}
 
-		// Check if any deployment has available replicas
-		for _, item := range deployments.Items {
-			availableReplicas, found, err := unstructured.NestedInt64(item.Object, "status", "availableReplicas")
-			if err != nil {
-				return false, err
-			}
-			if !found {
-				return false, nil
-			}
-
-			if availableReplicas > 0 {
-				return true, nil
-			}
-		}
-		return false, nil
-	}
-	return wait.PollUntilContextTimeout(ctx, checkInterval, checkTimeout, true, condition)
-}
-
-func (r *ReconcileObservability) waitForConsole(ctx context.Context) error {
-	condition := func(ctx context.Context) (bool, error) {
-		co := &unstructured.Unstructured{}
-		co.SetGroupVersionKind(schema.GroupVersionKind{
-			Group:   "config.openshift.io",
-			Version: "v1",
-			Kind:    "ClusterOperator", // used for health status
-		})
-
-		if err := r.client.Get(ctx, types.NamespacedName{Name: "console"}, co); err != nil {
-			return false, crclient.IgnoreNotFound(err)
-		}
-
-		// Check if the object is valid before accessing its fields
-		if co.Object == nil {
-			return false, nil
-		}
-
-		conds, found, _ := unstructured.NestedSlice(co.Object, "status", "conditions")
-		if !found {
-			return false, nil
-		}
-		for _, c := range conds {
-			if m, ok := c.(map[string]interface{}); ok {
-				if m["type"] == "Available" && m["status"] == "True" {
-					return true, nil
+		// Find the netobserv operator CSV
+		for _, csv := range csvs.Items {
+			name := csv.GetName()
+			// CSV names are typically like "netobserv-operator.v1.2.3"
+			if strings.HasPrefix(name, "netobserv-operator") {
+				phase, found, err := unstructured.NestedString(csv.Object, "status", "phase")
+				if err != nil {
+					return false, err
 				}
+				if !found {
+					return false, nil
+				}
+				return phase == "Succeeded", nil
 			}
 		}
 		return false, nil
@@ -289,14 +292,25 @@ func (r *ReconcileObservability) waitForConsole(ctx context.Context) error {
 	return wait.PollUntilContextTimeout(ctx, checkInterval, checkTimeout, true, condition)
 }
 
-// isFlowCollectorExists returns true if a FlowCollector instance exists
+// isFlowCollectorExists returns true if a FlowCollector instance exists.
+// Note: FlowCollector is a cluster-scoped singleton resource and can only be named "cluster".
 func (r *ReconcileObservability) isFlowCollectorExists(ctx context.Context) (bool, error) {
-	flowCollectors, err := r.findObjectsByLabel(ctx, "flows.netobserv.io", "FlowCollector", "", "", "", FlowCollectorVersion)
+	flowCollector := &unstructured.Unstructured{}
+	flowCollector.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "flows.netobserv.io",
+		Version: FlowCollectorVersion,
+		Kind:    "FlowCollector",
+	})
+
+	err := r.client.Get(ctx, types.NamespacedName{Name: FlowCollectorName}, flowCollector)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
 		return false, err
 	}
 
-	return len(flowCollectors.Items) > 0, nil
+	return true, nil
 }
 
 func (r *ReconcileObservability) createFlowCollector(ctx context.Context) error {

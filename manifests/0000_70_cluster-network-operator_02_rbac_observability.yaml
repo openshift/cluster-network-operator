@@ -8,6 +8,11 @@ rules:
     resources: ["namespaces"]
     verbs: ["get", "create", "list"]
 
+  # Manage OLM resources for operator installation
+  - apiGroups: ["operators.coreos.com"]
+    resources: ["subscriptions", "clusterserviceversions", "operatorgroups"]
+    verbs: ["get", "list", "create", "update", "patch"]
+
   # Manage FlowCollector CRs
   - apiGroups: ["flows.netobserv.io"]
     resources: ["flowcollectors"]
