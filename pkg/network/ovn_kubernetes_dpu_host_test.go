@@ -358,35 +358,90 @@ func TestOVNKubernetesNodeSelectorOperator(t *testing.T) {
 }
 
 func TestOVNKubernetesDPURBAC(t *testing.T) {
-	g := NewGomegaWithT(t)
 	rbacTemplatePath := "../../bindata/network/ovn-kubernetes/dpu-rbac.yaml"
 
-	data := render.MakeRenderData()
-
-	objs, err := render.RenderTemplate(rbacTemplatePath, &data)
-	g.Expect(err).NotTo(HaveOccurred())
-
-	var foundRoleBinding bool
-	for _, obj := range objs {
-		if obj.GetKind() != "RoleBinding" || !strings.HasPrefix(obj.GetName(), "openshift-ovn-kubernetes-node-dpu-service") {
-			continue
-		}
-		foundRoleBinding = true
-		g.Expect(obj.GetName()).To(Equal("openshift-ovn-kubernetes-node-dpu-service-limited"))
-
-		subjects, found, err := uns.NestedSlice(obj.Object, "subjects")
-		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(found).To(BeTrue())
-		g.Expect(subjects).To(HaveLen(1))
-
-		subj := subjects[0].(map[string]interface{})
-		kind, _, _ := uns.NestedString(subj, "kind")
-		name, _, _ := uns.NestedString(subj, "name")
-		g.Expect(kind).To(Equal("ServiceAccount"))
-		g.Expect(name).To(Equal("ovn-kubernetes-node-dpu-service"))
-
-		roleRefName, _, _ := uns.NestedString(obj.Object, "roleRef", "name")
-		g.Expect(roleRefName).To(Equal("openshift-ovn-kubernetes-node-limited"))
+	testCases := []struct {
+		name                string
+		identityEnable      bool
+		expectRoleBinding   string
+		expectSubjectKind   string
+		expectSubjectName   string
+		expectImpersonation bool
+	}{
+		{
+			name:                "without identity",
+			identityEnable:      false,
+			expectRoleBinding:   "openshift-ovn-kubernetes-node-dpu-service-limited",
+			expectSubjectKind:   "ServiceAccount",
+			expectSubjectName:   "ovn-kubernetes-node-dpu-service",
+			expectImpersonation: false,
+		},
+		{
+			name:                "with identity enabled",
+			identityEnable:      true,
+			expectRoleBinding:   "openshift-ovn-kubernetes-node-dpu-service-identity-limited",
+			expectSubjectKind:   "Group",
+			expectSubjectName:   "system:ovn-nodes",
+			expectImpersonation: true,
+		},
 	}
-	g.Expect(foundRoleBinding).To(BeTrue(), "DPU service RoleBinding should be present")
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+
+			data := render.MakeRenderData()
+			data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = tc.identityEnable
+
+			objs, err := render.RenderTemplate(rbacTemplatePath, &data)
+			g.Expect(err).NotTo(HaveOccurred())
+
+			var foundRoleBinding bool
+			var foundImpersonationCR, foundImpersonationCRB bool
+
+			for _, obj := range objs {
+				kind := obj.GetKind()
+				name := obj.GetName()
+
+				if kind == "RoleBinding" && strings.HasPrefix(name, "openshift-ovn-kubernetes-node-dpu-service") {
+					foundRoleBinding = true
+					g.Expect(name).To(Equal(tc.expectRoleBinding))
+
+					subjects, found, err := uns.NestedSlice(obj.Object, "subjects")
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(found).To(BeTrue())
+					g.Expect(subjects).To(HaveLen(1))
+
+					subj := subjects[0].(map[string]interface{})
+					subjKind, _, _ := uns.NestedString(subj, "kind")
+					subjName, _, _ := uns.NestedString(subj, "name")
+					g.Expect(subjKind).To(Equal(tc.expectSubjectKind))
+					g.Expect(subjName).To(Equal(tc.expectSubjectName))
+
+					roleRefName, _, _ := uns.NestedString(obj.Object, "roleRef", "name")
+					g.Expect(roleRefName).To(Equal("openshift-ovn-kubernetes-node-limited"))
+				}
+
+				if kind == "ClusterRole" && name == "openshift-ovn-kubernetes-node-dpu-host-impersonator" {
+					foundImpersonationCR = true
+					rules, found, err := uns.NestedSlice(obj.Object, "rules")
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(found).To(BeTrue())
+					g.Expect(len(rules)).To(BeNumerically(">=", 2))
+
+					rule0 := rules[0].(map[string]interface{})
+					verbs0, _, _ := uns.NestedStringSlice(rule0, "verbs")
+					g.Expect(verbs0).To(ContainElement("impersonate"))
+				}
+
+				if kind == "ClusterRoleBinding" && name == "openshift-ovn-kubernetes-node-dpu-host-impersonator" {
+					foundImpersonationCRB = true
+				}
+			}
+
+			g.Expect(foundRoleBinding).To(BeTrue(), "DPU service RoleBinding should be present")
+			g.Expect(foundImpersonationCR).To(Equal(tc.expectImpersonation))
+			g.Expect(foundImpersonationCRB).To(Equal(tc.expectImpersonation))
+		})
+	}
 }
