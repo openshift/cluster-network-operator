@@ -42,6 +42,9 @@ const (
 
 	checkInterval = 10 * time.Second
 	checkTimeout  = 10 * time.Minute
+
+	// NetworkObservabilityDeployed is the condition type that indicates Network Observability was successfully deployed
+	NetworkObservabilityDeployed = "NetworkObservabilityDeployed"
 )
 
 // Add creates a new controller. Referenced in add_networkconfig.go.
@@ -100,7 +103,15 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	// Now enable Network Observability
+	// Check if Network Observability was previously deployed
+	// If so, we're done - no need to check or manage anything
+	if r.wasNetworkObservabilityDeployed(&network) {
+		klog.Info("Network Observability was previously deployed, skipping reconciliation.")
+		r.status.SetNotDegraded(statusmanager.ObservabilityConfig)
+		return ctrl.Result{}, nil
+	}
+
+	// First time installation - proceed with operator installation
 	installed, err := r.isNetObservOperatorInstalled(ctx)
 	if err != nil {
 		r.status.SetDegraded(statusmanager.ObservabilityConfig, "CheckOperatorError", fmt.Sprintf("Failed to check if Network Observability Operator is installed: %v", err))
@@ -140,21 +151,24 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	// Check if FlowCollector exists
-	exists, err := r.isFlowCollectorExists(ctx)
+	// Check if FlowCollector already exists
+	flowCollectorExists, err := r.isFlowCollectorExists(ctx)
 	if err != nil {
 		r.status.SetDegraded(statusmanager.ObservabilityConfig, "CheckFlowCollectorError", fmt.Sprintf("Failed to check if FlowCollector exists: %v", err))
 		return ctrl.Result{}, err
 	}
-	if exists {
-		r.status.SetNotDegraded(statusmanager.ObservabilityConfig)
-		return ctrl.Result{}, nil
+
+	if !flowCollectorExists {
+		// Create FlowCollector (first time deployment)
+		if err := r.createFlowCollector(ctx); err != nil {
+			r.status.SetDegraded(statusmanager.ObservabilityConfig, "CreateFlowCollectorError", fmt.Sprintf("Failed to create FlowCollector: %v", err))
+			return ctrl.Result{}, err
+		}
 	}
 
-	// Create FlowCollector
-	if err := r.createFlowCollector(ctx); err != nil {
-		r.status.SetDegraded(statusmanager.ObservabilityConfig, "CreateFlowCollectorError", fmt.Sprintf("Failed to create FlowCollector: %v", err))
-		return ctrl.Result{}, err
+	// Mark as deployed in Network CR status
+	if err := r.markNetworkObservabilityDeployed(ctx, &network); err != nil {
+		klog.Warningf("Failed to update Network Observability deployment status: %v", err)
 	}
 
 	r.status.SetNotDegraded(statusmanager.ObservabilityConfig)
@@ -324,6 +338,57 @@ func (r *ReconcileObservability) isFlowCollectorExists(ctx context.Context) (boo
 	}
 
 	return true, nil
+}
+
+// wasNetworkObservabilityDeployed checks if Network Observability was previously deployed
+// by looking at the Network CR status conditions.
+func (r *ReconcileObservability) wasNetworkObservabilityDeployed(network *configv1.Network) bool {
+	for _, condition := range network.Status.Conditions {
+		if condition.Type == NetworkObservabilityDeployed && condition.Status == metav1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+// markNetworkObservabilityDeployed updates the Network CR status to indicate
+// that Network Observability was successfully deployed.
+func (r *ReconcileObservability) markNetworkObservabilityDeployed(ctx context.Context, network *configv1.Network) error {
+	// Check if condition already exists and is true
+	for _, condition := range network.Status.Conditions {
+		if condition.Type == NetworkObservabilityDeployed && condition.Status == metav1.ConditionTrue {
+			return nil // Already marked as deployed
+		}
+	}
+
+	// Get the latest version of the Network CR to avoid conflicts
+	latest := &configv1.Network{}
+	if err := r.client.Get(ctx, types.NamespacedName{Name: "cluster"}, latest); err != nil {
+		return err
+	}
+
+	// Remove any existing NetworkObservabilityDeployed condition
+	newConditions := []metav1.Condition{}
+	for _, condition := range latest.Status.Conditions {
+		if condition.Type != NetworkObservabilityDeployed {
+			newConditions = append(newConditions, condition)
+		}
+	}
+
+	// Add the new condition
+	now := metav1.Now()
+	newConditions = append(newConditions, metav1.Condition{
+		Type:               NetworkObservabilityDeployed,
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: now,
+		Reason:             "DeploymentComplete",
+		Message:            "Network Observability FlowCollector was successfully deployed",
+	})
+
+	latest.Status.Conditions = newConditions
+
+	// Update the status
+	return r.client.Status().Update(ctx, latest)
 }
 
 func (r *ReconcileObservability) createFlowCollector(ctx context.Context) error {

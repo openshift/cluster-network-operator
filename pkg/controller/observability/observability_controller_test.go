@@ -39,6 +39,20 @@ func createTestNetwork(name string, value string) *configv1.Network {
 	}
 }
 
+func createTestNetworkWithDeployedCondition(name string, value string) *configv1.Network {
+	network := createTestNetwork(name, value)
+	network.Status.Conditions = []metav1.Condition{
+		{
+			Type:               NetworkObservabilityDeployed,
+			Status:             metav1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "DeploymentComplete",
+			Message:            "Network Observability FlowCollector was successfully deployed",
+		},
+	}
+	return network
+}
+
 func createTestFlowCollector(name string) *unstructured.Unstructured {
 	fc := &unstructured.Unstructured{}
 	fc.SetGroupVersionKind(schema.GroupVersionKind{
@@ -766,6 +780,7 @@ func TestReconcile_SkipsFlowCollectorWhenExists(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	_ = configv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	network := createTestNetwork("cluster", "Enable")
 	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
@@ -774,6 +789,7 @@ func TestReconcile_SkipsFlowCollectorWhenExists(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(network, subscription, csv, flowCollector).
+		WithStatusSubresource(&configv1.Network{}).
 		Build()
 
 	r := &ReconcileObservability{
@@ -834,6 +850,7 @@ func TestReconcile_MultipleInvocations(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	_ = configv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	network := createTestNetwork("cluster", "Enable")
 	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
@@ -842,6 +859,7 @@ func TestReconcile_MultipleInvocations(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(network, subscription, csv, flowCollector).
+		WithStatusSubresource(&configv1.Network{}).
 		Build()
 
 	r := &ReconcileObservability{
@@ -906,44 +924,106 @@ func TestReconcile_FlowCollectorDeleted(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	_ = configv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Enable")
+	// Create network with the deployed condition set (simulating previous successful deployment)
+	// FlowCollector is NOT present (deleted)
+	network := createTestNetworkWithDeployedCondition("cluster", "Enable")
 	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
 	csv := createTestCSV("netobserv-operator.v1.0.0", OperatorNamespace, "Succeeded")
-	flowCollector := createTestFlowCollector(FlowCollectorName)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(network, subscription, csv, flowCollector).
+		WithObjects(network, subscription, csv).
+		WithStatusSubresource(&configv1.Network{}).
 		Build()
 
+	mockStatus := newMockStatusManager()
 	r := &ReconcileObservability{
 		client: client,
-		status: newMockStatusManager(),
+		status: mockStatus,
 	}
 
 	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
-	// First reconciliation - FlowCollector exists
-	result1, err1 := r.Reconcile(context.TODO(), req)
-	g.Expect(err1).NotTo(HaveOccurred())
-	g.Expect(result1).To(Equal(ctrl.Result{}))
-
-	// Delete the FlowCollector
-	fc := &unstructured.Unstructured{}
-	fc.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "flows.netobserv.io",
-		Version: FlowCollectorVersion,
-		Kind:    "FlowCollector",
-	})
-	err := client.Delete(context.TODO(), flowCollector)
+	// Reconciliation should skip everything since deployment condition is set
+	result, err := r.Reconcile(context.TODO(), req)
 	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(result).To(Equal(ctrl.Result{}))
 
-	// Second reconciliation - should try to recreate FlowCollector
-	// This will fail due to fake client limitations, but we can verify
-	// that it detects the missing FlowCollector
-	exists, err := r.isFlowCollectorExists(context.TODO())
+	// Verify status was set to not degraded
+	g.Expect(len(mockStatus.notDegradedCalls)).To(Equal(1))
+	g.Expect(mockStatus.notDegradedCalls[0]).To(Equal(statusmanager.ObservabilityConfig))
+}
+
+// TestReconcile_OperatorDeleted tests that operator is not reinstalled after deletion if previously deployed
+func TestReconcile_OperatorDeleted(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	_ = configv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+
+	// Create network with the deployed condition set (simulating previous successful deployment)
+	// Operator subscription and CSV are NOT present (simulating deletion)
+	network := createTestNetworkWithDeployedCondition("cluster", "Enable")
+	flowCollector := createTestFlowCollector(FlowCollectorName)
+
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(network, flowCollector).
+		WithStatusSubresource(&configv1.Network{}).
+		Build()
+
+	mockStatus := newMockStatusManager()
+	r := &ReconcileObservability{
+		client: client,
+		status: mockStatus,
+	}
+
+	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
+
+	// Reconciliation should skip everything since deployment condition is set
+	result, err := r.Reconcile(context.TODO(), req)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(exists).To(BeFalse())
+	g.Expect(result).To(Equal(ctrl.Result{}))
+
+	// Verify status was set to not degraded
+	g.Expect(len(mockStatus.notDegradedCalls)).To(Equal(1))
+	g.Expect(mockStatus.notDegradedCalls[0]).To(Equal(statusmanager.ObservabilityConfig))
+}
+
+// TestReconcile_BothDeleted tests that nothing is reinstalled when both operator and FlowCollector are deleted
+func TestReconcile_BothDeleted(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	_ = configv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+
+	// Create network with the deployed condition set (simulating previous successful deployment)
+	// Neither operator nor FlowCollector are present (both deleted)
+	network := createTestNetworkWithDeployedCondition("cluster", "Enable")
+
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(network).
+		WithStatusSubresource(&configv1.Network{}).
+		Build()
+
+	mockStatus := newMockStatusManager()
+	r := &ReconcileObservability{
+		client: client,
+		status: mockStatus,
+	}
+
+	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
+
+	// Reconciliation should skip everything since deployment condition is set
+	result, err := r.Reconcile(context.TODO(), req)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(result).To(Equal(ctrl.Result{}))
+
+	// Verify status was set to not degraded
+	g.Expect(len(mockStatus.notDegradedCalls)).To(Equal(1))
+	g.Expect(mockStatus.notDegradedCalls[0]).To(Equal(statusmanager.ObservabilityConfig))
 }
 
 // TestReconcile_NetworkCRUpdated tests that reconciliation handles
@@ -1148,6 +1228,7 @@ func TestReconcile_ConcurrentReconciliations(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	_ = configv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	network := createTestNetwork("cluster", "Enable")
 	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
@@ -1156,6 +1237,7 @@ func TestReconcile_ConcurrentReconciliations(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(network, subscription, csv, flowCollector).
+		WithStatusSubresource(&configv1.Network{}).
 		Build()
 
 	r := &ReconcileObservability{
@@ -1235,6 +1317,7 @@ func TestReconcile_StatusNotDegradedOnSuccess(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(network, infra, subscription, csv, flowCollector).
+		WithStatusSubresource(&configv1.Network{}).
 		Build()
 
 	mockStatus := newMockStatusManager()
@@ -1325,4 +1408,147 @@ func TestReconcile_StatusDegradedOnInfrastructureError(t *testing.T) {
 	g.Expect(len(mockStatus.degradedCalls)).To(BeNumerically(">", 0))
 	g.Expect(mockStatus.degradedCalls[0].level).To(Equal(statusmanager.ObservabilityConfig))
 	g.Expect(mockStatus.degradedCalls[0].reason).To(Equal("CheckInstallError"))
+}
+
+// TestWasNetworkObservabilityDeployed tests the wasNetworkObservabilityDeployed helper
+func TestWasNetworkObservabilityDeployed(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	r := &ReconcileObservability{}
+
+	// Test with no conditions
+	network1 := createTestNetwork("cluster", "Enable")
+	g.Expect(r.wasNetworkObservabilityDeployed(network1)).To(BeFalse())
+
+	// Test with deployed condition set to true
+	network2 := createTestNetworkWithDeployedCondition("cluster", "Enable")
+	g.Expect(r.wasNetworkObservabilityDeployed(network2)).To(BeTrue())
+
+	// Test with deployed condition set to false
+	network3 := createTestNetwork("cluster", "Enable")
+	network3.Status.Conditions = []metav1.Condition{
+		{
+			Type:   NetworkObservabilityDeployed,
+			Status: metav1.ConditionFalse,
+		},
+	}
+	g.Expect(r.wasNetworkObservabilityDeployed(network3)).To(BeFalse())
+
+	// Test with other conditions but not deployed condition
+	network4 := createTestNetwork("cluster", "Enable")
+	network4.Status.Conditions = []metav1.Condition{
+		{
+			Type:   "SomeOtherCondition",
+			Status: metav1.ConditionTrue,
+		},
+	}
+	g.Expect(r.wasNetworkObservabilityDeployed(network4)).To(BeFalse())
+}
+
+// TestMarkNetworkObservabilityDeployed tests setting the deployment condition
+func TestMarkNetworkObservabilityDeployed(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	_ = configv1.AddToScheme(scheme)
+
+	network := createTestNetwork("cluster", "Enable")
+
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(network).
+		WithStatusSubresource(&configv1.Network{}).
+		Build()
+
+	r := &ReconcileObservability{client: client}
+
+	// Mark as deployed
+	err := r.markNetworkObservabilityDeployed(context.TODO(), network)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	// Verify condition was added
+	updatedNetwork := &configv1.Network{}
+	err = client.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, updatedNetwork)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	foundCondition := false
+	for _, cond := range updatedNetwork.Status.Conditions {
+		if cond.Type == NetworkObservabilityDeployed {
+			foundCondition = true
+			g.Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+			g.Expect(cond.Reason).To(Equal("DeploymentComplete"))
+			g.Expect(cond.Message).To(ContainSubstring("successfully deployed"))
+		}
+	}
+	g.Expect(foundCondition).To(BeTrue(), "NetworkObservabilityDeployed condition should be present")
+
+	// Call again - should be idempotent
+	err = r.markNetworkObservabilityDeployed(context.TODO(), updatedNetwork)
+	g.Expect(err).NotTo(HaveOccurred())
+}
+
+// TestReconcile_FirstTimeDeploymentSetsCondition tests that the first deployment sets the condition
+func TestReconcile_FirstTimeDeploymentSetsCondition(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	_ = configv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+
+	// Network without deployed condition (first time deployment)
+	network := createTestNetwork("cluster", "Enable")
+	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
+	csv := createTestCSV("netobserv-operator.v1.0.0", OperatorNamespace, "Succeeded")
+	namespace := createTestNamespace(NetObservNamespace)
+
+	// Create manifests directory and FlowCollector manifest
+	flowCollectorManifest := `
+apiVersion: flows.netobserv.io/v1beta2
+kind: FlowCollector
+metadata:
+  name: cluster
+spec:
+  namespace: netobserv
+`
+	err := os.MkdirAll("manifests", 0755)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	// Create the FlowCollector manifest at the expected path
+	err = os.WriteFile(FlowCollectorYAML, []byte(flowCollectorManifest), 0644)
+	g.Expect(err).NotTo(HaveOccurred())
+	defer os.Remove(FlowCollectorYAML)
+
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(network, subscription, csv, namespace).
+		WithStatusSubresource(&configv1.Network{}).
+		Build()
+
+	r := &ReconcileObservability{
+		client: client,
+		status: newMockStatusManager(),
+	}
+
+	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
+
+	// First reconciliation - should create FlowCollector and set condition
+	result, err := r.Reconcile(context.TODO(), req)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(result).To(Equal(ctrl.Result{}))
+
+	// Verify FlowCollector was created
+	exists, err := r.isFlowCollectorExists(context.TODO())
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(exists).To(BeTrue(), "FlowCollector should be created on first deployment")
+
+	// Verify condition was set
+	updatedNetwork := &configv1.Network{}
+	err = client.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, updatedNetwork)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	foundCondition := false
+	for _, cond := range updatedNetwork.Status.Conditions {
+		if cond.Type == NetworkObservabilityDeployed && cond.Status == metav1.ConditionTrue {
+			foundCondition = true
+		}
+	}
+	g.Expect(foundCondition).To(BeTrue(), "NetworkObservabilityDeployed condition should be set after first deployment")
 }
