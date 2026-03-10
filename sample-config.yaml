@@ -10,6 +10,4 @@ spec:
       hostPrefix: 23
   defaultNetwork:
     type: OVNKubernetes
-  # installNetworkObservability enables Network Observability at cluster installation.
-  # Defaults to true (opt-out model). Set to false to disable installation.
-  installNetworkObservability: true
+  installNetworkObservability: Enable
