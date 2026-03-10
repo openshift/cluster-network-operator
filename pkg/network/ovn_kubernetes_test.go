@@ -75,7 +75,7 @@ var manifestDirOvn = "../../bindata"
 
 func getDefaultFeatureGates() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
-		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver, apifeatures.FeatureGateOVNObservability},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver, apifeatures.FeatureGateOVNObservability, apifeatures.FeatureGateNoOverlayMode},
 		[]configv1.FeatureGateName{apifeatures.FeatureGateEVPN},
 	)
 }
@@ -1061,6 +1061,7 @@ logfile-maxage=0`,
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGateEVPN,
+				apifeatures.FeatureGateNoOverlayMode,
 			}
 			s := sets.New[configv1.FeatureGateName](tc.enabledFeatureGates...)
 			enabled := []configv1.FeatureGateName{}
@@ -1173,6 +1174,9 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
 				MTU:        ptrToUint32(8900),
 				GenevePort: ptrToUint32(6081),
+				// Note: DefaultNetworkTransport is not set by fillOVNKubernetesDefaults
+				// When NoOverlayMode feature gate is disabled, the CRD doesn't have this field
+				// When enabled, the CRD itself provides the default
 				PolicyAuditConfig: &operv1.PolicyAuditConfig{
 					RateLimit:      ptrToUint32(20),
 					MaxFileSize:    ptrToUint32(50),
@@ -1214,6 +1218,7 @@ func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
 				MTU:         ptrToUint32(8854),
 				GenevePort:  ptrToUint32(8061),
 				IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull},
+				// Note: DefaultNetworkTransport is not set by fillOVNKubernetesDefaults
 				PolicyAuditConfig: &operv1.PolicyAuditConfig{
 					RateLimit:      ptrToUint32(20),
 					MaxFileSize:    ptrToUint32(50),
@@ -3954,6 +3959,7 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 		[]configv1.FeatureGateName{
 			apifeatures.FeatureGateDNSNameResolver,
 			apifeatures.FeatureGateOVNObservability,
+			apifeatures.FeatureGateNoOverlayMode,
 		},
 		[]configv1.FeatureGateName{
 			apifeatures.FeatureGateEVPN,
@@ -4141,6 +4147,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGateEVPN,
+				apifeatures.FeatureGateNoOverlayMode,
 			},
 		)
 	}
@@ -4151,6 +4158,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGateEVPN,
+				apifeatures.FeatureGateNoOverlayMode,
 			},
 		)
 	}
@@ -4161,6 +4169,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGateEVPN,
+				apifeatures.FeatureGateNoOverlayMode,
 			},
 		)
 	}
@@ -4324,5 +4333,534 @@ func TestRenderOVNKubernetes_OpenFlowProbeOverride(t *testing.T) {
 	t.Run("with invalid openflow-probe override", func(t *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"openflow-probe": "-60"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--openflow-probe="`))
+	})
+}
+
+func TestOVNKubernetesControlPlaneFlags(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	testCases := []struct {
+		name           string
+		variant        string
+		overrides      map[string]interface{}
+		mustContain    []string
+		mustNotContain []string
+	}{
+		{
+			name:    "self-hosted control-plane: always-enabled features",
+			variant: "self-hosted",
+			overrides: map[string]interface{}{
+				"OVN_OBSERVABILITY_ENABLE":        "false",
+				"OVN_MULTI_NETWORK_POLICY_ENABLE": "false",
+			},
+			mustContain: []string{
+				"--enable-egress-ip=true",
+				"--enable-egress-firewall=true",
+				"--enable-egress-qos=true",
+				"--enable-egress-service=true",
+				"--enable-multicast",
+				"--enable-multi-external-gateway=true",
+			},
+			mustNotContain: []string{
+				"egress_features_enable_flag=",
+				"enable_multicast_flag=",
+				"multi_external_gateway_enable_flag=",
+			},
+		},
+
+		{
+			name:    "self-hosted control-plane: conditional features enabled",
+			variant: "self-hosted",
+			overrides: map[string]interface{}{
+				"OVN_MULTI_NETWORK_POLICY_ENABLE": "true",
+			},
+			mustContain: []string{
+				"--enable-egress-ip=true",
+				"--enable-multicast",
+				"--enable-multi-external-gateway=true",
+				"multi_network_policy_enabled_flag=\"--enable-multi-networkpolicy\"",
+				"admin_network_policy_enabled_flag=\"--enable-admin-network-policy\"",
+			},
+			mustNotContain: []string{
+				"network_observability_enabled_flag=",
+			},
+		},
+		{
+			name:    "self-hosted control-plane: multi-network enabled",
+			variant: "self-hosted",
+			overrides: map[string]interface{}{
+				"OVN_MULTI_NETWORK_ENABLE": "true",
+			},
+			mustContain: []string{
+				"--enable-egress-ip=true",
+				"--enable-multicast",
+				"--enable-multi-external-gateway=true",
+				"multi_network_enabled_flag=\"--enable-multi-network\"",
+			},
+			mustNotContain: []string{},
+		},
+		{
+			name:    "self-hosted control-plane: network segmentation enabled (auto-enables multi-network)",
+			variant: "self-hosted",
+			overrides: map[string]interface{}{
+				"OVN_MULTI_NETWORK_ENABLE": "false",
+			},
+			mustContain: []string{
+				"--enable-egress-ip=true",
+				"--enable-multicast",
+				"--enable-multi-external-gateway=true",
+				"multi_network_enabled_flag=\"--enable-multi-network\"",
+				"network_segmentation_enabled_flag=\"--enable-network-segmentation\"",
+			},
+			mustNotContain: []string{},
+		},
+		{
+			name:    "self-hosted control-plane: both multi-network and segmentation enabled",
+			variant: "self-hosted",
+			overrides: map[string]interface{}{
+				"OVN_MULTI_NETWORK_ENABLE": "true",
+			},
+			mustContain: []string{
+				"--enable-egress-ip=true",
+				"--enable-multicast",
+				"--enable-multi-external-gateway=true",
+				"multi_network_enabled_flag=\"--enable-multi-network\"",
+				"network_segmentation_enabled_flag=\"--enable-network-segmentation\"",
+			},
+			mustNotContain: []string{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			script := renderControlPlaneWithOverrides(t, tc.variant, tc.overrides)
+			for _, s := range tc.mustContain {
+				g.Expect(script).To(ContainSubstring(s), "Expected to find: %s", s)
+			}
+			for _, s := range tc.mustNotContain {
+				g.Expect(script).NotTo(ContainSubstring(s), "Expected NOT to find: %s", s)
+			}
+		})
+	}
+}
+
+func TestOVNKubernetesScriptLibCombined(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	renderScript := func(overrides map[string]interface{}) string {
+		return renderScriptLibWithOverrides(t, overrides)
+	}
+
+	testCases := []struct {
+		name           string
+		overrides      map[string]interface{}
+		mustContain    []string
+		mustNotContain []string
+	}{
+		{
+			name: "dpu-host gating and egress/policy disable",
+			overrides: map[string]interface{}{
+				"OVN_NODE_MODE":                   "dpu-host",
+				"OVN_MULTI_NETWORK_ENABLE":        "true",
+				"OVN_MULTI_NETWORK_POLICY_ENABLE": "true",
+			},
+			mustContain: []string{
+				"gateway_interface=\"derive-from-mgmt-port\"",
+				"init_ovnkube_controller=\"\"",
+				"enable_multicast_flag=\"\"",
+				"egress_features_enable_flag=\"\"",
+				"multi_external_gateway_enable_flag=\"\"",
+				"ovnkube_node_mode=\"--ovnkube-node-mode dpu-host\"",
+				"multi_network_enabled_flag=",
+				"network_segmentation_enabled_flag=",
+				"multi_network_policy_enabled_flag=",
+				"admin_network_policy_enabled_flag=",
+			},
+			mustNotContain: []string{},
+		},
+		{
+			name: "full mode with multi-network features enabled",
+			overrides: map[string]interface{}{
+				"OVN_NODE_MODE":                   "full",
+				"OVN_MULTI_NETWORK_ENABLE":        "true",
+				"OVN_MULTI_NETWORK_POLICY_ENABLE": "true",
+			},
+			mustContain: []string{
+				"gateway_interface=br-ex",
+				"init_ovnkube_controller=\"--init-ovnkube-controller ${K8S_NODE}\"",
+				"enable_multicast_flag=\"--enable-multicast\"",
+				"egress_features_enable_flag=\"--enable-egress-ip=true --enable-egress-firewall=true --enable-egress-qos=true --enable-egress-service=true\"",
+				"multi_external_gateway_enable_flag=\"--enable-multi-external-gateway=true\"",
+				"multi_network_enabled_flag=\"--enable-multi-network\"",
+				"network_segmentation_enabled_flag=\"--enable-network-segmentation\"",
+				"multi_network_policy_enabled_flag=\"--enable-multi-networkpolicy\"",
+				"admin_network_policy_enabled_flag=\"--enable-admin-network-policy\"",
+			},
+			mustNotContain: []string{},
+		},
+		{
+			name: "non-mode-gated features enabled",
+			overrides: map[string]interface{}{
+				"OVN_NODE_MODE":                   "full",
+				"OVN_ROUTE_ADVERTISEMENTS_ENABLE": "true",
+				"OVN_PRE_CONF_UDN_ADDR_ENABLE":    "true",
+				"OVN_OBSERVABILITY_ENABLE":        "true",
+				"DNS_NAME_RESOLVER_ENABLE":        "true",
+				"NETWORK_NODE_IDENTITY_ENABLE":    "true",
+			},
+			mustContain: []string{
+				"route_advertisements_enable_flag=\"--enable-route-advertisements\"",
+				"preconfigured_udn_addresses_enable_flag=\"--enable-preconfigured-udn-addresses\"",
+				"network_observability_enabled_flag=\"--enable-observability\"",
+				"dns_name_resolver_enabled_flag=\"--enable-dns-name-resolver\"",
+				"ip_forwarding_flag=\"--disable-forwarding\"",
+				"--bootstrap-kubeconfig=/var/lib/kubelet/kubeconfig",
+			},
+			mustNotContain: []string{},
+		},
+		{
+			name: "full mode: multi-network features disabled",
+			overrides: map[string]interface{}{
+				"OVN_NODE_MODE":                   "full",
+				"OVN_MULTI_NETWORK_ENABLE":        "false",
+				"OVN_MULTI_NETWORK_POLICY_ENABLE": "false",
+			},
+			mustContain: []string{
+				"multi_network_enabled_flag=",
+				"network_segmentation_enabled_flag=",
+				"multi_network_policy_enabled_flag=",
+				"admin_network_policy_enabled_flag=",
+			},
+			mustNotContain: []string{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			script := renderScript(tc.overrides)
+			for _, s := range tc.mustContain {
+				g.Expect(script).To(ContainSubstring(s))
+			}
+			for _, s := range tc.mustNotContain {
+				g.Expect(script).NotTo(ContainSubstring(s))
+			}
+			// Ensure gateway flags use the variable rather than a hardcoded iface
+			g.Expect(script).To(ContainSubstring("--gateway-interface ${gateway_interface}"))
+		})
+	}
+}
+
+// TestRenderOVNKubernetesNoOverlay tests no-overlay mode rendering
+func TestRenderOVNKubernetesNoOverlay(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	noOverlayEnabledFeatureGates := func() featuregates.FeatureGate {
+		return featuregates.NewFeatureGate(
+			[]configv1.FeatureGateName{
+				apifeatures.FeatureGateDNSNameResolver,
+				apifeatures.FeatureGateOVNObservability,
+				apifeatures.FeatureGateNoOverlayMode,
+			},
+			[]configv1.FeatureGateName{
+				apifeatures.FeatureGateEVPN,
+			},
+		)
+	}
+
+	testCases := []struct {
+		name                    string
+		defaultNetworkTransport operv1.TransportOption
+		noOverlayConfig         *operv1.NoOverlayConfig
+		bgpManagedConfig        *operv1.BGPManagedConfig
+		featureGates            func() featuregates.FeatureGate
+		expectTransport         string // expected rendered transport value (e.g., "no-overlay", not "NoOverlay")
+		expectNoOverlayEnabled  bool
+		expectNoOverlayRouting  string
+		expectNoOverlaySNAT     string
+		expectManagedEnabled    bool
+		expectManagedTopology   string
+		expectManagedASNumber   any // int64 when BGP managed is enabled, empty string otherwise
+		expectErr               bool
+	}{
+		{
+			name:                    "default (Geneve) - no-overlay disabled",
+			defaultNetworkTransport: operv1.TransportOptionGeneve,
+			featureGates:            noOverlayEnabledFeatureGates,
+			expectTransport:         "",
+			expectNoOverlayEnabled:  false,
+			expectNoOverlayRouting:  "",
+			expectNoOverlaySNAT:     "",
+			expectManagedEnabled:    false,
+			expectManagedTopology:   "",
+			expectManagedASNumber:   "",
+		},
+		{
+			name:                    "NoOverlay with Unmanaged routing",
+			defaultNetworkTransport: operv1.TransportOptionNoOverlay,
+			noOverlayConfig: &operv1.NoOverlayConfig{
+				Routing:      operv1.RoutingUnmanaged,
+				OutboundSNAT: operv1.SNATEnabled,
+			},
+			featureGates:           noOverlayEnabledFeatureGates,
+			expectTransport:        "no-overlay",
+			expectNoOverlayEnabled: true,
+			expectNoOverlayRouting: "unmanaged",
+			expectNoOverlaySNAT:    "enabled",
+			expectManagedEnabled:   false,
+			expectManagedTopology:  "",
+			expectManagedASNumber:  "",
+		},
+		{
+			name:                    "NoOverlay with Managed routing and BGP FullMesh",
+			defaultNetworkTransport: operv1.TransportOptionNoOverlay,
+			noOverlayConfig: &operv1.NoOverlayConfig{
+				Routing:      operv1.RoutingManaged,
+				OutboundSNAT: operv1.SNATDisabled,
+			},
+			bgpManagedConfig: &operv1.BGPManagedConfig{
+				BGPTopology: operv1.BGPTopologyFullMesh,
+				ASNumber:    65001,
+			},
+			featureGates:           noOverlayEnabledFeatureGates,
+			expectTransport:        "no-overlay",
+			expectNoOverlayEnabled: true,
+			expectNoOverlayRouting: "managed",
+			expectNoOverlaySNAT:    "disabled",
+			expectManagedEnabled:   true,
+			expectManagedTopology:  "full-mesh",
+			expectManagedASNumber:  int64(65001),
+		},
+		{
+			name:                    "empty DefaultNetworkTransport defaults to Geneve",
+			defaultNetworkTransport: "", // Empty, should be filled by fillDefaults
+			featureGates:            noOverlayEnabledFeatureGates,
+			expectTransport:         "",
+			expectNoOverlayEnabled:  false,
+			expectNoOverlayRouting:  "",
+			expectNoOverlaySNAT:     "",
+			expectManagedEnabled:    false,
+			expectManagedTopology:   "",
+			expectManagedASNumber:   "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			crd := OVNKubernetesConfig.DeepCopy()
+			config := &crd.Spec
+			config.DefaultNetwork.OVNKubernetesConfig.MTU = ptrToUint32(1500)
+			config.DefaultNetwork.OVNKubernetesConfig.Transport = tc.defaultNetworkTransport
+
+			if tc.noOverlayConfig != nil {
+				config.DefaultNetwork.OVNKubernetesConfig.NoOverlayConfig = *tc.noOverlayConfig
+			}
+			if tc.bgpManagedConfig != nil {
+				config.DefaultNetwork.OVNKubernetesConfig.BGPManagedConfig = *tc.bgpManagedConfig
+			}
+
+			errs := validateOVNKubernetes(config)
+			g.Expect(errs).To(HaveLen(0))
+			fillDefaults(config, nil)
+
+			bootstrapResult := fakeBootstrapResult()
+			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+				ControlPlaneReplicaCount: 3,
+				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+					DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+					DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+					SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+					MgmtPortResourceName: "",
+					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+						Enabled: false,
+					},
+				},
+			}
+
+			fakeClient := cnofake.NewFakeClient()
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, tc.featureGates())
+
+			if tc.expectErr {
+				g.Expect(err).To(HaveOccurred())
+				return
+			}
+			g.Expect(err).NotTo(HaveOccurred())
+
+			// Find the ovnkube-config ConfigMap and check the template data
+			var configMap *uns.Unstructured
+			for _, obj := range objs {
+				if obj.GetKind() == "ConfigMap" && obj.GetName() == "ovnkube-config" {
+					configMap = obj
+					break
+				}
+			}
+			g.Expect(configMap).NotTo(BeNil(), "ovnkube-config ConfigMap should exist")
+
+			// Check the transport value in the rendered ConfigMap
+			configMapData, found, err := uns.NestedStringMap(configMap.Object, "data")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(found).To(BeTrue(), "ConfigMap should have data field")
+			ovnkubeConf := configMapData["ovnkube.conf"]
+			if tc.expectTransport != "" {
+				g.Expect(ovnkubeConf).To(ContainSubstring("transport=\""+tc.expectTransport+"\""),
+					"ConfigMap should contain transport=%q, got:\n%s", tc.expectTransport, ovnkubeConf)
+			} else {
+				g.Expect(ovnkubeConf).NotTo(ContainSubstring("transport=\"no-overlay\""),
+					"ConfigMap should not contain no-overlay transport when disabled")
+			}
+
+			// Validate no-overlay section in ConfigMap
+			if tc.expectNoOverlayEnabled {
+				g.Expect(ovnkubeConf).To(ContainSubstring("[no-overlay]"),
+					"ConfigMap should contain [no-overlay] section when enabled")
+				if tc.expectNoOverlayRouting != "" {
+					g.Expect(ovnkubeConf).To(ContainSubstring("routing="+tc.expectNoOverlayRouting),
+						"ConfigMap should contain routing=%s", tc.expectNoOverlayRouting)
+				}
+				if tc.expectNoOverlaySNAT != "" {
+					g.Expect(ovnkubeConf).To(ContainSubstring("outbound-snat="+tc.expectNoOverlaySNAT),
+						"ConfigMap should contain outbound-snat=%s", tc.expectNoOverlaySNAT)
+				}
+			} else {
+				g.Expect(ovnkubeConf).NotTo(ContainSubstring("[no-overlay]"),
+					"ConfigMap should not contain [no-overlay] section when disabled")
+			}
+
+			// Validate bgp-managed section in ConfigMap
+			if tc.expectManagedEnabled {
+				g.Expect(ovnkubeConf).To(ContainSubstring("[bgp-managed]"),
+					"ConfigMap should contain [bgp-managed] section when enabled")
+				if tc.expectManagedTopology != "" {
+					g.Expect(ovnkubeConf).To(ContainSubstring("topology="+tc.expectManagedTopology),
+						"ConfigMap should contain topology=%s", tc.expectManagedTopology)
+				}
+				if tc.expectManagedASNumber != "" {
+					g.Expect(ovnkubeConf).To(ContainSubstring(fmt.Sprintf("as-number=%v", tc.expectManagedASNumber)),
+						"ConfigMap should contain as-number=%v", tc.expectManagedASNumber)
+				}
+			} else {
+				g.Expect(ovnkubeConf).NotTo(ContainSubstring("[bgp-managed]"),
+					"ConfigMap should not contain [bgp-managed] section when disabled")
+			}
+
+			// Verify core objects exist
+			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+			g.Expect(renderedNode).NotTo(BeNil(), "ovnkube-node DaemonSet should exist")
+
+			renderedControlPlane := findInObjs("apps", "Deployment", "ovnkube-control-plane", "openshift-ovn-kubernetes", objs)
+			g.Expect(renderedControlPlane).NotTo(BeNil(), "ovnkube-control-plane Deployment should exist")
+		})
+	}
+}
+
+// TestFillOVNKubernetesDefaultsMTUNoOverlay tests that MTU is set correctly for no-overlay mode
+func TestFillOVNKubernetesDefaultsMTUNoOverlay(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	t.Run("no-overlay mode sets MTU to hostMTU (no overhead subtraction)", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = nil // not set
+
+		hostMTU := 9000
+		fillOVNKubernetesDefaults(conf, nil, hostMTU)
+
+		g.Expect(conf.DefaultNetwork.OVNKubernetesConfig.MTU).NotTo(BeNil())
+		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(uint32(hostMTU)))
+	})
+
+	t.Run("Geneve mode subtracts encapsulation overhead from hostMTU", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionGeneve
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = nil // not set
+
+		hostMTU := 9000
+		fillOVNKubernetesDefaults(conf, nil, hostMTU)
+
+		g.Expect(conf.DefaultNetwork.OVNKubernetesConfig.MTU).NotTo(BeNil())
+		// Geneve overhead is 100 bytes
+		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(uint32(hostMTU - 100)))
+	})
+
+	t.Run("empty transport (defaults to Geneve) subtracts overhead", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = "" // empty
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = nil      // not set
+
+		hostMTU := 9000
+		fillOVNKubernetesDefaults(conf, nil, hostMTU)
+
+		g.Expect(conf.DefaultNetwork.OVNKubernetesConfig.MTU).NotTo(BeNil())
+		// Empty defaults to Geneve, so overhead is 100 bytes
+		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(uint32(hostMTU - 100)))
+	})
+
+	t.Run("previous MTU is preserved also in no-overlay mode", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = nil // not set
+
+		prev := crd.DeepCopy()
+		prevMTU := uint32(1500)
+		prev.Spec.DefaultNetwork.OVNKubernetesConfig.MTU = &prevMTU
+
+		hostMTU := 9000
+		fillOVNKubernetesDefaults(conf, &prev.Spec, hostMTU)
+
+		g.Expect(conf.DefaultNetwork.OVNKubernetesConfig.MTU).NotTo(BeNil())
+		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(prevMTU))
+	})
+}
+
+// TestValidateMTUForNoOverlay tests the MTU validation for no-overlay mode
+func TestValidateMTUForNoOverlay(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	t.Run("valid MTU equal to hostMTU", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		mtu := uint32(9000)
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
+
+		err := ValidateMTUForNoOverlay(conf, 9000)
+		g.Expect(err).To(BeNil())
+	})
+
+	t.Run("valid MTU less than hostMTU", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		mtu := uint32(1500)
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
+
+		err := ValidateMTUForNoOverlay(conf, 9000)
+		g.Expect(err).To(BeNil())
+	})
+
+	t.Run("invalid MTU greater than hostMTU", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		mtu := uint32(9001)
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
+
+		err := ValidateMTUForNoOverlay(conf, 9000)
+		g.Expect(err).NotTo(BeNil())
+		g.Expect(err.Error()).To(ContainSubstring("cannot exceed host MTU"))
+	})
+
+	t.Run("hostMTU of 0 skips validation", func(t *testing.T) {
+		crd := OVNKubernetesConfig.DeepCopy()
+		conf := &crd.Spec
+		mtu := uint32(1500)
+		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
+		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
+
+		err := ValidateMTUForNoOverlay(conf, 0)
+		g.Expect(err).To(BeNil())
 	})
 }
