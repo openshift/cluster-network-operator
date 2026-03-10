@@ -537,6 +537,9 @@ data:
       # Ensure openflow_probe_flag is always defined
       openflow_probe_flag=
 
+      # Ensure dpu_lease_flags is always defined
+      dpu_lease_flags=
+
       if [[ $# -ne 3 ]]; then
         echo "Expected three arguments but got $#"
         exit 1
@@ -579,7 +582,15 @@ data:
 
         # disable init-ovnkube-controller for dpu-host mode as it is not supported
         init_ovnkube_controller=""
+      fi
 
+      if [ "${OVN_NODE_MODE}" == "dpu-host" ] || [ "${OVN_NODE_MODE}" == "dpu" ]; then
+        if [[ -n "${OVNKUBE_NODE_LEASE_RENEW_INTERVAL}" ]]; then
+          dpu_lease_flags="--dpu-node-lease-renew-interval ${OVNKUBE_NODE_LEASE_RENEW_INTERVAL}"
+        fi
+        if [[ -n "${OVNKUBE_NODE_LEASE_DURATION}" ]]; then
+          dpu_lease_flags="$dpu_lease_flags --dpu-node-lease-duration ${OVNKUBE_NODE_LEASE_DURATION}"
+        fi
       fi
 
       if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
@@ -731,5 +742,6 @@ data:
         ${ovn_v4_masquerade_subnet_opt} \
         ${ovn_v6_masquerade_subnet_opt} \
         ${ovn_v4_transit_switch_subnet_opt} \
-        ${ovn_v6_transit_switch_subnet_opt}
+        ${ovn_v6_transit_switch_subnet_opt} \
+        ${dpu_lease_flags}
     }

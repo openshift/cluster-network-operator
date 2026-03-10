@@ -437,6 +437,12 @@ spec:
         - name: OVNKUBE_NODE_MGMT_PORT_DP_RESOURCE_NAME
           value: {{ .MgmtPortResourceName }}
         {{ end }}
+        {{ if and (or (eq .OVN_NODE_MODE "dpu-host") (eq .OVN_NODE_MODE "dpu")) (ne .DpuNodeLeaseRenewInterval "0") }}
+        - name: OVNKUBE_NODE_LEASE_RENEW_INTERVAL
+          value: "{{.DpuNodeLeaseRenewInterval}}"
+        - name: OVNKUBE_NODE_LEASE_DURATION
+          value: "{{.DpuNodeLeaseDuration}}"
+        {{ end }}
 {{ if .HTTP_PROXY }}
         - name: "HTTP_PROXY"
           value: "{{ .HTTP_PROXY}}"
