@@ -189,6 +189,17 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			}
 		}
 	}
+	data.Data["AllowICMPNetworkPolicy"] = ""
+	if raw, ok := bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["allow-icmp-network-policy"]; ok {
+		AllowICMPNetworkPolicy := strings.TrimSpace(raw)
+		if AllowICMPNetworkPolicy != "" {
+			if _, err := strconv.ParseBool(AllowICMPNetworkPolicy); err != nil {
+				klog.Warningf("Ignoring invalid allow-icmp-network-policy override %q: expected boolean", raw)
+			} else {
+				data.Data["AllowICMPNetworkPolicy"] = AllowICMPNetworkPolicy
+			}
+		}
+	}
 
 	if conf.Migration != nil {
 		if conf.Migration.MTU != nil {

@@ -508,6 +508,9 @@ data:
       # Ensure openflow_probe_flag is always defined
       openflow_probe_flag=
 
+      # Ensure allow_icmp_network_policy_flag is always defined
+      allow_icmp_network_policy_flag=
+
       if [[ $# -ne 3 ]]; then
         echo "Expected three arguments but got $#"
         exit 1
@@ -633,6 +636,10 @@ data:
         openflow_probe_flag="--openflow-probe={{.OpenFlowProbe}}"
       fi
 
+      if [[ "{{.AllowICMPNetworkPolicy}}" != "" ]]; then
+        allow_icmp_network_policy_flag="--allow-icmp-network-policy={{.AllowICMPNetworkPolicy}}"
+      fi
+
       NETWORK_NODE_IDENTITY_ENABLE=
       if [[ "{{.NETWORK_NODE_IDENTITY_ENABLE}}" == "true" ]]; then
         NETWORK_NODE_IDENTITY_ENABLE="
@@ -696,6 +703,7 @@ data:
         ${ip_forwarding_flag} \
         ${ovn_advertised_udn_isolation_mode_flag} \
         ${openflow_probe_flag} \
+        ${allow_icmp_network_policy_flag} \
         ${NETWORK_NODE_IDENTITY_ENABLE} \
         ${ovn_v4_join_subnet_opt} \
         ${ovn_v6_join_subnet_opt} \
