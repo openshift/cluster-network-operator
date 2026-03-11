@@ -1,6 +1,7 @@
 package network
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/ghodss/yaml"
@@ -160,6 +161,8 @@ func createTestRenderData(ovnNodeMode string) render.RenderData {
 	data.Data["SmartNicModeValue"] = ""
 	data.Data["DpuModeLabel"] = ""
 	data.Data["MgmtPortResourceName"] = ""
+	data.Data["DpuNodeLeaseRenewInterval"] = strconv.Itoa(DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT)
+	data.Data["DpuNodeLeaseDuration"] = strconv.Itoa(DPU_NODE_LEASE_DURATION_DEFAULT)
 	data.Data["HTTP_PROXY"] = ""
 	data.Data["HTTPS_PROXY"] = ""
 	data.Data["NO_PROXY"] = ""
@@ -208,6 +211,126 @@ func getMatchExpression(g *WithT, ds *appsv1.DaemonSet, label string) (corev1.No
 	}
 
 	return corev1.NodeSelectorOpDoesNotExist, ""
+}
+
+// TestOVNKubernetesLeaseEnvVars tests that DPU lease env vars are set
+// for DPU and DPU-host modes but not for full mode
+func TestOVNKubernetesLeaseEnvVars(t *testing.T) {
+	templates := []struct {
+		name         string
+		templatePath string
+	}{
+		{
+			name:         "managed",
+			templatePath: "../../bindata/network/ovn-kubernetes/managed/ovnkube-node.yaml",
+		},
+		{
+			name:         "self-hosted",
+			templatePath: "../../bindata/network/ovn-kubernetes/self-hosted/ovnkube-node.yaml",
+		},
+	}
+
+	testCases := []struct {
+		name        string
+		ovnNodeMode string
+		expectSet   bool
+	}{
+		{
+			name:        "full mode should not have lease env vars",
+			ovnNodeMode: "full",
+			expectSet:   false,
+		},
+		{
+			name:        "dpu-host mode should have lease env vars",
+			ovnNodeMode: "dpu-host",
+			expectSet:   true,
+		},
+		{
+			name:        "dpu mode should have lease env vars",
+			ovnNodeMode: "dpu",
+			expectSet:   true,
+		},
+	}
+
+	// Env vars with literal values
+	leaseEnvVars := map[string]string{
+		"OVNKUBE_NODE_LEASE_RENEW_INTERVAL": strconv.Itoa(DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT),
+		"OVNKUBE_NODE_LEASE_DURATION":       strconv.Itoa(DPU_NODE_LEASE_DURATION_DEFAULT),
+	}
+	// Env vars using fieldRef (no literal value)
+	leaseFieldRefEnvVars := []string{
+		"OVNKUBE_NODE_LEASE_NAMESPACE",
+	}
+
+	for _, template := range templates {
+		for _, tc := range testCases {
+			testName := template.name + "_" + tc.name
+			t.Run(testName, func(t *testing.T) {
+				g := NewGomegaWithT(t)
+
+				data := createTestRenderData(tc.ovnNodeMode)
+
+				objs, err := render.RenderTemplate(template.templatePath, &data)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(objs).To(HaveLen(1))
+
+				yamlBytes, err := yaml.Marshal(objs[0])
+				g.Expect(err).NotTo(HaveOccurred())
+
+				ds := &appsv1.DaemonSet{}
+				err = yaml.Unmarshal(yamlBytes, ds)
+				g.Expect(err).NotTo(HaveOccurred())
+
+				// Check env vars with literal values
+				for envName, expectedValue := range leaseEnvVars {
+					found := false
+					for _, container := range ds.Spec.Template.Spec.Containers {
+						for _, env := range container.Env {
+							if env.Name == envName {
+								found = true
+								g.Expect(env.Value).To(Equal(expectedValue),
+									"%s should be set to %s", envName, expectedValue)
+							}
+						}
+					}
+
+					if tc.expectSet {
+						g.Expect(found).To(BeTrue(),
+							"%s should be set for %s mode", envName, tc.ovnNodeMode)
+					} else {
+						g.Expect(found).To(BeFalse(),
+							"%s should not be set for %s mode", envName, tc.ovnNodeMode)
+					}
+				}
+
+				// Check env vars using fieldRef
+				for _, envName := range leaseFieldRefEnvVars {
+					found := false
+					for _, container := range ds.Spec.Template.Spec.Containers {
+						for _, env := range container.Env {
+							if env.Name == envName {
+								found = true
+								g.Expect(env.ValueFrom).NotTo(BeNil(),
+									"%s should use valueFrom", envName)
+								g.Expect(env.ValueFrom.FieldRef).NotTo(BeNil(),
+									"%s should use fieldRef", envName)
+								g.Expect(env.ValueFrom.FieldRef.FieldPath).To(Equal("metadata.namespace"),
+									"%s fieldRef should reference metadata.namespace", envName)
+							}
+						}
+					}
+
+					if tc.expectSet {
+						g.Expect(found).To(BeTrue(),
+							"%s should be set for %s mode", envName, tc.ovnNodeMode)
+					} else {
+						g.Expect(found).To(BeFalse(),
+							"%s should not be set for %s mode", envName, tc.ovnNodeMode)
+					}
+				}
+			})
+		}
+	}
 }
 
 // TestOVNKubernetesNodeSelectorOperator tests that the node selector operator works correctly with label values of different Full/SmartNIC/DPU modes

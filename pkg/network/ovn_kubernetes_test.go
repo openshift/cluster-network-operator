@@ -95,10 +95,12 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		ControlPlaneReplicaCount: 3,
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -219,10 +221,12 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		ControlPlaneReplicaCount: 3,
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -240,10 +244,12 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		ControlPlaneReplicaCount: 3,
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -1046,10 +1052,12 @@ logfile-maxage=0`,
 			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 				ControlPlaneReplicaCount: tc.controlPlaneReplicaCount,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-					DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-					DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-					SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-					MgmtPortResourceName: "",
+					DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+					DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+					SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+					MgmtPortResourceName:      "",
+					DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+					DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 						Enabled: false,
 					},
@@ -2207,10 +2215,12 @@ metadata:
 				ControlPlaneUpdateStatus: controlPlaneStatus,
 				NodeUpdateStatus:         nodeStatus,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-					DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-					DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-					SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-					MgmtPortResourceName: "",
+					DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+					DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+					SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+					MgmtPortResourceName:      "",
+					DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+					DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 						Enabled: false,
 					},
@@ -2512,10 +2522,12 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 			IPFamilyMode: names.IPFamilySingleStack,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -2739,10 +2751,12 @@ func TestRenderOVNKubernetesEnableIPsecForHostedControlPlane(t *testing.T) {
 			IPFamilyMode: names.IPFamilySingleStack,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -2840,10 +2854,12 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 			IsOVNIPsecActiveOrRollingOut: true,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -2952,10 +2968,12 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 			IsOVNIPsecActiveOrRollingOut: true,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -3100,10 +3118,12 @@ func TestRenderOVNKubernetesIPsecUpgradeWithHypershiftHostedCluster(t *testing.T
 			IsOVNIPsecActiveOrRollingOut: true,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -3203,10 +3223,12 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 			IsOVNIPsecActiveOrRollingOut: true,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -3413,10 +3435,12 @@ func TestRenderOVNKubernetesEnableIPsecWithUserInstalledIPsecMachineConfigs(t *t
 			IPFamilyMode: names.IPFamilySingleStack,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -3559,10 +3583,12 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 			IsOVNIPsecActiveOrRollingOut: true,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -3698,10 +3724,12 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 			IPFamilyMode: names.IPFamilySingleStack,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -3941,10 +3969,12 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		ControlPlaneReplicaCount: 3,
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -4117,10 +4147,12 @@ func Test_renderOVNKubernetes(t *testing.T) {
 		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 			ControlPlaneReplicaCount: 3,
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-				DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-				SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-				MgmtPortResourceName: "",
+				DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+				DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+				SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+				MgmtPortResourceName:      "",
+				DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+				DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 					Enabled: false,
 				},
@@ -4252,10 +4284,12 @@ func TestRenderOVNKubernetes_AdvertisedUDNIsolationModeOverride(t *testing.T) {
 		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 			ControlPlaneReplicaCount: 3,
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-				DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-				SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-				MgmtPortResourceName: "",
+				DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+				DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+				SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+				MgmtPortResourceName:      "",
+				DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+				DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 					Enabled: false,
 				},
@@ -4293,10 +4327,12 @@ func TestRenderOVNKubernetes_OpenFlowProbeOverride(t *testing.T) {
 		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 			ControlPlaneReplicaCount: 3,
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-				DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-				SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-				MgmtPortResourceName: "",
+				DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+				DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+				SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+				MgmtPortResourceName:      "",
+				DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+				DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 					Enabled: false,
 				},
@@ -4325,4 +4361,152 @@ func TestRenderOVNKubernetes_OpenFlowProbeOverride(t *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"openflow-probe": "-60"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--openflow-probe="`))
 	})
+}
+
+func TestDpuLeaseConfigRendering(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+	errs := validateOVNKubernetes(config)
+	g.Expect(errs).To(HaveLen(0))
+	fillDefaults(config, nil)
+
+	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+		ControlPlaneReplicaCount: 3,
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: 15,
+			DpuNodeLeaseDuration:      60,
+			DpuHostModeNodes:          []string{"dpu-host-node-1"},
+			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+				Enabled: false,
+			},
+		},
+	}
+
+	featureGatesCNO := getDefaultFeatureGates()
+	fakeClient := cnofake.NewFakeClient()
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	envVars := extractDaemonSetEnvVars(g, objs, "ovnkube-node-dpu-host", "ovnkube-controller")
+	g.Expect(envVars["OVNKUBE_NODE_LEASE_RENEW_INTERVAL"]).To(Equal("15"))
+	g.Expect(envVars["OVNKUBE_NODE_LEASE_DURATION"]).To(Equal("60"))
+	_, hasNamespace := envVars["OVNKUBE_NODE_LEASE_NAMESPACE"]
+	g.Expect(hasNamespace).To(BeTrue(), "OVNKUBE_NODE_LEASE_NAMESPACE env var should be present")
+}
+
+func TestDpuLeaseConfigDefaults(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+	errs := validateOVNKubernetes(config)
+	g.Expect(errs).To(HaveLen(0))
+	fillDefaults(config, nil)
+
+	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+		ControlPlaneReplicaCount: 3,
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuHostModeNodes:          []string{"dpu-host-node-1"},
+			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+				Enabled: false,
+			},
+		},
+	}
+
+	featureGatesCNO := getDefaultFeatureGates()
+	fakeClient := cnofake.NewFakeClient()
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	envVars := extractDaemonSetEnvVars(g, objs, "ovnkube-node-dpu-host", "ovnkube-controller")
+	g.Expect(envVars["OVNKUBE_NODE_LEASE_RENEW_INTERVAL"]).To(Equal("10"))
+	g.Expect(envVars["OVNKUBE_NODE_LEASE_DURATION"]).To(Equal("40"))
+	_, hasNamespace := envVars["OVNKUBE_NODE_LEASE_NAMESPACE"]
+	g.Expect(hasNamespace).To(BeTrue(), "OVNKUBE_NODE_LEASE_NAMESPACE env var should be present")
+}
+
+func TestDpuLeaseConfigZeroDisables(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+	errs := validateOVNKubernetes(config)
+	g.Expect(errs).To(HaveLen(0))
+	fillDefaults(config, nil)
+
+	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+		ControlPlaneReplicaCount: 3,
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: 0,
+			DpuNodeLeaseDuration:      0,
+			DpuHostModeNodes:          []string{"dpu-host-node-1"},
+			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+				Enabled: false,
+			},
+		},
+	}
+
+	featureGatesCNO := getDefaultFeatureGates()
+	fakeClient := cnofake.NewFakeClient()
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	// Timer=0 should render as "0", not fall back to defaults
+	envVars := extractDaemonSetEnvVars(g, objs, "ovnkube-node-dpu-host", "ovnkube-controller")
+	g.Expect(envVars["OVNKUBE_NODE_LEASE_RENEW_INTERVAL"]).To(Equal("0"))
+	g.Expect(envVars["OVNKUBE_NODE_LEASE_DURATION"]).To(Equal("0"))
+}
+
+// extractDaemonSetEnvVars finds a DaemonSet by name in the rendered objects and returns
+// env vars for the specified container as a map.
+func extractDaemonSetEnvVars(g *WithT, objs []*uns.Unstructured, dsName, containerName string) map[string]string {
+	envVars := map[string]string{}
+	for _, obj := range objs {
+		if obj.GetKind() != "DaemonSet" || obj.GetName() != dsName {
+			continue
+		}
+		containers, found, err := uns.NestedSlice(obj.Object, "spec", "template", "spec", "containers")
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(found).To(BeTrue())
+		for _, c := range containers {
+			cmap := c.(map[string]interface{})
+			name, _, _ := uns.NestedString(cmap, "name")
+			if name != containerName {
+				continue
+			}
+			envList, found, err := uns.NestedSlice(cmap, "env")
+			g.Expect(err).NotTo(HaveOccurred())
+			if !found {
+				return envVars
+			}
+			for _, e := range envList {
+				emap := e.(map[string]interface{})
+				eName, _, _ := uns.NestedString(emap, "name")
+				eVal, _, _ := uns.NestedString(emap, "value")
+				envVars[eName] = eVal
+			}
+			return envVars
+		}
+	}
+	g.Expect(true).To(BeFalse(), "could not find DaemonSet %s with container %s", dsName, containerName)
+	return envVars
 }

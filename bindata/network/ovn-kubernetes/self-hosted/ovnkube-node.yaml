@@ -472,6 +472,16 @@ spec:
         - name: OVNKUBE_NODE_MGMT_PORT_DP_RESOURCE_NAME
           value: {{ .MgmtPortResourceName }}
         {{ end }}
+        {{ if or (eq .OVN_NODE_MODE "dpu-host") (eq .OVN_NODE_MODE "dpu") }}
+        - name: OVNKUBE_NODE_LEASE_RENEW_INTERVAL
+          value: "{{.DpuNodeLeaseRenewInterval}}"
+        - name: OVNKUBE_NODE_LEASE_DURATION
+          value: "{{.DpuNodeLeaseDuration}}"
+        - name: OVNKUBE_NODE_LEASE_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        {{ end }}
         - name: K8S_NODE
           valueFrom:
             fieldRef:
