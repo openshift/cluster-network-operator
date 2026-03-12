@@ -220,4 +220,4 @@ Status is posted to both the `Network.operator.openshift.io` object, as well as 
 
 ### Changes needed
 
-The Status-generating infrastructure in the CNO was written before it had multiple control loops. Correct behavior would be to separate status per-controller, and only publish network-controller status to the `Network.operator` object. This would reflect the logical structure more cleanly.
+The Status-generating infrastructure in the CNO was written before it had multiple control loops. Correct behavior would be to separate status per-controller, and only publish network-controller status to the `Network.operator` object. This would reflect the logical structure more cleanly.# Test addition
