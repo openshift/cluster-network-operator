@@ -13,3 +13,4 @@ COPY bindata /bindata
 ENV OPERATOR_NAME=cluster-network-operator
 CMD ["/usr/bin/cluster-network-operator"]
 LABEL io.openshift.release.operator true
+# test comment
