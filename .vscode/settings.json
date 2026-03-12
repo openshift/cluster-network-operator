@@ -3,4 +3,4 @@
     "go.lintFlags": [
         "--modules-download-mode=vendor"
     ]
-}
+}{"test": true}
