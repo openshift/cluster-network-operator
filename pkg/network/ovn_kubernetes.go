@@ -1157,31 +1157,44 @@ func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	return errs
 }
 
-func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
+func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int, isHyperShift bool) {
 
 	if conf.DefaultNetwork.OVNKubernetesConfig == nil {
 		conf.DefaultNetwork.OVNKubernetesConfig = &operv1.OVNKubernetesConfig{}
 	}
 
 	sc := conf.DefaultNetwork.OVNKubernetesConfig
-	// MTU is currently the only field we pull from previous.
-	// If it's not supplied, we infer it by probing a node's interface via the mtu-prober job.
-	// However, this can never change, so we always prefer previous.
+	// If the user explicitly set the tunnel MTU on the Network CR (e.g. via
+	// HyperShift's --ovn-kubernetes-mtu flag), sc.MTU is already populated
+	// and this entire block is skipped — the user value is preserved as-is.
+	//
+	// When sc.MTU is nil, we determine it from (in priority order):
+	// 1. previous: carry forward from the last applied configuration
+	// 2. hostMTU > 0: use the probed/defaulted host MTU minus encap overhead
+	// 3. isHyperShift safety net: use a safe default (1500) minus encap overhead,
+	//    because GetDefaultMTU() would return the management cluster's pod network
+	//    MTU, which is unrelated to the hosted cluster's worker nodes
+	// 4. standalone fallback: probe the local host interface via GetDefaultMTU()
 	if sc.MTU == nil {
 		var mtu uint32
-		if previous != nil && previous.DefaultNetwork.OVNKubernetesConfig != nil &&
-			previous.DefaultNetwork.OVNKubernetesConfig.MTU != nil {
+		switch {
+		case previous != nil && previous.DefaultNetwork.OVNKubernetesConfig != nil &&
+			previous.DefaultNetwork.OVNKubernetesConfig.MTU != nil:
 			mtu = *previous.DefaultNetwork.OVNKubernetesConfig.MTU
-		} else {
-			// utter paranoia
-			// somehow we didn't probe the MTU in the controller, but we need it.
-			// This might be wrong in cases where the CNO is not local (e.g. Hypershift).
+		case hostMTU > 0:
+			mtu = uint32(hostMTU) - getOVNEncapOverhead(conf)
+		case isHyperShift:
+			// In HyperShift, GetDefaultMTU() reads the management cluster's pod
+			// network interface, not the hosted cluster's worker node uplink.
+			// This path should not be reached because probeMTU always returns a
+			// valid value for HyperShift, but guard against it as a safety measure.
+			log.Printf("WARNING: No probed MTU available for HyperShift cluster, using safe default of 1500")
+			mtu = uint32(1500) - getOVNEncapOverhead(conf)
+		default:
+			log.Printf("BUG: Probed MTU wasn't supplied, but was needed. Falling back to host MTU")
+			hostMTU, _ = GetDefaultMTU()
 			if hostMTU == 0 {
-				log.Printf("BUG: Probed MTU wasn't supplied, but was needed. Falling back to host MTU")
-				hostMTU, _ = GetDefaultMTU()
-				if hostMTU == 0 { // this is beyond unlikely.
-					panic("BUG: Probed MTU wasn't supplied, host MTU invalid")
-				}
+				panic("BUG: Probed MTU wasn't supplied, host MTU invalid")
 			}
 			mtu = uint32(hostMTU) - getOVNEncapOverhead(conf)
 		}

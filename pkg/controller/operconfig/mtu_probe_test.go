@@ -59,13 +59,75 @@ func TestProbeMTU(t *testing.T) {
 			expectedMTU: 5000,
 		},
 		{
-			name:  "Unknown platform on Hypershift, value from configmap is used",
-			infra: &bootstrap.InfraStatus{ControlPlaneTopology: configv1.ExternalTopologyMode, HostedControlPlane: &hypershift.HostedControlPlane{}},
-			objects: []crclient.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Namespace: util.MTU_CM_NAMESPACE, Name: util.MTU_CM_NAME},
-				Data:       map[string]string{"mtu": "5000"},
-			}},
-			expectedMTU: 5000,
+			name: "Unknown platform on HyperShift, safe default is used",
+			infra: &bootstrap.InfraStatus{
+				ControlPlaneTopology: configv1.ExternalTopologyMode,
+				HostedControlPlane:   &hypershift.HostedControlPlane{},
+			},
+			expectedMTU: 1500,
+		},
+		{
+			name: "OpenStack on HyperShift, safe default is used",
+			infra: &bootstrap.InfraStatus{
+				PlatformType:         configv1.OpenStackPlatformType,
+				ControlPlaneTopology: configv1.ExternalTopologyMode,
+				HostedControlPlane:   &hypershift.HostedControlPlane{},
+			},
+			expectedMTU: 1500,
+		},
+		{
+			name: "KubeVirt on HyperShift, safe default is used",
+			infra: &bootstrap.InfraStatus{
+				PlatformType:         configv1.KubevirtPlatformType,
+				ControlPlaneTopology: configv1.ExternalTopologyMode,
+				HostedControlPlane:   &hypershift.HostedControlPlane{},
+			},
+			expectedMTU: 1500,
+		},
+		{
+			name: "PowerVS on HyperShift, safe default is used",
+			infra: &bootstrap.InfraStatus{
+				PlatformType:         configv1.PowerVSPlatformType,
+				ControlPlaneTopology: configv1.ExternalTopologyMode,
+				HostedControlPlane:   &hypershift.HostedControlPlane{},
+			},
+			expectedMTU: 1500,
+		},
+		{
+			name: "IBMCloud on HyperShift, safe default is used",
+			infra: &bootstrap.InfraStatus{
+				PlatformType:         configv1.IBMCloudPlatformType,
+				ControlPlaneTopology: configv1.ExternalTopologyMode,
+				HostedControlPlane:   &hypershift.HostedControlPlane{},
+			},
+			expectedMTU: 1500,
+		},
+		{
+			name: "GCP on HyperShift, safe default is used",
+			infra: &bootstrap.InfraStatus{
+				PlatformType:         configv1.GCPPlatformType,
+				ControlPlaneTopology: configv1.ExternalTopologyMode,
+				HostedControlPlane:   &hypershift.HostedControlPlane{},
+			},
+			expectedMTU: 1500,
+		},
+		{
+			name: "None platform on HyperShift, safe default is used",
+			infra: &bootstrap.InfraStatus{
+				PlatformType:         configv1.NonePlatformType,
+				ControlPlaneTopology: configv1.ExternalTopologyMode,
+				HostedControlPlane:   &hypershift.HostedControlPlane{},
+			},
+			expectedMTU: 1500,
+		},
+		{
+			name: "BareMetal (Agent) on HyperShift, safe default is used",
+			infra: &bootstrap.InfraStatus{
+				PlatformType:         configv1.BareMetalPlatformType,
+				ControlPlaneTopology: configv1.ExternalTopologyMode,
+				HostedControlPlane:   &hypershift.HostedControlPlane{},
+			},
+			expectedMTU: 1500,
 		},
 		{
 			name:  "Unknown platform, value from configmap is used",

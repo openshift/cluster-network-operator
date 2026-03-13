@@ -24,25 +24,41 @@ import (
 )
 
 const (
-	awsMTU   = 9001
-	azureMTU = 1500
+	awsMTU        = 9001
+	azureMTU      = 1500
+	defaultHCPMTU = 1500 // Safe default for HyperShift platforms without a known uplink MTU
 )
 
-// probeMTU executes the MTU prober job, if the result configmap
-// doesn't exist. It then waits 100 seconds for results to be written,
-// then cleans up after itsef.
-// If, for whatever reason, it takes longer for the MTU to be detected,
-// it will adopt an existing job.
+// probeMTU returns the host (uplink) MTU for the cluster.
+//
+// In HyperShift, the MTU prober job cannot run because CNO does not have access
+// to the hosted cluster's worker nodes. Instead, platform-specific defaults are
+// returned. If the user has explicitly set the tunnel MTU on the Network CR (via
+// HyperShift's --ovn-kubernetes-mtu flag), NeedMTUProbe returns false and this
+// function is never called — the user value is preserved as-is.
+//
+// For standalone clusters, a prober job is deployed to detect the host MTU
+// from a worker node's default route interface.
 func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, infra *bootstrap.InfraStatus) (int, error) {
-	// infra.HostedControlPlane is not nil only when HyperShift is enabled
+	// In HyperShift the MTU prober job cannot access guest worker nodes,
+	// so we return platform-specific defaults for the host (uplink) MTU.
+	// These defaults are only used when the user has not explicitly set
+	// the tunnel MTU on the Network CR; in that case NeedMTUProbe returns
+	// false and probeMTU is never called.
 	if infra.HostedControlPlane != nil {
-		if infra.PlatformType == configv1.AWSPlatformType {
-			klog.Infof("AWS cluster, omitting MTU probing and using default of %d", awsMTU)
+		switch infra.PlatformType {
+		case configv1.AWSPlatformType:
+			klog.Infof("HyperShift AWS cluster, omitting MTU probing and using default of %d", awsMTU)
 			return awsMTU, nil
-		}
-		if infra.PlatformType == configv1.AzurePlatformType {
-			klog.Infof("AWS cluster, omitting MTU probing and using default of %d", azureMTU)
+		case configv1.AzurePlatformType:
+			klog.Infof("HyperShift Azure cluster, omitting MTU probing and using default of %d", azureMTU)
 			return azureMTU, nil
+		default:
+			// For platforms without a known uplink MTU (OpenStack, Agent, PowerVS, etc.),
+			// use 1500 (standard Ethernet MTU) as a safe default. Users can override
+			// this by setting --ovn-kubernetes-mtu on the HostedCluster.
+			klog.Infof("HyperShift %s cluster, omitting MTU probing and using safe default of %d", infra.PlatformType, defaultHCPMTU)
+			return defaultHCPMTU, nil
 		}
 	}
 	mtu, err := util.ReadMTUConfigMap(ctx, r.client)

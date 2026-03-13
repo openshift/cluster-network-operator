@@ -277,8 +277,18 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	// If we need to, probe the host's MTU via a Job.
 	// Note that running clusters have no need of this but we want the configmap
-	// mtu to be created for consistancy with other non-hypershift clusters.
+	// mtu to be created for consistency with other non-hypershift clusters.
 	// A hypershift cluster may not have any worker nodes for running the mtu prober.
+	//
+	// MTU flow:
+	// 1. If the user set the tunnel MTU on the Network CR (e.g. via HyperShift's
+	//    --ovn-kubernetes-mtu), NeedMTUProbe returns false and we skip probing.
+	//    FillDefaults preserves the user value as-is.
+	// 2. If the tunnel MTU is not set, NeedMTUProbe returns true and we probe:
+	//    - Standalone: deploys a prober job on a worker node to detect the host MTU.
+	//    - HyperShift: returns a platform-specific default (e.g. 9001 for AWS).
+	//    FillDefaults then computes: tunnel MTU = host MTU - encap overhead.
+	// 3. On re-reconcile, FillDefaults carries forward the previously applied MTU.
 	mtu := 0
 	err = r.client.Default().CRClient().Get(ctx, types.NamespacedName{Namespace: util.MTU_CM_NAMESPACE, Name: util.MTU_CM_NAME}, &corev1.ConfigMap{})
 	if network.NeedMTUProbe(prev, &operConfig.Spec) || (apierrors.IsNotFound(err) && infraStatus.HostedControlPlane == nil) {
@@ -292,14 +302,16 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		log.Printf("Using detected MTU %d", mtu)
 	}
 
+	isHyperShift := infraStatus.HostedControlPlane != nil
+
 	// up-convert Prev by filling defaults
 	if prev != nil {
-		network.FillDefaults(prev, prev, mtu)
+		network.FillDefaults(prev, prev, mtu, isHyperShift)
 	}
 	// Reserve operConfig for the DeepEqual check before UpdateOperConfig
 	newOperConfig := operConfig.DeepCopy()
 	// Fill all defaults explicitly
-	network.FillDefaults(&newOperConfig.Spec, prev, mtu)
+	network.FillDefaults(&newOperConfig.Spec, prev, mtu, isHyperShift)
 
 	// Compare against previous applied configuration to see if this change
 	// is safe.
