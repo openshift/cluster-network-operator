@@ -57,6 +57,7 @@ const (
 	CertificateSigner
 	InfrastructureConfig
 	DashboardConfig
+	ObservabilityConfig
 	maxStatusLevel
 )
 
