@@ -21,6 +21,7 @@ package v1beta1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
@@ -33,4 +34,6 @@ var (
 
 	// AddToScheme adds the types in this group-version to the given scheme.
 	AddToScheme = SchemeBuilder.AddToScheme
+
+	localSchemeBuilder = SchemeBuilder.SchemeBuilder
 )

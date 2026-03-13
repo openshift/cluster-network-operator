@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	capiv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -49,6 +50,19 @@ type IBMVPCClusterSpec struct {
 	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.
 	// +optional
 	ControlPlaneEndpoint capiv1beta1.APIEndpoint `json:"controlPlaneEndpoint"`
+
+	// ControlPlaneLoadBalancer is optional configuration for customizing control plane behavior.
+	// +optional
+	ControlPlaneLoadBalancer *VPCLoadBalancerSpec `json:"controlPlaneLoadBalancer,omitempty"`
+}
+
+// VPCLoadBalancerSpec defines the desired state of an VPC load balancer.
+type VPCLoadBalancerSpec struct {
+	// Name sets the name of the VPC load balancer.
+	// +kubebuilder:validation:MaxLength:=63
+	// +kubebuilder:validation:Pattern=`^([a-z]|[a-z][-a-z0-9]*[a-z0-9])$`
+	// +optional
+	Name string `json:"name,omitempty"`
 }
 
 // IBMVPCClusterStatus defines the observed state of IBMVPCCluster.
@@ -56,10 +70,20 @@ type IBMVPCClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	VPC VPC `json:"vpc,omitempty"`
-	// Bastion Instance `json:"bastion,omitempty"`
+
+	// Ready is true when the provider resource is ready.
+	// +optional
 	Ready       bool        `json:"ready"`
 	Subnet      Subnet      `json:"subnet,omitempty"`
 	VPCEndpoint VPCEndpoint `json:"vpcEndpoint,omitempty"`
+
+	// ControlPlaneLoadBalancerState is the status of the load balancer.
+	// +optional
+	ControlPlaneLoadBalancerState VPCLoadBalancerState `json:"controlPlaneLoadBalancerState,omitempty"`
+
+	// Conditions defines current service state of the load balancer.
+	// +optional
+	Conditions capiv1beta1.Conditions `json:"conditions,omitempty"`
 }
 
 // VPC holds the VPC information.
@@ -70,7 +94,6 @@ type VPC struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=ibmvpcclusters,scope=Namespaced,categories=cluster-api
-// +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".metadata.labels.cluster\\.x-k8s\\.io/cluster-name",description="Cluster to which this IBMVPCCluster belongs"
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready",description="Cluster infrastructure is ready for IBM VPC instances"
@@ -95,4 +118,14 @@ type IBMVPCClusterList struct {
 
 func init() {
 	SchemeBuilder.Register(&IBMVPCCluster{}, &IBMVPCClusterList{})
+}
+
+// GetConditions returns the observations of the operational state of the IBMVPCCluster resource.
+func (r *IBMVPCCluster) GetConditions() capiv1beta1.Conditions {
+	return r.Status.Conditions
+}
+
+// SetConditions sets the underlying service state of the IBMVPCCluster to the predescribed clusterv1.Conditions.
+func (r *IBMVPCCluster) SetConditions(conditions capiv1beta1.Conditions) {
+	r.Status.Conditions = conditions
 }

@@ -29,9 +29,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"sigs.k8s.io/cluster-api/feature"
-	capilabels "sigs.k8s.io/cluster-api/internal/labels"
+	"sigs.k8s.io/cluster-api/util/labels/format"
 	"sigs.k8s.io/cluster-api/util/version"
 )
 
@@ -69,8 +70,8 @@ func (m *MachineSet) Default() {
 
 	if len(m.Spec.Selector.MatchLabels) == 0 && len(m.Spec.Selector.MatchExpressions) == 0 {
 		// Note: MustFormatValue is used here as the value of this label will be a hash if the MachineSet name is longer than 63 characters.
-		m.Spec.Selector.MatchLabels[MachineSetNameLabel] = capilabels.MustFormatValue(m.Name)
-		m.Spec.Template.Labels[MachineSetNameLabel] = capilabels.MustFormatValue(m.Name)
+		m.Spec.Selector.MatchLabels[MachineSetNameLabel] = format.MustFormatValue(m.Name)
+		m.Spec.Template.Labels[MachineSetNameLabel] = format.MustFormatValue(m.Name)
 	}
 
 	if m.Spec.Template.Spec.Version != nil && !strings.HasPrefix(*m.Spec.Template.Spec.Version, "v") {
@@ -80,22 +81,22 @@ func (m *MachineSet) Default() {
 }
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
-func (m *MachineSet) ValidateCreate() error {
-	return m.validate(nil)
+func (m *MachineSet) ValidateCreate() (admission.Warnings, error) {
+	return nil, m.validate(nil)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (m *MachineSet) ValidateUpdate(old runtime.Object) error {
+func (m *MachineSet) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	oldMS, ok := old.(*MachineSet)
 	if !ok {
-		return apierrors.NewBadRequest(fmt.Sprintf("expected a MachineSet but got a %T", old))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a MachineSet but got a %T", old))
 	}
-	return m.validate(oldMS)
+	return nil, m.validate(oldMS)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
-func (m *MachineSet) ValidateDelete() error {
-	return nil
+func (m *MachineSet) ValidateDelete() (admission.Warnings, error) {
+	return nil, nil
 }
 
 func (m *MachineSet) validate(old *MachineSet) error {

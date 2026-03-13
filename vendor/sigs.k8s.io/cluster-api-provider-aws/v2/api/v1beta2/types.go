@@ -194,6 +194,10 @@ type Instance struct {
 	// SpotMarketOptions option for configuring instances to be run using AWS Spot instances.
 	SpotMarketOptions *SpotMarketOptions `json:"spotMarketOptions,omitempty"`
 
+	// PlacementGroupName specifies the name of the placement group in which to launch the instance.
+	// +optional
+	PlacementGroupName string `json:"placementGroupName,omitempty"`
+
 	// Tenancy indicates if instance should run on shared or single-tenant hardware.
 	// +optional
 	Tenancy string `json:"tenancy,omitempty"`
@@ -264,9 +268,10 @@ type InstanceMetadataOptions struct {
 	// always returns the version 2.0 credentials; the version 1.0 credentials are
 	// not available.
 	//
-	// Default: required
+	// Default: optional
+	//
 	// +kubebuilder:validation:Enum:=optional;required
-	// +kubebuilder:default=required
+	// +kubebuilder:default=optional
 	HTTPTokens HTTPTokensState `json:"httpTokens,omitempty"`
 
 	// Set to enabled to allow access to instance tags from the instance metadata.
@@ -275,6 +280,7 @@ type InstanceMetadataOptions struct {
 	// (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html#work-with-tags-in-IMDS).
 	//
 	// Default: disabled
+	//
 	// +kubebuilder:validation:Enum:=enabled;disabled
 	// +kubebuilder:default=disabled
 	InstanceMetadataTags InstanceMetadataState `json:"instanceMetadataTags,omitempty"`
@@ -288,7 +294,7 @@ func (obj *InstanceMetadataOptions) SetDefaults() {
 		obj.HTTPPutResponseHopLimit = 1
 	}
 	if obj.HTTPTokens == "" {
-		obj.HTTPTokens = HTTPTokensStateRequired // Defaults to IMDSv2
+		obj.HTTPTokens = HTTPTokensStateOptional // Defaults to IMDSv1
 	}
 	if obj.InstanceMetadataTags == "" {
 		obj.InstanceMetadataTags = InstanceMetadataEndpointStateDisabled
