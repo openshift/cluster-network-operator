@@ -39,6 +39,10 @@ type AWSClusterSpec struct {
 	// The AWS Region the cluster lives in.
 	Region string `json:"region,omitempty"`
 
+	// Partition is the AWS security partition being used. Defaults to "aws"
+	// +optional
+	Partition string `json:"partition,omitempty"`
+
 	// SSHKeyName is the name of the ssh key to attach to the bastion host. Valid values are empty string (do not use SSH keys), a valid SSH key name, or omitted (use the default SSH key name)
 	// +optional
 	SSHKeyName *string `json:"sshKeyName,omitempty"`
@@ -195,6 +199,7 @@ type AWSLoadBalancerSpec struct {
 
 	// HealthCheckProtocol sets the protocol type for ELB health check target
 	// default value is ELBProtocolSSL
+	// +kubebuilder:validation:Enum=TCP;SSL;HTTP;HTTPS;TLS;UDP
 	// +optional
 	HealthCheckProtocol *ELBProtocol `json:"healthCheckProtocol,omitempty"`
 
@@ -202,6 +207,10 @@ type AWSLoadBalancerSpec struct {
 	// This is optional - if not provided new security groups will be created for the load balancer
 	// +optional
 	AdditionalSecurityGroups []string `json:"additionalSecurityGroups,omitempty"`
+
+	// IngressRules sets the ingress rules for the control plane load balancer.
+	// +optional
+	IngressRules []IngressRule `json:"ingressRules,omitempty"`
 
 	// LoadBalancerType sets the type for a load balancer. The default type is classic.
 	// +kubebuilder:default=classic
