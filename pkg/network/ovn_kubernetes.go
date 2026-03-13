@@ -67,6 +67,8 @@ const OVN_NODE_IDENTITY_CERT_DURATION = "24h"
 // gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
 
+const frrK8sNamespace = "openshift-frr-k8s"
+
 const (
 	OVSFlowsConfigMapName              = "ovs-flows-config"
 	OVNKubernetesConfigOverridesCMName = "ovn-kubernetes-config-overrides"
@@ -336,6 +338,57 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["IP_FORWARDING_MODE"] = c.GatewayConfig.IPForwarding
 	}
 
+	// No-overlay mode configuration
+	// The NoOverlayMode feature gate enables no-overlay networking for both the default network
+	// and CUDNs (Cluster User-Defined Networks). BGP managed configuration is cluster-wide and
+	// applies to any network using no-overlay mode with managed routing.
+	data.Data["DefaultNetworkTransport"] = ""
+	data.Data["NoOverlayEnabled"] = false
+	data.Data["NoOverlayOutboundSNAT"] = ""
+	data.Data["NoOverlayRouting"] = ""
+	data.Data["NoOverlayManagedEnabled"] = false
+	data.Data["NoOverlayManagedASNumber"] = ""
+	data.Data["NoOverlayManagedTopology"] = ""
+	data.Data["FRRK8sNamespace"] = frrK8sNamespace
+
+	if featureGates.Enabled(apifeatures.FeatureGateNoOverlayMode) {
+		if c.Transport == operv1.TransportOptionNoOverlay {
+			data.Data["DefaultNetworkTransport"] = "no-overlay"
+			data.Data["NoOverlayEnabled"] = true
+
+			// No-overlay specific options for the default network
+			if c.NoOverlayConfig.OutboundSNAT != "" {
+				// Convert API value (e.g., "Enabled") to lowercase for ovn-kubernetes config ("enabled", "disabled")
+				data.Data["NoOverlayOutboundSNAT"] = strings.ToLower(string(c.NoOverlayConfig.OutboundSNAT))
+			}
+			if c.NoOverlayConfig.Routing != "" {
+				// Convert API value (e.g., "Managed") to lowercase for ovn-kubernetes config ("managed", "unmanaged")
+				data.Data["NoOverlayRouting"] = strings.ToLower(string(c.NoOverlayConfig.Routing))
+			}
+		}
+
+		// BGP managed configuration is cluster-wide and applies to any network (default or CUDN)
+		// using no-overlay mode with managed routing.
+		// BGPTopology is required when BGPManagedConfig is specified.
+		if c.BGPManagedConfig.BGPTopology != "" {
+			data.Data["NoOverlayManagedEnabled"] = true
+
+			// ASNumber is optional, will have a default if not set
+			if c.BGPManagedConfig.ASNumber > 0 {
+				data.Data["NoOverlayManagedASNumber"] = c.BGPManagedConfig.ASNumber
+			}
+
+			var topology string
+			switch c.BGPManagedConfig.BGPTopology {
+			case operv1.BGPTopologyFullMesh:
+				topology = "full-mesh"
+			default:
+				return nil, progressing, fmt.Errorf("unsupported BGP topology: %s", c.BGPManagedConfig.BGPTopology)
+			}
+			data.Data["NoOverlayManagedTopology"] = topology
+		}
+	}
+
 	// leverage feature gates
 	data.Data["DNS_NAME_RESOLVER_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateDNSNameResolver)
 	data.Data["OVN_OBSERVABILITY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateOVNObservability)
@@ -433,6 +486,18 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		}
 	}
 	data.Data["OVNKubeConfigHash"] = hex.EncodeToString(h.Sum(nil))
+
+	// Compute a separate hash for control-plane config (bgpManagedConfig).
+	// This allows ovnkube-control-plane to restart when bgpManagedConfig changes,
+	// without restarting ovnkube-node pods.
+	cpHash := sha1.New()
+	cpHashData := fmt.Sprintf("asNumber=%v,topology=%v",
+		data.Data["NoOverlayManagedASNumber"],
+		data.Data["NoOverlayManagedTopology"])
+	if _, err := cpHash.Write([]byte(cpHashData)); err != nil {
+		return nil, progressing, errors.Wrap(err, "failed to hash control-plane config")
+	}
+	data.Data["OVNKubeControlPlaneConfigHash"] = hex.EncodeToString(cpHash.Sum(nil))
 
 	manifestDirs := make([]string, 0, 2)
 	manifestDirs = append(manifestDirs, commonManifestDir)
@@ -1098,6 +1163,32 @@ func getOVNEncapOverhead(conf *operv1.NetworkSpec) uint32 {
 	return encapOverhead
 }
 
+// ValidateMTUForNoOverlay validates that the configured MTU does not exceed the host MTU
+// when no-overlay mode is enabled for the default network. In no-overlay mode, there is
+// no encapsulation overhead, so the MTU can be set up to the host MTU but not higher.
+// This validation must be called after FillDefaults since it requires the hostMTU value.
+func ValidateMTUForNoOverlay(conf *operv1.NetworkSpec, hostMTU int) error {
+	if conf.DefaultNetwork.OVNKubernetesConfig == nil {
+		return nil
+	}
+	oc := conf.DefaultNetwork.OVNKubernetesConfig
+
+	if oc.Transport != operv1.TransportOptionNoOverlay {
+		return nil
+	}
+	// MTU should always be set at this point (fillDefaults sets it if unspecified)
+	if oc.MTU == nil {
+		return nil
+	}
+	if hostMTU == 0 {
+		return nil
+	}
+	if *oc.MTU > uint32(hostMTU) {
+		return errors.Errorf("invalid MTU %d for no-overlay mode: cannot exceed host MTU %d", *oc.MTU, hostMTU)
+	}
+	return nil
+}
+
 // isOVNKubernetesChangeSafe currently returns an error if any changes to immutable
 // fields are made.
 // In the future, we may support rolling out MTU or other alterations.
@@ -1183,7 +1274,13 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 					panic("BUG: Probed MTU wasn't supplied, host MTU invalid")
 				}
 			}
-			mtu = uint32(hostMTU) - getOVNEncapOverhead(conf)
+			// In no-overlay mode, use the host MTU directly since there's no encapsulation overhead.
+			// In overlay mode (Geneve), subtract the encapsulation overhead.
+			if sc.Transport == operv1.TransportOptionNoOverlay {
+				mtu = uint32(hostMTU)
+			} else {
+				mtu = uint32(hostMTU) - getOVNEncapOverhead(conf)
+			}
 		}
 		sc.MTU = &mtu
 	}
