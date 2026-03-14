@@ -404,6 +404,7 @@ github.com/openshift/library-go/pkg/network
 github.com/openshift/library-go/pkg/operator/certrotation
 github.com/openshift/library-go/pkg/operator/condition
 github.com/openshift/library-go/pkg/operator/configobserver
+github.com/openshift/library-go/pkg/operator/configobserver/apiserver
 github.com/openshift/library-go/pkg/operator/configobserver/featuregates
 github.com/openshift/library-go/pkg/operator/connectivitycheckcontroller
 github.com/openshift/library-go/pkg/operator/events
