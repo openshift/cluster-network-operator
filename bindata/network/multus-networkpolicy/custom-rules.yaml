@@ -10,8 +10,8 @@ data:
   
   custom-v6-rules.txt: |
     # accept NDP
-    -p icmpv6 --icmpv6-type neighbor-solicitation -j ACCEPT
-    -p icmpv6 --icmpv6-type neighbor-advertisement -j ACCEPT
+    icmpv6 type nd-neighbor-solicit accept
+    icmpv6 type nd-neighbor-advert accept
     # accept RA/RS
-    -p icmpv6 --icmpv6-type router-solicitation -j ACCEPT
-    -p icmpv6 --icmpv6-type router-advertisement -j ACCEPT
+    icmpv6 type nd-router-advert accept
+    icmpv6 type nd-router-solicit accept
