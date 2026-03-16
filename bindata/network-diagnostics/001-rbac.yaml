@@ -129,3 +129,10 @@ subjects:
   - kind: ServiceAccount
     name: network-diagnostics
     namespace: openshift-network-diagnostics
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: network-check-target
+  namespace: openshift-network-diagnostics
