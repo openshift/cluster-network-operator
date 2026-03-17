@@ -38,6 +38,7 @@ type podState struct {
 	DaemonsetStates   []daemonsetState
 	DeploymentStates  []deploymentState
 	StatefulsetStates []statefulsetState
+	InstallComplete   bool
 }
 
 // daemonsetState is the internal state we use to check if a rollout has
@@ -45,24 +46,27 @@ type podState struct {
 type daemonsetState struct {
 	ClusteredName
 
-	LastSeenStatus appsv1.DaemonSetStatus
-	LastChangeTime time.Time
+	LastSeenStatus    appsv1.DaemonSetStatus
+	LastChangeTime    time.Time
+	RolloutGeneration int64
 }
 
 // deploymentState is the same as daemonsetState.. but for deployments!
 type deploymentState struct {
 	ClusteredName
 
-	LastSeenStatus appsv1.DeploymentStatus
-	LastChangeTime time.Time
+	LastSeenStatus    appsv1.DeploymentStatus
+	LastChangeTime    time.Time
+	RolloutGeneration int64
 }
 
 // statefulsetState is the same as daemonsetState.. but for statefulsets!
 type statefulsetState struct {
 	ClusteredName
 
-	LastSeenStatus appsv1.StatefulSetStatus
-	LastChangeTime time.Time
+	LastSeenStatus    appsv1.StatefulSetStatus
+	LastChangeTime    time.Time
+	RolloutGeneration int64
 }
 
 // SetFromPods sets the operator Degraded/Progressing/Available status, based on
@@ -79,7 +83,10 @@ func (status *StatusManager) SetFromPods() {
 	progressing := []string{}
 	hung := []string{}
 
-	daemonsetStates, deploymentStates, statefulsetStates := status.getLastPodState()
+	daemonsetStates, deploymentStates, statefulsetStates, installComplete := status.getLastPodState()
+	if !status.installComplete && installComplete {
+		status.installComplete = true
+	}
 
 	if (len(daemonSets) + len(deployments) + len(statefulSets)) == 0 {
 		progressing = append(progressing, "Deploying")
@@ -87,6 +94,24 @@ func (status *StatusManager) SetFromPods() {
 
 	for _, ds := range daemonSets {
 		dsName := NewClusteredName(ds)
+		dsState, exists := daemonsetStates[dsName]
+		currentRolloutGeneration := rolloutGeneration(ds.Generation, ds.Status.ObservedGeneration)
+		if exists && dsState.RolloutGeneration == 0 {
+			dsState.RolloutGeneration = currentRolloutGeneration
+		}
+		if !status.installComplete || ds.Generation > ds.Status.ObservedGeneration || ds.Status.UpdatedNumberScheduled < ds.Status.DesiredNumberScheduled {
+			if dsState.RolloutGeneration < currentRolloutGeneration {
+				dsState.RolloutGeneration = currentRolloutGeneration
+			}
+		}
+		if dsState.RolloutGeneration != 0 &&
+			ds.Status.ObservedGeneration >= dsState.RolloutGeneration &&
+			ds.Status.NumberUnavailable == 0 &&
+			(ds.Status.DesiredNumberScheduled == 0 || ds.Status.UpdatedNumberScheduled >= ds.Status.DesiredNumberScheduled) &&
+			(ds.Status.DesiredNumberScheduled == 0 || ds.Status.NumberAvailable >= ds.Status.DesiredNumberScheduled) {
+			dsState.RolloutGeneration = 0
+		}
+		dsRolloutActive := dsState.RolloutGeneration != 0
 
 		dsProgressing := false
 
@@ -97,13 +122,14 @@ func (status *StatusManager) SetFromPods() {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q update is rolling out (%d out of %d updated)", dsName.String(), ds.Status.UpdatedNumberScheduled, ds.Status.DesiredNumberScheduled))
 			dsProgressing = true
 		} else if ds.Status.NumberUnavailable > 0 {
-			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not available (awaiting %d nodes)", dsName.String(), ds.Status.NumberUnavailable))
-			dsProgressing = true
-			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
+			if dsRolloutActive {
+				progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not available (awaiting %d nodes)", dsName.String(), ds.Status.NumberUnavailable))
+				dsProgressing = true
+			}
 			if !isNonCritical(ds) {
 				hung = append(hung, status.CheckCrashLoopBackOffPods(dsName, ds.Spec.Selector.MatchLabels, "DaemonSet")...)
 			}
-		} else if ds.Status.NumberAvailable == 0 && ds.Status.DesiredNumberScheduled > 0 {
+		} else if ds.Status.NumberAvailable == 0 && dsRolloutActive {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not yet scheduled on any nodes", dsName.String()))
 			dsProgressing = true
 		} else if ds.Generation > ds.Status.ObservedGeneration {
@@ -120,12 +146,11 @@ func (status *StatusManager) SetFromPods() {
 		if dsProgressing && !isNonCritical(ds) {
 			reachedAvailableLevel = false
 
-			dsState, exists := daemonsetStates[dsName]
 			if !exists || !reflect.DeepEqual(dsState.LastSeenStatus, ds.Status) {
 				dsState.LastChangeTime = time.Now()
 				ds.Status.DeepCopyInto(&dsState.LastSeenStatus)
-				daemonsetStates[dsName] = dsState
 			}
+			daemonsetStates[dsName] = dsState
 
 			// Catch hung rollouts
 			if exists && (time.Since(dsState.LastChangeTime)) > ProgressTimeout {
@@ -143,6 +168,23 @@ func (status *StatusManager) SetFromPods() {
 
 	for _, ss := range statefulSets {
 		ssName := NewClusteredName(ss)
+		ssState, exists := statefulsetStates[ssName]
+		currentRolloutGeneration := rolloutGeneration(ss.Generation, ss.Status.ObservedGeneration)
+		if exists && ssState.RolloutGeneration == 0 {
+			ssState.RolloutGeneration = currentRolloutGeneration
+		}
+		if !status.installComplete || ss.Generation > ss.Status.ObservedGeneration || ss.Status.UpdatedReplicas < ss.Status.Replicas {
+			if ssState.RolloutGeneration < currentRolloutGeneration {
+				ssState.RolloutGeneration = currentRolloutGeneration
+			}
+		}
+		if ssState.RolloutGeneration != 0 &&
+			ss.Status.ObservedGeneration >= ssState.RolloutGeneration &&
+			ss.Status.UpdatedReplicas >= ss.Status.Replicas &&
+			ss.Status.ReadyReplicas >= ss.Status.Replicas {
+			ssState.RolloutGeneration = 0
+		}
+		ssRolloutActive := ssState.RolloutGeneration != 0
 
 		ssProgressing := false
 
@@ -153,13 +195,15 @@ func (status *StatusManager) SetFromPods() {
 			progressing = append(progressing, fmt.Sprintf("StatefulSet %q update is rolling out (%d out of %d updated)", ssName.String(), ss.Status.UpdatedReplicas, ss.Status.Replicas))
 			ssProgressing = true
 		} else if ss.Status.ReadyReplicas > 0 && ss.Status.ReadyReplicas < ss.Status.Replicas {
-			progressing = append(progressing, fmt.Sprintf("StatefulSet %q is not available (awaiting %d nodes)", ssName.String(), (ss.Status.Replicas-ss.Status.ReadyReplicas)))
-			ssProgressing = true
+			if ssRolloutActive {
+				progressing = append(progressing, fmt.Sprintf("StatefulSet %q is not available (awaiting %d nodes)", ssName.String(), (ss.Status.Replicas-ss.Status.ReadyReplicas)))
+				ssProgressing = true
+			}
 			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
 			if !isNonCritical(ss) {
 				hung = append(hung, status.CheckCrashLoopBackOffPods(ssName, ss.Spec.Selector.MatchLabels, "StatefulSet")...)
 			}
-		} else if ss.Status.AvailableReplicas == 0 {
+		} else if ss.Status.AvailableReplicas == 0 && ssRolloutActive {
 			progressing = append(progressing, fmt.Sprintf("StatefulSet %q is not yet scheduled on any nodes", ssName.String()))
 			ssProgressing = true
 		} else if ss.Status.ObservedGeneration < ss.Generation {
@@ -176,12 +220,11 @@ func (status *StatusManager) SetFromPods() {
 		if ssProgressing && !isNonCritical(ss) {
 			reachedAvailableLevel = false
 
-			ssState, exists := statefulsetStates[ssName]
 			if !exists || !reflect.DeepEqual(ssState.LastSeenStatus, ss.Status) {
 				ssState.LastChangeTime = time.Now()
 				ss.Status.DeepCopyInto(&ssState.LastSeenStatus)
-				statefulsetStates[ssName] = ssState
 			}
+			statefulsetStates[ssName] = ssState
 
 			// Catch hung rollouts
 			if exists && (time.Since(ssState.LastChangeTime)) > ProgressTimeout {
@@ -199,6 +242,24 @@ func (status *StatusManager) SetFromPods() {
 
 	for _, dep := range deployments {
 		depName := NewClusteredName(dep)
+		depState, exists := deploymentStates[depName]
+		currentRolloutGeneration := rolloutGeneration(dep.Generation, dep.Status.ObservedGeneration)
+		if exists && depState.RolloutGeneration == 0 {
+			depState.RolloutGeneration = currentRolloutGeneration
+		}
+		if !status.installComplete || dep.Generation > dep.Status.ObservedGeneration || dep.Status.UpdatedReplicas < dep.Status.Replicas {
+			if depState.RolloutGeneration < currentRolloutGeneration {
+				depState.RolloutGeneration = currentRolloutGeneration
+			}
+		}
+		if depState.RolloutGeneration != 0 &&
+			dep.Status.ObservedGeneration >= depState.RolloutGeneration &&
+			dep.Status.UpdatedReplicas >= dep.Status.Replicas &&
+			dep.Status.UnavailableReplicas == 0 &&
+			(dep.Status.Replicas == 0 || dep.Status.AvailableReplicas >= dep.Status.Replicas) {
+			depState.RolloutGeneration = 0
+		}
+		depRolloutActive := depState.RolloutGeneration != 0
 		depProgressing := false
 
 		if isNonCritical(dep) && dep.Status.UnavailableReplicas > 0 && !status.installComplete {
@@ -208,13 +269,15 @@ func (status *StatusManager) SetFromPods() {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q update is rolling out (%d out of %d updated)", depName.String(), dep.Status.UpdatedReplicas, dep.Status.Replicas))
 			depProgressing = true
 		} else if dep.Status.UnavailableReplicas > 0 {
-			progressing = append(progressing, fmt.Sprintf("Deployment %q is not available (awaiting %d nodes)", depName.String(), dep.Status.UnavailableReplicas))
-			depProgressing = true
+			if depRolloutActive {
+				progressing = append(progressing, fmt.Sprintf("Deployment %q is not available (awaiting %d nodes)", depName.String(), dep.Status.UnavailableReplicas))
+				depProgressing = true
+			}
 			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
 			if !isNonCritical(dep) {
 				hung = append(hung, status.CheckCrashLoopBackOffPods(depName, dep.Spec.Selector.MatchLabels, "Deployment")...)
 			}
-		} else if dep.Status.AvailableReplicas == 0 {
+		} else if dep.Status.AvailableReplicas == 0 && depRolloutActive {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q is not yet scheduled on any nodes", depName.String()))
 			depProgressing = true
 		} else if dep.Status.ObservedGeneration < dep.Generation {
@@ -231,12 +294,11 @@ func (status *StatusManager) SetFromPods() {
 		if depProgressing && !isNonCritical(dep) {
 			reachedAvailableLevel = false
 
-			depState, exists := deploymentStates[depName]
 			if !exists || !reflect.DeepEqual(depState.LastSeenStatus, dep.Status) {
 				depState.LastChangeTime = time.Now()
 				dep.Status.DeepCopyInto(&depState.LastSeenStatus)
-				deploymentStates[depName] = depState
 			}
+			deploymentStates[depName] = depState
 
 			// Catch hung rollouts
 			if exists && (time.Since(depState.LastChangeTime)) > ProgressTimeout {
@@ -253,7 +315,10 @@ func (status *StatusManager) SetFromPods() {
 	}
 
 	status.setNotDegraded(PodDeployment)
-	if err := status.setLastPodState(daemonsetStates, deploymentStates, statefulsetStates); err != nil {
+	if reachedAvailableLevel && len(progressing) == 0 {
+		status.installComplete = true
+	}
+	if err := status.setLastPodState(daemonsetStates, deploymentStates, statefulsetStates, status.installComplete); err != nil {
 		log.Printf("Failed to set pod state (continuing): %+v\n", err)
 	}
 
@@ -269,10 +334,6 @@ func (status *StatusManager) SetFromPods() {
 			Status: operv1.ConditionTrue})
 	}
 
-	if reachedAvailableLevel && len(progressing) == 0 {
-		status.installComplete = true
-	}
-
 	if len(hung) > 0 {
 		status.setDegraded(RolloutHung, "RolloutHung", strings.Join(hung, "\n"))
 	} else {
@@ -280,10 +341,21 @@ func (status *StatusManager) SetFromPods() {
 	}
 }
 
+func rolloutGeneration(generation, observedGeneration int64) int64 {
+	switch {
+	case generation > 0:
+		return generation
+	case observedGeneration > 0:
+		return observedGeneration
+	default:
+		return 1
+	}
+}
+
 // getLastPodState reads the last-seen daemonset + deployment + statefulset
 // states from the clusteroperator annotation and parses it. On error, it
 // returns an empty state, since this should not block updating operator status.
-func (status *StatusManager) getLastPodState() (map[ClusteredName]daemonsetState, map[ClusteredName]deploymentState, map[ClusteredName]statefulsetState) {
+func (status *StatusManager) getLastPodState() (map[ClusteredName]daemonsetState, map[ClusteredName]deploymentState, map[ClusteredName]statefulsetState, bool) {
 	// with maps allocated
 	daemonsetStates := map[ClusteredName]daemonsetState{}
 	deploymentStates := map[ClusteredName]deploymentState{}
@@ -294,12 +366,12 @@ func (status *StatusManager) getLastPodState() (map[ClusteredName]daemonsetState
 	err := status.client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Name: status.name}, co)
 	if err != nil {
 		log.Printf("Failed to get ClusterOperator: %v", err)
-		return daemonsetStates, deploymentStates, statefulsetStates
+		return daemonsetStates, deploymentStates, statefulsetStates, false
 	}
 
 	lsbytes := co.Annotations[lastSeenAnnotation]
 	if lsbytes == "" {
-		return daemonsetStates, deploymentStates, statefulsetStates
+		return daemonsetStates, deploymentStates, statefulsetStates, false
 	}
 
 	out := podState{}
@@ -307,7 +379,7 @@ func (status *StatusManager) getLastPodState() (map[ClusteredName]daemonsetState
 	if err != nil {
 		// No need to return error; just move on
 		log.Printf("failed to unmashal last-seen-status: %v", err)
-		return daemonsetStates, deploymentStates, statefulsetStates
+		return daemonsetStates, deploymentStates, statefulsetStates, false
 	}
 
 	for _, ds := range out.DaemonsetStates {
@@ -322,18 +394,20 @@ func (status *StatusManager) getLastPodState() (map[ClusteredName]daemonsetState
 		statefulsetStates[ss.ClusteredName] = ss
 	}
 
-	return daemonsetStates, deploymentStates, statefulsetStates
+	return daemonsetStates, deploymentStates, statefulsetStates, out.InstallComplete
 }
 
 func (status *StatusManager) setLastPodState(
 	dss map[ClusteredName]daemonsetState,
 	deps map[ClusteredName]deploymentState,
-	sss map[ClusteredName]statefulsetState) error {
+	sss map[ClusteredName]statefulsetState,
+	installComplete bool) error {
 
 	ps := podState{
 		DaemonsetStates:   make([]daemonsetState, 0, len(dss)),
 		DeploymentStates:  make([]deploymentState, 0, len(deps)),
 		StatefulsetStates: make([]statefulsetState, 0, len(sss)),
+		InstallComplete:   installComplete,
 	}
 
 	for nsn, ds := range dss {
