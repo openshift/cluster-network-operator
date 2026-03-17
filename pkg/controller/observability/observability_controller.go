@@ -176,23 +176,23 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 // shouldInstallNetworkObservability returns true if Network Observability should be installed.
-// Valid values: "", "Enable", "Disable"
-// "Disable": skip installation (user opted out)
-// "Enable": install Network Observability (even on SNO clusters)
+// Valid values: "", "InstallAndEnable", "DoNotInstall"
+// "DoNotInstall": skip installation (user opted out)
+// "InstallAndEnable": install Network Observability (even on SNO clusters)
 // "" or nil: install Network Observability (opt-out model), except for SNO clusters
-// SNO (Single Node OpenShift) clusters: skip installation by default unless explicitly set to "Enable"
+// SNO (Single Node OpenShift) clusters: skip installation by default unless explicitly set to "InstallAndEnable"
 func (r *ReconcileObservability) shouldInstallNetworkObservability(ctx context.Context, network *configv1.Network) (bool, error) {
 	// Check explicit value
-	if network.Spec.InstallNetworkObservability != nil {
-		value := *network.Spec.InstallNetworkObservability
+	if network.Spec.NetworkObservability.InstallationPolicy != nil {
+		value := *network.Spec.NetworkObservability.InstallationPolicy
 
 		// Explicit disable
-		if value == "Disable" {
+		if value == configv1.NetworkObservabilityDoNotInstall {
 			return false, nil
 		}
 
 		// Explicit enable - install regardless of topology
-		if value == "Enable" {
+		if value == configv1.NetworkObservabilityInstallAndEnable {
 			return true, nil
 		}
 

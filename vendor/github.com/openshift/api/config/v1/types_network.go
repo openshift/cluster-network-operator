@@ -88,12 +88,12 @@ type NetworkSpec struct {
 	// +openshift:enable:FeatureGate=NetworkDiagnosticsConfig
 	NetworkDiagnostics NetworkDiagnostics `json:"networkDiagnostics"`
 
-	// installNetworkObservability is an optional field that enables network observability
-	// when omitted or set to enable.  If the field is set to disable, it does nothing.
-	// Valid values are "", "Enable", "Disable".
-	// +kubebuilder:validation:Enum:="";Enable;Disable
+	// networkObservability is an optional field that configures network observability installation
+	// during cluster deployment (day-0).
+	// When omitted, network observability will be installed unless this is a SNO cluster.
+	// +openshift:enable:FeatureGate=NetworkObservabilityInstall
 	// +optional
-	InstallNetworkObservability *string `json:"installNetworkObservability,omitempty"`
+	NetworkObservability NetworkObservabilitySpec `json:"networkObservability,omitempty,omitzero"`
 }
 
 // NetworkStatus is the current network configuration.
@@ -312,4 +312,32 @@ type NetworkDiagnosticsTargetPlacement struct {
 	// +optional
 	// +listType=atomic
 	Tolerations []corev1.Toleration `json:"tolerations"`
+}
+
+// NetworkObservabilityInstallationPolicy is an enumeration of the available network observability installation policies
+// Valid values are "", "InstallAndEnable", "DoNotInstall".
+// +kubebuilder:validation:Enum="";InstallAndEnable;DoNotInstall
+type NetworkObservabilityInstallationPolicy string
+
+const (
+	// NetworkObservabilityNoOpinion means that the user has no opinion and the platform is left
+	// to choose reasonable defaults. The current default is to install and enable network observability.
+	// This is subject to change over time.
+	NetworkObservabilityNoOpinion NetworkObservabilityInstallationPolicy = ""
+	// NetworkObservabilityInstallAndEnable means that network observability should be installed and enabled during cluster deployment
+	NetworkObservabilityInstallAndEnable NetworkObservabilityInstallationPolicy = "InstallAndEnable"
+	// NetworkObservabilityDoNotInstall means that network observability should not be installed
+	NetworkObservabilityDoNotInstall NetworkObservabilityInstallationPolicy = "DoNotInstall"
+)
+
+// NetworkObservabilitySpec defines the configuration for network observability installation
+// +kubebuilder:validation:MinProperties=1
+type NetworkObservabilitySpec struct {
+	// installationPolicy controls whether network observability is installed during cluster deployment.
+	// Valid values are "", "InstallAndEnable" and "DoNotInstall".
+	// When set to "", network observability will be installed unless this is a SNO cluster.
+	// When set to "InstallAndEnable", network observability will be installed and enabled.
+	// When set to "DoNotInstall", network observability will not be installed.
+	// +optional
+	InstallationPolicy *NetworkObservabilityInstallationPolicy `json:"installationPolicy,omitempty"`
 }

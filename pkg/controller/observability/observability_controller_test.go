@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,18 +26,20 @@ import (
 // Helper functions for creating test resources
 
 func createTestNetwork(name string, value string) *configv1.Network {
-	var installNetObserv *string
-	if value != "" {
-		installNetObserv = ptr.To(value)
-	}
-	return &configv1.Network{
+	network := &configv1.Network{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: configv1.NetworkSpec{
-			InstallNetworkObservability: installNetObserv,
-		},
 	}
+
+	if value != "" {
+		policy := configv1.NetworkObservabilityInstallationPolicy(value)
+		network.Spec.NetworkObservability = configv1.NetworkObservabilitySpec{
+			InstallationPolicy: &policy,
+		}
+	}
+
+	return network
 }
 
 func createTestNetworkWithDeployedCondition(name string, value string) *configv1.Network {
@@ -123,6 +126,7 @@ func createTempManifest(t *testing.T, content string) string {
 
 // Mock status manager that implements the methods the controller needs
 type mockStatusManager struct {
+	mu               sync.Mutex
 	degradedCalls    []degradedCall
 	notDegradedCalls []statusmanager.StatusLevel
 }
@@ -135,12 +139,16 @@ type degradedCall struct {
 
 func (m *mockStatusManager) SetDegraded(level statusmanager.StatusLevel, reason, message string) {
 	if m != nil {
+		m.mu.Lock()
+		defer m.mu.Unlock()
 		m.degradedCalls = append(m.degradedCalls, degradedCall{level, reason, message})
 	}
 }
 
 func (m *mockStatusManager) SetNotDegraded(level statusmanager.StatusLevel) {
 	if m != nil {
+		m.mu.Lock()
+		defer m.mu.Unlock()
 		m.notDegradedCalls = append(m.notDegradedCalls, level)
 	}
 }
@@ -163,7 +171,7 @@ func TestShouldInstallNetworkObservability_NilNonSNO(t *testing.T) {
 	network := &configv1.Network{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
 		Spec: configv1.NetworkSpec{
-			InstallNetworkObservability: nil, // Default: should install on non-SNO
+			// NetworkObservability not set: Default behavior should install on non-SNO
 		},
 	}
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
@@ -186,7 +194,7 @@ func TestShouldInstallNetworkObservability_NilSNO(t *testing.T) {
 	network := &configv1.Network{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
 		Spec: configv1.NetworkSpec{
-			InstallNetworkObservability: nil, // Default: should NOT install on SNO
+			// NetworkObservability not set: Default behavior should NOT install on SNO
 		},
 	}
 	infra := createTestInfrastructure(configv1.SingleReplicaTopologyMode)
@@ -200,7 +208,7 @@ func TestShouldInstallNetworkObservability_NilSNO(t *testing.T) {
 	g.Expect(result).To(BeFalse())
 }
 
-func TestShouldInstallNetworkObservability_ExplicitEnableNonSNO(t *testing.T) {
+func TestShouldInstallNetworkObservability_ExplicitInstallAndEnableNonSNO(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	scheme := runtime.NewScheme()
@@ -209,7 +217,9 @@ func TestShouldInstallNetworkObservability_ExplicitEnableNonSNO(t *testing.T) {
 	network := &configv1.Network{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
 		Spec: configv1.NetworkSpec{
-			InstallNetworkObservability: ptr.To("Enable"),
+			NetworkObservability: configv1.NetworkObservabilitySpec{
+				InstallationPolicy: ptr.To(configv1.NetworkObservabilityInstallAndEnable),
+			},
 		},
 	}
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
@@ -223,7 +233,7 @@ func TestShouldInstallNetworkObservability_ExplicitEnableNonSNO(t *testing.T) {
 	g.Expect(result).To(BeTrue())
 }
 
-func TestShouldInstallNetworkObservability_ExplicitEnableSNO(t *testing.T) {
+func TestShouldInstallNetworkObservability_ExplicitInstallAndEnableSNO(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	scheme := runtime.NewScheme()
@@ -232,7 +242,9 @@ func TestShouldInstallNetworkObservability_ExplicitEnableSNO(t *testing.T) {
 	network := &configv1.Network{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
 		Spec: configv1.NetworkSpec{
-			InstallNetworkObservability: ptr.To("Enable"), // Explicit Enable: install even on SNO
+			NetworkObservability: configv1.NetworkObservabilitySpec{
+				InstallationPolicy: ptr.To(configv1.NetworkObservabilityInstallAndEnable), // Explicit InstallAndEnable: install even on SNO
+			},
 		},
 	}
 	infra := createTestInfrastructure(configv1.SingleReplicaTopologyMode)
@@ -246,7 +258,7 @@ func TestShouldInstallNetworkObservability_ExplicitEnableSNO(t *testing.T) {
 	g.Expect(result).To(BeTrue())
 }
 
-func TestShouldInstallNetworkObservability_ExplicitDisable(t *testing.T) {
+func TestShouldInstallNetworkObservability_ExplicitDoNotInstall(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	scheme := runtime.NewScheme()
@@ -255,7 +267,9 @@ func TestShouldInstallNetworkObservability_ExplicitDisable(t *testing.T) {
 	network := &configv1.Network{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
 		Spec: configv1.NetworkSpec{
-			InstallNetworkObservability: ptr.To("Disable"),
+			NetworkObservability: configv1.NetworkObservabilitySpec{
+				InstallationPolicy: ptr.To(configv1.NetworkObservabilityDoNotInstall),
+			},
 		},
 	}
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
@@ -278,7 +292,9 @@ func TestShouldInstallNetworkObservability_EmptyStringNonSNO(t *testing.T) {
 	network := &configv1.Network{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
 		Spec: configv1.NetworkSpec{
-			InstallNetworkObservability: ptr.To(""), // Empty string: default behavior (install on non-SNO)
+			NetworkObservability: configv1.NetworkObservabilitySpec{
+				InstallationPolicy: ptr.To(configv1.NetworkObservabilityNoOpinion), // Empty string: default behavior (install on non-SNO)
+			},
 		},
 	}
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
@@ -336,7 +352,7 @@ func TestReconcile_IgnoresNonClusterNetwork(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = configv1.AddToScheme(scheme)
 
-	network := createTestNetwork("not-cluster", "Enable")
+	network := createTestNetwork("not-cluster", "InstallAndEnable")
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network).Build()
 
 	r := &ReconcileObservability{
@@ -358,7 +374,7 @@ func TestReconcile_SkipsWhenDisabled(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 
 	// Explicitly set to false (opt-out)
-	network := createTestNetwork("cluster", "Disable")
+	network := createTestNetwork("cluster", "DoNotInstall")
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network).Build()
 
 	r := &ReconcileObservability{
@@ -380,13 +396,13 @@ func TestReconcile_InstallsWhenNil(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	// Create network with nil InstallNetworkObservability field (defaults to enabled on non-SNO)
+	// Create network with no NetworkObservability field (defaults to enabled on non-SNO)
 	network := &configv1.Network{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "cluster",
 		},
 		Spec: configv1.NetworkSpec{
-			InstallNetworkObservability: nil,
+			// NetworkObservability not set: defaults to enabled on non-SNO
 		},
 	}
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
@@ -420,13 +436,13 @@ func TestReconcile_SkipsInstallWhenNilOnSNO(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	// Create network with nil InstallNetworkObservability field on SNO cluster
+	// Create network with no NetworkObservability field on SNO cluster
 	network := &configv1.Network{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "cluster",
 		},
 		Spec: configv1.NetworkSpec{
-			InstallNetworkObservability: nil,
+			// NetworkObservability not set: defaults to disabled on SNO
 		},
 	}
 	infra := createTestInfrastructure(configv1.SingleReplicaTopologyMode)
@@ -782,7 +798,7 @@ func TestReconcile_SkipsFlowCollectorWhenExists(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Enable")
+	network := createTestNetwork("cluster", "InstallAndEnable")
 	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
 	csv := createTestCSV("netobserv-operator.v1.0.0", OperatorNamespace, "Succeeded")
 	flowCollector := createTestFlowCollector(FlowCollectorName)
@@ -814,7 +830,7 @@ func TestReconcile_SkipsInstallWhenExists(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Enable")
+	network := createTestNetwork("cluster", "InstallAndEnable")
 	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
 	csv := createTestCSV("netobserv-operator.v1.0.0", OperatorNamespace, "Succeeded")
 	operatorNs := createTestNamespace(OperatorNamespace)
@@ -852,7 +868,7 @@ func TestReconcile_MultipleInvocations(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Enable")
+	network := createTestNetwork("cluster", "InstallAndEnable")
 	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
 	csv := createTestCSV("netobserv-operator.v1.0.0", OperatorNamespace, "Succeeded")
 	flowCollector := createTestFlowCollector(FlowCollectorName)
@@ -891,7 +907,7 @@ func TestReconcile_OperatorNotReady(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = configv1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Enable")
+	network := createTestNetwork("cluster", "InstallAndEnable")
 	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
 	// CSV exists but not in Succeeded phase
 	csv := createTestCSV("netobserv-operator.v1.0.0", OperatorNamespace, "Installing")
@@ -928,7 +944,7 @@ func TestReconcile_FlowCollectorDeleted(t *testing.T) {
 
 	// Create network with the deployed condition set (simulating previous successful deployment)
 	// FlowCollector is NOT present (deleted)
-	network := createTestNetworkWithDeployedCondition("cluster", "Enable")
+	network := createTestNetworkWithDeployedCondition("cluster", "InstallAndEnable")
 	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
 	csv := createTestCSV("netobserv-operator.v1.0.0", OperatorNamespace, "Succeeded")
 
@@ -965,7 +981,7 @@ func TestReconcile_OperatorDeleted(t *testing.T) {
 
 	// Create network with the deployed condition set (simulating previous successful deployment)
 	// Operator subscription and CSV are NOT present (simulating deletion)
-	network := createTestNetworkWithDeployedCondition("cluster", "Enable")
+	network := createTestNetworkWithDeployedCondition("cluster", "InstallAndEnable")
 	flowCollector := createTestFlowCollector(FlowCollectorName)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
@@ -1001,7 +1017,7 @@ func TestReconcile_BothDeleted(t *testing.T) {
 
 	// Create network with the deployed condition set (simulating previous successful deployment)
 	// Neither operator nor FlowCollector are present (both deleted)
-	network := createTestNetworkWithDeployedCondition("cluster", "Enable")
+	network := createTestNetworkWithDeployedCondition("cluster", "InstallAndEnable")
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(network).
@@ -1035,7 +1051,7 @@ func TestReconcile_NetworkCRUpdated(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 
 	// Start with disabled
-	network := createTestNetwork("cluster", "Disable")
+	network := createTestNetwork("cluster", "DoNotInstall")
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(network).
@@ -1054,7 +1070,9 @@ func TestReconcile_NetworkCRUpdated(t *testing.T) {
 	g.Expect(result1).To(Equal(ctrl.Result{}))
 
 	// Update Network CR to enable observability
-	network.Spec.InstallNetworkObservability = ptr.To("Enable")
+	network.Spec.NetworkObservability = configv1.NetworkObservabilitySpec{
+		InstallationPolicy: ptr.To(configv1.NetworkObservabilityInstallAndEnable),
+	}
 	err := client.Update(context.TODO(), network)
 	g.Expect(err).NotTo(HaveOccurred())
 
@@ -1078,7 +1096,7 @@ func TestReconcile_PartialFailure_OperatorInstallFails(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Enable")
+	network := createTestNetwork("cluster", "InstallAndEnable")
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(network).
@@ -1113,7 +1131,7 @@ func TestReconcile_RecoveryAfterOperatorBecomesReady(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Enable")
+	network := createTestNetwork("cluster", "InstallAndEnable")
 	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
 	// Start with CSV in Installing phase
 	csv := createTestCSV("netobserv-operator.v1.0.0", OperatorNamespace, "Installing")
@@ -1162,7 +1180,7 @@ func TestReconcile_NamespaceCreation(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Enable")
+	network := createTestNetwork("cluster", "InstallAndEnable")
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(network).
@@ -1194,7 +1212,7 @@ func TestReconcile_NamespaceAlreadyExists(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Enable")
+	network := createTestNetwork("cluster", "InstallAndEnable")
 	// Namespace already exists
 	operatorNs := createTestNamespace(OperatorNamespace)
 
@@ -1230,7 +1248,7 @@ func TestReconcile_ConcurrentReconciliations(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Enable")
+	network := createTestNetwork("cluster", "InstallAndEnable")
 	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
 	csv := createTestCSV("netobserv-operator.v1.0.0", OperatorNamespace, "Succeeded")
 	flowCollector := createTestFlowCollector(FlowCollectorName)
@@ -1274,7 +1292,7 @@ func TestReconcile_StatusDegradedOnError(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Enable")
+	network := createTestNetwork("cluster", "InstallAndEnable")
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
@@ -1309,7 +1327,7 @@ func TestReconcile_StatusNotDegradedOnSuccess(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Enable")
+	network := createTestNetwork("cluster", "InstallAndEnable")
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
 	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
 	csv := createTestCSV("netobserv-operator.v1.0.0", OperatorNamespace, "Succeeded")
@@ -1346,7 +1364,7 @@ func TestReconcile_StatusNotDegradedWhenDisabled(t *testing.T) {
 	_ = configv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Disable") // disabled
+	network := createTestNetwork("cluster", "DoNotInstall") // disabled
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
@@ -1378,11 +1396,11 @@ func TestReconcile_StatusDegradedOnInfrastructureError(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = configv1.AddToScheme(scheme)
 
-	// Create network with nil (will trigger SNO check which needs Infrastructure)
+	// Create network with no NetworkObservability field (will trigger SNO check which needs Infrastructure)
 	network := &configv1.Network{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
 		Spec: configv1.NetworkSpec{
-			InstallNetworkObservability: nil, // nil will trigger SNO check
+			// NetworkObservability not set: will trigger SNO check
 		},
 	}
 
@@ -1417,15 +1435,15 @@ func TestWasNetworkObservabilityDeployed(t *testing.T) {
 	r := &ReconcileObservability{}
 
 	// Test with no conditions
-	network1 := createTestNetwork("cluster", "Enable")
+	network1 := createTestNetwork("cluster", "InstallAndEnable")
 	g.Expect(r.wasNetworkObservabilityDeployed(network1)).To(BeFalse())
 
 	// Test with deployed condition set to true
-	network2 := createTestNetworkWithDeployedCondition("cluster", "Enable")
+	network2 := createTestNetworkWithDeployedCondition("cluster", "InstallAndEnable")
 	g.Expect(r.wasNetworkObservabilityDeployed(network2)).To(BeTrue())
 
 	// Test with deployed condition set to false
-	network3 := createTestNetwork("cluster", "Enable")
+	network3 := createTestNetwork("cluster", "InstallAndEnable")
 	network3.Status.Conditions = []metav1.Condition{
 		{
 			Type:   NetworkObservabilityDeployed,
@@ -1435,7 +1453,7 @@ func TestWasNetworkObservabilityDeployed(t *testing.T) {
 	g.Expect(r.wasNetworkObservabilityDeployed(network3)).To(BeFalse())
 
 	// Test with other conditions but not deployed condition
-	network4 := createTestNetwork("cluster", "Enable")
+	network4 := createTestNetwork("cluster", "InstallAndEnable")
 	network4.Status.Conditions = []metav1.Condition{
 		{
 			Type:   "SomeOtherCondition",
@@ -1452,7 +1470,7 @@ func TestMarkNetworkObservabilityDeployed(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = configv1.AddToScheme(scheme)
 
-	network := createTestNetwork("cluster", "Enable")
+	network := createTestNetwork("cluster", "InstallAndEnable")
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(network).
@@ -1495,7 +1513,7 @@ func TestReconcile_FirstTimeDeploymentSetsCondition(t *testing.T) {
 	_ = corev1.AddToScheme(scheme)
 
 	// Network without deployed condition (first time deployment)
-	network := createTestNetwork("cluster", "Enable")
+	network := createTestNetwork("cluster", "InstallAndEnable")
 	subscription := createTestSubscription("netobserv-operator", OperatorNamespace)
 	csv := createTestCSV("netobserv-operator.v1.0.0", OperatorNamespace, "Succeeded")
 	namespace := createTestNamespace(NetObservNamespace)
