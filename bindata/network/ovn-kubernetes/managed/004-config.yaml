@@ -49,7 +49,6 @@ data:
 {{- end }}
     enable-admin-network-policy=true
     enable-multi-external-gateway=true
-    enable-multicast=true
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
     enable-dns-name-resolver=true
 {{- end }}
@@ -134,7 +133,6 @@ data:
 {{- end }}
     enable-admin-network-policy=true
     enable-multi-external-gateway=true
-    enable-multicast=true
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
     enable-dns-name-resolver=true
 {{- end }}
