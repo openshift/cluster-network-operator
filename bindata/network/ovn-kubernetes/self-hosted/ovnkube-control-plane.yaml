@@ -153,6 +153,7 @@ spec:
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
+            --enable-multicast \
             --init-cluster-manager "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
