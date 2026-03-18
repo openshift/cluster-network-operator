@@ -171,6 +171,7 @@ func createTestRenderData(ovnNodeMode string) render.RenderData {
 	data.Data["IPFIXSampling"] = ""
 	data.Data["K8S_APISERVER"] = "https://test:8443"
 	data.Data["OVNKubeConfigHash"] = "test-hash"
+	data.Data["OVNKubeNodeConfigHash"] = "test-hash"
 
 	// Additional variables for self-hosted template
 	data.Data["IsNetworkTypeLiveMigration"] = false
