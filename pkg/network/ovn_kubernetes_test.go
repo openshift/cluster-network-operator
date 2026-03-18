@@ -306,7 +306,6 @@ enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
-enable-multicast=true
 
 [gateway]
 mode=shared
@@ -353,7 +352,6 @@ enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
-enable-multicast=true
 
 [gateway]
 mode=local
@@ -414,7 +412,6 @@ enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
-enable-multicast=true
 
 [gateway]
 mode=local
@@ -477,7 +474,6 @@ enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
-enable-multicast=true
 
 [gateway]
 mode=local
@@ -539,7 +535,6 @@ enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
-enable-multicast=true
 
 [gateway]
 mode=local
@@ -601,7 +596,6 @@ enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
-enable-multicast=true
 
 [gateway]
 mode=shared
@@ -652,7 +646,6 @@ enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
-enable-multicast=true
 
 [gateway]
 mode=shared
@@ -706,7 +699,6 @@ enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
-enable-multicast=true
 
 [gateway]
 mode=shared
@@ -754,7 +746,6 @@ enable-preconfigured-udn-addresses=true
 enable-multi-networkpolicy=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
-enable-multicast=true
 
 [gateway]
 mode=shared
@@ -803,7 +794,6 @@ enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
-enable-multicast=true
 
 [gateway]
 mode=shared
@@ -899,7 +889,6 @@ enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
-enable-multicast=true
 enable-dns-name-resolver=true
 
 [gateway]
@@ -947,7 +936,6 @@ enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
-enable-multicast=true
 
 [gateway]
 mode=shared
