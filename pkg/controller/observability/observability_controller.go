@@ -48,13 +48,17 @@ const (
 )
 
 // Add creates a new controller. Referenced in add_networkconfig.go.
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client, _ featuregates.FeatureGate) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client, featureGate featuregates.FeatureGate) error {
 	klog.Info("Add Network Observability Operator to manager")
-	return add(mgr, newReconciler(mgr.GetClient(), status))
+	return add(mgr, newReconciler(mgr.GetClient(), status, featureGate))
 }
 
-func newReconciler(client crclient.Client, status *statusmanager.StatusManager) *ReconcileObservability {
-	return &ReconcileObservability{client: client, status: status}
+func newReconciler(client crclient.Client, status *statusmanager.StatusManager, featureGate featuregates.FeatureGate) *ReconcileObservability {
+	return &ReconcileObservability{
+		client:      client,
+		status:      status,
+		featureGate: featureGate,
+	}
 }
 
 func add(mgr manager.Manager, r *ReconcileObservability) error {
@@ -74,8 +78,9 @@ type StatusReporter interface {
 }
 
 type ReconcileObservability struct {
-	client crclient.Client
-	status StatusReporter
+	client      crclient.Client
+	status      StatusReporter
+	featureGate featuregates.FeatureGate
 }
 
 // Reconcile reacts to changes in Network CR
@@ -84,6 +89,14 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req ctrl.Request
 
 	if req.Name != "cluster" {
 		return ctrl.Result{}, nil // only reconcile the singleton Network object
+	}
+
+	// Check if NetworkObservabilityInstall feature gate is enabled
+	if !r.isFeatureGateEnabled() {
+		klog.V(4).Info("NetworkObservabilityInstall feature gate is disabled, skipping Network Observability management")
+		// Clear any degraded status
+		r.status.SetNotDegraded(statusmanager.ObservabilityConfig)
+		return ctrl.Result{}, nil
 	}
 
 	// Get Network CR information
@@ -173,6 +186,16 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req ctrl.Request
 
 	r.status.SetNotDegraded(statusmanager.ObservabilityConfig)
 	return ctrl.Result{}, nil
+}
+
+// isFeatureGateEnabled checks if the NetworkObservabilityInstall feature gate is enabled.
+// If featureGate is nil (e.g., in tests), returns true to allow testing without feature gates.
+func (r *ReconcileObservability) isFeatureGateEnabled() bool {
+	if r.featureGate == nil {
+		return true // Default to enabled in tests
+	}
+
+	return r.featureGate.Enabled(configv1.FeatureGateName("NetworkObservabilityInstall"))
 }
 
 // shouldInstallNetworkObservability returns true if Network Observability should be installed.
