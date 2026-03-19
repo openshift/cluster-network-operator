@@ -190,12 +190,26 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req ctrl.Request
 
 // isFeatureGateEnabled checks if the NetworkObservabilityInstall feature gate is enabled.
 // If featureGate is nil (e.g., in tests), returns true to allow testing without feature gates.
+// If the feature gate is not registered yet (older cluster versions), returns false.
 func (r *ReconcileObservability) isFeatureGateEnabled() bool {
 	if r.featureGate == nil {
 		return true // Default to enabled in tests
 	}
 
-	return r.featureGate.Enabled(configv1.FeatureGateName("NetworkObservabilityInstall"))
+	featureGateName := configv1.FeatureGateName("NetworkObservabilityInstall")
+
+	// Check if the feature gate is registered in the cluster's feature gate list
+	// to avoid panic when the feature gate doesn't exist yet
+	knownFeatures := r.featureGate.KnownFeatures()
+	for _, known := range knownFeatures {
+		if known == featureGateName {
+			return r.featureGate.Enabled(featureGateName)
+		}
+	}
+
+	// Feature gate not registered yet (older API version), default to disabled
+	klog.V(4).Info("NetworkObservabilityInstall feature gate is not registered yet, defaulting to disabled")
+	return false
 }
 
 // shouldInstallNetworkObservability returns true if Network Observability should be installed.
