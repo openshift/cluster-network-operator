@@ -170,7 +170,7 @@ func TestShouldInstallNetworkObservability_NilNonSNO(t *testing.T) {
 
 	network := &configv1.Network{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
-		Spec: configv1.NetworkSpec{
+		Spec:       configv1.NetworkSpec{
 			// NetworkObservability not set: Default behavior should install on non-SNO
 		},
 	}
@@ -193,7 +193,7 @@ func TestShouldInstallNetworkObservability_NilSNO(t *testing.T) {
 
 	network := &configv1.Network{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
-		Spec: configv1.NetworkSpec{
+		Spec:       configv1.NetworkSpec{
 			// NetworkObservability not set: Default behavior should NOT install on SNO
 		},
 	}
@@ -1399,7 +1399,7 @@ func TestReconcile_StatusDegradedOnInfrastructureError(t *testing.T) {
 	// Create network with no NetworkObservability field (will trigger SNO check which needs Infrastructure)
 	network := &configv1.Network{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
-		Spec: configv1.NetworkSpec{
+		Spec:       configv1.NetworkSpec{
 			// NetworkObservability not set: will trigger SNO check
 		},
 	}
