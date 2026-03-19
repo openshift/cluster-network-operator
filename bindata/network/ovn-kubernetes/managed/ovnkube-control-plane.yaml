@@ -195,6 +195,11 @@ spec:
             evpn_enable_flag="--enable-evpn"
           fi
 
+          network_connect_enabled_flag=
+          if [[ "{{.OVN_NETWORK_CONNECT_ENABLE}}" == "true" ]]; then
+            network_connect_enabled_flag="--enable-network-connect"
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
@@ -214,6 +219,7 @@ spec:
             ${ovn_v4_masquerade_subnet_opt} \
             ${ovn_v6_masquerade_subnet_opt} \
             ${persistent_ips_enabled_flag} \
+            ${network_connect_enabled_flag} \
             ${route_advertisements_enable_flag} \
             ${evpn_enable_flag}
         volumeMounts:
