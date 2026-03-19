@@ -7,3 +7,17 @@ metadata:
   annotations:
     openshift.io/node-selector: "" #override default node selector
     workload.openshift.io/allowed: "management"
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: default-deny
+  namespace: openshift-network-diagnostics
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
+
