@@ -33,14 +33,23 @@ data:
     dns-service-name="dns-default"
  
     [ovnkubernetesfeature]
+    enable-egress-ip=true
+    enable-egress-firewall=true
+    enable-egress-qos=true
+    enable-egress-service=true
 {{- if .ReachabilityNodePort }}
     egressip-node-healthcheck-port={{.ReachabilityNodePort}}
 {{- end }}
-    {{- if not .OVN_MULTI_NETWORK_ENABLE }}
     enable-multi-network=true
-    {{- end }}
     enable-network-segmentation=true
     enable-preconfigured-udn-addresses=true
+
+{{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
+    enable-multi-networkpolicy=true
+{{- end }}
+    enable-admin-network-policy=true
+    enable-multi-external-gateway=true
+    enable-multicast=true
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
     enable-dns-name-resolver=true
 {{- end }}
@@ -117,14 +126,15 @@ data:
 {{- if .ReachabilityNodePort }}
     egressip-node-healthcheck-port={{.ReachabilityNodePort}}
 {{- end }}
-{{- if .OVN_MULTI_NETWORK_ENABLE }}
     enable-multi-network=true
-{{- end }}
-    {{- if not .OVN_MULTI_NETWORK_ENABLE }}
-    enable-multi-network=true
-    {{- end }}
     enable-network-segmentation=true
     enable-preconfigured-udn-addresses=true
+{{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
+    enable-multi-networkpolicy=true
+{{- end }}
+    enable-admin-network-policy=true
+    enable-multi-external-gateway=true
+    enable-multicast=true
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
     enable-dns-name-resolver=true
 {{- end }}
