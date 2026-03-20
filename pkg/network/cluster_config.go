@@ -119,6 +119,10 @@ func MergeClusterConfig(operConf *operv1.NetworkSpec, clusterConf configv1.Netwo
 	}
 
 	operConf.DefaultNetwork.Type = operv1.NetworkType(clusterConf.NetworkType)
+	// This only takes effect when the current value in the API is empty
+	// (initial creation). mergeOperConfigForUpdate preserves the existing
+	// ManagementState on subsequent SSA applies, preventing this default
+	// from overwriting a user-set value (e.g. "Unmanaged").
 	if operConf.ManagementState == "" {
 		operConf.ManagementState = "Managed"
 	}
