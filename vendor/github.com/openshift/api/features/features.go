@@ -969,4 +969,12 @@ var (
 					enhancementPR("https://github.com/openshift/enhancements/pull/1882").
 					enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 					mustRegister()
+
+	FeatureGateNetworkObservabilityInstall = newFeatureGate("NetworkObservabilityInstall").
+						reportProblemsToJiraComponent("netobserv").
+						contactPerson("jtakvori").
+						productScope(ocpSpecific).
+						enhancementPR("https://github.com/openshift/enhancements/pull/1908").
+						enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
+						mustRegister()
 )
