@@ -42,6 +42,7 @@ const (
 
 	checkInterval = 10 * time.Second
 	checkTimeout  = 10 * time.Minute
+	requeueAfter  = 5 * time.Minute // Requeue interval when operator is not ready yet
 
 	// NetworkObservabilityDeployed is the condition type that indicates Network Observability was successfully deployed
 	NetworkObservabilityDeployed = "NetworkObservabilityDeployed"
@@ -156,9 +157,9 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req ctrl.Request
 	klog.Info("Wait for Network Observability to be ready")
 	if err := r.waitForNetObservOperator(ctx); err != nil {
 		if err == context.DeadlineExceeded {
-			klog.Errorf("Timed out waiting for Network Observability Operator to be ready after %v. Stopping reconciliation.", checkTimeout)
+			klog.Errorf("Timed out waiting for Network Observability Operator to be ready after %v. Will retry in %v.", checkTimeout, requeueAfter)
 			r.status.SetDegraded(statusmanager.ObservabilityConfig, "OperatorNotReady", fmt.Sprintf("Timed out waiting for Network Observability Operator to be ready after %v", checkTimeout))
-			return ctrl.Result{RequeueAfter: 0}, nil // Don't requeue
+			return ctrl.Result{RequeueAfter: requeueAfter}, nil
 		}
 		r.status.SetDegraded(statusmanager.ObservabilityConfig, "WaitOperatorError", fmt.Sprintf("Failed waiting for Network Observability Operator: %v", err))
 		return ctrl.Result{}, err
@@ -181,7 +182,8 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Mark as deployed in Network CR status
 	if err := r.markNetworkObservabilityDeployed(ctx, &network); err != nil {
-		klog.Warningf("Failed to update Network Observability deployment status: %v", err)
+		r.status.SetDegraded(statusmanager.ObservabilityConfig, "UpdateStatusError", fmt.Sprintf("Failed to update Network Observability deployment status: %v", err))
+		return ctrl.Result{}, err
 	}
 
 	r.status.SetNotDegraded(statusmanager.ObservabilityConfig)
@@ -337,6 +339,8 @@ func (r *ReconcileObservability) waitForNetObservOperator(ctx context.Context) e
 		}
 
 		// Find the netobserv operator CSV
+		// During upgrades, there can be multiple CSVs. Check all of them and
+		// prioritize ones in "Succeeded" state to avoid checking the wrong CSV.
 		for _, csv := range csvs.Items {
 			name := csv.GetName()
 			// CSV names are typically like "netobserv-operator.v1.2.3"
@@ -346,11 +350,15 @@ func (r *ReconcileObservability) waitForNetObservOperator(ctx context.Context) e
 					return false, err
 				}
 				if !found {
-					return false, nil
+					continue
 				}
-				return phase == "Succeeded", nil
+				// If we find a CSV in Succeeded state, return true immediately
+				if phase == "Succeeded" {
+					return true, nil
+				}
 			}
 		}
+		// If we found matching CSVs but none in Succeeded state, keep waiting
 		return false, nil
 	}
 	return wait.PollUntilContextTimeout(ctx, checkInterval, checkTimeout, true, condition)

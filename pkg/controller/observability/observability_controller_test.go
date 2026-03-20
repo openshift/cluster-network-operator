@@ -928,9 +928,9 @@ func TestReconcile_OperatorNotReady(t *testing.T) {
 
 	result, err := r.Reconcile(ctx, req)
 
-	// Controller returns no error on timeout, but result.RequeueAfter should be 0
+	// Controller returns no error on timeout, but should requeue after 5 minutes
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(result.RequeueAfter).To(BeZero())
+	g.Expect(result.RequeueAfter).To(Equal(5 * time.Minute))
 }
 
 // TestReconcile_FlowCollectorDeleted tests that reconciliation recreates
@@ -1147,13 +1147,13 @@ func TestReconcile_RecoveryAfterOperatorBecomesReady(t *testing.T) {
 
 	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
-	// First reconciliation should timeout (returns no error but RequeueAfter=0)
+	// First reconciliation should timeout (returns no error but RequeueAfter=5 minutes)
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel1()
 
 	result1, err1 := r.Reconcile(ctx1, req)
 	g.Expect(err1).NotTo(HaveOccurred())
-	g.Expect(result1.RequeueAfter).To(BeZero())
+	g.Expect(result1.RequeueAfter).To(Equal(5 * time.Minute))
 
 	// Update CSV to Succeeded phase
 	_ = unstructured.SetNestedField(csv.Object, "Succeeded", "status", "phase")
