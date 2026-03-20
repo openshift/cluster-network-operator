@@ -125,11 +125,14 @@ data:
       MAXLOGFILES="{{.OVNPolicyAuditMaxLogFiles}}"
       LOGDIR=$(dirname ${controller_logfile})
 
-      # wait a bit for ovn-controller to start
+      # wait for ovn-controller to start and write its PID file
       local retries=0
+      CONTROLLERPID=""
       while [[ 30 -gt "${retries}" ]]; do
         (( retries += 1 ))
-        CONTROLLERPID=$(cat ${controller_pidfile})
+        if [[ -f "${controller_pidfile}" ]]; then
+          CONTROLLERPID=$(cat "${controller_pidfile}" 2>/dev/null || true)
+        fi
         if [[ -n "${CONTROLLERPID}" ]]; then
           break
         fi
