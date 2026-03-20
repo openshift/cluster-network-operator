@@ -57,6 +57,48 @@ func Test_Merge(t *testing.T) {
 				},
 			},
 		},
+		{
+			"merge operator config ManagementState remains at current value",
+			schema.GroupVersionKind{
+				Group:   operv1.GroupName,
+				Kind:    "Network",
+				Version: operv1.GroupVersion.Version,
+			},
+			&operv1.Network{
+				Spec: operv1.NetworkSpec{
+					OperatorSpec: operv1.OperatorSpec{ManagementState: operv1.Unmanaged},
+				},
+			},
+			&operv1.Network{
+				Spec: operv1.NetworkSpec{
+					OperatorSpec: operv1.OperatorSpec{ManagementState: operv1.Managed},
+				},
+			},
+			&operv1.Network{
+				Spec: operv1.NetworkSpec{
+					OperatorSpec: operv1.OperatorSpec{ManagementState: operv1.Unmanaged},
+				},
+			},
+		},
+		{
+			"merge operator config ManagementState changes when previously unset",
+			schema.GroupVersionKind{
+				Group:   operv1.GroupName,
+				Kind:    "Network",
+				Version: operv1.GroupVersion.Version,
+			},
+			&operv1.Network{},
+			&operv1.Network{
+				Spec: operv1.NetworkSpec{
+					OperatorSpec: operv1.OperatorSpec{ManagementState: operv1.Managed},
+				},
+			},
+			&operv1.Network{
+				Spec: operv1.NetworkSpec{
+					OperatorSpec: operv1.OperatorSpec{ManagementState: operv1.Managed},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
