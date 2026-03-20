@@ -469,7 +469,7 @@ func Test_getMultusAdmissionControllerReplicas(t *testing.T) {
 }
 
 func fillDefaults(conf, previous *operv1.NetworkSpec) {
-	FillDefaults(conf, previous, 1400)
+	FillDefaults(conf, previous, 1400, false)
 }
 
 func setupTestInfraAndBasicRenderConfigs(t *testing.T, prevType, nextType operv1.Network) (

@@ -245,7 +245,7 @@ func Validate(conf *operv1.NetworkSpec) error {
 //
 // We may need to know the MTU of nodes in the cluster, so we can compute the correct
 // underlay MTU for OVN-K.
-func FillDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
+func FillDefaults(conf, previous *operv1.NetworkSpec, hostMTU int, isHyperShift bool) {
 	// DisableMultiNetwork defaults to false
 	if conf.DisableMultiNetwork == nil {
 		disable := false
@@ -262,7 +262,7 @@ func FillDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 		conf.LogLevel = "Normal"
 	}
 
-	fillDefaultNetworkDefaults(conf, previous, hostMTU)
+	fillDefaultNetworkDefaults(conf, previous, hostMTU, isHyperShift)
 	fillKubeProxyDefaults(conf, previous)
 }
 
@@ -586,9 +586,9 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 	return nil, false, nil
 }
 
-func fillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
+func fillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int, isHyperShift bool) {
 	if conf.DefaultNetwork.Type == operv1.NetworkTypeOVNKubernetes {
-		fillOVNKubernetesDefaults(conf, previous, hostMTU)
+		fillOVNKubernetesDefaults(conf, previous, hostMTU, isHyperShift)
 	}
 }
 

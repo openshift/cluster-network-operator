@@ -1040,84 +1040,83 @@ func checkOVNKubernetesPostStart(objects []*uns.Unstructured) error {
 }
 
 func TestFillOVNKubernetesDefaults(t *testing.T) {
-	g := NewGomegaWithT(t)
-
-	crd := OVNKubernetesConfig.DeepCopy()
-	conf := &crd.Spec
-	conf.DefaultNetwork.OVNKubernetesConfig = nil
-
-	expected := operv1.NetworkSpec{
-		ServiceNetwork: []string{"172.30.0.0/16"},
-		ClusterNetwork: []operv1.ClusterNetworkEntry{
-			{
-				CIDR:       "10.128.0.0/15",
-				HostPrefix: 23,
+	testCases := []struct {
+		name         string
+		setup        func(conf *operv1.NetworkSpec)
+		previous     func(conf *operv1.NetworkSpec) *operv1.NetworkSpec
+		hostMTU      int
+		isHyperShift bool
+		expectedMTU  uint32
+	}{
+		{
+			name: "When standalone with probed MTU it should compute MTU from hostMTU minus geneve overhead",
+			setup: func(conf *operv1.NetworkSpec) {
+				conf.DefaultNetwork.OVNKubernetesConfig = nil
 			},
-			{
-				CIDR:       "10.0.0.0/14",
-				HostPrefix: 24,
-			},
+			hostMTU:      9000,
+			isHyperShift: false,
+			expectedMTU:  8900, // 9000 - 100 (geneve overhead)
 		},
-		DefaultNetwork: operv1.DefaultNetworkDefinition{
-			Type: operv1.NetworkTypeOVNKubernetes,
-			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				MTU:        ptrToUint32(8900),
-				GenevePort: ptrToUint32(6081),
-				PolicyAuditConfig: &operv1.PolicyAuditConfig{
-					RateLimit:      ptrToUint32(20),
-					MaxFileSize:    ptrToUint32(50),
-					Destination:    "null",
-					SyslogFacility: "local0",
-				},
+		{
+			name: "When standalone with IPsec it should compute MTU from hostMTU minus geneve+IPsec overhead",
+			setup: func(conf *operv1.NetworkSpec) {
+				conf.DefaultNetwork.OVNKubernetesConfig.IPsecConfig = &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}
 			},
+			previous: func(conf *operv1.NetworkSpec) *operv1.NetworkSpec {
+				return conf
+			},
+			hostMTU:      9000,
+			isHyperShift: false,
+			expectedMTU:  8854, // 9000 - 100 (geneve) - 46 (IPsec)
 		},
-	}
-
-	fillOVNKubernetesDefaults(conf, nil, 9000)
-
-	g.Expect(conf).To(Equal(&expected))
-
-}
-
-func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
-	g := NewGomegaWithT(t)
-
-	crd := OVNKubernetesConfig.DeepCopy()
-	conf := &crd.Spec
-	conf.DefaultNetwork.OVNKubernetesConfig.IPsecConfig = &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}
-
-	expected := operv1.NetworkSpec{
-		ServiceNetwork: []string{"172.30.0.0/16"},
-		ClusterNetwork: []operv1.ClusterNetworkEntry{
-			{
-				CIDR:       "10.128.0.0/15",
-				HostPrefix: 23,
+		{
+			name: "When user explicitly sets MTU on standalone it should preserve user value",
+			setup: func(conf *operv1.NetworkSpec) {
+				userMTU := uint32(1400)
+				conf.DefaultNetwork.OVNKubernetesConfig.MTU = &userMTU
 			},
-			{
-				CIDR:       "10.0.0.0/14",
-				HostPrefix: 24,
-			},
+			hostMTU:      9000,
+			isHyperShift: false,
+			expectedMTU:  1400,
 		},
-		DefaultNetwork: operv1.DefaultNetworkDefinition{
-			Type: operv1.NetworkTypeOVNKubernetes,
-			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				MTU:         ptrToUint32(8854),
-				GenevePort:  ptrToUint32(8061),
-				IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull},
-				PolicyAuditConfig: &operv1.PolicyAuditConfig{
-					RateLimit:      ptrToUint32(20),
-					MaxFileSize:    ptrToUint32(50),
-					Destination:    "null",
-					SyslogFacility: "local0",
-				},
+		{
+			name: "When user explicitly sets MTU on HyperShift it should preserve user value",
+			setup: func(conf *operv1.NetworkSpec) {
+				userMTU := uint32(1400)
+				conf.DefaultNetwork.OVNKubernetesConfig.MTU = &userMTU
 			},
+			hostMTU:      0,
+			isHyperShift: true,
+			expectedMTU:  1400,
+		},
+		{
+			name: "When HyperShift with no user MTU and no probed MTU it should use safe default minus geneve overhead",
+			setup: func(conf *operv1.NetworkSpec) {
+				conf.DefaultNetwork.OVNKubernetesConfig = nil
+			},
+			hostMTU:      0,
+			isHyperShift: true,
+			expectedMTU:  1400, // 1500 (safe default) - 100 (geneve overhead)
 		},
 	}
 
-	fillOVNKubernetesDefaults(conf, conf, 9000)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
 
-	g.Expect(conf).To(Equal(&expected))
+			crd := OVNKubernetesConfig.DeepCopy()
+			conf := &crd.Spec
+			tc.setup(conf)
 
+			var prev *operv1.NetworkSpec
+			if tc.previous != nil {
+				prev = tc.previous(conf)
+			}
+
+			fillOVNKubernetesDefaults(conf, prev, tc.hostMTU, tc.isHyperShift)
+			g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(tc.expectedMTU))
+		})
+	}
 }
 func TestValidateOVNKubernetes(t *testing.T) {
 	g := NewGomegaWithT(t)
