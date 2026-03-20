@@ -3,10 +3,10 @@ package infrastructureconfig
 import (
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
-	utilslice "k8s.io/utils/strings/slices"
 )
 
 type fieldSynchronizer interface {
@@ -91,7 +91,7 @@ func syncVIPs(newVIPs *[]string, oldVIP *string) error {
 		}
 	} else {
 		// case 2-5, we have old = new[0]
-		if !utilslice.Contains(*newVIPs, *oldVIP) {
+		if !slices.Contains(*newVIPs, *oldVIP) {
 			// case 5
 			// -> `new` contains values, `old` contains a value which is not
 			// included in `new`: new values take precedence over old
