@@ -13,6 +13,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1266,20 +1267,28 @@ func TestReconcile_ConcurrentReconciliations(t *testing.T) {
 	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
 	// Run 5 concurrent reconciliations
-	done := make(chan bool, 5)
+	errChan := make(chan error, 5)
 	for i := 0; i < 5; i++ {
 		go func() {
 			_, err := r.Reconcile(context.TODO(), req)
-			// All should complete without error (idempotent)
-			g.Expect(err).NotTo(HaveOccurred())
-			done <- true
+			errChan <- err
 		}()
 	}
 
-	// Wait for all to complete
+	// Wait for all to complete and collect errors
+	var unexpectedErrors []error
 	for i := 0; i < 5; i++ {
-		<-done
+		if err := <-errChan; err != nil {
+			// Filter out 409 conflict errors which are expected when multiple
+			// goroutines try to update the same resource status concurrently
+			if !errors.IsConflict(err) {
+				unexpectedErrors = append(unexpectedErrors, err)
+			}
+		}
 	}
+
+	// Assert no unexpected errors occurred (safe to do in main test goroutine)
+	g.Expect(unexpectedErrors).To(BeEmpty(), "All concurrent reconciliations should complete without unexpected errors")
 }
 
 // Status Manager Tests
