@@ -9,7 +9,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	mcutil "github.com/openshift/cluster-network-operator/pkg/util/machineconfig"
 	mcomcfgv1 "github.com/openshift/machine-config-operator/pkg/apihelpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -140,17 +139,10 @@ func (status *StatusManager) SetFromMachineConfigPool(mcPools []mcfgv1.MachineCo
 	// No degraded pools, so clear degraded status
 	status.setNotDegraded(MachineConfig)
 
-	// Now check for progressing and process machine configs
 	for role, machineConfigs := range status.renderedMachineConfigs {
 		pools, err := status.findMachineConfigPoolsForLabel(mcPools, map[string]string{names.MachineConfigLabelRoleKey: role})
 		if err != nil {
 			klog.Errorf("failed to get machine config pools for the role %s: %v", role, err)
-		}
-
-		progressingPool := status.isAnyMachineConfigPoolProgressing(pools)
-		if progressingPool != "" {
-			status.setProgressing(MachineConfig, "MachineConfig", fmt.Sprintf("%s machine config pool in progressing state", progressingPool))
-			return nil
 		}
 		for _, pool := range pools {
 			if pool.Spec.Paused {
@@ -165,7 +157,7 @@ func (status *StatusManager) SetFromMachineConfigPool(mcPools []mcfgv1.MachineCo
 				mcSet := sets.Set[string]{}
 				mcSet.Insert(machineConfig)
 				if mcsBeingRemoved, ok := status.machineConfigsBeingRemoved[role]; ok && mcsBeingRemoved.Has(machineConfig) {
-					removed = mcutil.AreMachineConfigsRemovedFromPool(pool.Status, mcSet)
+					removed = areMachineConfigsRemovedFromPoolSource(pool.Status, mcSet)
 					if removed {
 						status.machineConfigsBeingRemoved[role].Delete(machineConfig)
 						// Delete map entry from status cache if role doesn't have machine configs. By deleting the entry,
@@ -183,7 +175,7 @@ func (status *StatusManager) SetFromMachineConfigPool(mcPools []mcfgv1.MachineCo
 						}
 					}
 				} else {
-					added = mcutil.AreMachineConfigsRenderedOnPool(pool.Status, mcSet)
+					added = areMachineConfigsRenderedOnPoolSource(pool.Status, mcSet)
 				}
 				if !added || !removed {
 					status.setProgressing(MachineConfig, "MachineConfig",
@@ -239,6 +231,22 @@ func (status *StatusManager) setLastRenderedMachineConfigState(renderedMachineCo
 	return status.setAnnotation(context.TODO(), co, renderedMachineConfigAnnotation, &anno)
 }
 
+func areMachineConfigsRenderedOnPoolSource(status mcfgv1.MachineConfigPoolStatus, machineConfigs sets.Set[string]) bool {
+	sourceNames := sets.New[string]()
+	for _, source := range status.Configuration.Source {
+		sourceNames.Insert(source.Name)
+	}
+	return sourceNames.IsSuperset(machineConfigs)
+}
+
+func areMachineConfigsRemovedFromPoolSource(status mcfgv1.MachineConfigPoolStatus, machineConfigs sets.Set[string]) bool {
+	sourceNames := sets.New[string]()
+	for _, source := range status.Configuration.Source {
+		sourceNames.Insert(source.Name)
+	}
+	return !sourceNames.HasAny(machineConfigs.UnsortedList()...)
+}
+
 func (status *StatusManager) isAnyMachineConfigPoolDegraded(pools []mcfgv1.MachineConfigPool) string {
 	var degradedPool string
 	for _, pool := range pools {
@@ -248,17 +256,6 @@ func (status *StatusManager) isAnyMachineConfigPoolDegraded(pools []mcfgv1.Machi
 		}
 	}
 	return degradedPool
-}
-
-func (status *StatusManager) isAnyMachineConfigPoolProgressing(pools []mcfgv1.MachineConfigPool) string {
-	var progressingPool string
-	for _, pool := range pools {
-		if mcomcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolUpdating) {
-			progressingPool = pool.Name
-			break
-		}
-	}
-	return progressingPool
 }
 
 func (status *StatusManager) findMachineConfigPoolsForLabel(mcPools []mcfgv1.MachineConfigPool, mcLabel labels.Set) ([]mcfgv1.MachineConfigPool, error) {
