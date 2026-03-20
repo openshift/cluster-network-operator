@@ -97,7 +97,8 @@ func (status *StatusManager) SetFromPods() {
 		} else if ds.Status.UpdatedNumberScheduled < ds.Status.DesiredNumberScheduled {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q update is rolling out (%d out of %d updated)", dsName.String(), ds.Status.UpdatedNumberScheduled, ds.Status.DesiredNumberScheduled))
 			dsProgressing = true
-		} else if ds.Status.NumberUnavailable > 0 {
+		} else if ds.Status.NumberUnavailable > 0 && (ds.Status.DesiredNumberScheduled == 0 || ds.Generation > ds.Status.ObservedGeneration) {
+			// Report Progressing only during initial deployment (DesiredNumberScheduled not set) or active rollout (spec changed)
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not available (awaiting %d nodes)", dsName.String(), ds.Status.NumberUnavailable))
 			dsProgressing = true
 			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
@@ -154,8 +155,11 @@ func (status *StatusManager) SetFromPods() {
 			progressing = append(progressing, fmt.Sprintf("StatefulSet %q update is rolling out (%d out of %d updated)", ssName.String(), ss.Status.UpdatedReplicas, ss.Status.Replicas))
 			ssProgressing = true
 		} else if ss.Status.ReadyReplicas > 0 && ss.Status.ReadyReplicas < ss.Status.Replicas {
-			progressing = append(progressing, fmt.Sprintf("StatefulSet %q is not available (awaiting %d nodes)", ssName.String(), (ss.Status.Replicas-ss.Status.ReadyReplicas)))
-			ssProgressing = true
+			if ss.Generation == 0 || ss.Status.ObservedGeneration < ss.Generation {
+				// Report Progressing during initial deployment or active rollout (spec changed)
+				progressing = append(progressing, fmt.Sprintf("StatefulSet %q is not available (awaiting %d nodes)", ssName.String(), (ss.Status.Replicas-ss.Status.ReadyReplicas)))
+				ssProgressing = true
+			}
 			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
 			if !isNonCritical(ss) {
 				clbo = append(clbo, status.CheckCrashLoopBackOffPods(ssName, ss.Spec.Selector.MatchLabels, "StatefulSet")...)
@@ -209,8 +213,11 @@ func (status *StatusManager) SetFromPods() {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q update is rolling out (%d out of %d updated)", depName.String(), dep.Status.UpdatedReplicas, dep.Status.Replicas))
 			depProgressing = true
 		} else if dep.Status.UnavailableReplicas > 0 {
-			progressing = append(progressing, fmt.Sprintf("Deployment %q is not available (awaiting %d nodes)", depName.String(), dep.Status.UnavailableReplicas))
-			depProgressing = true
+			if dep.Generation == 0 || dep.Status.ObservedGeneration < dep.Generation {
+				// Report Progressing during initial deployment or active rollout (spec changed)
+				progressing = append(progressing, fmt.Sprintf("Deployment %q is not available (awaiting %d nodes)", depName.String(), dep.Status.UnavailableReplicas))
+				depProgressing = true
+			}
 			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
 			if !isNonCritical(dep) {
 				clbo = append(clbo, status.CheckCrashLoopBackOffPods(depName, dep.Spec.Selector.MatchLabels, "Deployment")...)

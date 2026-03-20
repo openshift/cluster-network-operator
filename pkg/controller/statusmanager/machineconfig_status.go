@@ -140,17 +140,10 @@ func (status *StatusManager) SetFromMachineConfigPool(mcPools []mcfgv1.MachineCo
 	// No degraded pools, so clear degraded status
 	status.setNotDegraded(MachineConfig)
 
-	// Now check for progressing and process machine configs
 	for role, machineConfigs := range status.renderedMachineConfigs {
 		pools, err := status.findMachineConfigPoolsForLabel(mcPools, map[string]string{names.MachineConfigLabelRoleKey: role})
 		if err != nil {
 			klog.Errorf("failed to get machine config pools for the role %s: %v", role, err)
-		}
-
-		progressingPool := status.isAnyMachineConfigPoolProgressing(pools)
-		if progressingPool != "" {
-			status.setProgressing(MachineConfig, "MachineConfig", fmt.Sprintf("%s machine config pool in progressing state", progressingPool))
-			return nil
 		}
 		for _, pool := range pools {
 			if pool.Spec.Paused {
@@ -248,17 +241,6 @@ func (status *StatusManager) isAnyMachineConfigPoolDegraded(pools []mcfgv1.Machi
 		}
 	}
 	return degradedPool
-}
-
-func (status *StatusManager) isAnyMachineConfigPoolProgressing(pools []mcfgv1.MachineConfigPool) string {
-	var progressingPool string
-	for _, pool := range pools {
-		if mcomcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolUpdating) {
-			progressingPool = pool.Name
-			break
-		}
-	}
-	return progressingPool
 }
 
 func (status *StatusManager) findMachineConfigPoolsForLabel(mcPools []mcfgv1.MachineConfigPool, mcLabel labels.Set) ([]mcfgv1.MachineConfigPool, error) {
