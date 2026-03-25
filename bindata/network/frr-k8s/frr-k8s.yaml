@@ -97,7 +97,8 @@ spec:
         args:
         - --node-name=$(NODE_NAME)
         - --namespace=$(NAMESPACE)
-        - --metrics-bind-address=127.0.0.1:7572
+        - --metrics-bind-address=0.0.0.0:9140
+        - --metrics-cert-dir=/etc/metrics
         - $(LOG_LEVEL)
         env:
         - name: FRR_CONFIG_FILE
@@ -119,8 +120,8 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         ports:
-        - containerPort: 7572
-          name: monitoring
+        - containerPort: 9140
+          name: metricshttps
         resources:
           requests:
             cpu: 100m
@@ -128,8 +129,8 @@ spec:
         terminationMessagePolicy: FallbackToLogsOnError
         livenessProbe:
           httpGet:
-            path: /metrics
-            port: monitoring
+            path: /healthz
+            port: 7572
             host: 127.0.0.1
           initialDelaySeconds: 10
           periodSeconds: 10
@@ -138,8 +139,8 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /metrics
-            port: monitoring
+            path: /readyz
+            port: 7572
             host: 127.0.0.1
           initialDelaySeconds: 10
           periodSeconds: 10
@@ -157,6 +158,9 @@ spec:
         volumeMounts:
           - name: reloader
             mountPath: /etc/frr_reloader
+          - name: metrics-certs
+            mountPath: /etc/metrics
+            readOnly: true
       - name: frr
         securityContext:
           allowPrivilegeEscalation: false
@@ -192,15 +196,15 @@ spec:
         livenessProbe:
           httpGet:
             path: /livez
-            port: 7573
-            host: 127.0.0.1
+            port: 9141
+            scheme: HTTPS
           periodSeconds: 10
           failureThreshold: 3
         startupProbe:
           httpGet:
             path: /livez
-            port: 7573
-            host: 127.0.0.1
+            port: 9141
+            scheme: HTTPS
           failureThreshold: 30
           periodSeconds: 5
       - name: reloader
@@ -222,11 +226,13 @@ spec:
         image: {{.FRRK8sImage}}
         command: ["/etc/frr_metrics/frr-metrics"]
         args:
-        - --metrics-port=7573
-        - --metrics-bind-address=127.0.0.1
+        - --metrics-port=9141
+        - --metrics-bind-address=0.0.0.0
+        - --tls-cert-file=/etc/metrics/tls.crt
+        - --tls-private-key-file=/etc/metrics/tls.key
         ports:
-        - containerPort: 7573
-          name: monitoring
+        - containerPort: 9141
+          name: frrmetricshttps
         resources:
           requests:
             cpu: 10m
@@ -239,6 +245,9 @@ spec:
           mountPath: /etc/frr
         - name: metrics
           mountPath: /etc/frr_metrics
+        - name: metrics-certs
+          mountPath: /etc/metrics
+          readOnly: true
       - name: frr-status
         image: {{.FRRK8sImage}}
         args:
@@ -272,48 +281,6 @@ spec:
           requests:
             cpu: 10m
             memory: 20Mi
-      - name: kube-rbac-proxy
-        image: {{.KubeRBACProxyImage}}
-        args:
-        - --logtostderr
-        - --secure-listen-address=:9140
-        - --upstream=http://127.0.0.1:7572/
-        - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
-        - --tls-private-key-file=/etc/metrics/tls.key
-        - --tls-cert-file=/etc/metrics/tls.crt
-        ports:
-        - containerPort: 9140
-          name: metricshttps
-        resources:
-          requests:
-            cpu: 10m
-            memory: 20Mi
-        terminationMessagePolicy: FallbackToLogsOnError
-        volumeMounts:
-        - name: metrics-certs
-          mountPath: /etc/metrics
-          readOnly: true
-      - name: kube-rbac-proxy-frr
-        image: {{.KubeRBACProxyImage}}
-        args:
-        - --logtostderr
-        - --secure-listen-address=:9141
-        - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
-        - --upstream=http://127.0.0.1:7573/
-        - --tls-private-key-file=/etc/metrics/tls.key
-        - --tls-cert-file=/etc/metrics/tls.crt
-        ports:
-        - containerPort: 9141
-          name: frrmetricshttps
-        resources:
-          requests:
-            cpu: 10m
-            memory: 20Mi
-        terminationMessagePolicy: FallbackToLogsOnError
-        volumeMounts:
-        - name: metrics-certs
-          mountPath: /etc/metrics
-          readOnly: true
       nodeSelector:
         kubernetes.io/os: linux
       tolerations:
