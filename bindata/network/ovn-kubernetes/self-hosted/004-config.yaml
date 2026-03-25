@@ -13,6 +13,9 @@ data:
     routable-mtu="{{.RoutableMTU}}"
     {{- end }}
     cluster-subnets="{{.OVN_cidr}}"
+    {{- if .DefaultNetworkTransport }}
+    transport="{{.DefaultNetworkTransport}}"
+    {{- end }}
     encap-port="{{.GenevePort}}"
     enable-lflow-cache=true
     lflow-cache-limit-kb=1048576
@@ -55,6 +58,27 @@ data:
     [gateway]
     mode={{.OVN_GATEWAY_MODE}}
     nodeport=true
+{{- if .NoOverlayEnabled }}
+
+    [no-overlay]
+    {{- if .NoOverlayOutboundSNAT }}
+    outbound-snat={{.NoOverlayOutboundSNAT}}
+    {{- end }}
+    {{- if .NoOverlayRouting }}
+    routing={{.NoOverlayRouting}}
+    {{- end }}
+{{- end }}
+{{- if .NoOverlayManagedEnabled }}
+
+    [bgp-managed]
+    frr-namespace={{.FRRK8sNamespace}}
+    {{- if .NoOverlayManagedASNumber }}
+    as-number={{.NoOverlayManagedASNumber}}
+    {{- end }}
+    {{- if .NoOverlayManagedTopology }}
+    topology={{.NoOverlayManagedTopology}}
+    {{- end }}
+{{- end }}
 
     [logging]
     libovsdblogfile=/var/log/ovnkube/libovsdb.log
