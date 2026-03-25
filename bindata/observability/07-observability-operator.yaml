@@ -1,0 +1,246 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-netobserv-operator
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: netobserv-operator-installer
+  namespace: openshift-netobserv-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: netobserv-operator-installer
+rules:
+  # Permissions needed by OLM v1 to install the Network Observability operator
+  # Based on OLM v1 pre-authorization requirements from the operator bundle
+
+  # Core resources
+  - apiGroups: [""]
+    resources: ["endpoints", "nodes", "pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["serviceaccounts", "services", "configmaps"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets", "persistentvolumeclaims"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # Webhooks - validating webhook configurations
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["validatingwebhookconfigurations"]
+    verbs: ["create", "list", "watch"]
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["validatingwebhookconfigurations"]
+    resourceNames: ["flowcollectorconversionwebhook.netobserv.io", "flowmetricvalidationwebhook.netobserv.io"]
+    verbs: ["delete", "get", "patch", "update"]
+
+  # CRDs and API services
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["create", "get", "list", "watch", "update", "patch"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions/status"]
+    verbs: ["patch", "update"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    resourceNames: ["flowcollectors.flows.netobserv.io", "flowcollectorslices.flows.netobserv.io", "flowmetrics.flows.netobserv.io"]
+    verbs: ["delete"]
+  - apiGroups: ["apiregistration.k8s.io"]
+    resources: ["apiservices"]
+    verbs: ["get", "list", "watch"]
+
+  # Workloads
+  - apiGroups: ["apps"]
+    resources: ["deployments", "daemonsets"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+
+  # Authentication and authorization
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+  - apiGroups: ["authorization.k8s.io"]
+    resources: ["subjectaccessreviews"]
+    verbs: ["create"]
+
+  # Autoscaling
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # eBPF (bpfman.io)
+  - apiGroups: ["bpfman.io"]
+    resources: ["clusterbpfapplications"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["bpfman.io"]
+    resources: ["clusterbpfapplications/status"]
+    verbs: ["get", "patch", "update"]
+
+  # OpenShift config
+  - apiGroups: ["config.openshift.io"]
+    resources: ["clusterversions", "networks"]
+    verbs: ["get", "list", "watch"]
+
+  # Console plugin
+  - apiGroups: ["console.openshift.io"]
+    resources: ["consoleplugins"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # Coordination (leader election)
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # Discovery
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+
+  # FlowCollector CRs
+  - apiGroups: ["flows.netobserv.io"]
+    resources: ["flowcollectors", "flowcollectorslices", "flowmetrics"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["flows.netobserv.io"]
+    resources: ["flowcollectors/finalizers"]
+    verbs: ["update"]
+  - apiGroups: ["flows.netobserv.io"]
+    resources: ["flowcollectors/status", "flowcollectorslices/status", "flowmetrics/status"]
+    verbs: ["get", "patch", "update"]
+
+  # OVN-Kubernetes
+  - apiGroups: ["k8s.ovn.org"]
+    resources: ["clusteruserdefinednetworks", "userdefinednetworks"]
+    verbs: ["get", "list", "watch"]
+
+  # Loki integration
+  - apiGroups: ["loki.grafana.com"]
+    resources: ["lokistacks"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["loki.grafana.com"]
+    resources: ["network"]
+    resourceNames: ["logs"]
+    verbs: ["create", "get"]
+
+  # Metrics
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["create"]
+
+  # Monitoring
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["prometheusrules", "servicemonitors"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # Network policies
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # OLM ClusterExtension finalizers
+  - apiGroups: ["olm.operatorframework.io"]
+    resources: ["clusterextensions/finalizers"]
+    resourceNames: ["netobserv-operator"]
+    verbs: ["update"]
+
+  # OpenShift console and network config
+  - apiGroups: ["operator.openshift.io"]
+    resources: ["consoles"]
+    verbs: ["get", "list", "update", "watch"]
+  - apiGroups: ["operator.openshift.io"]
+    resources: ["networks"]
+    verbs: ["get", "list", "watch"]
+
+  # RBAC
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles", "clusterrolebindings"]
+    verbs: ["create", "delete", "get", "list", "update", "watch", "patch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles"]
+    verbs: ["list", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["create", "delete", "get", "list", "update", "watch"]
+
+  # Security context constraints
+  - apiGroups: ["security.openshift.io"]
+    resources: ["securitycontextconstraints"]
+    verbs: ["create", "list", "update", "watch"]
+  - apiGroups: ["security.openshift.io"]
+    resources: ["securitycontextconstraints"]
+    resourceNames: ["hostnetwork"]
+    verbs: ["use"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: netobserv-operator-installer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: netobserv-operator-installer
+subjects:
+  - kind: ServiceAccount
+    name: netobserv-operator-installer
+    namespace: openshift-netobserv-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: netobserv-operator-installer
+  namespace: openshift-netobserv-operator
+rules:
+  # Namespace-scoped permissions needed for operator installation
+  # The operator needs to manage Roles and RoleBindings in its own namespace
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles"]
+    verbs: ["create"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles"]
+    resourceNames: ["netobserv-openshift-netobserv-operator-prometheus"]
+    verbs: ["delete", "get", "patch", "update"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    resourceNames: ["netobserv-openshift-netobserv-operator-prometheus"]
+    verbs: ["delete", "get", "patch", "update"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: netobserv-operator-installer
+  namespace: openshift-netobserv-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: netobserv-operator-installer
+subjects:
+  - kind: ServiceAccount
+    name: netobserv-operator-installer
+    namespace: openshift-netobserv-operator
+---
+apiVersion: olm.operatorframework.io/v1
+kind: ClusterExtension
+metadata:
+  name: netobserv-operator
+spec:
+  namespace: openshift-netobserv-operator
+  serviceAccount:
+    name: netobserv-operator-installer
+  source:
+    sourceType: Catalog
+    catalog:
+      packageName: netobserv-operator
+      channels: [stable]
