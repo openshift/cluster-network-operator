@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: frrconfigurations.frrk8s.metallb.io
 spec:
   group: frrk8s.metallb.io
@@ -185,8 +185,10 @@ spec:
                               disableMP:
                                 default: false
                                 description: |-
-                                  To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions.
-                                  Deprecated: DisableMP is deprecated in favor of dualStackAddressFamily.
+                                  DisableMP is no longer used and has no effect.
+                                  Use DualStackAddressFamily instead to enable the neighbor for both IPv4 and IPv6 address families.
+
+                                  Deprecated: This field is ignored. Use DualStackAddressFamily instead.
                                 type: boolean
                               dualStackAddressFamily:
                                 default: false
@@ -490,7 +492,72 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.17.3
+  name: frrk8sconfigurations.frrk8s.metallb.io
+spec:
+  group: frrk8s.metallb.io
+  names:
+    kind: FRRK8sConfiguration
+    listKind: FRRK8sConfigurationList
+    plural: frrk8sconfigurations
+    singular: frrk8sconfiguration
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          FRRK8sConfiguration holds the FRR Operator configuration with global
+          settings for the K8s and FRR.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: FRRK8sConfigurationSpec defines the desired state of FRRK8sConfiguration.
+            properties:
+              logLevel:
+                description: |-
+                  LogLevel sets the logging verbosity for the FRR-K8s components at runtime.
+                  When configured, this value overrides the defaults established by the --log-level CLI flag.
+                  Valid values are: all, debug, info, warn, error, none.
+                enum:
+                - all
+                - debug
+                - info
+                - warn
+                - error
+                - none
+                type: string
+            type: object
+          status:
+            description: FRRK8sConfigurationStatus defines the observed state of FRRK8sConfiguration.
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: frrnodestates.frrk8s.metallb.io
 spec:
   group: frrk8s.metallb.io
@@ -555,7 +622,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: bgpsessionstates.frrk8s.metallb.io
 spec:
   group: frrk8s.metallb.io

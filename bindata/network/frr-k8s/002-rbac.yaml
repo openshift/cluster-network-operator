@@ -125,6 +125,14 @@ rules:
   - patch
   - update
 - apiGroups:
+  - frrk8s.metallb.io
+  resources:
+  - frrk8sconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - authentication.k8s.io
   resources:
   - tokenreviews
