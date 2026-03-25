@@ -859,7 +859,6 @@ func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir s
 		case operv1.RoutingCapabilitiesProviderFRR:
 			data := render.MakeRenderData()
 			data.Data["FRRK8sImage"] = os.Getenv("FRR_K8S_IMAGE")
-			data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 			data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 			objs, err := render.RenderDir(filepath.Join(manifestDir, "network/frr-k8s"), &data)
 			if err != nil {
