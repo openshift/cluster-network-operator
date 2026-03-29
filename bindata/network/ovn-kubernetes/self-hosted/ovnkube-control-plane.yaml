@@ -164,6 +164,11 @@ spec:
           # Enable admin network policy if configured (control-plane always full mode)
           admin_network_policy_enabled_flag="--enable-admin-network-policy"
           
+          network_connect_enabled_flag=
+          if [[ "{{.OVN_NETWORK_CONNECT_ENABLE}}" == "true" ]]; then
+            network_connect_enabled_flag="--enable-network-connect"
+          fi
+
           if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
             gateway_mode_flags="--gateway-mode shared"
           elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
@@ -193,6 +198,7 @@ spec:
             ${multi_network_enabled_flag} \
             ${network_segmentation_enabled_flag} \
             ${gateway_mode_flags} \
+            ${network_connect_enabled_flag} \
             ${route_advertisements_enable_flag} \
             ${evpn_enable_flag} \
             ${preconfigured_udn_addresses_enable_flag} \

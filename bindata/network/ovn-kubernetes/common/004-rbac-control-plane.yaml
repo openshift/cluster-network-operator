@@ -112,6 +112,22 @@ rules:
   - update
   - watch
 {{- end }}
+{{- if .OVN_NETWORK_CONNECT_ENABLE }}
+- apiGroups: ["k8s.ovn.org"]
+  resources:
+  - clusternetworkconnects
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups: ["k8s.ovn.org"]
+  resources:
+  - clusternetworkconnects
+  - clusternetworkconnects/status
+  verbs:
+  - patch
+  - update
+{{- end }}
 - apiGroups: ["cloud.network.openshift.io"]
   resources:
   - cloudprivateipconfigs

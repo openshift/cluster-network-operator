@@ -164,6 +164,15 @@ rules:
   - list
   - watch
 {{- end }}
+{{- if .OVN_NETWORK_CONNECT_ENABLE }}
+- apiGroups: ["k8s.ovn.org"]
+  resources:
+  - clusternetworkconnects
+  verbs:
+  - get
+  - list
+  - watch
+{{- end }}
 - apiGroups: ["policy.networking.k8s.io"]
   resources:
   - adminnetworkpolicies
