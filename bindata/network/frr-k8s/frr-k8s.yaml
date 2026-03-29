@@ -254,7 +254,7 @@ spec:
         - --node-name=$(NODE_NAME)
         - --namespace=$(NAMESPACE)
         - --pod-name=$(POD_NAME)
-        - --poll-interval=2m
+        - $(POLL_INTERVAL)
         command:
         - /etc/frr_status/frr-status
         env:
@@ -270,6 +270,12 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: POLL_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: env-overrides
+              key: frrk8s-poll-interval
+              optional: true
         volumeMounts:
         - mountPath: /var/run/frr
           name: frr-sockets
