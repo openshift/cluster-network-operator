@@ -39,7 +39,8 @@ func getFeatureGatesWithDualStack() featuregates.FeatureGate {
 			apifeatures.FeatureGateDNSNameResolver,
 			apifeatures.FeatureGateOVNObservability,
 			apifeatures.FeatureGateAWSDualStackInstall,
-			apifeatures.FeatureGateAzureDualStackInstall},
+			apifeatures.FeatureGateAzureDualStackInstall,
+			apifeatures.FeatureGateGCPDualStackInstall},
 		[]configv1.FeatureGateName{
 			apifeatures.FeatureGateNetworkConnect,
 		},
@@ -129,6 +130,7 @@ func getFeatureGatesWithIncompleteDualStack() featuregates.FeatureGate {
 		[]configv1.FeatureGateName{
 			apifeatures.FeatureGateNetworkConnect,
 			apifeatures.FeatureGateAzureDualStackInstall,
+			apifeatures.FeatureGateGCPDualStackInstall,
 		},
 	)
 }
@@ -205,7 +207,7 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, infraRes, featureGates)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	// You can't use dual-stack if enabled on an unsupported platform
+	// GCP supports dual-stack with the feature gate enabled
 	infrastructure.Status.PlatformStatus.Type = configv1.GCPPlatformType
 	infrastructure.Status.PlatformStatus.GCP = &configv1.GCPPlatformStatus{
 		Region: "us-west1",
@@ -221,8 +223,8 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 		CIDR:       "fd01::/48",
 		HostPrefix: 64,
 	})
-	haveError(cc, fmt.Sprintf("%s is not one of the supported platforms for dual stack",
-		infrastructure.Status.PlatformStatus.Type))
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, infraRes, featureGates)
+	g.Expect(err).NotTo(HaveOccurred())
 
 	// DualStack supported only with featuregates
 	infrastructure.Status.PlatformStatus.Type = configv1.AWSPlatformType
@@ -247,6 +249,27 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 	featureGates = getFeatureGatesWithIncompleteDualStack()
 	infrastructure.Status.PlatformStatus.Type = configv1.AzurePlatformType
 	infrastructure.Status.PlatformStatus.Azure = &configv1.AzurePlatformStatus{}
+	client = fake.NewFakeClient(infrastructure)
+	err = createProxy(client)
+	g.Expect(err).NotTo(HaveOccurred())
+	infraRes, err = platform.InfraStatus(client)
+	g.Expect(err).NotTo(HaveOccurred())
+	cc = *ClusterConfig.DeepCopy()
+	cc.ServiceNetwork = append(cc.ServiceNetwork, "fd02::/112")
+	cc.ClusterNetwork = append(cc.ClusterNetwork, configv1.ClusterNetworkEntry{
+		CIDR:       "fd01::/48",
+		HostPrefix: 64,
+	})
+	err = ValidateClusterConfig(&configv1.Network{Spec: cc}, infraRes, featureGates)
+	haveError(cc, fmt.Sprintf("%s is not one of the supported platforms for dual stack",
+		infrastructure.Status.PlatformStatus.Type))
+
+	// GCP DualStack without feature gate should fail
+	featureGates = getFeatureGatesWithIncompleteDualStack()
+	infrastructure.Status.PlatformStatus.Type = configv1.GCPPlatformType
+	infrastructure.Status.PlatformStatus.GCP = &configv1.GCPPlatformStatus{
+		Region: "us-west1",
+	}
 	client = fake.NewFakeClient(infrastructure)
 	err = createProxy(client)
 	g.Expect(err).NotTo(HaveOccurred())
