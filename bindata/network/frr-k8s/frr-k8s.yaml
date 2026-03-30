@@ -254,6 +254,7 @@ spec:
         - --node-name=$(NODE_NAME)
         - --namespace=$(NAMESPACE)
         - --pod-name=$(POD_NAME)
+        - $(LOG_LEVEL)
         - $(POLL_INTERVAL)
         command:
         - /etc/frr_status/frr-status
@@ -270,6 +271,12 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: env-overrides
+              key: frrk8s-loglevel
+              optional: true
         - name: POLL_INTERVAL
           valueFrom:
             configMapKeyRef:
