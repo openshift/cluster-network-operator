@@ -59,6 +59,19 @@ func mergeOperConfigForUpdate(current, updated *uns.Unstructured) error {
 		}
 	}
 
+	// managementState has no omitempty JSON tag so it is always serialized,
+	// even as a zero value. Preserve the current value if already set,
+	// otherwise let the updated value through.
+	managementState, found, err := uns.NestedString(current.Object, "spec", "managementState")
+	if err != nil {
+		return err
+	}
+	if found && managementState != "" {
+		if err := uns.SetNestedField(updated.Object, managementState, "spec", "managementState"); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
