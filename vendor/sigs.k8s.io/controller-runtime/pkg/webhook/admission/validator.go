@@ -39,17 +39,17 @@ type Validator interface {
 	// ValidateCreate validates the object on creation.
 	// The optional warnings will be added to the response as warning messages.
 	// Return an error if the object is invalid.
-	ValidateCreate() (err error)
+	ValidateCreate() (warnings Warnings, err error)
 
 	// ValidateUpdate validates the object on update. The oldObj is the object before the update.
 	// The optional warnings will be added to the response as warning messages.
 	// Return an error if the object is invalid.
-	ValidateUpdate(old runtime.Object) (err error)
+	ValidateUpdate(old runtime.Object) (warnings Warnings, err error)
 
 	// ValidateDelete validates the object on deletion.
 	// The optional warnings will be added to the response as warning messages.
 	// Return an error if the object is invalid.
-	ValidateDelete() (err error)
+	ValidateDelete() (warnings Warnings, err error)
 }
 
 // ValidatingWebhookFor creates a new Webhook for validating the provided type.
@@ -87,7 +87,7 @@ func (h *validatingHandler) Handle(ctx context.Context, req Request) Response {
 			return Errored(http.StatusBadRequest, err)
 		}
 
-		err = obj.ValidateCreate()
+		warnings, err = obj.ValidateCreate()
 	case v1.Update:
 		oldObj := obj.DeepCopyObject()
 
@@ -100,7 +100,7 @@ func (h *validatingHandler) Handle(ctx context.Context, req Request) Response {
 			return Errored(http.StatusBadRequest, err)
 		}
 
-		err = obj.ValidateUpdate(oldObj)
+		warnings, err = obj.ValidateUpdate(oldObj)
 	case v1.Delete:
 		// In reference to PR: https://github.com/kubernetes/kubernetes/pull/76346
 		// OldObject contains the object being deleted
@@ -109,7 +109,7 @@ func (h *validatingHandler) Handle(ctx context.Context, req Request) Response {
 			return Errored(http.StatusBadRequest, err)
 		}
 
-		err = obj.ValidateDelete()
+		warnings, err = obj.ValidateDelete()
 	default:
 		return Errored(http.StatusBadRequest, fmt.Errorf("unknown operation %q", req.Operation))
 	}

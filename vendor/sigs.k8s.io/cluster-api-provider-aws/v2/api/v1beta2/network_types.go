@@ -36,6 +36,9 @@ type NetworkStatus struct {
 
 	// APIServerELB is the Kubernetes api server load balancer.
 	APIServerELB LoadBalancer `json:"apiServerElb,omitempty"`
+
+	// NatGatewaysIPs contains the public IPs of the NAT Gateways
+	NatGatewaysIPs []string `json:"natGatewaysIPs,omitempty"`
 }
 
 // ELBScheme defines the scheme of a load balancer.
@@ -53,6 +56,15 @@ var (
 
 func (e ELBScheme) String() string {
 	return string(e)
+}
+
+// Equals returns true if two ELBScheme are equal.
+func (e ELBScheme) Equals(other *ELBScheme) bool {
+	if other == nil {
+		return false
+	}
+
+	return e == *other
 }
 
 // ELBProtocol defines listener protocols for a load balancer.
@@ -73,7 +85,7 @@ var (
 	ELBProtocolHTTPS = ELBProtocol("HTTPS")
 	// ELBProtocolTLS defines the NLB API string representing the TLS protocol.
 	ELBProtocolTLS = ELBProtocol("TLS")
-	// ELBProtocolUDP defines the NLB API string representing the UPD protocol.
+	// ELBProtocolUDP defines the NLB API string representing the UDP protocol.
 	ELBProtocolUDP = ELBProtocol("UDP")
 )
 
@@ -94,7 +106,7 @@ var (
 	TargetGroupAttributeEnablePreserveClientIP = "preserve_client_ip.enabled"
 )
 
-// LoadBalancerAttribute defines a set of attributes for a V2 load balancer
+// LoadBalancerAttribute defines a set of attributes for a V2 load balancer.
 type LoadBalancerAttribute string
 
 var (
@@ -110,7 +122,7 @@ type TargetGroupSpec struct {
 	Name string `json:"name"`
 	// Port is the exposed port
 	Port int64 `json:"port"`
-	// +kubebuilder:validation:Enum=tcp;tls;upd
+	// +kubebuilder:validation:Enum=tcp;tls;udp;TCP;TLS;UDP
 	Protocol ELBProtocol `json:"protocol"`
 	VpcID    string      `json:"vpcId"`
 	// HealthCheck is the elb health check associated with the load balancer.
@@ -228,6 +240,10 @@ type NetworkSpec struct {
 	// This is optional - if not provided new security groups will be created for the cluster
 	// +optional
 	SecurityGroupOverrides map[SecurityGroupRole]string `json:"securityGroupOverrides,omitempty"`
+
+	// AdditionalControlPlaneIngressRules is an optional set of ingress rules to add to the control plane
+	// +optional
+	AdditionalControlPlaneIngressRules []IngressRule `json:"additionalControlPlaneIngressRules,omitempty"`
 }
 
 // IPv6 contains ipv6 specific settings for the network.
@@ -462,6 +478,7 @@ type RouteTable struct {
 }
 
 // SecurityGroupRole defines the unique role of a security group.
+// +kubebuilder:validation:Enum=bastion;node;controlplane;apiserver-lb;lb;node-eks-additional
 type SecurityGroupRole string
 
 var (
@@ -530,10 +547,15 @@ var (
 
 // IngressRule defines an AWS ingress rule for security groups.
 type IngressRule struct {
-	Description string                `json:"description"`
-	Protocol    SecurityGroupProtocol `json:"protocol"`
-	FromPort    int64                 `json:"fromPort"`
-	ToPort      int64                 `json:"toPort"`
+	// Description provides extended information about the ingress rule.
+	Description string `json:"description"`
+	// Protocol is the protocol for the ingress rule. Accepted values are "-1" (all), "4" (IP in IP),"tcp", "udp", "icmp", and "58" (ICMPv6).
+	// +kubebuilder:validation:Enum="-1";"4";tcp;udp;icmp;"58"
+	Protocol SecurityGroupProtocol `json:"protocol"`
+	// FromPort is the start of port range.
+	FromPort int64 `json:"fromPort"`
+	// ToPort is the end of port range.
+	ToPort int64 `json:"toPort"`
 
 	// List of CIDR blocks to allow access from. Cannot be specified with SourceSecurityGroupID.
 	// +optional
@@ -546,6 +568,11 @@ type IngressRule struct {
 	// The security group id to allow access from. Cannot be specified with CidrBlocks.
 	// +optional
 	SourceSecurityGroupIDs []string `json:"sourceSecurityGroupIds,omitempty"`
+
+	// The security group role to allow access from. Cannot be specified with CidrBlocks.
+	// The field will be combined with source security group IDs if specified.
+	// +optional
+	SourceSecurityGroupRoles []SecurityGroupRole `json:"sourceSecurityGroupRoles,omitempty"`
 }
 
 // String returns a string representation of the ingress rule.
