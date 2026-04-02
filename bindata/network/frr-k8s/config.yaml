@@ -46,7 +46,11 @@ data:
     #
     vtysh_enable=yes
     zebra_options="  -A 127.0.0.1 -s 90000000 --limit-fds 100000"
-    bgpd_options="   -A 127.0.0.1 -p 0 --limit-fds 100000"
+    # With -p 0, the BGP daemon does not listen for incoming connections,
+    # which breaks the full-mesh iBGP topology used in managed routing mode.
+    # Each node must be able to accept BGP sessions from all other nodes,
+    # requiring the standard port 179 to be active.
+    bgpd_options="   -A 127.0.0.1 -p {{ if .NoOverlayManagedEnabled }}179{{ else }}0{{ end }} --limit-fds 100000"
     ospfd_options="  -A 127.0.0.1"
     ospf6d_options=" -A ::1"
     ripd_options="   -A 127.0.0.1"
