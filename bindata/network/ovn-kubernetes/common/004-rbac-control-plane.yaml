@@ -243,7 +243,7 @@ rules:
   verbs:
   - patch
   - update
-- apiGroups: 
+- apiGroups:
   - frrk8s.metallb.io
   resources:
   - frrconfigurations
@@ -255,6 +255,17 @@ rules:
   - delete
   - update
   - patch
+{{- end}}
+{{- if .NoOverlayManagedEnabled }}
+- apiGroups:
+  - k8s.ovn.org
+  resources:
+  - routeadvertisements
+  verbs:
+  - create
+  - delete
+  - patch
+  - update
 {{- end}}
 {{- if .OVN_EVPN_ENABLE }}
 - apiGroups:
