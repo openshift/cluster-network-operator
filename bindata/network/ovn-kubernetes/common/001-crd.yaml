@@ -3822,32 +3822,32 @@ spec:
                             - message: RT global administrator must be either '*',
                                 an IPv4 address, or a number
                               rule: self.split(':').size() != 2 || (self.startsWith('*:')
-                                || isIP(self.split(':')[0]) || self.split(':')[0].matches('[0-9]+'))
+                                || isIP(self.split(':')[0]) || self.split(':')[0].matches('^[0-9]+$'))
                             - message: RT local administrator must be a number
-                              rule: self.split(':').size() != 2 || self.split(':')[1].matches('[0-9]+')
+                              rule: self.split(':').size() != 2 || self.split(':')[1].matches('^[0-9]+$')
                             - message: RT with wildcard global administrator must
                                 have format *:OPQR where OPQR <= 4294967295
                               rule: self.split(':').size() != 2 || !self.startsWith('*:')
-                                || (self.split(':')[1].matches('[0-9]+') && uint(self.split(':')[1])
+                                || (self.split(':')[1].matches('^[0-9]+$') && uint(self.split(':')[1])
                                 <= 4294967295u)
                             - message: RT with IPv4 global administrator must have
                                 format A.B.C.D:MN where MN <= 65535
                               rule: self.split(':').size() != 2 || !self.split(':')[0].contains('.')
-                                || (self.split(':')[1].matches('[0-9]+') && uint(self.split(':')[1])
+                                || (self.split(':')[1].matches('^[0-9]+$') && uint(self.split(':')[1])
                                 <= 65535u)
                             - message: RT with 4-byte ASN global administrator must
                                 have format GHJK:MN where GHJK <= 4294967295 and MN
                                 <= 65535
                               rule: self.split(':').size() != 2 || self.startsWith('*:')
-                                || self.split(':')[0].contains('.') || !self.split(':')[0].matches('[0-9]+')
-                                || !self.split(':')[1].matches('[0-9]+') || uint(self.split(':')[0])
+                                || self.split(':')[0].contains('.') || !self.split(':')[0].matches('^[0-9]+$')
+                                || !self.split(':')[1].matches('^[0-9]+$') || uint(self.split(':')[0])
                                 <= 65535u || uint(self.split(':')[1]) <= 65535u
                             - message: RT with 2-byte ASN global administrator must
                                 have format EF:OPQR where EF <= 65535 and OPQR <=
                                 4294967295
                               rule: self.split(':').size() != 2 || self.startsWith('*:')
-                                || self.split(':')[0].contains('.') || !self.split(':')[0].matches('[0-9]+')
-                                || !self.split(':')[1].matches('[0-9]+') || uint(self.split(':')[0])
+                                || self.split(':')[0].contains('.') || !self.split(':')[0].matches('^[0-9]+$')
+                                || !self.split(':')[1].matches('^[0-9]+$') || uint(self.split(':')[0])
                                 > 65535u || uint(self.split(':')[1]) <= 4294967295u
                           vni:
                             description: |-
@@ -3889,32 +3889,32 @@ spec:
                             - message: RT global administrator must be either '*',
                                 an IPv4 address, or a number
                               rule: self.split(':').size() != 2 || (self.startsWith('*:')
-                                || isIP(self.split(':')[0]) || self.split(':')[0].matches('[0-9]+'))
+                                || isIP(self.split(':')[0]) || self.split(':')[0].matches('^[0-9]+$'))
                             - message: RT local administrator must be a number
-                              rule: self.split(':').size() != 2 || self.split(':')[1].matches('[0-9]+')
+                              rule: self.split(':').size() != 2 || self.split(':')[1].matches('^[0-9]+$')
                             - message: RT with wildcard global administrator must
                                 have format *:OPQR where OPQR <= 4294967295
                               rule: self.split(':').size() != 2 || !self.startsWith('*:')
-                                || (self.split(':')[1].matches('[0-9]+') && uint(self.split(':')[1])
+                                || (self.split(':')[1].matches('^[0-9]+$') && uint(self.split(':')[1])
                                 <= 4294967295u)
                             - message: RT with IPv4 global administrator must have
                                 format A.B.C.D:MN where MN <= 65535
                               rule: self.split(':').size() != 2 || !self.split(':')[0].contains('.')
-                                || (self.split(':')[1].matches('[0-9]+') && uint(self.split(':')[1])
+                                || (self.split(':')[1].matches('^[0-9]+$') && uint(self.split(':')[1])
                                 <= 65535u)
                             - message: RT with 4-byte ASN global administrator must
                                 have format GHJK:MN where GHJK <= 4294967295 and MN
                                 <= 65535
                               rule: self.split(':').size() != 2 || self.startsWith('*:')
-                                || self.split(':')[0].contains('.') || !self.split(':')[0].matches('[0-9]+')
-                                || !self.split(':')[1].matches('[0-9]+') || uint(self.split(':')[0])
+                                || self.split(':')[0].contains('.') || !self.split(':')[0].matches('^[0-9]+$')
+                                || !self.split(':')[1].matches('^[0-9]+$') || uint(self.split(':')[0])
                                 <= 65535u || uint(self.split(':')[1]) <= 65535u
                             - message: RT with 2-byte ASN global administrator must
                                 have format EF:OPQR where EF <= 65535 and OPQR <=
                                 4294967295
                               rule: self.split(':').size() != 2 || self.startsWith('*:')
-                                || self.split(':')[0].contains('.') || !self.split(':')[0].matches('[0-9]+')
-                                || !self.split(':')[1].matches('[0-9]+') || uint(self.split(':')[0])
+                                || self.split(':')[0].contains('.') || !self.split(':')[0].matches('^[0-9]+$')
+                                || !self.split(':')[1].matches('^[0-9]+$') || uint(self.split(':')[0])
                                 > 65535u || uint(self.split(':')[1]) <= 4294967295u
                           vni:
                             description: |-
@@ -3940,6 +3940,9 @@ spec:
                     x-kubernetes-validations:
                     - message: at least one of macVRF or ipVRF must be specified
                       rule: has(self.macVRF) || has(self.ipVRF)
+                    - message: macVRF and ipVRF must use different VNIs
+                      rule: '!has(self.macVRF) || !has(self.ipVRF) || self.macVRF.vni
+                        != self.ipVRF.vni'
 {{- end }}
                   layer2:
                     description: Layer2 is the Layer2 topology configuration.
@@ -4486,14 +4489,13 @@ spec:
                   transport:
                     description: |-
                       Transport describes the transport technology for pod-to-pod traffic.
-                      Allowed values are "NoOverlay", "Geneve", and "EVPN".
+                      Allowed values are "NoOverlay" and "EVPN".
                       - "NoOverlay": The network operates in no-overlay mode.
-                      - "Geneve": The network uses Geneve overlay.
                       - "EVPN": The network uses EVPN transport.
-                      When omitted, the default behaviour is Geneve.
+                      When omitted, the network uses the default OVN overlay transport (e.g. Geneve, VXLAN)
+                      as configured by ovn-encap-type.
                     enum:
                     - NoOverlay
-                    - Geneve
                     - EVPN
                     type: string
 {{- end }}
@@ -4523,7 +4525,7 @@ spec:
                 - message: spec.evpn field is required when transport is 'EVPN'
                   rule: '!has(self.transport) || self.transport != ''EVPN'' || has(self.evpn)'
                 - message: spec.evpn field is forbidden when transport is not 'EVPN'
-                  rule: self.transport == 'EVPN' || !has(self.evpn)
+                  rule: (has(self.transport) && self.transport == 'EVPN') || !has(self.evpn)
                 - message: spec.evpn.macVRF field is required for Layer2 topology
                     when transport is 'EVPN'
                   rule: '!has(self.transport) || self.transport != ''EVPN'' || self.topology
@@ -5297,9 +5299,19 @@ spec:
             properties:
               cidrs:
                 description: |-
-                  CIDRs is the list of IP ranges from which VTEP IPs are allocated.
-                  Dual-stack clusters may set 2 CIDRs (one for each IP family), otherwise only 1 CIDR is allowed.
-                  The format should match standard CIDR notation (for example, "100.64.0.0/24" or "fd00::/64").
+                  CIDRs is the list of IP ranges from which VTEP IPs are discovered (unmanaged mode) or allocated (managed mode).
+                  Multiple CIDRs may be specified to expand capacity over time without recreating the VTEP.
+                  Each entry must be a valid network address in CIDR notation (for example, "100.64.0.0/24" or "fd00:100::/64").
+                  Each node receives at most one IP per address family from the CIDRs listed here.
+                  In managed mode, CIDRs are consumed sequentially: IPs are allocated from the first CIDR until it is
+                  exhausted, then from the next, and so on.
+                  In managed mode, CIDRs are append-only: existing entries cannot be removed, reordered, or shrunk to a
+                  smaller mask; they can only be expanded to a wider mask, and new entries may be appended.
+                  In unmanaged mode, if multiple IPs on a node match the configured CIDRs, or if the match is otherwise
+                  ambiguous, the VTEP will be placed into a failed status.
+                  In unmanaged mode, CIDRs may be freely added, removed, reordered, or resized.
+                  Caution: removing or modifying CIDRs in unmanaged mode that are actively in use may cause traffic disruption;
+                  no downtime guarantees are provided for such operations.
                 items:
                   description: CIDR represents a CIDR notation IP range.
                   maxLength: 43
@@ -5307,13 +5319,13 @@ spec:
                   x-kubernetes-validations:
                   - message: CIDR must be a valid network address
                     rule: isCIDR(self) && cidr(self) == cidr(self).masked()
-                maxItems: 2
+                maxItems: 20
                 minItems: 1
                 type: array
                 x-kubernetes-validations:
-                - message: When 2 CIDRs are set, they must be from different IP families
-                  rule: size(self) != 2 || !isCIDR(self[0]) || !isCIDR(self[1]) ||
-                    cidr(self[0]).ip().family() != cidr(self[1]).ip().family()
+                - message: CIDRs must not overlap with each other
+                  rule: self.all(i, a, self.all(j, b, i == j || !(cidr(a).containsIP(cidr(b).ip())
+                    || cidr(b).containsIP(cidr(a).ip()))))
               mode:
                 allOf:
                 - enum:
@@ -5332,6 +5344,16 @@ spec:
             required:
             - cidrs
             type: object
+            x-kubernetes-validations:
+            - message: CIDRs cannot be removed in managed mode; only appending new
+                CIDRs or expanding the existing CIDRs is allowed
+              rule: self.mode != 'Managed' || size(self.cidrs) >= size(oldSelf.cidrs)
+            - message: In managed mode, existing CIDRs must remain at the same position
+                and can only be expanded to a wider mask; shrinking the mask or reordering
+                is not allowed
+              rule: self.mode != 'Managed' || self.cidrs.all(i, v, i >= size(oldSelf.cidrs)
+                || (cidr(v).containsIP(cidr(oldSelf.cidrs[i]).ip()) && cidr(v).prefixLength()
+                <= cidr(oldSelf.cidrs[i]).prefixLength()))
           status:
             description: Status contains the observed state of the VTEP.
             properties:

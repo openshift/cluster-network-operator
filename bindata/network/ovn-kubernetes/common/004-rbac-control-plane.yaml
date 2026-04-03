@@ -265,6 +265,8 @@ rules:
   - list
   - get
   - watch
+  - update
+  - patch
 - apiGroups:
   - k8s.ovn.org
   resources:
