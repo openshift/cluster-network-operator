@@ -3976,6 +3976,27 @@ func TestRenderOVNKubernetesReachability(t *testing.T) {
 			expectKubernetesFeatureReachability: true,
 			expectErr:                           false,
 		},
+		{
+			name:                                "Reachability timeout unchanged to 10",
+			reachabilityTimeout:                 ptrToUint32(10),
+			expectHashChanged:                   false,
+			expectKubernetesFeatureReachability: true,
+			expectErr:                           false,
+		},
+		{
+			name:                                "Reachability timeout changed to 5",
+			reachabilityTimeout:                 ptrToUint32(5),
+			expectHashChanged:                   true,
+			expectKubernetesFeatureReachability: true,
+			expectErr:                           false,
+		},
+		{
+			name:                                "Reachability timeout disabled",
+			reachabilityTimeout:                 nil,
+			expectHashChanged:                   true,
+			expectKubernetesFeatureReachability: false,
+			expectErr:                           false,
+		},
 	}
 
 	// Track hashes across test iterations
