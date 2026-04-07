@@ -4059,6 +4059,11 @@ func TestRenderOVNKubernetesReachability(t *testing.T) {
 			if tc.expectKubernetesFeatureReachability {
 				g.Expect(ovnkubeConf).To(ContainSubstring("[ovnkubernetesfeature]"),
 					"ConfigMap should contain [ovnkubernetesfeature] section when enabled")
+				g.Expect(tc.reachabilityTimeout).NotTo(BeNil())
+				g.Expect(ovnkubeConf).To(
+					ContainSubstring(fmt.Sprintf("egressip-reachability-total-timeout=%d", *tc.reachabilityTimeout)),
+					"ConfigMap should contain the configured reachability timeout value",
+				)
 				g.Expect(ovnkubeConf).To(ContainSubstring("egressip-reachability-total-timeout="),
 					"ConfigMap should contain egressip-reachability-total-timeout=")
 			} else {
