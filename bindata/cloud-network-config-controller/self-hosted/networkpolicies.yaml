@@ -1,0 +1,32 @@
+# The openshift-cloud-network-config-controller namespace is created
+# via the CNO manifests, but we can't create a default-deny policy
+# there and an allow policy here, because the two policies won't be
+# applied at the same time. So we create both of them here.
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: default-deny
+  namespace: openshift-cloud-network-config-controller
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: cloud-network-config-controller
+  namespace: openshift-cloud-network-config-controller
+spec:
+  podSelector:
+    matchLabels:
+      app: cloud-network-config-controller
+  policyTypes:
+    - Egress
+  egress:
+    # CNCC needs access to apiserver and cloud APIs, possibly via a proxy... for now we
+    # just allow all egress.
+    - {}
