@@ -1,0 +1,15 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: cloud-network-config-controller
+  namespace: {{.HostedClusterNamespace}}
+spec:
+  podSelector:
+    matchLabels:
+      app: cloud-network-config-controller
+  policyTypes:
+    - Egress
+  egress:
+    # CNCC needs access to apiserver and cloud APIs, possibly via a proxy... for now we
+    # just allow all egress.
+    - {}
