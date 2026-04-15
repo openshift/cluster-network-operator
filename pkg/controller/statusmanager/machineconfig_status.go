@@ -140,59 +140,65 @@ func (status *StatusManager) SetFromMachineConfigPool(mcPools []mcfgv1.MachineCo
 	// No degraded pools, so clear degraded status
 	status.setNotDegraded(MachineConfig)
 
-	// Now check for progressing and process machine configs
 	for role, machineConfigs := range status.renderedMachineConfigs {
 		pools, err := status.findMachineConfigPoolsForLabel(mcPools, map[string]string{names.MachineConfigLabelRoleKey: role})
 		if err != nil {
 			klog.Errorf("failed to get machine config pools for the role %s: %v", role, err)
 		}
+		for _, machineConfig := range machineConfigs.UnsortedList() {
+			mcSet := sets.New[string](machineConfig)
+			beingRemoved := status.machineConfigsBeingRemoved[role].Has(machineConfig)
 
-		progressingPool := status.isAnyMachineConfigPoolProgressing(pools)
-		if progressingPool != "" {
-			status.setProgressing(MachineConfig, "MachineConfig", fmt.Sprintf("%s machine config pool in progressing state", progressingPool))
-			return nil
-		}
-		for _, pool := range pools {
-			if pool.Spec.Paused {
-				// When a machine config pool is in paused state, then it is expected that mco doesn't process any machine configs for the pool.
-				// so if we report network status as progressing state then it blocks networking upgrade until machine config pool is changed
-				// into unpaused state. so let's not consider the pool for reporting status.
-				continue
-			}
-			for _, machineConfig := range machineConfigs.UnsortedList() {
-				added := true
-				removed := true
-				mcSet := sets.Set[string]{}
-				mcSet.Insert(machineConfig)
-				if mcsBeingRemoved, ok := status.machineConfigsBeingRemoved[role]; ok && mcsBeingRemoved.Has(machineConfig) {
-					removed = mcutil.AreMachineConfigsRemovedFromPool(pool.Status, mcSet)
-					if removed {
-						status.machineConfigsBeingRemoved[role].Delete(machineConfig)
-						// Delete map entry from status cache if role doesn't have machine configs. By deleting the entry,
-						// there won't be any unnecessary processing of pools in the reconcile loop when it's not dealing
-						// with network operator machine configs anymore.
-						if status.machineConfigsBeingRemoved[role].Len() == 0 {
-							delete(status.machineConfigsBeingRemoved, role)
-						}
-						status.renderedMachineConfigs[role].Delete(machineConfig)
-						if status.renderedMachineConfigs[role].Len() == 0 {
-							delete(status.renderedMachineConfigs, role)
-						}
-						if err := status.setLastRenderedMachineConfigState(status.renderedMachineConfigs); err != nil {
-							return fmt.Errorf("failed to update rendered machine config state: %v", err)
-						}
-					}
-				} else {
-					added = mcutil.AreMachineConfigsRenderedOnPool(pool.Status, mcSet)
+			sawNonPausedPool := false
+			for _, pool := range pools {
+				if pool.Spec.Paused {
+					// When a machine config pool is in paused state, then it is expected that mco doesn't process any machine configs for the pool.
+					// so if we report network status as progressing state then it blocks networking upgrade until machine config pool is changed
+					// into unpaused state. so let's not consider the pool for reporting status.
+					continue
 				}
-				if !added || !removed {
-					status.setProgressing(MachineConfig, "MachineConfig",
-						fmt.Sprintf("%s machine config pool is still processing %s machine config", pool.Name, machineConfig))
-					return nil
+				sawNonPausedPool = true
+
+				if beingRemoved {
+					if mcutil.AreMachineConfigsRemovedFromPoolSource(pool.Status, mcSet) {
+						continue
+					}
+				} else if mcutil.AreMachineConfigsRenderedOnPoolSource(pool.Status, mcSet) {
+					continue
+				}
+
+				status.setProgressing(MachineConfig, "MachineConfig",
+					fmt.Sprintf("%s machine config pool is still processing %s machine config", pool.Name, machineConfig))
+				return nil
+			}
+
+			// Wait to prune cached removal state until every non-paused pool for
+			// this role reflects the updated rendered source.
+			if beingRemoved && sawNonPausedPool {
+				if err := status.forgetRemovedMachineConfig(role, machineConfig); err != nil {
+					return err
 				}
 			}
 		}
 		status.unsetProgressing(MachineConfig)
+	}
+	return nil
+}
+
+func (status *StatusManager) forgetRemovedMachineConfig(role, machineConfig string) error {
+	status.machineConfigsBeingRemoved[role].Delete(machineConfig)
+	// Delete map entry from status cache if role doesn't have machine configs. By deleting the entry,
+	// there won't be any unnecessary processing of pools in the reconcile loop when it's not dealing
+	// with network operator machine configs anymore.
+	if status.machineConfigsBeingRemoved[role].Len() == 0 {
+		delete(status.machineConfigsBeingRemoved, role)
+	}
+	status.renderedMachineConfigs[role].Delete(machineConfig)
+	if status.renderedMachineConfigs[role].Len() == 0 {
+		delete(status.renderedMachineConfigs, role)
+	}
+	if err := status.setLastRenderedMachineConfigState(status.renderedMachineConfigs); err != nil {
+		return fmt.Errorf("failed to update rendered machine config state: %v", err)
 	}
 	return nil
 }
@@ -248,17 +254,6 @@ func (status *StatusManager) isAnyMachineConfigPoolDegraded(pools []mcfgv1.Machi
 		}
 	}
 	return degradedPool
-}
-
-func (status *StatusManager) isAnyMachineConfigPoolProgressing(pools []mcfgv1.MachineConfigPool) string {
-	var progressingPool string
-	for _, pool := range pools {
-		if mcomcfgv1.IsMachineConfigPoolConditionTrue(pool.Status.Conditions, mcfgv1.MachineConfigPoolUpdating) {
-			progressingPool = pool.Name
-			break
-		}
-	}
-	return progressingPool
 }
 
 func (status *StatusManager) findMachineConfigPoolsForLabel(mcPools []mcfgv1.MachineConfigPool, mcLabel labels.Set) ([]mcfgv1.MachineConfigPool, error) {

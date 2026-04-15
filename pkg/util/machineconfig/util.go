@@ -26,21 +26,31 @@ func IsUserDefinedIPsecMachineConfig(machineConfig *mcfgv1.MachineConfig) bool {
 // AreMachineConfigsRenderedOnPool returns true if machineConfigs are completely rendered on the given machine config
 // pool status, otherwise returns false.
 func AreMachineConfigsRenderedOnPool(status mcfgv1.MachineConfigPoolStatus, machineConfigs sets.Set[string]) bool {
-	checkSource := func(sourceNames sets.Set[string], machineConfigs sets.Set[string]) bool {
-		return sourceNames.IsSuperset(machineConfigs)
-	}
 	return status.MachineCount == status.UpdatedMachineCount &&
-		checkSourceInMachineConfigPoolStatus(status, machineConfigs, checkSource)
+		AreMachineConfigsRenderedOnPoolSource(status, machineConfigs)
 }
 
 // AreMachineConfigsRemovedFromPool returns true if machineConfigs are completely removed on the given machine config
 // pool status, otherwise returns false.
 func AreMachineConfigsRemovedFromPool(status mcfgv1.MachineConfigPoolStatus, machineConfigs sets.Set[string]) bool {
+	return status.MachineCount == status.UpdatedMachineCount &&
+		AreMachineConfigsRemovedFromPoolSource(status, machineConfigs)
+}
+
+// AreMachineConfigsRenderedOnPoolSource returns true if machineConfigs are present in the pool's rendered source list.
+func AreMachineConfigsRenderedOnPoolSource(status mcfgv1.MachineConfigPoolStatus, machineConfigs sets.Set[string]) bool {
+	checkSource := func(sourceNames sets.Set[string], machineConfigs sets.Set[string]) bool {
+		return sourceNames.IsSuperset(machineConfigs)
+	}
+	return checkSourceInMachineConfigPoolStatus(status, machineConfigs, checkSource)
+}
+
+// AreMachineConfigsRemovedFromPoolSource returns true if machineConfigs are absent from the pool's rendered source list.
+func AreMachineConfigsRemovedFromPoolSource(status mcfgv1.MachineConfigPoolStatus, machineConfigs sets.Set[string]) bool {
 	checkSource := func(sourceNames sets.Set[string], machineConfigs sets.Set[string]) bool {
 		return !sourceNames.HasAny(machineConfigs.UnsortedList()...)
 	}
-	return status.MachineCount == status.UpdatedMachineCount &&
-		checkSourceInMachineConfigPoolStatus(status, machineConfigs, checkSource)
+	return checkSourceInMachineConfigPoolStatus(status, machineConfigs, checkSource)
 }
 
 func checkSourceInMachineConfigPoolStatus(machineConfigStatus mcfgv1.MachineConfigPoolStatus, machineConfigs sets.Set[string],
