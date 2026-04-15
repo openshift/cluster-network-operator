@@ -454,13 +454,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["NorthdThreads"] = 1
 	data.Data["IsSNO"] = bootstrapResult.OVN.ControlPlaneReplicaCount == 1
 
-	data.Data["OVN_MULTI_NETWORK_ENABLE"] = true
 	data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = false
-	if conf.DisableMultiNetwork != nil && *conf.DisableMultiNetwork {
-		data.Data["OVN_MULTI_NETWORK_ENABLE"] = false
-	} else if conf.UseMultiNetworkPolicy != nil && *conf.UseMultiNetworkPolicy {
-		// Multi-network policy support requires multi-network support to be
-		// enabled
+	if conf.UseMultiNetworkPolicy != nil && *conf.UseMultiNetworkPolicy {
 		data.Data["OVN_MULTI_NETWORK_POLICY_ENABLE"] = true
 	}
 
