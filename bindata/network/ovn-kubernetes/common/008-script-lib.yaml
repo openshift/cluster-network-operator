@@ -643,10 +643,6 @@ data:
       fi
 
       multi_network_enabled_flag=
-      if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" && "${OVN_NODE_MODE}" != "dpu-host" ]]; then
-        multi_network_enabled_flag="--enable-multi-network"
-      fi
-
       network_segmentation_enabled_flag=
       if [[ "${OVN_NODE_MODE}" != "dpu-host" ]]; then
         multi_network_enabled_flag="--enable-multi-network"
