@@ -3944,6 +3944,175 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("CustomResourceDefinition", "", "ipamclaims.k8s.cni.cncf.io")))
 }
 
+// TestRenderOVNKubernetesReachability tests egress IP reachability timeout rendering
+func TestRenderOVNKubernetesReachability(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	testCases := []struct {
+		name                                string
+		reachabilityTimeout                 *uint32
+		expectHashChanged                   bool
+		expectKubernetesFeatureReachability bool
+		expectErr                           bool
+	}{
+		{
+			name:                                "No reachability timeout (nil)",
+			reachabilityTimeout:                 nil,
+			expectHashChanged:                   false,
+			expectKubernetesFeatureReachability: false,
+			expectErr:                           false,
+		},
+		{
+			name:                                "Reachability timeout set to 0",
+			reachabilityTimeout:                 ptrToUint32(0),
+			expectHashChanged:                   true,
+			expectKubernetesFeatureReachability: true,
+			expectErr:                           false,
+		},
+		{
+			name:                                "Reachability timeout changed to 10",
+			reachabilityTimeout:                 ptrToUint32(10),
+			expectHashChanged:                   true,
+			expectKubernetesFeatureReachability: true,
+			expectErr:                           false,
+		},
+		{
+			name:                                "Reachability timeout unchanged to 10",
+			reachabilityTimeout:                 ptrToUint32(10),
+			expectHashChanged:                   false,
+			expectKubernetesFeatureReachability: true,
+			expectErr:                           false,
+		},
+		{
+			name:                                "Reachability timeout changed to 5",
+			reachabilityTimeout:                 ptrToUint32(5),
+			expectHashChanged:                   true,
+			expectKubernetesFeatureReachability: true,
+			expectErr:                           false,
+		},
+		{
+			name:                                "Reachability timeout disabled",
+			reachabilityTimeout:                 nil,
+			expectHashChanged:                   true,
+			expectKubernetesFeatureReachability: false,
+			expectErr:                           false,
+		},
+	}
+
+	// Track hashes across test iterations
+	var prevNodeHash, prevControlHash string
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			crd := OVNKubernetesConfig.DeepCopy()
+			config := &crd.Spec
+			config.DefaultNetwork.OVNKubernetesConfig.EgressIPConfig.ReachabilityTotalTimeoutSeconds = tc.reachabilityTimeout
+
+			errs := validateOVNKubernetes(config)
+			g.Expect(errs).To(HaveLen(0))
+			fillDefaults(config, nil)
+
+			// at the same time we have an upgrade
+			t.Setenv("RELEASE_VERSION", "2.0.0")
+
+			bootstrapResult := fakeBootstrapResult()
+			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+				ControlPlaneReplicaCount: 3,
+				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+					DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+					DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+					SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+					MgmtPortResourceName: "",
+					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+						Enabled: false,
+					},
+				},
+			}
+
+			featureGatesCNO := getDefaultFeatureGates()
+			fakeClient := cnofake.NewFakeClient()
+			// Set is as Hypershift hosted control plane.
+			bootstrapResult.Infra = bootstrap.InfraStatus{}
+			bootstrapResult.Infra.HostedControlPlane = &hypershift.HostedControlPlane{}
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+			if tc.expectErr {
+				g.Expect(err).To(HaveOccurred())
+				return
+			}
+			g.Expect(err).NotTo(HaveOccurred())
+
+			// Find the ovnkube-config ConfigMap and check the template data
+			var configMap *uns.Unstructured
+			for _, obj := range objs {
+				if obj.GetKind() == "ConfigMap" && obj.GetName() == "ovnkube-config" {
+					configMap = obj
+					break
+				}
+			}
+			g.Expect(configMap).NotTo(BeNil(), "ovnkube-config ConfigMap should exist")
+
+			// Check the transport value in the rendered ConfigMap
+			configMapData, found, err := uns.NestedStringMap(configMap.Object, "data")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(found).To(BeTrue(), "ConfigMap should have data field")
+			ovnkubeConf := configMapData["ovnkube.conf"]
+			if tc.expectKubernetesFeatureReachability {
+				g.Expect(ovnkubeConf).To(ContainSubstring("[ovnkubernetesfeature]"),
+					"ConfigMap should contain [ovnkubernetesfeature] section when enabled")
+				g.Expect(tc.reachabilityTimeout).NotTo(BeNil())
+				g.Expect(ovnkubeConf).To(
+					ContainSubstring(fmt.Sprintf("egressip-reachability-total-timeout=%d", *tc.reachabilityTimeout)),
+					"ConfigMap should contain the configured reachability timeout value",
+				)
+				g.Expect(ovnkubeConf).To(ContainSubstring("egressip-reachability-total-timeout="),
+					"ConfigMap should contain egressip-reachability-total-timeout=")
+			} else {
+				g.Expect(ovnkubeConf).NotTo(ContainSubstring("egressip-reachability-total-timeout="),
+					"ConfigMap should not contain egressip-reachability-total-timeout= section when disabled")
+			}
+
+			// Verify that hash annotations exist and change when expected
+			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+			g.Expect(renderedNode).NotTo(BeNil(), "ovnkube-node DaemonSet should exist")
+
+			// Check pod template annotations (this is what triggers restarts)
+			podTemplateAnnotations, found, err := uns.NestedStringMap(renderedNode.Object, "spec", "template", "metadata", "annotations")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(found).To(BeTrue(), "ovnkube-node DaemonSet pod template should have annotations")
+
+			nodeHash, ok := podTemplateAnnotations["network.operator.openshift.io/ovnkube-node-config-hash"]
+			g.Expect(ok).To(BeTrue(), "ovnkube-node DaemonSet pod template should have node-config-hash annotation")
+			g.Expect(nodeHash).NotTo(BeEmpty(), "node-config-hash should not be empty")
+
+			if tc.expectHashChanged && prevNodeHash != "" {
+				g.Expect(nodeHash).NotTo(Equal(prevNodeHash), "node hash should change when reachability timeout changes")
+			} else if !tc.expectHashChanged && prevNodeHash != "" {
+				g.Expect(nodeHash).To(Equal(prevNodeHash), "node hash should not change when reachability timeout stays the same")
+			}
+			prevNodeHash = nodeHash
+
+			renderedControlPlane := findInObjs("apps", "Deployment", "ovnkube-control-plane", "openshift-ovn-kubernetes", objs)
+			g.Expect(renderedControlPlane).NotTo(BeNil(), "ovnkube-control-plane Deployment should exist")
+
+			// Check pod template annotations (this is what triggers restarts)
+			cpPodTemplateAnnotations, found, err := uns.NestedStringMap(renderedControlPlane.Object, "spec", "template", "metadata", "annotations")
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(found).To(BeTrue(), "ovnkube-control-plane Deployment pod template should have annotations")
+
+			controlHash, ok := cpPodTemplateAnnotations["network.operator.openshift.io/ovnkube-control-plane-config-hash"]
+			g.Expect(ok).To(BeTrue(), "ovnkube-control-plane Deployment pod template should have control-plane-config-hash annotation")
+			g.Expect(controlHash).NotTo(BeEmpty(), "control-plane-config-hash should not be empty")
+
+			if tc.expectHashChanged && prevControlHash != "" {
+				g.Expect(controlHash).NotTo(Equal(prevControlHash), "control-plane hash should change when reachability timeout changes")
+			} else if !tc.expectHashChanged && prevControlHash != "" {
+				g.Expect(controlHash).To(Equal(prevControlHash), "control-plane hash should not change when reachability timeout stays the same")
+			}
+			prevControlHash = controlHash
+		})
+	}
+}
+
 type fakeClientReader struct {
 	configMap *v1.ConfigMap
 }

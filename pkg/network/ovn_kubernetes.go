@@ -501,10 +501,17 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 	data.Data["OVNKubeConfigHash"] = hex.EncodeToString(h.Sum(nil))
 
+	var reachabilityTimeoutStr string
+	if timeout, ok := data.Data["ReachabilityTotalTimeoutSeconds"].(*uint32); ok && timeout != nil {
+		reachabilityTimeoutStr = strconv.FormatUint(uint64(*timeout), 10)
+	}
+
 	// Compute a separate hash for no-overlay node config (outboundSNAT).
 	// This allows ovnkube-node to restart when outboundSNAT changes
 	nodeNoOverlayHash := sha1.New()
-	nodeNoOverlayHashData := fmt.Sprintf("outboundSNAT=%v", data.Data["NoOverlayOutboundSNAT"])
+	nodeNoOverlayHashData := fmt.Sprintf("outboundSNAT=%v,reachabilityTimeout=%s",
+		data.Data["NoOverlayOutboundSNAT"],
+		reachabilityTimeoutStr)
 	if _, err := nodeNoOverlayHash.Write([]byte(nodeNoOverlayHashData)); err != nil {
 		return nil, progressing, errors.Wrap(err, "failed to hash node no-overlay config")
 	}
@@ -514,9 +521,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// This allows ovnkube-control-plane to restart when bgpManagedConfig changes,
 	// without restarting ovnkube-node pods.
 	cpHash := sha1.New()
-	cpHashData := fmt.Sprintf("asNumber=%v,topology=%v",
+	cpHashData := fmt.Sprintf("asNumber=%v,topology=%v,reachabilityTimeout=%s",
 		data.Data["NoOverlayManagedASNumber"],
-		data.Data["NoOverlayManagedTopology"])
+		data.Data["NoOverlayManagedTopology"],
+		reachabilityTimeoutStr)
 	if _, err := cpHash.Write([]byte(cpHashData)); err != nil {
 		return nil, progressing, errors.Wrap(err, "failed to hash control-plane config")
 	}
