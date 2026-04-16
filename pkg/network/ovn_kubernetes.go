@@ -561,6 +561,14 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		objs = append(objs, manifests...)
 	}
 
+	if len(bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeNodes) > 0 || len(bootstrapResult.OVN.OVNKubernetesConfig.DpuModeNodes) > 0 {
+		manifests, err = render.RenderTemplate(filepath.Join(manifestDir, "network/ovn-kubernetes/dpu-rbac.yaml"), &data)
+		if err != nil {
+			return nil, progressing, errors.Wrap(err, "failed to render DPU RBAC manifests")
+		}
+		objs = append(objs, manifests...)
+	}
+
 	if len(bootstrapResult.OVN.OVNKubernetesConfig.DpuModeNodes) > 0 {
 		// "OVN_NODE_MODE" not set when render.RenderDir() called above,
 		// so render just the error-cni.yaml with "OVN_NODE_MODE" set.

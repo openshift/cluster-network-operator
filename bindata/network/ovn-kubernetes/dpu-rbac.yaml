@@ -1,0 +1,63 @@
+---
+# Grant lease permissions to the DPU service account so the DPU can renew
+# the health check lease in the openshift-ovn-kubernetes namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+  name: openshift-ovn-kubernetes-node-dpu-service-identity-limited
+{{ else }}
+  name: openshift-ovn-kubernetes-node-dpu-service-limited
+{{ end }}
+  namespace: openshift-ovn-kubernetes
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: openshift-ovn-kubernetes-node-limited
+subjects:
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+- kind: Group
+  name: system:ovn-nodes
+  apiGroup: rbac.authorization.k8s.io
+{{ else }}
+- kind: ServiceAccount
+  name: ovn-kubernetes-node-dpu-service
+  namespace: openshift-ovn-kubernetes
+{{ end }}
+
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+---
+# Allow the DPU service account to impersonate node users and groups
+# so it can act on behalf of the DPU host node.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openshift-ovn-kubernetes-node-dpu-host-impersonator
+rules:
+- apiGroups: [""]
+  resources:
+  - users
+  verbs:
+  - impersonate
+- apiGroups: [""]
+  resources:
+  - groups
+  verbs:
+  - impersonate
+  resourceNames:
+  - system:nodes
+  - system:authenticated
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openshift-ovn-kubernetes-node-dpu-host-impersonator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openshift-ovn-kubernetes-node-dpu-host-impersonator
+subjects:
+- kind: ServiceAccount
+  name: ovn-kubernetes-node-dpu-service
+  namespace: openshift-ovn-kubernetes
+{{ end }}
