@@ -1,3 +1,5 @@
+// Package allowlist implements a Kubernetes controller that distributes CNI
+// sysctl allowlist configuration to cluster nodes.
 package allowlist
 
 import (
@@ -17,8 +19,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -36,21 +36,15 @@ import (
 )
 
 const (
-	allowlistDsName      = "cni-sysctl-allowlist-ds"
-	allowlistAnnotation  = "app=cni-sysctl-allowlist-ds"
-	manifestDir          = "../../bindata/allowlist/daemonset"
-	allowlistManifestDir = "../../bindata/network/multus/004-sysctl-configmap.yaml"
+	dsName        = "cni-sysctl-allowlist-ds"
+	dsAnnotation  = "app=cni-sysctl-allowlist-ds"
+	dsManifestDir = "../../bindata/allowlist/daemonset"
+	// Note: The default values come from default-cni-sysctl-allowlist which multus creates.
+	defaultCMManifest = "../../bindata/network/multus/004-sysctl-configmap.yaml"
 )
 
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, _ featuregates.FeatureGate) error {
-	return add(mgr, newReconciler(mgr, status, c))
-}
-
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) *ReconcileAllowlist {
-	return &ReconcileAllowlist{client: c, scheme: mgr.GetScheme(), status: status}
-}
-
-func add(mgr manager.Manager, r *ReconcileAllowlist) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, client cnoclient.Client, _ featuregates.FeatureGate) error {
+	r := &ReconcileAllowlist{client: client, status: status}
 	c, err := controller.New("allowlist-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
@@ -59,7 +53,7 @@ func add(mgr manager.Manager, r *ReconcileAllowlist) error {
 	// watch for changes in all configmaps in our namespace
 	cmInformer := v1coreinformers.NewConfigMapInformer(
 		r.client.Default().Kubernetes(),
-		names.MULTUS_NAMESPACE,
+		names.MultusNamespace,
 		0, // don't resync
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
@@ -73,7 +67,8 @@ func add(mgr manager.Manager, r *ReconcileAllowlist) error {
 			predicate.NewPredicateFuncs(func(object crclient.Object) bool {
 				// Only care about cni-sysctl-allowlist, but also watching for default-cni-sysctl-allowlist
 				// as a trigger for creating cni-sysctl-allowlist if it doesn't exist
-				return (strings.Contains(object.GetName(), names.ALLOWLIST_CONFIG_NAME))
+				// NOTE: the cni-sysctl-allowlist is hardcoded in  pkg/network/multus.go:91
+				return (strings.Contains(object.GetName(), names.AllowlistConfigName))
 			}),
 		},
 	})
@@ -83,40 +78,45 @@ var _ reconcile.Reconciler = &ReconcileAllowlist{}
 
 type ReconcileAllowlist struct {
 	client cnoclient.Client
-	scheme *runtime.Scheme
 	status *statusmanager.StatusManager
 }
 
 func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
-	if exists, err := daemonsetConfigExists(ctx, r.client); !exists {
-		err = createObjects(ctx, r.client, allowlistManifestDir)
+	exists, err := allowlistConfigMapExists(ctx, r.client)
+	if err != nil {
+		klog.Errorf("Failed to look up allowlist config map: %v", err)
+		return reconcile.Result{}, err
+	}
+	if !exists {
+		err = createObjectsFrom(ctx, r.client, defaultCMManifest)
 		if err != nil {
 			klog.Errorf("Failed to create allowlist config map: %v", err)
 			return reconcile.Result{}, err
 		}
-	} else if err != nil {
-		klog.Errorf("Failed to look up allowlist config map: %v", err)
-		return reconcile.Result{}, err
 	}
 
-	if request.Name != names.ALLOWLIST_CONFIG_NAME {
+	if request.Name != names.AllowlistConfigName {
 		return reconcile.Result{}, nil
 	}
 	klog.Infof("Reconcile allowlist for %s/%s", request.Namespace, request.Name)
 
-	configMap, err := getConfig(ctx, r.client, request.NamespacedName)
+	configMap, err := getConfigMap(ctx, r.client, request.NamespacedName)
 	if err != nil {
 		klog.Errorf("Failed to get config map: %v", err)
 		return reconcile.Result{}, err
 	}
 
+	// Deletion handling: If user deletes the ConfigMap, we do nothing.
+	// The allowlist file persists on nodes and pods continue working.
+	// The auto-create check above will recreate the ConfigMap on next reconcile.
+	// This prevents accidental deletion from breaking pod creation.
 	// No action to be taken if user deletes the config map. The sysctl's will stay unmodified until config map is recreated
 	if configMap == nil {
 		return reconcile.Result{}, nil
 	}
 
-	defer cleanup(ctx, r.client)
+	defer cleanupDaemonSet(ctx, r.client)
 
 	// If daemonset still exists, delete it and reconcile again
 	ds, err := getDaemonSet(ctx, r.client)
@@ -129,7 +129,7 @@ func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{}, errors.New("retrying")
 	}
 
-	err = createObjects(ctx, r.client, manifestDir)
+	err = createObjectsFrom(ctx, r.client, dsManifestDir)
 	if err != nil {
 		klog.Errorf("Failed to create allowlist daemonset: %v", err)
 		return reconcile.Result{}, err
@@ -150,26 +150,24 @@ func (r *ReconcileAllowlist) Reconcile(ctx context.Context, request reconcile.Re
 	return reconcile.Result{}, nil
 }
 
-func createObjects(ctx context.Context, client cnoclient.Client, manifestDir string) error {
+func createObjectsFrom(ctx context.Context, client cnoclient.Client, manifestPath string) error {
 	data := render.MakeRenderData()
 	data.Data["MultusImage"] = os.Getenv("MULTUS_IMAGE")
-	data.Data["CniSysctlAllowlist"] = names.ALLOWLIST_CONFIG_NAME
+	data.Data["CniSysctlAllowlist"] = names.AllowlistConfigName
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
-	manifests, err := render.RenderDir(manifestDir, &data)
+	manifests, err := render.RenderDir(manifestPath, &data)
 	if err != nil {
 		return err
 	}
 	for _, obj := range manifests {
-
-		err = createObject(ctx, client, obj)
-		if err != nil {
-			return err
+		if err := client.Default().CRClient().Create(ctx, obj); err != nil {
+			return errors.Wrapf(err, "error creating %s %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
 		}
 	}
 	return nil
 }
 
-func getConfig(ctx context.Context, client cnoclient.Client, namespacedName types.NamespacedName) (*corev1.ConfigMap, error) {
+func getConfigMap(ctx context.Context, client cnoclient.Client, namespacedName types.NamespacedName) (*corev1.ConfigMap, error) {
 	configMap := &corev1.ConfigMap{}
 	err := client.Default().CRClient().Get(ctx, namespacedName, configMap)
 	if err != nil {
@@ -179,14 +177,6 @@ func getConfig(ctx context.Context, client cnoclient.Client, namespacedName type
 		return nil, err
 	}
 	return configMap, nil
-}
-
-func createObject(ctx context.Context, client cnoclient.Client, obj *unstructured.Unstructured) error {
-	err := client.Default().CRClient().Create(ctx, obj)
-	if err != nil {
-		return errors.Wrapf(err, "error creating %s %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
-	}
-	return nil
 }
 
 func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
@@ -199,8 +189,8 @@ func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
 			return false, fmt.Errorf("failed to get UID of daemon set")
 		}
 
-		podList, err := client.Default().Kubernetes().CoreV1().Pods(names.MULTUS_NAMESPACE).List(
-			ctx, metav1.ListOptions{LabelSelector: allowlistAnnotation})
+		podList, err := client.Default().Kubernetes().CoreV1().Pods(names.MultusNamespace).List(
+			ctx, metav1.ListOptions{LabelSelector: dsAnnotation})
 		if err != nil {
 			return false, err
 		}
@@ -223,32 +213,24 @@ func checkDsPodsReady(ctx context.Context, client cnoclient.Client) error {
 	})
 }
 
-func cleanup(ctx context.Context, client cnoclient.Client) {
+func cleanupDaemonSet(ctx context.Context, client cnoclient.Client) {
 	ds, err := getDaemonSet(ctx, client)
 	if err != nil {
 		klog.Errorf("Error looking up allowlist daemonset : %+v", err)
 		return
 	}
 	if ds != nil {
-		err = deleteDaemonSet(ctx, client)
+		err := client.Default().Kubernetes().AppsV1().DaemonSets(names.MultusNamespace).Delete(
+			ctx, dsName, metav1.DeleteOptions{})
 		if err != nil {
 			klog.Errorf("Error cleaning up allow list daemonset: %+v", err)
 		}
 	}
 }
 
-func deleteDaemonSet(ctx context.Context, client cnoclient.Client) error {
-	err := client.Default().Kubernetes().AppsV1().DaemonSets(names.MULTUS_NAMESPACE).Delete(
-		ctx, allowlistDsName, metav1.DeleteOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func getDaemonSet(ctx context.Context, client cnoclient.Client) (*appsv1.DaemonSet, error) {
-	ds, err := client.Default().Kubernetes().AppsV1().DaemonSets(names.MULTUS_NAMESPACE).Get(
-		ctx, allowlistDsName, metav1.GetOptions{})
+	ds, err := client.Default().Kubernetes().AppsV1().DaemonSets(names.MultusNamespace).Get(
+		ctx, dsName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil
@@ -258,9 +240,9 @@ func getDaemonSet(ctx context.Context, client cnoclient.Client) (*appsv1.DaemonS
 	return ds, nil
 }
 
-func daemonsetConfigExists(ctx context.Context, client cnoclient.Client) (bool, error) {
-	cm, err := client.Default().Kubernetes().CoreV1().ConfigMaps(names.MULTUS_NAMESPACE).Get(
-		ctx, names.ALLOWLIST_CONFIG_NAME, metav1.GetOptions{})
+func allowlistConfigMapExists(ctx context.Context, client cnoclient.Client) (bool, error) {
+	cm, err := client.Default().Kubernetes().CoreV1().ConfigMaps(names.MultusNamespace).Get(
+		ctx, names.AllowlistConfigName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return false, nil
