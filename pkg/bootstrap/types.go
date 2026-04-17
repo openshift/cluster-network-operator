@@ -30,18 +30,20 @@ type OVNHyperShiftBootstrapResult struct {
 }
 
 type OVNConfigBoostrapResult struct {
-	GatewayMode           string
-	HyperShiftConfig      *OVNHyperShiftBootstrapResult
-	DisableUDPAggregation bool
-	DpuHostModeLabel      string
-	DpuHostModeNodes      []string
-	DpuHostModeValue      string
-	DpuModeLabel          string
-	DpuModeNodes          []string
-	SmartNicModeLabel     string
-	SmartNicModeNodes     []string
-	SmartNicModeValue     string
-	MgmtPortResourceName  string
+	GatewayMode               string
+	HyperShiftConfig          *OVNHyperShiftBootstrapResult
+	DisableUDPAggregation     bool
+	DpuHostModeLabel          string
+	DpuHostModeNodes          []string
+	DpuHostModeValue          string
+	DpuModeLabel              string
+	DpuModeNodes              []string
+	SmartNicModeLabel         string
+	SmartNicModeNodes         []string
+	SmartNicModeValue         string
+	MgmtPortResourceName      string
+	DpuNodeLeaseRenewInterval int
+	DpuNodeLeaseDuration      int
 	// ConfigOverrides contains the overrides for the OVN Kubernetes configuration
 	// This is used to set the hidden OVN Kubernetes configuration in the cluster
 	// It is a map of key-value pairs where the key is the configuration option and the
