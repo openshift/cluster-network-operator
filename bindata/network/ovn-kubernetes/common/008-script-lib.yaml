@@ -543,6 +543,9 @@ data:
       # Ensure allow_icmp_network_policy_flag is always defined
       allow_icmp_network_policy_flag=
 
+      # Ensure dpu_lease_flags is always defined
+      dpu_lease_flags=
+
       if [[ $# -ne 3 ]]; then
         echo "Expected three arguments but got $#"
         exit 1
@@ -601,6 +604,13 @@ data:
 
         # disable multi-external-gateway for dpu-host mode as it is not supported
         multi_external_gateway_enable_flag=""
+      fi
+
+      if [[ -n "${OVNKUBE_NODE_LEASE_RENEW_INTERVAL}" ]]; then
+        dpu_lease_flags="--dpu-node-lease-renew-interval ${OVNKUBE_NODE_LEASE_RENEW_INTERVAL}"
+      fi
+      if [[ -n "${OVNKUBE_NODE_LEASE_DURATION}" ]]; then
+        dpu_lease_flags="${dpu_lease_flags} --dpu-node-lease-duration ${OVNKUBE_NODE_LEASE_DURATION}"
       fi
 
       if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
@@ -800,5 +810,6 @@ data:
         ${ovn_v4_transit_switch_subnet_opt} \
         ${ovn_v6_transit_switch_subnet_opt} \
         ${egress_features_enable_flag} \
-        ${multi_external_gateway_enable_flag}
+        ${multi_external_gateway_enable_flag} \
+        ${dpu_lease_flags}
     }
