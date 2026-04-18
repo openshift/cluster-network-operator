@@ -193,7 +193,9 @@ spec:
       hostPID: true
       nodeSelector:
         kubernetes.io/os: linux
-{{ if not .NETWORK_NODE_IDENTITY_ENABLE }}
+{{ if .NETWORK_NODE_IDENTITY_ENABLE }}
+      serviceAccountName: multus-node-identity
+{{ else }}
       serviceAccountName: multus
 {{ end }}
       priorityClassName: "system-node-critical"
