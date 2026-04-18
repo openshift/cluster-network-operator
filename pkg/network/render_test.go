@@ -190,6 +190,25 @@ func TestAllowMigrationOnlyForSupportedTypes(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 }
 
+func TestGCPDualStackDay0SupportedDay2Blocked(t *testing.T) {
+	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OVNKubernetesConfig, OVNKubernetesConfig)
+
+	infra.PlatformType = configv1.GCPPlatformType
+
+	// GCP does NOT support Day-2 conversion from single-stack to dual-stack
+	next.ServiceNetwork = append(next.ServiceNetwork, "fd02::/112")
+	next.ClusterNetwork = append(next.ClusterNetwork, operv1.ClusterNetworkEntry{
+		CIDR:       "fd01::/48",
+		HostPrefix: 64,
+	})
+	err := IsChangeSafe(prev, next, infra)
+	g.Expect(err).To(MatchError(ContainSubstring(fmt.Sprintf("%s does not allow conversion to dual-stack cluster", infra.PlatformType))))
+
+	// ... but the migration in the other direction (dual to single) should work
+	err = IsChangeSafe(next, prev, infra)
+	g.Expect(err).NotTo(HaveOccurred())
+}
+
 // ClusterNetwork CIDR tests
 func TestAllowExpandingClusterNetworkCIDRMaskForOVN(t *testing.T) {
 	g, infra, prev, next := setupTestInfraAndBasicRenderConfigs(t, OVNKubernetesConfig, OVNKubernetesConfig)
@@ -272,7 +291,8 @@ func getDefaultFeatureGatesWithDualStack() featuregates.FeatureGate {
 		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver,
 			apifeatures.FeatureGateOVNObservability,
 			apifeatures.FeatureGateAWSDualStackInstall,
-			apifeatures.FeatureGateAzureDualStackInstall},
+			apifeatures.FeatureGateAzureDualStackInstall,
+			apifeatures.FeatureGateGCPDualStackInstall},
 		[]configv1.FeatureGateName{
 			apifeatures.FeatureGateNetworkConnect,
 		},
