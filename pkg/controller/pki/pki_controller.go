@@ -8,7 +8,6 @@ package pki
 
 import (
 	"context"
-	"crypto/x509"
 	"fmt"
 	"log"
 	"reflect"
@@ -16,21 +15,21 @@ import (
 	"time"
 
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
-	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/eventrecorder"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 
+	features "github.com/openshift/api/features"
 	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/crypto"
 	"github.com/openshift/library-go/pkg/operator/certrotation"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
+	"github.com/openshift/library-go/pkg/pki"
 	"github.com/pkg/errors"
 
-	features "github.com/openshift/api/features"
-	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,8 +45,8 @@ const (
 )
 
 // Add attaches our control loop to the manager and watches for PKI objects
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client, featureGates featuregates.FeatureGate) error {
-	r, err := newPKIReconciler(mgr, status, featureGates)
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, featureGates featuregates.FeatureGate, pkiProfileProvider pki.PKIProfileProvider) error {
+	r, err := newPKIReconciler(mgr, status, featureGates, pkiProfileProvider)
 	if err != nil {
 		return err
 	}
@@ -76,11 +75,15 @@ type PKIReconciler struct {
 	status    *statusmanager.StatusManager
 
 	// one PKI per CA
-	pkis map[types.NamespacedName]*pki
+	pkis map[types.NamespacedName]*operatorPKI
 	// For computing status
 	pkiErrs map[types.NamespacedName]error
 
 	certDuration time.Duration
+
+	// pkiProfileProvider is non-nil when the ConfigurablePKI feature gate is
+	// enabled. It provides the PKI profile for certificate key configuration.
+	pkiProfileProvider pki.PKIProfileProvider
 }
 
 // The periodic resync interval.
@@ -90,7 +93,7 @@ var ResyncPeriod = 5 * time.Minute
 
 // newPKIReconciler creates the toplevel reconciler that receives PKI updates
 // and configures the CertRotationController accordingly
-func newPKIReconciler(mgr manager.Manager, status *statusmanager.StatusManager, featureGates featuregates.FeatureGate) (reconcile.Reconciler, error) {
+func newPKIReconciler(mgr manager.Manager, status *statusmanager.StatusManager, featureGates featuregates.FeatureGate, pkiProfileProvider pki.PKIProfileProvider) (reconcile.Reconciler, error) {
 	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		return nil, err
@@ -106,9 +109,10 @@ func newPKIReconciler(mgr manager.Manager, status *statusmanager.StatusManager, 
 		status:    status,
 		clientset: clientset,
 
-		pkis:         map[types.NamespacedName]*pki{},
-		pkiErrs:      map[types.NamespacedName]error{},
-		certDuration: certDuration,
+		pkis:               map[types.NamespacedName]*operatorPKI{},
+		pkiErrs:            map[types.NamespacedName]error{},
+		certDuration:       certDuration,
+		pkiProfileProvider: pkiProfileProvider,
 	}, nil
 }
 
@@ -139,7 +143,7 @@ func (r *PKIReconciler) Reconcile(ctx context.Context, request reconcile.Request
 		}
 	}
 	if existing == nil {
-		existing, err = newPKI(obj, r.clientset, r.mgr, r.certDuration)
+		existing, err = newPKI(obj, r.clientset, r.mgr, r.certDuration, r.pkiProfileProvider)
 		if err != nil {
 			log.Println(err)
 			r.pkiErrs[request.NamespacedName] =
@@ -179,15 +183,15 @@ func (r *PKIReconciler) setStatus() {
 	}
 }
 
-// pki is the internal type that represents a single PKI CRD. It manages the
+// operatorPKI is the internal type that represents a single PKI CRD. It manages the
 // business of reconciling the certificate objects
-type pki struct {
+type operatorPKI struct {
 	spec       netopv1.OperatorPKISpec
 	controller factory.Controller
 }
 
 // newPKI creates a CertRotationController for the supplied configuration
-func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr manager.Manager, certDuration time.Duration) (*pki, error) {
+func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr manager.Manager, certDuration time.Duration, pkiProfileProvider pki.PKIProfileProvider) (*operatorPKI, error) {
 	spec := config.Spec
 
 	// Ugly: the existing cache + informers used as part of the controller-manager
@@ -209,12 +213,14 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			AdditionalAnnotations: certrotation.AdditionalAnnotations{
 				JiraComponent: names.ClusterNetworkOperatorJiraComponent,
 			},
-			Validity:      10 * OneYear,
-			Refresh:       9 * OneYear,
-			Informer:      inf.Core().V1().Secrets(),
-			Lister:        inf.Core().V1().Secrets().Lister(),
-			Client:        clientset.CoreV1(),
-			EventRecorder: &eventrecorder.LoggingRecorder{},
+			CertificateName:    "network.signer",
+			PKIProfileProvider: pkiProfileProvider,
+			Validity:           10 * OneYear,
+			Refresh:            9 * OneYear,
+			Informer:           inf.Core().V1().Secrets(),
+			Lister:             inf.Core().V1().Secrets().Lister(),
+			Client:             clientset.CoreV1(),
+			EventRecorder:      &eventrecorder.LoggingRecorder{},
 		},
 		certrotation.CABundleConfigMap{
 			Namespace: config.Namespace,
@@ -233,15 +239,13 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 			AdditionalAnnotations: certrotation.AdditionalAnnotations{
 				JiraComponent: names.ClusterNetworkOperatorJiraComponent,
 			},
-			Validity: certDuration,
-			Refresh:  certDuration / 2,
-			CertCreator: &certrotation.ServingRotation{
+			CertificateName:    "network.peer",
+			PKIProfileProvider: pkiProfileProvider,
+			Validity:           certDuration,
+			Refresh:            certDuration / 2,
+			CertCreator: &certrotation.PeerRotation{
 				Hostnames: func() []string { return []string{spec.TargetCert.CommonName} },
-
-				// Force the certificate to also be client
-				CertificateExtensionFn: []crypto.CertificateExtensionFunc{
-					toClientCert,
-				},
+				UserInfo:  &user.DefaultInfo{Name: spec.TargetCert.CommonName},
 			},
 			Lister:        inf.Core().V1().Secrets().Lister(),
 			Informer:      inf.Core().V1().Secrets(),
@@ -252,7 +256,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 		nil,
 	)
 
-	out := &pki{
+	out := &operatorPKI{
 		controller: cont,
 	}
 	config.Spec.DeepCopyInto(&out.spec)
@@ -265,29 +269,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 }
 
 // sync causes the underlying cert controller to try and reconcile
-func (p *pki) sync() error {
+func (p *operatorPKI) sync() error {
 	runOnceCtx := context.WithValue(context.Background(), certrotation.RunOnceContextKey, true) //nolint:staticcheck
 	return p.controller.Sync(runOnceCtx, nil)
-}
-
-// toClientCert is a certificate "decorator" that adds ClientAuth to the
-// list of ExtendedKeyUsages. This allows the generated certificate to be
-// used for both client and server auth.
-func toClientCert(cert *x509.Certificate) error {
-	if len(cert.ExtKeyUsage) == 0 {
-		return nil
-	}
-
-	found := false
-	for _, u := range cert.ExtKeyUsage {
-		if u == x509.ExtKeyUsageClientAuth {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		cert.ExtKeyUsage = append(cert.ExtKeyUsage, x509.ExtKeyUsageClientAuth)
-	}
-	return nil
 }

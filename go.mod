@@ -102,9 +102,10 @@ require (
 require (
 	github.com/openshift/api v0.0.0-20260320151444-324a1bcb9f55
 	github.com/openshift/client-go v0.0.0-20260320040014-4b5fc2cdad98
-	github.com/openshift/library-go v0.0.0-20260303171201-5d9eb6295ff6
+	github.com/openshift/library-go v0.0.0-20260409165127-c57da2bf5720
 	github.com/openshift/machine-config-operator v0.0.1-0.20250724162154-ab14c8e2843b
 	k8s.io/apiextensions-apiserver v0.35.2
+	k8s.io/apiserver v0.35.2
 	k8s.io/client-go v0.35.2
 	sigs.k8s.io/controller-tools v0.20.1
 )
@@ -154,7 +155,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
-	k8s.io/apiserver v0.35.2 // indirect
 	k8s.io/gengo/v2 v2.0.0-20251215205346-5ee0d033ba5b // indirect
 	k8s.io/kms v0.35.2 // indirect
 	k8s.io/kube-aggregator v0.35.1 // indirect
