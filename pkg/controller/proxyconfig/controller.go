@@ -79,6 +79,18 @@ func add(mgr manager.Manager, r *ReconcileProxyConfig) error {
 		return err
 	}
 
+	// Watch for changes to the network resource.
+	err = c.Watch(source.Kind[crclient.Object](mgr.GetCache(), &configv1.Network{}, &handler.EnqueueRequestForObject{}))
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to the infrastructure resource.
+	err = c.Watch(source.Kind[crclient.Object](mgr.GetCache(), &configv1.Infrastructure{}, &handler.EnqueueRequestForObject{}))
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
