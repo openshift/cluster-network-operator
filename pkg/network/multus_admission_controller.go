@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -78,8 +79,8 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 	data.Data["RHOBSMonitoring"] = os.Getenv("RHOBS_MONITORING")
 	if hsc.Enabled {
 		data.Data["AdmissionControllerNamespace"] = hsc.Namespace
-		data.Data["KubernetesServiceHost"] = bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal].Host
-		data.Data["KubernetesServicePort"] = bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal].Port
+		localAPIServer := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal]
+		data.Data["KubernetesServiceURL"] = "https://" + net.JoinHostPort(localAPIServer.Host, localAPIServer.Port)
 		data.Data["CLIImage"] = os.Getenv("CLI_IMAGE")
 		data.Data["TokenMinterImage"] = os.Getenv("TOKEN_MINTER_IMAGE")
 		data.Data["TokenAudience"] = os.Getenv("TOKEN_AUDIENCE")
