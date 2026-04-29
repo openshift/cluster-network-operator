@@ -101,7 +101,7 @@ spec:
             - -c
             - |
               kc=/var/run/secrets/hosted_cluster/kubeconfig
-              kubectl --kubeconfig $kc config set clusters.default.server "https://[${KUBERNETES_SERVICE_HOST}]:${KUBERNETES_SERVICE_PORT}"
+              kubectl --kubeconfig $kc config set clusters.default.server "{{.KubernetesServiceURL}}"
               kubectl --kubeconfig $kc config set clusters.default.certificate-authority /hosted-ca/ca.crt
               kubectl --kubeconfig $kc config set users.admin.tokenFile /var/run/secrets/hosted_cluster/token
               kubectl --kubeconfig $kc config set contexts.default.cluster default
@@ -112,11 +112,6 @@ spec:
           volumeMounts:
             - mountPath: /var/run/secrets/hosted_cluster
               name: hosted-cluster-api-access
-          env:
-            - name: KUBERNETES_SERVICE_PORT
-              value: "{{.KubernetesServicePort}}"
-            - name: KUBERNETES_SERVICE_HOST
-              value: "{{.KubernetesServiceHost}}"
       automountServiceAccountToken: false
 {{- end }}
       containers:
