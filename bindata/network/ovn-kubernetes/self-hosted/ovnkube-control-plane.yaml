@@ -102,6 +102,13 @@ spec:
             source "/env/_master"
             set +o allexport
           fi
+          
+          ovn_eip_reachability_timeout_opt=
+          {{- if .ReachabilityTotalTimeoutSeconds }}        
+          if [[ "{{.ReachabilityTotalTimeoutSeconds}}" != "" ]]; then
+            ovn_eip_reachability_timeout_opt="--egressip-reachability-total-timeout {{.ReachabilityTotalTimeoutSeconds}}"
+          fi
+          {{ end }}
 
           ovn_v4_join_subnet_opt=
           if [[ "{{.V4JoinSubnet}}" != "" ]]; then
@@ -203,6 +210,7 @@ spec:
             ${evpn_enable_flag} \
             ${preconfigured_udn_addresses_enable_flag} \
             --enable-egress-ip=true \
+            ${ovn_eip_reachability_timeout_opt} \
             --enable-egress-firewall=true \
             --enable-egress-qos=true \
             --enable-egress-service=true \

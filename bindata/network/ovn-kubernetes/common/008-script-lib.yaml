@@ -571,6 +571,14 @@ data:
 
       # enable egress ip, egress firewall, egress qos, egress service
       egress_features_enable_flag="--enable-egress-ip=true --enable-egress-firewall=true --enable-egress-qos=true --enable-egress-service=true"
+
+      ovn_eip_reachability_timeout_opt=
+      {{- if .ReachabilityTotalTimeoutSeconds }}        
+      if [[ "{{.ReachabilityTotalTimeoutSeconds}}" != "" ]]; then
+        ovn_eip_reachability_timeout_opt="--egressip-reachability-total-timeout {{.ReachabilityTotalTimeoutSeconds}}"
+      fi
+      {{ end }}
+
       init_ovnkube_controller="--init-ovnkube-controller ${K8S_NODE}"
       multi_external_gateway_enable_flag="--enable-multi-external-gateway=true"
       gateway_interface=br-ex
@@ -797,5 +805,6 @@ data:
         ${ovn_v4_transit_switch_subnet_opt} \
         ${ovn_v6_transit_switch_subnet_opt} \
         ${egress_features_enable_flag} \
+        ${ovn_eip_reachability_timeout_opt} \
         ${multi_external_gateway_enable_flag}
     }
