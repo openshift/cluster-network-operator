@@ -499,7 +499,7 @@ data:
         ;;
         fedora)
           if [ "${VARIANT_ID}" == "coreos" ]; then
-            rhelmajor=8
+            rhelmajor=9
           else
             log "cnibincopy" "FATAL ERROR: Unsupported Fedora variant=${VARIANT_ID}"
             exit 1
@@ -509,20 +509,13 @@ data:
         ;;
       esac
 
-      # Set which directory we'll copy from, detect if it exists
-      sourcedir=/usr/libexec/cni/
-      case "${rhelmajor}" in
-        8)
-          sourcedir=/usr/libexec/cni/rhel8
-        ;;
-        9)
-          sourcedir=/usr/libexec/cni/rhel9
-        ;;
-        *)
-          log "cnibincopy" "ERROR: RHEL Major Version Unsupported, rhelmajor=${rhelmajor}"
-        ;;
-      esac
+      sourcedir="/usr/libexec/cni/rhel${rhelmajor}"
+      if [ ! -d "$sourcedir" ]; then
+        log "cnibincopy" "WARNING: Version-specific directory $sourcedir not found, falling back to /usr/libexec/cni"
+        sourcedir="/usr/libexec/cni"
+      fi
 
+      log "cnibincopy" "Copying $sourcedir/ovn-k8s-cni-overlay to /cni-bin-dir/"
       cp -f "$sourcedir/ovn-k8s-cni-overlay" /cni-bin-dir/
     }
 

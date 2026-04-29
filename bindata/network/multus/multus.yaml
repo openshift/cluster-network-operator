@@ -21,10 +21,8 @@ data:
     DESTINATION_DIRECTORY=/host/opt/cni/bin/
 
     # Perform validation of usage
-    if [ -z "$RHEL8_SOURCE_DIRECTORY" ] ||
-       [ -z "$RHEL9_SOURCE_DIRECTORY" ] ||
-       [ -z "$DEFAULT_SOURCE_DIRECTORY" ]; then
-      log "FATAL ERROR: You must set env variables: RHEL8_SOURCE_DIRECTORY, RHEL9_SOURCE_DIRECTORY, DEFAULT_SOURCE_DIRECTORY"
+    if [ -z "$SOURCE_DIRECTORY" ]; then
+      log "FATAL ERROR: You must set the SOURCE_DIRECTORY env variable"
       exit 1
     fi
 
@@ -46,7 +44,7 @@ data:
       ;;
       fedora)
         if [ "${VARIANT_ID}" == "coreos" ]; then
-          rhelmajor=8
+          rhelmajor=9
         else
           log "FATAL ERROR: Unsupported Fedora variant=${VARIANT_ID}"
           exit 1
@@ -56,32 +54,25 @@ data:
       ;;
     esac
 
-    # Set which directory we'll copy from, detect if it exists
+    # Use version-specific source directory
+    default_trimmed="${SOURCE_DIRECTORY%/}"
     sourcedir=
-    founddir=false
-    case "${rhelmajor}" in
-      8)
-        if [ -d "${RHEL8_SOURCE_DIRECTORY}" ]; then
-          sourcedir=${RHEL8_SOURCE_DIRECTORY}
-          founddir=true
-        fi
-      ;;
-      9)
-        if [ -d "${RHEL9_SOURCE_DIRECTORY}" ]; then
-          sourcedir=${RHEL9_SOURCE_DIRECTORY}
-          founddir=true
-        fi
-      ;;
-      *)
-        log "ERROR: RHEL Major Version Unsupported, rhelmajor=${rhelmajor}"
-      ;;
-    esac
-
-    # When it doesn't exist, fall back to the original directory.
-    if [ "$founddir" == false ]; then
-      log "Source directory unavailable for OS version: ${rhelmajor}"
-      sourcedir=$DEFAULT_SOURCE_DIRECTORY
+    # Standard layout: rhel<N> inserted before last path component
+    # e.g., /usr/src/multus-cni/bin/ -> /usr/src/multus-cni/rhel9/bin/
+    version_dir="$(dirname "$default_trimmed")/rhel${rhelmajor}/$(basename "$default_trimmed")"
+    if [ -d "$version_dir" ]; then
+      sourcedir="${version_dir}/"
     fi
+    # Flat layout: rhel<N> as a subdirectory of SOURCE_DIRECTORY
+    # e.g., /bondcni/ -> /bondcni/rhel9/
+    if [ -z "$sourcedir" ] && [ -d "${default_trimmed}/rhel${rhelmajor}" ]; then
+      sourcedir="${default_trimmed}/rhel${rhelmajor}/"
+    fi
+    if [ -z "$sourcedir" ]; then
+      log "WARNING: No version-specific directory found for rhel${rhelmajor}, using ${SOURCE_DIRECTORY}"
+      sourcedir="${SOURCE_DIRECTORY}"
+    fi
+    log "Copying binaries from ${sourcedir}"
 
     # Use a subdirectory called "upgrade" so we can atomically move fully copied files.
     # We now use --remove-destination after running into an issue with -f not working over symlinks
@@ -257,11 +248,7 @@ spec:
         - name: etc-kubernetes
           mountPath: /etc/kubernetes
         env:
-        - name: RHEL8_SOURCE_DIRECTORY
-          value: "/usr/src/multus-cni/rhel8/bin/"
-        - name: RHEL9_SOURCE_DIRECTORY
-          value: "/usr/src/multus-cni/rhel9/bin/"
-        - name: DEFAULT_SOURCE_DIRECTORY
+        - name: SOURCE_DIRECTORY
           value: "/usr/src/multus-cni/bin/"
         - name: KUBERNETES_SERVICE_PORT
           value: "{{.KUBERNETES_SERVICE_PORT}}"
@@ -400,11 +387,7 @@ spec:
           name: os-release
           readOnly: true
         env:
-        - name: RHEL8_SOURCE_DIRECTORY
-          value: "/usr/src/egress-router-cni/rhel8/bin/"
-        - name: RHEL9_SOURCE_DIRECTORY
-          value: "/usr/src/egress-router-cni/rhel9/bin/"
-        - name: DEFAULT_SOURCE_DIRECTORY
+        - name: SOURCE_DIRECTORY
           value: "/usr/src/egress-router-cni/bin/"
       - name: cni-plugins
         image: {{.CNIPluginsImage}}
@@ -424,11 +407,7 @@ spec:
         - mountPath: /sysctls
           name: cni-sysctl-allowlist
         env:
-        - name: RHEL8_SOURCE_DIRECTORY
-          value: "/usr/src/plugins/rhel8/bin/"
-        - name: RHEL9_SOURCE_DIRECTORY
-          value: "/usr/src/plugins/rhel9/bin/"
-        - name: DEFAULT_SOURCE_DIRECTORY
+        - name: SOURCE_DIRECTORY
           value: "/usr/src/plugins/bin/"
       - name: bond-cni-plugin
         image: {{.BondCNIPluginImage}}
@@ -443,12 +422,8 @@ spec:
           name: os-release
           readOnly: true
         env:
-        - name: RHEL8_SOURCE_DIRECTORY
-          value: "/bondcni/rhel8/"
-        - name: RHEL9_SOURCE_DIRECTORY
-          value: "/bondcni/rhel9/"
-        - name: DEFAULT_SOURCE_DIRECTORY
-          value: "/bondcni/rhel9/"
+        - name: SOURCE_DIRECTORY
+          value: "/bondcni/"
       - name: routeoverride-cni
         image: {{.RouteOverrideImage}}
         command: ["/entrypoint/cnibincopy.sh"]
@@ -462,11 +437,7 @@ spec:
           name: os-release
           readOnly: true
         env:
-        - name: RHEL8_SOURCE_DIRECTORY
-          value: "/usr/src/route-override/rhel8/bin/"
-        - name: RHEL9_SOURCE_DIRECTORY
-          value: "/usr/src/route-override/rhel9/bin/"
-        - name: DEFAULT_SOURCE_DIRECTORY
+        - name: SOURCE_DIRECTORY
           value: "/usr/src/route-override/bin/"
       - name: whereabouts-cni-bincopy
         image: {{.WhereaboutsImage}}
@@ -485,11 +456,7 @@ spec:
           name: os-release
           readOnly: true
         env:
-        - name: RHEL8_SOURCE_DIRECTORY
-          value: "/usr/src/whereabouts/rhel8/bin/"
-        - name: RHEL9_SOURCE_DIRECTORY
-          value: "/usr/src/whereabouts/rhel9/bin/"
-        - name: DEFAULT_SOURCE_DIRECTORY
+        - name: SOURCE_DIRECTORY
           value: "/usr/src/whereabouts/bin/"
       - name: whereabouts-cni
         image: {{.WhereaboutsImage}}
