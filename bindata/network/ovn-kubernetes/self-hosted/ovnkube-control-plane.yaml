@@ -169,6 +169,11 @@ spec:
             network_connect_enabled_flag="--enable-network-connect"
           fi
 
+          enable_dynamic_udn_allocation_flag=
+          if [[ "{{.EnableDynamicUDNAllocation}}" != "" ]]; then
+            enable_dynamic_udn_allocation_flag="--enable-dynamic-udn-allocation={{.EnableDynamicUDNAllocation}}"
+          fi
+
           if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
             gateway_mode_flags="--gateway-mode shared"
           elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
@@ -209,7 +214,8 @@ spec:
             --enable-multicast \
             --enable-multi-external-gateway=true \
             ${multi_network_policy_enabled_flag} \
-            ${admin_network_policy_enabled_flag}
+            ${admin_network_policy_enabled_flag} \
+            ${enable_dynamic_udn_allocation_flag}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config

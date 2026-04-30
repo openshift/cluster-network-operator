@@ -720,6 +720,10 @@ data:
         allow_icmp_network_policy_flag="--allow-icmp-network-policy={{.AllowICMPNetworkPolicy}}"
       fi
 
+      if [[ "{{.EnableDynamicUDNAllocation}}" != "" ]]; then
+        enable_dynamic_udn_allocation_flag="--enable-dynamic-udn-allocation={{.EnableDynamicUDNAllocation}}"
+      fi
+
       NETWORK_NODE_IDENTITY_ENABLE=
       if [[ "{{.NETWORK_NODE_IDENTITY_ENABLE}}" == "true" ]]; then
         NETWORK_NODE_IDENTITY_ENABLE="
@@ -792,6 +796,7 @@ data:
         ${ovn_advertised_udn_isolation_mode_flag} \
         ${openflow_probe_flag} \
         ${allow_icmp_network_policy_flag} \
+        ${enable_dynamic_udn_allocation_flag} \
         ${NETWORK_NODE_IDENTITY_ENABLE} \
         ${ovn_v4_join_subnet_opt} \
         ${ovn_v6_join_subnet_opt} \
