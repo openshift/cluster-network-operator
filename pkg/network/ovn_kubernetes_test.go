@@ -2048,6 +2048,41 @@ metadata:
   name: ovnkube-node
 `,
 		},
+
+		// zero-worker HyperShift: node at new version but DesiredNumberScheduled==0.
+		// Control-plane upgrade must not be blocked waiting for a node rollout that
+		// will never complete.
+		{
+			expectNode:         true,
+			expectControlPlane: true,
+			expectPrePull:      false,
+			rv:                 "2.0.0",
+			controlPlane: `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-control-plane
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 2.0.0
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+  generation: 1
+status:
+  desiredNumberScheduled: 0
+  numberAvailable: 0
+  numberUnavailable: 0
+  updatedNumberScheduled: 0
+  observedGeneration: 1
+`,
+		},
 	} {
 		t.Run(strconv.Itoa(idx), func(t *testing.T) {
 			g := NewGomegaWithT(t)
@@ -4212,4 +4247,110 @@ func TestRenderOVNKubernetes_OpenFlowProbeOverride(t *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"openflow-probe": "-60"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--openflow-probe="`))
 	})
+}
+
+// TestDaemonSetProgressing verifies daemonSetProgressing returns the correct
+// result for a variety of DaemonSet status scenarios, including the zero-worker
+// HyperShift case where DesiredNumberScheduled==0 must not be treated as progressing.
+func TestDaemonSetProgressing(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		status       appsv1.DaemonSetStatus
+		generation   int64
+		allowHung    bool
+		expectResult bool
+	}{
+		{
+			name: "zero workers (DesiredNumberScheduled==0) should not be progressing",
+			status: appsv1.DaemonSetStatus{
+				DesiredNumberScheduled: 0,
+				NumberAvailable:        0,
+				NumberUnavailable:      0,
+				UpdatedNumberScheduled: 0,
+				ObservedGeneration:     1,
+			},
+			generation:   1,
+			allowHung:    true,
+			expectResult: false,
+		},
+		{
+			// Isolates the NumberAvailable==0 && DesiredNumberScheduled>0 branch:
+			// all other predicates are false (no unavailable pods, all updated,
+			// generation matches), so only this condition drives the result.
+			name: "zero available with desired pods should be progressing",
+			status: appsv1.DaemonSetStatus{
+				DesiredNumberScheduled: 3,
+				NumberAvailable:        0,
+				NumberUnavailable:      0,
+				UpdatedNumberScheduled: 3,
+				ObservedGeneration:     1,
+			},
+			generation:   1,
+			allowHung:    true,
+			expectResult: true,
+		},
+		{
+			name: "rollout complete should not be progressing",
+			status: appsv1.DaemonSetStatus{
+				DesiredNumberScheduled: 3,
+				NumberAvailable:        3,
+				NumberUnavailable:      0,
+				UpdatedNumberScheduled: 3,
+				ObservedGeneration:     1,
+			},
+			generation:   1,
+			allowHung:    true,
+			expectResult: false,
+		},
+		{
+			name: "pods unavailable should be progressing",
+			status: appsv1.DaemonSetStatus{
+				DesiredNumberScheduled: 3,
+				NumberAvailable:        2,
+				NumberUnavailable:      1,
+				UpdatedNumberScheduled: 3,
+				ObservedGeneration:     1,
+			},
+			generation:   1,
+			allowHung:    true,
+			expectResult: true,
+		},
+		{
+			name: "not all pods updated should be progressing",
+			status: appsv1.DaemonSetStatus{
+				DesiredNumberScheduled: 3,
+				NumberAvailable:        3,
+				NumberUnavailable:      0,
+				UpdatedNumberScheduled: 2,
+				ObservedGeneration:     1,
+			},
+			generation:   1,
+			allowHung:    true,
+			expectResult: true,
+		},
+		{
+			name: "generation mismatch should be progressing",
+			status: appsv1.DaemonSetStatus{
+				DesiredNumberScheduled: 3,
+				NumberAvailable:        3,
+				NumberUnavailable:      0,
+				UpdatedNumberScheduled: 3,
+				ObservedGeneration:     1,
+			},
+			generation:   2,
+			allowHung:    true,
+			expectResult: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+			ds := &appsv1.DaemonSet{}
+			ds.Generation = tc.generation
+			ds.Status = tc.status
+			ds.Status.ObservedGeneration = tc.status.ObservedGeneration
+			result := daemonSetProgressing(ds, tc.allowHung)
+			g.Expect(result).To(Equal(tc.expectResult),
+				"test case %q: daemonSetProgressing() = %v, want %v", tc.name, result, tc.expectResult)
+		})
+	}
 }
