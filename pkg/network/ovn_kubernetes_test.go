@@ -4450,6 +4450,69 @@ func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
 	})
 }
 
+func TestRenderOVNKubernetes_EnableDynamicUDNAllocationOverride(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+	fillDefaults(config, nil)
+
+	renderWithOverrides := func(overrides map[string]string) string {
+		bootstrapResult := fakeBootstrapResult()
+		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+			ControlPlaneReplicaCount: 3,
+			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+				DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+				DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
+				SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+				MgmtPortResourceName: "",
+				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+					Enabled: false,
+				},
+				ConfigOverrides: overrides,
+			},
+		}
+		featureGatesCNO := getDefaultFeatureGates()
+		fakeClient := cnofake.NewFakeClient()
+
+		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+		g.Expect(err).NotTo(HaveOccurred())
+		return extractOVNScriptLib(g, objs)
+	}
+
+	t.Run("with enable-dynamic-udn-allocation override set to true", func(t *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"enable-dynamic-udn-allocation": "true"})
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "true" != "" ]]; then
+    enable_dynamic_udn_allocation_flag="--enable-dynamic-udn-allocation=true"
+  fi`))
+	})
+
+	t.Run("with enable-dynamic-udn-allocation override set to false", func(t *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"enable-dynamic-udn-allocation": "false"})
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "false" != "" ]]; then
+    enable_dynamic_udn_allocation_flag="--enable-dynamic-udn-allocation=false"
+  fi`))
+	})
+
+	t.Run("without enable-dynamic-udn-allocation override", func(t *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(nil)
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "" != "" ]]; then
+    enable_dynamic_udn_allocation_flag="--enable-dynamic-udn-allocation="
+  fi`))
+	})
+
+	t.Run("with invalid enable-dynamic-udn-allocation override", func(t *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"enable-dynamic-udn-allocation": "notabool"})
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "" != "" ]]; then
+    enable_dynamic_udn_allocation_flag="--enable-dynamic-udn-allocation="
+  fi`))
+	})
+}
+
 func TestOVNKubernetesControlPlaneFlags(t *testing.T) {
 	g := NewGomegaWithT(t)
 
