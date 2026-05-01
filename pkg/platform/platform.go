@@ -151,7 +151,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	}
 
 	// As per instructions given in the following links:
-	// https://github.com/openshift/cluster-network-operator/blob/master/docs/enabling_ns_ipsec.md#prerequsits
+	// docs/enabling_ns_ipsec.md#prerequsits
 	// https://docs.openshift.com/container-platform/4.14/networking/ovn_kubernetes_network_provider/configuring-ipsec-ovn.html#nw-ovn-ipsec-north-south-enable_configuring-ipsec-ovn
 	// The IPsecMachineConfig in 4.14 is created by user and can be created with any name and also is not managed by network operator, so find it by using the label
 	// and looking for the extension.

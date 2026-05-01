@@ -124,7 +124,7 @@ it is also consumed by third-party network operators that replace the Network Co
 
 **Output:** Most core networking components.
 
-For more detailed documentation, see [operands.md](https://github.com/openshift/cluster-network-operator/blob/master/docs/operands.md).
+For more detailed documentation, see [operands.md](operands.md).
 
 This is the "main" controller, in that it is responsible for rendering the core networking components (OVN-Kubernetes, Multus, etc). It is broken down into stages:
 
@@ -214,7 +214,7 @@ All controllers should report a status back. The controllers in the CNO are no d
 The CNO derives status in two ways:
 
 - Controllers can report a Degraded / non-Degraded state
-- A special Status Controller watches Pods, Deployments, and Daemonsets and derives status from them. This is only used for pods created by the Network controller. It is from this that we determine the "Available" and "Progressing" statuses. There is [more detailed documentation](https://github.com/openshift/cluster-network-operator/blob/master/docs/operands.md).
+- A special Status Controller watches Pods, Deployments, and Daemonsets and derives status from them. This is only used for pods created by the Network controller. It is from this that we determine the "Available" and "Progressing" statuses. There is [more detailed documentation](operands.md).
 
 Status is posted to both the `Network.operator.openshift.io` object, as well as the network `ClusterOperator.config.openshift.io` object, and the two statuses are currently identical.
 
