@@ -65,6 +65,11 @@ const OVN_NODE_SELECTOR_DEFAULT_DPU = "network.operator.openshift.io/dpu="
 const OVN_NODE_SELECTOR_DEFAULT_SMART_NIC = "network.operator.openshift.io/smart-nic="
 const OVN_NODE_IDENTITY_CERT_DURATION = "24h"
 
+// Default DPU health check lease configuration.
+// Setting renew-interval to 0 disables the health check.
+const DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT = 10
+const DPU_NODE_LEASE_DURATION_DEFAULT = 40
+
 // gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
 
@@ -232,6 +237,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["SmartNicModeLabel"] = bootstrapResult.OVN.OVNKubernetesConfig.SmartNicModeLabel
 	data.Data["SmartNicModeValue"] = bootstrapResult.OVN.OVNKubernetesConfig.SmartNicModeValue
 	data.Data["MgmtPortResourceName"] = bootstrapResult.OVN.OVNKubernetesConfig.MgmtPortResourceName
+	data.Data["DpuNodeLeaseRenewInterval"] = strconv.Itoa(bootstrapResult.OVN.OVNKubernetesConfig.DpuNodeLeaseRenewInterval)
+	data.Data["DpuNodeLeaseDuration"] = strconv.Itoa(bootstrapResult.OVN.OVNKubernetesConfig.DpuNodeLeaseDuration)
 	data.Data["OVN_CONTROLLER_INACTIVITY_PROBE"] = os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
 	controller_inactivity_probe := os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
 	if len(controller_inactivity_probe) == 0 {
@@ -1015,10 +1022,12 @@ func findCommonNode(nodeLists ...[]string) (bool, string) {
 // if it exists, otherwise returns default configuration for OCP clusters using OVN-Kubernetes
 func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *hypershift.HyperShiftConfig, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNConfigBoostrapResult, error) {
 	ovnConfigResult := &bootstrap.OVNConfigBoostrapResult{
-		DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-		DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-		SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-		MgmtPortResourceName: "",
+		DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+		DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+		SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+		MgmtPortResourceName:      "",
+		DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+		DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 	}
 	if conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig == nil {
 		bootstrapOVNGatewayConfig(conf, kubeClient.ClientFor("").CRClient())
@@ -1063,6 +1072,34 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 		mgmtPortresourceName, exists := cm.Data["mgmt-port-resource-name"]
 		if exists {
 			ovnConfigResult.MgmtPortResourceName = mgmtPortresourceName
+		}
+
+		if val, exists := cm.Data["dpu-node-lease-renew-interval"]; exists {
+			parsed, err := strconv.Atoi(val)
+			if err == nil && parsed >= 0 {
+				ovnConfigResult.DpuNodeLeaseRenewInterval = parsed
+			} else {
+				klog.Warningf("Invalid dpu-node-lease-renew-interval %q, using default %d", val, DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT)
+			}
+		}
+		if val, exists := cm.Data["dpu-node-lease-duration"]; exists {
+			parsed, err := strconv.Atoi(val)
+			if err == nil && parsed > 0 {
+				ovnConfigResult.DpuNodeLeaseDuration = parsed
+			} else {
+				klog.Warningf("Invalid dpu-node-lease-duration %q (must be > 0), using default %d", val, DPU_NODE_LEASE_DURATION_DEFAULT)
+			}
+		}
+
+		// Setting renew-interval to 0 disables the DPU health check.
+		// Duration must always be > 0 (required by ovn-kubernetes).
+		if ovnConfigResult.DpuNodeLeaseRenewInterval == 0 {
+			ovnConfigResult.DpuNodeLeaseDuration = DPU_NODE_LEASE_DURATION_DEFAULT
+		} else if ovnConfigResult.DpuNodeLeaseDuration <= ovnConfigResult.DpuNodeLeaseRenewInterval {
+			klog.Warningf("dpu-node-lease-duration (%d) must be greater than dpu-node-lease-renew-interval (%d), using defaults",
+				ovnConfigResult.DpuNodeLeaseDuration, ovnConfigResult.DpuNodeLeaseRenewInterval)
+			ovnConfigResult.DpuNodeLeaseRenewInterval = DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT
+			ovnConfigResult.DpuNodeLeaseDuration = DPU_NODE_LEASE_DURATION_DEFAULT
 		}
 	}
 

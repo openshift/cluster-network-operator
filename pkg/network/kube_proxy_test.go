@@ -374,10 +374,12 @@ func TestFillKubeProxyDefaults(t *testing.T) {
 var FakeKubeProxyBootstrapResult = bootstrap.BootstrapResult{
 	OVN: bootstrap.OVNBootstrapResult{
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
-			MgmtPortResourceName: "",
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 		},
 	},
 }

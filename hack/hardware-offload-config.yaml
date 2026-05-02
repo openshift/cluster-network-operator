@@ -12,3 +12,5 @@ data:
     dpu-mode-label: "network.operator.openshift.io/dpu="
     smart-nic-mode-label: "network.operator.openshift.io/smart-nic="
     mgmt-port-resource-name: "openshift.io/mgmtvf"
+    dpu-node-lease-renew-interval: "10"
+    dpu-node-lease-duration: "40"
