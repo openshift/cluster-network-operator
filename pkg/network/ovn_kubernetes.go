@@ -203,6 +203,17 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			}
 		}
 	}
+	data.Data["EnableDynamicUDNAllocation"] = ""
+	if raw, ok := bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["enable-dynamic-udn-allocation"]; ok {
+		enableDynamicUDNAllocation := strings.TrimSpace(raw)
+		if enableDynamicUDNAllocation != "" {
+			if _, err := strconv.ParseBool(enableDynamicUDNAllocation); err != nil {
+				klog.Warningf("Ignoring invalid enable-dynamic-udn-allocation override %q: expected boolean", raw)
+			} else {
+				data.Data["EnableDynamicUDNAllocation"] = enableDynamicUDNAllocation
+			}
+		}
+	}
 
 	if conf.Migration != nil {
 		if conf.Migration.MTU != nil {

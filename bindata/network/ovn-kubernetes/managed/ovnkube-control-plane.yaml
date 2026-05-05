@@ -222,6 +222,11 @@ spec:
             network_connect_enabled_flag="--enable-network-connect"
           fi
 
+          enable_dynamic_udn_allocation_flag=
+          if [[ "{{.EnableDynamicUDNAllocation}}" != "" ]]; then
+            enable_dynamic_udn_allocation_flag="--enable-dynamic-udn-allocation={{.EnableDynamicUDNAllocation}}"
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
             --enable-interconnect \
@@ -255,7 +260,8 @@ spec:
             --enable-multicast \
             --enable-multi-external-gateway=true \
             ${multi_network_policy_enabled_flag} \
-            ${admin_network_policy_enabled_flag}
+            ${admin_network_policy_enabled_flag} \
+            ${enable_dynamic_udn_allocation_flag}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
