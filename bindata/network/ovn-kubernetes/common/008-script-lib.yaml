@@ -478,6 +478,21 @@ data:
         echo "$(date --iso-8601=seconds) [{$1}] ${2}"
     }
 
+    # set-encap-ip-flag() sets --encap-ip from the OVN_ENCAP_IP environment
+    # variable when present.
+    set-encap-ip-flag()
+    {
+      local ovn_encap_ip_normalized
+      ovn_encap_ip_flag=
+
+      ovn_encap_ip_normalized="${OVN_ENCAP_IP//[[:space:]]/}"
+
+      if [[ -n "${ovn_encap_ip_normalized}" ]]; then
+        log "encapip" "Using OVN_ENCAP_IP=${OVN_ENCAP_IP}"
+        ovn_encap_ip_flag="--encap-ip=${ovn_encap_ip_normalized}"
+      fi
+    }
+
     # cni-bin-copy() detects the host OS and copies the correct shim binary to
     # the CNI binary directory.
     #
@@ -688,6 +703,8 @@ data:
         enable_interconnect_flag="--enable-interconnect"
       fi
 
+      set-encap-ip-flag
+
       exec /usr/bin/ovnkube \
         ${init_ovnkube_controller} \
         --init-node "${K8S_NODE}" \
@@ -698,6 +715,7 @@ data:
         ${gateway_mode_flags} \
         ${node_mgmt_port_netdev_flags} \
         ${ovnkube_node_mode} \
+        ${ovn_encap_ip_flag} \
         --metrics-bind-address "127.0.0.1:${metrics_port}" \
         --ovn-metrics-bind-address "127.0.0.1:${ovn_metrics_port}" \
         --metrics-enable-pprof \

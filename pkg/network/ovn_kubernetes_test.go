@@ -4402,6 +4402,74 @@ func TestRenderOVNKubernetes_OpenFlowProbeOverride(t *testing.T) {
 	})
 }
 
+// TestRenderOVNKubernetes_NodeDaemonSetEnvOverridesVolume verifies the
+// ovnkube-node DaemonSet keeps the optional env-overrides ConfigMap mounted so
+// node-specific OVN encapsulation overrides can be sourced at startup.
+func TestRenderOVNKubernetes_NodeDaemonSetEnvOverridesVolume(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+	fillDefaults(config, nil)
+
+	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+		ControlPlaneReplicaCount: 3,
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+				Enabled: false,
+			},
+		},
+	}
+	featureGatesCNO := getDefaultFeatureGates()
+	fakeClient := cnofake.NewFakeClient()
+
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	nodeDS := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+	g.Expect(nodeDS).NotTo(BeNil())
+
+	ds := appsv1.DaemonSet{}
+	g.Expect(convert(nodeDS, &ds)).To(Succeed())
+
+	var envOverridesVolume *v1.Volume
+	for i := range ds.Spec.Template.Spec.Volumes {
+		volume := &ds.Spec.Template.Spec.Volumes[i]
+		if volume.Name == "env-overrides" {
+			envOverridesVolume = volume
+			break
+		}
+	}
+
+	g.Expect(envOverridesVolume).NotTo(BeNil())
+	g.Expect(envOverridesVolume.ConfigMap).NotTo(BeNil())
+	g.Expect(envOverridesVolume.ConfigMap.Name).To(Equal("env-overrides"))
+	g.Expect(envOverridesVolume.ConfigMap.Optional).NotTo(BeNil())
+	g.Expect(*envOverridesVolume.ConfigMap.Optional).To(BeTrue())
+
+	nodeContainer, ok := findContainer(ds.Spec.Template.Spec.Containers, "ovnkube-node")
+	if !ok {
+		nodeContainer, ok = findContainer(ds.Spec.Template.Spec.Containers, "ovnkube-controller")
+	}
+	g.Expect(ok).To(BeTrue(), "expecting container named ovnkube-node or ovnkube-controller in the DaemonSet")
+
+	hasEnvOverridesMount := false
+	for _, mount := range nodeContainer.VolumeMounts {
+		if mount.Name == "env-overrides" && mount.MountPath == "/env" {
+			hasEnvOverridesMount = true
+			break
+		}
+	}
+	g.Expect(hasEnvOverridesMount).To(BeTrue())
+}
+
 func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
 	g := NewGomegaWithT(t)
 
