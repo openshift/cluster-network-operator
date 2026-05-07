@@ -134,7 +134,7 @@ metadata:
 data:
   daemon-config.json: |
     {
-        "cniVersion": "0.3.1",
+        "cniVersion": "1.1.0",
         "chrootDir": "/hostroot",
         "logToStderr": true,
         "logLevel": "verbose",
