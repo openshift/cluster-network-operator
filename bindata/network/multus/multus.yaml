@@ -181,6 +181,22 @@ spec:
       priorityClassName: "system-node-critical"
       tolerations:
       - operator: Exists
+      initContainers:
+      - name: fix-cni-kubeconfig
+        image: {{.MultusImage}}
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          KC="/host/etc/cni/net.d/multus.d/multus.kubeconfig"
+          [ -f "$KC" ] || exit 0
+          if grep -q 'server:.*://\[' "$KC"; then
+            sed -i -E 's|(server: https?://)(\[)([^]]+[^0-9:.])(\])|\1\3|g' "$KC"
+          fi
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: system-cni-dir
+          mountPath: /host/etc/cni/net.d
       containers:
       - name: kube-multus
         image: {{.MultusImage}}
