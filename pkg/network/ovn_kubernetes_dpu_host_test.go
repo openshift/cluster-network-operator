@@ -1,6 +1,7 @@
 package network
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ghodss/yaml"
@@ -355,4 +356,38 @@ func TestOVNKubernetesNodeSelectorOperator(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestOVNKubernetesDPURBAC(t *testing.T) {
+	g := NewGomegaWithT(t)
+	rbacTemplatePath := "../../bindata/network/ovn-kubernetes/dpu-rbac.yaml"
+
+	data := render.MakeRenderData()
+
+	objs, err := render.RenderTemplate(rbacTemplatePath, &data)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	var foundRoleBinding bool
+	for _, obj := range objs {
+		if obj.GetKind() != "RoleBinding" || !strings.HasPrefix(obj.GetName(), "openshift-ovn-kubernetes-node-dpu-service") {
+			continue
+		}
+		foundRoleBinding = true
+		g.Expect(obj.GetName()).To(Equal("openshift-ovn-kubernetes-node-dpu-service-limited"))
+
+		subjects, found, err := uns.NestedSlice(obj.Object, "subjects")
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(found).To(BeTrue())
+		g.Expect(subjects).To(HaveLen(1))
+
+		subj := subjects[0].(map[string]interface{})
+		kind, _, _ := uns.NestedString(subj, "kind")
+		name, _, _ := uns.NestedString(subj, "name")
+		g.Expect(kind).To(Equal("ServiceAccount"))
+		g.Expect(name).To(Equal("ovn-kubernetes-node-dpu-service"))
+
+		roleRefName, _, _ := uns.NestedString(obj.Object, "roleRef", "name")
+		g.Expect(roleRefName).To(Equal("openshift-ovn-kubernetes-node-limited"))
+	}
+	g.Expect(foundRoleBinding).To(BeTrue(), "DPU service RoleBinding should be present")
 }
