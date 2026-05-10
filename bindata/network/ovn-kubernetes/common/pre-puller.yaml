@@ -29,6 +29,7 @@ spec:
       - name: ovnkube-upgrades-prepuller
         image: "{{.OvnImage}}"
         imagePullPolicy: IfNotPresent
+        terminationMessagePolicy: FallbackToLogsOnError
         command:
         - /bin/bash
         - -c
