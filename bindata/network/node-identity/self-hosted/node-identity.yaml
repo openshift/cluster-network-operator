@@ -56,7 +56,6 @@ spec:
                 --webhook-host={{.NetworkNodeIdentityIP}} \
                 --webhook-port={{.NetworkNodeIdentityPort}} \
                 ${ho_enable} \
-                --enable-interconnect \
                 --disable-approver \
                 --extra-allowed-user="system:serviceaccount:openshift-ovn-kubernetes:ovn-kubernetes-control-plane" \
                 --wait-for-kubernetes-api={{.NetworkNodeIdentityTerminationDurationSeconds}}s \
