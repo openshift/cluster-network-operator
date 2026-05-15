@@ -406,6 +406,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// and controls deployment of EVPN runtime components (VTEP CRD, RBAC, FRR containers).
 	data.Data["OVN_EVPN_ENABLE"] = c.RouteAdvertisements == operv1.RouteAdvertisementsEnabled
 	data.Data["OVN_MAC_SECURITY_ENABLE_API"] = featureGates.Enabled(apifeatures.FeatureGateMACSecurity)
+	data.Data["OVN_NOOVERLAY_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateNoOverlayMode)
 
 	data.Data["ReachabilityTotalTimeoutSeconds"] = c.EgressIPConfig.ReachabilityTotalTimeoutSeconds
 
