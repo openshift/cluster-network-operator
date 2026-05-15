@@ -135,7 +135,6 @@ spec:
                 --webhook-host="" \
                 --webhook-port={{.NetworkNodeIdentityPort}} \
                 ${ho_enable} \
-                --enable-interconnect \
                 --disable-approver \
                 --extra-allowed-user="system:serviceaccount:openshift-ovn-kubernetes:ovn-kubernetes-control-plane" \
                 --pod-admission-conditions="/var/run/ovnkube-identity-config/additional-pod-admission-cond.json" \
