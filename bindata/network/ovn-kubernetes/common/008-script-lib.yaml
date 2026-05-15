@@ -774,7 +774,6 @@ data:
         ${network_observability_enabled_flag} \
         ${enable_multicast_flag} \
         --zone ${K8S_NODE} \
-        --enable-interconnect \
         --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}" \
         ${gw_interface_flag} \
         ${ip_forwarding_flag} \
