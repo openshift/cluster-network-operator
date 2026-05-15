@@ -747,6 +747,12 @@ data:
         ovn_v6_transit_switch_subnet_opt="--cluster-manager-v6-transit-subnet {{.V6TransitSwitchSubnet}}"
       fi
 
+      # DROP: remove when older OVN-K images that require --enable-interconnect are no longer supported
+      enable_interconnect_flag=
+      if /usr/bin/ovnkube --help 2>&1 | grep -q -- '--enable-interconnect'; then
+        enable_interconnect_flag="--enable-interconnect"
+      fi
+
       exec /usr/bin/ovnkube \
         ${init_ovnkube_controller} \
         --init-node "${K8S_NODE}" \
@@ -774,6 +780,7 @@ data:
         ${network_observability_enabled_flag} \
         ${enable_multicast_flag} \
         --zone ${K8S_NODE} \
+        ${enable_interconnect_flag} \
         --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}" \
         ${gw_interface_flag} \
         ${ip_forwarding_flag} \

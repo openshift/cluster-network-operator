@@ -176,8 +176,15 @@ spec:
             exit 1
           fi
 
+          # DROP: remove when older OVN-K images that require --enable-interconnect are no longer supported
+          enable_interconnect_flag=
+          if /usr/bin/ovnkube --help 2>&1 | grep -q -- '--enable-interconnect'; then
+            enable_interconnect_flag="--enable-interconnect"
+          fi
+
           echo "I$(date "+%m%d %H:%M:%S.%N") - ovnkube-control-plane - start ovnkube --init-cluster-manager ${K8S_NODE}"
           exec /usr/bin/ovnkube \
+            ${enable_interconnect_flag} \
             --init-cluster-manager "${K8S_NODE}" \
             --config-file=/run/ovnkube-config/ovnkube.conf \
             --loglevel "${OVN_KUBE_LOG_LEVEL}" \
