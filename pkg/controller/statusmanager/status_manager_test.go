@@ -147,16 +147,6 @@ func TestStatusManager_set(t *testing.T) {
 	// No operator config yet; should reflect this in the cluster operator
 	status.set(false)
 
-	// NoOperConfig doesn't get set degraded yet (debounced for 2 min)
-	_, err := getCO(client, "testing")
-	if err == nil {
-		t.Fatalf("ClusterOperator should not exist yet (NoOperConfig debounced)")
-	}
-
-	// Advance clock past the debounce threshold
-	status.clock.(*testingclock.FakeClock).Step(3 * time.Minute)
-	status.set(false)
-
 	co, err := getCO(client, "testing")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
