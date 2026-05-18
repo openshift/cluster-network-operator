@@ -24,17 +24,6 @@ const HostedClusterDefaultAdvertiseAddressIPV6 = "fd00::1"
 
 const HostedClusterDefaultAdvertisePort = int64(6443)
 
-var (
-	enabled           = os.Getenv("HYPERSHIFT")
-	name              = os.Getenv("HOSTED_CLUSTER_NAME")
-	namespace         = os.Getenv("HOSTED_CLUSTER_NAMESPACE")
-	runAsUser         = os.Getenv("RUN_AS_USER")
-	releaseImage      = os.Getenv("OPENSHIFT_RELEASE_IMAGE")
-	controlPlaneImage = os.Getenv("OVN_CONTROL_PLANE_IMAGE")
-	caConfigMap       = os.Getenv("CA_CONFIG_MAP")
-	caConfigMapKey    = os.Getenv("CA_CONFIG_MAP_KEY")
-)
-
 const (
 	// ClusterIDLabel (_id) is the common label used to identify clusters in telemeter.
 	// For hypershift, it will identify metrics produced by the both the control plane
@@ -104,28 +93,26 @@ type HyperShiftConfig struct {
 }
 
 func NewHyperShiftConfig() *HyperShiftConfig {
+	caConfigMap := os.Getenv("CA_CONFIG_MAP")
 	if caConfigMap == "" {
 		caConfigMap = "openshift-service-ca.crt"
 	}
 
+	caConfigMapKey := os.Getenv("CA_CONFIG_MAP_KEY")
 	if caConfigMapKey == "" {
 		caConfigMapKey = "service-ca.crt"
 	}
 
 	return &HyperShiftConfig{
-		Enabled:           hyperShiftEnabled(),
-		Name:              name,
-		Namespace:         namespace,
-		RunAsUser:         runAsUser,
-		ReleaseImage:      releaseImage,
-		ControlPlaneImage: controlPlaneImage,
+		Enabled:           os.Getenv("HYPERSHIFT") == "true",
+		Name:              os.Getenv("HOSTED_CLUSTER_NAME"),
+		Namespace:         os.Getenv("HOSTED_CLUSTER_NAMESPACE"),
+		RunAsUser:         os.Getenv("RUN_AS_USER"),
+		ReleaseImage:      os.Getenv("OPENSHIFT_RELEASE_IMAGE"),
+		ControlPlaneImage: os.Getenv("OVN_CONTROL_PLANE_IMAGE"),
 		CAConfigMap:       caConfigMap,
 		CAConfigMapKey:    caConfigMapKey,
 	}
-}
-
-func hyperShiftEnabled() bool {
-	return enabled == "true"
 }
 
 func (hc *HyperShiftConfig) SetRelatedObjects(relatedObjects []RelatedObject) {
