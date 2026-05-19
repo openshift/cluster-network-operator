@@ -39,7 +39,7 @@ data:
     UPGRADE_DIRECTORY=${DESTINATION_DIRECTORY}upgrade_$(uuidgen)
     rm -Rf $UPGRADE_DIRECTORY
     mkdir -p $UPGRADE_DIRECTORY
-    cp -r --remove-destination ${sourcedir}* $UPGRADE_DIRECTORY
+    find "${sourcedir}" -maxdepth 1 -mindepth 1 ! -type d -exec cp --remove-destination {} "${UPGRADE_DIRECTORY}/" \;
     if [ $? -eq 0 ]; then
       log "Successfully copied files in ${sourcedir} to $UPGRADE_DIRECTORY"
     else
