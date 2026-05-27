@@ -575,6 +575,11 @@ data:
 
       echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node"
 
+      ovn_eip_reachability_timeout_opt=
+      {{- if .ReachabilityTotalTimeoutSeconds }}        
+        ovn_eip_reachability_timeout_opt="--egressip-reachability-total-timeout {{.ReachabilityTotalTimeoutSeconds}}"
+      {{ end }}
+
       init_ovnkube_controller="--init-ovnkube-controller ${K8S_NODE}"
       gateway_interface="br-ex"
       OVN_NODE_MODE=${OVN_NODE_MODE:-full}
@@ -754,5 +759,6 @@ data:
         ${ovn_v6_masquerade_subnet_opt} \
         ${ovn_v4_transit_switch_subnet_opt} \
         ${ovn_v6_transit_switch_subnet_opt} \
-        ${dpu_lease_flags}
+        ${dpu_lease_flags} \
+        ${ovn_eip_reachability_timeout_opt}
     }
