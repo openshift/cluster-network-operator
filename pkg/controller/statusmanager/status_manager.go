@@ -473,13 +473,6 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 		}
 
 		if operStatus == nil {
-			if _, exists := status.failureFirstSeen[OperatorConfig]; !exists {
-				status.failureFirstSeen[OperatorConfig] = status.clock.Now()
-				return nil
-			}
-			if status.clock.Since(status.failureFirstSeen[OperatorConfig]) < degradedFailureDurationThreshold {
-				return nil
-			}
 			cohelpers.SetStatusCondition(&co.Status.Conditions, configv1.ClusterOperatorStatusCondition{
 				Type:    configv1.OperatorDegraded,
 				Status:  configv1.ConditionTrue,
@@ -487,7 +480,6 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 				Message: "Failed to get networks.operator.openshift.io cluster",
 			}, clock.RealClock{})
 		} else {
-			delete(status.failureFirstSeen, OperatorConfig)
 			if reachedAvailableLevel {
 				co.Status.Versions = []configv1.OperandVersion{
 					{Name: "operator", Version: operStatus.Version},
