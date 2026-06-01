@@ -94,18 +94,19 @@ func (status *StatusManager) SetFromPods() {
 	for _, ds := range daemonSets {
 		dsName := NewClusteredName(ds)
 		dsState, hadState := daemonsetStates[dsName]
-		dsRolloutActive := !status.installComplete || ds.Status.UpdatedNumberScheduled < ds.Status.CurrentNumberScheduled
+		dsRolloutPending := ds.Generation > ds.Status.ObservedGeneration
+		dsRolloutActive := !status.installComplete || dsRolloutPending || (hadState && ds.Status.UpdatedNumberScheduled < ds.Status.CurrentNumberScheduled)
 
 		dsProgressing := false
 
 		if isNonCritical(ds) && ds.Status.NumberReady == 0 && !status.installComplete {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is waiting for other operators to become ready", dsName.String()))
 			dsProgressing = true
-		} else if ds.Status.UpdatedNumberScheduled < ds.Status.CurrentNumberScheduled {
+		} else if ds.Status.UpdatedNumberScheduled < ds.Status.CurrentNumberScheduled && dsRolloutActive {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q update is rolling out (%d out of %d updated)", dsName.String(), ds.Status.UpdatedNumberScheduled, ds.Status.CurrentNumberScheduled))
 			dsProgressing = true
 		} else if ds.Status.NumberUnavailable > 0 {
-			if dsRolloutActive {
+			if dsRolloutActive || hadState {
 				progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not available (awaiting %d nodes)", dsName.String(), ds.Status.NumberUnavailable))
 				dsProgressing = true
 			}
@@ -123,7 +124,8 @@ func (status *StatusManager) SetFromPods() {
 
 		var dsHung *string
 
-		if dsProgressing && !isNonCritical(ds) {
+		trackDSRollout := (dsProgressing && !isNonCritical(ds)) || dsRolloutPending
+		if trackDSRollout {
 			reachedAvailableLevel = false
 
 			if !hadState || !reflect.DeepEqual(dsState.LastSeenStatus, ds.Status) {
@@ -132,13 +134,13 @@ func (status *StatusManager) SetFromPods() {
 			}
 
 			// Catch hung rollouts
-			if hadState && (time.Since(dsState.LastChangeTime)) > ProgressTimeout {
+			if dsProgressing && !isNonCritical(ds) && hadState && (time.Since(dsState.LastChangeTime)) > ProgressTimeout {
 				hung = append(hung, fmt.Sprintf("DaemonSet %q rollout is not making progress - last change %s", dsName.String(), dsState.LastChangeTime.Format(time.RFC3339)))
 				empty := ""
 				dsHung = &empty
 			}
 		}
-		if dsProgressing && !isNonCritical(ds) {
+		if trackDSRollout {
 			daemonsetStates[dsName] = dsState
 		} else {
 			delete(daemonsetStates, dsName)
