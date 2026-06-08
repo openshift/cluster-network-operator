@@ -481,25 +481,81 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// daemonsets need to know when those ConfigMaps change so they can
 	// restart with the new options. Render those ConfigMaps first and
 	// embed a hash of their data into the ovnkube-node daemonsets.
+	//
+	// To avoid spurious DaemonSet rollouts during install (when the CNO
+	// reconciles multiple times in quick succession and template inputs
+	// may resolve differently), we compare the rendered ConfigMap .data
+	// against the deployed ConfigMap .data. If they match, we preserve
+	// the existing hash from the DaemonSet annotation rather than
+	// recomputing it. This prevents a DaemonSet generation bump (and
+	// thus a rolling update) when the ConfigMap content hasn't actually
+	// changed. See OCPBUGS-87818 for details.
 	h := sha1.New()
+	var renderedCMData map[string]interface{}
 	for _, path := range cmPaths {
 		manifests, err := render.RenderTemplate(path, &data)
 		if err != nil {
 			return nil, progressing, errors.Wrapf(err, "failed to render ConfigMap template %q", path)
 		}
 
-		// Hash each rendered ConfigMap object's data
+		// Hash only the .data section of each rendered ConfigMap to avoid
+		// instability from metadata differences across reconciliation passes.
 		for _, m := range manifests {
-			bytes, err := json.Marshal(m)
+			cmData, _, _ := uns.NestedMap(m.Object, "data")
+			if cmData == nil {
+				cmData = map[string]interface{}{}
+			}
+			// Remember the rendered .data for comparison with the deployed ConfigMap.
+			if renderedCMData == nil {
+				renderedCMData = cmData
+			}
+			bytes, err := json.Marshal(cmData)
 			if err != nil {
-				return nil, progressing, errors.Wrapf(err, "failed to marshal ConfigMap %q manifest", path)
+				return nil, progressing, errors.Wrapf(err, "failed to marshal ConfigMap %q data", path)
 			}
 			if _, err := h.Write(bytes); err != nil {
 				return nil, progressing, errors.Wrapf(err, "failed to hash ConfigMap %q data", path)
 			}
 		}
 	}
-	data.Data["OVNKubeConfigHash"] = hex.EncodeToString(h.Sum(nil))
+	newHash := hex.EncodeToString(h.Sum(nil))
+
+	// Preserve the existing DaemonSet hash annotation if the deployed ConfigMap
+	// content matches the rendered content. This avoids unnecessary rolling
+	// updates caused by template rendering instability during bootstrap.
+	configHash := newHash
+	existingCM := &corev1.ConfigMap{}
+	if err := client.Default().CRClient().Get(context.TODO(),
+		types.NamespacedName{Name: "ovnkube-script-lib", Namespace: util.OVN_NAMESPACE}, existingCM); err == nil {
+		// ConfigMap exists — compare .data with the rendered content.
+		existingDataMatch := true
+		if renderedCMData != nil {
+			for key, renderedVal := range renderedCMData {
+				if existingCM.Data[key] != fmt.Sprintf("%v", renderedVal) {
+					existingDataMatch = false
+					break
+				}
+			}
+			if len(existingCM.Data) != len(renderedCMData) {
+				existingDataMatch = false
+			}
+		}
+		if existingDataMatch {
+			// The deployed ConfigMap already has the same content.
+			// Look up the existing DaemonSet annotation to preserve the hash.
+			existingDS := &appsv1.DaemonSet{}
+			if err := client.Default().CRClient().Get(context.TODO(),
+				types.NamespacedName{Name: "ovnkube-node", Namespace: util.OVN_NAMESPACE}, existingDS); err == nil {
+				if ann := existingDS.Spec.Template.Annotations; ann != nil {
+					if existingHash, ok := ann["network.operator.openshift.io/ovnkube-script-lib-hash"]; ok && existingHash != "" {
+						klog.V(4).Infof("Preserving existing ovnkube-script-lib-hash %q (deployed ConfigMap data matches rendered data)", existingHash)
+						configHash = existingHash
+					}
+				}
+			}
+		}
+	}
+	data.Data["OVNKubeConfigHash"] = configHash
 
 	// Compute a separate hash for no-overlay node config (outboundSNAT).
 	// This allows ovnkube-node to restart when outboundSNAT changes
