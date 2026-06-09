@@ -447,3 +447,119 @@ func TestOVNKubernetesNodeSelectorOperator(t *testing.T) {
 		}
 	}
 }
+
+func TestDpuHostModeResourceCount(t *testing.T) {
+	templates := []struct {
+		name         string
+		templatePath string
+	}{
+		{
+			name:         "managed",
+			templatePath: "../../bindata/network/ovn-kubernetes/managed/ovnkube-node.yaml",
+		},
+		{
+			name:         "self-hosted",
+			templatePath: "../../bindata/network/ovn-kubernetes/self-hosted/ovnkube-node.yaml",
+		},
+	}
+
+	tests := []struct {
+		name                  string
+		ovnNodeMode           string
+		mgmtPortResourceName  string
+		mgmtPortResourceCount string
+		expectResource        bool
+		expectedCount         string
+	}{
+		{
+			name:                  "dpu-host with resource count 8",
+			ovnNodeMode:           "dpu-host",
+			mgmtPortResourceName:  "openshift.io/mgmtvf",
+			mgmtPortResourceCount: "8",
+			expectResource:        true,
+			expectedCount:         "8",
+		},
+		{
+			name:                  "dpu-host with resource count 16",
+			ovnNodeMode:           "dpu-host",
+			mgmtPortResourceName:  "openshift.io/mgmtvf",
+			mgmtPortResourceCount: "16",
+			expectResource:        true,
+			expectedCount:         "16",
+		},
+		{
+			name:                  "dpu-host without resource name",
+			ovnNodeMode:           "dpu-host",
+			mgmtPortResourceName:  "",
+			mgmtPortResourceCount: "0",
+			expectResource:        false,
+		},
+		{
+			name:                  "smart-nic with resource - should use configured count",
+			ovnNodeMode:           "smart-nic",
+			mgmtPortResourceName:  "openshift.io/mgmtvf",
+			mgmtPortResourceCount: "8",
+			expectResource:        true,
+			expectedCount:         "8",
+		},
+		{
+			name:                  "full mode - no resource set",
+			ovnNodeMode:           "full",
+			mgmtPortResourceName:  "openshift.io/mgmtvf",
+			mgmtPortResourceCount: "8",
+			expectResource:        false,
+		},
+	}
+
+	for _, template := range templates {
+		for _, tc := range tests {
+			testName := template.name + "_" + tc.name
+			t.Run(testName, func(t *testing.T) {
+				g := NewGomegaWithT(t)
+
+				data := createTestRenderData(tc.ovnNodeMode)
+				data.Data["MgmtPortResourceName"] = tc.mgmtPortResourceName
+				data.Data["MgmtPortResourceCount"] = tc.mgmtPortResourceCount
+
+				objs, err := render.RenderTemplate(template.templatePath, &data)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(objs).To(HaveLen(1))
+
+				yamlBytes, err := yaml.Marshal(objs[0])
+				g.Expect(err).NotTo(HaveOccurred())
+
+				ds := &appsv1.DaemonSet{}
+				err = yaml.Unmarshal(yamlBytes, ds)
+				g.Expect(err).NotTo(HaveOccurred())
+
+				// Find the ovnkube-controller container
+				var ovnkubeController *corev1.Container
+				for i := range ds.Spec.Template.Spec.Containers {
+					if ds.Spec.Template.Spec.Containers[i].Name == "ovnkube-controller" {
+						ovnkubeController = &ds.Spec.Template.Spec.Containers[i]
+						break
+					}
+				}
+				g.Expect(ovnkubeController).NotTo(BeNil(), "ovnkube-controller container should exist")
+
+				resourceName := corev1.ResourceName(tc.mgmtPortResourceName)
+				if tc.expectResource {
+					reqQty, found := ovnkubeController.Resources.Requests[resourceName]
+					g.Expect(found).To(BeTrue(), "resource request should be set")
+					g.Expect(reqQty.String()).To(Equal(tc.expectedCount))
+
+					limQty, found := ovnkubeController.Resources.Limits[resourceName]
+					g.Expect(found).To(BeTrue(), "resource limit should be set")
+					g.Expect(limQty.String()).To(Equal(tc.expectedCount))
+				} else {
+					if tc.mgmtPortResourceName != "" {
+						_, found := ovnkubeController.Resources.Requests[resourceName]
+						g.Expect(found).To(BeFalse(), "resource request should not be set")
+						_, found = ovnkubeController.Resources.Limits[resourceName]
+						g.Expect(found).To(BeFalse(), "resource limit should not be set")
+					}
+				}
+			})
+		}
+	}
+}
