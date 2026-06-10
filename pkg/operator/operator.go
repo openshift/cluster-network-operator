@@ -28,6 +28,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller"
 	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
+	tlscontroller "github.com/openshift/cluster-network-operator/pkg/controller/tls"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 
@@ -47,7 +48,8 @@ type Operator struct {
 
 var logger = klog.NewKlogr()
 
-func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, inClusterClientName string, extraClusters map[string]string) error {
+func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, inClusterClientName string,
+	extraClusters map[string]string, triggerRestart context.CancelFunc) error {
 	o := &Operator{}
 
 	var err error
@@ -144,6 +146,12 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	klog.Info("Adding controller-runtime controllers")
 	if err := controller.AddToManager(o.manager, o.StatusManager, o.client, featureGates); err != nil {
 		return fmt.Errorf("failed to add controllers to manager: %w", err)
+	}
+
+	// Add TLS restart controller
+	klog.Info("Adding TLS restart controller")
+	if err := tlscontroller.Add(o.manager, o.client, triggerRestart); err != nil {
+		return fmt.Errorf("failed to add TLS restart controller: %w", err)
 	}
 
 	// Initialize individual (non-controller-runtime) controllers

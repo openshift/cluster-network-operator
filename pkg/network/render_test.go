@@ -3,15 +3,15 @@ package network
 import (
 	"fmt"
 	"reflect"
+	"testing"
 
 	. "github.com/onsi/gomega"
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+	openshifttls "github.com/openshift/controller-runtime-common/pkg/tls"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/kubernetes/scheme"
-
-	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
 	apifeatures "github.com/openshift/api/features"
@@ -332,7 +332,10 @@ func TestRenderUnknownNetwork(t *testing.T) {
 		},
 	}
 
-	client := fake.NewFakeClient(infrastructure)
+	client := fake.NewFakeClient(infrastructure, &configv1.APIServer{
+		ObjectMeta: metav1.ObjectMeta{Name: openshifttls.APIServerName},
+	})
+
 	err := createProxy(client)
 	g.Expect(err).NotTo(HaveOccurred())
 
