@@ -101,6 +101,7 @@ type BootstrapResult struct {
 
 	OVN             OVNBootstrapResult
 	IPTablesAlerter IPTablesAlerterBootstrapResult
+	TLSProfile      TLSProfile
 }
 
 type InfraStatus struct {
@@ -175,4 +176,9 @@ type FlowsConfig struct {
 
 	// Sampling is the sampling rate on the reporter. 100 means one flow on 100 is sent. 0 means disabled.
 	Sampling *uint
+}
+
+type TLSProfile struct {
+	Spec      configv1.TLSProfileSpec
+	Adherence configv1.TLSAdherencePolicy
 }

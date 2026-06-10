@@ -26,7 +26,7 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-proxy v0.35.2
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
-	sigs.k8s.io/controller-runtime v0.23.1
+	sigs.k8s.io/controller-runtime v0.23.3
 )
 
 require (
@@ -102,9 +102,11 @@ require (
 require (
 	github.com/openshift/api v0.0.0-20260609121705-d3390bd1109f
 	github.com/openshift/client-go v0.0.0-20260603140539-6892dc3e1ffc
-	github.com/openshift/library-go v0.0.0-20260303171201-5d9eb6295ff6
+	github.com/openshift/controller-runtime-common v0.0.0-20260428152732-64ee174f5e2e
+	github.com/openshift/library-go v0.0.0-20260318140748-04979c746b4d
 	github.com/openshift/machine-config-operator v0.0.1-0.20250724162154-ab14c8e2843b
 	k8s.io/apiextensions-apiserver v0.35.2
+	k8s.io/apiserver v0.35.2
 	k8s.io/client-go v0.35.2
 	sigs.k8s.io/controller-tools v0.20.1
 )
@@ -140,7 +142,6 @@ require (
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/onsi/ginkgo/v2 v2.28.1 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
@@ -154,7 +155,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
-	k8s.io/apiserver v0.35.2 // indirect
 	k8s.io/gengo/v2 v2.0.0-20251215205346-5ee0d033ba5b // indirect
 	k8s.io/kms v0.35.2 // indirect
 	k8s.io/kube-aggregator v0.35.1 // indirect
