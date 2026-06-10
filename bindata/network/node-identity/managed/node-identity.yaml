@@ -145,6 +145,12 @@ spec:
                 --disable-approver \
                 --extra-allowed-user="system:serviceaccount:openshift-ovn-kubernetes:ovn-kubernetes-control-plane" \
                 --pod-admission-conditions="/var/run/ovnkube-identity-config/additional-pod-admission-cond.json" \
+             {{- if .UseTLSProfile }}
+                --tls-min-version={{.TLSMinVersion}} \
+             {{- if .TLSCipherSuites }}
+                --tls-cipher-suites={{.TLSCipherSuites}} \
+             {{- end }}
+             {{- end }}
                 --loglevel="${LOGLEVEL}"
         env:
           - name: LOGLEVEL
