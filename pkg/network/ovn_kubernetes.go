@@ -2,10 +2,10 @@ package network
 
 import (
 	"context"
-	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"log"
 	"math"
 	"math/big"
@@ -483,29 +483,110 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// daemonsets need to know when those ConfigMaps change so they can
 	// restart with the new options. Render those ConfigMaps first and
 	// embed a hash of their data into the ovnkube-node daemonsets.
-	h := sha1.New()
+	//
+	// To avoid spurious DaemonSet rollouts during install (when the CNO
+	// reconciles multiple times in quick succession and template inputs
+	// may resolve differently), we compare the rendered ConfigMap .data
+	// against the deployed ConfigMap .data. If they match, we preserve
+	// the existing hash from the DaemonSet annotation rather than
+	// recomputing it. This prevents a DaemonSet generation bump (and
+	// thus a rolling update) when the ConfigMap content hasn't actually
+	// changed. See OCPBUGS-87818 for details.
+	h := fnv.New128a()
+	// renderedScriptLibData stores the rendered .data for the ovnkube-script-lib
+	// ConfigMap specifically, so we can compare it against the deployed version.
+	var renderedScriptLibData map[string]interface{}
 	for _, path := range cmPaths {
 		manifests, err := render.RenderTemplate(path, &data)
 		if err != nil {
 			return nil, progressing, errors.Wrapf(err, "failed to render ConfigMap template %q", path)
 		}
 
-		// Hash each rendered ConfigMap object's data
+		// Hash only the .data section of each rendered ConfigMap to avoid
+		// instability from metadata differences across reconciliation passes.
 		for _, m := range manifests {
-			bytes, err := json.Marshal(m)
+			cmData, found, err := uns.NestedMap(m.Object, "data")
 			if err != nil {
-				return nil, progressing, errors.Wrapf(err, "failed to marshal ConfigMap %q manifest", path)
+				return nil, progressing, errors.Wrapf(err, "failed to read rendered ConfigMap %q data", path)
+			}
+			if !found {
+				return nil, progressing, errors.Errorf("rendered ConfigMap %q is missing .data", path)
+			}
+			if cmData == nil {
+				cmData = map[string]interface{}{}
+			}
+			// Track the rendered .data for the ovnkube-script-lib ConfigMap
+			// so we can compare it with the deployed version below.
+			if m.GetName() == "ovnkube-script-lib" {
+				renderedScriptLibData = cmData
+			}
+			bytes, err := json.Marshal(cmData)
+			if err != nil {
+				return nil, progressing, errors.Wrapf(err, "failed to marshal ConfigMap %q data", path)
 			}
 			if _, err := h.Write(bytes); err != nil {
 				return nil, progressing, errors.Wrapf(err, "failed to hash ConfigMap %q data", path)
 			}
 		}
 	}
-	data.Data["OVNKubeConfigHash"] = hex.EncodeToString(h.Sum(nil))
+	newHash := hex.EncodeToString(h.Sum(nil))
+
+	// Preserve the existing DaemonSet hash annotation if the deployed ConfigMap
+	// content matches the rendered content. This avoids unnecessary rolling
+	// updates caused by template rendering instability during bootstrap.
+	configHash := newHash
+	existingCM := &corev1.ConfigMap{}
+	if err := client.Default().CRClient().Get(context.TODO(),
+		types.NamespacedName{Name: "ovnkube-script-lib", Namespace: util.OVN_NAMESPACE}, existingCM); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, progressing, errors.Wrap(err, "failed to fetch deployed ovnkube-script-lib ConfigMap")
+		}
+	} else {
+		// ConfigMap exists — compare .data with the rendered content.
+		// ConfigMap .data is map[string]string, and the rendered unstructured
+		// .data values should also be strings. Use a type assertion to avoid
+		// masking malformed rendered output.
+		existingDataMatch := renderedScriptLibData != nil && len(existingCM.Data) == len(renderedScriptLibData)
+		if existingDataMatch {
+			for key, renderedVal := range renderedScriptLibData {
+				renderedStr, ok := renderedVal.(string)
+				if !ok {
+					// Rendered value is not a string — treat as a mismatch
+					// so we don't incorrectly preserve a stale hash.
+					existingDataMatch = false
+					break
+				}
+				existingVal, exists := existingCM.Data[key]
+				if !exists || existingVal != renderedStr {
+					existingDataMatch = false
+					break
+				}
+			}
+		}
+		if existingDataMatch {
+			// The deployed ConfigMap already has the same content.
+			// Look up the existing DaemonSet annotation to preserve the hash.
+			existingDS := &appsv1.DaemonSet{}
+			if err := client.Default().CRClient().Get(context.TODO(),
+				types.NamespacedName{Name: "ovnkube-node", Namespace: util.OVN_NAMESPACE}, existingDS); err != nil {
+				if !apierrors.IsNotFound(err) {
+					return nil, progressing, errors.Wrap(err, "failed to fetch existing ovnkube-node DaemonSet")
+				}
+			} else {
+				if ann := existingDS.Spec.Template.Annotations; ann != nil {
+					if existingHash, ok := ann["network.operator.openshift.io/ovnkube-script-lib-hash"]; ok && existingHash != "" {
+						klog.V(4).Infof("Preserving existing ovnkube-script-lib-hash %q (deployed ConfigMap data matches rendered data)", existingHash)
+						configHash = existingHash
+					}
+				}
+			}
+		}
+	}
+	data.Data["OVNKubeConfigHash"] = configHash
 
 	// Compute a separate hash for no-overlay node config (outboundSNAT).
 	// This allows ovnkube-node to restart when outboundSNAT changes
-	nodeNoOverlayHash := sha1.New()
+	nodeNoOverlayHash := fnv.New128a()
 	nodeNoOverlayHashData := fmt.Sprintf("outboundSNAT=%v", data.Data["NoOverlayOutboundSNAT"])
 	if _, err := nodeNoOverlayHash.Write([]byte(nodeNoOverlayHashData)); err != nil {
 		return nil, progressing, errors.Wrap(err, "failed to hash node no-overlay config")
@@ -515,7 +596,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// Compute a separate hash for control-plane config (bgpManagedConfig).
 	// This allows ovnkube-control-plane to restart when bgpManagedConfig changes,
 	// without restarting ovnkube-node pods.
-	cpHash := sha1.New()
+	cpHash := fnv.New128a()
 	cpHashData := fmt.Sprintf("asNumber=%v,topology=%v",
 		data.Data["NoOverlayManagedASNumber"],
 		data.Data["NoOverlayManagedTopology"])

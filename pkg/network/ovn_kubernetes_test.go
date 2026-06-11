@@ -5006,3 +5006,174 @@ func extractDaemonSetEnvVars(g *WithT, objs []*uns.Unstructured, dsName, contain
 	g.Expect(true).To(BeFalse(), "could not find DaemonSet %s with container %s", dsName, containerName)
 	return envVars
 }
+
+// getOVNKubeConfigHashFromObjs extracts the ovnkube-script-lib-hash from the
+// rendered ovnkube-node DaemonSet's pod template annotations.
+func getOVNKubeConfigHashFromObjs(objs []*uns.Unstructured) string {
+	for _, obj := range objs {
+		if obj.GetKind() == "DaemonSet" && obj.GetName() == "ovnkube-node" {
+			ann, found, err := uns.NestedStringMap(obj.Object, "spec", "template", "metadata", "annotations")
+			if err != nil || !found || ann == nil {
+				continue
+			}
+			if hash, ok := ann["network.operator.openshift.io/ovnkube-script-lib-hash"]; ok {
+				return hash
+			}
+		}
+	}
+	return ""
+}
+
+// testOVNBootstrapResult returns a standard OVN bootstrap result for hash tests.
+func testOVNBootstrapResult() *bootstrap.BootstrapResult {
+	result := fakeBootstrapResult()
+	result.OVN = bootstrap.OVNBootstrapResult{
+		ControlPlaneReplicaCount: 3,
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			MgmtPortResourceName:      "",
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+				Enabled: false,
+			},
+		},
+	}
+	return result
+}
+
+// TestOVNKubeConfigHashPreservedWhenDataUnchanged verifies that when the
+// deployed ovnkube-script-lib ConfigMap .data matches the rendered .data,
+// the existing DaemonSet hash annotation is preserved — even if it differs
+// from the newly computed hash (which is the scenario this fix targets).
+func TestOVNKubeConfigHashPreservedWhenDataUnchanged(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+	fillDefaults(config, nil)
+	bootstrapResult := testOVNBootstrapResult()
+	featureGatesCNO := getDefaultFeatureGates()
+
+	// First render: no pre-existing ConfigMap or DaemonSet in the cluster.
+	fakeClient := cnofake.NewFakeClient()
+	objs1, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	g.Expect(err).NotTo(HaveOccurred(), "first render of OVNKubernetes should succeed")
+	hash1 := getOVNKubeConfigHashFromObjs(objs1)
+	g.Expect(hash1).NotTo(BeEmpty(), "expected OVNKubeConfigHash to be set on first render")
+
+	// Extract the rendered ConfigMap, then create a DaemonSet in the cluster
+	// with a DIFFERENT hash annotation (simulating the scenario where the CNO
+	// previously computed a different hash for the same ConfigMap content).
+	var renderedCM *v1.ConfigMap
+	for _, obj := range objs1 {
+		if obj.GetKind() == "ConfigMap" && obj.GetName() == "ovnkube-script-lib" {
+			raw, err := json.Marshal(obj.Object)
+			g.Expect(err).NotTo(HaveOccurred(), "failed to marshal rendered ovnkube-script-lib ConfigMap")
+			renderedCM = &v1.ConfigMap{}
+			g.Expect(json.Unmarshal(raw, renderedCM)).NotTo(HaveOccurred(), "failed to unmarshal rendered ovnkube-script-lib ConfigMap")
+		}
+	}
+	g.Expect(renderedCM).NotTo(BeNil(), "rendered objects should contain ovnkube-script-lib ConfigMap")
+
+	// Deploy the ConfigMap with the same .data, but a DaemonSet with a
+	// DIFFERENT hash — this is the exact scenario during install where
+	// the first reconciliation produced hash A and we want to preserve it
+	// on the second reconciliation (which would compute hash B).
+	const existingHashValue = "previously-computed-hash-from-first-reconciliation"
+	existingDS := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ovnkube-node",
+			Namespace: "openshift-ovn-kubernetes",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "ovnkube-node"}},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "ovnkube-node"},
+					Annotations: map[string]string{
+						"network.operator.openshift.io/ovnkube-script-lib-hash": existingHashValue,
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "placeholder", Image: "placeholder"}},
+				},
+			},
+		},
+	}
+
+	fakeClient2 := cnofake.NewFakeClient(renderedCM, existingDS)
+	objs2, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient2, featureGatesCNO)
+	g.Expect(err).NotTo(HaveOccurred(), "second render with pre-existing ConfigMap and DaemonSet should succeed")
+	hash2 := getOVNKubeConfigHashFromObjs(objs2)
+	g.Expect(hash2).NotTo(BeEmpty(), "OVNKubeConfigHash should be set on second render")
+	// The key assertion: the existing hash is preserved because the deployed
+	// ConfigMap .data matches the rendered .data, even though the newly
+	// computed hash would be different.
+	g.Expect(hash2).To(Equal(existingHashValue),
+		"hash should be preserved from existing DaemonSet annotation when deployed ConfigMap data matches rendered data")
+	g.Expect(hash2).NotTo(Equal(hash1),
+		"this test should use a different existing hash to prove the preservation path is exercised")
+}
+
+// TestOVNKubeConfigHashChangesWhenDataDiffers verifies that when the deployed
+// ovnkube-script-lib ConfigMap .data differs from the rendered .data, a new
+// hash is computed (legitimate rollout).
+func TestOVNKubeConfigHashChangesWhenDataDiffers(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+	fillDefaults(config, nil)
+	bootstrapResult := testOVNBootstrapResult()
+	featureGatesCNO := getDefaultFeatureGates()
+
+	// First render to get the expected hash.
+	fakeClient := cnofake.NewFakeClient()
+	objs1, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	g.Expect(err).NotTo(HaveOccurred(), "first render of OVNKubernetes should succeed")
+	hash1 := getOVNKubeConfigHashFromObjs(objs1)
+	g.Expect(hash1).NotTo(BeEmpty(), "OVNKubeConfigHash should be set on first render")
+
+	// Create a stale ConfigMap with different .data in the cluster,
+	// along with a DaemonSet that has the old hash.
+	staleCM := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ovnkube-script-lib",
+			Namespace: "openshift-ovn-kubernetes",
+		},
+		Data: map[string]string{
+			"ovnkube-lib.sh": "#!/bin/bash\n# stale content that does not match the rendered template",
+		},
+	}
+	staleDS := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ovnkube-node",
+			Namespace: "openshift-ovn-kubernetes",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "ovnkube-node"}},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "ovnkube-node"},
+					Annotations: map[string]string{
+						"network.operator.openshift.io/ovnkube-script-lib-hash": "stale-hash-value",
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "placeholder", Image: "placeholder"}},
+				},
+			},
+		},
+	}
+
+	fakeClient2 := cnofake.NewFakeClient(staleCM, staleDS)
+	objs2, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient2, featureGatesCNO)
+	g.Expect(err).NotTo(HaveOccurred(), "render with stale ConfigMap should succeed")
+	hash2 := getOVNKubeConfigHashFromObjs(objs2)
+	g.Expect(hash2).NotTo(BeEmpty(), "OVNKubeConfigHash should be set when deployed ConfigMap data differs")
+	g.Expect(hash2).NotTo(Equal("stale-hash-value"), "hash should NOT be preserved when deployed ConfigMap data differs from rendered data")
+	g.Expect(hash2).To(Equal(hash1), "hash should be the newly computed value when data differs")
+}
