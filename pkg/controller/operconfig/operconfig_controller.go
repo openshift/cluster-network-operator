@@ -365,6 +365,15 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		r.status.UnsetProgressing(statusmanager.OperatorRender)
 	}
 
+	if hcp := bootstrapResult.Infra.HostedControlPlane; hcp != nil && hcp.RestartDate != "" {
+		if err := hypershift.SetRestartDateAnnotation(objs, hcp.Namespace, hcp.RestartDate); err != nil {
+			log.Printf("Failed to set restart-date annotation: %v", err)
+			r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "RenderError",
+				fmt.Sprintf("Internal error while setting restart-date annotation: %v", err))
+			return reconcile.Result{}, err
+		}
+	}
+
 	// The first object we create should be the record of our applied configuration. The last object we create is config.openshift.io/v1/Network.Status
 	app, err := AppliedConfiguration(operConfig)
 	if err != nil {
