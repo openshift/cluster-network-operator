@@ -3,7 +3,6 @@ package signer
 import (
 	c "crypto"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -20,8 +19,6 @@ func newCertificateTemplate(certReq *x509.CertificateRequest, certDuration time.
 
 	template := &x509.Certificate{
 		Subject: certReq.Subject,
-
-		SignatureAlgorithm: x509.SHA512WithRSA,
 
 		NotBefore:    time.Now().Add(-1 * time.Second),
 		NotAfter:     time.Now().Add(certDuration),
@@ -69,13 +66,28 @@ func decodeCertificate(pemBytes []byte) (*x509.Certificate, error) {
 	return x509.ParseCertificate(block.Bytes)
 }
 
-func decodePrivateKey(pemBytes []byte) (*rsa.PrivateKey, error) {
+func decodePrivateKey(pemBytes []byte) (c.Signer, error) {
 	block, _ := pem.Decode(pemBytes)
-	if block == nil || block.Type != "RSA PRIVATE KEY" {
-		fmt.Println(block.Type)
-		err := errors.New("PEM block type must be RSA PRIVATE KEY")
-		return nil, err
+	if block == nil {
+		return nil, errors.New("no PEM block found in private key data")
 	}
 
-	return x509.ParsePKCS1PrivateKey(block.Bytes)
+	switch block.Type {
+	case "RSA PRIVATE KEY":
+		return x509.ParsePKCS1PrivateKey(block.Bytes)
+	case "PRIVATE KEY":
+		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse PKCS8 private key: %w", err)
+		}
+		signer, ok := key.(c.Signer)
+		if !ok {
+			return nil, fmt.Errorf("parsed private key does not implement crypto.Signer")
+		}
+		return signer, nil
+	case "EC PRIVATE KEY":
+		return x509.ParseECPrivateKey(block.Bytes)
+	default:
+		return nil, fmt.Errorf("unsupported PEM block type: %s", block.Type)
+	}
 }

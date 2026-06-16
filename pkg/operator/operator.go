@@ -8,6 +8,7 @@ import (
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
+	features "github.com/openshift/api/features"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -15,6 +16,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
+	pkipkg "github.com/openshift/library-go/pkg/pki"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -27,6 +29,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller"
 	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
+	pkictrl "github.com/openshift/cluster-network-operator/pkg/controller/pki"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -140,10 +143,33 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
+	// Set up PKI profile provider if ConfigurablePKI is enabled.
+	// Register the PKI informer on the existing configInformers factory,
+	// re-start to pick it up (idempotent for already-running informers),
+	// and wait for cache sync before controllers start reconciling.
+	var pkiProfileProvider pkipkg.PKIProfileProvider
+	if featureGates.Enabled(features.FeatureGateConfigurablePKI) {
+		configInformers.Config().V1alpha1().PKIs().Informer()
+		configInformers.Start(wait.NeverStop)
+		for t, synced := range configInformers.WaitForCacheSync(wait.NeverStop) {
+			if !synced {
+				return fmt.Errorf("failed to sync config informer for %v", t)
+			}
+		}
+		pkiProfileProvider = pkipkg.NewClusterPKIProfileProvider(
+			configInformers.Config().V1alpha1().PKIs().Lister(),
+		)
+	}
+
 	// Add controller-runtime controllers
 	klog.Info("Adding controller-runtime controllers")
 	if err := controller.AddToManager(o.manager, o.StatusManager, o.client, featureGates); err != nil {
 		return fmt.Errorf("failed to add controllers to manager: %w", err)
+	}
+
+	// Add PKI controller separately — it needs the PKI profile provider
+	if err := pkictrl.Add(o.manager, o.StatusManager, featureGates, pkiProfileProvider); err != nil {
+		return fmt.Errorf("failed to add pki controller: %w", err)
 	}
 
 	// Initialize individual (non-controller-runtime) controllers
