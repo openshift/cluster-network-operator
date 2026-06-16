@@ -2,7 +2,7 @@ package network
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -483,7 +483,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// daemonsets need to know when those ConfigMaps change so they can
 	// restart with the new options. Render those ConfigMaps first and
 	// embed a hash of their data into the ovnkube-node daemonsets.
-	h := sha1.New()
+	h := sha256.New()
 	for _, path := range cmPaths {
 		manifests, err := render.RenderTemplate(path, &data)
 		if err != nil {
@@ -505,7 +505,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	// Compute a separate hash for no-overlay node config (outboundSNAT).
 	// This allows ovnkube-node to restart when outboundSNAT changes
-	nodeNoOverlayHash := sha1.New()
+	nodeNoOverlayHash := sha256.New()
 	nodeNoOverlayHashData := fmt.Sprintf("outboundSNAT=%v", data.Data["NoOverlayOutboundSNAT"])
 	if _, err := nodeNoOverlayHash.Write([]byte(nodeNoOverlayHashData)); err != nil {
 		return nil, progressing, errors.Wrap(err, "failed to hash node no-overlay config")
@@ -515,7 +515,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	// Compute a separate hash for control-plane config (bgpManagedConfig).
 	// This allows ovnkube-control-plane to restart when bgpManagedConfig changes,
 	// without restarting ovnkube-node pods.
-	cpHash := sha1.New()
+	cpHash := sha256.New()
 	cpHashData := fmt.Sprintf("asNumber=%v,topology=%v",
 		data.Data["NoOverlayManagedASNumber"],
 		data.Data["NoOverlayManagedTopology"])
