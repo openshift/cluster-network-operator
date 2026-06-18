@@ -107,66 +107,11 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 			return reconcile.Result{}, err
 		}
 	case request.Namespace == names.ADDL_TRUST_BUNDLE_CONFIGMAP_NS:
-		log.Printf("Reconciling additional trust bundle configmap '%s/%s'", request.Namespace, request.Name)
-		if err := r.client.Get(ctx, request.NamespacedName, trustBundle); err != nil {
-			if apierrors.IsNotFound(err) {
-				// Request object not found, could have been deleted after reconcile request.
-				// Return and don't requeue
-				log.Println("configmap not found; reconciliation will be skipped", "request", request)
-				return reconcile.Result{}, nil
-			}
-			// Error reading the object - requeue the request.
-			return reconcile.Result{}, fmt.Errorf("failed to get configmap '%s': %v", request, err)
-		}
-
-		// Only proceed if request matches the configmap referenced by proxy trustedCA.
-		if err := r.configMapIsProxyTrustedCA(trustBundle.Name); err != nil {
-			log.Printf("configmap '%s/%s' name differs from trustedCA of proxy '%s' or trustedCA not set; "+
-				"reconciliation will be skipped", trustBundle.Namespace, trustBundle.Name, names.PROXY_CONFIG)
-			return reconcile.Result{}, nil
-		}
-
-		// Validate the trust bundle configmap.
-		proxyData, systemData, err := r.validateTrustedCA(trustBundle.Name)
-		if err != nil {
-			log.Printf("Failed to validate additional trust bundle configmap '%s/%s': %v", trustBundle.Namespace,
-				trustBundle.Name, err)
-			r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "TrustBundleValidationFailure",
-				fmt.Sprintf("Failed to validate additional trust bundle configmap '%s/%s' (%v)",
-					trustBundle.Namespace, trustBundle.Name, err))
-			return reconcile.Result{}, fmt.Errorf("failed to validate additional trust bundle configmap '%s/%s': %v",
-				trustBundle.Namespace, trustBundle.Name, err)
-		}
-
-		// Create a configmap containing the merged proxy.trustedCA/system bundles.
-		_, err = r.mergeTrustBundlesToConfigMap(proxyData, systemData)
-		if err != nil {
-			log.Printf("Failed to merge trustedCA and system bundles for proxy '%s': %v", names.PROXY_CONFIG, err)
-			r.status.SetDegraded(statusmanager.ProxyConfig, "EnsureProxyConfigFailure",
-				fmt.Sprintf("The configuration is invalid for proxy '%s' (%v). "+
-					"Use 'oc edit proxy.config.openshift.io %s' to fix.", names.PROXY_CONFIG, err, names.PROXY_CONFIG))
-			return reconcile.Result{}, fmt.Errorf("failed to merge trustedCA and system bundles for proxy '%s': %v",
-				names.PROXY_CONFIG, err)
-		}
-
-		proxyConfig := &configv1.Proxy{}
-		if err := r.client.Get(ctx, names.Proxy(), proxyConfig); err != nil {
-			if apierrors.IsNotFound(err) {
-				// Request object not found, could have been deleted after reconcile request.
-				// Return and don't requeue
-				log.Println("proxy not found; reconciliation will be skipped", "request", request)
-				return reconcile.Result{}, nil
-			}
-			// Error reading the object - requeue the request.
-			return reconcile.Result{}, fmt.Errorf("failed to get proxy '%s': %v", request.Name, err)
-		}
-
-		trustBundle, err = r.desiredTrustBundle(proxyConfig, request.Name)
-		if err != nil {
+		var err error
+		trustBundle, err = r.reconcileAdditionalTrustBundle(ctx, request)
+		if err != nil || trustBundle == nil {
 			return reconcile.Result{}, err
 		}
-
-		log.Printf("Reconciling additional trust bundle configmap '%s/%s' complete", request.Namespace, request.Name)
 	default:
 		// unknown object
 		log.Println("Ignoring unknown object, reconciliation will be skipped", "request", request)
@@ -241,6 +186,73 @@ func (r *ReconcileProxyConfig) reconcileProxy(ctx context.Context, request recon
 		return nil, fmt.Errorf("failed to sync proxy '%s': %v", names.PROXY_CONFIG, err)
 	}
 	log.Printf("Reconciling proxy '%s' complete", request.Name)
+
+	return trustBundle, nil
+}
+
+func (r *ReconcileProxyConfig) reconcileAdditionalTrustBundle(ctx context.Context, request reconcile.Request) (*corev1.ConfigMap, error) {
+	trustBundle := &corev1.ConfigMap{}
+
+	log.Printf("Reconciling additional trust bundle configmap '%s/%s'", request.Namespace, request.Name)
+	if err := r.client.Get(ctx, request.NamespacedName, trustBundle); err != nil {
+		if apierrors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Return and don't requeue
+			log.Println("configmap not found; reconciliation will be skipped", "request", request)
+			return nil, nil
+		}
+		// Error reading the object - requeue the request.
+		return nil, fmt.Errorf("failed to get configmap '%s': %v", request, err)
+	}
+
+	// Only proceed if request matches the configmap referenced by proxy trustedCA.
+	if err := r.configMapIsProxyTrustedCA(trustBundle.Name); err != nil {
+		log.Printf("configmap '%s/%s' name differs from trustedCA of proxy '%s' or trustedCA not set; "+
+			"reconciliation will be skipped", trustBundle.Namespace, trustBundle.Name, names.PROXY_CONFIG)
+		return nil, nil
+	}
+
+	// Validate the trust bundle configmap.
+	proxyData, systemData, err := r.validateTrustedCA(trustBundle.Name)
+	if err != nil {
+		log.Printf("Failed to validate additional trust bundle configmap '%s/%s': %v", trustBundle.Namespace,
+			trustBundle.Name, err)
+		r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "TrustBundleValidationFailure",
+			fmt.Sprintf("Failed to validate additional trust bundle configmap '%s/%s' (%v)",
+				trustBundle.Namespace, trustBundle.Name, err))
+		return nil, fmt.Errorf("failed to validate additional trust bundle configmap '%s/%s': %v",
+			trustBundle.Namespace, trustBundle.Name, err)
+	}
+
+	// Create a configmap containing the merged proxy.trustedCA/system bundles.
+	_, err = r.mergeTrustBundlesToConfigMap(proxyData, systemData)
+	if err != nil {
+		log.Printf("Failed to merge trustedCA and system bundles for proxy '%s': %v", names.PROXY_CONFIG, err)
+		r.status.SetDegraded(statusmanager.ProxyConfig, "EnsureProxyConfigFailure",
+			fmt.Sprintf("The configuration is invalid for proxy '%s' (%v). "+
+				"Use 'oc edit proxy.config.openshift.io %s' to fix.", names.PROXY_CONFIG, err, names.PROXY_CONFIG))
+		return nil, fmt.Errorf("failed to merge trustedCA and system bundles for proxy '%s': %v",
+			names.PROXY_CONFIG, err)
+	}
+
+	proxyConfig := &configv1.Proxy{}
+	if err := r.client.Get(ctx, names.Proxy(), proxyConfig); err != nil {
+		if apierrors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Return and don't requeue
+			log.Println("proxy not found; reconciliation will be skipped", "request", request)
+			return nil, nil
+		}
+		// Error reading the object - requeue the request.
+		return nil, fmt.Errorf("failed to get proxy '%s': %v", request.Name, err)
+	}
+
+	trustBundle, err = r.desiredTrustBundle(proxyConfig, request.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("Reconciling additional trust bundle configmap '%s/%s' complete", request.Namespace, request.Name)
 
 	return trustBundle, nil
 }
