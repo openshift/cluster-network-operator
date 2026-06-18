@@ -307,7 +307,6 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
@@ -353,7 +352,6 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
@@ -413,7 +411,6 @@ enable-egress-qos=true
 enable-egress-service=true
 egressip-reachability-total-timeout=3
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
@@ -475,7 +472,6 @@ enable-egress-qos=true
 enable-egress-service=true
 egressip-reachability-total-timeout=0
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
@@ -536,7 +532,6 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
@@ -597,7 +592,6 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
@@ -647,7 +641,6 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
@@ -700,7 +693,6 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
@@ -717,6 +709,47 @@ logfile-maxbackups=5
 logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
 			disableGRO:               true,
+		},
+		{
+			desc: "disabled multi-network",
+			expected: `
+[default]
+mtu="1500"
+cluster-subnets="10.128.0.0/15/23,10.0.0.0/14/24"
+encap-port="8061"
+enable-lflow-cache=true
+lflow-cache-limit-kb=1048576
+enable-udp-aggregation=true
+udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"
+
+[kubernetes]
+service-cidrs="172.30.0.0/16"
+ovn-config-namespace="openshift-ovn-kubernetes"
+apiserver="https://testing.test:8443"
+host-network-namespace="openshift-host-network"
+platform-type="GCP"
+healthz-bind-address="0.0.0.0:10256"
+dns-service-namespace="openshift-dns"
+dns-service-name="dns-default"
+
+[ovnkubernetesfeature]
+egressip-node-healthcheck-port=9107
+enable-multi-network=true
+enable-network-segmentation=true
+enable-preconfigured-udn-addresses=true
+
+[gateway]
+mode=shared
+nodeport=true
+
+[logging]
+libovsdblogfile=/var/log/ovnkube/libovsdb.log
+logfile-maxsize=100
+logfile-maxbackups=5
+logfile-maxage=0`,
+			controlPlaneReplicaCount: 2,
+
+			disableMultiNet: true,
 		},
 		{
 			desc: "enable multi-network policies and admin network policies",
@@ -746,7 +779,6 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-multi-networkpolicy=true
@@ -795,7 +827,6 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
@@ -814,7 +845,7 @@ logfile-maxage=0`,
 			enabledFeatureGates:      []configv1.FeatureGateName{},
 		},
 		{
-			desc: "enable multi-network policies with DisableMultiNetwork",
+			desc: "enable multi-network policies without multi-network support",
 			expected: `
 [default]
 mtu="1500"
@@ -841,12 +872,8 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
-enable-multi-networkpolicy=true
-enable-admin-network-policy=true
-enable-multi-external-gateway=true
 
 [gateway]
 mode=shared
@@ -890,7 +917,6 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
@@ -937,7 +963,6 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true
@@ -983,7 +1008,6 @@ enable-egress-firewall=true
 enable-egress-qos=true
 enable-egress-service=true
 egressip-node-healthcheck-port=9107
-enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
 enable-admin-network-policy=true

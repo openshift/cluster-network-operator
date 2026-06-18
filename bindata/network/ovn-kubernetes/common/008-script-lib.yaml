@@ -604,6 +604,17 @@ data:
         node_mgmt_port_netdev_flags="$node_mgmt_port_netdev_flags --ovnkube-node-mgmt-port-dp-resource-name ${OVNKUBE_NODE_MGMT_PORT_DP_RESOURCE_NAME}"
       fi
 
+      multi_network_enabled_flag=
+      if [[ "{{.OVN_MULTI_NETWORK_ENABLE}}" == "true" && "${OVN_NODE_MODE}" != "dpu-host" ]]; then
+        multi_network_enabled_flag="--enable-multi-network"
+      fi
+
+      network_segmentation_enabled_flag=
+      if [[ "${OVN_NODE_MODE}" != "dpu-host" ]]; then
+        multi_network_enabled_flag="--enable-multi-network"
+        network_segmentation_enabled_flag="--enable-network-segmentation"
+      fi
+
       route_advertisements_enable_flag=
       if [[ "{{.OVN_ROUTE_ADVERTISEMENTS_ENABLE}}" == "true" ]]; then
         route_advertisements_enable_flag="--enable-route-advertisements"
