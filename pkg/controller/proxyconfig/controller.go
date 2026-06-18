@@ -79,7 +79,22 @@ func add(mgr manager.Manager, r *ReconcileProxyConfig) error {
 		return err
 	}
 
+	// Network and Infrastructure contribute to Proxy status. Map changes to the
+	// canonical Proxy request because all three resources are cluster-scoped and
+	// named "cluster".
+	proxyEventHandler := handler.EnqueueRequestsFromMapFunc(enqueueProxy)
+	if err := c.Watch(source.Kind[crclient.Object](mgr.GetCache(), &configv1.Network{}, proxyEventHandler)); err != nil {
+		return err
+	}
+	if err := c.Watch(source.Kind[crclient.Object](mgr.GetCache(), &configv1.Infrastructure{}, proxyEventHandler)); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func enqueueProxy(_ context.Context, _ crclient.Object) []reconcile.Request {
+	return []reconcile.Request{{NamespacedName: names.Proxy()}}
 }
 
 // ReconcileProxyConfig reconciles a Proxy object
