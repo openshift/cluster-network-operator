@@ -31,17 +31,16 @@ controllerconfigs.machineconfiguration.openshift.io:
   FeatureGates:
   - AWSClusterHostedDNSInstall
   - AWSDualStackInstall
+  - AWSEuropeanSovereignCloudInstall
   - AzureClusterHostedDNSInstall
   - AzureDualStackInstall
   - DualReplica
   - DyanmicServiceEndpointIBMCloud
-  - GCPClusterHostedDNSInstall
-  - HighlyAvailableArbiter
-  - HighlyAvailableArbiter+DualReplica
   - NutanixMultiSubnets
   - OnPremDNSRecords
   - VSphereHostVMGroupZonal
   - VSphereMultiNetworks
+  - VSphereMultiVCenterDay2
   FilenameOperatorName: machine-config
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_80"
