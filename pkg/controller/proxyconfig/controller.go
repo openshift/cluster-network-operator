@@ -101,58 +101,11 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 
 	switch {
 	case request.NamespacedName == names.Proxy():
-		proxyConfig := &configv1.Proxy{}
-		infraConfig := &configv1.Infrastructure{}
-		netConfig := &configv1.Network{}
-		clusterConfig := &corev1.ConfigMap{}
-
-		log.Printf("Reconciling proxy '%s'", request.Name)
-		if err := r.client.Get(ctx, request.NamespacedName, proxyConfig); err != nil {
-			if apierrors.IsNotFound(err) {
-				// Request object not found, could have been deleted after reconcile request.
-				// Return and don't requeue
-				log.Println("proxy not found; reconciliation will be skipped", "request", request)
-				return reconcile.Result{}, nil
-			}
-			// Error reading the object - requeue the request.
-			return reconcile.Result{}, fmt.Errorf("failed to get proxy '%s': %v", request.Name, err)
-		}
-
 		var err error
-		trustBundle, err = r.desiredTrustBundle(proxyConfig, request.Name)
-		if err != nil {
+		trustBundle, err = r.reconcileProxy(ctx, request)
+		if err != nil || trustBundle == nil {
 			return reconcile.Result{}, err
 		}
-
-		// Only proceed if the required config objects can be collected.
-		if err := r.client.Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, infraConfig); err != nil {
-			log.Printf("Failed to get infrastructure config '%s': %v", names.CLUSTER_CONFIG, err)
-			r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "InfraConfigError",
-				fmt.Sprintf("Error getting infrastructure config %s: %v", names.CLUSTER_CONFIG, err))
-			return reconcile.Result{}, fmt.Errorf("failed to get infrastructure config '%s': %v", names.CLUSTER_CONFIG, err)
-		}
-		if err := r.client.Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, netConfig); err != nil {
-			log.Printf("Failed to get network config '%s': %v", names.CLUSTER_CONFIG, err)
-			r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "NetworkConfigError",
-				fmt.Sprintf("Error getting network config '%s': %v.", names.CLUSTER_CONFIG, err))
-			return reconcile.Result{}, fmt.Errorf("failed to get network config '%s': %v", names.CLUSTER_CONFIG, err)
-		}
-		if err := r.client.Get(ctx, types.NamespacedName{Name: "cluster-config-v1", Namespace: "kube-system"},
-			clusterConfig); err != nil {
-			log.Printf("Failed to get configmap '%s/%s': %v", clusterConfig.Namespace, clusterConfig.Name, err)
-			r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "ClusterConfigError",
-				fmt.Sprintf("Error getting cluster config configmap '%s/%s': %v.", clusterConfig.Namespace,
-					clusterConfig.Name, err))
-			return reconcile.Result{}, fmt.Errorf("failed to get configmap '%s/%s': %v", clusterConfig.Namespace, clusterConfig.Name, err)
-		}
-		// Update proxy status.
-		if err := r.syncProxyStatus(proxyConfig, infraConfig, netConfig, clusterConfig); err != nil {
-			log.Printf("Could not sync proxy '%s' status: %v", proxyConfig.Name, err)
-			r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "StatusError",
-				fmt.Sprintf("Could not update proxy '%s' status: %v", proxyConfig.Name, err))
-			return reconcile.Result{}, fmt.Errorf("failed to sync proxy '%s': %v", names.PROXY_CONFIG, err)
-		}
-		log.Printf("Reconciling proxy '%s' complete", request.Name)
 	case request.Namespace == names.ADDL_TRUST_BUNDLE_CONFIGMAP_NS:
 		log.Printf("Reconciling additional trust bundle configmap '%s/%s'", request.Namespace, request.Name)
 		if err := r.client.Get(ctx, request.NamespacedName, trustBundle); err != nil {
@@ -234,6 +187,62 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 	r.status.SetNotDegraded(statusmanager.ProxyConfig)
 
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileProxyConfig) reconcileProxy(ctx context.Context, request reconcile.Request) (*corev1.ConfigMap, error) {
+	proxyConfig := &configv1.Proxy{}
+	infraConfig := &configv1.Infrastructure{}
+	netConfig := &configv1.Network{}
+	clusterConfig := &corev1.ConfigMap{}
+
+	log.Printf("Reconciling proxy '%s'", request.Name)
+	if err := r.client.Get(ctx, request.NamespacedName, proxyConfig); err != nil {
+		if apierrors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Return and don't requeue
+			log.Println("proxy not found; reconciliation will be skipped", "request", request)
+			return nil, nil
+		}
+		// Error reading the object - requeue the request.
+		return nil, fmt.Errorf("failed to get proxy '%s': %v", request.Name, err)
+	}
+
+	trustBundle, err := r.desiredTrustBundle(proxyConfig, request.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Only proceed if the required config objects can be collected.
+	if err := r.client.Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, infraConfig); err != nil {
+		log.Printf("Failed to get infrastructure config '%s': %v", names.CLUSTER_CONFIG, err)
+		r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "InfraConfigError",
+			fmt.Sprintf("Error getting infrastructure config %s: %v", names.CLUSTER_CONFIG, err))
+		return nil, fmt.Errorf("failed to get infrastructure config '%s': %v", names.CLUSTER_CONFIG, err)
+	}
+	if err := r.client.Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, netConfig); err != nil {
+		log.Printf("Failed to get network config '%s': %v", names.CLUSTER_CONFIG, err)
+		r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "NetworkConfigError",
+			fmt.Sprintf("Error getting network config '%s': %v.", names.CLUSTER_CONFIG, err))
+		return nil, fmt.Errorf("failed to get network config '%s': %v", names.CLUSTER_CONFIG, err)
+	}
+	if err := r.client.Get(ctx, types.NamespacedName{Name: "cluster-config-v1", Namespace: "kube-system"},
+		clusterConfig); err != nil {
+		log.Printf("Failed to get configmap '%s/%s': %v", clusterConfig.Namespace, clusterConfig.Name, err)
+		r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "ClusterConfigError",
+			fmt.Sprintf("Error getting cluster config configmap '%s/%s': %v.", clusterConfig.Namespace,
+				clusterConfig.Name, err))
+		return nil, fmt.Errorf("failed to get configmap '%s/%s': %v", clusterConfig.Namespace, clusterConfig.Name, err)
+	}
+	// Update proxy status.
+	if err := r.syncProxyStatus(proxyConfig, infraConfig, netConfig, clusterConfig); err != nil {
+		log.Printf("Could not sync proxy '%s' status: %v", proxyConfig.Name, err)
+		r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "StatusError",
+			fmt.Sprintf("Could not update proxy '%s' status: %v", proxyConfig.Name, err))
+		return nil, fmt.Errorf("failed to sync proxy '%s': %v", names.PROXY_CONFIG, err)
+	}
+	log.Printf("Reconciling proxy '%s' complete", request.Name)
+
+	return trustBundle, nil
 }
 
 // desiredTrustBundle validates the proxy configuration and builds the managed
