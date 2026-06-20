@@ -104,11 +104,19 @@ func (status *StatusManager) SetFromPods() {
 		} else if ds.Status.UpdatedNumberScheduled < ds.Status.CurrentNumberScheduled {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q update is rolling out (%d out of %d updated)", dsName.String(), ds.Status.UpdatedNumberScheduled, ds.Status.CurrentNumberScheduled))
 			dsProgressing = true
-		} else if ds.Status.NumberUnavailable > 0 {
-			if dsRolloutActive {
+		} else if ds.Status.NumberUnavailable > 0 && (hadState || dsRolloutActive) {
+			// Rollout in progress: either continuing a tracked rollout or a new/initial rollout
+			if hadState {
+				progressing = append(progressing, fmt.Sprintf("DaemonSet %q rollout is waiting for %d pods to become available", dsName.String(), ds.Status.NumberUnavailable))
+			} else {
 				progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not available (awaiting %d nodes)", dsName.String(), ds.Status.NumberUnavailable))
-				dsProgressing = true
 			}
+			dsProgressing = true
+			if !isNonCritical(ds) {
+				clbo = append(clbo, status.CheckCrashLoopBackOffPods(dsName, ds.Spec.Selector.MatchLabels, "DaemonSet")...)
+			}
+		} else if ds.Status.NumberUnavailable > 0 {
+			// Reboot churn: unavailable pods but no active rollout and no tracked state
 			if !isNonCritical(ds) {
 				clbo = append(clbo, status.CheckCrashLoopBackOffPods(dsName, ds.Spec.Selector.MatchLabels, "DaemonSet")...)
 			}
@@ -161,12 +169,20 @@ func (status *StatusManager) SetFromPods() {
 		} else if ss.Status.UpdatedReplicas < ss.Status.Replicas {
 			progressing = append(progressing, fmt.Sprintf("StatefulSet %q update is rolling out (%d out of %d updated)", ssName.String(), ss.Status.UpdatedReplicas, ss.Status.Replicas))
 			ssProgressing = true
-		} else if ss.Status.ReadyReplicas > 0 && ss.Status.ReadyReplicas < ss.Status.Replicas {
-			if ssRolloutActive {
+		} else if ss.Status.ReadyReplicas < ss.Status.Replicas && (hadState || ssRolloutActive) {
+			// Rollout in progress: either continuing a tracked rollout or a new/initial rollout
+			if hadState {
+				progressing = append(progressing, fmt.Sprintf("StatefulSet %q rollout is waiting for %d pods to become available", ssName.String(), (ss.Status.Replicas-ss.Status.ReadyReplicas)))
+			} else {
 				progressing = append(progressing, fmt.Sprintf("StatefulSet %q is not available (awaiting %d nodes)", ssName.String(), (ss.Status.Replicas-ss.Status.ReadyReplicas)))
-				ssProgressing = true
 			}
+			ssProgressing = true
 			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
+			if !isNonCritical(ss) {
+				clbo = append(clbo, status.CheckCrashLoopBackOffPods(ssName, ss.Spec.Selector.MatchLabels, "StatefulSet")...)
+			}
+		} else if ss.Status.ReadyReplicas < ss.Status.Replicas {
+			// Reboot churn: unavailable pods but no active rollout and no tracked state
 			if !isNonCritical(ss) {
 				clbo = append(clbo, status.CheckCrashLoopBackOffPods(ssName, ss.Spec.Selector.MatchLabels, "StatefulSet")...)
 			}
@@ -218,12 +234,20 @@ func (status *StatusManager) SetFromPods() {
 		} else if dep.Status.UpdatedReplicas < dep.Status.Replicas {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q update is rolling out (%d out of %d updated)", depName.String(), dep.Status.UpdatedReplicas, dep.Status.Replicas))
 			depProgressing = true
-		} else if dep.Status.UnavailableReplicas > 0 {
-			if depRolloutActive {
+		} else if dep.Status.UnavailableReplicas > 0 && (hadState || depRolloutActive) {
+			// Rollout in progress: either continuing a tracked rollout or a new/initial rollout
+			if hadState {
+				progressing = append(progressing, fmt.Sprintf("Deployment %q rollout is waiting for %d pods to become available", depName.String(), dep.Status.UnavailableReplicas))
+			} else {
 				progressing = append(progressing, fmt.Sprintf("Deployment %q is not available (awaiting %d nodes)", depName.String(), dep.Status.UnavailableReplicas))
-				depProgressing = true
 			}
+			depProgressing = true
 			// Check for any pods in CrashLoopBackOff state and mark the operator as degraded if so.
+			if !isNonCritical(dep) {
+				clbo = append(clbo, status.CheckCrashLoopBackOffPods(depName, dep.Spec.Selector.MatchLabels, "Deployment")...)
+			}
+		} else if dep.Status.UnavailableReplicas > 0 {
+			// Reboot churn: unavailable pods but no active rollout and no tracked state
 			if !isNonCritical(dep) {
 				clbo = append(clbo, status.CheckCrashLoopBackOffPods(depName, dep.Spec.Selector.MatchLabels, "Deployment")...)
 			}
