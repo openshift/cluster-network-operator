@@ -300,6 +300,8 @@ spec:
           name: host-cni-netd
         - mountPath: /var/run/openvswitch
           name: host-var-run-ovs
+        - mountPath: /var/run/pluto
+          name: host-var-run-pluto
         - mountPath: /var/log/openvswitch/
           name: host-var-log-ovs
         - mountPath: /etc/openvswitch
@@ -344,6 +346,10 @@ spec:
       - name: host-var-run-ovs
         hostPath:
           path: /var/run/openvswitch
+          type: DirectoryOrCreate
+      - name: host-var-run-pluto
+        hostPath:
+          path: /var/run/pluto
           type: DirectoryOrCreate
       - name: signer-ca
         configMap:
