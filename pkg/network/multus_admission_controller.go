@@ -145,6 +145,8 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 		data.Data["ReleaseImage"] = hsc.ReleaseImage
 	}
 
+	addTLSInfoToRenderData(data.Data, bootstrapResult, true)
+
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus-admission-controller"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render multus admission controller manifests")
