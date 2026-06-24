@@ -183,7 +183,7 @@ spec:
           #!/bin/bash
           set -euo pipefail
           . /ovnkube-lib/ovnkube-lib.sh || exit 1
-          start-rbac-proxy-node ovn-node-metrics 9103 29103 /etc/pki/tls/metrics-cert/tls.key /etc/pki/tls/metrics-cert/tls.crt
+          start-rbac-proxy ovn-node-metrics 9103 29103 /etc/pki/tls/metrics-cert/tls.key /etc/pki/tls/metrics-cert/tls.crt
         ports:
         - containerPort: 9103
           name: https
@@ -208,7 +208,7 @@ spec:
           #!/bin/bash
           set -euo pipefail
           . /ovnkube-lib/ovnkube-lib.sh || exit 1
-          start-rbac-proxy-node ovn-metrics 9105 29105 /etc/pki/tls/metrics-cert/tls.key /etc/pki/tls/metrics-cert/tls.crt
+          start-rbac-proxy ovn-metrics 9105 29105 /etc/pki/tls/metrics-cert/tls.key /etc/pki/tls/metrics-cert/tls.crt
         ports:
         - containerPort: 9105
           name: https

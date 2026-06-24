@@ -209,7 +209,7 @@ data:
     #
     # Requires the following volume mounts:
     #   /etc/pki/tls/metrics-cert
-    start-rbac-proxy-node()
+    start-rbac-proxy()
     {
       local detail=$1
       local listen_port=$2
@@ -223,9 +223,8 @@ data:
       fi
 
       # As the secret mount is optional we must wait for the files to be present.
-      # The service is created in monitor-node.yaml but start-rbac-proxy-node is
-      # called from ovnkube-node.yaml. If the certificate isn't created there is
-      # probably an issue so we want to crashloop.
+      # If the certificate isn't created there is probably an issue so we want to
+      # crashloop.
       echo "$(date -Iseconds) INFO: waiting for ${detail} certs to be mounted"
       wait-for-certs "${detail}" "${privkey}" "${clientcert}"
 
