@@ -502,7 +502,8 @@ spec:
             # Wait upto 15 seconds for ovs-monitor-ipsec process to terminate before
             # cleaning up ipsec entries.
             counter=0
-            while kill -0 "$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)"; do
+            pid=$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)
+            while [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; do
               counter=$((counter+1))
               sleep 1
               if [ $counter -gt 15 ];
@@ -535,7 +536,8 @@ spec:
           # in the ovn-ipsec container's pre stop hook.
           if ! chroot /proc/1/root systemctl is-active --quiet openvswitch-ipsec; then
             # Monitor the ovs-monitor-ipsec process.
-            while kill -0 "$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)"; do
+            pid=$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)
+            while [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; do
               sleep 1
             done
 
