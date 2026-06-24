@@ -338,13 +338,6 @@ spec:
           # Workaround for https://github.com/libreswan/libreswan/issues/373
           ulimit -n 1024
 
-          /usr/libexec/ipsec/addconn --config /etc/ipsec.conf --checkconfig
-          # Check kernel modules only for libreswan version <= 5.2. The _stackmanager binary is
-          # removed from 5.3 onwards, so this check is not needed on later versions.
-          if [ -e /usr/libexec/ipsec/_stackmanager ]; then
-            /usr/libexec/ipsec/_stackmanager start
-          fi
-
           # Start ovs-monitor-ipsec which will monitor for changes in the ovs
           # tunnelling configuration (for example addition of a node) and configures
           # libreswan appropriately.
@@ -397,8 +390,6 @@ spec:
           name: host-var-lib
         - mountPath: /etc
           name: host-etc
-        - mountPath: /usr/libexec
-          name: usr-libexec
         resources:
           requests:
             cpu: 10m
@@ -605,10 +596,6 @@ spec:
           path: /etc
           type: Directory
         name: host-etc
-      - hostPath:
-          path: /usr/libexec
-          type: Directory
-        name: usr-libexec
       tolerations:
       - operator: "Exists"
 {{end}}
