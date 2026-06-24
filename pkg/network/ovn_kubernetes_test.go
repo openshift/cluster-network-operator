@@ -194,6 +194,25 @@ func TestRenderOVNKubernetes(t *testing.T) {
 			g.Expect(clusterRole.Rules).To(ContainElements(expectedRules))
 		}
 	}
+
+	// Test TLS rendering for the kube-rbac-proxy in the start-rbac-proxy-node function
+	testTLSArgRendering(t, "ovnkube-script-lib kube-rbac-proxy", "",
+		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			testBootstrap := *bootstrapResult
+			testBootstrap.TLSProfile = tlsProfile
+			objs, _, err = renderOVNKubernetes(config, &testBootstrap, manifestDirOvn, fakeClient, featureGatesCNO)
+			g.Expect(err).NotTo(HaveOccurred())
+
+			cm := mustFindRenderedObj(t, objs, "ConfigMap", "ovnkube-script-lib", &v1.ConfigMap{})
+			data, ok := cm.Data["ovnkube-lib.sh"]
+			g.Expect(ok).To(BeTrue(), "ovnkube-lib.sh not found in ConfigMap")
+
+			execStart := strings.Index(data, "exec /usr/bin/kube-rbac-proxy")
+			g.Expect(execStart).NotTo(Equal(-1), "exec /usr/bin/kube-rbac-proxy not found in script")
+
+			return data[execStart:]
+		})
 }
 
 func encodeClusterRole(obj *uns.Unstructured) (*rbacv1.ClusterRole, error) {

@@ -232,7 +232,14 @@ data:
       exec /usr/bin/kube-rbac-proxy \
         --logtostderr \
         --secure-listen-address=:${listen_port} \
+{{- if .UseTLSProfile }}
+        --tls-min-version={{.TLSMinVersion}} \
+  {{- if .TLSCipherSuites }}
+        --tls-cipher-suites={{.TLSCipherSuites}} \
+  {{- end }}
+{{- else }}
         --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 \
+{{- end }}
         --upstream=http://127.0.0.1:${upstream_port}/ \
         --tls-private-key-file=${privkey} \
         --tls-cert-file=${clientcert}
