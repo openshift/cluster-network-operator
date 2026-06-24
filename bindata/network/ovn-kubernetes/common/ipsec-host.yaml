@@ -344,8 +344,6 @@ spec:
           if [ -e /usr/libexec/ipsec/_stackmanager ]; then
             /usr/libexec/ipsec/_stackmanager start
           fi
-          # Check nss database status
-          /usr/sbin/ipsec --checknss
 
           # Start ovs-monitor-ipsec which will monitor for changes in the ovs
           # tunnelling configuration (for example addition of a node) and configures
@@ -399,8 +397,6 @@ spec:
           name: host-var-lib
         - mountPath: /etc
           name: host-etc
-        - mountPath: /usr/sbin
-          name: usr-sbin
         - mountPath: /usr/libexec
           name: usr-libexec
         resources:
@@ -421,8 +417,10 @@ spec:
                 exit 0
               fi
 {{ end }}
-              if [[ $(ipsec whack --trafficstatus | wc -l) -eq 0 ]]; then
-                echo "no ipsec traffic configured"
+              # Check if ovs-monitor-ipsec is running and has configured IPsec tunnels
+              status=$(ovs-appctl -t ovs-monitor-ipsec ipsec/status 2>/dev/null)
+              if [ -z "$status" ] || [ "$status" = "{}" ]; then
+                echo "no ipsec tunnels configured"
                 exit 10
               fi
           initialDelaySeconds: 15
@@ -607,10 +605,6 @@ spec:
           path: /etc
           type: Directory
         name: host-etc
-      - hostPath:
-          path: /usr/sbin
-          type: Directory
-        name: usr-sbin
       - hostPath:
           path: /usr/libexec
           type: Directory
