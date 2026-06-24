@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Inherit settings from the organization-level .coderabbit.yaml configuration.
+inheritance: true
+# https://docs.coderabbit.ai/reference/configuration#reviews
+reviews:
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  poem: false
+  # https://docs.coderabbit.ai/configuration/path-instructions
+  path_instructions:
+    - path: '**'
+      instructions: |
+        This is the OpenShift Cluster Network Operator (CNO). It manages the lifecycle
+        of cluster networking components in OpenShift including OVN-Kubernetes, Multus,
+        kube-proxy, network-diagnostics, egress-router, cloud-network-config-controller,
+        network-metrics, node-identity, FRR-K8s, iptables-alerter, MTU-prober,
+        container-networking-plugins, bond CNI, whereabouts CNI, route-override CNI,
+        multi-network-policy, and the networking console plugin.
+        - Focus on major issues impacting performance, readability, maintainability and security.
+        - Consider backward compatibility, upgrade safety, and multi-platform support.
+        - Avoid nitpicks and avoid verbosity.
+  # https://docs.coderabbit.ai/configuration/path-instructions#path-filters
+  path_filters:
+    - "!vendor/**"
+    - "!_output/**"
+  # https://docs.coderabbit.ai/reference/configuration#auto-review
+  auto_review:
+    drafts: false
+    ignore_title_keywords:
+      - WIP
+      - DNM
+    # To exclude labels, be sure to negate the label with '!'.
+    # Non-negated values turn this into an allowlist.
+    labels:
+      - '!work-in-progress'
+  # https://docs.coderabbit.ai/reference/configuration#slop-detection
+  slop_detection:
+    enabled: true
+    label: "coderabbit/ai-slop"
