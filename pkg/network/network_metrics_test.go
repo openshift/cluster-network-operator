@@ -1,10 +1,13 @@
 package network
 
 import (
+	"strings"
 	"testing"
 
 	. "github.com/onsi/gomega"
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 var NetworkMetricsDaemonConfig = operv1.Network{
@@ -54,4 +57,17 @@ func TestRenderNetworkMetricsDaemon(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ServiceMonitor", "openshift-multus", "monitor-network")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Role", "openshift-multus", "prometheus-k8s")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("RoleBinding", "openshift-multus", "prometheus-k8s")))
+
+	// Test TLS rendering for kube-rbac-proxy container
+	testTLSArgRendering(t, "network-metrics kube-rbac-proxy", "",
+		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			testBootstrap := fakeBootstrapResult()
+			testBootstrap.TLSProfile = tlsProfile
+			objs, err := renderMultus(config, testBootstrap, manifestDir)
+			g.Expect(err).NotTo(HaveOccurred())
+
+			daemonSet := mustFindRenderedObj[*appsv1.DaemonSet](t, objs, "DaemonSet", "network-metrics-daemon")
+			return strings.Join(mustFindContainer(t, daemonSet.Spec.Template.Spec.Containers, "kube-rbac-proxy").Args, " ")
+		})
 }
