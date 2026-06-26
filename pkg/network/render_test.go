@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -11,6 +12,8 @@ import (
 	openshifttls "github.com/openshift/controller-runtime-common/pkg/tls"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -599,11 +602,56 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := renderAdditionalRoutingCapabilities(tt.args.operConf, manifestDir)
+			got, err := renderAdditionalRoutingCapabilities(tt.args.operConf, fakeBootstrapResult(), manifestDir)
 			if !reflect.DeepEqual(tt.expectedErr, err) {
 				t.Errorf("renderAdditionalRoutingCapabilities() err = %v, want %v", err, tt.expectedErr)
 			}
 			assert.Equalf(t, tt.want, len(got), "renderAdditionalRoutingCapabilities(%v, %v)", tt.args.operConf, manifestDir)
 		})
 	}
+}
+
+func Test_renderFRRRoutingCapabilities(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	getRenderedObjs := func(t *testing.T, tlsProfile bootstrap.TLSProfile) []*unstructured.Unstructured {
+		testBootstrap := fakeBootstrapResult()
+		testBootstrap.TLSProfile = tlsProfile
+		objs, err := renderAdditionalRoutingCapabilities(&operv1.NetworkSpec{
+			AdditionalRoutingCapabilities: &operv1.AdditionalRoutingCapabilities{
+				Providers: []operv1.RoutingCapabilitiesProvider{
+					operv1.RoutingCapabilitiesProviderFRR,
+				},
+			},
+		}, testBootstrap, manifestDir)
+		g.Expect(err).NotTo(HaveOccurred())
+
+		return objs
+	}
+
+	getDaemonsetContainerArgs := func(t *testing.T, tlsProfile bootstrap.TLSProfile, containerName string) string {
+		daemonSet := mustFindRenderedObj[*appsv1.DaemonSet](t, getRenderedObjs(t, tlsProfile), "DaemonSet", "frr-k8s")
+		container := mustFindContainer(t, daemonSet.Spec.Template.Spec.Containers, containerName)
+		return strings.Join(container.Args, " ")
+	}
+
+	// Test TLS rendering for frr-metrics container
+	testTLSArgRendering(t, "frr-metrics", "", "",
+		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			return getDaemonsetContainerArgs(t, tlsProfile, "frr-metrics")
+		})
+
+	// Test TLS rendering for controller container
+	testTLSArgRendering(t, "frr-k8s controller", "", "",
+		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			return getDaemonsetContainerArgs(t, tlsProfile, "controller")
+		})
+
+	// Test TLS rendering for statuscleaner container
+	testTLSArgRendering(t, "frr-k8s-statuscleaner", "", "",
+		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			deployment := mustFindRenderedObj[*appsv1.Deployment](t, getRenderedObjs(t, tlsProfile), "Deployment", "frr-k8s-statuscleaner")
+			g.Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
+			return strings.Join(deployment.Spec.Template.Spec.Containers[0].Args, " ")
+		})
 }

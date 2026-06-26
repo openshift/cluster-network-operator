@@ -28,6 +28,12 @@ spec:
         - --namespace=$(NAMESPACE)
         - --webhook-port=9123
         - --frrk8s-selector=component=frr-k8s
+{{- if .UseTLSProfile }}
+        - --tls-min-version={{.TLSMinVersion}}
+  {{- if .TLSCipherSuites }}
+        - --tls-cipher-suites={{.TLSCipherSuites}}
+  {{- end }}
+{{- end }}
         - $(LOG_LEVEL)
         env:
         - name: NAMESPACE

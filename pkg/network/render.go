@@ -129,7 +129,7 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	}
 	objs = append(objs, o...)
 
-	o, err = renderAdditionalRoutingCapabilities(operConf, manifestDir)
+	o, err = renderAdditionalRoutingCapabilities(operConf, bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -849,7 +849,7 @@ func registerNetworkingConsolePlugin(bootstrapResult *bootstrap.BootstrapResult,
 	})
 }
 
-func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	if conf == nil || conf.AdditionalRoutingCapabilities == nil {
 		return nil, nil
 	}
@@ -858,6 +858,9 @@ func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir s
 		switch provider {
 		case operv1.RoutingCapabilitiesProviderFRR:
 			data := render.MakeRenderData()
+
+			addTLSInfoToRenderData(data.Data, bootstrapResult, true)
+
 			data.Data["FRRK8sImage"] = os.Getenv("FRR_K8S_IMAGE")
 			data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 			data.Data["NoOverlayManagedEnabled"] = conf.DefaultNetwork.OVNKubernetesConfig != nil &&
