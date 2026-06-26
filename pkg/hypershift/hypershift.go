@@ -42,6 +42,8 @@ const (
 	ClusterIDLabel = "_id"
 	// HyperShiftConditionTypePrefix is a cluster network operator condition type prefix in hostedControlPlane status
 	HyperShiftConditionTypePrefix = "network.operator.openshift.io/"
+	// RestartDateAnnotation is used to trigger rolling restarts of control plane operands
+	RestartDateAnnotation = "hypershift.openshift.io/restart-date"
 )
 
 type RelatedObject struct {
@@ -55,6 +57,7 @@ type RelatedObject struct {
 
 // HostedControlPlane represents a subset of HyperShift API definition for HostedControlPlane
 type HostedControlPlane struct {
+	Namespace                    string
 	ClusterID                    string
 	ControllerAvailabilityPolicy AvailabilityPolicy
 	NodeSelector                 map[string]string
@@ -63,6 +66,7 @@ type HostedControlPlane struct {
 	AdvertiseAddress             string
 	AdvertisePort                int
 	PriorityClass                string
+	RestartDate                  string
 }
 
 // AvailabilityPolicy specifies a high level availability policy for components.
@@ -149,6 +153,11 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 	controlPlanePriorityClassAnnotation, _, err := unstructured.NestedString(hcp.UnstructuredContent(), "metadata", "annotations", "hypershift.openshift.io/control-plane-priority-class")
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract control plane priority class annotation: %v", err)
+	}
+
+	restartDate, _, err := unstructured.NestedString(hcp.UnstructuredContent(), "metadata", "annotations", RestartDateAnnotation)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract restart date annotation: %v", err)
 	}
 
 	nodeSelector, _, err := unstructured.NestedStringMap(hcp.UnstructuredContent(), "spec", "nodeSelector")
@@ -256,6 +265,7 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 	}
 
 	return &HostedControlPlane{
+		Namespace:                    hcp.GetNamespace(),
 		ControllerAvailabilityPolicy: AvailabilityPolicy(controllerAvailabilityPolicy),
 		ClusterID:                    clusterID,
 		NodeSelector:                 nodeSelector,
@@ -264,7 +274,40 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 		AdvertiseAddress:             advertiseAddress,
 		AdvertisePort:                int(advertisePort),
 		PriorityClass:                controlPlanePriorityClassAnnotation,
+		RestartDate:                  restartDate,
 	}, nil
+}
+
+// SetRestartDateAnnotation sets the restart-date annotation on pod templates of
+// Deployment, DaemonSet, and StatefulSet objects in the HCP namespace to trigger
+// a rolling restart. Objects outside the HCP namespace (e.g. guest-cluster
+// DaemonSets) are not modified.
+func SetRestartDateAnnotation(objs []*unstructured.Unstructured, hcpNamespace, restartDate string) error {
+	for _, obj := range objs {
+		if obj.GetNamespace() != hcpNamespace {
+			continue
+		}
+		if obj.GetAPIVersion() != "apps/v1" {
+			continue
+		}
+		kind := obj.GetKind()
+		if kind != "Deployment" && kind != "DaemonSet" && kind != "StatefulSet" {
+			continue
+		}
+
+		anno, _, err := unstructured.NestedStringMap(obj.Object, "spec", "template", "metadata", "annotations")
+		if err != nil {
+			return fmt.Errorf("failed to get pod template annotations from %s/%s: %v", kind, obj.GetName(), err)
+		}
+		if anno == nil {
+			anno = map[string]string{}
+		}
+		anno[RestartDateAnnotation] = restartDate
+		if err := unstructured.SetNestedStringMap(obj.Object, anno, "spec", "template", "metadata", "annotations"); err != nil {
+			return fmt.Errorf("failed to set restart-date annotation on %s/%s: %v", kind, obj.GetName(), err)
+		}
+	}
+	return nil
 }
 
 // SetHostedControlPlaneConditions updates the hcp status.conditions based on the provided operStatus
