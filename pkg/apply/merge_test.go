@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	utilruntime.Must(operv1.AddToScheme(scheme.Scheme))
+	utilruntime.Must(operv1.Install(scheme.Scheme))
 }
 
 func Test_Merge(t *testing.T) {

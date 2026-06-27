@@ -44,7 +44,7 @@ func init() {
 	utilruntime.Must(operv1.Install(scheme.Scheme))
 	utilruntime.Must(configv1.Install(scheme.Scheme))
 	utilruntime.Must(netopv1.Install(scheme.Scheme))
-	utilruntime.Must(machineapi.AddToScheme(scheme.Scheme))
+	utilruntime.Must(machineapi.Install(scheme.Scheme))
 	utilruntime.Must(op_netopv1.Install(scheme.Scheme))
 	utilruntime.Must(mcfgv1.Install(scheme.Scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme.Scheme))
