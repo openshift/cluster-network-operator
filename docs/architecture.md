@@ -141,6 +141,12 @@ The Network operator needs to make sure that the input configuration doesn't cha
 
 The persisted configuration must **make all defaults explicit**. This protects against inadvertent code changes that could destabilize an existing cluster.
 
+### Per-Node Configuration
+
+For certain specialized deployments (e.g., DPU host nodes), some features need to be disabled on a per-node basis even when enabled cluster-wide. Since ConfigMap values cannot be reliably overridden per-node, the CNO implements per-node feature enforcement through conditional logic in the startup scripts.
+
+The `OVN_NODE_MODE` environment variable is injected into `ovnkube-node` pods and consumed by the startup script (`008-script-lib.yaml`) to conditionally enable or disable features based on the node's operational mode. This ensures that unsupported features are deterministically disabled on specialized hardware regardless of cluster-wide configuration.
+
 ## Egress Router
 
 **Input:** `EgressRouter.network.operator.openshift.io`
