@@ -133,6 +133,13 @@ subjects:
 
 {{ if .NETWORK_NODE_IDENTITY_ENABLE }}
 ---
+# This SA has no permissions since the pod uses node identity for API access
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: multus-node-identity
+  namespace: openshift-multus
+---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
