@@ -13,7 +13,7 @@ data:
     #!/bin/bash
     set -e
 
-    cniVersionStr="0.4.0"
+    cniVersionStr="1.1.0"
     addErrorStr="Only host backed pods supported on DPU in Infra Cluster."
     unknownErrorStr="Unknown cni command: $CNI_COMMAND"
 
@@ -25,7 +25,7 @@ data:
       \"msg\": \"Not Supported\",
       \"details\": \"${addErrorStr}\"
     }"
-        exit 1 
+        exit 1
     ;;
 
     DEL)
@@ -34,10 +34,19 @@ data:
     GET)
     ;;
 
+    STATUS)
+    echo "{
+      \"cniVersion\": \"${cniVersionStr}\"
+    }"
+    ;;
+
+    GC)
+    ;;
+
     VERSION)
     echo "{
-      \"cniVersion\": \"${cniVersionStr}\", 
-      \"supportedVersions\": [ \"0.3.0\", \"0.3.1\", \"0.4.0\" ] 
+      \"cniVersion\": \"${cniVersionStr}\",
+      \"supportedVersions\": [ \"0.3.0\", \"0.3.1\", \"0.4.0\", \"1.0.0\", \"1.1.0\" ]
     }"
     ;;
 
@@ -48,7 +57,7 @@ data:
       \"msg\": \"Invalid Configuration\",
       \"details\": \"${unknownErrorStr}\"
     }"
-        exit 1 
+        exit 1
     ;;
 
     esac
@@ -65,7 +74,7 @@ metadata:
     release.openshift.io/version: "{{.ReleaseVersion}}"
 data:
   08-error-cni.conf: |-
-    {"cniVersion":"0.4.0","name":"error-cni","type":"error-cni"}
+    {"cniVersion":"1.1.0","name":"error-cni","type":"error-cni"}
 
 ---
 kind: DaemonSet
