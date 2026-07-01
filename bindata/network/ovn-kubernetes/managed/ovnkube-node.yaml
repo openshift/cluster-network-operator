@@ -526,6 +526,11 @@ spec:
           name: etc-openvswitch
         - mountPath: /var/lib/openvswitch
           name: var-lib-openvswitch
+{{ if .OVNIPsecEnable }}
+        - mountPath: /var/run/pluto/
+          name: host-var-run-pluto
+          readOnly: true
+{{ end }}
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
         - mountPath: /env
@@ -719,6 +724,12 @@ spec:
       - name: host-var-lib-cni-networks-ovn-kubernetes
         hostPath:
           path: /var/lib/cni/networks/ovn-k8s-cni-overlay
+{{ if .OVNIPsecEnable }}
+      - name: host-var-run-pluto
+        hostPath:
+          path: /var/run/pluto
+          type: DirectoryOrCreate
+{{ end }}
       - name: ovnkube-config
         configMap:
           name: ovnkube-config
