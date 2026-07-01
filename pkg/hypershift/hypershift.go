@@ -1,6 +1,7 @@
 package hypershift
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,12 +11,16 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const HostedClusterLocalProxy = "socks5://127.0.0.1:8090"
@@ -23,17 +28,6 @@ const HostedClusterDefaultAdvertiseAddressIPV4 = "172.20.0.1"
 const HostedClusterDefaultAdvertiseAddressIPV6 = "fd00::1"
 
 const HostedClusterDefaultAdvertisePort = int64(6443)
-
-var (
-	enabled           = os.Getenv("HYPERSHIFT")
-	name              = os.Getenv("HOSTED_CLUSTER_NAME")
-	namespace         = os.Getenv("HOSTED_CLUSTER_NAMESPACE")
-	runAsUser         = os.Getenv("RUN_AS_USER")
-	releaseImage      = os.Getenv("OPENSHIFT_RELEASE_IMAGE")
-	controlPlaneImage = os.Getenv("OVN_CONTROL_PLANE_IMAGE")
-	caConfigMap       = os.Getenv("CA_CONFIG_MAP")
-	caConfigMapKey    = os.Getenv("CA_CONFIG_MAP_KEY")
-)
 
 const (
 	// ClusterIDLabel (_id) is the common label used to identify clusters in telemeter.
@@ -63,6 +57,7 @@ type HostedControlPlane struct {
 	AdvertiseAddress             string
 	AdvertisePort                int
 	PriorityClass                string
+	APIServerSpec                *configv1.APIServerSpec
 }
 
 // AvailabilityPolicy specifies a high level availability policy for components.
@@ -82,13 +77,13 @@ const (
 	SingleReplica AvailabilityPolicy = "SingleReplica"
 )
 
-// HostedControlPlaneGVK GroupVersionKind for HostedControlPlane
-// Based on https://github.com/openshift/hypershift/blob/27316d734d806a29d63f65ddf746cafd4409a1de/api/hypershift/v1beta1/hosted_controlplane.go#L19
-var HostedControlPlaneGVK = schema.GroupVersionKind{
-	Group:   "hypershift.openshift.io",
-	Version: "v1beta1",
-	Kind:    "HostedControlPlane",
-}
+var (
+	HostedControlPlaneGVK = schema.GroupVersionKind{
+		Group:   "hypershift.openshift.io",
+		Version: "v1beta1",
+		Kind:    "HostedControlPlane",
+	}
+)
 
 type HyperShiftConfig struct {
 	sync.Mutex
@@ -104,28 +99,26 @@ type HyperShiftConfig struct {
 }
 
 func NewHyperShiftConfig() *HyperShiftConfig {
+	caConfigMap := os.Getenv("CA_CONFIG_MAP")
 	if caConfigMap == "" {
 		caConfigMap = "openshift-service-ca.crt"
 	}
 
+	caConfigMapKey := os.Getenv("CA_CONFIG_MAP_KEY")
 	if caConfigMapKey == "" {
 		caConfigMapKey = "service-ca.crt"
 	}
 
 	return &HyperShiftConfig{
-		Enabled:           hyperShiftEnabled(),
-		Name:              name,
-		Namespace:         namespace,
-		RunAsUser:         runAsUser,
-		ReleaseImage:      releaseImage,
-		ControlPlaneImage: controlPlaneImage,
+		Enabled:           os.Getenv("HYPERSHIFT") == "true",
+		Name:              os.Getenv("HOSTED_CLUSTER_NAME"),
+		Namespace:         os.Getenv("HOSTED_CLUSTER_NAMESPACE"),
+		RunAsUser:         os.Getenv("RUN_AS_USER"),
+		ReleaseImage:      os.Getenv("OPENSHIFT_RELEASE_IMAGE"),
+		ControlPlaneImage: os.Getenv("OVN_CONTROL_PLANE_IMAGE"),
 		CAConfigMap:       caConfigMap,
 		CAConfigMapKey:    caConfigMapKey,
 	}
-}
-
-func hyperShiftEnabled() bool {
-	return enabled == "true"
 }
 
 func (hc *HyperShiftConfig) SetRelatedObjects(relatedObjects []RelatedObject) {
@@ -255,6 +248,23 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 		advertisePort = HostedClusterDefaultAdvertisePort
 	}
 
+	// Parse APIServer configuration (for TLS profile and other settings)
+	var apiServerSpec *configv1.APIServerSpec
+	apiServerConfig, found, err := unstructured.NestedFieldCopy(hcp.UnstructuredContent(), "spec", "configuration", "apiServer")
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract apiServer config: %v", err)
+	}
+	if found && apiServerConfig != nil {
+		apiServerMap, ok := apiServerConfig.(map[string]interface{})
+		if ok {
+			var spec configv1.APIServerSpec
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(apiServerMap, &spec); err != nil {
+				return nil, fmt.Errorf("failed to convert apiServer spec: %w", err)
+			}
+			apiServerSpec = &spec
+		}
+	}
+
 	return &HostedControlPlane{
 		ControllerAvailabilityPolicy: AvailabilityPolicy(controllerAvailabilityPolicy),
 		ClusterID:                    clusterID,
@@ -264,7 +274,32 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 		AdvertiseAddress:             advertiseAddress,
 		AdvertisePort:                int(advertisePort),
 		PriorityClass:                controlPlanePriorityClassAnnotation,
+		APIServerSpec:                apiServerSpec,
 	}, nil
+}
+
+// GetHostedControlPlane retrieves and parses the HostedControlPlane CR for the current HyperShift cluster.
+// Returns nil if HyperShift is not enabled.
+func GetHostedControlPlane(client cnoclient.Client) (*HostedControlPlane, error) {
+	hc := NewHyperShiftConfig()
+	if !hc.Enabled {
+		return nil, nil
+	}
+
+	hcp := &unstructured.Unstructured{}
+	hcp.SetGroupVersionKind(HostedControlPlaneGVK)
+	err := client.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(),
+		types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, hcp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve HostedControlPlane %s/%s: %w", hc.Namespace, hc.Name, err)
+	}
+
+	parsed, err := ParseHostedControlPlane(hcp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse HostedControlPlane %s/%s: %w", hc.Namespace, hc.Name, err)
+	}
+
+	return parsed, nil
 }
 
 // SetHostedControlPlaneConditions updates the hcp status.conditions based on the provided operStatus

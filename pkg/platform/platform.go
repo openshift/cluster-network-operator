@@ -19,7 +19,6 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -119,18 +118,10 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 		}
 	}
 
-	if hc := hypershift.NewHyperShiftConfig(); hc.Enabled {
-		hcp := &unstructured.Unstructured{}
-		hcp.SetGroupVersionKind(hypershift.HostedControlPlaneGVK)
-		err := client.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, hcp)
-		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve HostedControlPlane %s: %v", types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, err)
-		}
-
-		res.HostedControlPlane, err = hypershift.ParseHostedControlPlane(hcp)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parsing HostedControlPlane %s: %v", types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, err)
-		}
+	var err error
+	res.HostedControlPlane, err = hypershift.GetHostedControlPlane(client)
+	if err != nil {
+		return nil, err
 	}
 
 	netIDEnabled, err := isNetworkNodeIdentityEnabled(client)
