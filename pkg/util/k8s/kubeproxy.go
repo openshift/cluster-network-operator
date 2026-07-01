@@ -63,6 +63,11 @@ func GenerateKubeProxyConfiguration(args map[string]operv1.ProxyArgumentList) (s
 	kpc.IPTables.SyncPeriod.Duration = ka.getDuration("iptables-sync-period")
 	kpc.IPTables.MinSyncPeriod.Duration = ka.getDuration("iptables-min-sync-period")
 
+	kpc.NFTables.MasqueradeBit = ka.getOptInt32("nftables-masquerade-bit")
+	kpc.NFTables.MasqueradeAll = ka.getBool("nftables-masquerade-all")
+	kpc.NFTables.SyncPeriod.Duration = ka.getDuration("nftables-sync-period")
+	kpc.NFTables.MinSyncPeriod.Duration = ka.getDuration("nftables-min-sync-period")
+
 	kpc.IPVS.SyncPeriod.Duration = ka.getDuration("ipvs-sync-period")
 	kpc.IPVS.MinSyncPeriod.Duration = ka.getDuration("ipvs-min-sync-period")
 	kpc.IPVS.Scheduler = ka.getString("ipvs-scheduler")
@@ -84,10 +89,16 @@ func GenerateKubeProxyConfiguration(args map[string]operv1.ProxyArgumentList) (s
 	if duration := ka.getDuration("conntrack-tcp-timeout-close-wait"); duration != 0 {
 		kpc.Conntrack.TCPCloseWaitTimeout = &metav1.Duration{Duration: duration}
 	}
+	kpc.Conntrack.TCPBeLiberal = ka.getBool("conntrack-tcp-be-liberal")
 
 	kpc.ConfigSyncPeriod.Duration = ka.getDuration("config-sync-period")
 
-	kpc.NodePortAddresses = ka.getCIDRList("node-port-addresses")
+	kpc.NodePortAddresses = ka.getStringList("nodeport-addresses")
+	if kpc.NodePortAddresses == nil {
+		kpc.NodePortAddresses = ka.getStringList("node-port-addresses")
+	} else {
+		ka.getStringList("node-port-addresses")
+	}
 
 	// kpc.Winkernel : CNO's kube-proxy config is never used for Windows kube-proxy so
 	// there's no need to allow overriding this.
@@ -215,6 +226,15 @@ func (ka *kpcArgs) getCIDRList(key string) []string {
 		}
 	}
 	return values
+}
+
+// getStringList parses a comma-separated list and returns an array of strings
+func (ka *kpcArgs) getStringList(key string) []string {
+	value := ka.get(key)
+	if value == "" {
+		return nil
+	}
+	return strings.Split(value, ",")
 }
 
 // getOptInt32 returns an optional int32

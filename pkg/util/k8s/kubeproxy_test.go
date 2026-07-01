@@ -405,6 +405,85 @@ winkernel:
 `,
 		},
 		{
+			description: "nftables overrides",
+			overrides: map[string]operv1.ProxyArgumentList{
+				"proxy-mode":               {"nftables"},
+				"nftables-masquerade-bit":  {"14"},
+				"nftables-masquerade-all":  {"true"},
+				"nftables-sync-period":     {"30s"},
+				"nftables-min-sync-period": {"10s"},
+			},
+			output: `
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+bindAddress: 0.0.0.0
+bindAddressHardFail: false
+clientConnection:
+  acceptContentTypes: ""
+  burst: 0
+  contentType: ""
+  kubeconfig: ""
+  qps: 0
+clusterCIDR: ""
+configSyncPeriod: 0s
+conntrack:
+  maxPerCore: null
+  min: null
+  tcpBeLiberal: false
+  tcpCloseWaitTimeout: null
+  tcpEstablishedTimeout: null
+  udpStreamTimeout: 0s
+  udpTimeout: 0s
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
+detectLocalMode: ""
+enableProfiling: false
+healthzBindAddress: ""
+hostnameOverride: ""
+iptables:
+  localhostNodePorts: null
+  masqueradeAll: false
+  masqueradeBit: 0
+  minSyncPeriod: 0s
+  syncPeriod: 0s
+ipvs:
+  excludeCIDRs: null
+  minSyncPeriod: 0s
+  scheduler: ""
+  strictARP: false
+  syncPeriod: 0s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
+kind: KubeProxyConfiguration
+logging:
+  flushFrequency: 0
+  options:
+    json:
+      infoBufferSize: "0"
+    text:
+      infoBufferSize: "0"
+  verbosity: 0
+metricsBindAddress: 0.0.0.0:9102
+mode: nftables
+nftables:
+  masqueradeAll: true
+  masqueradeBit: 14
+  minSyncPeriod: 10s
+  syncPeriod: 30s
+nodePortAddresses: null
+oomScoreAdj: null
+portRange: ""
+showHiddenMetricsForVersion: ""
+winkernel:
+  enableDSR: false
+  forwardHealthCheckVip: false
+  networkName: ""
+  rootHnsEndpointName: ""
+  sourceVip: ""
+`,
+		},
+		{
 			description: "bad address",
 			overrides: map[string]operv1.ProxyArgumentList{
 				"bind-address": {"foo"},
