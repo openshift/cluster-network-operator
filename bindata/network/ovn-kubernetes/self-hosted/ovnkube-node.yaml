@@ -510,12 +510,7 @@ spec:
         - mountPath: /etc/systemd/system
           name: systemd-units
           readOnly: true
-        # for the iptables wrapper
-        - mountPath: /host
-          name: host-slash
-          readOnly: true
-          mountPropagation: HostToContainer
-        # for the CNI server socket
+# for the CNI server socket
         - mountPath: /run/ovn-kubernetes/
           name: host-run-ovn-kubernetes
         # accessing bind-mounted net namespaces
@@ -603,41 +598,37 @@ spec:
           export KUBECONFIG=/etc/ovn/kubeconfig
 {{ end }}
 
-          touch /var/run/ovn/add_iptables.sh
-          chmod 0755 /var/run/ovn/add_iptables.sh
-          cat <<'EOF' > /var/run/ovn/add_iptables.sh
+          touch /var/run/ovn/add_nft_icmp.sh
+          chmod 0755 /var/run/ovn/add_nft_icmp.sh
+          cat <<'EOF' > /var/run/ovn/add_nft_icmp.sh
           #!/bin/sh
           if [ -z "$3" ]
           then
                echo "Called with host address missing, ignore"
                exit 0
           fi
-          echo "Adding ICMP drop rule for '$3' "
-          if iptables -C CHECK_ICMP_SOURCE -p icmp -s $3 -j ICMP_ACTION
-          then
-               echo "iptables already set for $3"
-          else
-               iptables -A CHECK_ICMP_SOURCE -p icmp -s $3 -j ICMP_ACTION
-          fi
+          echo "Adding ICMP drop rule for '$3'"
+          nft add element ip azure_icmp icmp_sources "{ $3 }"
           EOF
 
           echo "I$(date "+%m%d %H:%M:%S.%N") - drop-icmp - start drop-icmp ${K8S_NODE}"
-          iptables -X CHECK_ICMP_SOURCE || true
-          iptables -N CHECK_ICMP_SOURCE || true
-          iptables -F CHECK_ICMP_SOURCE
-          iptables -D INPUT -p icmp --icmp-type fragmentation-needed -j CHECK_ICMP_SOURCE || true
-          iptables -I INPUT -p icmp --icmp-type fragmentation-needed -j CHECK_ICMP_SOURCE
-          iptables -N ICMP_ACTION || true
-          iptables -F ICMP_ACTION
-          iptables -A ICMP_ACTION -j LOG
-          iptables -A ICMP_ACTION -j DROP
+          # Clean up old iptables ICMP rules from before the nftables migration.
+          # This cleanup code can be removed once all nodes have been upgraded.
+          iptables -D INPUT -p icmp --icmp-type fragmentation-needed -j CHECK_ICMP_SOURCE 2>/dev/null || true
+          iptables -F CHECK_ICMP_SOURCE 2>/dev/null || true
+          iptables -X CHECK_ICMP_SOURCE 2>/dev/null || true
+          iptables -F ICMP_ACTION 2>/dev/null || true
+          iptables -X ICMP_ACTION 2>/dev/null || true
+          nft 'add table ip azure_icmp { comment "Azure ICMP drop filtering" ; }'
+          nft flush table ip azure_icmp
+          nft 'add set ip azure_icmp icmp_sources { type ipv4_addr; }'
+          nft 'add chain ip azure_icmp input { type filter hook input priority 0; policy accept; }'
+          nft add rule ip azure_icmp input icmp type destination-unreachable icmp code frag-needed ip saddr @icmp_sources counter log drop
           #
           ip addr show
           ip route show
-          iptables -nvL
-          iptables -nvL -t nat
-          oc observe pods -n openshift-ovn-kubernetes --listen-addr='' -l app=ovnkube-node -a '{ .status.hostIP }' -- /var/run/ovn/add_iptables.sh
-          #systemd-run -qPG -- oc observe pods -n openshift-ovn-kubernetes --listen-addr='' -l app=ovnkube-node -a '{ .status.hostIP }' -- /var/run/ovn/add_iptables.sh
+          nft list table ip azure_icmp
+          oc observe pods -n openshift-ovn-kubernetes --listen-addr='' -l app=ovnkube-node -a '{ .status.hostIP }' -- /var/run/ovn/add_nft_icmp.sh
         lifecycle:
           preStop:
             exec:
@@ -650,12 +641,7 @@ spec:
         - mountPath: /etc/ovn/
           name: etc-openvswitch
 {{ end }}
-        # for the iptables wrapper
-        - mountPath: /host
-          name: host-slash
-          readOnly: true
-          mountPropagation: HostToContainer
-        - mountPath: /run/ovn/
+- mountPath: /run/ovn/
           name: run-ovn
         resources:
           requests:
@@ -679,10 +665,6 @@ spec:
       - name: systemd-units
         hostPath:
           path: /etc/systemd/system
-      # used for iptables wrapper scripts
-      - name: host-slash
-        hostPath:
-          path: /
       - name: host-run-netns
         hostPath:
           path: /run/netns
