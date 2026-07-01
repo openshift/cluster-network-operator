@@ -559,11 +559,11 @@ spec:
             cpu: 10m
             memory: 600Mi
             {{ if and (.MgmtPortResourceName) (or (eq .OVN_NODE_MODE "smart-nic") (eq .OVN_NODE_MODE "dpu-host")) }}
-            {{ .MgmtPortResourceName }}: '1'
+            {{ .MgmtPortResourceName }}: '{{ .MgmtPortResourceCount }}'
             {{ end }}
           {{ if and (.MgmtPortResourceName) (or (eq .OVN_NODE_MODE "smart-nic") (eq .OVN_NODE_MODE "dpu-host")) }}
           limits:
-            {{ .MgmtPortResourceName }}: '1'
+            {{ .MgmtPortResourceName }}: '{{ .MgmtPortResourceCount }}'
           {{ end }}
         lifecycle:
           preStop:
