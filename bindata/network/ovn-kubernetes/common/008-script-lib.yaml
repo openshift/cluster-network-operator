@@ -11,6 +11,13 @@ data:
   ovnkube-lib.sh: |-
     #!/bin/bash
     set -x
+    # Add global overrides if the container has mounted any
+    if [[ -f "/env/_global" ]]; then
+      set -o allexport
+      source "/env/_global"
+      set +o allexport
+    fi
+
     # Add node-specific overrides if the container has mounted any
     K8S_NODE=${K8S_NODE:-}
     if [[ -n "${K8S_NODE}" && -f "/env/${K8S_NODE}" ]]; then
