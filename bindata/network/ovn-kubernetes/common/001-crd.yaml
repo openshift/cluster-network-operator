@@ -4472,6 +4472,31 @@ spec:
                         specified in the subnets field
                       rule: '!has(self.excludeSubnets) || self.excludeSubnets.all(e,
                         self.subnets.exists(s, cidr(s).containsCIDR(cidr(e))))'
+{{- if .OVN_NOOVERLAY_ENABLE }}                        
+                  noOverlay:
+                    description: |-
+                      NoOverlay contains configuration for no-overlay mode.
+                      This is only allowed when Transport is "NoOverlay".
+                    properties:
+                      outboundSNAT:
+                        description: OutboundSNAT defines the SNAT behavior for outbound
+                          traffic from pods.
+                        enum:
+                        - Enabled
+                        - Disabled
+                        type: string
+                      routing:
+                        description: Routing specifies whether the pod network routing
+                          is managed by OVN-Kubernetes or users.
+                        enum:
+                        - Managed
+                        - Unmanaged
+                        type: string
+                    required:
+                    - outboundSNAT
+                    - routing
+                    type: object
+{{- end }}                    
                   topology:
                     description: |-
                       Topology describes network configuration.
@@ -4485,7 +4510,7 @@ spec:
                     - Layer3
                     - Localnet
                     type: string
-{{- if .OVN_EVPN_ENABLE_API }}
+{{- if or .OVN_EVPN_ENABLE_API .OVN_NOOVERLAY_ENABLE }}
                   transport:
                     description: |-
                       Transport describes the transport technology for pod-to-pod traffic.
@@ -4495,8 +4520,12 @@ spec:
                       When omitted, the network uses the default OVN overlay transport (e.g. Geneve, VXLAN)
                       as configured by ovn-encap-type.
                     enum:
+{{- if .OVN_NOOVERLAY_ENABLE }}
                     - NoOverlay
+{{- end }}
+{{- if .OVN_EVPN_ENABLE_API }}
                     - EVPN
+{{- end }}                    
                     type: string
 {{- end }}
                 required:
@@ -4538,6 +4567,18 @@ spec:
                     when transport is 'EVPN'
                   rule: '!has(self.transport) || self.transport != ''EVPN'' || self.topology
                     != ''Layer3'' || !has(self.evpn) || !has(self.evpn.macVRF)'
+{{- end }}
+{{- if .OVN_NOOVERLAY_ENABLE }}
+                - message: transport 'NoOverlay' is only supported for Layer3 primary
+                    networks
+                  rule: '!has(self.transport) || self.transport != ''NoOverlay'' ||
+                    (self.topology == ''Layer3'' && has(self.layer3) && self.layer3.role
+                    == ''Primary'')'
+                - message: spec.noOverlay is required when type transport is 'NoOverlay'
+                  rule: '!has(self.transport) || self.transport != ''NoOverlay'' ||
+                    has(self.noOverlay)'
+                - message: spec.noOverlay is forbidden when transport type is not 'NoOverlay'
+                  rule: self.transport == 'NoOverlay' || !has(self.noOverlay)
 {{- end }}
                 - message: Network spec is immutable
                   rule: self == oldSelf
