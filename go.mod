@@ -15,8 +15,8 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
-	github.com/vishvananda/netlink v1.1.0
-	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
+	github.com/vishvananda/netlink v1.3.1
+	github.com/vishvananda/netns v0.0.5 // indirect
 	golang.org/x/net v0.51.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.35.2
@@ -100,12 +100,16 @@ require (
 )
 
 require (
+	github.com/onsi/ginkgo/v2 v2.28.1
+	github.com/openshift-eng/openshift-tests-extension v0.0.0-20260521151256-b5a8f7ec8a38
 	github.com/openshift/api v0.0.0-20260609121705-d3390bd1109f
 	github.com/openshift/client-go v0.0.0-20260603140539-6892dc3e1ffc
 	github.com/openshift/library-go v0.0.0-20260303171201-5d9eb6295ff6
 	github.com/openshift/machine-config-operator v0.0.1-0.20250724162154-ab14c8e2843b
 	k8s.io/apiextensions-apiserver v0.35.2
 	k8s.io/client-go v0.35.2
+	k8s.io/kubernetes v1.35.2
+	k8s.io/pod-security-admission v0.35.2
 	sigs.k8s.io/controller-tools v0.20.1
 )
 
@@ -114,6 +118,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
+	github.com/distribution/reference v0.6.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fatih/color v1.18.0 // indirect
@@ -131,16 +136,21 @@ require (
 	github.com/go-openapi/swag/stringutils v0.25.5 // indirect
 	github.com/go-openapi/swag/typeutils v0.25.5 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.5 // indirect
+	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gobuffalo/flect v1.0.3 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/cel-go v0.27.0 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
+	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/onsi/ginkgo/v2 v2.28.1 // indirect
+	github.com/moby/spdystream v0.5.0 // indirect
+	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
@@ -155,9 +165,45 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	k8s.io/apiserver v0.35.2 // indirect
+	k8s.io/component-helpers v0.35.2 // indirect
+	k8s.io/controller-manager v0.32.1 // indirect
 	k8s.io/gengo/v2 v2.0.0-20251215205346-5ee0d033ba5b // indirect
 	k8s.io/kms v0.35.2 // indirect
 	k8s.io/kube-aggregator v0.35.1 // indirect
+	k8s.io/kubectl v0.32.1 // indirect
+	k8s.io/kubelet v0.32.1 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect
+)
+
+replace (
+	github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20260303184444-1cc650aa0565
+	k8s.io/api => k8s.io/api v0.35.2
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.35.2
+	k8s.io/apimachinery => k8s.io/apimachinery v0.35.2
+	k8s.io/apiserver => k8s.io/apiserver v0.35.2
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.35.2
+	k8s.io/client-go => k8s.io/client-go v0.35.2
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.35.2
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.35.2
+	k8s.io/code-generator => k8s.io/code-generator v0.35.2
+	k8s.io/component-base => k8s.io/component-base v0.35.2
+	k8s.io/component-helpers => k8s.io/component-helpers v0.35.2
+	k8s.io/controller-manager => k8s.io/controller-manager v0.35.2
+	k8s.io/cri-api => k8s.io/cri-api v0.35.2
+	k8s.io/cri-client => k8s.io/cri-client v0.35.2
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.35.2
+	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.35.2
+	k8s.io/endpointslice => k8s.io/endpointslice v0.35.2
+	k8s.io/externaljwt => k8s.io/externaljwt v0.35.2
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.35.2
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.35.2
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.35.2
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.35.2
+	k8s.io/kubectl => k8s.io/kubectl v0.35.2
+	k8s.io/kubelet => k8s.io/kubelet v0.35.2
+	k8s.io/metrics => k8s.io/metrics v0.35.2
+	k8s.io/mount-utils => k8s.io/mount-utils v0.35.2
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.35.2
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.35.2
 )
