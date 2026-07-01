@@ -15,10 +15,173 @@ reviews:
         kube-proxy, network-diagnostics, egress-router, cloud-network-config-controller,
         network-metrics, node-identity, FRR-K8s, iptables-alerter, MTU-prober,
         container-networking-plugins, bond CNI, whereabouts CNI, route-override CNI,
-        multi-network-policy, and the networking console plugin.
+        multi-network-policy, EVPN, and the networking console plugin.
         - Focus on major issues impacting performance, readability, maintainability and security.
         - Consider backward compatibility, upgrade safety, and multi-platform support.
         - Avoid nitpicks and avoid verbosity.
+        - In HyperShift, CNO is deployed by openshift/hypershift (not CVO). If changes
+          touch `manifests/` or the CNO deployment, check whether corresponding changes
+          are needed in the openshift/hypershift repo.
+        - Dual-stack (IPv4+IPv6) must always be considered. Flag changes that only
+          handle single-stack addresses (e.g. missing net.JoinHostPort for IPv6).
+        - Two CRDs drive CNO configuration:
+          `network.config.openshift.io/cluster` is the source of truth set by the
+          installer. `network.operator.openshift.io/cluster` is the operational
+          config CNO actually renders from. On each reconcile, CNO copies
+          `clusterNetwork`, `serviceNetwork`, and `networkType` from config → operator,
+          unconditionally overwriting whatever is in the operator CR for those fields.
+          Fields that exist only on the operator CR (e.g. `defaultNetwork.ovnKubernetesConfig`,
+          `ManagementState`, `disableNetworkDiagnostics`) are NOT touched by this merge
+          and are the user/admin's to control. Setting a config-owned field directly on
+          the operator CR has no effect — it gets overwritten on next reconcile.
+          `ManagementState` and `disableNetworkDiagnostics` need special SSA merge
+          protection (`pkg/apply/merge.go`) because they are non-pointer fields whose
+          zero values would otherwise clobber user-set values.
+
+    # -------------------------------------------------------------------------
+    # CVO-managed manifests (applied before CNO starts)
+    # -------------------------------------------------------------------------
+    - path: 'manifests/**'
+      instructions: |
+        Files in `manifests/` are applied by the Cluster Version Operator (CVO) before
+        CNO starts. They define the operator's own namespace, deployment, RBAC, CRDs,
+        and monitoring resources.
+        - Every resource MUST have the correct `include.release.openshift.io/*`
+          annotations (`self-managed-high-availability`, `single-node-developer`,
+          and `ibm-cloud-managed` where applicable). Missing annotations cause the
+          resource to be skipped on certain profiles.
+        - CVO applies `manifests/` before CNO starts, so resources there must
+          not depend on CNO running.
+        - The CNO deployment manifest (`03_deployment.yaml`) has a companion
+          `03_deployment-ibm-cloud-managed.yaml` variant. Changes to one may
+          require changes to the other.
+
+    # -------------------------------------------------------------------------
+    # CNO-managed bindata (rendered and applied by the operator at runtime)
+    # -------------------------------------------------------------------------
+    - path: 'bindata/**'
+      instructions: |
+        Files in `bindata/` are Go-template YAML manifests rendered and applied by CNO
+        at runtime. They define the actual networking components (DaemonSets, Deployments,
+        ConfigMaps, RBAC, etc.).
+
+        **Critical annotations CNO acts upon — verify correctness when adding/modifying resources:**
+        - `release.openshift.io/version: "{{.ReleaseVersion}}"` — annotation that MUST
+          be present on every Deployment, DaemonSet, and StatefulSet. CNO uses this to
+          track upgrade progress. Missing annotation = operator never reports upgrade
+          complete.
+        - `network.operator.openshift.io/cluster-name` — annotation specifying which
+          cluster a resource belongs to in HyperShift (management vs guest). CNO uses
+          this to select the correct API client for applying. Wrong value = resource
+          applied to wrong cluster.
+        - `networkoperator.openshift.io/create-only` — annotation marking a resource as
+          created but never updated. Removing this changes apply semantics.
+        - `network.operator.openshift.io/copy-from` — annotation indicating resource
+          content is copied from another object (format: `ClusterName/Namespace/Name`).
+          Verify source exists.
+        - `networkoperator.openshift.io/non-critical` — annotation marking resources
+          that should not block the operator from becoming `Available` during cluster
+          install, because they depend on other operators.
+
+        **Namespace manifests:**
+        - Namespaces running DaemonSets MUST have `openshift.io/node-selector: ""`
+          annotation to override any default node selector. Missing this causes pods
+          to be unschedulable when cluster-wide defaultNodeSelector is set.
+
+        **General:**
+        - When a field is added to containers in a DaemonSet/Deployment (e.g.
+          `terminationMessagePolicy`, resource limits), verify ALL containers
+          including init containers are covered — partial coverage is a recurring bug.
+
+    # -------------------------------------------------------------------------
+    # OVN-Kubernetes: managed (HyperShift) vs self-hosted alignment
+    # -------------------------------------------------------------------------
+    - path: 'bindata/network/ovn-kubernetes/**'
+      instructions: |
+        OVN-Kubernetes manifests are split into three directories:
+        - `common/` — shared across both HyperShift (managed) and standalone (self-hosted)
+        - `managed/` — HyperShift control plane (runs in the management cluster)
+        - `self-hosted/` — standalone OCP control plane (runs on cluster nodes)
+
+        **Managed ↔ Self-hosted alignment (HIGH PRIORITY):**
+        - `managed/` and `self-hosted/` contain parallel files for the same components
+          (ovnkube-control-plane, ovnkube-node, config, monitoring).
+        - When changing a file in one, ALWAYS check if the same change is needed in
+          the other. This is the #1 source of HyperShift drift bugs. Examples:
+          masquerade subnet config, interconnect flags, IPv6 URL formatting.
+          Some settings are HyperShift-only (SOCKS proxy, different cert paths,
+          `{{.OVNControlPlaneImage}}`), but most feature flags must appear in both.
+
+        **OVN-K rollout behavior:**
+        - CNO rolls out OVN-K changes in a specific order: control-plane first, then
+          nodes (only after control-plane rollout completes). The pre-puller DaemonSet
+          runs before node rollout to pull images.
+        - `release.openshift.io/version` on DaemonSets/Deployments drives rollout
+          progress tracking. `networkoperator.openshift.io/rollout-hung` is set when
+          a rollout appears stuck.
+        - Rollout/progress checks must handle zero-node and zero-replica edge cases
+          (HyperShift clusters can have zero workers during provisioning).
+
+        **What triggers OVN-K pod restarts (and what does not):**
+        - The `ovnkube-script-lib` ConfigMap (`008-script-lib.yaml`) is hashed into a
+          pod template annotation (`OVNKubeConfigHash`). Changes to this ConfigMap
+          trigger ovnkube-node restarts.
+        - Separate hashes exist for node-only config (`OVNKubeNodeConfigHash` — tracks
+          `outboundSNAT`) and control-plane-only config (`OVNKubeControlPlaneConfigHash`
+          — tracks BGP `asNumber`/`topology`), so changes to one don't restart the other.
+        - Annotations set via `setOVNObjectAnnotation` (`ip-family-mode`,
+          `cluster-network-cidr`, `hybrid-overlay-status`) are placed on both the
+          object AND the pod template, so changes trigger a rollout.
+        - Other ConfigMaps (e.g. `004-config.yaml`) are NOT hashed — changes to them
+          are only picked up on next pod restart. If a new config option is added to a
+          non-hashed ConfigMap and must take effect immediately, either add it to the
+          hash computation or use a different restart mechanism.
+
+        **CLI flags:**
+        - OVN-K containers are especially prone to duplicated or obsolete CLI flags
+          in command/args. Audit for duplicates when modifying container specs.
+
+    # -------------------------------------------------------------------------
+    # Other components with managed/self-hosted variants
+    # -------------------------------------------------------------------------
+    - path: 'bindata/network/node-identity/**'
+      instructions: |
+        Node identity controller — has `managed/` and `self-hosted/` variants
+        like OVN-K. Ensure both variants stay aligned when making changes.
+
+    # -------------------------------------------------------------------------
+    # Go source: rendering, apply, and operator logic
+    # -------------------------------------------------------------------------
+    - path: 'pkg/network/*.go'
+      instructions: |
+        Network component rendering functions. Each file (multus.go, kube_proxy.go,
+        ovn_kubernetes.go, etc.) renders bindata templates for its component.
+        - Every render function must set `data.Data["ReleaseVersion"]` from
+          `os.Getenv("RELEASE_VERSION")`. Missing this = the component's workloads
+          won't have the version annotation and upgrades stall.
+        - `daemonSetProgressing()` / `deploymentProgressing()` in ovn_kubernetes.go
+          drive upgrade status. Must handle zero DesiredNumberScheduled, rollout-hung
+          annotation, generation mismatch. Bugs here block cluster upgrades.
+
+    - path: 'pkg/apply/**'
+      instructions: |
+        CNO uses Server-Side Apply exclusively (`Force: true`). Changes here
+        affect ALL components.
+        - Fields NOT included in the applied object are released (not deleted).
+          To actually remove a field from the live object, explicit deletion
+          logic is needed.
+        - `merge.go` has special-case merge functions for non-pointer fields
+          whose zero values conflict with SSA (`disableNetworkDiagnostics`,
+          `managementState`). Changes here need careful review.
+
+    - path: 'pkg/hypershift/**'
+      instructions: |
+        HyperShift integration layer.
+        - Uses a locally-defined subset of the HostedControlPlane API to avoid
+          importing the full openshift/hypershift dependency.
+        - Environment variables (`HYPERSHIFT`, `HOSTED_CLUSTER_NAME`, etc.) control
+          HyperShift mode detection.
+
   # https://docs.coderabbit.ai/configuration/path-instructions#path-filters
   path_filters:
     - "!vendor/**"
