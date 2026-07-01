@@ -93,6 +93,10 @@ func (fakeSharedIndexInformer) SetTransform(f cache.TransformFunc) error {
 	panic("implement me")
 }
 
+func (fakeSharedIndexInformer) HasSyncedChecker() cache.DoneChecker {
+	panic("implement me")
+}
+
 // NewFakeStaticPodOperatorClient returns a fake operator client suitable to use in static pod controller unit tests.
 func NewFakeStaticPodOperatorClient(
 	staticPodSpec *operatorv1.StaticPodOperatorSpec, staticPodStatus *operatorv1.StaticPodOperatorStatus,

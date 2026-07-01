@@ -36,10 +36,10 @@ var (
 
 //nolint:errcheck
 func init() {
-	configv1.AddToScheme(scheme.Scheme)
-	operv1.AddToScheme(scheme.Scheme)
+	configv1.Install(scheme.Scheme)
+	operv1.Install(scheme.Scheme)
 	appsv1.AddToScheme(scheme.Scheme)
-	mcfgv1.AddToScheme(scheme.Scheme)
+	mcfgv1.Install(scheme.Scheme)
 }
 
 func getCO(client cnoclient.Client, name string) (*configv1.ClusterOperator, error) {

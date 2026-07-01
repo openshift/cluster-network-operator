@@ -47,7 +47,7 @@ var (
 
 //nolint:errcheck
 func init() {
-	operv1.AddToScheme(scheme.Scheme)
+	operv1.Install(scheme.Scheme)
 	appsv1.AddToScheme(scheme.Scheme)
 }
 
