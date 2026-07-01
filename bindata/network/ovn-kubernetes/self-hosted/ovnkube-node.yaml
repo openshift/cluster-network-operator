@@ -510,12 +510,7 @@ spec:
         - mountPath: /etc/systemd/system
           name: systemd-units
           readOnly: true
-        # for the iptables wrapper
-        - mountPath: /host
-          name: host-slash
-          readOnly: true
-          mountPropagation: HostToContainer
-        # for the CNI server socket
+# for the CNI server socket
         - mountPath: /run/ovn-kubernetes/
           name: host-run-ovn-kubernetes
         # accessing bind-mounted net namespaces
@@ -646,12 +641,7 @@ spec:
         - mountPath: /etc/ovn/
           name: etc-openvswitch
 {{ end }}
-        # for the iptables wrapper
-        - mountPath: /host
-          name: host-slash
-          readOnly: true
-          mountPropagation: HostToContainer
-        - mountPath: /run/ovn/
+- mountPath: /run/ovn/
           name: run-ovn
         resources:
           requests:
@@ -675,10 +665,6 @@ spec:
       - name: systemd-units
         hostPath:
           path: /etc/systemd/system
-      # used for iptables wrapper scripts
-      - name: host-slash
-        hostPath:
-          path: /
       - name: host-run-netns
         hostPath:
           path: /run/netns
