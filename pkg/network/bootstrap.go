@@ -3,12 +3,10 @@ package network
 import (
 	"context"
 
+	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
-
-	operv1 "github.com/openshift/api/operator/v1"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,6 +33,11 @@ func Bootstrap(conf *operv1.Network, client cnoclient.Client) (*bootstrap.Bootst
 	}
 
 	out.IPTablesAlerter = iptablesAlerterBootstrap(client.ClientFor("").CRClient())
+
+	out.TLSProfile, err = GetTLSProfile(client, infraStatus.HostedControlPlane)
+	if err != nil {
+		return nil, err
+	}
 
 	return out, nil
 }

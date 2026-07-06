@@ -107,9 +107,20 @@ func NewFakeClient(objs ...crclient.Object) cnoclient.Client {
 		crclient:     crfake.NewClientBuilder().WithStatusSubresource(co, proxy).WithObjects(objs...).Build(),
 		osOperClient: osoperfakeclient.NewClientset(),
 	}
+
+	// Create a management cluster client for HyperShift scenarios
+	// This represents a separate cluster, so it starts empty
+	managementClient := FakeClusterClient{
+		kClient:      faketyped.NewClientset(),
+		dynclient:    fakedynamic.NewSimpleDynamicClient(scheme.Scheme),
+		crclient:     crfake.NewClientBuilder().WithStatusSubresource(co).Build(),
+		osOperClient: osoperfakeclient.NewClientset(),
+	}
+
 	return &FakeClient{
 		clusterClients: map[string]*FakeClusterClient{
-			names.DefaultClusterName: &fc,
+			names.DefaultClusterName:    &fc,
+			names.ManagementClusterName: &managementClient,
 		},
 	}
 }
