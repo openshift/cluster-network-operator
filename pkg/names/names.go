@@ -90,6 +90,13 @@ const IPsecEnableAnnotation = "networkoperator.openshift.io/ipsec-enabled"
 // (i.e. DaemonSet or Deployment) is not making progress, unset otherwise.
 const RolloutHungAnnotation = "networkoperator.openshift.io/rollout-hung"
 
+// ObservedStableGenerationAnnotation records the metadata.generation at which a
+// DaemonSet, Deployment, or StatefulSet was last observed fully available by
+// SetFromPods. A resource whose current generation does not match this value
+// has never completed a successful rollout at its current spec and must be
+// tracked as Progressing until all pods are available.
+const ObservedStableGenerationAnnotation = "networkoperator.openshift.io/observed-stable-generation"
+
 // CopyFromAnnotation is an annotation that allows copying resources from specified clusters
 // value format: cluster/namespace/name
 const CopyFromAnnotation = "network.operator.openshift.io/copy-from"
