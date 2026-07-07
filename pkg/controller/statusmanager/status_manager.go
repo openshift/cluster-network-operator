@@ -111,6 +111,11 @@ type StatusManager struct {
 	failing         [maxStatusLevel]*operv1.OperatorCondition
 	installComplete bool
 
+	// annotationMigrationDone is set after the first SetFromPods call where
+	// installComplete is true. It prevents the one-time migration from running
+	// again on subsequent calls.
+	annotationMigrationDone bool
+
 	// failureFirstSeen tracks when each StatusLevel first started failing.
 	failureFirstSeen map[StatusLevel]time.Time
 
