@@ -128,14 +128,14 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	}
 	objs = append(objs, o...)
 
-	o, err = renderAdditionalRoutingCapabilities(operConf, bootstrapResult, manifestDir)
+	bgpVIP := isBGPVIPManagement(bootstrapResult, featureGates)
+
+	o, err = renderAdditionalRoutingCapabilities(operConf, bootstrapResult, manifestDir, bgpVIP)
 	if err != nil {
 		return nil, progressing, err
 	}
 	objs = append(objs, o...)
 
-	// render BGP VIP FRRConfiguration CRs if BGP VIP management is active
-	bgpVIP := isBGPVIPManagement(bootstrapResult, featureGates)
 	o, err = renderBGPVIPFRRConfiguration(operConf, client, bgpVIP)
 	if err != nil {
 		return nil, progressing, err
@@ -861,7 +861,7 @@ func registerNetworkingConsolePlugin(bootstrapResult *bootstrap.BootstrapResult,
 	})
 }
 
-func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, bgpVIP bool) ([]*uns.Unstructured, error) {
 	if conf == nil || conf.AdditionalRoutingCapabilities == nil {
 		return nil, nil
 	}
@@ -878,6 +878,7 @@ func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, bootstrapResu
 			data.Data["NoOverlayManagedEnabled"] = conf.DefaultNetwork.OVNKubernetesConfig != nil &&
 				conf.DefaultNetwork.OVNKubernetesConfig.BGPManagedConfig.BGPTopology != ""
 			data.Data["IsSNO"] = bootstrapResult.OVN.ControlPlaneReplicaCount == 1
+			data.Data["BGPVIPManagement"] = bgpVIP
 			objs, err := render.RenderDir(filepath.Join(manifestDir, "network/frr-k8s"), &data)
 			if err != nil {
 				return nil, fmt.Errorf("failed to render frr-k8s manifests: %w", err)
