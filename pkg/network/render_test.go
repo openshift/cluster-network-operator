@@ -610,10 +610,9 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 	}
 }
 
-// Test_renderAdditionalRoutingCapabilitiesBGPVIPManagement verifies the
-// frr-k8s DaemonSet affinity: with BGP VIP management active the DaemonSet
-// must avoid control plane nodes by role (the static FRR pods own them);
-// otherwise no affinity is rendered at all.
+// Test_renderAdditionalRoutingCapabilitiesBGPVIPManagement verifies that the
+// master-avoiding DaemonSet affinity and the static pod RBAC render only
+// under BGP VIP management.
 func Test_renderAdditionalRoutingCapabilitiesBGPVIPManagement(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -637,9 +636,7 @@ func Test_renderAdditionalRoutingCapabilitiesBGPVIPManagement(t *testing.T) {
 			},
 		},
 	}
-	// The Infrastructure vipManagement status field is not in the vendored
-	// openshift/api yet (openshift/api#2923), so seed it unstructured -
-	// exactly the shape isBGPVIPManagement reads.
+	// vipManagement is not in the vendored openshift/api yet (#2923).
 	infra := &uns.Unstructured{}
 	infra.SetGroupVersionKind(schema.GroupVersionKind{Group: "config.openshift.io", Version: "v1", Kind: "Infrastructure"})
 	infra.SetName("cluster")
@@ -666,7 +663,7 @@ func Test_renderAdditionalRoutingCapabilitiesBGPVIPManagement(t *testing.T) {
 
 	got, err := renderAdditionalRoutingCapabilities(operConf, manifestDir, bgpVIP)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(got).To(HaveLen(21))
+	g.Expect(got).To(HaveLen(25))
 	affinity, found := daemonSetAffinity(got)
 	g.Expect(found).To(BeTrue())
 	terms, found, err := uns.NestedSlice(affinity, "nodeAffinity", "requiredDuringSchedulingIgnoredDuringExecution", "nodeSelectorTerms")
@@ -680,7 +677,17 @@ func Test_renderAdditionalRoutingCapabilitiesBGPVIPManagement(t *testing.T) {
 		"operator": "DoesNotExist",
 	}))
 
-	// BGP VIP management inactive (nil bootstrap result): no affinity.
+	staticPodRBAC := func(objs []*uns.Unstructured) bool {
+		for _, obj := range objs {
+			if obj.GetName() == "frr-k8s-static-pod" {
+				return true
+			}
+		}
+		return false
+	}
+	g.Expect(staticPodRBAC(got)).To(BeTrue())
+
+	// Inactive (nil bootstrap result): no affinity, no static pod RBAC.
 	bgpVIP, err = isBGPVIPManagement(client, nil, featureGates)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(bgpVIP).To(BeFalse())
@@ -689,4 +696,10 @@ func Test_renderAdditionalRoutingCapabilitiesBGPVIPManagement(t *testing.T) {
 	g.Expect(got).To(HaveLen(21))
 	_, found = daemonSetAffinity(got)
 	g.Expect(found).To(BeFalse())
+	g.Expect(staticPodRBAC(got)).To(BeFalse())
+
+	// BGP VIP management without the FRR provider is a configuration error:
+	// the FRRConfiguration CRD ships with the frr-k8s bundle.
+	_, err = renderBGPVIPFRRConfiguration(&operv1.NetworkSpec{}, client, true)
+	g.Expect(err).To(MatchError(ContainSubstring("requires the FRR additional routing capability provider")))
 }
