@@ -42,6 +42,7 @@ type OVNConfigBoostrapResult struct {
 	SmartNicModeNodes         []string
 	SmartNicModeValue         string
 	MgmtPortResourceName      string
+	MgmtPortResourceCount     int64
 	DpuNodeLeaseRenewInterval int
 	DpuNodeLeaseDuration      int
 	// ConfigOverrides contains the overrides for the OVN Kubernetes configuration

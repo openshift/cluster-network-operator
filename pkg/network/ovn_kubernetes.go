@@ -237,6 +237,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["SmartNicModeLabel"] = bootstrapResult.OVN.OVNKubernetesConfig.SmartNicModeLabel
 	data.Data["SmartNicModeValue"] = bootstrapResult.OVN.OVNKubernetesConfig.SmartNicModeValue
 	data.Data["MgmtPortResourceName"] = bootstrapResult.OVN.OVNKubernetesConfig.MgmtPortResourceName
+	data.Data["MgmtPortResourceCount"] = strconv.FormatInt(bootstrapResult.OVN.OVNKubernetesConfig.MgmtPortResourceCount, 10)
 	data.Data["DpuNodeLeaseRenewInterval"] = strconv.Itoa(bootstrapResult.OVN.OVNKubernetesConfig.DpuNodeLeaseRenewInterval)
 	data.Data["DpuNodeLeaseDuration"] = strconv.Itoa(bootstrapResult.OVN.OVNKubernetesConfig.DpuNodeLeaseDuration)
 	data.Data["OVN_CONTROLLER_INACTIVITY_PROBE"] = os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
@@ -1067,6 +1068,21 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 		mgmtPortresourceName, exists := cm.Data["mgmt-port-resource-name"]
 		if exists {
 			ovnConfigResult.MgmtPortResourceName = mgmtPortresourceName
+			ovnConfigResult.MgmtPortResourceCount = 1
+		}
+
+		mgmtPortResourceCount, exists := cm.Data["mgmt-port-resource-count"]
+		if exists && ovnConfigResult.MgmtPortResourceName == "" {
+			klog.Warningf("mgmt-port-resource-count is set but mgmt-port-resource-name is not; count will be ignored")
+		} else if exists {
+			count, err := strconv.ParseInt(mgmtPortResourceCount, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid mgmt-port-resource-count value %q: %w", mgmtPortResourceCount, err)
+			}
+			if count <= 0 {
+				return nil, fmt.Errorf("invalid mgmt-port-resource-count value %q: must be > 0", mgmtPortResourceCount)
+			}
+			ovnConfigResult.MgmtPortResourceCount = count
 		}
 
 		if val, exists := cm.Data["dpu-node-lease-renew-interval"]; exists {
