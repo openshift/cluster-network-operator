@@ -135,6 +135,14 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	}
 	objs = append(objs, o...)
 
+	// render BGP VIP FRRConfiguration CRs if BGP VIP management is active
+	bgpVIP := isBGPVIPManagement(bootstrapResult, featureGates)
+	o, err = renderBGPVIPFRRConfiguration(operConf, client, bgpVIP)
+	if err != nil {
+		return nil, progressing, err
+	}
+	objs = append(objs, o...)
+
 	// render networking console plugin
 	o, err = renderNetworkingConsolePlugin(manifestDir, bootstrapResult)
 	if err != nil {
