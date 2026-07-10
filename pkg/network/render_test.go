@@ -626,7 +626,7 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := renderAdditionalRoutingCapabilities(tt.args.operConf, fakeBootstrapResult(), manifestDir)
+			got, err := renderAdditionalRoutingCapabilities(tt.args.operConf, fakeBootstrapResult(), manifestDir, false)
 			if !reflect.DeepEqual(tt.expectedErr, err) {
 				t.Errorf("renderAdditionalRoutingCapabilities() err = %v, want %v", err, tt.expectedErr)
 			}
@@ -647,7 +647,7 @@ func Test_renderFRRRoutingCapabilities(t *testing.T) {
 					operv1.RoutingCapabilitiesProviderFRR,
 				},
 			},
-		}, testBootstrap, manifestDir)
+		}, testBootstrap, manifestDir, false)
 		g.Expect(err).NotTo(HaveOccurred())
 
 		return objs
@@ -693,7 +693,7 @@ func Test_renderFRRStatusCleanerStrategy(t *testing.T) {
 		g := NewWithT(t)
 		br := fakeBootstrapResult()
 		br.OVN.ControlPlaneReplicaCount = replicaCount
-		objs, err := renderAdditionalRoutingCapabilities(frrConf, br, manifestDir)
+		objs, err := renderAdditionalRoutingCapabilities(frrConf, br, manifestDir, false)
 		g.Expect(err).NotTo(HaveOccurred())
 		return mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "frr-k8s-statuscleaner")
 	}
@@ -818,4 +818,77 @@ func Test_renderNetworkingConsolePlugin(t *testing.T) {
 
 		g.Expect(hash1).NotTo(Equal(hash2), "config-hash should change when TLS config changes")
 	})
+}
+
+// Test_renderAdditionalRoutingCapabilitiesBGPVIPManagement verifies the
+// frr-k8s DaemonSet affinity: with BGP VIP management active the DaemonSet
+// must avoid control plane nodes by role (the static FRR pods own them);
+// otherwise no affinity is rendered at all.
+func Test_renderAdditionalRoutingCapabilitiesBGPVIPManagement(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	operConf := &operv1.NetworkSpec{
+		AdditionalRoutingCapabilities: &operv1.AdditionalRoutingCapabilities{
+			Providers: []operv1.RoutingCapabilitiesProvider{
+				operv1.RoutingCapabilitiesProviderFRR,
+			},
+		},
+	}
+	featureGates := featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{apifeatures.FeatureGateBGPBasedVIPManagement},
+		[]configv1.FeatureGateName{},
+	)
+	bootstrapResult := &bootstrap.BootstrapResult{
+		Infra: bootstrap.InfraStatus{
+			PlatformType: configv1.BareMetalPlatformType,
+			PlatformStatus: &configv1.PlatformStatus{
+				Type: configv1.BareMetalPlatformType,
+				BareMetal: &configv1.BareMetalPlatformStatus{
+					VIPManagement: configv1.VIPManagementTypeBGP,
+				},
+			},
+		},
+	}
+
+	daemonSetAffinity := func(objs []*unstructured.Unstructured) (map[string]any, bool) {
+		for _, obj := range objs {
+			if obj.GetKind() == "DaemonSet" && obj.GetName() == "frr-k8s" {
+				affinity, found, err := unstructured.NestedMap(obj.Object, "spec", "template", "spec", "affinity")
+				g.Expect(err).NotTo(HaveOccurred())
+				return affinity, found
+			}
+		}
+		t.Fatal("frr-k8s DaemonSet not found in rendered objects")
+		return nil, false
+	}
+
+	// isBGPVIPManagement is evaluated once in Render and passed down; the
+	// fixture asserts it reads the typed vipManagement field.
+	bgpVIP := isBGPVIPManagement(bootstrapResult, featureGates)
+	g.Expect(bgpVIP).To(BeTrue())
+
+	got, err := renderAdditionalRoutingCapabilities(operConf, fakeBootstrapResult(), manifestDir, bgpVIP)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(got).To(HaveLen(21))
+	affinity, found := daemonSetAffinity(got)
+	g.Expect(found).To(BeTrue())
+	terms, found, err := unstructured.NestedSlice(affinity, "nodeAffinity", "requiredDuringSchedulingIgnoredDuringExecution", "nodeSelectorTerms")
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(found).To(BeTrue())
+	g.Expect(terms).To(HaveLen(1))
+	matchExpressions := terms[0].(map[string]any)["matchExpressions"].([]any)
+	g.Expect(matchExpressions).To(HaveLen(1))
+	g.Expect(matchExpressions[0]).To(Equal(map[string]any{
+		"key":      "node-role.kubernetes.io/master",
+		"operator": "DoesNotExist",
+	}))
+
+	// BGP VIP management inactive (nil bootstrap result): no affinity.
+	bgpVIP = isBGPVIPManagement(nil, featureGates)
+	g.Expect(bgpVIP).To(BeFalse())
+	got, err = renderAdditionalRoutingCapabilities(operConf, fakeBootstrapResult(), manifestDir, bgpVIP)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(got).To(HaveLen(21))
+	_, found = daemonSetAffinity(got)
+	g.Expect(found).To(BeFalse())
 }
