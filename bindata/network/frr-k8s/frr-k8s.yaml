@@ -294,6 +294,17 @@ spec:
           requests:
             cpu: 10m
             memory: 20Mi
+{{ if .BGPVIPManagement }}
+      # Control plane nodes run the MCO-rendered frr-k8s static pod instead;
+      # on compact/SNO this DaemonSet correctly matches zero nodes.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/master
+                operator: DoesNotExist
+{{ end }}
       nodeSelector:
         kubernetes.io/os: linux
       tolerations:
