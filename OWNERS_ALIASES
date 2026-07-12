@@ -2,12 +2,9 @@ aliases:
   core-approvers:
   - abhat
   - danwinship
-  - fepan
-  - JacobTanenbaum
   - jcaamano
   - knobunc
   - kyrtapz
-  - pliurh
   - tssurya
   core-reviewers:
   - arghosh93
@@ -19,7 +16,6 @@ aliases:
   - marty-power
   - mattedallo
   - miheer
-  - pliurh
   - pperiyasamy
   - taanyas
   - tssurya
