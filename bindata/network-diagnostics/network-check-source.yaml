@@ -48,8 +48,6 @@ spec:
         args:
           - --listen
           - 0.0.0.0:17698
-          - --namespace
-          - $(POD_NAMESPACE)
         env:
           - name: POD_NAME
             valueFrom:
