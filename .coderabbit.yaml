@@ -200,3 +200,328 @@ reviews:
   slop_detection:
     enabled: true
     label: "coderabbit/ai-slop"
+  # https://docs.coderabbit.ai/guides/review-instructions#request-changes
+  # When true, CodeRabbit submits a "Request Changes" review on failing
+  # checks, which blocks the PR from merging until resolved or overridden.
+  request_changes_workflow: true
+  # https://docs.coderabbit.ai/pr-reviews/pre-merge-checks
+  pre_merge_checks:
+    # Built-in checks
+    title:
+      mode: "error"
+      requirements: >-
+        Use the imperative mood (e.g. "Add", "Fix", "Update"). Keep under 72
+        characters. Prefix with the affected component when scoped (e.g.
+        "ovn-kubernetes: Fix EgressIP race condition").
+    description:
+      mode: "error"
+    docstrings:
+      mode: "warning"
+      threshold: 80
+    issue_assessment:
+      mode: "error"
+    # Custom checks
+    custom_checks:
+      - name: "PR Quality"
+        mode: "error"
+        instructions: >-
+          Check the PR for overall quality in both description and size:
+
+          Description — must include the following sections:
+
+          1. "Why": A clear explanation of why this change is needed,
+          the motivation or problem being solved. Must go beyond
+          restating the title.
+
+          2. "What": A description of what the PR does, the approach
+          taken, and any key design decisions.
+
+          3. "How to verify it" or "Testing": Which automated CI lanes
+          or jobs in the CNO repo are running tests for this PR, and on
+          what platforms (e.g. AWS, GCP, Azure, bare-metal, vSphere,
+          SNO, HyperShift). Manual testing alone is not acceptable;
+          tests must run in CI in an automated fashion. Not required
+          for trivial or non-functional changes (typo fix, comment
+          update, CI/review config like .coderabbit.yaml or OWNERS,
+          vendor bump, doc-only change, Makefile/script tweak).
+
+          4. For bug fixes: a description of the root cause and how
+          the fix addresses it. A bug/issue link must be present in
+          either the PR title or the description (not required in
+          both).
+
+          5. For new features or behavioral changes: a description of
+          the user-facing impact and any upgrade/rollback considerations.
+
+          6. Size — the PR must be reasonably scoped. PRs over 7000
+          lines (additions + deletions, excluding vendor/) or
+          implementing an entire large feature end-to-end touching
+          many unrelated components must be split. Large PRs lead to
+          shallow reviews and increase the risk of bugs slipping
+          through.
+
+          Pass: The PR satisfies all applicable criteria above, or is
+          a trivial/non-functional change with a self-explanatory
+          title.
+
+          Fail: Any of the above criteria (1-6) are not met for
+          non-trivial changes.
+      - name: "Commit Message Quality"
+        mode: "error"
+        instructions: >-
+          Check commit messages and structure in this PR for quality:
+
+          1. Each commit must be a logical, self-contained unit of
+          change. Flag commits that bundle unrelated changes together.
+
+          2. Subject line should be concise and descriptive.
+
+          3. Subject should be prefixed with the affected component
+          when scoped (e.g. "ovn-kubernetes: Fix EgressIP race").
+
+          4. Body must be present and explain why the change is needed,
+          not just what was changed. The code diff already shows what.
+
+          5. Flag vague, uninformative, or generic messages like
+          "fix", "update", "wip", "changes", "misc", or "address
+          review comments" that provide no meaningful context. Review
+          feedback should be squashed into the relevant logical
+          commit, not added as a separate "address review comments"
+          commit.
+
+          6. Flag overly verbose commit messages that read like
+          AI-generated changelogs — listing every function name,
+          variable, or line changed. Commit messages should explain
+          intent at a high level, not narrate the diff.
+
+          7. No merge commits (e.g. "Merge branch 'master' into ..."
+          or "Merge remote-tracking branch ..."). The author should
+          rebase onto the target branch instead.
+
+          Fail if any commit violates any of the above points.
+          Pass only if all commits satisfy all 7 criteria.
+      - name: "Unit Tests for Go Changes"
+        mode: "error"
+        instructions: >-
+          If Go source files (*.go) under pkg/ or cmd/ are added or
+          modified (excluding vendor/ and *_test.go files), or if
+          YAML templates under bindata/ are added or modified, check
+          whether corresponding *_test.go files are also added or
+          modified in this PR. Exclude documentation-only, CI, or
+          script changes.
+
+          Fail if production Go code or bindata/ templates changed
+          with no test file changes. If failing, advise the author:
+          if there is a valid
+          reason for not including tests (e.g. existing tests already
+          cover the change, the change is trivial, or testing is
+          infeasible), document that justification in the PR
+          description under "How to verify it" and then, once all
+          other pre-merge checks are also addressed, use
+          "@coderabbitai ignore pre-merge checks" to override.
+
+          Pass only if no production Go files or bindata/ templates
+          changed, or if test files are included alongside the
+          changes.
+      - name: "E2E Tests for Feature Changes"
+        mode: "error"
+        instructions: >-
+          If Go source files (*.go) under pkg/ or cmd/ are added or
+          modified in a way that adds new user-facing behavior, changes
+          existing user-facing behavior, or fixes a bug (excluding
+          vendor/, *_test.go, pure refactors with no behavioral change,
+          and internal-only changes):
+
+          1. Check whether files under test/e2e/ are also added or
+          modified in this PR.
+
+          2. The PR description must include a "Testing" or "How to
+          verify it" section that describes which CI lanes or jobs are
+          running tests for this PR, what platforms have coverage (e.g.
+          AWS, GCP, Azure, bare-metal, vSphere, SNO, HyperShift), and
+          whether the tests passed.
+
+          Fail if user-facing behavior changed or a bug was fixed and
+          either criterion 1 or 2 (or both) is not satisfied. If
+          failing, advise the author: if E2E tests are genuinely not
+          feasible for this change, document the justification in the
+          PR description under "How to verify it" and then, once all
+          other pre-merge checks are also addressed, use
+          "@coderabbitai ignore pre-merge checks" to override.
+
+          Pass only if no user-facing behavior changed and no bug was
+          fixed, or if both E2E test files are included and the PR
+          description contains the required testing context.
+      - name: "RBAC Least Privilege"
+        mode: "warning"
+        instructions: >-
+          In YAML files under bindata/ and manifests/, if ClusterRole or
+          Role rules are added or modified:
+
+          1. Flag any rule that uses a wildcard verb ("*") or wildcard
+          resource ("*") unless explicitly justified.
+
+          2. Flag rules granting mutation verbs (create, update, patch,
+          delete, deletecollection) and ask the author to justify why
+          mutation access is needed. Read-only verbs (get, list, watch)
+          are fine without justification.
+
+          Fail if any new RBAC rule uses wildcards without
+          justification or grants mutation access without explanation.
+
+          Pass only if no RBAC rules are changed, or all new rules
+          use specific verbs and resources with appropriate
+          justification for any mutation access.
+      - name: "Docs for Feature and Behavior Changes"
+        mode: "error"
+        instructions: >-
+          If a PR introduces a new feature, changes user-facing behavior,
+          fixes a significant bug that alters expected behavior, or
+          modifies architecture or control flows, check whether files
+          under docs/ are also added or modified.
+
+          DPU/DPF-related changes require elaborate documentation
+          covering: the architectural impact (which components run on
+          DPU vs host, what changes in the data path), new or changed
+          configuration options (ConfigMap keys, environment variables,
+          CLI flags), operational considerations (health monitoring,
+          failure modes, troubleshooting), platform requirements, and
+          any interaction with other features (egress IP, multicast,
+          multi-network). Similarly, changes to IPsec must update
+          docs/enabling_ns_ipsec.md, and changes to operand lifecycle
+          or component boundaries must update docs/operands.md or
+          docs/architecture.md.
+
+          Fail if the PR introduces a new CNO-specific feature or
+          significantly changes how the operator behaves for users
+          without any docs/ changes. For new features, a new markdown
+          file must be added under docs/ describing the feature. The
+          absence of existing documentation is not an excuse for not
+          adding it — new features must create new docs. If failing,
+          advise the author: if docs are genuinely not required for
+          this change, document the reasoning in the PR description
+          and then use "@coderabbitai ignore pre-merge checks" to
+          override.
+
+          Pass if the change is a bug fix, pure refactor,
+          test-only change, CI/infra change, internal-only change,
+          upstream CRD addition, or any change that does not alter
+          CNO-specific user-facing behavior or architecture. Also
+          pass if relevant docs/ files are included.
+      - name: "Stale Project Docs and Config"
+        mode: "error"
+        instructions: >-
+          Check whether changes in this PR make any of the following
+          project files stale or inaccurate:
+          - .coderabbit.yaml (path instructions, pre-merge checks,
+            global review instructions)
+          - docs/**
+          - **/AGENTS.md
+          - **/ARCHITECTURE.md
+
+          Examples of staleness:
+          1. A file or directory is renamed, moved, or deleted but is
+          still referenced by path in .coderabbit.yaml.
+          2. A code entity (CRD, flag, binary, config key) is renamed
+          or removed but still referenced in docs.
+          3. Architecture or component boundaries change but
+          docs/architecture.md is not updated.
+          4. A new operand is added but docs/operands.md is not updated.
+          5. DPU/DPF mode behavior changes but docs/ovn_node_mode.md
+          is not updated.
+
+          Fail if any project docs or config become stale due to the
+          changes. If failing, advise the author: update the affected
+          docs/config files in this PR, or if the flagged staleness
+          is a false positive, explain why in a PR comment and use
+          "@coderabbitai ignore pre-merge checks" to override.
+
+          Pass only if the PR does not introduce any such staleness,
+          or if the affected docs/config files are also updated in
+          this PR.
+      - name: "Go and Test Code Quality"
+        mode: "warning"
+        instructions: >-
+          Check new or modified Go code (excluding vendor/) for these
+          objective issues:
+
+          Production code (excluding *_test.go):
+
+          1. Flag use of fmt.Print, fmt.Println, log.Print,
+          log.Fatal, or log.* for logging. The project uses klog
+          exclusively.
+
+          2. Flag bare error returns (return err) without adding
+          context in functions that perform meaningful work. Errors
+          should be wrapped with fmt.Errorf to add context. Use %w
+          when the caller should be able to inspect the underlying
+          error with errors.Is/errors.As. Use %v when the underlying
+          error is an implementation detail that should not be exposed
+          as part of the API. Do not flag bare returns in thin
+          wrappers or delegation functions where the caller already
+          provides sufficient context.
+
+          3. Flag bare integers passed as time.Duration without
+          explicit units. Must use e.g. 10*time.Second, not 10.
+
+          4. Flag err := inside nested blocks that shadow an outer
+          err variable, silently losing errors.
+
+          5. Flag changes that only handle IPv4 without considering
+          IPv6. Dual-stack (IPv4+IPv6) must always be considered.
+
+          6. Flag unprotected concurrent map or slice access. Shared
+          state between goroutines must be guarded by locks.
+
+          Test code (pkg/**/*_test.go, cmd/**/*_test.go, test/e2e/**):
+
+          7. Flag bare t.Fatal(err) or t.Fatalf calls that only pass
+          the error without describing what operation failed. Must
+          include context, e.g. t.Fatalf("failed to render ovn: %v",
+          err).
+
+          8. Flag time.Sleep in tests: prefer retry/poll loops or
+          gomega Eventually/Consistently for async assertions.
+
+          9. Flag os.Setenv in tests: use t.Setenv which
+          auto-restores on cleanup. This is already the established
+          pattern in the CNO codebase.
+
+          Fail if any of the above 9 issues are found in new or
+          modified code.
+
+          Pass only if none of the above issues are present.
+      - name: "AI-Generated Code Smell"
+        mode: "error"
+        instructions: >-
+          Flag signs of AI-generated code that was not properly
+          reviewed by the author before submission:
+
+          1. Obvious comment slop: comments that merely restate the
+          code they annotate (e.g. "// set a to b" above "a = b",
+          "// return the error" above "return err", "// create the
+          pod" above "CreatePod()"). These add no value and clutter
+          the codebase.
+
+          2. Large blocks of unit tests that are auto-generated by AI
+          and are unrelated to the functional changes in the PR.
+          Flag if the PR adds hundreds of lines of tests for code
+          that was not modified in this PR.
+
+          3. Unnecessarily verbose code: unnecessary intermediate
+          variables (e.g. x := foo(); return x), redundant nil/error
+          checks already handled by the next line, defensive checks
+          for conditions that cannot occur in context, logic that a
+          single stdlib call replaces, or consecutive copy-paste
+          blocks differing only in names/literals that should be a
+          shared helper or table-driven approach.
+
+          4. Comments or variable names that reference AI tools or
+          prompts (e.g. "as suggested by", "generated by", "TODO:
+          verify this AI suggestion").
+
+          Fail if any of the above 4 patterns are found in new or
+          modified code.
+
+          Pass only if the code is clean, comments add genuine value,
+          and test changes are proportional to the functional changes.
