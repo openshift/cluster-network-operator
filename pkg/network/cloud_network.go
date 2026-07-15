@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -48,6 +49,13 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 	data.Data["ExternalControlPlane"] = cloudBootstrapResult.ControlPlaneTopology == configv1.ExternalTopologyMode
 	data.Data["PlatformAzureEnvironment"] = ""
 	data.Data["PlatformAWSCAPath"] = ""
+
+	cnc := bootstrapResult.CloudNetworkConfig
+	if cnc.OSMaxAllowedAddressPairs.IsSet && cnc.OSMaxAllowedAddressPairs.Value <= 0 {
+		return nil, fmt.Errorf("invalid cloud-network-config: platform-os-max-allowed-address-pairs must be a non-zero, positive integer, got %q", cnc.OSMaxAllowedAddressPairs.RawValue)
+	}
+	data.Data["OSMaxAllowedAddressPairs"] = cnc.OSMaxAllowedAddressPairs.Value
+	data.Data["OSMaxAllowedAddressPairsIsSet"] = cnc.OSMaxAllowedAddressPairs.IsSet
 
 	// AWS and azure allow for funky endpoint overriding.
 	// in different ways, of course.

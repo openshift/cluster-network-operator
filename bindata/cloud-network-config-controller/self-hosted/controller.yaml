@@ -47,7 +47,11 @@ spec:
                 "-platform-api-url={{.PlatformAPIURL}}",
                 "-platform-aws-ca-override={{.PlatformAWSCAPath}}",
                 "-platform-azure-environment={{.PlatformAzureEnvironment}}",
-                "-secret-name", "cloud-credentials"]
+                "-secret-name", "cloud-credentials"
+{{- if and .OSMaxAllowedAddressPairsIsSet (gt .OSMaxAllowedAddressPairs 0) }}
+                ,"-platform-os-max-allowed-address-pairs={{ .OSMaxAllowedAddressPairs }}"
+{{- end }}
+                ]
         env:
         - name: CONTROLLER_NAMESPACE
           valueFrom:
