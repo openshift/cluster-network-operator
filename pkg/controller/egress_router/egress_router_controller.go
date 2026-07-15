@@ -216,7 +216,8 @@ func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifes
 	}
 	data.Data["FallbackIP"] = router.Spec.Redirect.FallbackIP
 	data.Data["mode"] = router.Spec.Mode
-	data.Data["network_interfaces"] = router.Spec.NetworkInterface
+	data.Data["MacvlanMaster"] = router.Spec.NetworkInterface.Macvlan.Master
+	data.Data["MacvlanMode"] = strings.ToLower(string(router.Spec.NetworkInterface.Macvlan.Mode))
 	data.Data["EgressRouterPodImage"] = os.Getenv("EGRESS_ROUTER_CNI_IMAGE")
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "egress-router"), &data)
 	if err != nil {
