@@ -7,7 +7,7 @@ toolchain go1.24.4
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/sprig/v3 v3.2.3
-	github.com/containernetworking/cni v0.8.0
+	github.com/containernetworking/cni v1.3.0
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/onsi/gomega v1.38.1
@@ -18,7 +18,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	github.com/vishvananda/netlink v1.1.0
-	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
+	github.com/vishvananda/netns v0.0.4 // indirect
 	golang.org/x/net v0.46.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.34.1
