@@ -97,12 +97,20 @@ type IPTablesAlerterBootstrapResult struct {
 	Enabled bool
 }
 
+// CloudNetworkConfigBootstrapResult contains bootstrap configuration
+// read from the cloud-network-config ConfigMap.
+type CloudNetworkConfigBootstrapResult struct {
+	OpenStackMaxAllowedAddressPairs int
+}
+
 type BootstrapResult struct {
 	Infra InfraStatus
 
 	OVN             OVNBootstrapResult
 	IPTablesAlerter IPTablesAlerterBootstrapResult
 	TLSProfile      TLSProfile
+
+	CloudNetworkConfig CloudNetworkConfigBootstrapResult
 }
 
 type InfraStatus struct {

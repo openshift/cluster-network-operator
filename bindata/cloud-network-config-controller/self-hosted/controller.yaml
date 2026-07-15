@@ -42,12 +42,16 @@ spec:
         image: {{.CloudNetworkConfigControllerImage}}
         imagePullPolicy: IfNotPresent
         command: ["/usr/bin/cloud-network-config-controller"]
-        args: [ "-platform-type", "{{.PlatformType}}",
-                "-platform-region={{.PlatformRegion}}",
-                "-platform-api-url={{.PlatformAPIURL}}",
-                "-platform-aws-ca-override={{.PlatformAWSCAPath}}",
-                "-platform-azure-environment={{.PlatformAzureEnvironment}}",
-                "-secret-name", "cloud-credentials"]
+        args:
+        - "-platform-type={{.PlatformType}}"
+        - "-platform-region={{.PlatformRegion}}"
+        - "-platform-api-url={{.PlatformAPIURL}}"
+        - "-platform-aws-ca-override={{.PlatformAWSCAPath}}"
+        - "-platform-azure-environment={{.PlatformAzureEnvironment}}"
+        - "-secret-name=cloud-credentials"
+{{- if .OpenStackMaxAllowedAddressPairs }}
+        - "-platform-os-max-allowed-address-pairs={{ .OpenStackMaxAllowedAddressPairs }}"
+{{- end }}
         env:
         - name: CONTROLLER_NAMESPACE
           valueFrom:
