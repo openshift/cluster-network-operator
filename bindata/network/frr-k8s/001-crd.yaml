@@ -125,7 +125,7 @@ spec:
                         asn:
                           description: ASN is the AS number to use for the local end
                             of the session.
-                          format: int32
+                          format: int64
                           maximum: 4294967295
                           minimum: 0
                           type: integer
@@ -159,7 +159,7 @@ spec:
                                 description: |-
                                   ASN is the AS number to use for the local end of the session.
                                   ASN and DynamicASN are mutually exclusive and one of them must be specified.
-                                format: int32
+                                format: int64
                                 maximum: 4294967295
                                 minimum: 0
                                 type: integer
