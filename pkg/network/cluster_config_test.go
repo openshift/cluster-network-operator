@@ -51,7 +51,7 @@ func TestValidateClusterConfig(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	// Bootstrap a client of type Baremetal
-	if err := configv1.AddToScheme(scheme.Scheme); err != nil {
+	if err := configv1.Install(scheme.Scheme); err != nil {
 		t.Fatalf("failed to add configv1 to scheme: %v", err)
 	}
 	infrastructure := &configv1.Infrastructure{
@@ -139,7 +139,7 @@ func TestValidateClusterConfigDualStack(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	// Bootstrap a client of type Baremetal
-	if err := configv1.AddToScheme(scheme.Scheme); err != nil {
+	if err := configv1.Install(scheme.Scheme); err != nil {
 		t.Fatalf("failed to add configv1 to scheme: %v", err)
 	}
 	infrastructure := &configv1.Infrastructure{

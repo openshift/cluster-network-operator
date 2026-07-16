@@ -322,7 +322,7 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	}
 
 	// Bootstrap a client with an infrastructure object
-	if err := configv1.AddToScheme(scheme.Scheme); err != nil {
+	if err := configv1.Install(scheme.Scheme); err != nil {
 		t.Fatalf("failed to add configv1 to scheme: %v", err)
 	}
 	infrastructure := &configv1.Infrastructure{
