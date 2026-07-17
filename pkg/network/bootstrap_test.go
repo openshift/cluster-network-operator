@@ -64,8 +64,11 @@ func TestBootstrap(t *testing.T) {
 					Type: configv1.TLSProfileCustomType,
 					Custom: &configv1.CustomTLSProfile{
 						TLSProfileSpec: configv1.TLSProfileSpec{
-							MinTLSVersion: configv1.VersionTLS13,
-							Ciphers:       []string{"TLS_AES_128_GCM_SHA256"},
+							MinTLSVersion: configv1.VersionTLS11,
+							Ciphers: []string{
+								"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", // IANA name
+								"ECDHE-ECDSA-CHACHA20-POLY1305",         // OpenSSL name
+							},
 						},
 					},
 				},
@@ -83,12 +86,12 @@ func TestBootstrap(t *testing.T) {
 				t.Fatal("Bootstrap result is nil")
 			}
 
-			if result.TLSProfile.Spec.MinTLSVersion != configv1.VersionTLS13 {
+			if result.TLSProfile.Spec.MinTLSVersion != configv1.VersionTLS11 {
 				t.Errorf("Expected MinTLSVersion %v, got %v",
-					configv1.VersionTLS13, result.TLSProfile.Spec.MinTLSVersion)
+					configv1.VersionTLS11, result.TLSProfile.Spec.MinTLSVersion)
 			}
 
-			expectedCiphers := []string{"TLS_AES_128_GCM_SHA256"}
+			expectedCiphers := []string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"}
 			if !reflect.DeepEqual(result.TLSProfile.Spec.Ciphers, expectedCiphers) {
 				t.Errorf("Expected ciphers %v, got %v",
 					expectedCiphers, result.TLSProfile.Spec.Ciphers)
@@ -162,8 +165,9 @@ func TestBootstrap(t *testing.T) {
 						configv1.VersionTLS13, result.TLSProfile.Spec.MinTLSVersion)
 				}
 
-				if len(result.TLSProfile.Spec.Ciphers) == 0 {
-					t.Error("Expected ciphers to not be empty")
+				// TLS 1.3 cipher suites should be filtered out since they're not configurable in Go
+				if len(result.TLSProfile.Spec.Ciphers) != 0 {
+					t.Errorf("Expected ciphers to be empty for TLS 1.3, got %v", result.TLSProfile.Spec.Ciphers)
 				}
 
 				if result.TLSProfile.Adherence != configv1.TLSAdherencePolicyStrictAllComponents {
