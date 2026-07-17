@@ -558,13 +558,36 @@ func Test_renderNetworkDiagnostics(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := renderNetworkDiagnostics(tt.args.operConf, tt.args.clusterConf, manifestDir)
+			got, err := renderNetworkDiagnostics(tt.args.operConf, tt.args.clusterConf, fakeBootstrapResult(), manifestDir)
 			if !reflect.DeepEqual(tt.expectedErr, err) {
 				t.Errorf("Test_renderNetworkDiagnostics() err = %v, want %v", err, tt.expectedErr)
 			}
 			assert.Equalf(t, tt.want, len(got), "renderNetworkDiagnostics(%v, %v, %v)", tt.args.operConf, tt.args.clusterConf, manifestDir)
 		})
 	}
+
+	// Test TLS args rendering for network-check-source
+	t.Run("TLS args rendering", func(t *testing.T) {
+		testTLSArgRendering(t, "network-check-source", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			operConf := &operv1.NetworkSpec{}
+			clusterConf := &configv1.NetworkSpec{
+				NetworkDiagnostics: configv1.NetworkDiagnostics{
+					Mode: configv1.NetworkDiagnosticsAll,
+				},
+			}
+			bootstrapResult := fakeBootstrapResult()
+			bootstrapResult.TLSProfile = tlsProfile
+
+			objs, err := renderNetworkDiagnostics(operConf, clusterConf, bootstrapResult, manifestDir)
+			if err != nil {
+				t.Fatalf("renderNetworkDiagnostics failed: %v", err)
+			}
+
+			deployment := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "network-check-source")
+			container := mustFindContainer(t, deployment.Spec.Template.Spec.Containers, "check-endpoints")
+			return strings.Join(container.Args, " ")
+		})
+	})
 }
 
 func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
