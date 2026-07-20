@@ -147,6 +147,11 @@ spec:
             evpn_enable_flag="--enable-evpn"
           fi
 
+          multi_network_policy_enabled_flag=
+          if [[ "{{.OVN_MULTI_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
+            multi_network_policy_enabled_flag="--enable-multi-networkpolicy"
+          fi
+
           if [ "{{.OVN_GATEWAY_MODE}}" == "shared" ]; then
             gateway_mode_flags="--gateway-mode shared"
           elif [ "{{.OVN_GATEWAY_MODE}}" == "local" ]; then
@@ -179,6 +184,7 @@ spec:
             ${ovn_v4_masquerade_subnet_opt} \
             ${ovn_v6_masquerade_subnet_opt} \
             ${persistent_ips_enabled_flag} \
+            ${multi_network_policy_enabled_flag} \
             ${gateway_mode_flags} \
             ${route_advertisements_enable_flag} \
             ${evpn_enable_flag} \
