@@ -526,15 +526,23 @@ data:
       cni-bin-copy
 
       echo "I$(date "+%m%d %H:%M:%S.%N") - disable conntrack on geneve port"
-      iptables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
-      iptables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
-      ip6tables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
-      ip6tables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
+      # Clean up old iptables NOTRACK rules from before the nftables migration.
+      # This cleanup code can be removed once all nodes have been upgraded.
+      iptables -t raw -D PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK 2>/dev/null || true
+      iptables -t raw -D OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK 2>/dev/null || true
+      ip6tables -t raw -D PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK 2>/dev/null || true
+      ip6tables -t raw -D OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK 2>/dev/null || true
+      nft 'add table inet ovn_notrack { comment "OVN conntrack notrack rules" ; }'
+      nft flush table inet ovn_notrack
+      nft 'add chain inet ovn_notrack prerouting { type filter hook prerouting priority raw; policy accept; }'
+      nft 'add chain inet ovn_notrack output { type filter hook output priority raw; policy accept; }'
+      nft add rule inet ovn_notrack prerouting udp dport {{.GenevePort}} notrack
+      nft add rule inet ovn_notrack output udp dport {{.GenevePort}} notrack
 
       {{- if .OVNHybridOverlayVXLANPort}}
       echo "I$(date "+%m%d %H:%M:%S.%N") - disable conntrack on hybrid overlay VXLAN port"
-      iptables -t raw -A PREROUTING -p udp --dport {{.OVNHybridOverlayVXLANPort}} -j NOTRACK
-      iptables -t raw -A OUTPUT -p udp --dport {{.OVNHybridOverlayVXLANPort}} -j NOTRACK
+      nft add rule inet ovn_notrack prerouting udp dport {{.OVNHybridOverlayVXLANPort}} notrack
+      nft add rule inet ovn_notrack output udp dport {{.OVNHybridOverlayVXLANPort}} notrack
       {{- end}}
 
       echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node"
