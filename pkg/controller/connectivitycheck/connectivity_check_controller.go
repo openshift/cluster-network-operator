@@ -3,12 +3,14 @@ package connectivitycheck
 import (
 	"context"
 	"fmt"
-	"k8s.io/utils/clock"
 	"net"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"k8s.io/utils/clock"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	applyconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
@@ -174,7 +176,7 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 		}
 		for _, template := range templates {
 			check := copySpecFields(template)
-			WithSource("network-check-source-" + strings.Split(pod.Spec.NodeName, ".")[0])(check)
+			WithSource("network-check-source-" + nodeNameForLabel(pod.Spec.NodeName))(check)
 			check.Spec.SourcePod = &pod.Name
 			nodeUID := node.GetUID()
 			nodeName := node.GetName()
@@ -375,7 +377,7 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForGenericPodServiceEndp
 	}
 
 	for _, address := range addresses {
-		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(net.JoinHostPort(address.hostName, address.port), "openshift-network-diagnostics", withTarget("network-check-target", strings.Split(address.nodeName, ".")[0])))
+		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(net.JoinHostPort(address.hostName, address.port), "openshift-network-diagnostics", withTarget("network-check-target", nodeNameForLabel(address.nodeName))))
 	}
 	return templates
 }
@@ -434,6 +436,18 @@ type endpointInfo struct {
 
 func withTarget(label, target string) func(check *applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration) {
 	return WithTarget(label + "-" + target)
+}
+
+// nodeNameForLabel returns a string derived from a node name that is safe to embed
+// in a Kubernetes resource name. For bare IP addresses (IPv4 or IPv6), dots and
+// colons are replaced with dashes so the full address is preserved and collisions
+// between different IPs are avoided. For all other names (e.g. FQDNs), only the
+// segment before the first dot is returned, preserving the existing behaviour.
+func nodeNameForLabel(nodeName string) string {
+	if _, err := netip.ParseAddr(nodeName); err == nil {
+		return strings.NewReplacer(".", "-", ":", "-").Replace(nodeName)
+	}
+	return strings.Split(nodeName, ".")[0]
 }
 
 func Start(ctx context.Context, kubeConfig *rest.Config) error {
