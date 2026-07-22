@@ -547,6 +547,11 @@ data:
 
       echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node"
 
+      multinetwork_policy_enabled_flag=
+      {{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
+        multinetwork_policy_enabled_flag="--enable-multi-networkpolicy"
+      {{ end }}
+
       ovn_eip_reachability_timeout_opt=
       {{- if .ReachabilityTotalTimeoutSeconds }}        
         ovn_eip_reachability_timeout_opt="--egressip-reachability-total-timeout {{.ReachabilityTotalTimeoutSeconds}}"
@@ -738,5 +743,6 @@ data:
         ${ovn_v4_transit_switch_subnet_opt} \
         ${ovn_v6_transit_switch_subnet_opt} \
         ${dpu_lease_flags} \
-        ${ovn_eip_reachability_timeout_opt}
+        ${ovn_eip_reachability_timeout_opt} \
+        ${multinetwork_policy_enabled_flag}
     }

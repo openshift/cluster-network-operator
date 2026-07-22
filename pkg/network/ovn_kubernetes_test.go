@@ -717,7 +717,7 @@ logfile-maxage=0`,
 			disableGRO:               true,
 		},
 		{
-			desc: "enable multi-network policies and admin network policies",
+			desc: "enable admin network policies",
 			expected: `
 [default]
 mtu="1500"
@@ -747,7 +747,6 @@ egressip-node-healthcheck-port=9107
 enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
-enable-multi-networkpolicy=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
 
@@ -761,9 +760,7 @@ logfile-maxsize=100
 logfile-maxbackups=5
 logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
-
-			enableMultiNetPolicies: true,
-			enabledFeatureGates:    []configv1.FeatureGateName{},
+			enabledFeatureGates:      []configv1.FeatureGateName{},
 		},
 		{
 			desc: "enable network segmentation and multi-network",
@@ -812,7 +809,7 @@ logfile-maxage=0`,
 			enabledFeatureGates:      []configv1.FeatureGateName{},
 		},
 		{
-			desc: "enable multi-network policies with DisableMultiNetwork",
+			desc: "Set DisableMultiNetwork",
 			expected: `
 [default]
 mtu="1500"
@@ -842,7 +839,6 @@ egressip-node-healthcheck-port=9107
 enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
-enable-multi-networkpolicy=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
 
@@ -857,7 +853,6 @@ logfile-maxbackups=5
 logfile-maxage=0`,
 			controlPlaneReplicaCount: 2,
 			disableMultiNet:          true,
-			enableMultiNetPolicies:   true,
 			enabledFeatureGates:      []configv1.FeatureGateName{},
 		},
 		{
@@ -4029,51 +4024,53 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("CustomResourceDefinition", "", "ipamclaims.k8s.cni.cncf.io")))
 }
 
-// TestRenderOVNKubernetesReachability tests egress IP reachability timeout rendering
-func TestRenderOVNKubernetesReachability(t *testing.T) {
+// TestRenderOVNKubernetesFlags tests the rendering of different ovnkube flags
+// ReachabilityTotalTimeoutSeconds: --egressip-reachability-total-timeout
+// OVN_MULTI_NETWORK_POLICY_ENABLE: --enable-multi-networkpolicy
+func TestRenderOVNKubernetesFlags(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	testCases := []struct {
 		name                                string
 		reachabilityTimeout                 *uint32
+		enableMultiNetworkPolicy            bool
 		expectKubernetesFeatureReachability bool
-		expectErr                           bool
 	}{
 		{
 			name:                                "No reachability timeout (nil)",
 			reachabilityTimeout:                 nil,
 			expectKubernetesFeatureReachability: false,
-			expectErr:                           false,
 		},
 		{
 			name:                                "Reachability timeout set to 0",
 			reachabilityTimeout:                 ptrToUint32(0),
 			expectKubernetesFeatureReachability: true,
-			expectErr:                           false,
 		},
 		{
 			name:                                "Reachability timeout changed to 10",
 			reachabilityTimeout:                 ptrToUint32(10),
 			expectKubernetesFeatureReachability: true,
-			expectErr:                           false,
 		},
 		{
 			name:                                "Reachability timeout unchanged to 10",
 			reachabilityTimeout:                 ptrToUint32(10),
 			expectKubernetesFeatureReachability: true,
-			expectErr:                           false,
 		},
 		{
 			name:                                "Reachability timeout changed to 5",
 			reachabilityTimeout:                 ptrToUint32(5),
 			expectKubernetesFeatureReachability: true,
-			expectErr:                           false,
 		},
 		{
 			name:                                "Reachability timeout disabled",
 			reachabilityTimeout:                 nil,
 			expectKubernetesFeatureReachability: false,
-			expectErr:                           false,
+		},
+		{
+			name:                                "Enable Multi Network Policy",
+			reachabilityTimeout:                 nil,
+			expectKubernetesFeatureReachability: false,
+			enableMultiNetworkPolicy:            true,
 		},
 	}
 
@@ -4082,6 +4079,7 @@ func TestRenderOVNKubernetesReachability(t *testing.T) {
 			crd := OVNKubernetesConfig.DeepCopy()
 			config := &crd.Spec
 			config.DefaultNetwork.OVNKubernetesConfig.EgressIPConfig.ReachabilityTotalTimeoutSeconds = tc.reachabilityTimeout
+			config.UseMultiNetworkPolicy = &tc.enableMultiNetworkPolicy
 
 			errs := validateOVNKubernetes(config)
 			g.Expect(errs).To(HaveLen(0))
@@ -4110,10 +4108,6 @@ func TestRenderOVNKubernetesReachability(t *testing.T) {
 			bootstrapResult.Infra = bootstrap.InfraStatus{}
 			bootstrapResult.Infra.HostedControlPlane = &hypershift.HostedControlPlane{}
 			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
-			if tc.expectErr {
-				g.Expect(err).To(HaveOccurred())
-				return
-			}
 			g.Expect(err).NotTo(HaveOccurred())
 
 			var configMap *uns.Unstructured
@@ -4168,6 +4162,19 @@ func TestRenderOVNKubernetesReachability(t *testing.T) {
 				g.Expect(scriptNode).NotTo(
 					ContainSubstring("--egressip-reachability-total-timeout"),
 					"ovnkube-node pod template should not contain the configured reachability timeout value",
+				)
+			}
+
+			if tc.enableMultiNetworkPolicy {
+				g.Expect(scriptNode).To(
+					ContainSubstring("--enable-multi-networkpolicy"),
+					"ovnkube-node pod template should contain the flag --enable-multi-networkpolicy",
+				)
+
+			} else {
+				g.Expect(scriptNode).NotTo(
+					ContainSubstring("--enable-multi-networkpolicy"),
+					"ovnkube-node pod template should not contain the flag --enable-multi-networkpolicy",
 				)
 			}
 		})

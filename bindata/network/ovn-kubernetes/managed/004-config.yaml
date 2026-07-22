@@ -44,9 +44,6 @@ data:
     enable-network-segmentation=true
     enable-preconfigured-udn-addresses=true
 
-{{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
-    enable-multi-networkpolicy=true
-{{- end }}
     enable-admin-network-policy=true
     enable-multi-external-gateway=true
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
@@ -131,9 +128,6 @@ data:
     enable-multi-network=true
     enable-network-segmentation=true
     enable-preconfigured-udn-addresses=true
-{{- if .OVN_MULTI_NETWORK_POLICY_ENABLE }}
-    enable-multi-networkpolicy=true
-{{- end }}
     enable-admin-network-policy=true
     enable-multi-external-gateway=true
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
