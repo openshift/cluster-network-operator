@@ -822,6 +822,8 @@ func renderNetworkingConsolePlugin(manifestDir string, bootstrapResult *bootstra
 	}
 	data.Data["NetworkingConsolePluginImage"] = consolePluginImage
 
+	addTLSInfoToRenderData(data.Data, bootstrapResult, true)
+
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "networking-console-plugin"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render networking-console-plugin manifests")
