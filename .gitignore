@@ -1,6 +1,8 @@
 /cluster-network-operator
 /cluster-network-check-endpoints
 /cluster-network-check-target
+/test/bin/
+/test/vendor/
 
 # Temporary Build Files
 tmp/_output
