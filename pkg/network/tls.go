@@ -21,17 +21,47 @@ const (
 	TLSMinVersionKey = "TLSMinVersion"
 	// TLSCipherSuitesKey is the template data key for the comma-separated cipher suites
 	TLSCipherSuitesKey = "TLSCipherSuites"
+	// NginxTLSProtocolsKey is the template data key for NGINX ssl_protocols directive
+	NginxTLSProtocolsKey = "NginxTLSProtocols"
+	// NginxTLSCiphersKey is the template data key for NGINX ssl_ciphers directive
+	NginxTLSCiphersKey = "NginxTLSCiphers"
 )
 
 // addTLSInfoToRenderData adds TLS-related template data to the render data.
+// It converts OpenSSL cipher names (from TLSProfile.Spec.Ciphers) to IANA format for Go components,
+// and also adds NGINX-specific parameters using the original OpenSSL names.
 func addTLSInfoToRenderData(data map[string]interface{}, bootstrapResult *bootstrap.BootstrapResult, respectAdherence bool) {
 	if respectAdherence && !crypto.ShouldHonorClusterTLSProfile(bootstrapResult.TLSProfile.Adherence) {
 		data[UseTLSProfileKey] = false
 		return
 	}
 
+	// Convert OpenSSL cipher names to IANA names for Go components (kube-rbac-proxy, controller-runtime, etc.)
+	var ianaCiphers []string
+	for _, cipher := range bootstrapResult.TLSProfile.Spec.Ciphers {
+		// First try as IANA name directly (in case of custom profiles with IANA names)
+		if _, err := crypto.CipherSuite(cipher); err == nil {
+			ianaCiphers = append(ianaCiphers, cipher)
+			continue
+		}
+
+		// Try converting from OpenSSL name to IANA name
+		converted := crypto.OpenSSLToIANACipherSuites([]string{cipher})
+		if len(converted) > 0 {
+			ianaCiphers = append(ianaCiphers, converted...)
+		} else {
+			ianaCiphers = append(ianaCiphers, cipher)
+		}
+	}
+
+	// Add Go-style TLS parameters (IANA cipher names, comma-separated)
 	data[TLSMinVersionKey] = bootstrapResult.TLSProfile.Spec.MinTLSVersion
-	data[TLSCipherSuitesKey] = strings.Join(bootstrapResult.TLSProfile.Spec.Ciphers, ",")
+	data[TLSCipherSuitesKey] = strings.Join(ianaCiphers, ",")
+
+	// Add NGINX-style TLS parameters (OpenSSL cipher names, colon-separated)
+	data[NginxTLSProtocolsKey] = convertTLSVersionToNginx(bootstrapResult.TLSProfile.Spec.MinTLSVersion)
+	data[NginxTLSCiphersKey] = strings.Join(bootstrapResult.TLSProfile.Spec.Ciphers, ":")
+
 	data[UseTLSProfileKey] = true
 }
 
@@ -67,28 +97,25 @@ func toTLSProfile(apiServerSpec *configv1.APIServerSpec) (bootstrap.TLSProfile, 
 		profileSpec.Ciphers = nil
 	}
 
-	// OCP uses OpenSSL names in its pre-defined TLS profile specs (although it's possible a user-defined custom profile
-	// spec could have IANA names). The components that accept cipher suites as an arg expect IANA names so convert them.
-	var convertedCiphers []string
-	for _, cipher := range profileSpec.Ciphers {
-		// First try as IANA name directly.
-		if _, err := crypto.CipherSuite(cipher); err == nil {
-			convertedCiphers = append(convertedCiphers, cipher)
-			continue
-		}
-
-		// Try converting from OpenSSL name to IANA name.
-		ianaCiphers := crypto.OpenSSLToIANACipherSuites([]string{cipher})
-		if len(ianaCiphers) > 0 {
-			convertedCiphers = append(convertedCiphers, ianaCiphers...)
-		} else {
-			convertedCiphers = append(convertedCiphers, cipher)
-		}
-	}
-	profileSpec.Ciphers = convertedCiphers
-
 	return bootstrap.TLSProfile{
 		Spec:      profileSpec,
 		Adherence: apiServerSpec.TLSAdherence,
 	}, nil
+}
+
+// convertTLSVersionToNginx converts OpenShift TLS version to NGINX ssl_protocols format
+func convertTLSVersionToNginx(version configv1.TLSProtocolVersion) string {
+	switch version {
+	case configv1.VersionTLS10:
+		return "TLSv1 TLSv1.1 TLSv1.2 TLSv1.3"
+	case configv1.VersionTLS11:
+		return "TLSv1.1 TLSv1.2 TLSv1.3"
+	case configv1.VersionTLS12:
+		return "TLSv1.2 TLSv1.3"
+	case configv1.VersionTLS13:
+		return "TLSv1.3"
+	default:
+		// Default to TLS 1.2 and 1.3 for unknown versions
+		return "TLSv1.2 TLSv1.3"
+	}
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes/scheme"
 
@@ -677,4 +678,69 @@ func Test_renderFRRRoutingCapabilities(t *testing.T) {
 			g.Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
 			return strings.Join(deployment.Spec.Template.Spec.Containers[0].Args, " ")
 		})
+}
+
+func Test_renderNetworkingConsolePlugin(t *testing.T) {
+	renderAndFindNginxConfig := func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+		g := NewWithT(t)
+		t.Setenv("NETWORKING_CONSOLE_PLUGIN_IMAGE", "quay.io/openshift/networking-console-plugin:latest")
+		bootstrapResult := fakeBootstrapResult()
+		bootstrapResult.Infra.ConsolePluginCRDExists = true
+		bootstrapResult.TLSProfile = tlsProfile
+
+		objs, err := renderNetworkingConsolePlugin(manifestDir, bootstrapResult)
+		g.Expect(err).NotTo(HaveOccurred())
+
+		cm := mustFindRenderedObj[*corev1.ConfigMap](t, objs, "ConfigMap", "networking-console-plugin")
+		return cm.Data["nginx.conf"]
+	}
+
+	t.Run("when TLS profile adherence is StrictAllComponents", func(t *testing.T) {
+		t.Run("should render ssl_protocols and ssl_ciphers directives", func(t *testing.T) {
+			g := NewWithT(t)
+			nginxConf := renderAndFindNginxConfig(t, bootstrap.TLSProfile{
+				Spec: configv1.TLSProfileSpec{
+					MinTLSVersion: configv1.VersionTLS12,
+					Ciphers:       []string{"ECDHE-RSA-AES128-GCM-SHA256", "ECDHE-ECDSA-CHACHA20-POLY1305"},
+				},
+				Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
+			})
+
+			g.Expect(nginxConf).To(MatchRegexp(`ssl_protocols\s+TLSv1\.2 TLSv1\.3;`))
+			g.Expect(nginxConf).To(MatchRegexp(`ssl_ciphers\s+ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;`))
+			g.Expect(nginxConf).To(MatchRegexp(`ssl_prefer_server_ciphers\s+on;`))
+		})
+
+		t.Run("with TLS 1.3 and empty ciphers", func(t *testing.T) {
+			g := NewWithT(t)
+			nginxConf := renderAndFindNginxConfig(t, bootstrap.TLSProfile{
+				Spec: configv1.TLSProfileSpec{
+					MinTLSVersion: configv1.VersionTLS13,
+					Ciphers:       nil,
+				},
+				Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
+			})
+
+			g.Expect(nginxConf).To(MatchRegexp(`ssl_protocols\s+TLSv1\.3;`))
+			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_ciphers"))
+			g.Expect(nginxConf).To(MatchRegexp(`ssl_prefer_server_ciphers\s+on;`))
+		})
+	})
+
+	t.Run("when adherence is LegacyAdheringComponentsOnly", func(t *testing.T) {
+		t.Run("should not render ssl_protocols and ssl_ciphers directives", func(t *testing.T) {
+			g := NewWithT(t)
+			nginxConf := renderAndFindNginxConfig(t, bootstrap.TLSProfile{
+				Spec: configv1.TLSProfileSpec{
+					MinTLSVersion: configv1.VersionTLS12,
+					Ciphers:       []string{"ECDHE-RSA-AES128-GCM-SHA256"},
+				},
+				Adherence: configv1.TLSAdherencePolicyLegacyAdheringComponentsOnly,
+			})
+
+			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_protocols"))
+			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_ciphers"))
+			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_prefer_server_ciphers"))
+		})
+	})
 }
