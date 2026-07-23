@@ -209,6 +209,29 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		}
 	}
 
+	data.Data["EnableUDNARPProxy"] = ""
+	if raw, ok := bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["enable-udn-arp-proxy"]; ok {
+		enableUDNArpProxy := strings.TrimSpace(raw)
+		if enableUDNArpProxy != "" {
+			if _, err := strconv.ParseBool(enableUDNArpProxy); err != nil {
+				klog.Warningf("Ignoring invalid enable-udn-arp-proxy override %q: expected boolean", raw)
+			} else {
+				data.Data["EnableUDNARPProxy"] = enableUDNArpProxy
+			}
+		}
+	}
+	data.Data["EnableUDNNDPProxy"] = ""
+	if raw, ok := bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["enable-udn-ndp-proxy"]; ok {
+		enableUDNNdpProxy := strings.TrimSpace(raw)
+		if enableUDNNdpProxy != "" {
+			if _, err := strconv.ParseBool(enableUDNNdpProxy); err != nil {
+				klog.Warningf("Ignoring invalid enable-udn-ndp-proxy override %q: expected boolean", raw)
+			} else {
+				data.Data["EnableUDNNDPProxy"] = enableUDNNdpProxy
+			}
+		}
+	}
+
 	if conf.Migration != nil {
 		if conf.Migration.MTU != nil {
 			if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
