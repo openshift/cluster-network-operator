@@ -146,16 +146,17 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}
 
 	// Set up PKI profile provider if ConfigurablePKI is enabled.
-	// Register the PKI informer on the existing configInformers factory,
-	// re-start to pick it up (idempotent for already-running informers),
-	// and wait for cache sync before controllers start reconciling.
+	// Register the PKI informer on the existing configInformers factory
+	// (already started above) and wait for cache sync.
 	var pkiProfileProvider pkipkg.PKIProfileProvider
 	if featureGates.Enabled(features.FeatureGateConfigurablePKI) {
 		configInformers.Config().V1alpha1().PKIs().Informer()
 		configInformers.Start(wait.NeverStop)
-		for t, synced := range configInformers.WaitForCacheSync(wait.NeverStop) {
+		syncCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+		defer cancel()
+		for t, synced := range configInformers.WaitForCacheSync(syncCtx.Done()) {
 			if !synced {
-				return fmt.Errorf("failed to sync config informer for %v", t)
+				return fmt.Errorf("timed out waiting for config informer sync for %v", t)
 			}
 		}
 		pkiProfileProvider = pkipkg.NewClusterPKIProfileProvider(
