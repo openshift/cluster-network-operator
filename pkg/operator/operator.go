@@ -164,6 +164,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		)
 	}
 
+	// Set PKI profile provider before adding controllers
+	pkictrl.SetPKIProfileProvider(pkiProfileProvider)
+
 	// Add controller-runtime controllers
 	klog.Info("Adding controller-runtime controllers")
 	if err := controller.AddToManager(o.manager, o.StatusManager, o.client, featureGates); err != nil {
@@ -174,11 +177,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	klog.Info("Adding TLS restart controller")
 	if err := tlscontroller.Add(o.manager, o.client, triggerRestart); err != nil {
 		return fmt.Errorf("failed to add TLS restart controller: %w", err)
-	}
-
-	// Add PKI controller separately — it needs the PKI profile provider
-	if err := pkictrl.Add(o.manager, o.StatusManager, featureGates, pkiProfileProvider); err != nil {
-		return fmt.Errorf("failed to add pki controller: %w", err)
 	}
 
 	// Initialize individual (non-controller-runtime) controllers

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/network/v1"
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller/eventrecorder"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/cluster-network-operator/pkg/names"
@@ -44,9 +45,15 @@ const (
 	OneYear = 365 * 24 * time.Hour
 )
 
+var pkiProvider pki.PKIProfileProvider
+
+func SetPKIProfileProvider(p pki.PKIProfileProvider) {
+	pkiProvider = p
+}
+
 // Add attaches our control loop to the manager and watches for PKI objects
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, featureGates featuregates.FeatureGate, pkiProfileProvider pki.PKIProfileProvider) error {
-	r, err := newPKIReconciler(mgr, status, featureGates, pkiProfileProvider)
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, client cnoclient.Client, featureGates featuregates.FeatureGate) error {
+	r, err := newPKIReconciler(mgr, status, featureGates, pkiProvider)
 	if err != nil {
 		return err
 	}

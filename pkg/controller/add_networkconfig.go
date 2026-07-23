@@ -9,13 +9,12 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/infrastructureconfig"
 	"github.com/openshift/cluster-network-operator/pkg/controller/ingressconfig"
 	"github.com/openshift/cluster-network-operator/pkg/controller/operconfig"
+	pkictrl "github.com/openshift/cluster-network-operator/pkg/controller/pki"
 	"github.com/openshift/cluster-network-operator/pkg/controller/proxyconfig"
 	signer "github.com/openshift/cluster-network-operator/pkg/controller/signer"
 )
 
 func init() {
-	// AddToManagerFuncs is a list of functions to create controllers and add them to a manager.
-	// Note: pki.Add is called separately in operator.go with additional parameters.
 	AddToManagerFuncs = append(AddToManagerFuncs,
 		egress_router.Add,
 		proxyconfig.Add,
@@ -27,5 +26,6 @@ func init() {
 		infrastructureconfig.Add,
 		allowlist.Add,
 		dashboards.Add,
+		pkictrl.Add,
 	)
 }
