@@ -3,6 +3,8 @@ package signer
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -165,6 +167,136 @@ func TestSigner_reconciler_withInvalidUserName(t *testing.T) {
 	}
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(len(co.Status.Conditions)).To(BeZero())
+}
+
+func TestDecodePrivateKey(t *testing.T) {
+	testCases := []struct {
+		name    string
+		pemData func(t *testing.T) []byte
+		wantErr bool
+	}{
+		{
+			name: "RSA PKCS1 private key",
+			pemData: func(t *testing.T) []byte {
+				key, err := rsa.GenerateKey(rand.Reader, 2048)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return pem.EncodeToMemory(&pem.Block{
+					Type:  "RSA PRIVATE KEY",
+					Bytes: x509.MarshalPKCS1PrivateKey(key),
+				})
+			},
+		},
+		{
+			name: "EC private key",
+			pemData: func(t *testing.T) []byte {
+				key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
+				der, err := x509.MarshalECPrivateKey(key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return pem.EncodeToMemory(&pem.Block{
+					Type:  "EC PRIVATE KEY",
+					Bytes: der,
+				})
+			},
+		},
+		{
+			name: "PKCS8 RSA private key",
+			pemData: func(t *testing.T) []byte {
+				key, err := rsa.GenerateKey(rand.Reader, 2048)
+				if err != nil {
+					t.Fatal(err)
+				}
+				der, err := x509.MarshalPKCS8PrivateKey(key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return pem.EncodeToMemory(&pem.Block{
+					Type:  "PRIVATE KEY",
+					Bytes: der,
+				})
+			},
+		},
+		{
+			name: "PKCS8 EC private key",
+			pemData: func(t *testing.T) []byte {
+				key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
+				der, err := x509.MarshalPKCS8PrivateKey(key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return pem.EncodeToMemory(&pem.Block{
+					Type:  "PRIVATE KEY",
+					Bytes: der,
+				})
+			},
+		},
+		{
+			name: "EC private key with EC PARAMETERS block",
+			pemData: func(t *testing.T) []byte {
+				key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
+				der, err := x509.MarshalECPrivateKey(key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var buf bytes.Buffer
+				if err := pem.Encode(&buf, &pem.Block{
+					Type:  "EC PARAMETERS",
+					Bytes: []byte{0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07},
+				}); err != nil {
+					t.Fatal(err)
+				}
+				if err := pem.Encode(&buf, &pem.Block{
+					Type:  "EC PRIVATE KEY",
+					Bytes: der,
+				}); err != nil {
+					t.Fatal(err)
+				}
+				return buf.Bytes()
+			},
+		},
+		{
+			name: "empty PEM data",
+			pemData: func(t *testing.T) []byte {
+				return []byte{}
+			},
+			wantErr: true,
+		},
+		{
+			name: "unsupported PEM block type only",
+			pemData: func(t *testing.T) []byte {
+				return pem.EncodeToMemory(&pem.Block{
+					Type:  "CERTIFICATE",
+					Bytes: []byte("not a key"),
+				})
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+			signer, err := decodePrivateKey(tc.pemData(t))
+			if tc.wantErr {
+				g.Expect(err).To(HaveOccurred())
+				return
+			}
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(signer).NotTo(BeNil())
+		})
+	}
 }
 
 func generateCSR() (string, error) {

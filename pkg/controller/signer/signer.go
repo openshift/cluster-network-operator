@@ -10,6 +10,8 @@ import (
 	"math/big"
 	mathrand "math/rand"
 	"time"
+
+	"k8s.io/client-go/util/keyutil"
 )
 
 func newCertificateTemplate(certReq *x509.CertificateRequest, certDuration time.Duration) *x509.Certificate {
@@ -67,27 +69,13 @@ func decodeCertificate(pemBytes []byte) (*x509.Certificate, error) {
 }
 
 func decodePrivateKey(pemBytes []byte) (c.Signer, error) {
-	block, _ := pem.Decode(pemBytes)
-	if block == nil {
-		return nil, errors.New("no PEM block found in private key data")
+	key, err := keyutil.ParsePrivateKeyPEM(pemBytes)
+	if err != nil {
+		return nil, err
 	}
-
-	switch block.Type {
-	case "RSA PRIVATE KEY":
-		return x509.ParsePKCS1PrivateKey(block.Bytes)
-	case "PRIVATE KEY":
-		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse PKCS8 private key: %w", err)
-		}
-		signer, ok := key.(c.Signer)
-		if !ok {
-			return nil, fmt.Errorf("parsed private key does not implement crypto.Signer")
-		}
-		return signer, nil
-	case "EC PRIVATE KEY":
-		return x509.ParseECPrivateKey(block.Bytes)
-	default:
-		return nil, fmt.Errorf("unsupported PEM block type: %s", block.Type)
+	signer, ok := key.(c.Signer)
+	if !ok {
+		return nil, fmt.Errorf("parsed private key does not implement crypto.Signer")
 	}
+	return signer, nil
 }
