@@ -462,6 +462,21 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		Name:     "openshift-cloud-network-config-controller",
 	})
 
+	// Add cluster-scoped RBAC resources deployed by CVO from static manifests.
+	// Per OCPBUGS-65488: ClusterRoleBindings must be explicitly listed in relatedObjects
+	// for 'oc adm inspect clusteroperator/network' to collect them for debugging.
+	relatedObjects = append(relatedObjects, configv1.ObjectReference{
+		Group:    "rbac.authorization.k8s.io",
+		Resource: "clusterrolebindings",
+		Name:     "cluster-network-operator",
+	})
+
+	relatedObjects = append(relatedObjects, configv1.ObjectReference{
+		Group:    "rbac.authorization.k8s.io",
+		Resource: "clusterrolebindings",
+		Name:     "default-account-cluster-network-operator",
+	})
+
 	r.status.SetRelatedObjects(relatedObjects)
 	r.status.SetRelatedClusterObjects(relatedClusterObjects)
 	err = r.status.SetMachineConfigs(ctx, renderedMachineConfigs)
