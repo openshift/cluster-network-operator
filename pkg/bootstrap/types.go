@@ -97,12 +97,28 @@ type IPTablesAlerterBootstrapResult struct {
 	Enabled bool
 }
 
+// OSMaxAllowedAddressPairs holds the configured max_allowed_address_pairs value
+// from the cloud-network-config ConfigMap.
+type OSMaxAllowedAddressPairs struct {
+	Value    int
+	IsSet    bool   // used to differentiate between a zero value and an explicitly set zero value
+	RawValue string // used for error reporting if user provides a non-numeric string
+}
+
+// CloudNetworkConfigBootstrapResult contains bootstrap configuration
+// read from the cloud-network-config ConfigMap.
+type CloudNetworkConfigBootstrapResult struct {
+	OSMaxAllowedAddressPairs OSMaxAllowedAddressPairs
+}
+
 type BootstrapResult struct {
 	Infra InfraStatus
 
 	OVN             OVNBootstrapResult
 	IPTablesAlerter IPTablesAlerterBootstrapResult
 	TLSProfile      TLSProfile
+
+	CloudNetworkConfig CloudNetworkConfigBootstrapResult
 }
 
 type InfraStatus struct {

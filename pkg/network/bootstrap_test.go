@@ -215,3 +215,180 @@ func TestBootstrap(t *testing.T) {
 		})
 	})
 }
+
+func TestBootstrapCloudNetworkConfig(t *testing.T) {
+	baseOperConfig := &operv1.Network{
+		ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+		Spec: operv1.NetworkSpec{
+			DefaultNetwork: operv1.DefaultNetworkDefinition{
+				Type: operv1.NetworkTypeOVNKubernetes,
+				OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
+					MTU: nil,
+				},
+			},
+		},
+	}
+
+	baseClientObjs := func(platformType configv1.PlatformType) []crclient.Object {
+		return []crclient.Object{
+			&configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: platformType,
+					},
+				},
+			},
+			&configv1.Proxy{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+			},
+			&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      network.CLUSTER_CONFIG_NAME,
+					Namespace: network.CLUSTER_CONFIG_NAMESPACE,
+				},
+				Data: map[string]string{
+					"install-config": "controlPlane:\n  replicas: 3\n",
+				},
+			},
+			&configv1.APIServer{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+			},
+		}
+	}
+
+	tests := []struct {
+		name           string
+		platformType   configv1.PlatformType
+		configMap      *corev1.ConfigMap
+		expectIsSet    bool
+		expectValue    int
+		expectRawValue string
+	}{
+		{
+			name:         "skipped on non-OpenStack platform",
+			platformType: configv1.NonePlatformType,
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cloud-network-config",
+					Namespace: "openshift-network-operator",
+				},
+				Data: map[string]string{
+					"platform-os-max-allowed-address-pairs": "20",
+				},
+			},
+			expectIsSet: false,
+			expectValue: 0,
+		},
+		{
+			name:         "ConfigMap absent",
+			platformType: configv1.OpenStackPlatformType,
+			configMap:    nil,
+			expectIsSet:  false,
+			expectValue:  0,
+		},
+		{
+			name:         "key missing from ConfigMap",
+			platformType: configv1.OpenStackPlatformType,
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cloud-network-config",
+					Namespace: "openshift-network-operator",
+				},
+				Data: map[string]string{"other-key": "value"},
+			},
+			expectIsSet: false,
+			expectValue: 0,
+		},
+		{
+			name:         "valid value 20",
+			platformType: configv1.OpenStackPlatformType,
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cloud-network-config",
+					Namespace: "openshift-network-operator",
+				},
+				Data: map[string]string{
+					"platform-os-max-allowed-address-pairs": "20",
+				},
+			},
+			expectIsSet:    true,
+			expectValue:    20,
+			expectRawValue: "20",
+		},
+		{
+			name:         "zero value",
+			platformType: configv1.OpenStackPlatformType,
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cloud-network-config",
+					Namespace: "openshift-network-operator",
+				},
+				Data: map[string]string{
+					"platform-os-max-allowed-address-pairs": "0",
+				},
+			},
+			expectIsSet:    true,
+			expectValue:    0,
+			expectRawValue: "0",
+		},
+		{
+			name:         "negative value",
+			platformType: configv1.OpenStackPlatformType,
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cloud-network-config",
+					Namespace: "openshift-network-operator",
+				},
+				Data: map[string]string{
+					"platform-os-max-allowed-address-pairs": "-5",
+				},
+			},
+			expectIsSet:    true,
+			expectValue:    -5,
+			expectRawValue: "-5",
+		},
+		{
+			name:         "non-integer value",
+			platformType: configv1.OpenStackPlatformType,
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cloud-network-config",
+					Namespace: "openshift-network-operator",
+				},
+				Data: map[string]string{
+					"platform-os-max-allowed-address-pairs": "abc",
+				},
+			},
+			expectIsSet:    true,
+			expectValue:    0,
+			expectRawValue: "abc",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			objs := baseClientObjs(tc.platformType)
+			if tc.configMap != nil {
+				objs = append(objs, tc.configMap)
+			}
+			client := fakeclient.NewFakeClient(objs...)
+
+			result, err := network.Bootstrap(baseOperConfig, client)
+			if err != nil {
+				t.Fatalf("Bootstrap failed: %v", err)
+			}
+
+			got := result.CloudNetworkConfig.OSMaxAllowedAddressPairs
+			if got.IsSet != tc.expectIsSet {
+				t.Errorf("IsSet: got %v, want %v", got.IsSet, tc.expectIsSet)
+			}
+			if got.Value != tc.expectValue {
+				t.Errorf("Value: got %d, want %d", got.Value, tc.expectValue)
+			}
+			if tc.expectIsSet && got.RawValue != tc.expectRawValue {
+				t.Errorf("RawValue: got %q, want %q", got.RawValue, tc.expectRawValue)
+			}
+		})
+	}
+}
