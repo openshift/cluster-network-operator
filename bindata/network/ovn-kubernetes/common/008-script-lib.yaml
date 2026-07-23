@@ -701,6 +701,11 @@ data:
         enable_interconnect_flag="--enable-interconnect"
       fi
 
+      ipsec_enable_flag=
+      {{ if .OVNIPsecEnable }}
+      ipsec_enable_flag="--enable-ipsec"
+      {{ end }}
+
       exec /usr/bin/ovnkube \
         ${init_ovnkube_controller} \
         --init-node "${K8S_NODE}" \
@@ -727,6 +732,7 @@ data:
         --acl-logging-rate-limit "{{.OVNPolicyAuditRateLimit}}" \
         ${gw_interface_flag} \
         ${ip_forwarding_flag} \
+        ${ipsec_enable_flag} \
         ${ovn_advertised_udn_isolation_mode_flag} \
         ${openflow_probe_flag} \
         ${allow_icmp_network_policy_flag} \

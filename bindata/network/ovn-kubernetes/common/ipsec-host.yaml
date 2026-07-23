@@ -338,10 +338,6 @@ spec:
           name: host-var-lib
         - mountPath: /etc
           name: host-etc
-        - mountPath: /usr/sbin
-          name: usr-sbin
-        - mountPath: /usr/libexec
-          name: usr-libexec
         resources:
           requests:
             cpu: 10m
@@ -537,14 +533,6 @@ spec:
           path: /etc
           type: Directory
         name: host-etc
-      - hostPath:
-          path: /usr/sbin
-          type: Directory
-        name: usr-sbin
-      - hostPath:
-          path: /usr/libexec
-          type: Directory
-        name: usr-libexec
       tolerations:
       - operator: "Exists"
 {{end}}
