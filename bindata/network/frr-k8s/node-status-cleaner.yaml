@@ -18,7 +18,7 @@ spec:
         component: frr-k8s-statuscleaner
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        openshift.io/required-scc: privileged
+        openshift.io/required-scc: frr-k8s
     spec:
       containers:
       - command:
