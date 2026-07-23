@@ -522,6 +522,10 @@ data:
       # Ensure ovn_advertised_udn_isolation_mode_flag is always defined
       ovn_advertised_udn_isolation_mode_flag=
 
+      # Define mac binding proxy flags
+      ovn_enable_udn_arp_proxy_flag=
+      ovn_enable_udn_ndp_proxy_flag=
+
       # Ensure openflow_probe_flag is always defined
       openflow_probe_flag=
 
@@ -672,6 +676,13 @@ data:
         ovn_advertised_udn_isolation_mode_flag="--advertised-udn-isolation-mode={{.AdvertisedUDNIsolationMode}}"
       fi
 
+      if [[ "{{.EnableUDNARPProxy}}" != "" ]]; then
+        ovn_enable_udn_arp_proxy_flag="--enable-udn-arp-proxy={{.EnableUDNARPProxy}}"
+      fi
+      if [[ "{{.EnableUDNNDPProxy}}" != "" ]]; then
+        ovn_enable_udn_ndp_proxy_flag="--enable-udn-ndp-proxy={{.EnableUDNNDPProxy}}"
+      fi
+
       if [[ "{{.OpenFlowProbe}}" != "" ]]; then
         openflow_probe_flag="--openflow-probe={{.OpenFlowProbe}}"
       fi
@@ -745,6 +756,8 @@ data:
         ${route_advertisements_enable_flag} \
         ${evpn_enable_flag} \
         ${network_observability_enabled_flag} \
+        ${ovn_enable_udn_arp_proxy_flag} \
+        ${ovn_enable_udn_ndp_proxy_flag} \
         --zone ${K8S_NODE} \
         ${enable_interconnect_flag} \
         --enable-multicast \
