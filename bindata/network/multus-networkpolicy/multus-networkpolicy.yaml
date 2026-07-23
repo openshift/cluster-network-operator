@@ -36,7 +36,7 @@ spec:
         args:
         - "--host-prefix=/host"
         - "--container-runtime-endpoint=/run/crio/crio.sock"
-        - "--network-plugins=macvlan,sriov,ipvlan,bond"
+        - "--network-plugins=macvlan,sriov,ipvlan,bond,ovn-k8s-cni-overlay"
         - "--custom-v6-ingress-rule-file=/etc/multi-networkpolicy/rules/custom-v6-rules.txt"
         - "--custom-v6-egress-rule-file=/etc/multi-networkpolicy/rules/custom-v6-rules.txt"
         - "--hostname-override=$(K8S_NODE_NAME)"
