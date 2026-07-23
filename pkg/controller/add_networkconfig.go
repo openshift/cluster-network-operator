@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/egress_router"
 	"github.com/openshift/cluster-network-operator/pkg/controller/infrastructureconfig"
 	"github.com/openshift/cluster-network-operator/pkg/controller/ingressconfig"
+	"github.com/openshift/cluster-network-operator/pkg/controller/observability"
 	"github.com/openshift/cluster-network-operator/pkg/controller/operconfig"
 	pkictrl "github.com/openshift/cluster-network-operator/pkg/controller/pki"
 	"github.com/openshift/cluster-network-operator/pkg/controller/proxyconfig"
@@ -27,5 +28,6 @@ func init() {
 		allowlist.Add,
 		dashboards.Add,
 		pkictrl.Add,
+		observability.Add,
 	)
 }

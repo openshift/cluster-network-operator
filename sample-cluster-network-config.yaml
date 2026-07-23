@@ -5,7 +5,14 @@ metadata:
 spec:
   serviceNetwork:
     - "172.30.0.0/16"
-  clusterNetwork: 
+  clusterNetwork:
     - cidr: "10.128.0.0/14"
-      hostPrefix: 23 
+      hostPrefix: 23
   networkType: OVNKubernetes
+  networkObservability:
+    # installationPolicy controls Network Observability installation during cluster deployment (day-0).
+    # Valid values: "", "InstallAndEnable", "NoAction"
+    # Default (empty or omitted): enabled on multi-node clusters, disabled on SNO
+    # "InstallAndEnable": explicitly enable (even on SNO)
+    # "NoAction": explicitly disable
+    installationPolicy: InstallAndEnable
