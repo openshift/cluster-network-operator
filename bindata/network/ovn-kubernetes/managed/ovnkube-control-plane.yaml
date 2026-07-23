@@ -219,6 +219,12 @@ spec:
             --metrics-enable-config-duration \
             --node-server-privkey ${TLS_PK} \
             --node-server-cert ${TLS_CERT} \
+{{- if .UseTLSProfile }}
+            --tls-min-version={{.TLSMinVersion}} \
+  {{- if .TLSCipherSuites }}
+            --tls-cipher-suites={{.TLSCipherSuites}} \
+  {{- end }}
+{{- end }}
             ${ovn_v4_join_subnet_opt} \
             ${ovn_v6_join_subnet_opt} \
             ${ovn_v4_transit_switch_subnet_opt} \

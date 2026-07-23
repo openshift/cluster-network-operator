@@ -48,8 +48,12 @@ spec:
         args:
           - --listen
           - 0.0.0.0:17698
-          - --namespace
-          - $(POD_NAMESPACE)
+{{- if .UseTLSProfile }}
+          - --tls-min-version={{.TLSMinVersion}}
+{{- if .TLSCipherSuites }}
+          - --tls-cipher-suites={{.TLSCipherSuites}}
+{{- end }}
+{{- end }}
         env:
           - name: POD_NAME
             valueFrom:

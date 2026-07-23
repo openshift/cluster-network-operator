@@ -43,6 +43,16 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 				if v, ok := data[TLSCipherSuitesKey]; !ok || v != expectedCiphers {
 					t.Errorf("Expected %s to be %v, got %v", TLSCipherSuitesKey, expectedCiphers, v)
 				}
+
+				// Check NGINX parameters
+				expectedNginxProtocols := "TLSv1.2 TLSv1.3"
+				if v, ok := data[NginxTLSProtocolsKey]; !ok || v != expectedNginxProtocols {
+					t.Errorf("Expected %s to be %q, got %v", NginxTLSProtocolsKey, expectedNginxProtocols, v)
+				}
+				expectedNginxCiphers := "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384"
+				if v, ok := data[NginxTLSCiphersKey]; !ok || v != expectedNginxCiphers {
+					t.Errorf("Expected %s to be %q, got %v", NginxTLSCiphersKey, expectedNginxCiphers, v)
+				}
 			})
 		}
 	})
@@ -82,6 +92,13 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 					if _, ok := data[TLSCipherSuitesKey]; ok {
 						t.Errorf("Expected %s to not be present, but it was: %v", TLSCipherSuitesKey, data[TLSCipherSuitesKey])
 					}
+					// NGINX parameters should also not be set
+					if _, ok := data[NginxTLSProtocolsKey]; ok {
+						t.Errorf("Expected %s to not be present, but it was: %v", NginxTLSProtocolsKey, data[NginxTLSProtocolsKey])
+					}
+					if _, ok := data[NginxTLSCiphersKey]; ok {
+						t.Errorf("Expected %s to not be present, but it was: %v", NginxTLSCiphersKey, data[NginxTLSCiphersKey])
+					}
 				})
 
 				t.Run("and not respecting adherence", func(t *testing.T) {
@@ -109,6 +126,17 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 					if v, ok := data[TLSCipherSuitesKey]; !ok || v != expectedCiphers {
 						t.Errorf("Expected %s to be %v, got %v", TLSCipherSuitesKey, expectedCiphers, v)
 					}
+
+					// Check NGINX parameters for TLS 1.3
+					expectedNginxProtocols := "TLSv1.3"
+					if v, ok := data[NginxTLSProtocolsKey]; !ok || v != expectedNginxProtocols {
+						t.Errorf("Expected %s to be %q, got %v", NginxTLSProtocolsKey, expectedNginxProtocols, v)
+					}
+					// TLS 1.3 ciphers should be empty (not configurable)
+					expectedNginxCiphers := "TLS_AES_128_GCM_SHA256"
+					if v, ok := data[NginxTLSCiphersKey]; !ok || v != expectedNginxCiphers {
+						t.Errorf("Expected %s to be %q, got %v", NginxTLSCiphersKey, expectedNginxCiphers, v)
+					}
 				})
 			})
 		}
@@ -135,6 +163,16 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 		}
 		if v, ok := data[TLSCipherSuitesKey]; !ok || v != "" {
 			t.Errorf("Expected %s to be empty string, got %v", TLSCipherSuitesKey, v)
+		}
+
+		// Check NGINX parameters with nil ciphers
+		expectedNginxProtocols := "TLSv1.2 TLSv1.3"
+		if v, ok := data[NginxTLSProtocolsKey]; !ok || v != expectedNginxProtocols {
+			t.Errorf("Expected %s to be %q, got %v", NginxTLSProtocolsKey, expectedNginxProtocols, v)
+		}
+		expectedNginxCiphers := ""
+		if v, ok := data[NginxTLSCiphersKey]; !ok || v != expectedNginxCiphers {
+			t.Errorf("Expected %s to be %q, got %v", NginxTLSCiphersKey, expectedNginxCiphers, v)
 		}
 	})
 }

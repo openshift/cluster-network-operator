@@ -194,6 +194,52 @@ func TestRenderOVNKubernetes(t *testing.T) {
 			g.Expect(clusterRole.Rules).To(ContainElements(expectedRules))
 		}
 	}
+
+	// Test TLS rendering for the kube-rbac-proxy in the start-rbac-proxy-node function
+	testTLSArgRendering(t, "ovnkube-script-lib kube-rbac-proxy", "",
+		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			testBootstrap := *bootstrapResult
+			testBootstrap.TLSProfile = tlsProfile
+			objs, _, err = renderOVNKubernetes(config, &testBootstrap, manifestDirOvn, fakeClient, featureGatesCNO)
+			g.Expect(err).NotTo(HaveOccurred())
+
+			cm := mustFindRenderedObj[*v1.ConfigMap](t, objs, "ConfigMap", "ovnkube-script-lib")
+			data, ok := cm.Data["ovnkube-lib.sh"]
+			g.Expect(ok).To(BeTrue(), "ovnkube-lib.sh not found in ConfigMap")
+
+			execStart := strings.Index(data, "exec /usr/bin/kube-rbac-proxy")
+			g.Expect(execStart).NotTo(Equal(-1), "exec /usr/bin/kube-rbac-proxy not found in script")
+
+			return data[execStart:]
+		})
+
+	// Test TLS rendering for ovnkube in HyperShift managed ovnkube-control-plane
+	testTLSArgRendering(t, "HyperShift ovnkube-control-plane", "", "",
+		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			testBootstrap := *bootstrapResult
+			testBootstrap.TLSProfile = tlsProfile
+			testBootstrap.Infra = bootstrap.InfraStatus{}
+			testBootstrap.Infra.HostedControlPlane = &hypershift.HostedControlPlane{}
+			ovnConfig := *testBootstrap.OVN.OVNKubernetesConfig
+			ovnConfig.HyperShiftConfig = &bootstrap.OVNHyperShiftBootstrapResult{
+				Enabled: true,
+			}
+			testBootstrap.OVN.OVNKubernetesConfig = &ovnConfig
+			objs, _, err = renderOVNKubernetes(config, &testBootstrap, manifestDirOvn, fakeClient, featureGatesCNO)
+			g.Expect(err).NotTo(HaveOccurred())
+
+			deployment := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "ovnkube-control-plane")
+			container := mustFindContainer(t, deployment.Spec.Template.Spec.Containers, "ovnkube-control-plane")
+			g.Expect(container.Command).NotTo(BeEmpty(), "ovnkube-control-plane container command should not be empty")
+
+			// The command is a bash script, extract the exec line
+			commandScript := strings.Join(container.Command, " ")
+			execStart := strings.Index(commandScript, "exec /usr/bin/ovnkube")
+			g.Expect(execStart).NotTo(Equal(-1), "exec /usr/bin/ovnkube not found in container command")
+
+			return commandScript[execStart:]
+		})
 }
 
 func encodeClusterRole(obj *uns.Unstructured) (*rbacv1.ClusterRole, error) {

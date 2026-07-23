@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -11,6 +12,9 @@ import (
 	openshifttls "github.com/openshift/controller-runtime-common/pkg/tls"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -555,13 +559,36 @@ func Test_renderNetworkDiagnostics(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := renderNetworkDiagnostics(tt.args.operConf, tt.args.clusterConf, manifestDir)
+			got, err := renderNetworkDiagnostics(tt.args.operConf, tt.args.clusterConf, fakeBootstrapResult(), manifestDir)
 			if !reflect.DeepEqual(tt.expectedErr, err) {
 				t.Errorf("Test_renderNetworkDiagnostics() err = %v, want %v", err, tt.expectedErr)
 			}
 			assert.Equalf(t, tt.want, len(got), "renderNetworkDiagnostics(%v, %v, %v)", tt.args.operConf, tt.args.clusterConf, manifestDir)
 		})
 	}
+
+	// Test TLS args rendering for network-check-source
+	t.Run("TLS args rendering", func(t *testing.T) {
+		testTLSArgRendering(t, "network-check-source", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			operConf := &operv1.NetworkSpec{}
+			clusterConf := &configv1.NetworkSpec{
+				NetworkDiagnostics: configv1.NetworkDiagnostics{
+					Mode: configv1.NetworkDiagnosticsAll,
+				},
+			}
+			bootstrapResult := fakeBootstrapResult()
+			bootstrapResult.TLSProfile = tlsProfile
+
+			objs, err := renderNetworkDiagnostics(operConf, clusterConf, bootstrapResult, manifestDir)
+			if err != nil {
+				t.Fatalf("renderNetworkDiagnostics failed: %v", err)
+			}
+
+			deployment := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "network-check-source")
+			container := mustFindContainer(t, deployment.Spec.Template.Spec.Containers, "check-endpoints")
+			return strings.Join(container.Args, " ")
+		})
+	})
 }
 
 func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
@@ -599,11 +626,121 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := renderAdditionalRoutingCapabilities(tt.args.operConf, manifestDir)
+			got, err := renderAdditionalRoutingCapabilities(tt.args.operConf, fakeBootstrapResult(), manifestDir)
 			if !reflect.DeepEqual(tt.expectedErr, err) {
 				t.Errorf("renderAdditionalRoutingCapabilities() err = %v, want %v", err, tt.expectedErr)
 			}
 			assert.Equalf(t, tt.want, len(got), "renderAdditionalRoutingCapabilities(%v, %v)", tt.args.operConf, manifestDir)
 		})
 	}
+}
+
+func Test_renderFRRRoutingCapabilities(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	getRenderedObjs := func(t *testing.T, tlsProfile bootstrap.TLSProfile) []*unstructured.Unstructured {
+		testBootstrap := fakeBootstrapResult()
+		testBootstrap.TLSProfile = tlsProfile
+		objs, err := renderAdditionalRoutingCapabilities(&operv1.NetworkSpec{
+			AdditionalRoutingCapabilities: &operv1.AdditionalRoutingCapabilities{
+				Providers: []operv1.RoutingCapabilitiesProvider{
+					operv1.RoutingCapabilitiesProviderFRR,
+				},
+			},
+		}, testBootstrap, manifestDir)
+		g.Expect(err).NotTo(HaveOccurred())
+
+		return objs
+	}
+
+	getDaemonsetContainerArgs := func(t *testing.T, tlsProfile bootstrap.TLSProfile, containerName string) string {
+		daemonSet := mustFindRenderedObj[*appsv1.DaemonSet](t, getRenderedObjs(t, tlsProfile), "DaemonSet", "frr-k8s")
+		container := mustFindContainer(t, daemonSet.Spec.Template.Spec.Containers, containerName)
+		return strings.Join(container.Args, " ")
+	}
+
+	// Test TLS rendering for frr-metrics container
+	testTLSArgRendering(t, "frr-metrics", "", "",
+		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			return getDaemonsetContainerArgs(t, tlsProfile, "frr-metrics")
+		})
+
+	// Test TLS rendering for controller container
+	testTLSArgRendering(t, "frr-k8s controller", "", "",
+		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			return getDaemonsetContainerArgs(t, tlsProfile, "controller")
+		})
+
+	// Test TLS rendering for statuscleaner container
+	testTLSArgRendering(t, "frr-k8s-statuscleaner", "", "",
+		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			deployment := mustFindRenderedObj[*appsv1.Deployment](t, getRenderedObjs(t, tlsProfile), "Deployment", "frr-k8s-statuscleaner")
+			g.Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
+			return strings.Join(deployment.Spec.Template.Spec.Containers[0].Args, " ")
+		})
+}
+
+func Test_renderNetworkingConsolePlugin(t *testing.T) {
+	renderAndFindNginxConfig := func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+		g := NewWithT(t)
+		t.Setenv("NETWORKING_CONSOLE_PLUGIN_IMAGE", "quay.io/openshift/networking-console-plugin:latest")
+		bootstrapResult := fakeBootstrapResult()
+		bootstrapResult.Infra.ConsolePluginCRDExists = true
+		bootstrapResult.TLSProfile = tlsProfile
+
+		objs, err := renderNetworkingConsolePlugin(manifestDir, bootstrapResult)
+		g.Expect(err).NotTo(HaveOccurred())
+
+		cm := mustFindRenderedObj[*corev1.ConfigMap](t, objs, "ConfigMap", "networking-console-plugin")
+		return cm.Data["nginx.conf"]
+	}
+
+	t.Run("when TLS profile adherence is StrictAllComponents", func(t *testing.T) {
+		t.Run("should render ssl_protocols and ssl_ciphers directives", func(t *testing.T) {
+			g := NewWithT(t)
+			nginxConf := renderAndFindNginxConfig(t, bootstrap.TLSProfile{
+				Spec: configv1.TLSProfileSpec{
+					MinTLSVersion: configv1.VersionTLS12,
+					Ciphers:       []string{"ECDHE-RSA-AES128-GCM-SHA256", "ECDHE-ECDSA-CHACHA20-POLY1305"},
+				},
+				Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
+			})
+
+			g.Expect(nginxConf).To(MatchRegexp(`ssl_protocols\s+TLSv1\.2 TLSv1\.3;`))
+			g.Expect(nginxConf).To(MatchRegexp(`ssl_ciphers\s+ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;`))
+			g.Expect(nginxConf).To(MatchRegexp(`ssl_prefer_server_ciphers\s+on;`))
+		})
+
+		t.Run("with TLS 1.3 and empty ciphers", func(t *testing.T) {
+			g := NewWithT(t)
+			nginxConf := renderAndFindNginxConfig(t, bootstrap.TLSProfile{
+				Spec: configv1.TLSProfileSpec{
+					MinTLSVersion: configv1.VersionTLS13,
+					Ciphers:       nil,
+				},
+				Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
+			})
+
+			g.Expect(nginxConf).To(MatchRegexp(`ssl_protocols\s+TLSv1\.3;`))
+			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_ciphers"))
+			g.Expect(nginxConf).To(MatchRegexp(`ssl_prefer_server_ciphers\s+on;`))
+		})
+	})
+
+	t.Run("when adherence is LegacyAdheringComponentsOnly", func(t *testing.T) {
+		t.Run("should not render ssl_protocols and ssl_ciphers directives", func(t *testing.T) {
+			g := NewWithT(t)
+			nginxConf := renderAndFindNginxConfig(t, bootstrap.TLSProfile{
+				Spec: configv1.TLSProfileSpec{
+					MinTLSVersion: configv1.VersionTLS12,
+					Ciphers:       []string{"ECDHE-RSA-AES128-GCM-SHA256"},
+				},
+				Adherence: configv1.TLSAdherencePolicyLegacyAdheringComponentsOnly,
+			})
+
+			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_protocols"))
+			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_ciphers"))
+			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_prefer_server_ciphers"))
+		})
+	})
 }

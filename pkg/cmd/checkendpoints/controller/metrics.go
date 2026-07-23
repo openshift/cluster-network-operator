@@ -4,38 +4,38 @@ import (
 	"sync"
 
 	"github.com/openshift/cluster-network-operator/pkg/cmd/checkendpoints/trace"
-	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
+	"github.com/prometheus/client_golang/prometheus"
+	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 var (
 	registerMetrics sync.Once
 
-	endpointCheckCounter   *metrics.CounterVec
-	tcpConnectLatencyGauge *metrics.GaugeVec
-	dnsResolveLatencyGauge *metrics.GaugeVec
+	endpointCheckCounter   *prometheus.CounterVec
+	tcpConnectLatencyGauge *prometheus.GaugeVec
+	dnsResolveLatencyGauge *prometheus.GaugeVec
 )
 
-// RegisterMetrics in the global registry
+// RegisterMetrics in the controller-runtime global registry
 func RegisterMetrics() {
 	registerMetrics.Do(func() {
-		endpointCheckCounter = metrics.NewCounterVec(&metrics.CounterOpts{
+		endpointCheckCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "pod_network_connectivity_check_count",
 			Help: "Report status of pod network connectivity checks over time.",
 		}, []string{"component", "checkName", "targetEndpoint", "tcpConnect", "dnsResolve"})
 
-		tcpConnectLatencyGauge = metrics.NewGaugeVec(&metrics.GaugeOpts{
+		tcpConnectLatencyGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "pod_network_connectivity_check_tcp_connect_latency_gauge",
 			Help: "Report latency of TCP connect to target endpoint over time.",
 		}, []string{"component", "checkName", "targetEndpoint"})
 
-		dnsResolveLatencyGauge = metrics.NewGaugeVec(&metrics.GaugeOpts{
+		dnsResolveLatencyGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "pod_network_connectivity_check_dns_resolve_latency_gauge",
 			Help: "Report latency of DNS resolve of target endpoint over time.",
 		}, []string{"component", "checkName", "targetEndpoint"})
-		legacyregistry.MustRegister(endpointCheckCounter)
-		legacyregistry.MustRegister(tcpConnectLatencyGauge)
-		legacyregistry.MustRegister(dnsResolveLatencyGauge)
+		ctrlmetrics.Registry.MustRegister(endpointCheckCounter)
+		ctrlmetrics.Registry.MustRegister(tcpConnectLatencyGauge)
+		ctrlmetrics.Registry.MustRegister(dnsResolveLatencyGauge)
 	})
 }
 
