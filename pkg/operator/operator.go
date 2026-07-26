@@ -8,6 +8,7 @@ import (
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
+	features "github.com/openshift/api/features"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -15,6 +16,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
+	pkipkg "github.com/openshift/library-go/pkg/pki"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -27,6 +29,7 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/controller"
 	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
+	pkictrl "github.com/openshift/cluster-network-operator/pkg/controller/pki"
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	tlscontroller "github.com/openshift/cluster-network-operator/pkg/controller/tls"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
@@ -141,6 +144,28 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if err != nil {
 		return err
 	}
+
+	// Set up PKI profile provider if ConfigurablePKI is enabled.
+	// Register the PKI informer on the existing configInformers factory
+	// (already started above) and wait for cache sync.
+	var pkiProfileProvider pkipkg.PKIProfileProvider
+	if featureGates.Enabled(features.FeatureGateConfigurablePKI) {
+		configInformers.Config().V1alpha1().PKIs().Informer()
+		configInformers.Start(wait.NeverStop)
+		syncCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+		defer cancel()
+		for t, synced := range configInformers.WaitForCacheSync(syncCtx.Done()) {
+			if !synced {
+				return fmt.Errorf("timed out waiting for config informer sync for %v", t)
+			}
+		}
+		pkiProfileProvider = pkipkg.NewClusterPKIProfileProvider(
+			configInformers.Config().V1alpha1().PKIs().Lister(),
+		)
+	}
+
+	// Set PKI profile provider before adding controllers
+	pkictrl.SetPKIProfileProvider(pkiProfileProvider)
 
 	// Add controller-runtime controllers
 	klog.Info("Adding controller-runtime controllers")
