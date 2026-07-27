@@ -490,6 +490,26 @@ data:
       cp -f "/usr/libexec/cni/ovn-k8s-cni-overlay" /cni-bin-dir/
     }
 
+    # ensure-notrack-rule ensures exactly one NOTRACK rule exists for the given
+    # iptables command, chain, and port. Adds the rule if missing, removes only
+    # duplicates if present, and does nothing if a single rule already exists.
+    ensure-notrack-rule()
+    {
+      local cmd=$1
+      local chain=$2
+      local port=$3
+      local count
+      count=$($cmd -t raw -S $chain 2>/dev/null | grep -c "\-\-dport $port -j NOTRACK" || true)
+      if [ "$count" -eq 0 ]; then
+        $cmd -t raw -A $chain -p udp --dport $port -j NOTRACK
+      elif [ "$count" -gt 1 ]; then
+        local to_delete=$((count - 1))
+        for ((i=0; i<to_delete; i++)); do
+          $cmd -t raw -D $chain -p udp --dport $port -j NOTRACK
+        done
+      fi
+    }
+
     # start-ovnkube-node starts the ovnkube-node process. This function does not
     # return.
     start-ovnkube-node()
@@ -526,15 +546,15 @@ data:
       cni-bin-copy
 
       echo "I$(date "+%m%d %H:%M:%S.%N") - disable conntrack on geneve port"
-      iptables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
-      iptables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
-      ip6tables -t raw -A PREROUTING -p udp --dport {{.GenevePort}} -j NOTRACK
-      ip6tables -t raw -A OUTPUT -p udp --dport {{.GenevePort}} -j NOTRACK
+      ensure-notrack-rule iptables PREROUTING {{.GenevePort}}
+      ensure-notrack-rule iptables OUTPUT {{.GenevePort}}
+      ensure-notrack-rule ip6tables PREROUTING {{.GenevePort}}
+      ensure-notrack-rule ip6tables OUTPUT {{.GenevePort}}
 
       {{- if .OVNHybridOverlayVXLANPort}}
       echo "I$(date "+%m%d %H:%M:%S.%N") - disable conntrack on hybrid overlay VXLAN port"
-      iptables -t raw -A PREROUTING -p udp --dport {{.OVNHybridOverlayVXLANPort}} -j NOTRACK
-      iptables -t raw -A OUTPUT -p udp --dport {{.OVNHybridOverlayVXLANPort}} -j NOTRACK
+      ensure-notrack-rule iptables PREROUTING {{.OVNHybridOverlayVXLANPort}}
+      ensure-notrack-rule iptables OUTPUT {{.OVNHybridOverlayVXLANPort}}
       {{- end}}
 
       echo "I$(date "+%m%d %H:%M:%S.%N") - starting ovnkube-node"
