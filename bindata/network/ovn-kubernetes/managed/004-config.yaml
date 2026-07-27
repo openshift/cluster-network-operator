@@ -43,7 +43,6 @@ data:
     enable-multi-network=true
     enable-network-segmentation=true
     enable-preconfigured-udn-addresses=true
-
     enable-admin-network-policy=true
     enable-multi-external-gateway=true
 {{- if .DNS_NAME_RESOLVER_ENABLE }}
