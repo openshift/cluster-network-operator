@@ -144,7 +144,14 @@ spec:
           exec /usr/bin/kube-rbac-proxy \
             --logtostderr \
             --secure-listen-address=:{{.MetricsPort}} \
+{{- if .UseTLSProfile }}
+            --tls-min-version={{.TLSMinVersion}} \
+  {{- if .TLSCipherSuites }}
+            --tls-cipher-suites={{.TLSCipherSuites}} \
+  {{- end }}
+{{- else }}
             --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 \
+{{- end }}
             --upstream=http://127.0.0.1:29102/ \
             --tls-private-key-file=${TLS_PK} \
             --tls-cert-file=${TLS_CERT}

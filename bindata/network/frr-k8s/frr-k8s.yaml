@@ -99,6 +99,12 @@ spec:
         - --namespace=$(NAMESPACE)
         - --metrics-bind-address=0.0.0.0:9140
         - --metrics-cert-dir=/etc/metrics
+{{- if .UseTLSProfile }}
+        - --tls-min-version={{.TLSMinVersion}}
+  {{- if .TLSCipherSuites }}
+        - --tls-cipher-suites={{.TLSCipherSuites}}
+  {{- end }}
+{{- end }}
         - $(LOG_LEVEL)
         env:
         - name: FRR_CONFIG_FILE
@@ -230,6 +236,12 @@ spec:
         - --metrics-bind-address=0.0.0.0
         - --tls-cert-file=/etc/metrics/tls.crt
         - --tls-private-key-file=/etc/metrics/tls.key
+{{- if .UseTLSProfile }}
+        - --tls-min-version={{.TLSMinVersion}}
+  {{- if .TLSCipherSuites }}
+        - --tls-cipher-suites={{.TLSCipherSuites}}
+  {{- end }}
+{{- end }}
         ports:
         - containerPort: 9141
           name: frrmetricshttps

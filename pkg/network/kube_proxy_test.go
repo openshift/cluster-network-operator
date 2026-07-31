@@ -5,6 +5,7 @@ import (
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	appsv1 "k8s.io/api/apps/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	. "github.com/onsi/gomega"
@@ -491,4 +492,18 @@ winkernel:
 		}
 	}
 	g.Expect(found).To(BeTrue())
+
+	// Test TLS rendering for kube-rbac-proxy container
+	testTLSArgRendering(t, "kube-proxy kube-rbac-proxy", "",
+		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			testBootstrap := FakeKubeProxyBootstrapResult
+			testBootstrap.TLSProfile = tlsProfile
+			objs, err := renderStandaloneKubeProxy(c, &testBootstrap, manifestDir)
+			g.Expect(err).NotTo(HaveOccurred())
+
+			daemonSet := mustFindRenderedObj[*appsv1.DaemonSet](t, objs, "DaemonSet", "openshift-kube-proxy")
+			cmdArgs := mustFindContainer(t, daemonSet.Spec.Template.Spec.Containers, "kube-rbac-proxy").Command
+			return findExecCommand(t, cmdArgs, "kube-rbac-proxy")
+		})
 }

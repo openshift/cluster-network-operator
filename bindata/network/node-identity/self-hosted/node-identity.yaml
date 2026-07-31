@@ -57,7 +57,8 @@ spec:
             echo "I$(date "+%m%d %H:%M:%S.%N") - network-node-identity - start webhook"
             # extra-allowed-user: service account `ovn-kubernetes-control-plane`
             # sets pod annotations in multi-homing layer3 network controller (cluster-manager)
-            exec /usr/bin/ovnkube-identity  --k8s-apiserver={{.K8S_APISERVER}} \
+            exec /usr/bin/ovnkube-identity \
+                --k8s-apiserver={{.K8S_APISERVER}} \
                 --webhook-cert-dir="/etc/webhook-cert" \
                 --webhook-host={{.NetworkNodeIdentityIP}} \
                 --webhook-port={{.NetworkNodeIdentityPort}} \
@@ -67,6 +68,12 @@ spec:
                 --extra-allowed-user="system:serviceaccount:openshift-ovn-kubernetes:ovn-kubernetes-control-plane" \
                 --wait-for-kubernetes-api={{.NetworkNodeIdentityTerminationDurationSeconds}}s \
                 --pod-admission-conditions="/var/run/ovnkube-identity-config/additional-pod-admission-cond.json" \
+             {{- if .UseTLSProfile }}
+                --tls-min-version={{.TLSMinVersion}} \
+             {{- if .TLSCipherSuites }}
+                --tls-cipher-suites={{.TLSCipherSuites}} \
+             {{- end }}
+             {{- end }}
                 --loglevel="${LOGLEVEL}"
         env:
           - name: LOGLEVEL

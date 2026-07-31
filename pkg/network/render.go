@@ -97,7 +97,7 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	objs = append(objs, o...)
 
 	// render network diagnostics
-	o, err = renderNetworkDiagnostics(operConf, clusterConf, manifestDir)
+	o, err = renderNetworkDiagnostics(operConf, clusterConf, bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -129,7 +129,7 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	}
 	objs = append(objs, o...)
 
-	o, err = renderAdditionalRoutingCapabilities(operConf, manifestDir)
+	o, err = renderAdditionalRoutingCapabilities(operConf, bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -722,7 +722,7 @@ func renderMultiNetworkpolicy(conf *operv1.NetworkSpec, manifestDir string) ([]*
 }
 
 // renderNetworkDiagnostics renders the connectivity checks
-func renderNetworkDiagnostics(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func renderNetworkDiagnostics(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	// network diagnostics feature is disabled when clusterConf.NetworkDiagnostics.Mode is set to "Disabled"
 	// or when clusterConf.NetworkDiagnostics is empty and the legacy operConf.DisableNetworkDiagnostics is true
 	if clusterConf.NetworkDiagnostics.Mode == configv1.NetworkDiagnosticsDisabled ||
@@ -748,6 +748,9 @@ func renderNetworkDiagnostics(operConf *operv1.NetworkSpec, clusterConf *configv
 	if clusterConf.NetworkDiagnostics.TargetPlacement.Tolerations != nil {
 		data.Data["NetworkCheckTargetTolerations"] = clusterConf.NetworkDiagnostics.TargetPlacement.Tolerations
 	}
+
+	addTLSInfoToRenderData(data.Data, bootstrapResult, true)
+
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network-diagnostics"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render network-diagnostics manifests")
@@ -819,6 +822,8 @@ func renderNetworkingConsolePlugin(manifestDir string, bootstrapResult *bootstra
 	}
 	data.Data["NetworkingConsolePluginImage"] = consolePluginImage
 
+	addTLSInfoToRenderData(data.Data, bootstrapResult, true)
+
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "networking-console-plugin"), &data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to render networking-console-plugin manifests")
@@ -849,7 +854,7 @@ func registerNetworkingConsolePlugin(bootstrapResult *bootstrap.BootstrapResult,
 	})
 }
 
-func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir string) ([]*uns.Unstructured, error) {
+func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	if conf == nil || conf.AdditionalRoutingCapabilities == nil {
 		return nil, nil
 	}
@@ -858,6 +863,9 @@ func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, manifestDir s
 		switch provider {
 		case operv1.RoutingCapabilitiesProviderFRR:
 			data := render.MakeRenderData()
+
+			addTLSInfoToRenderData(data.Data, bootstrapResult, true)
+
 			data.Data["FRRK8sImage"] = os.Getenv("FRR_K8S_IMAGE")
 			data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 			data.Data["NoOverlayManagedEnabled"] = conf.DefaultNetwork.OVNKubernetesConfig != nil &&

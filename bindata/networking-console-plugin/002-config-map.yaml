@@ -12,6 +12,13 @@ data:
         listen              [::]:9443 ssl;
         ssl_certificate     /var/cert/tls.crt;
         ssl_certificate_key /var/cert/tls.key;
+{{- if .UseTLSProfile }}
+        ssl_protocols       {{.NginxTLSProtocols}};
+{{- if .NginxTLSCiphers }}
+        ssl_ciphers         {{.NginxTLSCiphers}};
+{{- end }}
+        ssl_prefer_server_ciphers on;
+{{- end }}
         root                /opt/app-root/src;
 
         # Prevent caching for plugin-manifest.json

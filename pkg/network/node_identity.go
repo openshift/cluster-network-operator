@@ -61,6 +61,8 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 	}
 	data.Data["NetworkNodeIdentityPort"] = NetworkNodeIdentityWebhookPort
 
+	addTLSInfoToRenderData(data.Data, bootstrapResult, true)
+
 	manifestDirs := make([]string, 0, 2)
 	manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "network/node-identity/common"))
 

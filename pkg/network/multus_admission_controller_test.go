@@ -1,16 +1,19 @@
 package network
 
 import (
-	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/gomega"
 	operv1 "github.com/openshift/api/operator/v1"
-	"github.com/openshift/cluster-network-operator/pkg/names"
-
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnofake "github.com/openshift/cluster-network-operator/pkg/client/fake"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+	"github.com/openshift/cluster-network-operator/pkg/names"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var MultusAdmissionControllerConfig = operv1.Network{
@@ -59,17 +62,17 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 			},
 		},
 		})
-	bootstrap := fakeBootstrapResult()
+	bootstrapResult := fakeBootstrapResult()
 
 	// disable MultusAdmissionController
-	objs, err := renderMultusAdmissionController(config, manifestDir, false, bootstrap, fakeClient, getDefaultFeatureGates())
+	objs, err := renderMultusAdmissionController(config, manifestDir, false, bootstrapResult, fakeClient, getDefaultFeatureGates())
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 
 	// enable MultusAdmissionController
 	enabled := false
 	config.DisableMultiNetwork = &enabled
-	objs, err = renderMultusAdmissionController(config, manifestDir, false, bootstrap, fakeClient, getDefaultFeatureGates())
+	objs, err = renderMultusAdmissionController(config, manifestDir, false, bootstrapResult, fakeClient, getDefaultFeatureGates())
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 
@@ -81,6 +84,33 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ValidatingWebhookConfiguration", "", names.MULTUS_VALIDATING_WEBHOOK)))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("NetworkPolicy", "openshift-multus", "multus-admission-controller")))
+
+	weboookCmd := findMultusWebhookExec(t, objs)
+	g.Expect(weboookCmd).To(ContainSubstring("-metrics-listen-address=127.0.0.1:9091"))
+	g.Expect(weboookCmd).NotTo(ContainSubstring("-encrypt-metrics"))
+
+	// Test TLS rendering for webhook container
+	testTLSArgRendering(t, "multus-admission-controller webhook", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+		testBootstrap := *bootstrapResult
+		testBootstrap.TLSProfile = tlsProfile
+		objs, err := renderMultusAdmissionController(config, manifestDir, false, &testBootstrap, fakeClient, getDefaultFeatureGates())
+		g.Expect(err).NotTo(HaveOccurred())
+		return findMultusWebhookExec(t, objs)
+	})
+
+	// Test TLS rendering for kube-rbac-proxy container
+	// kube-rbac-proxy has hardcoded default ciphers when TLS profile is not honored
+	testTLSArgRendering(t, "multus-admission-controller kube-rbac-proxy", "",
+		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			testBootstrap := *bootstrapResult
+			testBootstrap.TLSProfile = tlsProfile
+			objs, err := renderMultusAdmissionController(config, manifestDir, false, &testBootstrap, fakeClient, getDefaultFeatureGates())
+			g.Expect(err).NotTo(HaveOccurred())
+			deployment := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "multus-admission-controller")
+			container := mustFindContainer(t, deployment.Spec.Template.Spec.Containers, "kube-rbac-proxy")
+			return strings.Join(container.Args, " ")
+		})
 }
 
 // TestRenderMultusAdmissionController has some simple rendering tests
@@ -132,7 +162,7 @@ func TestRenderMultusAdmissonControllerConfigForHyperShift(t *testing.T) {
 			},
 		},
 		})
-	bootstrap := fakeBootstrapResultWithHyperShift()
+	bootstrapResult := fakeBootstrapResultWithHyperShift()
 
 	hsc := hypershift.NewHyperShiftConfig()
 	hsc.Enabled = true
@@ -144,7 +174,7 @@ func TestRenderMultusAdmissonControllerConfigForHyperShift(t *testing.T) {
 	hsc.ReleaseImage = "MyImage"
 	hsc.ControlPlaneImage = "MyCPOImage"
 
-	objs, err := renderMultusAdmissonControllerConfig(manifestDir, false, bootstrap, fakeClient, hsc, "", getDefaultFeatureGates())
+	objs, err := renderMultusAdmissonControllerConfig(manifestDir, false, bootstrapResult, fakeClient, hsc, "", getDefaultFeatureGates())
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Check rendered object
@@ -159,6 +189,23 @@ func TestRenderMultusAdmissonControllerConfigForHyperShift(t *testing.T) {
 			g.Expect(annotations["network.operator.openshift.io/cluster-name"]).To(Equal("management"))
 		}
 	}
+
+	weboookCmd := findMultusWebhookExec(t, objs)
+	g.Expect(weboookCmd).To(ContainSubstring("-metrics-listen-address=:9091"))
+	g.Expect(weboookCmd).To(ContainSubstring("-encrypt-metrics=true"))
+
+	deployment := mustFindMultusAdmissionDeployment(t, objs)
+	_, ok := findContainer(deployment.Spec.Template.Spec.Containers, "kube-rbac-proxy")
+	g.Expect(ok).To(BeFalse(), "Found unexpected container \"kube-rbac-proxy\"")
+
+	// Test TLS rendering for webhook container in HyperShift mode
+	testTLSArgRendering(t, "multus-admission-controller webhook (HyperShift)", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+		testBootstrap := *bootstrapResult
+		testBootstrap.TLSProfile = tlsProfile
+		objs, err := renderMultusAdmissonControllerConfig(manifestDir, false, &testBootstrap, fakeClient, hsc, "", getDefaultFeatureGates())
+		g.Expect(err).NotTo(HaveOccurred())
+		return findMultusWebhookExec(t, objs)
+	})
 }
 
 // TestRenderMultusAdmissionControllerGetNamespace tests getOpenshiftNamespaces()
@@ -195,4 +242,16 @@ func TestRenderMultusAdmissionControllerGetNamespace(t *testing.T) {
 	namespaces, err := getOpenshiftNamespaces(fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(namespaces).To(Equal("test1-ignored,test3-ignored"))
+}
+
+func mustFindMultusAdmissionDeployment(t *testing.T, objs []*unstructured.Unstructured) *appsv1.Deployment {
+	return mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "multus-admission-controller")
+}
+
+func findMultusWebhookExec(t *testing.T, objs []*unstructured.Unstructured) string {
+	t.Helper()
+
+	deployment := mustFindMultusAdmissionDeployment(t, objs)
+	cmdArgs := mustFindContainer(t, deployment.Spec.Template.Spec.Containers, "multus-admission-controller").Command
+	return findExecCommand(t, cmdArgs, "webhook")
 }

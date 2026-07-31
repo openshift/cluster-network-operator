@@ -45,7 +45,7 @@ func renderMultus(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bootstrap
 	}
 	out = append(out, objs...)
 
-	objs, err = renderNetworkMetricsDaemon(manifestDir)
+	objs, err = renderNetworkMetricsDaemon(manifestDir, bootstrapResult)
 	if err != nil {
 		return nil, err
 	}
@@ -107,12 +107,15 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 }
 
 // renderNetworkMetricsDaemon returns the manifests of the Network Metrics Daemon
-func renderNetworkMetricsDaemon(manifestDir string) ([]*uns.Unstructured, error) {
+func renderNetworkMetricsDaemon(manifestDir string, bootstrapResult *bootstrap.BootstrapResult) ([]*uns.Unstructured, error) {
 
 	objs := []*uns.Unstructured{}
 
 	// render the manifests on disk
 	data := render.MakeRenderData()
+
+	addTLSInfoToRenderData(data.Data, bootstrapResult, true)
+
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["NetworkMetricsImage"] = os.Getenv("NETWORK_METRICS_DAEMON_IMAGE")
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")

@@ -111,6 +111,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	// render the manifests on disk
 	data := render.MakeRenderData()
+
+	addTLSInfoToRenderData(data.Data, bootstrapResult, true)
+
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["OvnImage"] = os.Getenv("OVN_IMAGE")
 	data.Data["OvnControlPlaneImage"] = os.Getenv("OVN_IMAGE")

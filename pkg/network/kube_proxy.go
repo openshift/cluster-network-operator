@@ -182,6 +182,9 @@ func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, bootstrapResult *bootst
 	}
 
 	data := render.MakeRenderData()
+
+	addTLSInfoToRenderData(data.Data, bootstrapResult, true)
+
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["KubeProxyImage"] = os.Getenv("KUBE_PROXY_IMAGE")
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
