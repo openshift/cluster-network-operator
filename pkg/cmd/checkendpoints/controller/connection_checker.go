@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"regexp"
@@ -174,12 +175,8 @@ func (c *connectionChecker) getTCPConnectLatency(ctx context.Context, address st
 
 // isDNSError returns true if the cause of the net operation error is a DNS error
 func isDNSError(err error) bool {
-	if opErr, ok := err.(*net.OpError); ok {
-		if _, ok := opErr.Err.(*net.DNSError); ok {
-			return true
-		}
-	}
-	return false
+	var dnsErr *net.DNSError
+	return errors.As(err, &dnsErr)
 }
 
 // manageStatusLogs returns status update functions that updates the PodNetworkConnectivityCheck.Status's
