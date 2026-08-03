@@ -291,7 +291,7 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 
 // GetHostedControlPlane retrieves and parses the HostedControlPlane CR for the current HyperShift cluster.
 // Returns nil if HyperShift is not enabled.
-func GetHostedControlPlane(client cnoclient.Client) (*HostedControlPlane, error) {
+func GetHostedControlPlane(ctx context.Context, client cnoclient.Client) (*HostedControlPlane, error) {
 	hc := NewHyperShiftConfig()
 	if !hc.Enabled {
 		return nil, nil
@@ -299,7 +299,7 @@ func GetHostedControlPlane(client cnoclient.Client) (*HostedControlPlane, error)
 
 	hcp := &unstructured.Unstructured{}
 	hcp.SetGroupVersionKind(HostedControlPlaneGVK)
-	err := client.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(),
+	err := client.ClientFor(names.ManagementClusterName).CRClient().Get(ctx,
 		types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, hcp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve HostedControlPlane %s/%s: %w", hc.Namespace, hc.Name, err)

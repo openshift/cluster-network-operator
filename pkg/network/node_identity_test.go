@@ -70,7 +70,7 @@ func TestRenderNetworkNodeIdentity(t *testing.T) {
 	assertRenderSuccess := func(t *testing.T, networkConfig *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult,
 		client cnoclient.Client) []*uns.Unstructured {
 		g := NewWithT(t)
-		objs, err := renderNetworkNodeIdentity(networkConfig, bootstrapResult, manifestDir, client)
+		objs, err := renderNetworkNodeIdentity(t.Context(), networkConfig, bootstrapResult, manifestDir, client)
 		g.Expect(err).NotTo(HaveOccurred())
 
 		return objs

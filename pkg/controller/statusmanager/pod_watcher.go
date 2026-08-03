@@ -122,7 +122,7 @@ func (p *PodWatcher) Reconcile(ctx context.Context, request reconcile.Request) (
 		val := p.status.isClusterRunningOVNKubernetes()
 		p.status.isOVNKubernetes = &val
 	}
-	p.status.SetFromPods()
+	p.status.SetFromPods(ctx)
 	return reconcile.Result{}, nil
 }
 

@@ -3945,7 +3945,7 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 }
 
 func TestBootStrapOvsConfigMap_SharedTarget(t *testing.T) {
-	fc := bootstrapFlowsConfig(&fakeClientReader{
+	fc := bootstrapFlowsConfig(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"sharedTarget":       "1.2.3.4:3030",
@@ -3964,7 +3964,7 @@ func TestBootStrapOvsConfigMap_SharedTarget(t *testing.T) {
 }
 
 func TestBootStrapOvsConfigMap_NodePort(t *testing.T) {
-	fc := bootstrapFlowsConfig(&fakeClientReader{
+	fc := bootstrapFlowsConfig(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"nodePort":           "3131",
@@ -3982,7 +3982,7 @@ func TestBootStrapOvsConfigMap_NodePort(t *testing.T) {
 }
 
 func TestBootStrapOvsConfigMap_IncompleteMap(t *testing.T) {
-	fc := bootstrapFlowsConfig(&fakeClientReader{
+	fc := bootstrapFlowsConfig(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"cacheActiveTimeout": "3200ms",
@@ -3997,7 +3997,7 @@ func TestBootStrapOvsConfigMap_IncompleteMap(t *testing.T) {
 }
 
 func TestBootStrapOvsConfigMap_UnexistingMap(t *testing.T) {
-	fc := bootstrapFlowsConfig(&fakeClientReader{configMap: nil})
+	fc := bootstrapFlowsConfig(t.Context(), &fakeClientReader{configMap: nil})
 
 	// without sharedTarget nor nodePort, flow collection can't be set
 	assert.Nil(t, fc)
@@ -4006,10 +4006,10 @@ func TestBootStrapOvsConfigMap_UnexistingMap(t *testing.T) {
 func Test_getDisableUDPAggregation(t *testing.T) {
 	var disable bool
 
-	disable = getDisableUDPAggregation(&fakeClientReader{configMap: nil})
+	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{configMap: nil})
 	assert.Equal(t, false, disable, "with no configmap")
 
-	disable = getDisableUDPAggregation(&fakeClientReader{
+	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"friday": "2",
@@ -4018,7 +4018,7 @@ func Test_getDisableUDPAggregation(t *testing.T) {
 	})
 	assert.Equal(t, false, disable, "with bad configmap")
 
-	disable = getDisableUDPAggregation(&fakeClientReader{
+	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"disable-udp-aggregation": "false",
@@ -4027,7 +4027,7 @@ func Test_getDisableUDPAggregation(t *testing.T) {
 	})
 	assert.Equal(t, false, disable, "with configmap that sets 'disable-udp-aggregation' to 'false'")
 
-	disable = getDisableUDPAggregation(&fakeClientReader{
+	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"disable-udp-aggregation": "bad",
@@ -4036,7 +4036,7 @@ func Test_getDisableUDPAggregation(t *testing.T) {
 	})
 	assert.Equal(t, false, disable, "with configmap that sets 'disable-udp-aggregation' to 'bad'")
 
-	disable = getDisableUDPAggregation(&fakeClientReader{
+	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"disable-udp-aggregation": "true",

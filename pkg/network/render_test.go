@@ -355,12 +355,12 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	err = IsChangeSafe(prev, next, &fakeBootstrapResult().Infra)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	bootstrapResult, err := Bootstrap(&config, client)
+	bootstrapResult, err := Bootstrap(t.Context(), &config, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	featureGatesCNO := getDefaultFeatureGatesWithDualStack()
 
-	objs, _, err := Render(prev, &configv1.NetworkSpec{}, manifestDir, client, featureGatesCNO, bootstrapResult)
+	objs, _, err := Render(t.Context(), prev, &configv1.NetworkSpec{}, manifestDir, client, featureGatesCNO, bootstrapResult)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Validate that ovn-kubernetes isn't rendered

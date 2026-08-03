@@ -215,7 +215,7 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 			WithReason(currentStatus.Reason).
 			WithMessage(currentStatus.Message)
 		netConfig := applyconfigv1.Network(names.CLUSTER_CONFIG).WithStatus(applyconfigv1.NetworkStatus().WithConditions(condition))
-		_, err := c.configClient.ConfigV1().Networks().Apply(context.TODO(), netConfig, metav1.ApplyOptions{
+		_, err := c.configClient.ConfigV1().Networks().Apply(ctx, netConfig, metav1.ApplyOptions{
 			Force:        true,
 			FieldManager: "cluster-network-operator/connectivity-check-controller",
 		})

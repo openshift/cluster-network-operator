@@ -154,38 +154,38 @@ func (r *PKIReconciler) Reconcile(ctx context.Context, request reconcile.Request
 			log.Println(err)
 			r.pkiErrs[request.NamespacedName] =
 				fmt.Errorf("could not parse PKI.Spec %s: %w", request.NamespacedName, err)
-			r.setStatus()
+			r.setStatus(ctx)
 			return reconcile.Result{}, err
 		}
 		r.pkis[request.NamespacedName] = existing
 	}
 
-	err = existing.sync()
+	err = existing.sync(ctx)
 	if err != nil {
 		log.Println(err)
 		r.pkiErrs[request.NamespacedName] =
 			fmt.Errorf("could not reconcile PKI %s: %w", request.NamespacedName, err)
-		r.setStatus()
+		r.setStatus(ctx)
 		return reconcile.Result{}, err
 	}
 
 	log.Println("successful reconciliation")
 	delete(r.pkiErrs, request.NamespacedName)
-	r.setStatus()
+	r.setStatus(ctx)
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
 }
 
 // setStatus summarizes the status of all PKI objects and updates the statusmanager
 // as appropriate.
-func (r *PKIReconciler) setStatus() {
+func (r *PKIReconciler) setStatus(ctx context.Context) {
 	if len(r.pkiErrs) == 0 {
-		r.status.SetNotDegraded(statusmanager.PKIConfig)
+		r.status.SetNotDegraded(ctx, statusmanager.PKIConfig)
 	} else {
 		msgs := []string{}
 		for _, e := range r.pkiErrs {
 			msgs = append(msgs, e.Error())
 		}
-		r.status.MaybeSetDegraded(statusmanager.PKIConfig, "PKIError", strings.Join(msgs, ", "))
+		r.status.MaybeSetDegraded(ctx, statusmanager.PKIConfig, "PKIError", strings.Join(msgs, ", "))
 	}
 }
 
@@ -275,7 +275,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 }
 
 // sync causes the underlying cert controller to try and reconcile
-func (p *operatorPKI) sync() error {
-	runOnceCtx := context.WithValue(context.Background(), certrotation.RunOnceContextKey, true) //nolint:staticcheck
+func (p *operatorPKI) sync(ctx context.Context) error {
+	runOnceCtx := context.WithValue(ctx, certrotation.RunOnceContextKey, true) //nolint:staticcheck
 	return p.controller.Sync(runOnceCtx, nil)
 }

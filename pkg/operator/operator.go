@@ -91,7 +91,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		infraConfig := &configv1.Infrastructure{}
 
 		err := retry.OnError(backoff, func(error) bool { return true }, func() error {
-			if err := o.client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
+			if err := o.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
 				return fmt.Errorf("failed to get infrastructure 'cluster': %v", err)
 			}
 			if infraConfig.Status.InfrastructureName == "" {
@@ -125,7 +125,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controllerConfig.EventRecorder,
 	)
 
-	go featureGateAccessor.Run(context.TODO())
+	go featureGateAccessor.Run(ctx)
 	go configInformers.Start(wait.NeverStop)
 	klog.Infof("Waiting for feature gates initialization...")
 	select {
