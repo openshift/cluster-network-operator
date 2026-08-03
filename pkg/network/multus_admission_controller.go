@@ -103,7 +103,7 @@ func renderMultusAdmissonControllerConfig(ctx context.Context, manifestDir strin
 		err := client.ClientFor(clientName).CRClient().Get(
 			ctx, types.NamespacedName{Namespace: hsc.Namespace, Name: hsc.CAConfigMap}, serviceCA)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get managments clusters service CA: %v", err)
+			return nil, fmt.Errorf("failed to get managments clusters service CA: %w", err)
 		}
 		ca, exists := serviceCA.Data[hsc.CAConfigMapKey]
 		if !exists {
@@ -138,7 +138,7 @@ func renderMultusAdmissonControllerConfig(ctx context.Context, manifestDir strin
 			if apierrors.IsNotFound(err) {
 				klog.Warningf("failed to get multus deployment: %v", err)
 			} else {
-				return nil, fmt.Errorf("failed to get multus deployment: %v", err)
+				return nil, fmt.Errorf("failed to get multus deployment: %w", err)
 			}
 		}
 

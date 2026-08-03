@@ -71,7 +71,7 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 	// determine resource
 	rm, err := clusterClient.RESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve resource from Object %s: %v", objDesc, err)
+		return fmt.Errorf("failed to retrieve resource from Object %s: %w", objDesc, err)
 	}
 
 	// If create-wait is specified, ignore creating the object

@@ -90,7 +90,7 @@ func (status *StatusManager) SetMachineConfigs(ctx context.Context, newRenderedM
 		}
 		if annotateUpdate {
 			if err := status.setLastRenderedMachineConfigState(ctx, status.renderedMachineConfigs); err != nil {
-				return false, fmt.Errorf("failed to set rendered machine config state: %v", err)
+				return false, fmt.Errorf("failed to set rendered machine config state: %w", err)
 			}
 		}
 		return true, nil
@@ -103,7 +103,7 @@ func (status *StatusManager) SetMachineConfigs(ctx context.Context, newRenderedM
 	mcPools := &mcfgv1.MachineConfigPoolList{}
 	err = status.client.ClientFor("").CRClient().List(ctx, mcPools)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve machine config pools: %v", err)
+		return fmt.Errorf("failed to retrieve machine config pools: %w", err)
 	}
 	return status.SetFromMachineConfigPool(ctx, mcPools.Items)
 }
@@ -198,7 +198,7 @@ func (status *StatusManager) forgetRemovedMachineConfig(ctx context.Context, rol
 		delete(status.renderedMachineConfigs, role)
 	}
 	if err := status.setLastRenderedMachineConfigState(ctx, status.renderedMachineConfigs); err != nil {
-		return fmt.Errorf("failed to update rendered machine config state: %v", err)
+		return fmt.Errorf("failed to update rendered machine config state: %w", err)
 	}
 	return nil
 }

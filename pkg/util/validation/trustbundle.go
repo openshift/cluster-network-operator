@@ -24,7 +24,7 @@ func TrustBundleConfigMap(cfgMap *corev1.ConfigMap, caDataKey string) ([]*x509.C
 	}
 	certBundle, err := crypto.CertsFromPEM(trustBundleData)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed parsing certificate data from ConfigMap %q: %v", cfgMap.Name, err)
+		return nil, nil, fmt.Errorf("failed parsing certificate data from ConfigMap %q: %w", cfgMap.Name, err)
 	}
 
 	return certBundle, trustBundleData, nil
@@ -37,14 +37,14 @@ func MergeCertificateData(addlData, systemData []byte) ([]*x509.Certificate, err
 	if len(addlData) > 0 {
 		addlCerts, err := crypto.CertsFromPEM(addlData)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse certificate data: %v", err)
+			return nil, fmt.Errorf("failed to parse certificate data: %w", err)
 		}
 		mergedCerts = append(mergedCerts, addlCerts...)
 	}
 	if len(systemData) > 0 {
 		systemCerts, err := crypto.CertsFromPEM(systemData)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse certificate data: %v", err)
+			return nil, fmt.Errorf("failed to parse certificate data: %w", err)
 		}
 		mergedCerts = append(mergedCerts, systemCerts...)
 	}

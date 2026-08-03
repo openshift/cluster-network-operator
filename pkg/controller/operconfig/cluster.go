@@ -60,7 +60,7 @@ func (r *ReconcileOperConfig) UpdateOperConfig(ctx context.Context, operConfig *
 	config.TypeMeta = metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}
 	us, err := k8sutil.ToUnstructured(config)
 	if err != nil {
-		return fmt.Errorf("failed to transmute operator config, err: %v", err)
+		return fmt.Errorf("failed to transmute operator config, err: %w", err)
 	}
 	if err = apply.ApplyObject(ctx, r.client, us, "operconfig"); err != nil {
 		return fmt.Errorf("could not apply (%s) %s/%s, err: %w", operConfig.GroupVersionKind(), operConfig.GetNamespace(), operConfig.GetName(), err)

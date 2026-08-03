@@ -143,7 +143,7 @@ func (r *ReconcileDashboard) applyManifests(ctx context.Context, cfg *operv1.Net
 	klog.Info("Applying dashboards manifests")
 	manifests, err := renderManifests(cfg)
 	if err != nil {
-		return fmt.Errorf("could not render dashboards manifests: %v", err)
+		return fmt.Errorf("could not render dashboards manifests: %w", err)
 	}
 	for _, obj := range manifests {
 		if err := apply.ApplyObject(ctx, r.client, obj, "dashboards"); err != nil {

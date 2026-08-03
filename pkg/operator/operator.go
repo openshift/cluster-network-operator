@@ -92,7 +92,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 		err := retry.OnError(backoff, func(error) bool { return true }, func() error {
 			if err := o.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
-				return fmt.Errorf("failed to get infrastructure 'cluster': %v", err)
+				return fmt.Errorf("failed to get infrastructure 'cluster': %w", err)
 			}
 			if infraConfig.Status.InfrastructureName == "" {
 				return fmt.Errorf("infrastructureName not set in infrastructure 'cluster'")
@@ -100,7 +100,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			return nil
 		})
 		if err != nil {
-			return fmt.Errorf("failed to get infrastructure name: %v", err)
+			return fmt.Errorf("failed to get infrastructure name: %w", err)
 		}
 		cluster = infraConfig.Status.InfrastructureName
 	}

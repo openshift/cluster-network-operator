@@ -86,7 +86,7 @@ func (r *ReconcileOperConfig) probeMTU(ctx context.Context, oc *operv1.Network, 
 		return mtu, nil
 	}
 
-	return 0, fmt.Errorf("timed out getting result from MTU prober %v", err)
+	return 0, fmt.Errorf("timed out getting result from MTU prober %w", err)
 }
 
 func (r *ReconcileOperConfig) deployMTUProber(ctx context.Context, owner metav1.Object, infra *bootstrap.InfraStatus) error {

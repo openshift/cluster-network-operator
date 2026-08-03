@@ -23,7 +23,7 @@ func (r *ReconcileProxyConfig) syncProxyStatus(ctx context.Context, proxy *confi
 		} else {
 			noProxy, err = proxyconfig.MergeUserSystemNoProxy(proxy, infra, network, cluster)
 			if err != nil {
-				return fmt.Errorf("failed to merge user/system noProxy settings: %v", err)
+				return fmt.Errorf("failed to merge user/system noProxy settings: %w", err)
 			}
 		}
 	}
@@ -34,7 +34,7 @@ func (r *ReconcileProxyConfig) syncProxyStatus(ctx context.Context, proxy *confi
 
 	if !proxyStatusesEqual(proxy.Status, updated.Status) {
 		if err := r.client.Status().Update(ctx, updated); err != nil {
-			return fmt.Errorf("failed to update proxy status: %v", err)
+			return fmt.Errorf("failed to update proxy status: %w", err)
 		}
 	}
 

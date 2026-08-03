@@ -40,7 +40,7 @@ func isNetworkNodeIdentityEnabled(ctx context.Context, client cnoclient.Client) 
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %s", err)
+		return false, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %w", err)
 	}
 	enabled, ok := nodeIdentity.Data["enabled"]
 	if ok {
@@ -53,7 +53,7 @@ func isNetworkNodeIdentityEnabled(ctx context.Context, client cnoclient.Client) 
 func InfraStatus(ctx context.Context, client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	infraConfig := &configv1.Infrastructure{}
 	if err := client.Default().CRClient().Get(ctx, types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
-		return nil, fmt.Errorf("failed to get infrastructure 'cluster': %v", err)
+		return nil, fmt.Errorf("failed to get infrastructure 'cluster': %w", err)
 	}
 
 	res := &bootstrap.InfraStatus{
@@ -148,20 +148,20 @@ func InfraStatus(ctx context.Context, client cnoclient.Client) (*bootstrap.Infra
 
 	masterIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(ctx, client, names.MasterRoleMachineConfigLabel())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ipsec machine configs for master: %v", err)
+		return nil, fmt.Errorf("failed to get ipsec machine configs for master: %w", err)
 	}
 	res.MasterIPsecMachineConfigs = masterIPsecMachineConfigs
 
 	workerIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(ctx, client, names.WorkerRoleMachineConfigLabel())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ipsec machine configs for worker: %v", err)
+		return nil, fmt.Errorf("failed to get ipsec machine configs for worker: %w", err)
 	}
 	res.WorkerIPsecMachineConfigs = workerIPsecMachineConfigs
 
 	if res.MasterIPsecMachineConfigs != nil {
 		mcpMasterStatuses, err := getMachineConfigPoolStatuses(ctx, client, names.MasterRoleMachineConfigLabel())
 		if err != nil {
-			return nil, fmt.Errorf("failed to get machine config pools for master role: %v", err)
+			return nil, fmt.Errorf("failed to get machine config pools for master role: %w", err)
 		}
 		res.MasterMCPStatuses = mcpMasterStatuses
 	}
@@ -169,14 +169,14 @@ func InfraStatus(ctx context.Context, client cnoclient.Client) (*bootstrap.Infra
 	if res.WorkerIPsecMachineConfigs != nil {
 		mcpWorkerStatuses, err := getMachineConfigPoolStatuses(ctx, client, names.WorkerRoleMachineConfigLabel())
 		if err != nil {
-			return nil, fmt.Errorf("failed to get machine config pools for worker role: %v", err)
+			return nil, fmt.Errorf("failed to get machine config pools for worker role: %w", err)
 		}
 		res.WorkerMCPStatuses = mcpWorkerStatuses
 	}
 
 	machineConfigClusterOperatorReady, err := isMachineConfigClusterOperatorReady(ctx, client)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to get machine config cluster operator: %v", err)
+		return nil, fmt.Errorf("failed to get machine config cluster operator: %w", err)
 	}
 	res.MachineConfigClusterOperatorReady = machineConfigClusterOperatorReady
 

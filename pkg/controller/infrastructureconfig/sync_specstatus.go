@@ -107,23 +107,23 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 	}
 
 	if err := syncMachineNetworks(specMachineNetworks, statusMachineNetworks); err != nil {
-		return nil, fmt.Errorf("error on syncing machine networks: %v", err)
+		return nil, fmt.Errorf("error on syncing machine networks: %w", err)
 	}
 	if err := validateVipsWithVips(*specApiVips, *specIngressVips, elb); err != nil {
-		return nil, fmt.Errorf("error on validating VIPs: %v", err)
+		return nil, fmt.Errorf("error on validating VIPs: %w", err)
 	}
 	if err := validateVipsWithMachineNetworks(*specApiVips, *specMachineNetworks); err != nil {
-		return nil, fmt.Errorf("error on validating API VIPs and Machine Networks: %v", err)
+		return nil, fmt.Errorf("error on validating API VIPs and Machine Networks: %w", err)
 	}
 	if err := validateVipsWithMachineNetworks(*specIngressVips, *specMachineNetworks); err != nil {
-		return nil, fmt.Errorf("error on validating Ingress VIPs and Machine Networks: %v", err)
+		return nil, fmt.Errorf("error on validating Ingress VIPs and Machine Networks: %w", err)
 	}
 
 	if err := syncVips(specApiVips, statusApiVips); err != nil {
-		return nil, fmt.Errorf("error on syncing API VIPs: %v", err)
+		return nil, fmt.Errorf("error on syncing API VIPs: %w", err)
 	}
 	if err := syncVips(specIngressVips, statusIngressVips); err != nil {
-		return nil, fmt.Errorf("error on syncing Ingress VIPs: %v", err)
+		return nil, fmt.Errorf("error on syncing Ingress VIPs: %w", err)
 	}
 
 	return updatedInfraConfig, nil
