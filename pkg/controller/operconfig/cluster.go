@@ -26,7 +26,7 @@ import (
 func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig *operv1.Network, clusterConfig *configv1.Network) error {
 	// Validate cluster config
 	// If invalid just warn and proceed.
-	infraRes, err := platform.InfraStatus(r.client)
+	infraRes, err := platform.InfraStatus(ctx, r.client)
 	if err != nil {
 		log.Printf("WARNING: ignoring Network.config.openshift.io/v1/cluster - failed to get infrastructure status: %v", err)
 		return nil

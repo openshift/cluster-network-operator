@@ -808,7 +808,7 @@ func renderOVNFlowsConfig(bootstrapResult *bootstrap.BootstrapResult, data *rend
 	}
 }
 
-func bootstrapOVNHyperShiftConfig(hc *hypershift.HyperShiftConfig, kubeClient cnoclient.Client, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNHyperShiftBootstrapResult, error) {
+func bootstrapOVNHyperShiftConfig(ctx context.Context, hc *hypershift.HyperShiftConfig, kubeClient cnoclient.Client, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNHyperShiftBootstrapResult, error) {
 	ovnHypershiftResult := &bootstrap.OVNHyperShiftBootstrapResult{
 		Enabled:           hc.Enabled,
 		Namespace:         hc.Namespace,
@@ -840,7 +840,7 @@ func bootstrapOVNHyperShiftConfig(hc *hypershift.HyperShiftConfig, kubeClient cn
 
 	// Preserve any customizations to the resource requests on the three containers in the ovn-control-plane pod
 	controlPlaneClient := kubeClient.ClientFor(names.ManagementClusterName)
-	tokenMinterCPURequest, tokenMinterMemoryRequest := getResourceRequestsForDeployment(controlPlaneClient.CRClient(), hc.Namespace, util.OVN_CONTROL_PLANE, "token-minter")
+	tokenMinterCPURequest, tokenMinterMemoryRequest := getResourceRequestsForDeployment(ctx, controlPlaneClient.CRClient(), hc.Namespace, util.OVN_CONTROL_PLANE, "token-minter")
 	if tokenMinterCPURequest > 0 {
 		ovnHypershiftResult.TokenMinterResourceRequestCPU = strconv.FormatInt(tokenMinterCPURequest, 10)
 	}
@@ -848,7 +848,7 @@ func bootstrapOVNHyperShiftConfig(hc *hypershift.HyperShiftConfig, kubeClient cn
 		ovnHypershiftResult.TokenMinterResourceRequestMemory = strconv.FormatInt(tokenMinterMemoryRequest, 10)
 	}
 
-	ovnControlPlaneCPURequest, ovnControlPlaneMemoryRequest := getResourceRequestsForDeployment(controlPlaneClient.CRClient(), hc.Namespace, util.OVN_CONTROL_PLANE, "ovnkube-control-plane")
+	ovnControlPlaneCPURequest, ovnControlPlaneMemoryRequest := getResourceRequestsForDeployment(ctx, controlPlaneClient.CRClient(), hc.Namespace, util.OVN_CONTROL_PLANE, "ovnkube-control-plane")
 	if ovnControlPlaneCPURequest > 0 {
 		ovnHypershiftResult.OVNControlPlaneResourceRequestCPU = strconv.FormatInt(ovnControlPlaneCPURequest, 10)
 	}
@@ -856,7 +856,7 @@ func bootstrapOVNHyperShiftConfig(hc *hypershift.HyperShiftConfig, kubeClient cn
 		ovnHypershiftResult.OVNControlPlaneResourceRequestMemory = strconv.FormatInt(ovnControlPlaneMemoryRequest, 10)
 	}
 
-	socksProxyCPURequest, socksProxyMemoryRequest := getResourceRequestsForDeployment(controlPlaneClient.CRClient(), hc.Namespace, util.OVN_CONTROL_PLANE, "socks-proxy")
+	socksProxyCPURequest, socksProxyMemoryRequest := getResourceRequestsForDeployment(ctx, controlPlaneClient.CRClient(), hc.Namespace, util.OVN_CONTROL_PLANE, "socks-proxy")
 	if socksProxyCPURequest > 0 {
 		ovnHypershiftResult.Socks5ProxyResourceRequestCPU = strconv.FormatInt(socksProxyCPURequest, 10)
 	}
@@ -869,9 +869,9 @@ func bootstrapOVNHyperShiftConfig(hc *hypershift.HyperShiftConfig, kubeClient cn
 
 // getResourceRequestsForDeployment gets the cpu and memory resource requests for the specified deployment
 // If the deployment or container is not found, or if the container doesn't have a cpu or memory resource request, then 0 is returned
-func getResourceRequestsForDeployment(cl crclient.Reader, namespace string, deploymentName string, containerName string) (cpu int64, memory int64) {
+func getResourceRequestsForDeployment(ctx context.Context, cl crclient.Reader, namespace string, deploymentName string, containerName string) (cpu int64, memory int64) {
 	deployment := &appsv1.Deployment{}
-	if err := cl.Get(context.TODO(), types.NamespacedName{
+	if err := cl.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      deploymentName,
 	}, deployment); err != nil {
@@ -898,11 +898,11 @@ func getResourceRequestsForDeployment(cl crclient.Reader, namespace string, depl
 	return cpu, memory
 }
 
-func getDisableUDPAggregation(cl crclient.Reader) bool {
+func getDisableUDPAggregation(ctx context.Context, cl crclient.Reader) bool {
 	disable := false
 
 	cm := &corev1.ConfigMap{}
-	if err := cl.Get(context.TODO(), types.NamespacedName{
+	if err := cl.Get(ctx, types.NamespacedName{
 		Namespace: "openshift-network-operator",
 		Name:      "udp-aggregation-config",
 	}, cm); err != nil {
@@ -926,9 +926,9 @@ func getDisableUDPAggregation(cl crclient.Reader) bool {
 }
 
 // getNodeListByLabel returns a list of node names that matches the provided label.
-func getNodeListByLabel(kubeClient cnoclient.Client, label string) ([]string, error) {
+func getNodeListByLabel(ctx context.Context, kubeClient cnoclient.Client, label string) ([]string, error) {
 	var nodeNames []string
-	nodeList, err := kubeClient.Default().Kubernetes().CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: label})
+	nodeList, err := kubeClient.Default().Kubernetes().CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return nil, err
 	}
@@ -1001,7 +1001,7 @@ func findCommonNode(nodeLists ...[]string) (bool, string) {
 
 // bootstrapOVNConfig returns the values in the openshift-ovn-kubernetes/hardware-offload-config configMap
 // if it exists, otherwise returns default configuration for OCP clusters using OVN-Kubernetes
-func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *hypershift.HyperShiftConfig, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNConfigBoostrapResult, error) {
+func bootstrapOVNConfig(ctx context.Context, conf *operv1.Network, kubeClient cnoclient.Client, hc *hypershift.HyperShiftConfig, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNConfigBoostrapResult, error) {
 	ovnConfigResult := &bootstrap.OVNConfigBoostrapResult{
 		DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
 		DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
@@ -1011,18 +1011,18 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 		DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
 	}
 	if conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig == nil {
-		bootstrapOVNGatewayConfig(conf, kubeClient.ClientFor("").CRClient())
+		bootstrapOVNGatewayConfig(ctx, conf, kubeClient.ClientFor("").CRClient())
 	}
 
 	var err error
-	ovnConfigResult.HyperShiftConfig, err = bootstrapOVNHyperShiftConfig(hc, kubeClient, infraStatus)
+	ovnConfigResult.HyperShiftConfig, err = bootstrapOVNHyperShiftConfig(ctx, hc, kubeClient, infraStatus)
 	if err != nil {
 		return nil, err
 	}
 
 	cm := &corev1.ConfigMap{}
 	dmc := types.NamespacedName{Namespace: "openshift-network-operator", Name: "hardware-offload-config"}
-	err = kubeClient.ClientFor("").CRClient().Get(context.TODO(), dmc, cm)
+	err = kubeClient.ClientFor("").CRClient().Get(ctx, dmc, cm)
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -1107,7 +1107,7 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 	//   The difference is that the management port is set from a SR-IOV interface.
 	// For DPU mode, currently CNO does not render any OVN-Kubernetes daemonset pods (preventing any OVN-Kubernetes
 	//   daemonset pods in DPU mode from running), it is done by an external operator.
-	ovnConfigResult.DpuHostModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.DpuHostModeLabel)
+	ovnConfigResult.DpuHostModeNodes, err = getNodeListByLabel(ctx, kubeClient, ovnConfigResult.DpuHostModeLabel)
 	if err != nil {
 		return nil, fmt.Errorf("could not get node list with label %s : %w", ovnConfigResult.DpuHostModeLabel, err)
 	}
@@ -1116,7 +1116,7 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 		return nil, fmt.Errorf("could not get key and value from label %s : %w", ovnConfigResult.DpuHostModeLabel, err)
 	}
 
-	ovnConfigResult.DpuModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.DpuModeLabel)
+	ovnConfigResult.DpuModeNodes, err = getNodeListByLabel(ctx, kubeClient, ovnConfigResult.DpuModeLabel)
 	if err != nil {
 		return nil, fmt.Errorf("could not get node list with label %s : %w", ovnConfigResult.DpuModeLabel, err)
 	}
@@ -1125,7 +1125,7 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 		return nil, fmt.Errorf("could not get key and value from label %s : %w", ovnConfigResult.DpuModeLabel, err)
 	}
 
-	ovnConfigResult.SmartNicModeNodes, err = getNodeListByLabel(kubeClient, ovnConfigResult.SmartNicModeLabel)
+	ovnConfigResult.SmartNicModeNodes, err = getNodeListByLabel(ctx, kubeClient, ovnConfigResult.SmartNicModeLabel)
 	if err != nil {
 		return nil, fmt.Errorf("could not get node list with label %s : %w", ovnConfigResult.SmartNicModeLabel, err)
 	}
@@ -1140,14 +1140,14 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 		return nil, fmt.Errorf("node %s has multiple hardware offload labels", nodeName)
 	}
 
-	ovnConfigResult.ConfigOverrides, err = getOVNKubernetesConfigOverrides(kubeClient)
+	ovnConfigResult.ConfigOverrides, err = getOVNKubernetesConfigOverrides(ctx, kubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("could not get OVN Kubernetes config overrides: %w", err)
 	}
 
 	klog.Infof("OVN configuration is now %+v", ovnConfigResult)
 
-	ovnConfigResult.DisableUDPAggregation = getDisableUDPAggregation(kubeClient.ClientFor("").CRClient())
+	ovnConfigResult.DisableUDPAggregation = getDisableUDPAggregation(ctx, kubeClient.ClientFor("").CRClient())
 
 	return ovnConfigResult, nil
 }
@@ -1379,12 +1379,12 @@ type replicaCountDecoder struct {
 
 // bootstrapOVNGatewayConfig sets the Network.operator.openshift.io.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig value
 // based on the values from the "gateway-mode-config" map if any
-func bootstrapOVNGatewayConfig(conf *operv1.Network, kubeClient crclient.Client) {
+func bootstrapOVNGatewayConfig(ctx context.Context, conf *operv1.Network, kubeClient crclient.Client) {
 	// handle upgrade logic for gateway mode in OVN-K plugin (migration from hidden config map to using proper API)
 	// TODO: Remove this logic in future releases when we are sure everyone has migrated away from the config-map
 	cm := &corev1.ConfigMap{}
 	nsn := types.NamespacedName{Namespace: "openshift-network-operator", Name: "gateway-mode-config"}
-	err := kubeClient.Get(context.TODO(), nsn, cm)
+	err := kubeClient.Get(ctx, nsn, cm)
 	modeOverride := OVN_SHARED_GW_MODE
 	routeViaHost := false
 
@@ -1407,11 +1407,11 @@ func bootstrapOVNGatewayConfig(conf *operv1.Network, kubeClient crclient.Client)
 	klog.Infof("Gateway mode is %s", modeOverride)
 }
 
-func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNBootstrapResult, error) {
+func bootstrapOVN(ctx context.Context, conf *operv1.Network, kubeClient cnoclient.Client, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNBootstrapResult, error) {
 	clusterConfig := &corev1.ConfigMap{}
 	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
 
-	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), clusterConfigLookup, clusterConfig); err != nil {
+	if err := kubeClient.ClientFor("").CRClient().Get(ctx, clusterConfigLookup, clusterConfig); err != nil {
 		return nil, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %s", err)
 	}
 
@@ -1421,7 +1421,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	}
 
 	hc := hypershift.NewHyperShiftConfig()
-	ovnConfigResult, err := bootstrapOVNConfig(conf, kubeClient, hc, infraStatus)
+	ovnConfigResult, err := bootstrapOVNConfig(ctx, conf, kubeClient, hc, infraStatus)
 	if err != nil {
 		return nil, fmt.Errorf("unable to bootstrap OVN config, err: %v", err)
 	}
@@ -1456,7 +1456,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 	}
 
 	nsn = types.NamespacedName{Namespace: namespaceForControlPlane, Name: util.OVN_CONTROL_PLANE}
-	if err := clusterClientForControlPlane.CRClient().Get(context.TODO(), nsn, controlPlaneDeployment); err != nil {
+	if err := clusterClientForControlPlane.CRClient().Get(ctx, nsn, controlPlaneDeployment); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to retrieve %s deployment: %w", util.OVN_CONTROL_PLANE, err)
 		} else {
@@ -1485,7 +1485,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		},
 	}
 	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: util.OVN_NODE}
-	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, nodeDaemonSet); err != nil {
+	if err := kubeClient.ClientFor("").CRClient().Get(ctx, nsn, nodeDaemonSet); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to retrieve existing ovnkube-node DaemonSet: %w", err)
 		} else {
@@ -1514,7 +1514,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		},
 	}
 	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovnkube-upgrades-prepuller"}
-	if err := kubeClient.ClientFor("").CRClient().Get(context.TODO(), nsn, prePullerDaemonSet); err != nil {
+	if err := kubeClient.ClientFor("").CRClient().Get(ctx, nsn, prePullerDaemonSet); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to retrieve existing prepuller DaemonSet: %w", err)
 		} else {
@@ -1535,7 +1535,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 		IPsecUpdateStatus:        ovnIPsecStatus,
 		PrePullerUpdateStatus:    prepullerStatus,
 		OVNKubernetesConfig:      ovnConfigResult,
-		FlowsConfig:              bootstrapFlowsConfig(kubeClient.ClientFor("").CRClient()),
+		FlowsConfig:              bootstrapFlowsConfig(ctx, kubeClient.ClientFor("").CRClient()),
 	}
 
 	// preserve any default masquerade subnet values that might have been set previously
@@ -1565,9 +1565,9 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 // bootstrapFlowsConfig looks for the openshift-network-operator/ovs-flows-config configmap, and
 // returns it or returns nil if it does not exist (or can't be properly parsed).
 // Usually, the second argument will be net.LookupIP
-func bootstrapFlowsConfig(cl crclient.Reader) *bootstrap.FlowsConfig {
+func bootstrapFlowsConfig(ctx context.Context, cl crclient.Reader) *bootstrap.FlowsConfig {
 	cm := corev1.ConfigMap{}
-	if err := cl.Get(context.TODO(), types.NamespacedName{
+	if err := cl.Get(ctx, types.NamespacedName{
 		Name:      OVSFlowsConfigMapName,
 		Namespace: OVSFlowsConfigNamespace,
 	}, &cm); err != nil {
@@ -2215,9 +2215,9 @@ func validateOVNKubernetesSubnet(name, subnet string, otherSubnets *iputil.IPPoo
 // If the configmap does not exist, it returns nil, indicating that no overrides are set
 // and no error.
 // If there is an error retrieving the configmap, it returns an error.
-func getOVNKubernetesConfigOverrides(client cnoclient.Client) (map[string]string, error) {
+func getOVNKubernetesConfigOverrides(ctx context.Context, client cnoclient.Client) (map[string]string, error) {
 	configMap := &corev1.ConfigMap{}
-	if err := client.Default().CRClient().Get(context.TODO(),
+	if err := client.Default().CRClient().Get(ctx,
 		types.NamespacedName{Name: OVNKubernetesConfigOverridesCMName, Namespace: names.APPLIED_NAMESPACE}, configMap); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil

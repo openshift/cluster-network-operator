@@ -34,11 +34,11 @@ const bytesInMiB = 1024 * 1024
 var ignoredNamespaces string
 
 // getOpenshiftNamespaces collect openshift related namespaces, as comma separate list
-func getOpenshiftNamespaces(client cnoclient.Client) (string, error) {
+func getOpenshiftNamespaces(ctx context.Context, client cnoclient.Client) (string, error) {
 	namespaces := []string{}
 
 	// get openshift specific namespaces to add them into ignoreNamespace
-	nsList, err := client.Default().Kubernetes().CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{
+	nsList, err := client.Default().Kubernetes().CoreV1().Namespaces().List(ctx, metav1.ListOptions{
 		LabelSelector: "openshift.io/cluster-monitoring==true",
 	})
 	if err != nil {
@@ -55,13 +55,13 @@ func getOpenshiftNamespaces(client cnoclient.Client) (string, error) {
 }
 
 // renderMultusAdmissonControllerConfig returns the manifests of Multus Admisson Controller
-func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client, hsc *hypershift.HyperShiftConfig, clientName string, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, error) {
+func renderMultusAdmissonControllerConfig(ctx context.Context, manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client, hsc *hypershift.HyperShiftConfig, clientName string, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 	var err error
 
 	replicas := getMultusAdmissionControllerReplicas(bootstrapResult, hsc.Enabled)
 	if ignoredNamespaces == "" {
-		ignoredNamespaces, err = getOpenshiftNamespaces(client)
+		ignoredNamespaces, err = getOpenshiftNamespaces(ctx, client)
 		if err != nil {
 			klog.Warningf("failed to get openshift namespaces: %+v", err)
 		}
@@ -101,7 +101,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 
 		serviceCA := &corev1.ConfigMap{}
 		err := client.ClientFor(clientName).CRClient().Get(
-			context.TODO(), types.NamespacedName{Namespace: hsc.Namespace, Name: hsc.CAConfigMap}, serviceCA)
+			ctx, types.NamespacedName{Namespace: hsc.Namespace, Name: hsc.CAConfigMap}, serviceCA)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get managments clusters service CA: %v", err)
 		}
@@ -122,7 +122,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 		// Preserve any existing multus container resource requests which may have been modified by an external source
 		multusDeploy := &appsv1.Deployment{}
 		err = client.ClientFor(clientName).CRClient().Get(
-			context.TODO(), types.NamespacedName{Namespace: hsc.Namespace, Name: "multus-admission-controller"}, multusDeploy)
+			ctx, types.NamespacedName{Namespace: hsc.Namespace, Name: "multus-admission-controller"}, multusDeploy)
 		if err == nil {
 			multusContainer, ok := findContainer(multusDeploy.Spec.Template.Spec.Containers, "multus-admission-controller")
 			if !ok {

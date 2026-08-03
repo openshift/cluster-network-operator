@@ -94,10 +94,10 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	}
 
 	// Fetch infrastructure status for validation
-	infraRes, err := platform.InfraStatus(r.client)
+	infraRes, err := platform.InfraStatus(ctx, r.client)
 	if err != nil {
 		log.Printf("Failed to get infrastructure status: %v", err)
-		r.status.MaybeSetDegraded(statusmanager.ClusterConfig, "InfraStatusError",
+		r.status.MaybeSetDegraded(ctx, statusmanager.ClusterConfig, "InfraStatusError",
 			fmt.Sprintf("Failed to get infrastructure status: %v", err))
 		return reconcile.Result{}, err
 	}
@@ -105,7 +105,7 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	// Validate the cluster config - degrade immediately since bad config won't recover on its own
 	if err := network.ValidateClusterConfig(clusterConfig, infraRes, r.featureGates); err != nil {
 		log.Printf("Failed to validate Network CR: %v", err)
-		r.status.SetDegraded(statusmanager.ClusterConfig, "InvalidClusterConfig",
+		r.status.SetDegraded(ctx, statusmanager.ClusterConfig, "InvalidClusterConfig",
 			fmt.Sprintf("The cluster configuration is invalid (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))
 		return reconcile.Result{}, err
 	}
@@ -121,7 +121,7 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	if err := apply.ApplyObject(ctx, r.client, operConfig, "clusterconfig"); err != nil {
 		// not set degraded if the err is a version conflict, but return a reconcile err for retry.
 		if !apierrors.IsConflict(err) {
-			r.status.MaybeSetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",
+			r.status.MaybeSetDegraded(ctx, statusmanager.ClusterConfig, "ApplyOperatorConfig",
 				fmt.Sprintf("Error while trying to update operator configuration: %v", err))
 		}
 		log.Printf("Could not propagate configuration from network.config.openshift.io to network.operator.openshift.io: %v", err)
@@ -129,6 +129,6 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	}
 	log.Println("Successfully updated Operator config from Cluster config")
 
-	r.status.SetNotDegraded(statusmanager.ClusterConfig)
+	r.status.SetNotDegraded(ctx, statusmanager.ClusterConfig)
 	return reconcile.Result{}, nil
 }

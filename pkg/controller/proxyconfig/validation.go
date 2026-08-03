@@ -37,7 +37,7 @@ const (
 
 // ValidateProxyConfig ensures that httpProxy, httpsProxy and
 // noProxy fields of proxyConfig are valid.
-func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySpec) error {
+func (r *ReconcileProxyConfig) ValidateProxyConfig(ctx context.Context, proxyConfig *configv1.ProxySpec) error {
 	if !isSpecHTTPProxySet(proxyConfig) && !isSpecHTTPSProxySet(proxyConfig) {
 		return fmt.Errorf("httpProxy or httpsProxy must be set when using proxy")
 	}
@@ -85,7 +85,7 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 			var proxyData []byte
 			if isSpecTrustedCASet(proxyConfig) {
 				// TrustedCA is set, so create a combined trustedCA/system trust bundle for readinessEndpoints.
-				proxyData, systemData, err = r.validateTrustedCA(proxyConfig.TrustedCA.Name)
+				proxyData, systemData, err = r.validateTrustedCA(ctx, proxyConfig.TrustedCA.Name)
 				if err != nil {
 					return fmt.Errorf("failed to get certificate data for trustedCA '%s': %v",
 						proxyConfig.TrustedCA.Name, err)
@@ -123,8 +123,8 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 // reference and that the ConfigMap contains a valid trust bundle,
 // returning the byte slices of the certificate data from the
 // validated trustedCA and system trust bundles.
-func (r *ReconcileProxyConfig) validateTrustedCA(trustedCA string) ([]byte, []byte, error) {
-	cfgMap, err := r.validateConfigMapRef(trustedCA)
+func (r *ReconcileProxyConfig) validateTrustedCA(ctx context.Context, trustedCA string) ([]byte, []byte, error) {
+	cfgMap, err := r.validateConfigMapRef(ctx, trustedCA)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to validate configmap reference for proxy trustedCA '%s': %v",
 			trustedCA, err)
@@ -146,13 +146,13 @@ func (r *ReconcileProxyConfig) validateTrustedCA(trustedCA string) ([]byte, []by
 
 // validateConfigMapRef validates that trustedCA is a valid ConfigMap reference,
 // returning the validated ConfigMap.
-func (r *ReconcileProxyConfig) validateConfigMapRef(trustedCA string) (*corev1.ConfigMap, error) {
+func (r *ReconcileProxyConfig) validateConfigMapRef(ctx context.Context, trustedCA string) (*corev1.ConfigMap, error) {
 	cfgMap := &corev1.ConfigMap{}
 	ns := names.ADDL_TRUST_BUNDLE_CONFIGMAP_NS
 	if trustedCA == names.TRUSTED_CA_BUNDLE_CONFIGMAP {
 		ns = names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS
 	}
-	if err := r.client.Get(context.TODO(), types.NamespacedName{Namespace: ns, Name: trustedCA}, cfgMap); err != nil {
+	if err := r.client.Get(ctx, types.NamespacedName{Namespace: ns, Name: trustedCA}, cfgMap); err != nil {
 		return nil, fmt.Errorf("failed to get trustedCA configmap for proxy %s: %v", names.PROXY_CONFIG, err)
 	}
 

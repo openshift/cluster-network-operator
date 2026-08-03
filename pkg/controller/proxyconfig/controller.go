@@ -145,9 +145,9 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 		}
 
 		if validate {
-			if err := r.ValidateProxyConfig(&proxyConfig.Spec); err != nil {
+			if err := r.ValidateProxyConfig(ctx, &proxyConfig.Spec); err != nil {
 				log.Printf("Failed to validate proxy '%s': %v", proxyConfig.Name, err)
-				r.status.SetDegraded(statusmanager.ProxyConfig, "InvalidProxyConfig",
+				r.status.SetDegraded(ctx, statusmanager.ProxyConfig, "InvalidProxyConfig",
 					fmt.Sprintf("The configuration is invalid for proxy '%s' (%v). "+
 						"Use 'oc edit proxy.config.openshift.io %s' to fix.", proxyConfig.Name, err, proxyConfig.Name))
 				return reconcile.Result{}, fmt.Errorf("failed to validate proxy '%s': %v", proxyConfig.Name, err)
@@ -159,7 +159,7 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 			if trustBundle, err = r.generateSystemTrustBundle(); err != nil {
 				log.Printf("Failed to generate system trust bundle configmap '%s/%s': %v",
 					names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS, names.TRUSTED_CA_BUNDLE_CONFIGMAP, err)
-				r.status.SetDegraded(statusmanager.ProxyConfig, "GenerateConfigMapFailure",
+				r.status.SetDegraded(ctx, statusmanager.ProxyConfig, "GenerateConfigMapFailure",
 					fmt.Sprintf("failed to generate system trust bundle configmap '%s/%s (%v).",
 						names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS, names.TRUSTED_CA_BUNDLE_CONFIGMAP, err))
 				return reconcile.Result{}, fmt.Errorf("failed to generate system trust bundle configmap '%s/%s': %v",
@@ -167,10 +167,10 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 			}
 		} else {
 			// Validate trustedCA of proxy spec.
-			proxyData, systemData, err := r.validateTrustedCA(proxyConfig.Spec.TrustedCA.Name)
+			proxyData, systemData, err := r.validateTrustedCA(ctx, proxyConfig.Spec.TrustedCA.Name)
 			if err != nil {
 				log.Printf("Failed to validate trustedCA for proxy '%s': %v", proxyConfig.Name, err)
-				r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "InvalidProxyConfig",
+				r.status.MaybeSetDegraded(ctx, statusmanager.ProxyConfig, "InvalidProxyConfig",
 					fmt.Sprintf("The configuration is invalid for proxy '%s' (%v). "+
 						"Use 'oc edit proxy.config.openshift.io %s' to fix.", proxyConfig.Name, err, proxyConfig.Name))
 				return reconcile.Result{}, fmt.Errorf("failed to validate trustedCA for proxy '%s': %v",
@@ -181,7 +181,7 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 			trustBundle, err = r.mergeTrustBundlesToConfigMap(proxyData, systemData)
 			if err != nil {
 				log.Printf("Failed to merge trustedCA and system bundles for proxy '%s': %v", proxyConfig.Name, err)
-				r.status.SetDegraded(statusmanager.ProxyConfig, "ProxyCAMergeFailure",
+				r.status.SetDegraded(ctx, statusmanager.ProxyConfig, "ProxyCAMergeFailure",
 					fmt.Sprintf("The configuration is invalid for proxy '%s' (%v). "+
 						"Use 'oc edit proxy.config.openshift.io %s' to fix.", proxyConfig.Name, err, proxyConfig.Name))
 				return reconcile.Result{}, fmt.Errorf("failed to merge trustedCA and system bundles for proxy '%s': %v",
@@ -192,28 +192,28 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 		// Only proceed if the required config objects can be collected.
 		if err := r.client.Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, infraConfig); err != nil {
 			log.Printf("Failed to get infrastructure config '%s': %v", names.CLUSTER_CONFIG, err)
-			r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "InfraConfigError",
+			r.status.MaybeSetDegraded(ctx, statusmanager.ProxyConfig, "InfraConfigError",
 				fmt.Sprintf("Error getting infrastructure config %s: %v", names.CLUSTER_CONFIG, err))
 			return reconcile.Result{}, fmt.Errorf("failed to get infrastructure config '%s': %v", names.CLUSTER_CONFIG, err)
 		}
 		if err := r.client.Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, netConfig); err != nil {
 			log.Printf("Failed to get network config '%s': %v", names.CLUSTER_CONFIG, err)
-			r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "NetworkConfigError",
+			r.status.MaybeSetDegraded(ctx, statusmanager.ProxyConfig, "NetworkConfigError",
 				fmt.Sprintf("Error getting network config '%s': %v.", names.CLUSTER_CONFIG, err))
 			return reconcile.Result{}, fmt.Errorf("failed to get network config '%s': %v", names.CLUSTER_CONFIG, err)
 		}
 		if err := r.client.Get(ctx, types.NamespacedName{Name: "cluster-config-v1", Namespace: "kube-system"},
 			clusterConfig); err != nil {
 			log.Printf("Failed to get configmap '%s/%s': %v", clusterConfig.Namespace, clusterConfig.Name, err)
-			r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "ClusterConfigError",
+			r.status.MaybeSetDegraded(ctx, statusmanager.ProxyConfig, "ClusterConfigError",
 				fmt.Sprintf("Error getting cluster config configmap '%s/%s': %v.", clusterConfig.Namespace,
 					clusterConfig.Name, err))
 			return reconcile.Result{}, fmt.Errorf("failed to get configmap '%s/%s': %v", clusterConfig.Namespace, clusterConfig.Name, err)
 		}
 		// Update proxy status.
-		if err := r.syncProxyStatus(proxyConfig, infraConfig, netConfig, clusterConfig); err != nil {
+		if err := r.syncProxyStatus(ctx, proxyConfig, infraConfig, netConfig, clusterConfig); err != nil {
 			log.Printf("Could not sync proxy '%s' status: %v", proxyConfig.Name, err)
-			r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "StatusError",
+			r.status.MaybeSetDegraded(ctx, statusmanager.ProxyConfig, "StatusError",
 				fmt.Sprintf("Could not update proxy '%s' status: %v", proxyConfig.Name, err))
 			return reconcile.Result{}, fmt.Errorf("failed to sync proxy '%s': %v", names.PROXY_CONFIG, err)
 		}
@@ -232,18 +232,18 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 		}
 
 		// Only proceed if request matches the configmap referenced by proxy trustedCA.
-		if err := r.configMapIsProxyTrustedCA(trustBundle.Name); err != nil {
+		if err := r.configMapIsProxyTrustedCA(ctx, trustBundle.Name); err != nil {
 			log.Printf("configmap '%s/%s' name differs from trustedCA of proxy '%s' or trustedCA not set; "+
 				"reconciliation will be skipped", trustBundle.Namespace, trustBundle.Name, names.PROXY_CONFIG)
 			return reconcile.Result{}, nil
 		}
 
 		// Validate the trust bundle configmap.
-		proxyData, systemData, err := r.validateTrustedCA(trustBundle.Name)
+		proxyData, systemData, err := r.validateTrustedCA(ctx, trustBundle.Name)
 		if err != nil {
 			log.Printf("Failed to validate additional trust bundle configmap '%s/%s': %v", trustBundle.Namespace,
 				trustBundle.Name, err)
-			r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "TrustBundleValidationFailure",
+			r.status.MaybeSetDegraded(ctx, statusmanager.ProxyConfig, "TrustBundleValidationFailure",
 				fmt.Sprintf("Failed to validate additional trust bundle configmap '%s/%s' (%v)",
 					trustBundle.Namespace, trustBundle.Name, err))
 			return reconcile.Result{}, fmt.Errorf("failed to validate additional trust bundle configmap '%s/%s': %v",
@@ -254,7 +254,7 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 		_, err = r.mergeTrustBundlesToConfigMap(proxyData, systemData)
 		if err != nil {
 			log.Printf("Failed to merge trustedCA and system bundles for proxy '%s': %v", names.PROXY_CONFIG, err)
-			r.status.SetDegraded(statusmanager.ProxyConfig, "EnsureProxyConfigFailure",
+			r.status.SetDegraded(ctx, statusmanager.ProxyConfig, "EnsureProxyConfigFailure",
 				fmt.Sprintf("The configuration is invalid for proxy '%s' (%v). "+
 					"Use 'oc edit proxy.config.openshift.io %s' to fix.", names.PROXY_CONFIG, err, names.PROXY_CONFIG))
 			return reconcile.Result{}, fmt.Errorf("failed to merge trustedCA and system bundles for proxy '%s': %v",
@@ -283,9 +283,9 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 		}
 
 		if validate {
-			if err := r.ValidateProxyConfig(&proxyConfig.Spec); err != nil {
+			if err := r.ValidateProxyConfig(ctx, &proxyConfig.Spec); err != nil {
 				log.Printf("Failed to validate proxy '%s': %v", proxyConfig.Name, err)
-				r.status.SetDegraded(statusmanager.ProxyConfig, "InvalidProxyConfig",
+				r.status.SetDegraded(ctx, statusmanager.ProxyConfig, "InvalidProxyConfig",
 					fmt.Sprintf("The configuration is invalid for proxy '%s' (%v). "+
 						"Use 'oc edit proxy.config.openshift.io %s' to fix.", proxyConfig.Name, err, proxyConfig.Name))
 				return reconcile.Result{}, fmt.Errorf("failed to validate proxy '%s': %v", proxyConfig.Name, err)
@@ -297,7 +297,7 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 			if trustBundle, err = r.generateSystemTrustBundle(); err != nil {
 				log.Printf("Failed to generate system trust bundle configmap '%s/%s': %v",
 					names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS, names.TRUSTED_CA_BUNDLE_CONFIGMAP, err)
-				r.status.SetDegraded(statusmanager.ProxyConfig, "GenerateConfigMapFailure",
+				r.status.SetDegraded(ctx, statusmanager.ProxyConfig, "GenerateConfigMapFailure",
 					fmt.Sprintf("failed to generate system trust bundle configmap '%s/%s (%v).",
 						names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS, names.TRUSTED_CA_BUNDLE_CONFIGMAP, err))
 				return reconcile.Result{}, fmt.Errorf("failed to generate system trust bundle configmap '%s/%s': %v",
@@ -305,10 +305,10 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 			}
 		} else {
 			// Validate trustedCA of proxy spec.
-			proxyData, systemData, err := r.validateTrustedCA(proxyConfig.Spec.TrustedCA.Name)
+			proxyData, systemData, err := r.validateTrustedCA(ctx, proxyConfig.Spec.TrustedCA.Name)
 			if err != nil {
 				log.Printf("Failed to validate trustedCA for proxy '%s': %v", proxyConfig.Name, err)
-				r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "InvalidProxyConfig",
+				r.status.MaybeSetDegraded(ctx, statusmanager.ProxyConfig, "InvalidProxyConfig",
 					fmt.Sprintf("The configuration is invalid for proxy '%s' (%v). "+
 						"Use 'oc edit proxy.config.openshift.io %s' to fix.", proxyConfig.Name, err, proxyConfig.Name))
 				return reconcile.Result{}, fmt.Errorf("failed to validate trustedCA for proxy '%s': %v",
@@ -318,7 +318,7 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 			trustBundle, err = r.mergeTrustBundlesToConfigMap(proxyData, systemData)
 			if err != nil {
 				log.Printf("Failed to merge trustedCA and system bundles for proxy '%s': %v", proxyConfig.Name, err)
-				r.status.SetDegraded(statusmanager.ProxyConfig, "ProxyCAMergeFailure",
+				r.status.SetDegraded(ctx, statusmanager.ProxyConfig, "ProxyCAMergeFailure",
 					fmt.Sprintf("The configuration is invalid for proxy '%s' (%v). "+
 						"Use 'oc edit proxy.config.openshift.io %s' to fix.", proxyConfig.Name, err, proxyConfig.Name))
 				return reconcile.Result{}, fmt.Errorf("failed to merge trustedCA and system bundles for proxy '%s': %v",
@@ -330,17 +330,17 @@ func (r *ReconcileProxyConfig) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	// Make sure the trust bundle configmap is in sync with the api server.
-	if err := r.syncTrustedCABundle(trustBundle); err != nil {
+	if err := r.syncTrustedCABundle(ctx, trustBundle); err != nil {
 		log.Printf("Failed to sync additional trust bundle configmap %s/%s: %v", trustBundle.Namespace,
 			trustBundle.Name, err)
-		r.status.MaybeSetDegraded(statusmanager.ProxyConfig, "TrustBundleSyncFailure",
+		r.status.MaybeSetDegraded(ctx, statusmanager.ProxyConfig, "TrustBundleSyncFailure",
 			fmt.Sprintf("Additional trust bundle configmap '%s/%s' not synced (%v)", trustBundle.Namespace,
 				trustBundle.Name, err))
 		return reconcile.Result{}, fmt.Errorf("failed to sync additional trust bundle configmap %s/%s: %v",
 			trustBundle.Namespace, trustBundle.Name, err)
 	}
 
-	r.status.SetNotDegraded(statusmanager.ProxyConfig)
+	r.status.SetNotDegraded(ctx, statusmanager.ProxyConfig)
 
 	return reconcile.Result{}, nil
 }
@@ -417,21 +417,21 @@ func (r *ReconcileProxyConfig) mergeTrustBundlesToConfigMap(additionalData, syst
 // in namespace "openshift-config-managed" exists, creating trustedCABundle
 // if it doesn't exist or comparing the configmap data values and updating
 // trustedCABundle if the values differ.
-func (r *ReconcileProxyConfig) syncTrustedCABundle(trustedCABundle *corev1.ConfigMap) error {
+func (r *ReconcileProxyConfig) syncTrustedCABundle(ctx context.Context, trustedCABundle *corev1.ConfigMap) error {
 	currentCfgMap := &corev1.ConfigMap{}
-	if err := r.client.Get(context.TODO(), names.TrustedCABundleConfigMap(), currentCfgMap); err != nil {
+	if err := r.client.Get(ctx, names.TrustedCABundleConfigMap(), currentCfgMap); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get trusted CA bundle configmap '%s/%s': %v",
 				trustedCABundle.Namespace, trustedCABundle.Name, err)
 		}
-		if err := r.client.Create(context.TODO(), trustedCABundle); err != nil {
+		if err := r.client.Create(ctx, trustedCABundle); err != nil {
 			return fmt.Errorf("failed to create trusted CA bundle configmap '%s/%s': %v",
 				trustedCABundle.Namespace, trustedCABundle.Name, err)
 		}
 	}
 
 	if !configMapsEqual(names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY, currentCfgMap, trustedCABundle) {
-		if err := r.client.Update(context.TODO(), trustedCABundle); err != nil {
+		if err := r.client.Update(ctx, trustedCABundle); err != nil {
 			return fmt.Errorf("failed to update trusted CA bundle configmap '%s/%s': %v",
 				trustedCABundle.Namespace, trustedCABundle.Name, err)
 		}
@@ -478,9 +478,9 @@ func (r *ReconcileProxyConfig) generateSystemTrustBundle() (*corev1.ConfigMap, e
 
 // configMapIsProxyTrustedCA returns an error if cfgMapName does not match the
 // ConfigMap name referenced by proxy "cluster" trustedCA.
-func (r *ReconcileProxyConfig) configMapIsProxyTrustedCA(cfgMapName string) error {
+func (r *ReconcileProxyConfig) configMapIsProxyTrustedCA(ctx context.Context, cfgMapName string) error {
 	proxyConfig := &configv1.Proxy{}
-	err := r.client.Get(context.TODO(), names.Proxy(), proxyConfig)
+	err := r.client.Get(ctx, names.Proxy(), proxyConfig)
 	if err != nil {
 		return fmt.Errorf("failed to get proxy '%s': %v", names.PROXY_CONFIG, err)
 	}

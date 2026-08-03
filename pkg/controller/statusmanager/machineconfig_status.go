@@ -89,7 +89,7 @@ func (status *StatusManager) SetMachineConfigs(ctx context.Context, newRenderedM
 			}
 		}
 		if annotateUpdate {
-			if err := status.setLastRenderedMachineConfigState(status.renderedMachineConfigs); err != nil {
+			if err := status.setLastRenderedMachineConfigState(ctx, status.renderedMachineConfigs); err != nil {
 				return false, fmt.Errorf("failed to set rendered machine config state: %v", err)
 			}
 		}
@@ -105,7 +105,7 @@ func (status *StatusManager) SetMachineConfigs(ctx context.Context, newRenderedM
 	if err != nil {
 		return fmt.Errorf("failed to retrieve machine config pools: %v", err)
 	}
-	return status.SetFromMachineConfigPool(mcPools.Items)
+	return status.SetFromMachineConfigPool(ctx, mcPools.Items)
 }
 
 // SetFromMachineConfigPool reconcile loop being executed when CNO rendering pipeline renders a new
@@ -121,7 +121,7 @@ func (status *StatusManager) SetMachineConfigs(ctx context.Context, newRenderedM
 // in the status manager are rebuilt from annotation cache, so delete machine config entry from annotation cache
 // when machine config is actually removed from machine config pool(s). This makes the status manager cache
 // always up to date.
-func (status *StatusManager) SetFromMachineConfigPool(mcPools []mcfgv1.MachineConfigPool) error {
+func (status *StatusManager) SetFromMachineConfigPool(ctx context.Context, mcPools []mcfgv1.MachineConfigPool) error {
 	status.Lock()
 	defer status.Unlock()
 	// The status.renderedMachineConfigs is a non-nil map at the time when SetFromMachineConfigPool method is invoked.
@@ -133,12 +133,12 @@ func (status *StatusManager) SetFromMachineConfigPool(mcPools []mcfgv1.MachineCo
 		}
 		degradedPool := status.isAnyMachineConfigPoolDegraded(pools)
 		if degradedPool != "" {
-			status.setDegraded(MachineConfig, "MachineConfig", fmt.Sprintf("%s machine config pool in degraded state", degradedPool))
+			status.setDegraded(ctx, MachineConfig, "MachineConfig", fmt.Sprintf("%s machine config pool in degraded state", degradedPool))
 			return nil
 		}
 	}
 	// No degraded pools, so clear degraded status
-	status.setNotDegraded(MachineConfig)
+	status.setNotDegraded(ctx, MachineConfig)
 
 	for role, machineConfigs := range status.renderedMachineConfigs {
 		pools, err := status.findMachineConfigPoolsForLabel(mcPools, map[string]string{names.MachineConfigLabelRoleKey: role})
@@ -167,7 +167,7 @@ func (status *StatusManager) SetFromMachineConfigPool(mcPools []mcfgv1.MachineCo
 					continue
 				}
 
-				status.setProgressing(MachineConfig, "MachineConfig",
+				status.setProgressing(ctx, MachineConfig, "MachineConfig",
 					fmt.Sprintf("%s machine config pool is still processing %s machine config", pool.Name, machineConfig))
 				return nil
 			}
@@ -175,17 +175,17 @@ func (status *StatusManager) SetFromMachineConfigPool(mcPools []mcfgv1.MachineCo
 			// Wait to prune cached removal state until every non-paused pool for
 			// this role reflects the updated rendered source.
 			if beingRemoved && sawNonPausedPool {
-				if err := status.forgetRemovedMachineConfig(role, machineConfig); err != nil {
+				if err := status.forgetRemovedMachineConfig(ctx, role, machineConfig); err != nil {
 					return err
 				}
 			}
 		}
-		status.unsetProgressing(MachineConfig)
+		status.unsetProgressing(ctx, MachineConfig)
 	}
 	return nil
 }
 
-func (status *StatusManager) forgetRemovedMachineConfig(role, machineConfig string) error {
+func (status *StatusManager) forgetRemovedMachineConfig(ctx context.Context, role, machineConfig string) error {
 	status.machineConfigsBeingRemoved[role].Delete(machineConfig)
 	// Delete map entry from status cache if role doesn't have machine configs. By deleting the entry,
 	// there won't be any unnecessary processing of pools in the reconcile loop when it's not dealing
@@ -197,7 +197,7 @@ func (status *StatusManager) forgetRemovedMachineConfig(role, machineConfig stri
 	if status.renderedMachineConfigs[role].Len() == 0 {
 		delete(status.renderedMachineConfigs, role)
 	}
-	if err := status.setLastRenderedMachineConfigState(status.renderedMachineConfigs); err != nil {
+	if err := status.setLastRenderedMachineConfigState(ctx, status.renderedMachineConfigs); err != nil {
 		return fmt.Errorf("failed to update rendered machine config state: %v", err)
 	}
 	return nil
@@ -228,7 +228,7 @@ func (status *StatusManager) getLastRenderedMachineConfigState() (map[string]set
 	return renderedMachineConfigs, nil
 }
 
-func (status *StatusManager) setLastRenderedMachineConfigState(renderedMachineConfigs map[string]sets.Set[string]) error {
+func (status *StatusManager) setLastRenderedMachineConfigState(ctx context.Context, renderedMachineConfigs map[string]sets.Set[string]) error {
 	machineConfigState := machineConfigState{}
 	for role, mcs := range renderedMachineConfigs {
 		for _, mc := range mcs.UnsortedList() {
@@ -242,7 +242,7 @@ func (status *StatusManager) setLastRenderedMachineConfigState(renderedMachineCo
 	}
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
 	anno := string(lsbytes)
-	return status.setAnnotation(context.TODO(), co, renderedMachineConfigAnnotation, &anno)
+	return status.setAnnotation(ctx, co, renderedMachineConfigAnnotation, &anno)
 }
 
 func (status *StatusManager) isAnyMachineConfigPoolDegraded(pools []mcfgv1.MachineConfigPool) string {

@@ -88,7 +88,7 @@ func (m *MachineConfigWatcher) Reconcile(ctx context.Context, request reconcile.
 		klog.Errorf("failed to retrieve machine config pools: %v", err)
 		return reconcile.Result{}, nil
 	}
-	return reconcile.Result{}, m.status.SetFromMachineConfigPool(mcPools.Items)
+	return reconcile.Result{}, m.status.SetFromMachineConfigPool(ctx, mcPools.Items)
 }
 
 // Reconcile triggers a re-update of Status.
@@ -100,7 +100,7 @@ func (p *MachineConfigPoolWatcher) Reconcile(ctx context.Context, request reconc
 		klog.Errorf("failed to retrieve machine config pools: %v", err)
 		return reconcile.Result{}, nil
 	}
-	return reconcile.Result{}, p.status.SetFromMachineConfigPool(mcPools.Items)
+	return reconcile.Result{}, p.status.SetFromMachineConfigPool(ctx, mcPools.Items)
 }
 
 func onMachineConfigPredicate() predicate.Predicate {

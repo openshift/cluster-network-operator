@@ -138,7 +138,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 
 	if err != nil {
 		log.Println(err)
-		r.status.SetDegraded(statusmanager.InjectorConfig, "InvalidInjectorConfig",
+		r.status.SetDegraded(ctx, statusmanager.InjectorConfig, "InvalidInjectorConfig",
 			fmt.Sprintf("Failed to validate trusted CA certificates in %s", trustedCAbundleConfigMap.Name))
 		return reconcile.Result{}, err
 	}
@@ -150,7 +150,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 		cms, err := r.labelLister.List(labelSelector.AsSelector())
 		if err != nil { // unlikely -- informer list
 			log.Println(err)
-			r.status.SetDegraded(statusmanager.InjectorConfig, "ListConfigMapError",
+			r.status.SetDegraded(ctx, statusmanager.InjectorConfig, "ListConfigMapError",
 				fmt.Sprintf("Error getting the list of affected configmaps: %v", err))
 			return reconcile.Result{}, err
 
@@ -168,7 +168,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 				return reconcile.Result{}, nil
 			}
 			// Unlikely -- this is an informer
-			r.status.SetDegraded(statusmanager.InjectorConfig, "ClusterConfigError",
+			r.status.SetDegraded(ctx, statusmanager.InjectorConfig, "ClusterConfigError",
 				fmt.Sprintf("failed to get configmap '%s/%s': %v", request.Namespace, request.Name, err))
 			log.Println(err)
 			return reconcile.Result{}, err
@@ -216,18 +216,18 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 		if err != nil {
 			errs = append(errs, err)
 			if len(errs) > 5 {
-				r.status.MaybeSetDegraded(statusmanager.InjectorConfig, "ConfigMapUpdateFailure",
+				r.status.MaybeSetDegraded(ctx, statusmanager.InjectorConfig, "ConfigMapUpdateFailure",
 					"Too many errors seen when updating trusted CA configmaps")
 				return reconcile.Result{}, fmt.Errorf("too many errors attempting to update configmaps with CA cert data")
 			}
 		}
 	}
 	if len(errs) > 0 {
-		r.status.MaybeSetDegraded(statusmanager.InjectorConfig, "ConfigmapUpdateFailure",
+		r.status.MaybeSetDegraded(ctx, statusmanager.InjectorConfig, "ConfigmapUpdateFailure",
 			"some configmaps didn't fully update with CA cert. data")
 		return reconcile.Result{}, fmt.Errorf("some configmaps didn't fully update with CA cert. data")
 	}
-	r.status.SetNotDegraded(statusmanager.InjectorConfig)
+	r.status.SetNotDegraded(ctx, statusmanager.InjectorConfig)
 	return reconcile.Result{}, nil
 }
 

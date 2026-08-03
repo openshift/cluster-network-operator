@@ -181,13 +181,13 @@ func applyClusterTLSProfile(ctx context.Context, config *operatorv1alpha1.Generi
 	}
 
 	// Fetch HostedControlPlane for HyperShift (if applicable)
-	hcp, err := hypershift.GetHostedControlPlane(client)
+	hcp, err := hypershift.GetHostedControlPlane(ctx, client)
 	if err != nil {
 		return fmt.Errorf("failed to get HostedControlPlane: %w", err)
 	}
 
 	// Fetch TLS profile using network.GetTLSProfile (handles both standalone and HyperShift)
-	tlsProfile, err := network.GetTLSProfile(client, hcp)
+	tlsProfile, err := network.GetTLSProfile(ctx, client, hcp)
 	if err != nil {
 		return fmt.Errorf("failed to get TLS profile: %w", err)
 	}

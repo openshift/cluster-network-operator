@@ -119,7 +119,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 	}
 	if !isValid {
 		// Update CSR status condition with Failed condition.
-		updateCSRStatusConditions(r, csr, "CSRInvalidUser",
+		updateCSRStatusConditions(ctx, r, csr, "CSRInvalidUser",
 			"Certificate Signing Request is set with invalid user name, can't sign it")
 		return reconcile.Result{}, nil
 	}
@@ -159,7 +159,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 	caSecret := &corev1.Secret{}
 	err = r.client.Default().CRClient().Get(ctx, types.NamespacedName{Namespace: "openshift-ovn-kubernetes", Name: "signer-ca"}, caSecret)
 	if err != nil {
-		signerFailure(r, csr, "CAFailure",
+		signerFailure(ctx, r, csr, "CAFailure",
 			fmt.Sprintf("Could not get CA certificate and key: %v", err))
 		return reconcile.Result{}, err
 	}
@@ -169,7 +169,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 	if err != nil {
 		// We dont degrade the status of the controller as this is due to a
 		// malformed CSR rather than an issue with the controller.
-		updateCSRStatusConditions(r, csr, "CSRDecodeFailure",
+		updateCSRStatusConditions(ctx, r, csr, "CSRDecodeFailure",
 			fmt.Sprintf("Could not decode Certificate Request: %v", err))
 		return reconcile.Result{}, nil
 	}
@@ -177,7 +177,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 	// Decode the CA certificate from PEM format.
 	caCert, err := decodeCertificate(caSecret.Data["tls.crt"])
 	if err != nil {
-		signerFailure(r, csr, "CorruptCACert",
+		signerFailure(ctx, r, csr, "CorruptCACert",
 			fmt.Sprintf("Unable to decode CA certificate for %v: %v", signerName, err))
 		return reconcile.Result{}, nil
 	}
@@ -185,7 +185,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 	// Decode the CA key from PEM format.
 	caKey, err := decodePrivateKey(caSecret.Data["tls.key"])
 	if err != nil {
-		signerFailure(r, csr, "CorruptCAKey",
+		signerFailure(ctx, r, csr, "CorruptCAKey",
 			fmt.Sprintf("Unable to decode CA private key for %v: %v", signerName, err))
 		return reconcile.Result{}, nil
 	}
@@ -194,7 +194,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 	// We can then sign this using the CA.
 	signedCert, err := signCSR(newCertificateTemplate(certReq, r.certDuration), certReq.PublicKey, caCert, caKey)
 	if err != nil {
-		signerFailure(r, csr, "SigningFailure",
+		signerFailure(ctx, r, csr, "SigningFailure",
 			fmt.Sprintf("Unable to sign certificate for %v and signer %v: %v", request.Name, signerName, err))
 		return reconcile.Result{}, nil
 	}
@@ -202,7 +202,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 	// Encode the certificate into PEM format and add to the status of the CSR
 	csr.Status.Certificate, err = crypto.EncodeCertificates(signedCert)
 	if err != nil {
-		signerFailure(r, csr, "EncodeFailure",
+		signerFailure(ctx, r, csr, "EncodeFailure",
 			fmt.Sprintf("Could not encode certificate: %v", err))
 		return reconcile.Result{}, nil
 	}
@@ -214,7 +214,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 	}
 
 	log.Printf("Certificate signed, issued and approved for %s by %s", request.Name, signerName)
-	r.status.SetNotDegraded(statusmanager.CertificateSigner)
+	r.status.SetNotDegraded(ctx, statusmanager.CertificateSigner)
 	return reconcile.Result{}, nil
 }
 
@@ -252,24 +252,24 @@ func getCertApprovalCondition(status *csrv1.CertificateSigningRequestStatus) (ap
 
 // Something has gone wrong with the signer controller so we update the statusmanager, the csr
 // and log.
-func signerFailure(r *ReconcileCSR, csr *csrv1.CertificateSigningRequest, reason string, message string) {
+func signerFailure(ctx context.Context, r *ReconcileCSR, csr *csrv1.CertificateSigningRequest, reason string, message string) {
 	log.Printf("%s: %s", reason, message)
-	updateCSRStatusConditions(r, csr, reason, message)
-	r.status.MaybeSetDegraded(statusmanager.CertificateSigner, reason, message)
+	updateCSRStatusConditions(ctx, r, csr, reason, message)
+	r.status.MaybeSetDegraded(ctx, statusmanager.CertificateSigner, reason, message)
 }
 
 // Update the status conditions on the CSR object
-func updateCSRStatusConditions(r *ReconcileCSR, csr *csrv1.CertificateSigningRequest, reason string, message string) {
+func updateCSRStatusConditions(ctx context.Context, r *ReconcileCSR, csr *csrv1.CertificateSigningRequest, reason string, message string) {
 	setCertificateSigningRequestCondition(&csr.Status.Conditions, csrv1.CertificateSigningRequestCondition{
 		Type:    csrv1.CertificateFailed,
 		Status:  "True",
 		Reason:  reason,
 		Message: message})
 
-	err := r.client.Default().CRClient().Status().Update(context.TODO(), csr)
+	err := r.client.Default().CRClient().Status().Update(ctx, csr)
 	if err != nil {
 		log.Printf("Could not update CSR status: %v", err)
-		r.status.MaybeSetDegraded(statusmanager.CertificateSigner, "UpdateFailure",
+		r.status.MaybeSetDegraded(ctx, statusmanager.CertificateSigner, "UpdateFailure",
 			fmt.Sprintf("Unable to update csr: %v", err))
 	}
 }
