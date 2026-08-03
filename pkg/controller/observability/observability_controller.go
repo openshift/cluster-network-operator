@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	goerrors "errors"
 	"io"
 	"os"
 	"strings"
@@ -512,7 +513,7 @@ func (r *ReconcileObservability) applyManifest(ctx context.Context, yamlPath, de
 	for {
 		obj := &unstructured.Unstructured{}
 		if err := dec.Decode(obj); err != nil {
-			if err == io.EOF {
+			if goerrors.Is(err, io.EOF) {
 				break
 			}
 			return err

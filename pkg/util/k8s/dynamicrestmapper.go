@@ -1,6 +1,8 @@
 package k8s
 
 import (
+	"errors"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -43,7 +45,8 @@ func (drm *DynamicRESTMapper) reload() error {
 // reloadOnError checks if an error indicates that the delegated RESTMapper needs to be
 // reloaded, and if so, reloads it and returns true.
 func (drm *DynamicRESTMapper) reloadOnError(err error) bool {
-	if _, matches := err.(*meta.NoKindMatchError); !matches {
+	var noKindErr *meta.NoKindMatchError
+	if !errors.As(err, &noKindErr) {
 		return false
 	}
 	err = drm.reload()
