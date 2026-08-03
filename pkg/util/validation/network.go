@@ -71,10 +71,10 @@ func URI(uri string) (string, error) {
 	if port := parsed.Port(); len(port) != 0 {
 		intPort, err := strconv.Atoi(port)
 		if err != nil {
-			return "", fmt.Errorf("failed converting port to integer for URI %q: %v", uri, err)
+			return "", fmt.Errorf("failed converting port to integer for URI %q: %w", uri, err)
 		}
 		if err := Port(intPort); err != nil {
-			return "", fmt.Errorf("failed to validate port for URL %q: %v", uri, err)
+			return "", fmt.Errorf("failed to validate port for URL %q: %w", uri, err)
 		}
 	}
 
@@ -85,7 +85,7 @@ func URI(uri string) (string, error) {
 func IPAddressOrCIDR(ip string) error {
 	if net.ParseIP(ip) == nil {
 		if _, _, err := net.ParseCIDR(ip); err != nil {
-			return fmt.Errorf("invalid IP/CIDR: %v", ip)
+			return fmt.Errorf("invalid IP/CIDR: %s", ip)
 		}
 	}
 

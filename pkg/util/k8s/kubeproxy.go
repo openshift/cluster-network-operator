@@ -171,7 +171,7 @@ func (ka *kpcArgs) getAddressAndPort(addressKey, portKey, defaultPort string) st
 
 	if port != "" {
 		if _, err := strconv.ParseUint(port, 10, 16); err != nil {
-			ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%v)", portKey, port, err))
+			ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%w)", portKey, port, err))
 			return ""
 		}
 	} else {
@@ -206,7 +206,7 @@ func (ka *kpcArgs) getCIDR(key string) string {
 		return ""
 	}
 	if _, _, err := net.ParseCIDR(value); err != nil {
-		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%v)", key, value, err))
+		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%w)", key, value, err))
 		return ""
 	}
 	return value
@@ -221,7 +221,7 @@ func (ka *kpcArgs) getCIDRList(key string) []string {
 	values := strings.Split(value, ",")
 	for _, v := range values {
 		if _, _, err := net.ParseCIDR(v); err != nil {
-			ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%v)", key, value, err))
+			ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%w)", key, value, err))
 			return nil
 		}
 	}
@@ -245,7 +245,7 @@ func (ka *kpcArgs) getOptInt32(key string) *int32 {
 	}
 	intval, err := strconv.ParseInt(value, 10, 32)
 	if err != nil {
-		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%v)", key, value, err))
+		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%w)", key, value, err))
 		return nil
 	}
 	int32val := int32(intval)
@@ -260,7 +260,7 @@ func (ka *kpcArgs) getBool(key string) bool {
 	}
 	bval, err := strconv.ParseBool(value)
 	if err != nil {
-		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%v)", key, value, err))
+		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%w)", key, value, err))
 		return false
 	}
 	return bval
@@ -274,7 +274,7 @@ func (ka *kpcArgs) getOptBool(key string) *bool {
 	}
 	bval, err := strconv.ParseBool(value)
 	if err != nil {
-		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%v)", key, value, err))
+		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%w)", key, value, err))
 		return nil
 	}
 	return &bval
@@ -288,7 +288,7 @@ func (ka *kpcArgs) getDuration(key string) time.Duration {
 	}
 	duration, err := time.ParseDuration(value)
 	if err != nil {
-		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%v)", key, value, err))
+		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%w)", key, value, err))
 		return 0
 	}
 	return duration
@@ -301,7 +301,7 @@ func (ka *kpcArgs) getPortRange(key string) string {
 		return ""
 	}
 	if _, err := utilnet.ParsePortRange(value); err != nil {
-		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%v)", key, value, err))
+		ka.errs = append(ka.errs, fmt.Errorf("invalid %s %q (%w)", key, value, err))
 		return ""
 	}
 	return value
@@ -319,7 +319,7 @@ func (ka *kpcArgs) getFeatureGates(key string) map[string]bool {
 	for _, v := range val {
 		err := featureGates.Set(v)
 		if err != nil {
-			ka.errs = append(ka.errs, fmt.Errorf("invalid %q (%v)", v, err))
+			ka.errs = append(ka.errs, fmt.Errorf("invalid %q (%w)", v, err))
 			continue
 		}
 	}

@@ -221,7 +221,7 @@ func (r *ReconcileCSR) Reconcile(ctx context.Context, request reconcile.Request)
 func (r *ReconcileCSR) isValidUserName(ctx context.Context, csrUserName string) (bool, error) {
 	nodeList, err := r.client.Default().Kubernetes().CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return false, fmt.Errorf("failed to list nodes: %v", err)
+		return false, fmt.Errorf("failed to list nodes: %w", err)
 	}
 	for _, node := range nodeList.Items {
 		if fmt.Sprintf("system:ovn-node:%s", node.Name) == csrUserName {

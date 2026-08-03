@@ -334,7 +334,7 @@ func (status *StatusManager) writeHypershiftStatus(ctx context.Context, operStat
 
 		updatedConditions, err := hypershift.SetHostedControlPlaneConditions(hcp, operStatus)
 		if err != nil {
-			return fmt.Errorf("failed to set HostedControlPlane conditions: %v", err)
+			return fmt.Errorf("failed to set HostedControlPlane conditions: %w", err)
 		}
 		if len(updatedConditions) == 0 {
 			// nothing changed, return

@@ -55,7 +55,7 @@ func (status *StatusManager) setAnnotation(ctx context.Context, obj crclient.Obj
 	}
 	patchData, err := json.Marshal(&patch)
 	if err != nil {
-		return fmt.Errorf("failed to create patch: %v", err)
+		return fmt.Errorf("failed to create patch: %w", err)
 	}
 
 	return status.client.ClientFor(apply.GetClusterName(obj)).CRClient().Patch(ctx, obj, crclient.RawPatch(types.MergePatchType, patchData))

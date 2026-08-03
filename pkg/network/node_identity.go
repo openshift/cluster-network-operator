@@ -35,7 +35,7 @@ func isBootstrapComplete(ctx context.Context, cli cnoclient.Client) (bool, error
 	clusterBootstrapLookup := types.NamespacedName{Name: "bootstrap", Namespace: CLUSTER_CONFIG_NAMESPACE}
 	if err := cli.ClientFor("").CRClient().Get(ctx, clusterBootstrapLookup, clusterBootstrap); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return false, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %s", err)
+			return false, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %w", err)
 		}
 	}
 	status, ok := clusterBootstrap.Data["status"]
@@ -181,7 +181,7 @@ func renderNetworkNodeIdentity(ctx context.Context, conf *operv1.NetworkSpec, bo
 	if err := webhookCAClient.CRClient().Get(ctx, webhookCALookup, webhookCAConfigMap); err != nil {
 		// If the CA doesn't exist, the ValidatingWebhookConfiguration will not be rendered
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("unable to retrieve ovnkube-identity webhook CA config: %s", err)
+			return nil, fmt.Errorf("unable to retrieve ovnkube-identity webhook CA config: %w", err)
 		}
 	} else {
 		_, webhookCA, err = validation.TrustBundleConfigMap(webhookCAConfigMap, caKey)

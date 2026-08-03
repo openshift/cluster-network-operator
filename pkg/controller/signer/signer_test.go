@@ -303,7 +303,7 @@ func generateCSR() (string, error) {
 	// Create private key.
 	csrKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate private key: %v", err)
+		return "", fmt.Errorf("failed to generate private key: %w", err)
 	}
 	// Create CSR with private key.
 	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{}, csrKey)

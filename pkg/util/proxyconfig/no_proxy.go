@@ -47,7 +47,7 @@ func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		return "", fmt.Errorf("missing install-config in configmap")
 	}
 	if err := yaml.Unmarshal([]byte(data), &ic); err != nil {
-		return "", fmt.Errorf("invalid install-config: %v\njson:\n%s", err, data)
+		return "", fmt.Errorf("invalid install-config: %w\njson:\n%s", err, data)
 	}
 
 	set := sets.NewString(

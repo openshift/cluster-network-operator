@@ -78,7 +78,7 @@ func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 	if p.IptablesSyncPeriod != "" {
 		_, err := time.ParseDuration(p.IptablesSyncPeriod)
 		if err != nil {
-			out = append(out, fmt.Errorf("IptablesSyncPeriod is not a valid duration (%v)", err))
+			out = append(out, fmt.Errorf("IptablesSyncPeriod is not a valid duration: %w", err))
 		}
 	}
 

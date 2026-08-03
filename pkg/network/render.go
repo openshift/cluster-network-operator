@@ -427,11 +427,11 @@ func isClusterNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
 	for i, e := range prev.ClusterNetwork {
 		prevIp, prevMask, err := net.ParseCIDR(e.CIDR)
 		if err != nil {
-			return fmt.Errorf("error parsing CIDR from ClusterNetwork entry %s: %v", e.CIDR, err)
+			return fmt.Errorf("error parsing CIDR from ClusterNetwork entry %s: %w", e.CIDR, err)
 		}
 		nextIp, nextMask, err := net.ParseCIDR(next.ClusterNetwork[i].CIDR)
 		if err != nil {
-			return fmt.Errorf("error parsing CIDR from ClusterNetwork entry %s: %v", next.ClusterNetwork[i].CIDR, err)
+			return fmt.Errorf("error parsing CIDR from ClusterNetwork entry %s: %w", next.ClusterNetwork[i].CIDR, err)
 		}
 		prevHostPrefix := e.HostPrefix
 		nextHostPrefix := next.ClusterNetwork[i].HostPrefix
@@ -477,7 +477,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 			ipv4Service = true
 		}
 		if err := pool.Add(*cidr); err != nil {
-			errs = append(errs, fmt.Errorf("whole or subset of ServiceNetwork CIDR %s is already in use: %s", snet, err))
+			errs = append(errs, fmt.Errorf("whole or subset of ServiceNetwork CIDR %s is already in use: %w", snet, err))
 		}
 	}
 
@@ -520,7 +520,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 			}
 		}
 		if err := pool.Add(*cidr); err != nil {
-			errs = append(errs, fmt.Errorf("whole or subset of ClusterNetwork CIDR %s is already in use: %s", cnet.CIDR, err))
+			errs = append(errs, fmt.Errorf("whole or subset of ClusterNetwork CIDR %s is already in use: %w", cnet.CIDR, err))
 		}
 	}
 
