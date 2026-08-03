@@ -85,7 +85,7 @@ const ClusterNetworkCIDRsAnnotation = "networkoperator.openshift.io/cluster-netw
 const MasqueradeCIDRsAnnotation = "networkoperator.openshift.io/default-masquerade-network-cidrs"
 
 // NetworkHybridOverlayAnnotatiion is an annotation on the OVN networks.operator.io.daemonsets
-// to indicate the current state of of the Hybrid overlay on the cluster: "enabled" or "disabled"
+// to indicate the current state of the Hybrid overlay on the cluster: "enabled" or "disabled"
 const NetworkHybridOverlayAnnotation = "networkoperator.openshift.io/hybrid-overlay-status"
 
 // IPsecEnableAnnotation is an annotation on the OVN networks.operator.openshift.io
