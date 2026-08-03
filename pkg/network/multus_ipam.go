@@ -80,7 +80,7 @@ func detectIPAMTypeRaw(targetType string, addNet *operv1.AdditionalNetworkDefini
 	return false
 }
 
-// useDHCPSimpleMacvlan determines if the the DHCP CNI plugin running as a daemon should be rendered in case of SimpleMacvlan.
+// useDHCPSimpleMacvlan determines if the DHCP CNI plugin running as a daemon should be rendered in case of SimpleMacvlan.
 func useDHCPSimpleMacvlan(conf *operv1.SimpleMacvlanConfig) bool {
 	// if IPAMConfig is not configured, DHCP is used (as default IPAM is DHCP)
 	if conf == nil || conf.IPAMConfig == nil {
