@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"testing"
@@ -547,7 +548,6 @@ func setupTestInfraAndBasicRenderConfigs(t *testing.T, prevType, nextType operv1
 	*bootstrap.InfraStatus,
 	*operv1.NetworkSpec,
 	*operv1.NetworkSpec) {
-
 	g := NewGomegaWithT(t)
 	infra := &fakeBootstrapResult().Infra
 
@@ -644,11 +644,42 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := renderAdditionalRoutingCapabilities(tt.args.operConf, manifestDir)
+			got, err := renderAdditionalRoutingCapabilities(tt.args.operConf, fakeBootstrapResult(), manifestDir)
 			if !reflect.DeepEqual(tt.expectedErr, err) {
 				t.Errorf("renderAdditionalRoutingCapabilities() err = %v, want %v", err, tt.expectedErr)
 			}
 			assert.Equalf(t, tt.want, len(got), "renderAdditionalRoutingCapabilities(%v, %v)", tt.args.operConf, manifestDir)
 		})
 	}
+}
+
+func Test_renderFRRWebhookServerStrategy(t *testing.T) {
+	frrConf := &operv1.NetworkSpec{
+		AdditionalRoutingCapabilities: &operv1.AdditionalRoutingCapabilities{
+			Providers: []operv1.RoutingCapabilitiesProvider{
+				operv1.RoutingCapabilitiesProviderFRR,
+			},
+		},
+	}
+
+	render := func(replicaCount int) *appsv1.Deployment {
+		g := NewWithT(t)
+		br := fakeBootstrapResult()
+		br.OVN.ControlPlaneReplicaCount = replicaCount
+		objs, err := renderAdditionalRoutingCapabilities(frrConf, br, manifestDir)
+		g.Expect(err).NotTo(HaveOccurred())
+		return mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "frr-k8s-webhook-server")
+	}
+
+	t.Run("SNO: strategy is Recreate", func(t *testing.T) {
+		g := NewWithT(t)
+		d := render(1)
+		g.Expect(d.Spec.Strategy.Type).To(Equal(appsv1.RecreateDeploymentStrategyType))
+	})
+
+	t.Run("HA: no strategy override", func(t *testing.T) {
+		g := NewWithT(t)
+		d := render(3)
+		g.Expect(d.Spec.Strategy.Type).To(BeEmpty())
+	})
 }
