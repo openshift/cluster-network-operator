@@ -36,11 +36,14 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
 	logs.InitLogs()
-	defer logs.FlushLogs()
 
 	command := newNetworkOperatorCommand()
 
-	if err := command.Execute(); err != nil {
+	err := command.Execute()
+
+	logs.FlushLogs()
+
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
