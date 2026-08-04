@@ -3,6 +3,7 @@ package network_test
 import (
 	"os"
 	"reflect"
+	"slices"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -56,7 +57,7 @@ func TestBootstrap(t *testing.T) {
 	}
 
 	t.Run("in standalone (non-HyperShift) mode", func(t *testing.T) {
-		clientObjs := append(baseClientObjs, &configv1.APIServer{
+		clientObjs := append(slices.Clone(baseClientObjs), &configv1.APIServer{
 			ObjectMeta: metav1.ObjectMeta{Name: openshifttls.APIServerName},
 			Spec: configv1.APIServerSpec{
 				TLSSecurityProfile: &configv1.TLSSecurityProfile{
