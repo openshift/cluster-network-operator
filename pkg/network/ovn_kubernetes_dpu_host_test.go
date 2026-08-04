@@ -549,13 +549,11 @@ func TestDpuHostModeResourceCount(t *testing.T) {
 					limQty, found := ovnkubeController.Resources.Limits[resourceName]
 					g.Expect(found).To(BeTrue(), "resource limit should be set")
 					g.Expect(limQty.String()).To(Equal(tc.expectedCount))
-				} else {
-					if tc.mgmtPortResourceName != "" {
-						_, found := ovnkubeController.Resources.Requests[resourceName]
-						g.Expect(found).To(BeFalse(), "resource request should not be set")
-						_, found = ovnkubeController.Resources.Limits[resourceName]
-						g.Expect(found).To(BeFalse(), "resource limit should not be set")
-					}
+				} else if tc.mgmtPortResourceName != "" {
+					_, found := ovnkubeController.Resources.Requests[resourceName]
+					g.Expect(found).To(BeFalse(), "resource request should not be set")
+					_, found = ovnkubeController.Resources.Limits[resourceName]
+					g.Expect(found).To(BeFalse(), "resource limit should not be set")
 				}
 			})
 		}
