@@ -119,7 +119,7 @@ func (r EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile
 		klog.Infof("Creating a new Egress Router")
 		// Set owner reference to the controller
 		boolTrue := bool(true)
-		EgressRouterOwnerReferences := []metav1.OwnerReference{
+		egressRouterOwnerReferences := []metav1.OwnerReference{
 			{
 				APIVersion: "network.operator.openshift.io/v1",
 				Kind:       "EgressRouter",
@@ -128,7 +128,7 @@ func (r EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile
 				Controller: &boolTrue,
 			},
 		}
-		err := r.ensureEgressRouter(ctx, manifestDir, request.Namespace, obj, EgressRouterOwnerReferences)
+		err := r.ensureEgressRouter(ctx, manifestDir, request.Namespace, obj, egressRouterOwnerReferences)
 
 		if err != nil {
 			klog.Error(err)
@@ -171,10 +171,10 @@ func (r *EgressRouterReconciler) setStatus(ctx context.Context) {
 
 // getAllowedDestinationsConfigJSONi generates AllowedDestinations json config
 // order of the fields need to match egress-route-cni macvlan module
-func getAllowedDestinationsConfigJSON(RedirectRules []netopv1.L4RedirectRule) (string, error) {
-	config := make([]string, len(RedirectRules))
+func getAllowedDestinationsConfigJSON(redirectRules []netopv1.L4RedirectRule) (string, error) {
+	config := make([]string, len(redirectRules))
 
-	for idx, rule := range RedirectRules {
+	for idx, rule := range redirectRules {
 		if rule.Port != 0 && len(rule.Protocol) != 0 {
 			if rule.TargetPort != 0 {
 				config[idx] = fmt.Sprintf("%d %s %s %d", rule.Port, rule.Protocol, rule.DestinationIP, rule.TargetPort)
@@ -194,7 +194,7 @@ func getAllowedDestinationsConfigJSON(RedirectRules []netopv1.L4RedirectRule) (s
 	return string(jsonByte), nil
 }
 
-func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifestDir string, namespace string, router *netopv1.EgressRouter, EgressRouterOwnerReferences []metav1.OwnerReference) error {
+func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifestDir string, namespace string, router *netopv1.EgressRouter, egressRouterOwnerReferences []metav1.OwnerReference) error {
 	var err error
 	if len(router.Spec.Addresses) == 0 {
 		return fmt.Errorf("router without addresses")
@@ -225,7 +225,7 @@ func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifes
 
 	for _, obj := range out {
 		klog.Infof("Assigning owner references")
-		obj.SetOwnerReferences(EgressRouterOwnerReferences)
+		obj.SetOwnerReferences(egressRouterOwnerReferences)
 		klog.Infof("Applying manifest")
 		if err := apply.ApplyObject(ctx, r.client, obj, "egress_router"); err != nil {
 			klog.Infof("could not apply egress router object: %v", err)
