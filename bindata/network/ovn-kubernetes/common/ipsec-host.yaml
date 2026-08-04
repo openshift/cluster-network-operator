@@ -281,7 +281,9 @@ spec:
 
           /usr/libexec/ipsec/addconn --config /etc/ipsec.conf --checkconfig
           # Check kernel modules
-          /usr/libexec/ipsec/_stackmanager start
+          if [ -e /usr/libexec/ipsec/_stackmanager ]; then
+            /usr/libexec/ipsec/_stackmanager start
+          fi
           # Check nss database status
           /usr/sbin/ipsec --checknss
 
