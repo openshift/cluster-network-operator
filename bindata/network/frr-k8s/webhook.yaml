@@ -52,6 +52,10 @@ metadata:
   annotations:
     release.openshift.io/version: "{{.ReleaseVersion}}"
 spec:
+{{- if .IsSNO }}
+  strategy:
+    type: Recreate
+{{- end }}
   selector:
     matchLabels:
       component: frr-k8s-webhook-server
