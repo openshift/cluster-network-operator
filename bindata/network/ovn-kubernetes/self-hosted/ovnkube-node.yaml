@@ -186,7 +186,7 @@ spec:
         terminationMessagePolicy: FallbackToLogsOnError
         resources:
           requests:
-            cpu: 10m
+            cpu: 50m
             memory: 300Mi
       - name: ovn-acl-logging
         image: "{{.OvnImage}}"
