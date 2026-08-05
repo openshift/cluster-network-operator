@@ -480,6 +480,75 @@ data:
         echo "$(date --iso-8601=seconds) [{$1}] ${2}"
     }
 
+    # get-first-interface-address() returns the first global address on the
+    # specified interface for the requested IP family.
+    #
+    # Arguments:
+    #   $1 - interface name
+    #   $2 - IP family, either 4 or 6
+    get-first-interface-address()
+    {
+      local interface_name=$1
+      local family=$2
+
+      ip -o -"${family}" addr show dev "${interface_name}" scope global 2>/dev/null | \
+        awk 'NR == 1 {split($4, addr, "/"); print addr[1]}'
+    }
+
+    # set-encap-ip-flag() resolves --encap-ip from /etc/ovnk/encap_interface
+    # or from the OVN_ENCAP_IP environment variable.
+    #
+    # The host root is also checked through /host so this continues to work on
+    # node pods that do not mount /etc/ovnk directly into the container.
+    set-encap-ip-flag()
+    {
+      local encap_interface_file="/etc/ovnk/encap_interface"
+      local encap_interface=""
+      local encap_ipv4=""
+      local encap_ipv6=""
+      local resolved_encap_ips=""
+
+      ovn_encap_ip_flag=
+
+      if [[ ! -f "${encap_interface_file}" && -f "/host${encap_interface_file}" ]]; then
+        encap_interface_file="/host${encap_interface_file}"
+      fi
+
+      if [[ -f "${encap_interface_file}" ]]; then
+        read -r encap_interface < "${encap_interface_file}"
+        encap_interface="${encap_interface//[[:space:]]/}"
+        if [[ -z "${encap_interface}" ]]; then
+          log "encapip" "Ignoring empty encap interface file ${encap_interface_file}"
+        else
+          encap_ipv4="$(get-first-interface-address "${encap_interface}" 4)"
+          encap_ipv6="$(get-first-interface-address "${encap_interface}" 6)"
+
+          if [[ -n "${encap_ipv4}" ]]; then
+            resolved_encap_ips="${encap_ipv4}"
+          fi
+          if [[ -n "${encap_ipv6}" ]]; then
+            if [[ -n "${resolved_encap_ips}" ]]; then
+              resolved_encap_ips="${resolved_encap_ips},${encap_ipv6}"
+            else
+              resolved_encap_ips="${encap_ipv6}"
+            fi
+          fi
+
+          if [[ -n "${resolved_encap_ips}" ]]; then
+            log "encapip" "Resolved encap IPs ${resolved_encap_ips} from interface ${encap_interface}"
+            ovn_encap_ip_flag="--encap-ip=${resolved_encap_ips}"
+          else
+            log "encapip" "No global IPv4 or IPv6 address found on interface ${encap_interface}"
+          fi
+        fi
+      fi
+
+      if [[ -n "${OVN_ENCAP_IP}" ]]; then
+        log "encapip" "Using OVN_ENCAP_IP override ${OVN_ENCAP_IP}"
+        ovn_encap_ip_flag="--encap-ip=${OVN_ENCAP_IP}"
+      fi
+    }
+
     # cni-bin-copy() detects the host OS and copies the correct shim binary to
     # the CNI binary directory.
     #
@@ -744,6 +813,8 @@ data:
         ovn_v6_transit_switch_subnet_opt="--cluster-manager-v6-transit-switch-subnet {{.V6TransitSwitchSubnet}}"
       fi
 
+      set-encap-ip-flag
+
       exec /usr/bin/ovnkube \
         ${init_ovnkube_controller} \
         --init-node "${K8S_NODE}" \
@@ -754,6 +825,7 @@ data:
         ${gateway_mode_flags} \
         ${node_mgmt_port_netdev_flags} \
         ${ovnkube_node_mode} \
+        ${ovn_encap_ip_flag} \
         --metrics-bind-address "127.0.0.1:${metrics_port}" \
         --ovn-metrics-bind-address "127.0.0.1:${ovn_metrics_port}" \
         --metrics-enable-pprof \
