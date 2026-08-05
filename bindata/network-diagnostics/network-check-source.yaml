@@ -71,6 +71,10 @@ spec:
           requests:
             memory: 40Mi
             cpu: 10m
+        volumeMounts:
+        - name: metrics-certs
+          mountPath: /etc/pki/tls/metrics-certs
+          readOnly: true
       {{ if .NetworkCheckSourceNodeSelector }}
       nodeSelector:
         {{ range $key, $value := .NetworkCheckSourceNodeSelector }}
@@ -98,6 +102,10 @@ spec:
           {{ end }}
       {{ end }}
       {{ end }}
+      volumes:
+      - name: metrics-certs
+        secret:
+          secretName: network-check-source-metrics-certs
 
 ---
 apiVersion: v1
@@ -107,6 +115,7 @@ metadata:
   namespace: openshift-network-diagnostics
   annotations:
     include.release.openshift.io/self-managed-high-availability: "true"
+    service.beta.openshift.io/serving-cert-secret-name: network-check-source-metrics-certs
   labels:
     app: network-check-source
 spec:
@@ -134,7 +143,8 @@ spec:
     port: check-endpoints
     scheme: https
     tlsConfig:
-      insecureSkipVerify: true
+      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+      serverName: network-check-source.openshift-network-diagnostics.svc
   jobLabel: component
   namespaceSelector:
     matchNames:

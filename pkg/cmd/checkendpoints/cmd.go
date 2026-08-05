@@ -75,6 +75,9 @@ func run(ctx context.Context, listenAddr, tlsMinVersion string, tlsCipherSuites 
 		Metrics: metricsserver.Options{
 			BindAddress:    listenAddr,
 			SecureServing:  true,
+			CertDir:        "/etc/pki/tls/metrics-certs",
+			CertName:       "tls.crt",
+			KeyName:        "tls.key",
 			TLSOpts:        tlsOpts,
 			FilterProvider: filters.WithAuthenticationAndAuthorization,
 		},
