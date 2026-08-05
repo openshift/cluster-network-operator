@@ -30,18 +30,41 @@ type ConnectionChecker interface {
 
 type GetCheckFunc func() *operatorcontrolplanev1alpha1.PodNetworkConnectivityCheck
 
+// ConnectionCheckerConfig holds the configuration for creating a ConnectionChecker.
+type ConnectionCheckerConfig struct {
+	Name             string
+	PodName          string
+	PodNamespace     string
+	GetCheck         GetCheckFunc
+	Client           v1alpha1helpers.PodNetworkConnectivityCheckClient
+	ClientCertGetter CertificatesGetter
+	Recorder         Recorder
+	CheckPeriod      time.Duration
+	CheckTimeout     time.Duration
+}
+
 // NewConnectionChecker returns a ConnectionChecker.
-func NewConnectionChecker(name, podName, podNamespace string, getCheck GetCheckFunc, client v1alpha1helpers.PodNetworkConnectivityCheckClient, clientCertGetter CertificatesGetter, recorder Recorder) ConnectionChecker {
+func NewConnectionChecker(config ConnectionCheckerConfig) ConnectionChecker {
+	checkPeriodToUse := config.CheckPeriod
+	if checkPeriodToUse == 0 {
+		checkPeriodToUse = checkPeriod
+	}
+
+	checkTimeoutToUse := config.CheckTimeout
+	if checkTimeoutToUse == 0 {
+		checkTimeoutToUse = checkTimeout
+	}
+
 	return &connectionChecker{
-		name:             name,
-		podName:          podName,
-		getCheck:         getCheck,
-		client:           client,
-		clientCertGetter: clientCertGetter,
-		recorder:         recorder,
-		updates:          NewUpdatesManager(checkPeriod, checkTimeout, newUpdatesProcessor(client, name)),
+		name:             config.Name,
+		podName:          config.PodName,
+		getCheck:         config.GetCheck,
+		checkPeriod:      checkPeriodToUse,
+		clientCertGetter: config.ClientCertGetter,
+		recorder:         config.Recorder,
+		updates:          NewUpdatesManager(checkPeriodToUse, checkTimeoutToUse, newUpdatesProcessor(config.Client, config.Name)),
 		stop:             make(chan interface{}),
-		metrics:          NewMetricsContext(podNamespace, name),
+		metrics:          NewMetricsContext(config.PodNamespace, config.Name),
 	}
 }
 
@@ -55,11 +78,11 @@ func newUpdatesProcessor(client v1alpha1helpers.PodNetworkConnectivityCheckClien
 type CertificatesGetter func() []tls.Certificate
 
 type connectionChecker struct {
-	name     string
-	podName  string
-	getCheck GetCheckFunc
+	name        string
+	podName     string
+	getCheck    GetCheckFunc
+	checkPeriod time.Duration
 
-	client           v1alpha1helpers.PodNetworkConnectivityCheckClient
 	clientCertGetter CertificatesGetter
 	recorder         Recorder
 	updates          UpdatesManager
@@ -67,36 +90,22 @@ type connectionChecker struct {
 	metrics          MetricsContext
 }
 
-// checkConnection checks the connection periodically, updating status as needed
+// checkConnection checks the connection once, updating status as needed
 func (c *connectionChecker) checkConnection(ctx context.Context) {
-	ticker := time.NewTicker(checkPeriod)
-	defer ticker.Stop()
-	defer klog.V(1).Infof("Stopped connectivity check %s.", c.name)
-	for {
-		select {
-		case <-c.stop:
-			return
-		case <-ctx.Done():
-			return
-
-		case <-ticker.C:
-			go func() {
-				currCheck := c.getCheck()
-				// if we have no check or the check isn't for us or the check has no target, report status if needed, but nothing else
-				if currCheck == nil || currCheck.Spec.SourcePod != c.podName || len(currCheck.Spec.TargetEndpoint) == 0 {
-					c.updateStatus(ctx, false)
-					return
-				}
-				c.checkEndpoint(ctx, currCheck)
-				c.updateStatus(ctx, false)
-			}()
-		}
+	currCheck := c.getCheck()
+	// if we have no check or the check isn't for us or the check has no target, report status if needed, but nothing else
+	if currCheck == nil || currCheck.Spec.SourcePod != c.podName || len(currCheck.Spec.TargetEndpoint) == 0 {
+		c.updateStatus(ctx, false)
+		return
 	}
+	c.checkEndpoint(ctx, currCheck)
+	c.updateStatus(ctx, false)
 }
 
 // Run starts the connection checker.
 func (c *connectionChecker) Run(ctx context.Context) {
 	ctx2, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go func() {
 		select {
 		case <-c.stop:
@@ -104,11 +113,10 @@ func (c *connectionChecker) Run(ctx context.Context) {
 		case <-ctx2.Done():
 		}
 	}()
-	go wait.UntilWithContext(ctx2, func(ctx context.Context) {
-		c.checkConnection(ctx2)
-	}, checkPeriod)
+
 	klog.V(1).Infof("Started connectivity check %s.", c.name)
-	<-ctx2.Done()
+	wait.UntilWithContext(ctx2, c.checkConnection, c.checkPeriod)
+	klog.V(1).Infof("Stopped connectivity check %s.", c.name)
 }
 
 // Stop
