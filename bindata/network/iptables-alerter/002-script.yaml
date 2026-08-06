@@ -33,11 +33,12 @@ data:
         for netns_pid in $(lsns -t net -o pid -nr | sort -u | grep -v '^1$'); do
             # Set iptables_output to the first iptables rule in the network namespace, if any.
             # (We use `awk` here rather than `grep` intentionally to avoid awkwardness with
-            # grep's exit status on no match.)
+            # grep's exit status on no match. The "127.0.0.1:8421" exclusion skips Azure Monitor
+            # Agent rules.)
             iptables_output=$(
                 (nsenter -n -t "${netns_pid}" iptables-save || true;
                  nsenter -n -t "${netns_pid}" ip6tables-save || true) 2>/dev/null | \
-                awk '/^-A/ {print; exit}'
+                awk '/127\.0\.0\.1:8421/ {next} /^-A/ {print; exit}'
             )
             if [[ -n "${iptables_output}" ]]; then
                 break
