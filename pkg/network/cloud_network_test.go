@@ -1,10 +1,23 @@
 package network
 
 import (
+	"context"
+	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 
+	configv1 "github.com/openshift/api/config/v1"
+	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
+	crfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func makeManagedControllerRenderData() render.RenderData {
@@ -39,6 +52,7 @@ func makeManagedControllerRenderData() render.RenderData {
 	data.Data["AzureManagedCredsPath"] = ""
 	data.Data["AzureManagedSecretProviderClass"] = ""
 	data.Data["GCPCredentialsPath"] = ""
+	data.Data["OpenStackMaxAllowedAddressPairs"] = 0
 	return data
 }
 
@@ -170,4 +184,297 @@ func TestCloudTokenMinterHasTokenAudience(t *testing.T) {
 		return
 	}
 	t.Fatal("Deployment object not found in rendered output")
+}
+
+func makeSelfHostedControllerRenderData() render.RenderData {
+	data := render.MakeRenderData()
+	data.Data["ReleaseVersion"] = "4.18.0"
+	data.Data["PlatformType"] = "OpenStack"
+	data.Data["PlatformRegion"] = "regionOne"
+	data.Data["PlatformTypeAWS"] = "AWS"
+	data.Data["PlatformTypeAzure"] = "Azure"
+	data.Data["PlatformTypeGCP"] = "GCP"
+	data.Data["CloudNetworkConfigControllerImage"] = "test-image"
+	data.Data["KubernetesServiceURL"] = "https://localhost:6443"
+	data.Data["ExternalControlPlane"] = false
+	data.Data["PlatformAzureEnvironment"] = ""
+	data.Data["PlatformAWSCAPath"] = ""
+	data.Data["PlatformAPIURL"] = ""
+	data.Data["HTTP_PROXY"] = ""
+	data.Data["HTTPS_PROXY"] = ""
+	data.Data["NO_PROXY"] = ""
+	data.Data["OpenStackMaxAllowedAddressPairs"] = 0
+	return data
+}
+
+func TestOpenStackMaxAllowedAddressPairsManagedTemplateRendering(t *testing.T) {
+	tests := []struct {
+		name        string
+		value       int
+		expectFlag  bool
+		expectValue string
+	}{
+		{
+			name:       "not set - flag absent",
+			value:      0,
+			expectFlag: false,
+		},
+		{
+			name:        "valid value 20 - flag present",
+			value:       20,
+			expectFlag:  true,
+			expectValue: "20",
+		},
+		{
+			name:        "valid value 1 - flag present",
+			value:       1,
+			expectFlag:  true,
+			expectValue: "1",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			data := makeManagedControllerRenderData()
+			data.Data["OpenStackMaxAllowedAddressPairs"] = tc.value
+
+			objs, err := render.RenderDir("../../bindata/cloud-network-config-controller/managed", &data)
+			if err != nil {
+				t.Fatalf("failed to render managed controller: %v", err)
+			}
+
+			for _, obj := range objs {
+				if obj.GetKind() != "Deployment" {
+					continue
+				}
+
+				container, found := findUnstructuredContainer(t, obj.Object, "controller")
+				if !found {
+					t.Fatal("controller container not found in Deployment")
+				}
+
+				cmdSlice, found, err := uns.NestedStringSlice(container, "command")
+				if err != nil || !found || len(cmdSlice) < 3 {
+					t.Fatal("command not found in controller container")
+				}
+				shellScript := cmdSlice[2]
+
+				flagStr := fmt.Sprintf("-platform-os-max-allowed-address-pairs=%s", tc.expectValue)
+				if tc.expectFlag && !strings.Contains(shellScript, flagStr) {
+					t.Errorf("expected shell script to contain %q, but it does not.\nScript:\n%s", flagStr, shellScript)
+				}
+				if !tc.expectFlag && strings.Contains(shellScript, "-platform-os-max-allowed-address-pairs=") {
+					t.Errorf("expected shell script to NOT contain the flag, but it does.\nScript:\n%s", shellScript)
+				}
+				return
+			}
+			t.Fatal("Deployment object not found in rendered output")
+		})
+	}
+}
+
+func TestOpenStackMaxAllowedAddressPairsSelfHostedTemplateRendering(t *testing.T) {
+	tests := []struct {
+		name        string
+		value       int
+		expectFlag  bool
+		expectValue string
+	}{
+		{
+			name:       "not set - flag absent",
+			value:      0,
+			expectFlag: false,
+		},
+		{
+			name:        "valid value 20 - flag present",
+			value:       20,
+			expectFlag:  true,
+			expectValue: "20",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			data := makeSelfHostedControllerRenderData()
+			data.Data["OpenStackMaxAllowedAddressPairs"] = tc.value
+
+			objs, err := render.RenderDir("../../bindata/cloud-network-config-controller/self-hosted", &data)
+			if err != nil {
+				t.Fatalf("failed to render self-hosted controller: %v", err)
+			}
+
+			for _, obj := range objs {
+				if obj.GetKind() != "Deployment" {
+					continue
+				}
+
+				container, found := findUnstructuredContainer(t, obj.Object, "controller")
+				if !found {
+					t.Fatal("controller container not found in Deployment")
+				}
+
+				args, found, err := uns.NestedStringSlice(container, "args")
+				if err != nil || !found {
+					t.Fatal("args not found in controller container")
+				}
+
+				flagStr := fmt.Sprintf("-platform-os-max-allowed-address-pairs=%s", tc.expectValue)
+				var hasFlag bool
+				for _, arg := range args {
+					if tc.expectFlag && arg == flagStr {
+						hasFlag = true
+						break
+					}
+					if !tc.expectFlag && strings.Contains(arg, "-platform-os-max-allowed-address-pairs=") {
+						t.Errorf("expected args to NOT contain the flag, but found %q", arg)
+						return
+					}
+				}
+				if tc.expectFlag && !hasFlag {
+					t.Errorf("expected args to contain %q, but it was not found.\nArgs: %v", flagStr, args)
+				}
+				return
+			}
+			t.Fatal("Deployment object not found in rendered output")
+		})
+	}
+}
+
+func TestOpenStackMaxAllowedAddressPairsRenderValidation(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     int
+		expectErr bool
+		errSubstr string
+	}{
+		{
+			name:      "valid positive value - no error",
+			value:     20,
+			expectErr: false,
+		},
+		{
+			name:      "not set - no error",
+			value:     0,
+			expectErr: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			conf := &operv1.NetworkSpec{
+				DefaultNetwork: operv1.DefaultNetworkDefinition{
+					Type: operv1.NetworkTypeOVNKubernetes,
+				},
+			}
+			br := &bootstrap.BootstrapResult{
+				Infra: bootstrap.InfraStatus{
+					PlatformType: configv1.OpenStackPlatformType,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: configv1.OpenStackPlatformType,
+					},
+					APIServers: map[string]bootstrap.APIServer{
+						bootstrap.APIServerDefault:      {Host: "localhost", Port: "6443"},
+						bootstrap.APIServerDefaultLocal: {Host: "localhost", Port: "6443"},
+					},
+					KubeCloudConfig: map[string]string{},
+				},
+				CloudNetworkConfig: bootstrap.CloudNetworkConfigBootstrapResult{
+					OpenStackMaxAllowedAddressPairs: tc.value,
+				},
+			}
+
+			_, err := renderCloudNetworkConfigController(conf, br, "../../bindata")
+			if tc.expectErr && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if tc.expectErr && err != nil && tc.errSubstr != "" && !strings.Contains(err.Error(), tc.errSubstr) {
+				t.Errorf("expected error to contain %q, got: %v", tc.errSubstr, err)
+			}
+			if !tc.expectErr && err != nil {
+				t.Errorf("expected no error, got: %v", err)
+			}
+		})
+	}
+}
+
+type erroringReader struct {
+	err error
+}
+
+func (r *erroringReader) Get(_ context.Context, _ crclient.ObjectKey, _ crclient.Object, _ ...crclient.GetOption) error {
+	return r.err
+}
+
+func (r *erroringReader) List(_ context.Context, _ crclient.ObjectList, _ ...crclient.ListOption) error {
+	return r.err
+}
+
+func TestCloudNetworkConfigBootstrapErrorPropagation(t *testing.T) {
+	tests := []struct {
+		name      string
+		reader    crclient.Reader
+		expectErr bool
+		errSubstr string
+		expectRes bootstrap.CloudNetworkConfigBootstrapResult
+	}{
+		{
+			name:      "transient API error is propagated",
+			reader:    &erroringReader{err: fmt.Errorf("connection refused")},
+			expectErr: true,
+			errSubstr: "connection refused",
+		},
+		{
+			name: "forbidden error is propagated",
+			reader: &erroringReader{err: apierrors.NewForbidden(
+				schema.GroupResource{Group: "", Resource: "configmaps"}, "cloud-network-config", fmt.Errorf("access denied"),
+			)},
+			expectErr: true,
+			errSubstr: "forbidden",
+		},
+		{
+			name: "not-found error returns empty result without error",
+			reader: &erroringReader{err: apierrors.NewNotFound(
+				schema.GroupResource{Group: "", Resource: "configmaps"}, "cloud-network-config",
+			)},
+			expectErr: false,
+			expectRes: bootstrap.CloudNetworkConfigBootstrapResult{},
+		},
+		{
+			name: "ConfigMap present with valid value succeeds",
+			reader: crfake.NewClientBuilder().WithObjects(&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cloud-network-config",
+					Namespace: "openshift-network-operator",
+				},
+				Data: map[string]string{
+					"platform-os-max-allowed-address-pairs": "15",
+				},
+			}).Build(),
+			expectErr: false,
+			expectRes: bootstrap.CloudNetworkConfigBootstrapResult{
+				OpenStackMaxAllowedAddressPairs: 15,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := cloudNetworkConfigBootstrap(context.Background(), tc.reader)
+			if tc.expectErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if !strings.Contains(err.Error(), tc.errSubstr) {
+					t.Errorf("expected error containing %q, got: %v", tc.errSubstr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(result, tc.expectRes) {
+				t.Errorf("result mismatch:\n  got:  %+v\n  want: %+v", result, tc.expectRes)
+			}
+		})
+	}
 }
