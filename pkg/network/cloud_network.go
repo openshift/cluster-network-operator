@@ -1,13 +1,13 @@
 package network
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/names"
-	"github.com/pkg/errors"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
@@ -114,7 +114,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 		if gcpCredsFile == "" {
 			data.Data["GCPCredentialsPath"] = ""
 		} else if filepath.Base(gcpCredsFile) != gcpCredsFile {
-			return nil, errors.Errorf("invalid GCP_CNCC_CREDENTIALS_FILE %q: must be a filename", gcpCredsFile)
+			return nil, fmt.Errorf("invalid GCP_CNCC_CREDENTIALS_FILE %q: must be a filename", gcpCredsFile)
 		} else {
 			data.Data["GCPCredentialsPath"] = filepath.Join("/etc/secret/cloudprovider", gcpCredsFile)
 		}
@@ -133,12 +133,12 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 
 	manifests, err := render.RenderDirs(manifestDirs, &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render cloud-network-config-controller manifests")
+		return nil, fmt.Errorf("failed to render cloud-network-config-controller manifests: %w", err)
 	}
 
 	obj, err := k8sutil.ToUnstructured(caOverride)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to transmute")
+		return nil, fmt.Errorf("failed to transmute: %w", err)
 	}
 	manifests = k8sutil.ReplaceObj(manifests, obj)
 

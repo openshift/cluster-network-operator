@@ -25,7 +25,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/certrotation"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/library-go/pkg/pki"
-	"github.com/pkg/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -154,7 +153,7 @@ func (r *PKIReconciler) Reconcile(ctx context.Context, request reconcile.Request
 		if err != nil {
 			log.Println(err)
 			r.pkiErrs[request.NamespacedName] =
-				errors.Wrapf(err, "could not parse PKI.Spec %s", request.NamespacedName)
+				fmt.Errorf("could not parse PKI.Spec %s: %w", request.NamespacedName, err)
 			r.setStatus()
 			return reconcile.Result{}, err
 		}
@@ -165,7 +164,7 @@ func (r *PKIReconciler) Reconcile(ctx context.Context, request reconcile.Request
 	if err != nil {
 		log.Println(err)
 		r.pkiErrs[request.NamespacedName] =
-			errors.Wrapf(err, "could not reconcile PKI %s", request.NamespacedName)
+			fmt.Errorf("could not reconcile PKI %s: %w", request.NamespacedName, err)
 		r.setStatus()
 		return reconcile.Result{}, err
 	}

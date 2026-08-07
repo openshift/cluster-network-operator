@@ -13,7 +13,6 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-	"github.com/pkg/errors"
 
 	"path/filepath"
 	"reflect"
@@ -134,7 +133,7 @@ func (r EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile
 		if err != nil {
 			klog.Error(err)
 			r.egressrouterErrs[request.NamespacedName] =
-				errors.Wrapf(err, "could not reconcile Egress Router %s", request.NamespacedName)
+				fmt.Errorf("could not reconcile Egress Router %s: %w", request.NamespacedName, err)
 			r.setStatus()
 			return reconcile.Result{}, err
 		}
@@ -145,7 +144,7 @@ func (r EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile
 	if err != nil {
 		klog.Error(err)
 		r.egressrouterErrs[request.NamespacedName] =
-			errors.Wrapf(err, "could not reconcile Egress Router %s", request.NamespacedName)
+			fmt.Errorf("could not reconcile Egress Router %s: %w", request.NamespacedName, err)
 		r.setStatus()
 		return reconcile.Result{}, err
 	}
@@ -212,7 +211,7 @@ func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifes
 	}
 	data.Data["AllowedDestinations"], err = getAllowedDestinationsConfigJSON(router.Spec.Redirect.RedirectRules)
 	if err != nil {
-		return errors.Wrap(err, "failed to render AllowedDestinations config")
+		return fmt.Errorf("failed to render AllowedDestinations config: %w", err)
 	}
 	data.Data["FallbackIP"] = router.Spec.Redirect.FallbackIP
 	data.Data["mode"] = router.Spec.Mode

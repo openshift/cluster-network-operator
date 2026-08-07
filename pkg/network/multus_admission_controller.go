@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -19,7 +20,6 @@ import (
 
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
-	"github.com/pkg/errors"
 
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +42,7 @@ func getOpenshiftNamespaces(client cnoclient.Client) (string, error) {
 		LabelSelector: "openshift.io/cluster-monitoring==true",
 	})
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get namespaces to render multus admission controller manifests")
+		return "", fmt.Errorf("failed to get namespaces to render multus admission controller manifests: %w", err)
 	}
 
 	for _, ns := range nsList.Items {
@@ -149,7 +149,7 @@ func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPla
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus-admission-controller"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render multus admission controller manifests")
+		return nil, fmt.Errorf("failed to render multus admission controller manifests: %w", err)
 	}
 	objs = append(objs, manifests...)
 	return objs, nil
