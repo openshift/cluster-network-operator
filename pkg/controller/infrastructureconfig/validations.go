@@ -30,7 +30,7 @@ func validateVipsWithVips(api, ingress []configv1.IP, elb bool) error {
 
 	// For external load balancer we allow VIPs to be equal.
 	if !elb {
-		for i := 0; i < len(api); i++ {
+		for i := range api {
 			if api[i] == ingress[i] {
 				return fmt.Errorf("VIPs cannot be equal, got '%s' for API and '%s' for Ingress", api[i], ingress[i])
 			}

@@ -402,7 +402,7 @@ func (r *ReconcileObservability) checkOLMv1Installation(ctx context.Context) (in
 
 	// Check for "Installed" condition
 	for _, cond := range conditions {
-		condMap, ok := cond.(map[string]interface{})
+		condMap, ok := cond.(map[string]any)
 		if !ok {
 			continue
 		}

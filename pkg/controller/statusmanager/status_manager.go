@@ -422,7 +422,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 
 		buf, err := yaml.Marshal(oc.Status.Conditions)
 		if err != nil {
-			buf = []byte(fmt.Sprintf("(failed to convert to YAML: %s)", err))
+			buf = fmt.Appendf(nil, "(failed to convert to YAML: %s)", err)
 		}
 
 		// Use applyconfigurations to change only the specified fields
@@ -497,7 +497,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 
 		buf, err := yaml.Marshal(co.Status.Conditions)
 		if err != nil {
-			buf = []byte(fmt.Sprintf("(failed to convert to YAML: %s)", err))
+			buf = fmt.Appendf(nil, "(failed to convert to YAML: %s)", err)
 		}
 
 		if isNotFound {
@@ -583,7 +583,7 @@ func (status *StatusManager) MaybeSetDegraded(statusLevel StatusLevel, reason, m
 	status.maybeSetDegraded(statusLevel, reason, message)
 }
 
-func (status *StatusManager) SetDegradedOnPanicAndCrash(panicVal interface{}) {
+func (status *StatusManager) SetDegradedOnPanicAndCrash(panicVal any) {
 	status.Lock()
 	defer status.Unlock()
 	status.setDegraded(PanicLevel, "ReconcileError", fmt.Sprintf("Panic detected: %v", panicVal))

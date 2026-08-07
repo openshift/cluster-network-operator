@@ -67,7 +67,7 @@ var OVNKubernetesConfig = operv1.Network{
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				GenevePort: ptrToUint32(8061),
+				GenevePort: new(uint32(8061)),
 			},
 		},
 	},
@@ -486,7 +486,7 @@ cluster-subnets="10.132.0.0/14"`,
 				RoutingViaHost: true,
 			},
 			egressIPConfig: &operv1.EgressIPConfig{
-				ReachabilityTotalTimeoutSeconds: ptrToUint32(3),
+				ReachabilityTotalTimeoutSeconds: new(uint32(3)),
 			},
 			controlPlaneReplicaCount: 2,
 		},
@@ -547,7 +547,7 @@ cluster-subnets="10.132.0.0/14"`,
 				RoutingViaHost: true,
 			},
 			egressIPConfig: &operv1.EgressIPConfig{
-				ReachabilityTotalTimeoutSeconds: ptrToUint32(0),
+				ReachabilityTotalTimeoutSeconds: new(uint32(0)),
 			},
 			controlPlaneReplicaCount: 2,
 		},
@@ -605,7 +605,7 @@ hybrid-overlay-vxlan-port="9000"`,
 				HybridClusterNetwork: []operv1.ClusterNetworkEntry{
 					{CIDR: "10.132.0.0/14", HostPrefix: 23},
 				},
-				HybridOverlayVXLANPort: ptrToUint32(9000),
+				HybridOverlayVXLANPort: new(uint32(9000)),
 			},
 			gatewayConfig: &operv1.GatewayConfig{
 				RoutingViaHost: true,
@@ -1064,7 +1064,7 @@ logfile-maxage=0`,
 				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.EgressIPConfig = *tc.egressIPConfig
 			}
 			//set a few inputs so that the tests are not machine dependant
-			OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.MTU = ptrToUint32(1500)
+			OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.MTU = new(uint32(1500))
 
 			if tc.v4InternalSubnet != "" {
 				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.V4InternalSubnet = tc.v4InternalSubnet
@@ -1160,9 +1160,9 @@ func checkOVNKubernetesPostStart(objects []*uns.Unstructured) error {
 		return fmt.Errorf("unable to find containers in ovnkube-node daemonset : %w", err)
 	}
 
-	var nbdb map[string]interface{}
+	var nbdb map[string]any
 	for _, container := range ovnkubeNodeContainers {
-		cmap := container.(map[string]interface{})
+		cmap := container.(map[string]any)
 		name, found, err := uns.NestedString(cmap, "name")
 		if found && err == nil && name == "nbdb" {
 			nbdb = cmap
@@ -1213,14 +1213,14 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				MTU:        ptrToUint32(8900),
-				GenevePort: ptrToUint32(6081),
+				MTU:        new(uint32(8900)),
+				GenevePort: new(uint32(6081)),
 				// Note: DefaultNetworkTransport is not set by fillOVNKubernetesDefaults
 				// When NoOverlayMode feature gate is disabled, the CRD doesn't have this field
 				// When enabled, the CRD itself provides the default
 				PolicyAuditConfig: &operv1.PolicyAuditConfig{
-					RateLimit:      ptrToUint32(20),
-					MaxFileSize:    ptrToUint32(50),
+					RateLimit:      new(uint32(20)),
+					MaxFileSize:    new(uint32(50)),
 					Destination:    "null",
 					SyslogFacility: "local0",
 				},
@@ -1256,13 +1256,13 @@ func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				MTU:         ptrToUint32(8854),
-				GenevePort:  ptrToUint32(8061),
+				MTU:         new(uint32(8854)),
+				GenevePort:  new(uint32(8061)),
 				IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull},
 				// Note: DefaultNetworkTransport is not set by fillOVNKubernetesDefaults
 				PolicyAuditConfig: &operv1.PolicyAuditConfig{
-					RateLimit:      ptrToUint32(20),
-					MaxFileSize:    ptrToUint32(50),
+					RateLimit:      new(uint32(20)),
+					MaxFileSize:    new(uint32(50)),
 					Destination:    "null",
 					SyslogFacility: "local0",
 				},
@@ -1294,11 +1294,11 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	}
 
 	// set mtu to insanity
-	ovnConfig.MTU = ptrToUint32(70000)
+	ovnConfig.MTU = new(uint32(70000))
 	errExpect("invalid MTU 70000")
 
 	// set geneve port to insanity
-	ovnConfig.GenevePort = ptrToUint32(70001)
+	ovnConfig.GenevePort = new(uint32(70001))
 	errExpect("invalid GenevePort 70001")
 
 	config.ClusterNetwork = []operv1.ClusterNetworkEntry{{
@@ -1306,7 +1306,7 @@ func TestValidateOVNKubernetes(t *testing.T) {
 	}}
 
 	// invalid ipv6 mtu
-	ovnConfig.MTU = ptrToUint32(576)
+	ovnConfig.MTU = new(uint32(576))
 	errExpect("invalid MTU 576")
 
 	config.ClusterNetwork = nil
@@ -1561,10 +1561,10 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	g.Expect(errs).To(BeEmpty())
 
 	// change the mtu without migration
-	next.DefaultNetwork.OVNKubernetesConfig.MTU = ptrToUint32(70000)
+	next.DefaultNetwork.OVNKubernetesConfig.MTU = new(uint32(70000))
 
 	// change the geneve port
-	next.DefaultNetwork.OVNKubernetesConfig.GenevePort = ptrToUint32(34001)
+	next.DefaultNetwork.OVNKubernetesConfig.GenevePort = new(uint32(34001))
 	errs = isOVNKubernetesChangeSafe(prev, next)
 	g.Expect(errs).To(HaveLen(2))
 	g.Expect(errs[0]).To(MatchError("cannot change ovn-kubernetes MTU without migration"))
@@ -1580,10 +1580,10 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 		MTU: &operv1.MTUMigration{
 			Network: &operv1.MTUMigrationValues{
 				From: prev.DefaultNetwork.OVNKubernetesConfig.MTU,
-				To:   ptrToUint32(1300),
+				To:   new(uint32(1300)),
 			},
 			Machine: &operv1.MTUMigrationValues{
-				To: ptrToUint32(1500),
+				To: new(uint32(1500)),
 			},
 		},
 	}
@@ -1597,7 +1597,7 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	g.Expect(errs[0]).To(MatchError("invalid Migration.MTU, at least one of the required fields is missing"))
 
 	// invalid Migration.MTU.Network.From, not equal to previously applied MTU
-	next.Migration.MTU.Network.From = ptrToUint32(*prev.DefaultNetwork.OVNKubernetesConfig.MTU + 100)
+	next.Migration.MTU.Network.From = new(*prev.DefaultNetwork.OVNKubernetesConfig.MTU + 100)
 	errs = isOVNKubernetesChangeSafe(prev, next)
 	g.Expect(errs).To(HaveLen(1))
 	g.Expect(errs[0]).To(MatchError(fmt.Sprintf("invalid Migration.MTU.Network.From(%d) not equal to the currently applied MTU(%d)", *next.Migration.MTU.Network.From, *prev.DefaultNetwork.OVNKubernetesConfig.MTU)))
@@ -1605,27 +1605,27 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	next.Migration.MTU.Network.From = prev.DefaultNetwork.OVNKubernetesConfig.MTU
 
 	// invalid Migration.MTU.Network.To, lower than minimum MTU for IPv4
-	next.Migration.MTU.Network.To = ptrToUint32(100)
+	next.Migration.MTU.Network.To = new(uint32(100))
 	errs = isOVNKubernetesChangeSafe(prev, next)
 	g.Expect(errs).To(HaveLen(1))
 	g.Expect(errs[0]).To(MatchError(fmt.Sprintf("invalid Migration.MTU.Network.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Network.To, MinMTUIPv4, MaxMTU)))
 
 	// invalid Migration.MTU.Network.To, higher than maximum MTU for IPv4
-	next.Migration.MTU.Network.To = ptrToUint32(MaxMTU + 1)
+	next.Migration.MTU.Network.To = new(MaxMTU + 1)
 	errs = isOVNKubernetesChangeSafe(prev, next)
 	g.Expect(errs).To(HaveLen(2))
 	g.Expect(errs[0]).To(MatchError(fmt.Sprintf("invalid Migration.MTU.Network.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Network.To, MinMTUIPv4, MaxMTU)))
 
-	next.Migration.MTU.Network.To = ptrToUint32(1300)
+	next.Migration.MTU.Network.To = new(uint32(1300))
 
 	// invalid Migration.MTU.Machine.To, not big enough to accommodate next.Migration.MTU.Network.To with encap overhead
-	next.Migration.MTU.Network.To = ptrToUint32(1500)
+	next.Migration.MTU.Network.To = new(uint32(1500))
 	errs = isOVNKubernetesChangeSafe(prev, next)
 	g.Expect(errs).To(HaveLen(1))
 	g.Expect(errs[0]).To(MatchError(fmt.Sprintf("invalid Migration.MTU.Machine.To(%d), has to be at least %d", *next.Migration.MTU.Machine.To, *next.Migration.MTU.Network.To+getOVNEncapOverhead(next))))
 
 	// invalid Migration.MTU.Network.To, lower than minimum MTU for IPv6
-	next.Migration.MTU.Network.To = ptrToUint32(1200)
+	next.Migration.MTU.Network.To = new(uint32(1200))
 	next.ClusterNetwork = []operv1.ClusterNetworkEntry{
 		{
 			CIDR:       "fd00:1:2:3::/64",
@@ -1637,8 +1637,8 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 	g.Expect(errs[0]).To(MatchError(fmt.Sprintf("invalid Migration.MTU.Network.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Network.To, MinMTUIPv6, MaxMTU)))
 
 	// invalid Migration.MTU.Machine.To, higher than max MTU
-	next.Migration.MTU.Network.To = ptrToUint32(MaxMTU)
-	next.Migration.MTU.Machine.To = ptrToUint32(*next.Migration.MTU.Network.To + getOVNEncapOverhead(next))
+	next.Migration.MTU.Network.To = new(MaxMTU)
+	next.Migration.MTU.Machine.To = new(*next.Migration.MTU.Network.To + getOVNEncapOverhead(next))
 	errs = isOVNKubernetesChangeSafe(prev, next)
 	g.Expect(errs).To(HaveLen(1))
 	g.Expect(errs[0]).To(MatchError(fmt.Sprintf("invalid Migration.MTU.Machine.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Machine.To, MinMTUIPv6, MaxMTU)))
@@ -2561,7 +2561,7 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				GenevePort:  ptrToUint32(8061),
+				GenevePort:  new(uint32(8061)),
 				IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull},
 			},
 		},
@@ -2791,7 +2791,7 @@ func TestRenderOVNKubernetesEnableIPsecForHostedControlPlane(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				GenevePort:  ptrToUint32(8061),
+				GenevePort:  new(uint32(8061)),
 				IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull},
 			},
 		},
@@ -2891,7 +2891,7 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				GenevePort:  ptrToUint32(8061),
+				GenevePort:  new(uint32(8061)),
 				IPsecConfig: &operv1.IPsecConfig{},
 			},
 		},
@@ -3003,7 +3003,7 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				GenevePort:  ptrToUint32(8061),
+				GenevePort:  new(uint32(8061)),
 				IPsecConfig: &operv1.IPsecConfig{},
 			},
 		},
@@ -3155,7 +3155,7 @@ func TestRenderOVNKubernetesIPsecUpgradeWithHypershiftHostedCluster(t *testing.T
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				GenevePort:  ptrToUint32(8061),
+				GenevePort:  new(uint32(8061)),
 				IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull},
 			},
 		},
@@ -3260,7 +3260,7 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				GenevePort: ptrToUint32(8061),
+				GenevePort: new(uint32(8061)),
 			},
 		},
 	}
@@ -3474,7 +3474,7 @@ func TestRenderOVNKubernetesEnableIPsecWithUserInstalledIPsecMachineConfigs(t *t
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				GenevePort:  ptrToUint32(8061),
+				GenevePort:  new(uint32(8061)),
 				IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull},
 			},
 		},
@@ -3620,7 +3620,7 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				GenevePort: ptrToUint32(8061),
+				GenevePort: new(uint32(8061)),
 			},
 		},
 	}
@@ -3764,7 +3764,7 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				GenevePort: ptrToUint32(8061),
+				GenevePort: new(uint32(8061)),
 			},
 		},
 	}
@@ -3839,11 +3839,11 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 		DefaultNetwork: operv1.DefaultNetworkDefinition{
 			Type: operv1.NetworkTypeOVNKubernetes,
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
-				GenevePort:        ptrToUint32(8061),
+				GenevePort:        new(uint32(8061)),
 				PolicyAuditConfig: &operv1.PolicyAuditConfig{},
 			},
 		},
-		DisableMultiNetwork: boolPtr(true),
+		DisableMultiNetwork: new(true),
 	}
 	testCases := []struct {
 		Description string
@@ -3869,9 +3869,9 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 			Description: "IPFIX performance variables are specified",
 			FlowsConfig: &bootstrap.FlowsConfig{
 				Target:             "7.8.9.10:1112",
-				CacheMaxFlows:      uintPtr(123),
-				CacheActiveTimeout: uintPtr(456),
-				Sampling:           uintPtr(789),
+				CacheMaxFlows:      new(uint(123)),
+				CacheActiveTimeout: new(uint(456)),
+				Sampling:           new(uint(789)),
 			},
 			Expected: []v1.EnvVar{
 				{Name: "IPFIX_COLLECTORS", Value: "7.8.9.10:1112"},
@@ -3883,9 +3883,9 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 		{
 			Description: "Wrong configuration: target missing but performance variables present",
 			FlowsConfig: &bootstrap.FlowsConfig{
-				CacheMaxFlows:      uintPtr(123),
-				CacheActiveTimeout: uintPtr(456),
-				Sampling:           uintPtr(789),
+				CacheMaxFlows:      new(uint(123)),
+				CacheActiveTimeout: new(uint(456)),
+				Sampling:           new(uint(789)),
 			},
 			NotExpected: []string{"IPFIX_COLLECTORS", "IPFIX_CACHE_MAX_FLOWS",
 				"IPFIX_CACHE_ACTIVE_TIMEOUT", "IPFIX_SAMPLING"},
@@ -4091,25 +4091,25 @@ func TestRenderOVNKubernetesReachability(t *testing.T) {
 		},
 		{
 			name:                                "Reachability timeout set to 0",
-			reachabilityTimeout:                 ptrToUint32(0),
+			reachabilityTimeout:                 new(uint32(0)),
 			expectKubernetesFeatureReachability: true,
 			expectErr:                           false,
 		},
 		{
 			name:                                "Reachability timeout changed to 10",
-			reachabilityTimeout:                 ptrToUint32(10),
+			reachabilityTimeout:                 new(uint32(10)),
 			expectKubernetesFeatureReachability: true,
 			expectErr:                           false,
 		},
 		{
 			name:                                "Reachability timeout unchanged to 10",
-			reachabilityTimeout:                 ptrToUint32(10),
+			reachabilityTimeout:                 new(uint32(10)),
 			expectKubernetesFeatureReachability: true,
 			expectErr:                           false,
 		},
 		{
 			name:                                "Reachability timeout changed to 5",
-			reachabilityTimeout:                 ptrToUint32(5),
+			reachabilityTimeout:                 new(uint32(5)),
 			expectKubernetesFeatureReachability: true,
 			expectErr:                           false,
 		},
@@ -4170,7 +4170,7 @@ func TestRenderOVNKubernetesReachability(t *testing.T) {
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(found).To(BeTrue())
 					for _, c := range containers {
-						cm := c.(map[string]interface{})
+						cm := c.(map[string]any)
 						if name, ok := cm["name"]; ok && name == "ovnkube-cluster-manager" {
 							command, found, err := uns.NestedSlice(cm, "command")
 							g.Expect(err).NotTo(HaveOccurred())
@@ -4344,18 +4344,6 @@ func checkContainerImagePullPolicy(g *WithT, container map[string]any) {
 	g.Expect(policy).To(Equal(string(v1.PullIfNotPresent)))
 }
 
-func ptrToUint32(x uint32) *uint32 {
-	return &x
-}
-
-func uintPtr(x uint) *uint {
-	return &x
-}
-
-func boolPtr(x bool) *bool {
-	return &x
-}
-
 func networkOwnerRef() []metav1.OwnerReference {
 	isController := true
 	return []metav1.OwnerReference{{APIVersion: operv1.GroupVersion.String(), Kind: "Network", Controller: &isController, Name: "cluster"}}
@@ -4382,7 +4370,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 	}
 	fakeNetworkConf := func() *operv1.NetworkSpec {
 		config := OVNKubernetesConfig.DeepCopy()
-		config.Spec.DisableMultiNetwork = boolPtr(false)
+		config.Spec.DisableMultiNetwork = new(false)
 		config.Spec.DefaultNetwork.OVNKubernetesConfig.PolicyAuditConfig = &operv1.PolicyAuditConfig{}
 		return &config.Spec
 	}
@@ -4849,7 +4837,7 @@ func TestRenderOVNKubernetesNoOverlay(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			crd := OVNKubernetesConfig.DeepCopy()
 			config := &crd.Spec
-			config.DefaultNetwork.OVNKubernetesConfig.MTU = ptrToUint32(1500)
+			config.DefaultNetwork.OVNKubernetesConfig.MTU = new(uint32(1500))
 			config.DefaultNetwork.OVNKubernetesConfig.Transport = tc.defaultNetworkTransport
 
 			if tc.noOverlayConfig != nil {
@@ -5171,7 +5159,7 @@ func extractDaemonSetEnvVars(g *WithT, objs []*uns.Unstructured, dsName, contain
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(found).To(BeTrue())
 		for _, c := range containers {
-			cmap := c.(map[string]interface{})
+			cmap := c.(map[string]any)
 			name, _, _ := uns.NestedString(cmap, "name")
 			if name != containerName {
 				continue
@@ -5182,7 +5170,7 @@ func extractDaemonSetEnvVars(g *WithT, objs []*uns.Unstructured, dsName, contain
 				return envVars
 			}
 			for _, e := range envList {
-				emap := e.(map[string]interface{})
+				emap := e.(map[string]any)
 				eName, _, _ := uns.NestedString(emap, "name")
 				eVal, _, _ := uns.NestedString(emap, "value")
 				envVars[eName] = eVal

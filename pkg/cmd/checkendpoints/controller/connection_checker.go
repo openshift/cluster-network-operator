@@ -40,7 +40,7 @@ func NewConnectionChecker(name, podName, podNamespace string, getCheck GetCheckF
 		clientCertGetter: clientCertGetter,
 		recorder:         recorder,
 		updates:          NewUpdatesManager(checkPeriod, checkTimeout, newUpdatesProcessor(client, name)),
-		stop:             make(chan interface{}),
+		stop:             make(chan any),
 		metrics:          NewMetricsContext(podNamespace, name),
 	}
 }
@@ -63,7 +63,7 @@ type connectionChecker struct {
 	clientCertGetter CertificatesGetter
 	recorder         Recorder
 	updates          UpdatesManager
-	stop             chan interface{}
+	stop             chan any
 	metrics          MetricsContext
 }
 

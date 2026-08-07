@@ -14,8 +14,8 @@ const ipamTypeWhereabouts = "whereabouts"
 // this facilitates using auxiliary features associated with that IPAM (such as DHCP CNI daemon, or ip-reconciler for Whereabouts)
 func detectIPAMTypeRaw(targetType string, addNet *operv1.AdditionalNetworkDefinition) bool {
 	// Parse the RawCNIConfig
-	var rawConfig map[string]interface{}
-	var useipam interface{}
+	var rawConfig map[string]any
+	var useipam any
 	var err error
 	foundipam := false
 
@@ -29,14 +29,14 @@ func detectIPAMTypeRaw(targetType string, addNet *operv1.AdditionalNetworkDefini
 	// First we determine if it's a conflist.
 	if rawConfig["plugins"] != nil {
 		// As a limitation, we'll only look for the first instance of ipam (should be the primary case)
-		plugins, okplugincast := rawConfig["plugins"].([]interface{})
+		plugins, okplugincast := rawConfig["plugins"].([]any)
 		if !okplugincast {
 			log.Printf("WARNING: Plugins (conflist) element has data of type %T but wanted []interface{}", rawConfig["plugins"])
 			return false
 		}
 
 		for _, pvalue := range plugins {
-			eachConfig, okeachconfigcast := pvalue.(map[string]interface{})
+			eachConfig, okeachconfigcast := pvalue.(map[string]any)
 			if !okeachconfigcast {
 				log.Printf("WARNING: Each Plugin element (conflist) has data of type %T but wanted map[string]interface{}", pvalue)
 				return false
@@ -56,7 +56,7 @@ func detectIPAMTypeRaw(targetType string, addNet *operv1.AdditionalNetworkDefini
 	}
 
 	if foundipam {
-		ipam, okipamcast := useipam.(map[string]interface{})
+		ipam, okipamcast := useipam.(map[string]any)
 		if !okipamcast {
 			log.Printf("WARNING: IPAM element has data of type %T but wanted map[string]interface{}", useipam)
 			return false

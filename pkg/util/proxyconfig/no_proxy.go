@@ -142,7 +142,7 @@ func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 	}
 
 	if len(proxy.Spec.NoProxy) > 0 {
-		for _, userValue := range strings.Split(proxy.Spec.NoProxy, ",") {
+		for userValue := range strings.SplitSeq(proxy.Spec.NoProxy, ",") {
 			if userValue != "" {
 				set.Insert(userValue)
 			}

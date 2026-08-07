@@ -83,7 +83,7 @@ func TestWithLongWindow(t *testing.T) {
 	}
 
 	// excessive events for long window
-	for i := 0; i < excessiveEventCount; i++ {
+	for range excessiveEventCount {
 		r.Eventf(t.Name(), "TEST")
 	}
 
@@ -91,7 +91,7 @@ func TestWithLongWindow(t *testing.T) {
 	<-time.After(backoffDuration)
 
 	// some more events
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		r.Eventf(t.Name(), "TEST")
 	}
 

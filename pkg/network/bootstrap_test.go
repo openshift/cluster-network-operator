@@ -135,12 +135,12 @@ func TestBootstrap(t *testing.T) {
 				hcp.SetGroupVersionKind(hypershift.HostedControlPlaneGVK)
 				hcp.SetName(hostedClusterName)
 				hcp.SetNamespace(hostedClusterNamespace)
-				hcp.Object["spec"] = map[string]interface{}{
+				hcp.Object["spec"] = map[string]any{
 					"clusterID":                    "test-cluster-id",
 					"controllerAvailabilityPolicy": "SingleReplica",
-					"configuration": map[string]interface{}{
-						"apiServer": map[string]interface{}{
-							"tlsSecurityProfile": map[string]interface{}{
+					"configuration": map[string]any{
+						"apiServer": map[string]any{
+							"tlsSecurityProfile": map[string]any{
 								"type": string(configv1.TLSProfileModernType),
 							},
 							"tlsAdherence": string(configv1.TLSAdherencePolicyStrictAllComponents),
@@ -186,7 +186,7 @@ func TestBootstrap(t *testing.T) {
 				hcp.SetGroupVersionKind(hypershift.HostedControlPlaneGVK)
 				hcp.SetName(hostedClusterName)
 				hcp.SetNamespace(hostedClusterNamespace)
-				hcp.Object["spec"] = map[string]interface{}{
+				hcp.Object["spec"] = map[string]any{
 					"clusterID":                    "test-cluster-id",
 					"controllerAvailabilityPolicy": "SingleReplica",
 				}

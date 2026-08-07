@@ -19,7 +19,7 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				data := make(map[string]interface{})
+				data := make(map[string]any)
 				bootstrapResult := &bootstrap.BootstrapResult{
 					TLSProfile: bootstrap.TLSProfile{
 						Spec: configv1.TLSProfileSpec{
@@ -69,7 +69,7 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 		for _, policy := range adherencePolicies {
 			t.Run(policy.name, func(t *testing.T) {
 				t.Run("and respecting adherence", func(t *testing.T) {
-					data := make(map[string]interface{})
+					data := make(map[string]any)
 					bootstrapResult := &bootstrap.BootstrapResult{
 						TLSProfile: bootstrap.TLSProfile{
 							Spec: configv1.TLSProfileSpec{
@@ -102,7 +102,7 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 				})
 
 				t.Run("and not respecting adherence", func(t *testing.T) {
-					data := make(map[string]interface{})
+					data := make(map[string]any)
 					bootstrapResult := &bootstrap.BootstrapResult{
 						TLSProfile: bootstrap.TLSProfile{
 							Spec: configv1.TLSProfileSpec{
@@ -143,7 +143,7 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 	})
 
 	t.Run("with nil cipher list", func(t *testing.T) {
-		data := make(map[string]interface{})
+		data := make(map[string]any)
 		bootstrapResult := &bootstrap.BootstrapResult{
 			TLSProfile: bootstrap.TLSProfile{
 				Spec: configv1.TLSProfileSpec{
