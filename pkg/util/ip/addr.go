@@ -1,10 +1,10 @@
 package ip
 
 import (
-	configv1 "github.com/openshift/api/config/v1"
+	"fmt"
 	"net"
 
-	"github.com/pkg/errors"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 type IPPool struct {
@@ -14,7 +14,7 @@ type IPPool struct {
 func (p *IPPool) Add(cidr net.IPNet) error {
 	for _, n := range p.cidrs {
 		if NetsOverlap(n, cidr) {
-			return errors.Errorf("CIDRs %s and %s overlap",
+			return fmt.Errorf("CIDRs %s and %s overlap",
 				n.String(),
 				cidr.String())
 		}

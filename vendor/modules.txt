@@ -431,9 +431,6 @@ github.com/openshift/library-go/pkg/serviceability
 ## explicit; go 1.23.0
 github.com/openshift/machine-config-operator/pkg/apihelpers
 github.com/openshift/machine-config-operator/pkg/daemon/constants
-# github.com/pkg/errors v0.9.1
-## explicit
-github.com/pkg/errors
 # github.com/pkg/profile v1.7.0
 ## explicit; go 1.13
 github.com/pkg/profile

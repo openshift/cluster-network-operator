@@ -9,8 +9,6 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 
-	"github.com/pkg/errors"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -44,11 +42,11 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 
 	oks, _, _ := clusterClient.Scheme().ObjectKinds(obj)
 	if len(oks) == 0 {
-		return errors.Errorf("Object %s/%s has no Kind registered in the Scheme", namespace, name)
+		return fmt.Errorf("Object %s/%s has no Kind registered in the Scheme", namespace, name)
 	}
 	gvk := oks[0]
 	if name == "" {
-		return errors.Errorf("Object %s has no name", gvk)
+		return fmt.Errorf("Object %s has no name", gvk)
 	}
 
 	// Dragons: If we're passed a non-Unstructured object (e.g. v1.ConfigMap), it won't have

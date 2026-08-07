@@ -1,15 +1,16 @@
 package network
 
 import (
-	v1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
+	v1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	operv1 "github.com/openshift/api/operator/v1"
@@ -72,20 +73,20 @@ func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 		if noKubeProxyConfig(conf) {
 			return out
 		}
-		out = append(out, errors.Errorf("network type %q does not allow specifying kube-proxy options", conf.DefaultNetwork.Type))
+		out = append(out, fmt.Errorf("network type %q does not allow specifying kube-proxy options", conf.DefaultNetwork.Type))
 		return out
 	}
 
 	if p.IptablesSyncPeriod != "" {
 		_, err := time.ParseDuration(p.IptablesSyncPeriod)
 		if err != nil {
-			out = append(out, errors.Errorf("IptablesSyncPeriod is not a valid duration (%v)", err))
+			out = append(out, fmt.Errorf("IptablesSyncPeriod is not a valid duration (%v)", err))
 		}
 	}
 
 	if p.BindAddress != "" {
 		if net.ParseIP(p.BindAddress) == nil {
-			out = append(out, errors.Errorf("BindAddress must be a valid IP address"))
+			out = append(out, fmt.Errorf("BindAddress must be a valid IP address"))
 		}
 	}
 
@@ -95,16 +96,16 @@ func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 	if p.ProxyArguments != nil {
 		if val, ok := p.ProxyArguments["metrics-port"]; ok {
 			if len(val) != 1 || val[0] != "9101" {
-				out = append(out, errors.Errorf("kube-proxy --metrics-port cannot be overridden"))
+				out = append(out, fmt.Errorf("kube-proxy --metrics-port cannot be overridden"))
 			}
 		}
 		if val, ok := p.ProxyArguments["healthz-port"]; ok {
 			if len(val) != 1 || val[0] != "10256" {
-				out = append(out, errors.Errorf("kube-proxy --healthz-port cannot be overridden"))
+				out = append(out, fmt.Errorf("kube-proxy --healthz-port cannot be overridden"))
 			}
 		}
 		if _, ok := p.ProxyArguments["feature-gates"]; ok {
-			out = append(out, errors.Errorf("kube-proxy --feature-gates cannot be overridden"))
+			out = append(out, fmt.Errorf("kube-proxy --feature-gates cannot be overridden"))
 		}
 	}
 
@@ -178,7 +179,7 @@ func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, bootstrapResult *bootst
 	}
 	kpc, err := kubeProxyConfiguration(kpcDefaults, conf, kpcOverrides)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to generate kube-proxy configuration file")
+		return nil, fmt.Errorf("failed to generate kube-proxy configuration file: %w", err)
 	}
 
 	data := render.MakeRenderData()
@@ -211,7 +212,7 @@ func renderStandaloneKubeProxy(conf *operv1.NetworkSpec, bootstrapResult *bootst
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "kube-proxy"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render kube-proxy manifests")
+		return nil, fmt.Errorf("failed to render kube-proxy manifests: %w", err)
 	}
 
 	return manifests, nil

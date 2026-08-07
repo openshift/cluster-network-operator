@@ -2,6 +2,7 @@ package network
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"path/filepath"
 	"strings"
@@ -10,7 +11,6 @@ import (
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/render"
-	"github.com/pkg/errors"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -21,7 +21,7 @@ func renderAdditionalNetworksCRD(manifestDir string) ([]*uns.Unstructured, error
 	data := render.MakeRenderData()
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/crd"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render additional network manifests")
+		return nil, fmt.Errorf("failed to render additional network manifests: %w", err)
 	}
 	objs = append(objs, manifests...)
 	return objs, nil
@@ -38,7 +38,7 @@ func renderRawCNIConfig(conf *operv1.AdditionalNetworkDefinition, manifestDir st
 	data.Data["AdditionalNetworkConfig"] = conf.RawCNIConfig
 	objs, err := render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/raw"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render additional network")
+		return nil, fmt.Errorf("failed to render additional network: %w", err)
 	}
 	return objs, nil
 }
@@ -50,13 +50,13 @@ func validateRaw(conf *operv1.AdditionalNetworkDefinition) []error {
 	var err error
 
 	if conf.Name == "" {
-		out = append(out, errors.Errorf("Additional Network Name cannot be nil"))
+		out = append(out, fmt.Errorf("Additional Network Name cannot be nil")) //nolint:staticcheck // ANN is the name
 	}
 
 	confBytes := []byte(conf.RawCNIConfig)
 	err = json.Unmarshal(confBytes, &rawConfig)
 	if err != nil {
-		out = append(out, errors.Errorf("Failed to Unmarshal RawCNIConfig: %s", string(confBytes)))
+		out = append(out, fmt.Errorf("failed to Unmarshal RawCNIConfig: %s", string(confBytes)))
 	}
 
 	return out
@@ -97,7 +97,7 @@ func getStaticIPAMConfigJSON(conf *operv1.StaticIPAMConfig) (string, error) {
 		for _, route := range conf.Routes {
 			_, dest, err := net.ParseCIDR(route.Destination)
 			if err != nil {
-				return "", errors.Wrap(err, "failed to parse macvlan route")
+				return "", fmt.Errorf("failed to parse macvlan route: %w", err)
 			}
 			staticIPAMConfig.Routes = append(staticIPAMConfig.Routes, &cnitypes.Route{Dst: *dest, GW: net.ParseIP(route.Gateway)})
 		}
@@ -112,7 +112,7 @@ func getStaticIPAMConfigJSON(conf *operv1.StaticIPAMConfig) (string, error) {
 
 	jsonByte, err := json.Marshal(staticIPAMConfig)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create static ipam config")
+		return "", fmt.Errorf("failed to create static ipam config: %w", err)
 	}
 
 	return string(jsonByte), nil
@@ -129,7 +129,7 @@ func getIPAMConfigJSON(conf *operv1.IPAMConfig) (string, error) {
 		return staticIPAMConfig, err
 	}
 
-	return "", errors.Errorf("failed to render IPAM JSON")
+	return "", fmt.Errorf("failed to render IPAM JSON")
 }
 
 // renderSimpleMacvlanConfig returns the SimpleMacvlanConfig manifests
@@ -145,7 +145,7 @@ func renderSimpleMacvlanConfig(conf *operv1.AdditionalNetworkDefinition, manifes
 		// no additional config, just fill default IPAM
 		data.Data["IPAMConfig"], err = getIPAMConfigJSON(nil)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to render ipam config")
+			return nil, fmt.Errorf("failed to render ipam config: %w", err)
 		}
 
 	} else {
@@ -154,7 +154,7 @@ func renderSimpleMacvlanConfig(conf *operv1.AdditionalNetworkDefinition, manifes
 
 		data.Data["IPAMConfig"], err = getIPAMConfigJSON(macvlanConfig.IPAMConfig)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to render ipam config")
+			return nil, fmt.Errorf("failed to render ipam config: %w", err)
 		}
 
 		if macvlanConfig.Mode != "" {
@@ -169,7 +169,7 @@ func renderSimpleMacvlanConfig(conf *operv1.AdditionalNetworkDefinition, manifes
 
 	objs, err := render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/simplemacvlan"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render simplemacvlan additional network")
+		return nil, fmt.Errorf("failed to render simplemacvlan additional network: %w", err)
 	}
 	return objs, nil
 }
@@ -180,19 +180,19 @@ func validateStaticIPAMConfig(conf *operv1.StaticIPAMConfig) []error {
 	for _, addr := range conf.Addresses {
 		_, _, err := net.ParseCIDR(addr.Address)
 		if err != nil {
-			out = append(out, errors.Errorf("invalid static address: %v", err))
+			out = append(out, fmt.Errorf("invalid static address: %w", err))
 		}
 		if addr.Gateway != "" && net.ParseIP(addr.Gateway) == nil {
-			out = append(out, errors.Errorf("invalid gateway: %s", addr.Gateway))
+			out = append(out, fmt.Errorf("invalid gateway: %s", addr.Gateway))
 		}
 	}
 	for _, route := range conf.Routes {
 		_, _, err := net.ParseCIDR(route.Destination)
 		if err != nil {
-			out = append(out, errors.Errorf("invalid route destination: %v", err))
+			out = append(out, fmt.Errorf("invalid route destination: %w", err))
 		}
 		if route.Gateway != "" && net.ParseIP(route.Gateway) == nil {
-			out = append(out, errors.Errorf("invalid gateway: %s", route.Gateway))
+			out = append(out, fmt.Errorf("invalid gateway: %s", route.Gateway))
 		}
 	}
 	return out
@@ -210,7 +210,7 @@ func validateIPAMConfig(conf *operv1.IPAMConfig) []error {
 		}
 	case operv1.IPAMTypeDHCP:
 	default:
-		out = append(out, errors.Errorf("invalid IPAM type: %s", conf.Type))
+		out = append(out, fmt.Errorf("invalid IPAM type: %s", conf.Type))
 	}
 
 	return out
@@ -221,7 +221,7 @@ func validateSimpleMacvlanConfig(conf *operv1.AdditionalNetworkDefinition) []err
 	out := []error{}
 
 	if conf.Name == "" {
-		out = append(out, errors.Errorf("Additional Network Name cannot be nil"))
+		out = append(out, fmt.Errorf("Additional Network Name cannot be nil")) //nolint:staticcheck // ANN is the name
 	}
 
 	if conf.SimpleMacvlanConfig != nil {
@@ -238,7 +238,7 @@ func validateSimpleMacvlanConfig(conf *operv1.AdditionalNetworkDefinition) []err
 			case operv1.MacvlanModeVEPA:
 			case operv1.MacvlanModePassthru:
 			default:
-				out = append(out, errors.Errorf("invalid Macvlan mode: %s", conf.SimpleMacvlanConfig.Mode))
+				out = append(out, fmt.Errorf("invalid Macvlan mode: %s", conf.SimpleMacvlanConfig.Mode))
 			}
 		}
 	}

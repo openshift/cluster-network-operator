@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
-	"github.com/pkg/errors"
 
 	configv1 "github.com/openshift/api/config/v1"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
@@ -480,7 +479,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		if apply.GetClusterName(obj) == "" {
 			// Mark the object to be GC'd if the owner is deleted.
 			if err := controllerutil.SetControllerReference(operConfig, obj, r.client.ClientFor(apply.GetClusterName(obj)).Scheme()); err != nil {
-				err = errors.Wrapf(err, "could not set reference for (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
+				err = fmt.Errorf("could not set reference for (%s) %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
 				log.Println(err)
 				r.status.SetDegraded(statusmanager.OperatorConfig, "InternalError",
 					fmt.Sprintf("Internal error while updating operator configuration: %v", err))
@@ -490,11 +489,11 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 		// Open question: should an error here indicate we will never retry?
 		if err := apply.ApplyObject(ctx, r.client, obj, ControllerName); err != nil {
-			err = errors.Wrapf(err, "could not apply (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
+			err = fmt.Errorf("could not apply (%s) %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
 
 			// If error comes from nonexistent namespace print out a help message.
 			if obj.GroupVersionKind().Kind == "NetworkAttachmentDefinition" && strings.Contains(err.Error(), "namespaces") {
-				err = errors.Wrapf(err, "could not apply (%s) %s/%s; Namespace error for networkattachment definition, consider possible solutions: (1) Edit config files to include existing namespace (2) Create non-existent namespace (3) Delete erroneous network-attachment-definition", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
+				err = fmt.Errorf("could not apply (%s) %s/%s: %w; Namespace error for networkattachment definition, consider possible solutions: (1) Edit config files to include existing namespace (2) Create non-existent namespace (3) Delete erroneous network-attachment-definition", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
 			}
 
 			log.Println(err)
@@ -530,7 +529,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		// Don't set the owner reference in this case -- we're updating
 		// the status of our owner.
 		if err := apply.ApplyObject(ctx, r.client, status, ControllerName); err != nil {
-			err = errors.Wrapf(err, "could not apply (%s) %s/%s", status.GroupVersionKind(), status.GetNamespace(), status.GetName())
+			err = fmt.Errorf("could not apply (%s) %s/%s: %w", status.GroupVersionKind(), status.GetNamespace(), status.GetName(), err)
 			log.Println(err)
 			r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "StatusError",
 				fmt.Sprintf("Could not update cluster configuration status: %v", err))

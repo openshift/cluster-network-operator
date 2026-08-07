@@ -1,12 +1,12 @@
 package network
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/render"
-	"github.com/pkg/errors"
 
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -22,7 +22,7 @@ func renderMultiNetworkpolicyConfig(manifestDir string) ([]*uns.Unstructured, er
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus-networkpolicy"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render multus networkpolicy manifests")
+		return nil, fmt.Errorf("failed to render multus networkpolicy manifests: %w", err)
 	}
 	objs = append(objs, manifests...)
 	return objs, nil
