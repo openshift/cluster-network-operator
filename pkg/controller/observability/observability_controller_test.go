@@ -1527,7 +1527,7 @@ func TestReconcile_ConcurrentReconciliations(t *testing.T) {
 
 	// Run 5 concurrent reconciliations
 	errChan := make(chan error, 5)
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		go func() {
 			_, err := r.Reconcile(context.TODO(), req)
 			errChan <- err
@@ -1536,7 +1536,7 @@ func TestReconcile_ConcurrentReconciliations(t *testing.T) {
 
 	// Wait for all to complete and collect errors
 	var unexpectedErrors []error
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if err := <-errChan; err != nil {
 			// Filter out 409 conflict errors which are expected when multiple
 			// goroutines try to update the same resource status concurrently

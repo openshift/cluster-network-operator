@@ -219,7 +219,7 @@ func validateReadinessEndpoint(caBundle []*x509.Certificate, proxy, endpoint str
 // finite loop using proxy and returns the last result if it never succeeds.
 func validateReadinessEndpointWithRetries(caBundle []*x509.Certificate, proxy, endpoint *url.URL, retries int) error {
 	var err error
-	for i := 0; i < retries; i++ {
+	for range retries {
 		err = runReadinessProbe(caBundle, proxy, endpoint)
 		if err == nil {
 			return nil
