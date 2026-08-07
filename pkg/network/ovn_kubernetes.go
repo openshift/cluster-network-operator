@@ -1785,12 +1785,7 @@ func isCNOIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
 // are already present in both master and worker nodes, otherwise returns false.
 func isUserDefinedIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
 	isUserDefinedMachineConfigPresentIn := func(mcs []*mcfgv1.MachineConfig) bool {
-		for _, mc := range mcs {
-			if mcutil.IsUserDefinedIPsecMachineConfig(mc) {
-				return true
-			}
-		}
-		return false
+		return slices.ContainsFunc(mcs, mcutil.IsUserDefinedIPsecMachineConfig)
 	}
 	return isUserDefinedMachineConfigPresentIn(infra.MasterIPsecMachineConfigs) &&
 		isUserDefinedMachineConfigPresentIn(infra.WorkerIPsecMachineConfigs)

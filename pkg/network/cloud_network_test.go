@@ -1,6 +1,7 @@
 package network
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -161,10 +162,8 @@ func TestCloudTokenMinterHasTokenAudience(t *testing.T) {
 			t.Fatal("args not found in cloud-token-minter container")
 		}
 
-		for _, arg := range args {
-			if arg == "--token-audience=openshift" {
-				return
-			}
+		if slices.Contains(args, "--token-audience=openshift") {
+			return
 		}
 		t.Error("expected cloud-token minter to have --token-audience=openshift arg")
 		return

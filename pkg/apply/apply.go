@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"maps"
 	"strings"
 
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
@@ -188,9 +189,7 @@ func getCopySource(ctx context.Context, obj Object, client cnoclient.Client) (Ob
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
-	for k, v := range obj.GetAnnotations() {
-		annotations[k] = v
-	}
+	maps.Copy(annotations, obj.GetAnnotations())
 	ret.SetAnnotations(annotations)
 
 	return ret, nil
