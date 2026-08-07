@@ -680,6 +680,37 @@ func Test_renderFRRRoutingCapabilities(t *testing.T) {
 		})
 }
 
+func Test_renderFRRStatusCleanerStrategy(t *testing.T) {
+	frrConf := &operv1.NetworkSpec{
+		AdditionalRoutingCapabilities: &operv1.AdditionalRoutingCapabilities{
+			Providers: []operv1.RoutingCapabilitiesProvider{
+				operv1.RoutingCapabilitiesProviderFRR,
+			},
+		},
+	}
+
+	render := func(replicaCount int) *appsv1.Deployment {
+		g := NewWithT(t)
+		br := fakeBootstrapResult()
+		br.OVN.ControlPlaneReplicaCount = replicaCount
+		objs, err := renderAdditionalRoutingCapabilities(frrConf, br, manifestDir)
+		g.Expect(err).NotTo(HaveOccurred())
+		return mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "frr-k8s-statuscleaner")
+	}
+
+	t.Run("SNO: strategy is Recreate", func(t *testing.T) {
+		g := NewWithT(t)
+		d := render(1)
+		g.Expect(d.Spec.Strategy.Type).To(Equal(appsv1.RecreateDeploymentStrategyType))
+	})
+
+	t.Run("HA: no strategy override", func(t *testing.T) {
+		g := NewWithT(t)
+		d := render(3)
+		g.Expect(d.Spec.Strategy.Type).To(BeEmpty())
+	})
+}
+
 func Test_renderNetworkingConsolePlugin(t *testing.T) {
 	renderAndFindNginxConfig := func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
 		g := NewWithT(t)
