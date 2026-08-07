@@ -471,10 +471,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	//there only needs to be two cluster managers
-	clusterManagerReplicas := 2
-	if bootstrapResult.OVN.ControlPlaneReplicaCount < 2 {
-		clusterManagerReplicas = bootstrapResult.OVN.ControlPlaneReplicaCount
-	}
+	clusterManagerReplicas := min(bootstrapResult.OVN.ControlPlaneReplicaCount, 2)
 	data.Data["ClusterManagerReplicas"] = clusterManagerReplicas
 
 	commonManifestDir := filepath.Join(manifestDir, "network/ovn-kubernetes/common")
