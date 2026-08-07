@@ -115,7 +115,7 @@ func TestValidateRaw(t *testing.T) {
 	}
 
 	rawConfig.RawCNIConfig = "wrongCNIConfig"
-	errExpect("Failed to Unmarshal RawCNIConfig")
+	errExpect("failed to Unmarshal RawCNIConfig")
 
 	rawConfig.Name = ""
 	errExpect("Additional Network Name cannot be nil")

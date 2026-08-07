@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -10,7 +11,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/render"
-	"github.com/pkg/errors"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -100,7 +100,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/multus"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render multus manifests")
+		return nil, fmt.Errorf("failed to render multus manifests: %w", err)
 	}
 	objs = append(objs, manifests...)
 	return objs, nil
@@ -122,7 +122,7 @@ func renderNetworkMetricsDaemon(manifestDir string, bootstrapResult *bootstrap.B
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/network-metrics"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render multus admission controller manifests")
+		return nil, fmt.Errorf("failed to render multus admission controller manifests: %w", err)
 	}
 	objs = append(objs, manifests...)
 	return objs, nil

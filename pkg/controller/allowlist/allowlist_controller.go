@@ -4,6 +4,7 @@ package allowlist
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -161,7 +161,7 @@ func createObjectsFrom(ctx context.Context, client cnoclient.Client, manifestPat
 	}
 	for _, obj := range manifests {
 		if err := client.Default().CRClient().Create(ctx, obj); err != nil {
-			return errors.Wrapf(err, "error creating %s %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
+			return fmt.Errorf("error creating %s %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
 		}
 	}
 	return nil
