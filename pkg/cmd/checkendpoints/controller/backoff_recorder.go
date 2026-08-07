@@ -15,9 +15,9 @@ import (
 // Recorder is a stripped down version of the library-go events.Recorder interface.
 type Recorder interface {
 	Event(reason, message string)
-	Eventf(reason, messageFmt string, args ...interface{})
+	Eventf(reason, messageFmt string, args ...any)
 	Warning(reason, message string)
-	Warningf(reason, messageFmt string, args ...interface{})
+	Warningf(reason, messageFmt string, args ...any)
 }
 
 // NewBackoffEventRecorder returns a new Recorder that keeps track of the rate of events
@@ -84,7 +84,7 @@ func (r *backoffEventRecorder) Event(reason, message string) {
 	r.event(corev1.EventTypeNormal, reason, message)
 }
 
-func (r *backoffEventRecorder) Eventf(reason, messageFmt string, args ...interface{}) {
+func (r *backoffEventRecorder) Eventf(reason, messageFmt string, args ...any) {
 	r.Event(reason, fmt.Sprintf(messageFmt, args...))
 }
 
@@ -92,7 +92,7 @@ func (r *backoffEventRecorder) Warning(reason, message string) {
 	r.event(corev1.EventTypeWarning, reason, message)
 }
 
-func (r *backoffEventRecorder) Warningf(reason, messageFmt string, args ...interface{}) {
+func (r *backoffEventRecorder) Warningf(reason, messageFmt string, args ...any) {
 	r.Warning(reason, fmt.Sprintf(messageFmt, args...))
 }
 

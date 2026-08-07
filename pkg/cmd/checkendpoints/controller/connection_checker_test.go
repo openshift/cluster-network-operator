@@ -510,7 +510,7 @@ func withConnectivityRestoredMessage(start, end int) func(*v1alpha1.OutageEntry)
 	return withOutageMessage("Connectivity restored after %v", testTime(end).Sub(testTime(start)))
 }
 
-func withOutageMessage(msg string, args ...interface{}) func(*v1alpha1.OutageEntry) {
+func withOutageMessage(msg string, args ...any) func(*v1alpha1.OutageEntry) {
 	return func(entry *v1alpha1.OutageEntry) {
 		entry.Message = fmt.Sprintf(msg, args...)
 	}

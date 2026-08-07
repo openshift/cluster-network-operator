@@ -170,10 +170,10 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 		return nil, fmt.Errorf("failed extract tolerations: %v", err)
 	}
 	if tolerationsArrayFound {
-		tolerationsArrayConverted, hasConverted := tolerationsArray.([]interface{})
+		tolerationsArrayConverted, hasConverted := tolerationsArray.([]any)
 		if hasConverted {
 			for _, entry := range tolerationsArrayConverted {
-				tolerationConverted, hasConverted := entry.(map[string]interface{})
+				tolerationConverted, hasConverted := entry.(map[string]any)
 				if hasConverted {
 					toleration := corev1.Toleration{}
 					raw, ok := tolerationConverted["key"]
@@ -233,10 +233,10 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 			return nil, fmt.Errorf("failed extract serviceNetwork: %v", err)
 		}
 		if cidrArrayValueFound {
-			cidrArrayConverted, hasConverted := cidrArray.([]interface{})
+			cidrArrayConverted, hasConverted := cidrArray.([]any)
 			if hasConverted {
 				sampleCidrVal := cidrArrayConverted[0]
-				sampleCidrValConverted, sampleCidrHasConverted := sampleCidrVal.(map[string]interface{})
+				sampleCidrValConverted, sampleCidrHasConverted := sampleCidrVal.(map[string]any)
 				if sampleCidrHasConverted {
 					cidrRawVal, hasCidrKey := sampleCidrValConverted["cidr"]
 					if hasCidrKey {
@@ -264,7 +264,7 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 		return nil, fmt.Errorf("failed to extract apiServer config: %v", err)
 	}
 	if found && apiServerConfig != nil {
-		apiServerMap, ok := apiServerConfig.(map[string]interface{})
+		apiServerMap, ok := apiServerConfig.(map[string]any)
 		if ok {
 			var spec configv1.APIServerSpec
 			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(apiServerMap, &spec); err != nil {
@@ -396,7 +396,7 @@ func SetHostedControlPlaneConditions(hcp *unstructured.Unstructured, operStatus 
 
 	// Set the conditions directly instead of using SetNestedField
 	// because it does a DeepCopy and metav1.Condition doesn't implement it
-	hcp.Object["status"].(map[string]interface{})["conditions"] = conditions
+	hcp.Object["status"].(map[string]any)["conditions"] = conditions
 	return conditions, nil
 }
 

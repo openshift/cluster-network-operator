@@ -1160,9 +1160,9 @@ func checkOVNKubernetesPostStart(objects []*uns.Unstructured) error {
 		return fmt.Errorf("unable to find containers in ovnkube-node daemonset : %w", err)
 	}
 
-	var nbdb map[string]interface{}
+	var nbdb map[string]any
 	for _, container := range ovnkubeNodeContainers {
-		cmap := container.(map[string]interface{})
+		cmap := container.(map[string]any)
 		name, found, err := uns.NestedString(cmap, "name")
 		if found && err == nil && name == "nbdb" {
 			nbdb = cmap
@@ -4170,7 +4170,7 @@ func TestRenderOVNKubernetesReachability(t *testing.T) {
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(found).To(BeTrue())
 					for _, c := range containers {
-						cm := c.(map[string]interface{})
+						cm := c.(map[string]any)
 						if name, ok := cm["name"]; ok && name == "ovnkube-cluster-manager" {
 							command, found, err := uns.NestedSlice(cm, "command")
 							g.Expect(err).NotTo(HaveOccurred())
@@ -5171,7 +5171,7 @@ func extractDaemonSetEnvVars(g *WithT, objs []*uns.Unstructured, dsName, contain
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(found).To(BeTrue())
 		for _, c := range containers {
-			cmap := c.(map[string]interface{})
+			cmap := c.(map[string]any)
 			name, _, _ := uns.NestedString(cmap, "name")
 			if name != containerName {
 				continue
@@ -5182,7 +5182,7 @@ func extractDaemonSetEnvVars(g *WithT, objs []*uns.Unstructured, dsName, contain
 				return envVars
 			}
 			for _, e := range envList {
-				emap := e.(map[string]interface{})
+				emap := e.(map[string]any)
 				eName, _, _ := uns.NestedString(emap, "name")
 				eVal, _, _ := uns.NestedString(emap, "value")
 				envVars[eName] = eVal

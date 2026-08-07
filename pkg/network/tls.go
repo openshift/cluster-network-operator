@@ -30,7 +30,7 @@ const (
 // addTLSInfoToRenderData adds TLS-related template data to the render data.
 // It converts OpenSSL cipher names (from TLSProfile.Spec.Ciphers) to IANA format for Go components,
 // and also adds NGINX-specific parameters using the original OpenSSL names.
-func addTLSInfoToRenderData(data map[string]interface{}, bootstrapResult *bootstrap.BootstrapResult, respectAdherence bool) {
+func addTLSInfoToRenderData(data map[string]any, bootstrapResult *bootstrap.BootstrapResult, respectAdherence bool) {
 	if respectAdherence && !crypto.ShouldHonorClusterTLSProfile(bootstrapResult.TLSProfile.Adherence) {
 		data[UseTLSProfileKey] = false
 		return

@@ -46,7 +46,7 @@ func renderRawCNIConfig(conf *operv1.AdditionalNetworkDefinition, manifestDir st
 // validateRaw checks the AdditionalNetwork name and RawCNIConfig.
 func validateRaw(conf *operv1.AdditionalNetworkDefinition) []error {
 	out := []error{}
-	var rawConfig map[string]interface{}
+	var rawConfig map[string]any
 	var err error
 
 	if conf.Name == "" {

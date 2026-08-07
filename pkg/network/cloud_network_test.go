@@ -43,14 +43,14 @@ func makeManagedControllerRenderData() render.RenderData {
 }
 
 // getEnvVar looks up an env var by name from a container map and returns its value.
-func getEnvVar(t *testing.T, container map[string]interface{}, name string) (string, bool) {
+func getEnvVar(t *testing.T, container map[string]any, name string) (string, bool) {
 	t.Helper()
 	envSlice, found, err := uns.NestedSlice(container, "env")
 	if err != nil || !found {
 		return "", false
 	}
 	for _, e := range envSlice {
-		em := e.(map[string]interface{})
+		em := e.(map[string]any)
 		n, _, _ := uns.NestedString(em, "name")
 		if n == name {
 			v, _, _ := uns.NestedString(em, "value")
@@ -61,14 +61,14 @@ func getEnvVar(t *testing.T, container map[string]interface{}, name string) (str
 }
 
 // findUnstructuredContainer finds a container by name from a deployment's unstructured object.
-func findUnstructuredContainer(t *testing.T, obj map[string]interface{}, containerName string) (map[string]interface{}, bool) {
+func findUnstructuredContainer(t *testing.T, obj map[string]any, containerName string) (map[string]any, bool) {
 	t.Helper()
 	containers, found, err := uns.NestedSlice(obj, "spec", "template", "spec", "containers")
 	if err != nil || !found {
 		return nil, false
 	}
 	for _, c := range containers {
-		cm := c.(map[string]interface{})
+		cm := c.(map[string]any)
 		name, _, _ := uns.NestedString(cm, "name")
 		if name == containerName {
 			return cm, true

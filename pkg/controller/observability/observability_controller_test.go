@@ -122,8 +122,8 @@ func createTestClusterExtension(t *testing.T, name string, installed bool) *unst
 	ce.SetName(name)
 
 	// Set status conditions
-	conditions := []interface{}{
-		map[string]interface{}{
+	conditions := []any{
+		map[string]any{
 			"type": "Installed",
 			"status": func() string {
 				if installed {
@@ -674,8 +674,8 @@ func TestIsNetObservOperatorInstalled_OLMv1InstallationFailed(t *testing.T) {
 		Kind:    "ClusterExtension",
 	})
 	ce.SetName("netobserv-operator")
-	conditions := []interface{}{
-		map[string]interface{}{
+	conditions := []any{
+		map[string]any{
 			"type":    "Installed",
 			"status":  "False",
 			"reason":  "InstallationFailed",
@@ -715,8 +715,8 @@ func TestIsNetObservOperatorInstalled_OLMv1NotInstalledYet(t *testing.T) {
 		Kind:    "ClusterExtension",
 	})
 	ce.SetName("netobserv-operator")
-	conditions := []interface{}{
-		map[string]interface{}{
+	conditions := []any{
+		map[string]any{
 			"type":    "Installed",
 			"status":  "Unknown",
 			"reason":  "Installing",
@@ -1468,8 +1468,8 @@ func TestReconcile_RecoveryAfterOperatorBecomesReady(t *testing.T) {
 	g.Expect(result1.RequeueAfter).To(Equal(requeueAfterStandard))
 
 	// Update ClusterExtension to Installed status
-	conditions := []interface{}{
-		map[string]interface{}{
+	conditions := []any{
+		map[string]any{
 			"type":    "Installed",
 			"status":  "True",
 			"reason":  "InstallSucceeded",

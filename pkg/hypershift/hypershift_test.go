@@ -134,16 +134,16 @@ func TestSetRestartDateAnnotation(t *testing.T) {
 
 	makeObj := func(apiVersion, kind, name, ns string) *unstructured.Unstructured {
 		return &unstructured.Unstructured{
-			Object: map[string]interface{}{
+			Object: map[string]any{
 				"apiVersion": apiVersion,
 				"kind":       kind,
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":      name,
 					"namespace": ns,
 				},
-				"spec": map[string]interface{}{
-					"template": map[string]interface{}{
-						"metadata": map[string]interface{}{},
+				"spec": map[string]any{
+					"template": map[string]any{
+						"metadata": map[string]any{},
 					},
 				},
 			},
