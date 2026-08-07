@@ -415,7 +415,7 @@ func tolerationsToStringSliceYaml(tolerations []corev1.Toleration) ([]string, er
 	}
 
 	yamlStrs := []string{}
-	for _, arg := range strings.Split(string(yamlBytes), "\n") {
+	for arg := range strings.SplitSeq(string(yamlBytes), "\n") {
 
 		// filter out null and empty strings
 		if strings.Contains(arg, ": null") || strings.Contains(arg, ": \"\"") {

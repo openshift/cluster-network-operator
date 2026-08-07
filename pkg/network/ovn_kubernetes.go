@@ -1558,7 +1558,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 
 	// preserve any default masquerade subnet values that might have been set previously
 	if masqueradeCIDRs, ok := nodeDaemonSet.GetAnnotations()[names.MasqueradeCIDRsAnnotation]; ok {
-		for _, masqueradeCIDR := range strings.Split(masqueradeCIDRs, ",") {
+		for masqueradeCIDR := range strings.SplitSeq(masqueradeCIDRs, ",") {
 			if utilnet.IsIPv6CIDRString(masqueradeCIDR) {
 				klog.Infof("Found the DefaultV6MasqueradeSubnet(%s) in the %q annotation", masqueradeCIDR, names.MasqueradeCIDRsAnnotation)
 				res.DefaultV6MasqueradeSubnet = masqueradeCIDR

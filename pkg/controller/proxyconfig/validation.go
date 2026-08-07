@@ -64,7 +64,7 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(proxyConfig *configv1.ProxySp
 
 	if isSpecNoProxySet(proxyConfig) {
 		if proxyConfig.NoProxy != noProxyWildcard {
-			for _, v := range strings.Split(proxyConfig.NoProxy, ",") {
+			for v := range strings.SplitSeq(proxyConfig.NoProxy, ",") {
 				v = strings.TrimSpace(v)
 				errDomain := validation.DomainName(v, true)
 				errCIDR := validation.IPAddressOrCIDR(v)
