@@ -15,9 +15,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,7 +32,6 @@ import (
 const (
 	OperatorYAML         = "bindata/observability/07-observability-operator.yaml"
 	FlowCollectorYAML    = "bindata/observability/08-flowcollector.yaml"
-	NetObservNamespace   = "netobserv"
 	OperatorNamespace    = "netobserv-operator"
 	FlowCollectorVersion = "v1beta2"
 	FlowCollectorName    = "cluster"
@@ -118,23 +115,23 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 	}
 	if !installed {
 		if !ceExists {
-			// ClusterExtension doesn't exist yet, create it
+			// Operator not yet installed, apply OLM v0 Subscription
 			if err := r.installNetObservOperator(ctx); err != nil {
 				klog.Warningf("Failed to install Network Observability Operator: %v. Will retry in %v.", err, requeueAfterOLM)
 				_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentFailed", fmt.Sprintf("Failed to install Network Observability Operator: %v", err))
 				return reconcile.Result{RequeueAfter: requeueAfterOLM}, nil
 			}
-			klog.Infof("Created ClusterExtension netobserv-operator, will check installation status in %v", requeueAfterOLM)
+			klog.Infof("Applied OLM v0 Subscription for netobserv-operator, will check installation status in %v", requeueAfterOLM)
 			return reconcile.Result{RequeueAfter: requeueAfterOLM}, nil
 		}
 
-		// ClusterExtension exists but installation not complete yet
-		klog.Infof("ClusterExtension netobserv-operator installation in progress, will recheck in %v", requeueAfterOLM)
+		// OLM v1 ClusterExtension exists but installation not complete yet
+		klog.Infof("netobserv-operator installation in progress, will recheck in %v", requeueAfterOLM)
 		return reconcile.Result{RequeueAfter: requeueAfterOLM}, nil
 	}
 
 	// Operator installation completed
-	klog.Info("ClusterExtension netobserv-operator installation completed, proceeding to FlowCollector creation")
+	klog.Info("Network Observability Operator installation completed, proceeding to FlowCollector creation")
 
 	// Check if FlowCollector already exists
 	flowCollectorExists, err := r.isFlowCollectorExists(ctx)
@@ -145,7 +142,7 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 
 	if !flowCollectorExists {
 		// Create FlowCollector
-		if err := r.createFlowCollector(ctx); err != nil {
+		if err := r.applyManifest(ctx, FlowCollectorYAML, "FlowCollector"); err != nil {
 			klog.Warningf("Failed to create FlowCollector: %v. Will retry in %v.", err, requeueAfterStandard)
 			// Mark deployment as failed
 			_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentFailed", fmt.Sprintf("Failed to create FlowCollector: %v", err))
@@ -539,23 +536,4 @@ func (r *ReconcileObservability) isFlowCollectorExists(ctx context.Context) (boo
 	}
 
 	return true, nil
-}
-
-func (r *ReconcileObservability) createFlowCollector(ctx context.Context) error {
-	// Ensure the netobserv namespace exists before applying manifests.
-	ns := &corev1.Namespace{}
-	if err := r.client.Get(ctx, types.NamespacedName{Name: NetObservNamespace}, ns); err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.client.Create(ctx, &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: NetObservNamespace},
-			}); err != nil {
-				return fmt.Errorf("failed to create namespace %s: %w", NetObservNamespace, err)
-			}
-			klog.Infof("Created namespace %s", NetObservNamespace)
-		} else {
-			return err
-		}
-	}
-
-	return r.applyManifest(ctx, FlowCollectorYAML, "FlowCollector")
 }

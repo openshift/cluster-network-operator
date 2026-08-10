@@ -835,7 +835,7 @@ func TestIsFlowCollectorExists_OnlyChecksCluster(t *testing.T) {
 	g.Expect(exists).To(BeFalse())
 }
 
-// Test createFlowCollector() - Note: Full testing requires real manifest files
+// Test FlowCollector creation - Note: Full testing requires real manifest files
 
 func TestCreateFlowCollector_ManifestNotFound(t *testing.T) {
 	g := NewGomegaWithT(t)
