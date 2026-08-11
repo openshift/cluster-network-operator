@@ -870,6 +870,7 @@ func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, bootstrapResu
 			data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 			data.Data["NoOverlayManagedEnabled"] = conf.DefaultNetwork.OVNKubernetesConfig != nil &&
 				conf.DefaultNetwork.OVNKubernetesConfig.BGPManagedConfig.BGPTopology != ""
+			data.Data["IsSNO"] = bootstrapResult.OVN.ControlPlaneReplicaCount == 1
 			objs, err := render.RenderDir(filepath.Join(manifestDir, "network/frr-k8s"), &data)
 			if err != nil {
 				return nil, fmt.Errorf("failed to render frr-k8s manifests: %w", err)
