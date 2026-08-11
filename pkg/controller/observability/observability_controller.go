@@ -444,8 +444,8 @@ func (r *ReconcileObservability) checkOLMv0Installation(ctx context.Context) (bo
 	// Look for netobserv operator CSV
 	for _, item := range csvList.Items {
 		name := item.GetName()
-		// CSV names typically follow pattern: netobserv-operator.v1.2.3
-		if strings.HasPrefix(name, "netobserv-operator") {
+		// CSV name for OLMv0 is like this: network-observabililty-operator.v1.2.3
+		if strings.HasPrefix(name, "network-observability-operator") {
 			// Check the CSV phase
 			phase, found, err := unstructured.NestedString(item.Object, "status", "phase")
 			if err != nil {
