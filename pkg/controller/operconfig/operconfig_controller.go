@@ -215,8 +215,9 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			r.status.SetDegraded(statusmanager.OperatorConfig, "NoOperatorConfig",
 				fmt.Sprintf("Operator configuration %s was deleted", request.String()))
 			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected, since we set
-			// the ownerReference (see https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/).
+			// Most owned objects are automatically garbage collected, since we
+			// set the ownerReference. CRDs are excluded from controller
+			// ownership to avoid conflicts with other operators.
 			// Return and don't requeue
 			return reconcile.Result{}, nil
 		}
@@ -477,9 +478,15 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	var degradedErr error
 	for _, obj := range objs {
 		// TODO: OwnerRef for non default clusters. For HyperShift this should probably be HostedControlPlane CR
-		if apply.GetClusterName(obj) == "" {
+		clusterName := apply.GetClusterName(obj)
+		// Skip controller ownership on CRDs: GC-deleting a CRD destroys
+		// all its CRs (data loss), and other operators (e.g. MetalLB via
+		// ClusterExtension/boxcutter) may legitimately claim controller
+		// ownership of the same CRDs, which conflicts because Kubernetes
+		// only allows a single controller ownerReference per object.
+		if clusterName == "" && !isCRD(obj) {
 			// Mark the object to be GC'd if the owner is deleted.
-			if err := controllerutil.SetControllerReference(operConfig, obj, r.client.ClientFor(apply.GetClusterName(obj)).Scheme()); err != nil {
+			if err := controllerutil.SetControllerReference(operConfig, obj, r.client.ClientFor(clusterName).Scheme()); err != nil {
 				err = errors.Wrapf(err, "could not set reference for (%s) %s/%s", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName())
 				log.Println(err)
 				r.status.SetDegraded(statusmanager.OperatorConfig, "InternalError",
@@ -561,6 +568,11 @@ func updateIPsecMetric(newOperConfigSpec *operv1.NetworkSpec) {
 
 		ipsecMetrics.UpdateIPsecMetric(mode, legacyAPI)
 	}
+}
+
+func isCRD(obj *uns.Unstructured) bool {
+	gvk := obj.GroupVersionKind()
+	return gvk.Kind == "CustomResourceDefinition" && gvk.Group == "apiextensions.k8s.io"
 }
 
 func reconcileOperConfig(ctx context.Context, obj crclient.Object) []reconcile.Request {
