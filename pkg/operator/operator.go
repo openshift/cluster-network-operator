@@ -7,12 +7,6 @@ import (
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
-	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
-	"github.com/openshift/cluster-network-operator/pkg/controller"
-	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
-	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
-	"github.com/openshift/cluster-network-operator/pkg/hypershift"
-	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
@@ -24,6 +18,14 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
+	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/controller"
+	"github.com/openshift/cluster-network-operator/pkg/controller/connectivitycheck"
+	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 
 	ctlog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -60,7 +62,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		MapperProvider: func(cfg *rest.Config, httpClient *http.Client) (meta.RESTMapper, error) {
 			return o.client.Default().RESTMapper(), nil
 		},
-		Logger: klog.Background(),
+		Metrics: metricsserver.Options{BindAddress: "0"},
+		Logger:  klog.Background(),
 	})
 	if err != nil {
 		return err
