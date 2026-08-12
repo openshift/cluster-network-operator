@@ -49,9 +49,9 @@ func addTLSInfoToRenderData(data map[string]interface{}, bootstrapResult *bootst
 		converted := crypto.OpenSSLToIANACipherSuites([]string{cipher})
 		if len(converted) > 0 {
 			ianaCiphers = append(ianaCiphers, converted...)
-		} else {
-			ianaCiphers = append(ianaCiphers, cipher)
 		}
+		// If conversion fails, silently drop the cipher (it's unsupported by Go's crypto/tls).
+		// The library-go OpenSSLToIANACipherSuites function already logs dropped ciphers at V(4).
 	}
 
 	// Add Go-style TLS parameters (IANA cipher names, comma-separated)
