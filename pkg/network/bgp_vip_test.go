@@ -68,7 +68,7 @@ func TestBuildFRRConfigurationObjects(t *testing.T) {
 // installer-shaped config.json payload with every optional field set.
 func TestBuildFRRConfigurationObjectsAllOptionalFields(t *testing.T) {
 	g := NewGomegaWithT(t)
-	raw := `{"localASN":64512,"defaultPeers":[{"peerAddress":"192.168.111.1","peerASN":64513,"password":"s3cret","bfdEnabled":"true","ebgpMultiHop":"true","holdTime":"90s","keepaliveTime":"30s"}],"communities":["64512:100"],"apiVIPs":["192.168.111.5"],"ingressVIPs":["192.168.111.4"],"hostOverrides":{"master-0":[{"peerAddress":"192.168.1.1","peerASN":64513}]}}`
+	raw := `{"localASN":64512,"defaultPeers":[{"peerAddress":"192.168.111.1","peerASN":64513,"password":"s3cret","bfdEnabled":"true","ebgpMultiHop":"true","port":1790,"holdTime":"90","keepaliveTime":"30"}],"communities":["64512:100"],"apiVIPs":["192.168.111.5"],"ingressVIPs":["192.168.111.4"],"hostOverrides":{"master-0":[{"peerAddress":"192.168.1.1","peerASN":64513}]}}`
 	var cfg bgpVIPConfigData
 	g.Expect(json.Unmarshal([]byte(raw), &cfg)).To(Succeed())
 	g.Expect(cfg.DefaultPeers).To(HaveLen(1))
@@ -93,6 +93,7 @@ func TestBuildFRRConfigurationObjectsAllOptionalFields(t *testing.T) {
 	g.Expect(neighbor["ebgpMultiHop"]).To(Equal(true))
 	g.Expect(neighbor["holdTime"]).To(Equal("90s"))
 	g.Expect(neighbor["keepaliveTime"]).To(Equal("30s"))
+	g.Expect(neighbor["port"]).To(Equal(int64(1790)))
 	g.Expect(neighbor["password"]).To(Equal("s3cret"))
 	g.Expect(neighbor["bfdProfile"]).To(Equal("vip-bfd"))
 	_, found, err = uns.NestedMap(neighbor, "toAdvertise")
@@ -177,7 +178,7 @@ func TestValidateBGPVIPConfig(t *testing.T) {
 	g.Expect(validateBGPVIPConfig(badOverride)).NotTo(Succeed())
 
 	badDuration := valid
-	badDuration.DefaultPeers = []bgpVIPPeer{{PeerAddress: "192.168.111.1", PeerASN: 64513, HoldTime: "ninety"}}
+	badDuration.DefaultPeers = []bgpVIPPeer{{PeerAddress: "192.168.111.1", PeerASN: 64513, HoldTime: "ninety", KeepaliveTime: "30"}}
 	g.Expect(validateBGPVIPConfig(badDuration)).NotTo(Succeed())
 
 	badBool := valid

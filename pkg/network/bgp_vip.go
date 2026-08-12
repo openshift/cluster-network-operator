@@ -7,6 +7,7 @@ import (
 	"net"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,11 +29,14 @@ import (
 // BFDEnabled and EBGPMultiHop match the installer's BGPPeerConfig
 // serialization.
 type bgpVIPPeer struct {
-	PeerAddress   string `json:"peerAddress"`
-	PeerASN       int64  `json:"peerASN"`
-	Password      string `json:"password,omitempty"`
-	BFDEnabled    string `json:"bfdEnabled,omitempty"`
-	EBGPMultiHop  string `json:"ebgpMultiHop,omitempty"`
+	PeerAddress  string `json:"peerAddress"`
+	PeerASN      int64  `json:"peerASN"`
+	Password     string `json:"password,omitempty"`
+	Port         int32  `json:"port,omitempty"`
+	BFDEnabled   string `json:"bfdEnabled,omitempty"`
+	EBGPMultiHop string `json:"ebgpMultiHop,omitempty"`
+	// HoldTime and KeepaliveTime are whole seconds as decimal strings
+	// (e.g. "90"), matching FRR's timers syntax; set together or not at all.
 	HoldTime      string `json:"holdTime,omitempty"`
 	KeepaliveTime string `json:"keepaliveTime,omitempty"`
 }
@@ -82,13 +86,22 @@ func validateBGPVIPConfig(cfg bgpVIPConfigData) error {
 		if peer.PeerASN < 1 || peer.PeerASN > 4294967295 {
 			return fmt.Errorf("BGP peer %s: peerASN %d out of range", peer.PeerAddress, peer.PeerASN)
 		}
+		if (peer.HoldTime == "") != (peer.KeepaliveTime == "") {
+			return fmt.Errorf("BGP peer %s: holdTime and keepaliveTime must be set together", peer.PeerAddress)
+		}
 		for _, d := range []string{peer.HoldTime, peer.KeepaliveTime} {
 			if d == "" {
 				continue
 			}
-			if _, err := time.ParseDuration(d); err != nil {
-				return fmt.Errorf("BGP peer %s: invalid duration %q", peer.PeerAddress, d)
+			// The peer-data contract carries whole seconds as decimal
+			// strings (FRR's timers take bare seconds).
+			sec, err := strconv.ParseInt(d, 10, 32)
+			if err != nil || sec < 0 || sec > 65535 {
+				return fmt.Errorf("BGP peer %s: invalid timer %q: must be whole seconds between 0 and 65535", peer.PeerAddress, d)
 			}
+		}
+		if peer.Port != 0 && (peer.Port < 1 || peer.Port > 65535) {
+			return fmt.Errorf("BGP peer %s: invalid port %d", peer.PeerAddress, peer.Port)
 		}
 		for _, v := range []string{peer.BFDEnabled, peer.EBGPMultiHop} {
 			if v != "" && v != "true" && v != "false" {
@@ -190,11 +203,16 @@ func buildFRRConfigurationObjects(cfg bgpVIPConfigData) ([]*uns.Unstructured, er
 		if peer.EBGPMultiHop == "true" {
 			neighbor["ebgpMultiHop"] = true
 		}
+		if peer.Port != 0 {
+			neighbor["port"] = int64(peer.Port)
+		}
+		// The FRRConfiguration timer fields are metav1.Duration strings;
+		// the peer data carries bare seconds.
 		if peer.HoldTime != "" {
-			neighbor["holdTime"] = peer.HoldTime
+			neighbor["holdTime"] = peer.HoldTime + "s"
 		}
 		if peer.KeepaliveTime != "" {
-			neighbor["keepaliveTime"] = peer.KeepaliveTime
+			neighbor["keepaliveTime"] = peer.KeepaliveTime + "s"
 		}
 		neighbors = append(neighbors, neighbor)
 	}
