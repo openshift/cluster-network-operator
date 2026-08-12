@@ -10,6 +10,20 @@ metadata:
   namespace: netobserv-operator
 ---
 apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: netobserv-dev
+  namespace: openshift-marketplace
+spec:
+  sourceType: grpc
+  image: quay.io/netobserv/network-observability-operator-catalog:v0.0.0-sha-4cfb3f87
+  displayName: NetObserv development catalog
+  publisher: Me
+  updateStrategy:
+    registryPoll:
+      interval: 1m
+---
+apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: netobserv-operator
@@ -18,5 +32,5 @@ spec:
   channel: stable
   installPlanApproval: Automatic
   name: netobserv-operator
-  source: redhat-operators
+  source: netobserv-dev
   sourceNamespace: openshift-marketplace
