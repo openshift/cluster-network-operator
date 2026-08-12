@@ -29,7 +29,7 @@ metadata:
   name: netobserv-operator
   namespace: netobserv-operator
 spec:
-  channel: stable
+  channel: latest
   installPlanApproval: Automatic
   name: netobserv-operator
   source: netobserv-dev
