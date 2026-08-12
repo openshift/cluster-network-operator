@@ -141,21 +141,15 @@ func createTestClusterExtension(t *testing.T, name string, installed bool) *unst
 	return ce
 }
 
-func createTestCSV(name string, succeeded bool) *unstructured.Unstructured {
+func createTestCSV(name, phase string) *unstructured.Unstructured {
 	csv := &unstructured.Unstructured{}
 	csv.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "operators.coreos.com",
 		Version: "v1alpha1",
 		Kind:    "ClusterServiceVersion",
 	})
-	csv.SetName(name + ".v1.0.0")
+	csv.SetName(name)
 	csv.SetNamespace(OperatorNamespace)
-
-	// Set status phase
-	phase := "Succeeded"
-	if !succeeded {
-		phase = "Failed"
-	}
 	_ = unstructured.SetNestedField(csv.Object, phase, "status", "phase")
 
 	return csv
@@ -761,13 +755,57 @@ func TestIsNetObservOperatorInstalled_CRDMissingButOLMv1Present(t *testing.T) {
 	g.Expect(ceExists).To(BeTrue())
 }
 
+func TestIsNetObservOperatorInstalled_OLMv0InstallationFailed(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+
+	crd := createTestCRD("flowcollectors.flows.netobserv.io")
+	csv := createTestCSV("network-observability-operator.v1.12.1", "Failed")
+	_ = unstructured.SetNestedField(csv.Object, "InstallCheckFailed", "status", "reason")
+	_ = unstructured.SetNestedField(csv.Object, "install timeout", "status", "message")
+
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(crd, csv).Build()
+
+	r := &ReconcileObservability{client: client}
+
+	installed, ceExists, err := r.isNetObservOperatorInstalled(context.TODO())
+
+	g.Expect(err).To(HaveOccurred())
+	g.Expect(err.Error()).To(ContainSubstring("OLMv0 installation error"))
+	g.Expect(err.Error()).To(ContainSubstring("ClusterServiceVersion installation failed"))
+	g.Expect(installed).To(BeFalse())
+	g.Expect(ceExists).To(BeFalse())
+}
+
+func TestIsNetObservOperatorInstalled_OLMv0NotInstalledYet(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+
+	crd := createTestCRD("flowcollectors.flows.netobserv.io")
+	csv := createTestCSV("network-observability-operator.v1.12.1", "Installing")
+
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(crd, csv).Build()
+
+	r := &ReconcileObservability{client: client}
+
+	installed, ceExists, err := r.isNetObservOperatorInstalled(context.TODO())
+
+	// CRD exists, CSV is installing — neither OLM reports success
+	g.Expect(err).To(HaveOccurred())
+	g.Expect(err.Error()).To(ContainSubstring("could not identify how Network Observability Operator was installed"))
+	g.Expect(installed).To(BeFalse())
+	g.Expect(ceExists).To(BeFalse())
+}
+
 func TestIsNetObservOperatorInstalled_CRDMissingButOLMv0Present(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	scheme := runtime.NewScheme()
 
 	// No CRD, but CSV exists
-	csv := createTestCSV("netobserv-operator", true)
+	csv := createTestCSV("network-observability-operator.v1.12.1", "Succeeded")
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(csv).Build()
 

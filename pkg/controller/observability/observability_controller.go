@@ -39,10 +39,9 @@ const (
 
 	NetworkObservabilityDeployed = "NetworkObservabilityDeployed"
 
-	checkInterval        = 10 * time.Second
-	checkTimeout         = 10 * time.Minute
 	requeueAfterOLM      = 5 * time.Minute  // Requeue interval for OLM operations (install/wait)
 	requeueAfterStandard = 30 * time.Second // Requeue interval for standard operations
+	installTimeout       = 20 * time.Minute // Stop retrying installation after this duration
 )
 
 // Add creates a new controller. Referenced in add_networkconfig.go.
@@ -105,6 +104,14 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 		return reconcile.Result{}, nil
 	}
 
+	// Check if installation has been failing for too long
+	if r.hasInstallTimedOut(ctx) {
+		klog.Warning("Network Observability installation timed out, giving up")
+		_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentTimedOut",
+			fmt.Sprintf("Network Observability installation timed out after %v", installTimeout))
+		return reconcile.Result{}, nil
+	}
+
 	// Proceed with installation/reinstallation
 	installed, ceExists, err := r.isNetObservOperatorInstalled(ctx)
 	if err != nil {
@@ -122,11 +129,13 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 				return reconcile.Result{RequeueAfter: requeueAfterOLM}, nil
 			}
 			klog.Infof("Applied OLM v0 Subscription for netobserv-operator, will check installation status in %v", requeueAfterOLM)
+			_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "InstallationInProgress", "Network Observability Operator installation initiated")
 			return reconcile.Result{RequeueAfter: requeueAfterOLM}, nil
 		}
 
 		// OLM v1 ClusterExtension exists but installation not complete yet
 		klog.Infof("netobserv-operator installation in progress, will recheck in %v", requeueAfterOLM)
+		_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "InstallationInProgress", "Network Observability Operator installation in progress")
 		return reconcile.Result{RequeueAfter: requeueAfterOLM}, nil
 	}
 
@@ -189,6 +198,25 @@ func (r *ReconcileObservability) wasNetworkObservabilityDeployed(ctx context.Con
 	}
 
 	return false, nil
+}
+
+// hasInstallTimedOut returns true if the installation has been in a non-success
+// state for longer than installTimeout, or has already been marked as timed out.
+func (r *ReconcileObservability) hasInstallTimedOut(ctx context.Context) bool {
+	network := &operatorv1.Network{}
+	if err := r.client.Get(ctx, types.NamespacedName{Name: NetworkCRName}, network); err != nil {
+		return false
+	}
+
+	condition := operatorv1helpers.FindOperatorCondition(network.Status.Conditions, NetworkObservabilityDeployed)
+	if condition == nil || condition.Status != operatorv1.ConditionFalse {
+		return false
+	}
+	if condition.Reason == "DeploymentTimedOut" {
+		return true
+	}
+
+	return time.Since(condition.LastTransitionTime.Time) > installTimeout
 }
 
 // setNetworkObservabilityCondition sets the NetworkObservabilityDeployed condition
@@ -444,7 +472,7 @@ func (r *ReconcileObservability) checkOLMv0Installation(ctx context.Context) (bo
 	// Look for netobserv operator CSV
 	for _, item := range csvList.Items {
 		name := item.GetName()
-		// CSV name for OLMv0 is like this: network-observabililty-operator.v1.2.3
+		// CSV name for OLMv0 is like this: network-observability-operator.v1.2.3
 		if strings.HasPrefix(name, "network-observability-operator") {
 			// Check the CSV phase
 			phase, found, err := unstructured.NestedString(item.Object, "status", "phase")
