@@ -31,6 +31,6 @@ metadata:
 spec:
   channel: latest
   installPlanApproval: Automatic
-  name: openshift-netobserv-operator
+  name: netobserv-operator
   source: netobserv-dev
   sourceNamespace: openshift-marketplace
