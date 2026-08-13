@@ -8,10 +8,19 @@ metadata:
     component: frr-k8s-statuscleaner
   annotations:
     release.openshift.io/version: "{{.ReleaseVersion}}"
+{{- if .IsSNO }}
+    networkoperator.openshift.io/pre-patch: '{"spec":{"strategy":{"type":"Recreate","rollingUpdate":null}}}'
+{{- end }}
 spec:
 {{- if .IsSNO }}
   strategy:
     type: Recreate
+{{- else }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
 {{- end }}
   selector:
     matchLabels:
