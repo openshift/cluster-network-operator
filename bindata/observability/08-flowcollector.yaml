@@ -22,4 +22,4 @@ spec:
   deploymentModel: Service
   loki:
     enable: false
-  namespace: netobserv
+  namespace: openshift-network-observability
