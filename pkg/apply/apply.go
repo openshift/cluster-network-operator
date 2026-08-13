@@ -108,6 +108,23 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 		fieldManager = fmt.Sprintf("%s/%s", fieldManager, subcontroller)
 	}
 
+	// If pre-patch is specified, apply it as a strategic-merge-patch to the live
+	// object before SSA. This handles cases where SSA cannot remove a field it
+	// does not own (e.g. defaulted rollingUpdate when switching to Recreate).
+	// The pre-patch is silently skipped if the object does not exist yet, making
+	// this mainly relevant on upgrades where defaulted fields must be removed.
+	if prePatch, ok := obj.GetAnnotations()[names.PrePatchAnnotation]; ok {
+		log.Printf("Object %s has pre-patch annotation, attempting strategic-merge-patch before SSA", objDesc)
+		patchOptions := metav1.PatchOptions{FieldManager: fieldManager}
+		_, err := clusterClient.Dynamic().Resource(rm.Resource).Namespace(namespace).Patch(
+			ctx, name, types.StrategicMergePatchType, []byte(prePatch), patchOptions)
+		if apierrors.IsNotFound(err) {
+			log.Printf("Object %s not found, skipping pre-patch", objDesc)
+		} else if err != nil {
+			return fmt.Errorf("failed to pre-patch %s: %w", objDesc, err)
+		}
+	}
+
 	// Use server-side apply to merge the desired object with the object on disk
 	patchOptions := metav1.PatchOptions{
 		// It is considered best-practice for controllers to force

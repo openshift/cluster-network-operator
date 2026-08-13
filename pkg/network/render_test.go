@@ -21,6 +21,7 @@ import (
 	apifeatures "github.com/openshift/api/features"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -702,12 +703,19 @@ func Test_renderFRRStatusCleanerStrategy(t *testing.T) {
 		g := NewWithT(t)
 		d := render(1)
 		g.Expect(d.Spec.Strategy.Type).To(Equal(appsv1.RecreateDeploymentStrategyType))
+		g.Expect(d.Annotations).To(
+			HaveKeyWithValue(
+				names.PrePatchAnnotation,
+				`{"spec":{"strategy":{"type":"Recreate","rollingUpdate":null}}}`,
+			),
+		)
 	})
 
-	t.Run("HA: no strategy override", func(t *testing.T) {
+	t.Run("HA: strategy is RollingUpdate", func(t *testing.T) {
 		g := NewWithT(t)
 		d := render(3)
-		g.Expect(d.Spec.Strategy.Type).To(BeEmpty())
+		g.Expect(d.Spec.Strategy.Type).To(Equal(appsv1.RollingUpdateDeploymentStrategyType))
+		g.Expect(d.Annotations).NotTo(HaveKey(names.PrePatchAnnotation))
 	})
 }
 
