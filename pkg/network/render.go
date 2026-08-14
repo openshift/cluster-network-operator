@@ -17,7 +17,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -232,7 +231,7 @@ func Validate(conf *operv1.NetworkSpec) error {
 	errs = append(errs, validateMigration(conf)...)
 
 	if len(errs) > 0 {
-		return errors.Errorf("invalid configuration: %v", errs)
+		return fmt.Errorf("invalid configuration: %v", errs)
 	}
 	return nil
 }
@@ -291,7 +290,7 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec, infraStatus *bootstrap.InfraSt
 
 	// Changing AdditionalNetworks is supported
 	if !reflect.DeepEqual(prev.DisableMultiNetwork, next.DisableMultiNetwork) {
-		errs = append(errs, errors.Errorf("cannot change DisableMultiNetwork"))
+		errs = append(errs, fmt.Errorf("cannot change DisableMultiNetwork"))
 	}
 
 	// Check MultiNetworkPolicy
@@ -301,7 +300,7 @@ func IsChangeSafe(prev, next *operv1.NetworkSpec, infraStatus *bootstrap.InfraSt
 	errs = append(errs, isKubeProxyChangeSafe(prev, next)...)
 
 	if len(errs) > 0 {
-		return errors.Errorf("invalid configuration: %v", errs)
+		return fmt.Errorf("invalid configuration: %v", errs)
 	}
 	return nil
 }
@@ -328,7 +327,7 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 	// Forbid changing service network during a migration
 	if prev.Migration != nil {
 		if !reflect.DeepEqual(prev.ServiceNetwork, next.ServiceNetwork) {
-			return errors.Errorf("cannot change ServiceNetwork during migration")
+			return fmt.Errorf("cannot change ServiceNetwork during migration")
 		}
 		return nil
 	}
@@ -355,7 +354,7 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 	case !reflect.DeepEqual(prev.ServiceNetwork, next.ServiceNetwork):
 		// If the ServiceNetwork has changed, but it's not part of a single<->dual stack migration
 		// then we do not support
-		return errors.Errorf("unsupported change to ServiceNetwork")
+		return fmt.Errorf("unsupported change to ServiceNetwork")
 	default:
 		// this is not a single/dual stack migration; check if the clusterNetwork change is ok
 		return isClusterNetworkChangeSafe(prev, next)
@@ -364,7 +363,7 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 	// Check if migration to DualStack is prohibited
 	if len(prev.ServiceNetwork) < len(next.ServiceNetwork) {
 		if !isConversionToDualStackSupported(infraRes.PlatformType) {
-			return errors.Errorf("%s does not allow conversion to dual-stack cluster", infraRes.PlatformType)
+			return fmt.Errorf("%s does not allow conversion to dual-stack cluster", infraRes.PlatformType)
 		}
 	}
 
@@ -374,7 +373,7 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 	if singleStack.ServiceNetwork[0] != dualStack.ServiceNetwork[0] {
 		// User changed the primary service network, or tried to swap the order of
 		// the primary and secondary networks.
-		return errors.Errorf("cannot change primary ServiceNetwork when migrating to/from dual-stack")
+		return fmt.Errorf("cannot change primary ServiceNetwork when migrating to/from dual-stack")
 	}
 
 	// Validate that the shared ClusterNetwork entries are unchanged, and that ALL of
@@ -386,11 +385,11 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 		if i < len(singleStack.ClusterNetwork) {
 			if !reflect.DeepEqual(singleStack.ClusterNetwork[i], dualStack.ClusterNetwork[i]) {
 				// Changed or re-ordered an existing ClusterNetwork element
-				return errors.Errorf("cannot change primary ClusterNetwork when migrating to/from dual-stack")
+				return fmt.Errorf("cannot change primary ClusterNetwork when migrating to/from dual-stack")
 			}
 		} else if utilnet.IsIPv6CIDRString(dualStack.ClusterNetwork[i].CIDR) == EntryZeroIsIPv6 {
 			// Added a new element of the existing IP family
-			return errors.Errorf("cannot add additional ClusterNetwork values of original IP family when migrating to dual stack")
+			return fmt.Errorf("cannot add additional ClusterNetwork values of original IP family when migrating to dual stack")
 		}
 	}
 
@@ -403,12 +402,12 @@ func isClusterNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
 	// support adding/removing additional clusterNetwork entries unless it's for a
 	// single/dual stack migration. in those cases validation is done in isNetworkChangeSafe()
 	if len(prev.ClusterNetwork) != len(next.ClusterNetwork) {
-		return errors.Errorf("adding/removing clusterNetwork entries of the same type is not supported")
+		return fmt.Errorf("adding/removing clusterNetwork entries of the same type is not supported")
 	}
 
 	// Only support changing ClusterNetwork CIDR if it's OVNK
 	if next.DefaultNetwork.Type != operv1.NetworkTypeOVNKubernetes {
-		return errors.Errorf("network type is %v. changing clusterNetwork entries is only supported for OVNKubernetes", next.DefaultNetwork.Type)
+		return fmt.Errorf("network type is %v. changing clusterNetwork entries is only supported for OVNKubernetes", next.DefaultNetwork.Type)
 	}
 
 	// sort prev and next just in case there was some re-ordering of the slice, since we
@@ -425,28 +424,28 @@ func isClusterNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
 	for i, e := range prev.ClusterNetwork {
 		prevIp, prevMask, err := net.ParseCIDR(e.CIDR)
 		if err != nil {
-			return errors.Errorf("error parsing CIDR from ClusterNetwork entry %s: %v", e.CIDR, err)
+			return fmt.Errorf("error parsing CIDR from ClusterNetwork entry %s: %v", e.CIDR, err)
 		}
 		nextIp, nextMask, err := net.ParseCIDR(next.ClusterNetwork[i].CIDR)
 		if err != nil {
-			return errors.Errorf("error parsing CIDR from ClusterNetwork entry %s: %v", next.ClusterNetwork[i].CIDR, err)
+			return fmt.Errorf("error parsing CIDR from ClusterNetwork entry %s: %v", next.ClusterNetwork[i].CIDR, err)
 		}
 		prevHostPrefix := e.HostPrefix
 		nextHostPrefix := next.ClusterNetwork[i].HostPrefix
 
 		// changing hostPrefix is not allowed
 		if prevHostPrefix != nextHostPrefix {
-			return errors.Errorf("modifying a clusterNetwork's hostPrefix value is unsupported")
+			return fmt.Errorf("modifying a clusterNetwork's hostPrefix value is unsupported")
 		}
 
 		if !prevIp.Equal(nextIp) {
-			return errors.Errorf("modifying IP network value for clusterNetwork CIDR is unsupported")
+			return fmt.Errorf("modifying IP network value for clusterNetwork CIDR is unsupported")
 		}
 
 		prevMaskSize, _ := prevMask.Mask.Size()
 		nextMaskSize, _ := nextMask.Mask.Size()
 		if prevMaskSize < nextMaskSize {
-			return errors.Errorf("reducing IP range with a larger CIDR mask for clusterNetwork CIDR is unsupported")
+			return fmt.Errorf("reducing IP range with a larger CIDR mask for clusterNetwork CIDR is unsupported")
 		}
 	}
 	return nil
@@ -466,7 +465,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 	for _, snet := range conf.ServiceNetwork {
 		_, cidr, err := net.ParseCIDR(snet)
 		if err != nil {
-			errs = append(errs, errors.Wrapf(err, "could not parse spec.serviceNetwork %s", snet))
+			errs = append(errs, fmt.Errorf("could not parse spec.serviceNetwork %s: %w", snet, err))
 			continue
 		}
 		if utilnet.IsIPv6CIDR(cidr) {
@@ -475,17 +474,17 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 			ipv4Service = true
 		}
 		if err := pool.Add(*cidr); err != nil {
-			errs = append(errs, errors.Errorf("Whole or subset of ServiceNetwork CIDR %s is already in use: %s", snet, err))
+			errs = append(errs, fmt.Errorf("whole or subset of ServiceNetwork CIDR %s is already in use: %s", snet, err))
 		}
 	}
 
 	// Validate count / dual-stack-ness
 	if len(conf.ServiceNetwork) == 0 {
-		errs = append(errs, errors.Errorf("spec.serviceNetwork must have at least 1 entry"))
+		errs = append(errs, fmt.Errorf("spec.serviceNetwork must have at least 1 entry"))
 	} else if len(conf.ServiceNetwork) == 2 && (!ipv4Service || !ipv6Service) {
-		errs = append(errs, errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network"))
+		errs = append(errs, fmt.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network"))
 	} else if len(conf.ServiceNetwork) > 2 {
-		errs = append(errs, errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network"))
+		errs = append(errs, fmt.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network"))
 	}
 
 	// validate clusternetwork
@@ -496,7 +495,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 	for _, cnet := range conf.ClusterNetwork {
 		_, cidr, err := net.ParseCIDR(cnet.CIDR)
 		if err != nil {
-			errs = append(errs, errors.Errorf("could not parse spec.clusterNetwork %s", cnet.CIDR))
+			errs = append(errs, fmt.Errorf("could not parse spec.clusterNetwork %s", cnet.CIDR))
 			continue
 		}
 		if utilnet.IsIPv6CIDR(cidr) {
@@ -509,24 +508,24 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 			ones, bits := cidr.Mask.Size()
 			// The comparison is inverted; smaller number is larger block
 			if cnet.HostPrefix < uint32(ones) {
-				errs = append(errs, errors.Errorf("hostPrefix %d is larger than its cidr %s",
+				errs = append(errs, fmt.Errorf("hostPrefix %d is larger than its cidr %s",
 					cnet.HostPrefix, cnet.CIDR))
 			}
 			if int(cnet.HostPrefix) > bits-2 {
-				errs = append(errs, errors.Errorf("hostPrefix %d is too small, must be a /%d or larger",
+				errs = append(errs, fmt.Errorf("hostPrefix %d is too small, must be a /%d or larger",
 					cnet.HostPrefix, bits-2))
 			}
 		}
 		if err := pool.Add(*cidr); err != nil {
-			errs = append(errs, errors.Errorf("Whole or subset of ClusterNetwork CIDR %s is already in use: %s", cnet.CIDR, err))
+			errs = append(errs, fmt.Errorf("whole or subset of ClusterNetwork CIDR %s is already in use: %s", cnet.CIDR, err))
 		}
 	}
 
 	if len(conf.ClusterNetwork) < 1 {
-		errs = append(errs, errors.Errorf("spec.clusterNetwork must have at least 1 entry"))
+		errs = append(errs, fmt.Errorf("spec.clusterNetwork must have at least 1 entry"))
 	}
 	if len(errs) == 0 && (ipv4Cluster != ipv4Service || ipv6Cluster != ipv6Service) {
-		errs = append(errs, errors.Errorf("spec.clusterNetwork and spec.serviceNetwork must either both be IPv4-only, both be IPv6-only, or both be dual-stack"))
+		errs = append(errs, fmt.Errorf("spec.clusterNetwork and spec.serviceNetwork must either both be IPv4-only, both be IPv6-only, or both be dual-stack"))
 	}
 
 	return errs
@@ -540,7 +539,7 @@ func validateMultus(conf *operv1.NetworkSpec) []error {
 	// Additional Networks are useless without Multus, so don't let them
 	// exist without Multus and confuse things (for now)
 	if !deployMultus && len(conf.AdditionalNetworks) > 0 {
-		return []error{errors.Errorf("additional networks cannot be specified without deploying Multus")}
+		return []error{fmt.Errorf("additional networks cannot be specified without deploying Multus")}
 	}
 	return []error{}
 }
@@ -560,10 +559,10 @@ func validateMigration(conf *operv1.NetworkSpec) []error {
 
 	if conf.Migration != nil {
 		if conf.Migration.NetworkType != "" {
-			errs = append(errs, errors.Errorf("network type migration is not supported"))
+			errs = append(errs, fmt.Errorf("network type migration is not supported"))
 		}
 		if conf.Migration.Features != nil {
-			errs = append(errs, errors.Errorf("network feature migration is not supported"))
+			errs = append(errs, fmt.Errorf("network feature migration is not supported"))
 		}
 	}
 	return errs
@@ -575,7 +574,7 @@ func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.B
 	client cnoclient.Client, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, bool, error) {
 	dn := conf.DefaultNetwork
 	if errs := validateDefaultNetwork(conf); len(errs) > 0 {
-		return nil, false, errors.Errorf("invalid Default Network configuration: %v", errs)
+		return nil, false, fmt.Errorf("invalid Default Network configuration: %v", errs)
 	}
 
 	if dn.Type == operv1.NetworkTypeOVNKubernetes {
@@ -594,7 +593,7 @@ func fillDefaultNetworkDefaults(conf, previous *operv1.NetworkSpec, hostMTU int)
 
 func isDefaultNetworkChangeSafe(prev, next *operv1.NetworkSpec) []error {
 	if prev.DefaultNetwork.Type != next.DefaultNetwork.Type {
-		return []error{errors.Errorf("cannot change default network type")}
+		return []error{fmt.Errorf("cannot change default network type")}
 	}
 
 	if prev.DefaultNetwork.Type == operv1.NetworkTypeOVNKubernetes {
@@ -618,7 +617,7 @@ func validateAdditionalNetworks(conf *operv1.NetworkSpec) []error {
 				out = append(out, errs...)
 			}
 		default:
-			out = append(out, errors.Errorf("unknown or unsupported NetworkType: %s", an.Type))
+			out = append(out, fmt.Errorf("unknown or unsupported NetworkType: %s", an.Type))
 		}
 	}
 	return out
@@ -631,7 +630,7 @@ func renderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 
 	// validate additional network configuration
 	if errs := validateAdditionalNetworks(conf); len(errs) > 0 {
-		return nil, errors.Errorf("invalid Additional Network Configuration: %v", errs)
+		return nil, fmt.Errorf("invalid Additional Network Configuration: %v", errs)
 	}
 
 	if len(ans) == 0 {
@@ -654,7 +653,7 @@ func renderAdditionalNetworks(conf *operv1.NetworkSpec, manifestDir string) ([]*
 			}
 			out = append(out, objs...)
 		default:
-			return nil, errors.Errorf("unknown or unsupported NetworkType: %s", an.Type)
+			return nil, fmt.Errorf("unknown or unsupported NetworkType: %s", an.Type)
 		}
 	}
 
@@ -753,7 +752,7 @@ func renderNetworkDiagnostics(operConf *operv1.NetworkSpec, clusterConf *configv
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network-diagnostics"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render network-diagnostics manifests")
+		return nil, fmt.Errorf("failed to render network-diagnostics manifests: %w", err)
 	}
 
 	return manifests, nil
@@ -765,7 +764,7 @@ func renderNetworkPublic(manifestDir string) ([]*uns.Unstructured, error) {
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network", "public"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render network/public manifests")
+		return nil, fmt.Errorf("failed to render network/public manifests: %w", err)
 	}
 	return manifests, nil
 }
@@ -776,7 +775,7 @@ func renderCNO(manifestDir string) ([]*uns.Unstructured, error) {
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "cluster-network-operator"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render cluster-network-operator manifests")
+		return nil, fmt.Errorf("failed to render cluster-network-operator manifests: %w", err)
 	}
 	return manifests, nil
 }
@@ -793,7 +792,7 @@ func renderIPTablesAlerter(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network", "iptables-alerter"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render network/iptables-alerter manifests")
+		return nil, fmt.Errorf("failed to render network/iptables-alerter manifests: %w", err)
 	}
 	return manifests, nil
 }
@@ -818,7 +817,7 @@ func renderNetworkingConsolePlugin(manifestDir string, bootstrapResult *bootstra
 
 	consolePluginImage, ok := os.LookupEnv("NETWORKING_CONSOLE_PLUGIN_IMAGE")
 	if !ok {
-		return nil, errors.Errorf("Could not get NETWORKING_CONSOLE_PLUGIN_IMAGE env var")
+		return nil, fmt.Errorf("could not get NETWORKING_CONSOLE_PLUGIN_IMAGE env var")
 	}
 	data.Data["NetworkingConsolePluginImage"] = consolePluginImage
 
@@ -826,7 +825,7 @@ func renderNetworkingConsolePlugin(manifestDir string, bootstrapResult *bootstra
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "networking-console-plugin"), &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render networking-console-plugin manifests")
+		return nil, fmt.Errorf("failed to render networking-console-plugin manifests: %w", err)
 	}
 
 	return manifests, nil
@@ -841,7 +840,7 @@ func registerNetworkingConsolePlugin(bootstrapResult *bootstrap.BootstrapResult,
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		console, err := cl.ClientFor("").OpenshiftOperatorClient().OperatorV1().Consoles().Get(context.TODO(), "cluster", metav1.GetOptions{})
 		if err != nil {
-			return errors.Wrap(err, "Failed to get Console Operator resource")
+			return fmt.Errorf("failed to get Console Operator resource: %w", err)
 		}
 
 		if sets.NewString(console.Spec.Plugins...).Has(pluginName) {

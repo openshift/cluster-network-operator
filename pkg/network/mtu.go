@@ -5,7 +5,7 @@ package network
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
+
 	"github.com/vishvananda/netlink"
 )
 
@@ -21,10 +21,10 @@ func GetDefaultMTU() (int, error) {
 	// TODO(cdc) handle v6-only nodes
 	routes, err := netlink.RouteList(nil, netlink.FAMILY_ALL)
 	if err != nil {
-		return 0, errors.Wrapf(err, "could not list routes")
+		return 0, fmt.Errorf("could not list routes: %w", err)
 	}
 	if len(routes) == 0 {
-		return 0, errors.Errorf("got no routes")
+		return 0, fmt.Errorf("got no routes")
 	}
 
 	const maxMTU = 65536
@@ -42,7 +42,7 @@ func GetDefaultMTU() (int, error) {
 			for _, p := range route.MultiPath {
 				link, err := netlink.LinkByIndex(p.LinkIndex)
 				if err != nil {
-					return 0, errors.Wrapf(err, "could not retrieve link id %d", p.LinkIndex)
+					return 0, fmt.Errorf("could not retrieve link id %d: %w", p.LinkIndex, err)
 				}
 
 				newmtu := link.Attrs().MTU
@@ -54,7 +54,7 @@ func GetDefaultMTU() (int, error) {
 		}
 		link, err := netlink.LinkByIndex(route.LinkIndex)
 		if err != nil {
-			return 0, errors.Wrapf(err, "could not retrieve link id %d", route.LinkIndex)
+			return 0, fmt.Errorf("could not retrieve link id %d: %w", route.LinkIndex, err)
 		}
 
 		newmtu := link.Attrs().MTU
@@ -63,7 +63,7 @@ func GetDefaultMTU() (int, error) {
 		}
 	}
 	if mtu > maxMTU {
-		return 0, errors.Errorf("unable to determine MTU")
+		return 0, fmt.Errorf("unable to determine MTU")
 	}
 
 	return mtu, nil

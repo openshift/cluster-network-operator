@@ -16,7 +16,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/cluster-network-operator/pkg/util/k8s"
 	"github.com/openshift/cluster-network-operator/pkg/util/validation"
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -194,7 +193,7 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 
 	manifests, err := render.RenderDirs(manifestDirs, &data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to render network-node-identity manifests")
+		return nil, fmt.Errorf("failed to render network-node-identity manifests: %w", err)
 	}
 
 	applyWebhook := true

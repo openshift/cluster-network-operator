@@ -11,7 +11,6 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -63,7 +62,7 @@ func RenderDirs(manifestDirs []string, d *RenderData) ([]*unstructured.Unstructu
 
 			return nil
 		}); err != nil {
-			return nil, errors.Wrap(err, "error listing manifests")
+			return nil, fmt.Errorf("error listing manifests: %w", err)
 		}
 	}
 	// sort files by filename, not full path
@@ -108,16 +107,16 @@ func RenderTemplate(path string, d *RenderData) ([]*unstructured.Unstructured, e
 
 	source, err := os.ReadFile(path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read manifest %s", path)
+		return nil, fmt.Errorf("failed to read manifest %s: %w", path, err)
 	}
 
 	if _, err := tmpl.Parse(string(source)); err != nil {
-		return nil, errors.Wrapf(err, "failed to parse manifest %s as template", path)
+		return nil, fmt.Errorf("failed to parse manifest %s as template: %w", path, err)
 	}
 
 	rendered := bytes.Buffer{}
 	if err := tmpl.Execute(&rendered, d.Data); err != nil {
-		return nil, errors.Wrapf(err, "failed to render manifest %s", path)
+		return nil, fmt.Errorf("failed to render manifest %s: %w", path, err)
 	}
 
 	out := []*unstructured.Unstructured{}
@@ -134,7 +133,7 @@ func RenderTemplate(path string, d *RenderData) ([]*unstructured.Unstructured, e
 			if err == io.EOF {
 				break
 			}
-			return nil, errors.Wrapf(err, "failed to unmarshal manifest %s", path)
+			return nil, fmt.Errorf("failed to unmarshal manifest %s: %w", path, err)
 		}
 		out = append(out, &u)
 	}

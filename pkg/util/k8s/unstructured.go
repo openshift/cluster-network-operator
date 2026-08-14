@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/pkg/errors"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
@@ -16,11 +15,11 @@ import (
 func ToUnstructured(obj interface{}) (*uns.Unstructured, error) {
 	b, err := json.Marshal(obj)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to convert to unstructured (marshal)")
+		return nil, fmt.Errorf("failed to convert to unstructured (marshal): %w", err)
 	}
 	u := &uns.Unstructured{}
 	if err := json.Unmarshal(b, u); err != nil {
-		return nil, errors.Wrapf(err, "failed to convert to unstructured (unmarshal)")
+		return nil, fmt.Errorf("failed to convert to unstructured (unmarshal): %w", err)
 	}
 	return u, nil
 }

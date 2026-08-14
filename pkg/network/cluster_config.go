@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"net"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -11,8 +12,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilnet "k8s.io/utils/net"
-
-	"github.com/pkg/errors"
 )
 
 // list of known plugins that require hostPrefix to be set
@@ -30,7 +29,7 @@ func ValidateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.
 	for _, snet := range clusterConfig.Spec.ServiceNetwork {
 		_, cidr, err := net.ParseCIDR(snet)
 		if err != nil {
-			return errors.Wrapf(err, "could not parse spec.serviceNetwork %s", snet)
+			return fmt.Errorf("could not parse spec.serviceNetwork %s: %w", snet, err)
 		}
 		if utilnet.IsIPv6CIDR(cidr) {
 			ipv6Service = true
@@ -44,11 +43,11 @@ func ValidateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.
 
 	// Validate count / dual-stack-ness
 	if len(clusterConfig.Spec.ServiceNetwork) == 0 {
-		return errors.Errorf("spec.serviceNetwork must have at least 1 entry")
+		return fmt.Errorf("spec.serviceNetwork must have at least 1 entry")
 	} else if len(clusterConfig.Spec.ServiceNetwork) == 2 && (!ipv4Service || !ipv6Service) {
-		return errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network")
+		return fmt.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network")
 	} else if len(clusterConfig.Spec.ServiceNetwork) > 2 {
-		return errors.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network")
+		return fmt.Errorf("spec.serviceNetwork must contain at most one IPv4 and one IPv6 network")
 	}
 
 	// validate clusternetwork
@@ -59,7 +58,7 @@ func ValidateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.
 	for _, cnet := range clusterConfig.Spec.ClusterNetwork {
 		_, cidr, err := net.ParseCIDR(cnet.CIDR)
 		if err != nil {
-			return errors.Errorf("could not parse spec.clusterNetwork %s", cnet.CIDR)
+			return fmt.Errorf("could not parse spec.clusterNetwork %s", cnet.CIDR)
 		}
 		if utilnet.IsIPv6CIDR(cidr) {
 			ipv6Cluster = true
@@ -71,11 +70,11 @@ func ValidateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.
 			ones, bits := cidr.Mask.Size()
 			// The comparison is inverted; smaller number is larger block
 			if cnet.HostPrefix < uint32(ones) {
-				return errors.Errorf("hostPrefix %d is larger than its cidr %s",
+				return fmt.Errorf("hostPrefix %d is larger than its cidr %s",
 					cnet.HostPrefix, cnet.CIDR)
 			}
 			if int(cnet.HostPrefix) > bits-2 {
-				return errors.Errorf("hostPrefix %d is too small, must be a /%d or larger",
+				return fmt.Errorf("hostPrefix %d is too small, must be a /%d or larger",
 					cnet.HostPrefix, bits-2)
 			}
 		}
@@ -85,19 +84,19 @@ func ValidateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.
 	}
 
 	if len(clusterConfig.Spec.ClusterNetwork) < 1 {
-		return errors.Errorf("spec.clusterNetwork must have at least 1 entry")
+		return fmt.Errorf("spec.clusterNetwork must have at least 1 entry")
 	}
 	if ipv4Cluster != ipv4Service || ipv6Cluster != ipv6Service {
-		return errors.Errorf("spec.clusterNetwork and spec.serviceNetwork must either both be IPv4-only, both be IPv6-only, or both be dual-stack")
+		return fmt.Errorf("spec.clusterNetwork and spec.serviceNetwork must either both be IPv4-only, both be IPv6-only, or both be dual-stack")
 	}
 
 	if clusterConfig.Spec.NetworkType == "" {
-		return errors.Errorf("spec.networkType is required")
+		return fmt.Errorf("spec.networkType is required")
 	}
 
 	if ipv4Service && ipv6Service || ipv4Cluster && ipv6Cluster {
 		if !isSupportedDualStackPlatform(infraRes.PlatformType, featureGates) {
-			return errors.Errorf("%s is not one of the supported platforms for dual stack", infraRes.PlatformType)
+			return fmt.Errorf("%s is not one of the supported platforms for dual stack", infraRes.PlatformType)
 		}
 	}
 

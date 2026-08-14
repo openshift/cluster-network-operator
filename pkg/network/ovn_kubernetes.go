@@ -24,7 +24,6 @@ import (
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -491,17 +490,17 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	for _, path := range cmPaths {
 		manifests, err := render.RenderTemplate(path, &data)
 		if err != nil {
-			return nil, progressing, errors.Wrapf(err, "failed to render ConfigMap template %q", path)
+			return nil, progressing, fmt.Errorf("failed to render ConfigMap template %q: %w", path, err)
 		}
 
 		// Hash each rendered ConfigMap object's data
 		for _, m := range manifests {
 			bytes, err := json.Marshal(m)
 			if err != nil {
-				return nil, progressing, errors.Wrapf(err, "failed to marshal ConfigMap %q manifest", path)
+				return nil, progressing, fmt.Errorf("failed to marshal ConfigMap %q manifest: %w", path, err)
 			}
 			if _, err := h.Write(bytes); err != nil {
-				return nil, progressing, errors.Wrapf(err, "failed to hash ConfigMap %q data", path)
+				return nil, progressing, fmt.Errorf("failed to hash ConfigMap %q data: %w", path, err)
 			}
 		}
 	}
@@ -512,7 +511,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	nodeNoOverlayHash := sha256.New()
 	nodeNoOverlayHashData := fmt.Sprintf("outboundSNAT=%v", data.Data["NoOverlayOutboundSNAT"])
 	if _, err := nodeNoOverlayHash.Write([]byte(nodeNoOverlayHashData)); err != nil {
-		return nil, progressing, errors.Wrap(err, "failed to hash node no-overlay config")
+		return nil, progressing, fmt.Errorf("failed to hash node no-overlay config: %w", err)
 	}
 	data.Data["OVNKubeNodeConfigHash"] = hex.EncodeToString(nodeNoOverlayHash.Sum(nil))
 
@@ -524,7 +523,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["NoOverlayManagedASNumber"],
 		data.Data["NoOverlayManagedTopology"])
 	if _, err := cpHash.Write([]byte(cpHashData)); err != nil {
-		return nil, progressing, errors.Wrap(err, "failed to hash control-plane config")
+		return nil, progressing, fmt.Errorf("failed to hash control-plane config: %w", err)
 	}
 	data.Data["OVNKubeControlPlaneConfigHash"] = hex.EncodeToString(cpHash.Sum(nil))
 
@@ -540,20 +539,20 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	manifests, err := render.RenderDirs(manifestDirs, &data)
 	if err != nil {
-		return nil, progressing, errors.Wrap(err, "failed to render manifests")
+		return nil, progressing, fmt.Errorf("failed to render manifests: %w", err)
 	}
 	objs = append(objs, manifests...)
 
 	err = setOVNObjectAnnotation(objs, names.NetworkHybridOverlayAnnotation, hybridOverlayStatus)
 	if err != nil {
-		return nil, progressing, errors.Wrapf(err, "failed to set the status of hybrid overlay %s annotation on ovnkube daemonset and deployment", hybridOverlayStatus)
+		return nil, progressing, fmt.Errorf("failed to set the status of hybrid overlay %s annotation on ovnkube daemonset and deployment: %w", hybridOverlayStatus, err)
 	}
 
 	if len(bootstrapResult.OVN.OVNKubernetesConfig.SmartNicModeNodes) > 0 {
 		data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_SMART_NIC
 		manifests, err = render.RenderTemplate(filepath.Join(manifestSubDir, "ovnkube-node.yaml"), &data)
 		if err != nil {
-			return nil, progressing, errors.Wrap(err, "failed to render manifests for smart-nic")
+			return nil, progressing, fmt.Errorf("failed to render manifests for smart-nic: %w", err)
 		}
 		objs = append(objs, manifests...)
 	}
@@ -562,7 +561,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_DPU_HOST
 		manifests, err = render.RenderTemplate(filepath.Join(manifestSubDir, "ovnkube-node.yaml"), &data)
 		if err != nil {
-			return nil, progressing, errors.Wrap(err, "failed to render manifests for dpu-host")
+			return nil, progressing, fmt.Errorf("failed to render manifests for dpu-host: %w", err)
 		}
 		objs = append(objs, manifests...)
 	}
@@ -573,7 +572,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_DPU
 		manifests, err = render.RenderTemplate(filepath.Join(commonManifestDir, "error-cni.yaml"), &data)
 		if err != nil {
-			return nil, progressing, errors.Wrap(err, "failed to render manifests for dpu")
+			return nil, progressing, fmt.Errorf("failed to render manifests for dpu: %w", err)
 		}
 		objs = append(objs, manifests...)
 
@@ -1184,7 +1183,7 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 		}
 	}
 	if !cnHasIPv6 && !cnHasIPv4 {
-		out = append(out, errors.Errorf("ClusterNetwork cannot be empty"))
+		out = append(out, fmt.Errorf("ClusterNetwork cannot be empty"))
 	}
 
 	var snHasIPv4, snHasIPv6 bool
@@ -1196,14 +1195,14 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 		}
 	}
 	if !snHasIPv6 && !snHasIPv4 {
-		out = append(out, errors.Errorf("ServiceNetwork cannot be empty"))
+		out = append(out, fmt.Errorf("ServiceNetwork cannot be empty"))
 	}
 
 	if cnHasIPv4 != snHasIPv4 || cnHasIPv6 != snHasIPv6 {
-		out = append(out, errors.Errorf("ClusterNetwork and ServiceNetwork must have matching IP families"))
+		out = append(out, fmt.Errorf("ClusterNetwork and ServiceNetwork must have matching IP families"))
 	}
 	if len(conf.ServiceNetwork) > 2 || (len(conf.ServiceNetwork) == 2 && (!snHasIPv4 || !snHasIPv6)) {
-		out = append(out, errors.Errorf("ServiceNetwork must have either a single CIDR or a dual-stack pair of CIDRs"))
+		out = append(out, fmt.Errorf("ServiceNetwork must have either a single CIDR or a dual-stack pair of CIDRs"))
 	}
 
 	oc := conf.DefaultNetwork.OVNKubernetesConfig
@@ -1213,10 +1212,10 @@ func validateOVNKubernetes(conf *operv1.NetworkSpec) []error {
 			minMTU = MinMTUIPv6
 		}
 		if oc.MTU != nil && (*oc.MTU < minMTU || *oc.MTU > MaxMTU) {
-			out = append(out, errors.Errorf("invalid MTU %d", *oc.MTU))
+			out = append(out, fmt.Errorf("invalid MTU %d", *oc.MTU))
 		}
 		if oc.GenevePort != nil && (*oc.GenevePort < 1 || *oc.GenevePort > 65535) {
-			out = append(out, errors.Errorf("invalid GenevePort %d", *oc.GenevePort))
+			out = append(out, fmt.Errorf("invalid GenevePort %d", *oc.GenevePort))
 		}
 	}
 
@@ -1251,7 +1250,7 @@ func ValidateMTUForNoOverlay(conf *operv1.NetworkSpec, hostMTU int) error {
 	}
 	if oc.MTU == nil && hostMTU == 0 {
 		// This should not happen: fillOVNKubernetesDefaults always sets oc.MTU
-		return errors.Errorf("both MTU and host MTU are unset for no-overlay mode")
+		return fmt.Errorf("both MTU and host MTU are unset for no-overlay mode")
 	}
 	if oc.MTU == nil {
 		return nil
@@ -1263,7 +1262,7 @@ func ValidateMTUForNoOverlay(conf *operv1.NetworkSpec, hostMTU int) error {
 		return nil
 	}
 	if *oc.MTU > uint32(hostMTU) {
-		return errors.Errorf("invalid MTU %d for no-overlay mode: cannot exceed host MTU %d", *oc.MTU, hostMTU)
+		return fmt.Errorf("invalid MTU %d for no-overlay mode: cannot exceed host MTU %d", *oc.MTU, hostMTU)
 	}
 	return nil
 }
@@ -1286,12 +1285,12 @@ func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 		//  - The current MTU actually matches the MTU known as current
 		//  - The machine target MTU has a valid overhead with the CNI target MTU
 		if mtuNet == nil || mtuMach == nil || mtuNet.From == nil || mtuNet.To == nil || mtuMach.To == nil {
-			errs = append(errs, errors.Errorf("invalid Migration.MTU, at least one of the required fields is missing"))
+			errs = append(errs, fmt.Errorf("invalid Migration.MTU, at least one of the required fields is missing"))
 		} else {
 			// Only check next.Migration.MTU.Network.From when it changes
 			checkPrevMTU := prev.Migration == nil || prev.Migration.MTU == nil || prev.Migration.MTU.Network == nil || !reflect.DeepEqual(prev.Migration.MTU.Network.From, next.Migration.MTU.Network.From)
 			if checkPrevMTU && !reflect.DeepEqual(next.Migration.MTU.Network.From, pn.MTU) {
-				errs = append(errs, errors.Errorf("invalid Migration.MTU.Network.From(%d) not equal to the currently applied MTU(%d)", *next.Migration.MTU.Network.From, *pn.MTU))
+				errs = append(errs, fmt.Errorf("invalid Migration.MTU.Network.From(%d) not equal to the currently applied MTU(%d)", *next.Migration.MTU.Network.From, *pn.MTU))
 			}
 
 			minMTU := MinMTUIPv4
@@ -1302,25 +1301,25 @@ func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 				}
 			}
 			if *next.Migration.MTU.Network.To < minMTU || *next.Migration.MTU.Network.To > MaxMTU {
-				errs = append(errs, errors.Errorf("invalid Migration.MTU.Network.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Network.To, minMTU, MaxMTU))
+				errs = append(errs, fmt.Errorf("invalid Migration.MTU.Network.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Network.To, minMTU, MaxMTU))
 			}
 			if *next.Migration.MTU.Machine.To < minMTU || *next.Migration.MTU.Machine.To > MaxMTU {
-				errs = append(errs, errors.Errorf("invalid Migration.MTU.Machine.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Machine.To, minMTU, MaxMTU))
+				errs = append(errs, fmt.Errorf("invalid Migration.MTU.Machine.To(%d), has to be in range: %d-%d", *next.Migration.MTU.Machine.To, minMTU, MaxMTU))
 			}
 			if (*next.Migration.MTU.Network.To + getOVNEncapOverhead(next)) > *next.Migration.MTU.Machine.To {
-				errs = append(errs, errors.Errorf("invalid Migration.MTU.Machine.To(%d), has to be at least %d", *next.Migration.MTU.Machine.To, *next.Migration.MTU.Network.To+getOVNEncapOverhead(next)))
+				errs = append(errs, fmt.Errorf("invalid Migration.MTU.Machine.To(%d), has to be at least %d", *next.Migration.MTU.Machine.To, *next.Migration.MTU.Network.To+getOVNEncapOverhead(next)))
 			}
 		}
 	} else if !reflect.DeepEqual(pn.MTU, nn.MTU) {
-		errs = append(errs, errors.Errorf("cannot change ovn-kubernetes MTU without migration"))
+		errs = append(errs, fmt.Errorf("cannot change ovn-kubernetes MTU without migration"))
 	}
 
 	if !reflect.DeepEqual(pn.GenevePort, nn.GenevePort) {
-		errs = append(errs, errors.Errorf("cannot change ovn-kubernetes genevePort"))
+		errs = append(errs, fmt.Errorf("cannot change ovn-kubernetes genevePort"))
 	}
 	if pn.HybridOverlayConfig != nil && nn.HybridOverlayConfig != nil {
 		if !reflect.DeepEqual(pn.HybridOverlayConfig, nn.HybridOverlayConfig) {
-			errs = append(errs, errors.Errorf("cannot edit a running hybrid overlay network"))
+			errs = append(errs, fmt.Errorf("cannot edit a running hybrid overlay network"))
 		}
 	}
 
@@ -1677,12 +1676,12 @@ func handleIPFamilyAnnotationAndIPFamilyChange(conf *operv1.NetworkSpec, ovn boo
 	// This triggers a daemonset restart if there are changes.
 	err := setOVNObjectAnnotation(*objs, names.NetworkIPFamilyModeAnnotation, ipFamilyMode)
 	if err != nil {
-		return true, true, errors.Wrapf(err, "failed to set IP family %s annotation on daemonset and deployment", ipFamilyMode)
+		return true, true, fmt.Errorf("failed to set IP family %s annotation on daemonset and deployment: %w", ipFamilyMode, err)
 	}
 
 	err = setOVNObjectAnnotation(*objs, names.ClusterNetworkCIDRsAnnotation, clusterNetworkCIDRs)
 	if err != nil {
-		return true, true, errors.Wrapf(err, "failed to set %s annotation on daemonset and deployment", clusterNetworkCIDRs)
+		return true, true, fmt.Errorf("failed to set %s annotation on daemonset and deployment: %w", clusterNetworkCIDRs, err)
 	}
 
 	return updateNode, updateControlPlane, nil
@@ -2102,7 +2101,7 @@ func validateOVNKubernetesSubnets(conf *operv1.NetworkSpec) error {
 	for _, cn := range conf.ClusterNetwork {
 		_, cidr, err := net.ParseCIDR(cn.CIDR)
 		if err != nil {
-			out = append(out, errors.Errorf("could not parse spec.clusterNetwork %s", cn.CIDR))
+			out = append(out, fmt.Errorf("could not parse spec.clusterNetwork %s", cn.CIDR))
 			continue
 		}
 		if utilnet.IsIPv6CIDRString(cn.CIDR) {
@@ -2111,17 +2110,17 @@ func validateOVNKubernetesSubnets(conf *operv1.NetworkSpec) error {
 			cnHasIPv4 = true
 		}
 		if err := pool.Add(*cidr); err != nil {
-			out = append(out, errors.Errorf("Whole or subset of ClusterNetwork CIDR %s is already in use: %s", cn.CIDR, err))
+			out = append(out, fmt.Errorf("whole or subset of ClusterNetwork CIDR %s is already in use: %s", cn.CIDR, err))
 		}
 	}
 	for _, snet := range conf.ServiceNetwork {
 		_, cidr, err := net.ParseCIDR(snet)
 		if err != nil {
-			out = append(out, errors.Wrapf(err, "could not parse spec.serviceNetwork %s", snet))
+			out = append(out, fmt.Errorf("could not parse spec.serviceNetwork %s: %w", snet, err))
 			continue
 		}
 		if err := pool.Add(*cidr); err != nil {
-			out = append(out, errors.Errorf("Whole or subset of ServiceNetwork CIDR %s is already in use: %s", snet, err))
+			out = append(out, fmt.Errorf("whole or subset of ServiceNetwork CIDR %s is already in use: %s", snet, err))
 		}
 	}
 
@@ -2131,13 +2130,13 @@ func validateOVNKubernetesSubnets(conf *operv1.NetworkSpec) error {
 	v4InternalSubnet := oc.V4InternalSubnet
 	if oc.IPv4 != nil && oc.IPv4.InternalJoinSubnet != "" {
 		if v4InternalSubnet != "" && v4InternalSubnet != oc.IPv4.InternalJoinSubnet {
-			out = append(out, errors.Errorf("v4InternalSubnet will be deprecated soon, until then it must be same as v4InternalJoinSubnet %s ", oc.IPv4.InternalJoinSubnet))
+			out = append(out, fmt.Errorf("v4InternalSubnet will be deprecated soon, until then it must be same as v4InternalJoinSubnet %s ", oc.IPv4.InternalJoinSubnet))
 		}
 		v4InternalSubnet = oc.IPv4.InternalJoinSubnet
 	}
 	if v4InternalSubnet != "" {
 		if !cnHasIPv4 {
-			out = append(out, errors.Errorf("JoinSubnet %s and ClusterNetwork must have matching IP families", v4InternalSubnet))
+			out = append(out, fmt.Errorf("JoinSubnet %s and ClusterNetwork must have matching IP families", v4InternalSubnet))
 		}
 		if err := validateOVNKubernetesSubnet("v4InternalJoinSubnet", v4InternalSubnet, &pool, conf.ClusterNetwork); err != nil {
 			out = append(out, err)
@@ -2149,13 +2148,13 @@ func validateOVNKubernetesSubnets(conf *operv1.NetworkSpec) error {
 	v6InternalSubnet := oc.V6InternalSubnet
 	if oc.IPv6 != nil && oc.IPv6.InternalJoinSubnet != "" {
 		if v6InternalSubnet != "" && v6InternalSubnet != oc.IPv6.InternalJoinSubnet {
-			out = append(out, errors.Errorf("v6InternalSubnet will be deprecated soon, until then it must be same as v6InternalJoinSubnet %s ", oc.IPv6.InternalJoinSubnet))
+			out = append(out, fmt.Errorf("v6InternalSubnet will be deprecated soon, until then it must be same as v6InternalJoinSubnet %s ", oc.IPv6.InternalJoinSubnet))
 		}
 		v6InternalSubnet = oc.IPv6.InternalJoinSubnet
 	}
 	if v6InternalSubnet != "" {
 		if !cnHasIPv6 {
-			out = append(out, errors.Errorf("JoinSubnet %s and ClusterNetwork must have matching IP families", v6InternalSubnet))
+			out = append(out, fmt.Errorf("JoinSubnet %s and ClusterNetwork must have matching IP families", v6InternalSubnet))
 		}
 		if err := validateOVNKubernetesSubnet("v6InternalJoinSubnet", v6InternalSubnet, &pool, conf.ClusterNetwork); err != nil {
 			out = append(out, err)
@@ -2164,7 +2163,7 @@ func validateOVNKubernetesSubnets(conf *operv1.NetworkSpec) error {
 
 	if oc.IPv4 != nil && oc.IPv4.InternalTransitSwitchSubnet != "" {
 		if !cnHasIPv4 {
-			out = append(out, errors.Errorf("v4InternalTransitSwitchSubnet %s and ClusterNetwork must have matching IP families", oc.IPv4.InternalTransitSwitchSubnet))
+			out = append(out, fmt.Errorf("v4InternalTransitSwitchSubnet %s and ClusterNetwork must have matching IP families", oc.IPv4.InternalTransitSwitchSubnet))
 		}
 		if err := validateOVNKubernetesSubnet("v4InternalTransitSwitchSubnet", oc.IPv4.InternalTransitSwitchSubnet, &pool, conf.ClusterNetwork); err != nil {
 			out = append(out, err)
@@ -2173,7 +2172,7 @@ func validateOVNKubernetesSubnets(conf *operv1.NetworkSpec) error {
 
 	if oc.IPv6 != nil && oc.IPv6.InternalTransitSwitchSubnet != "" {
 		if !cnHasIPv6 {
-			out = append(out, errors.Errorf("v6InternalTransitSwitchSubnet %s and ClusterNetwork must have matching IP families", oc.IPv6.InternalTransitSwitchSubnet))
+			out = append(out, fmt.Errorf("v6InternalTransitSwitchSubnet %s and ClusterNetwork must have matching IP families", oc.IPv6.InternalTransitSwitchSubnet))
 		}
 		if err := validateOVNKubernetesSubnet("v6InternalTransitSwitchSubnet", oc.IPv6.InternalTransitSwitchSubnet, &pool, conf.ClusterNetwork); err != nil {
 			out = append(out, err)
@@ -2185,7 +2184,7 @@ func validateOVNKubernetesSubnets(conf *operv1.NetworkSpec) error {
 	if oc.GatewayConfig != nil {
 		if oc.GatewayConfig.IPv4.InternalMasqueradeSubnet != "" {
 			if !cnHasIPv4 {
-				out = append(out, errors.Errorf("v4InternalMasqueradeSubnet %s and ClusterNetwork must have matching IP families", oc.GatewayConfig.IPv4.InternalMasqueradeSubnet))
+				out = append(out, fmt.Errorf("v4InternalMasqueradeSubnet %s and ClusterNetwork must have matching IP families", oc.GatewayConfig.IPv4.InternalMasqueradeSubnet))
 			}
 			// Masquerade subnet does not need subnet length check. Sending ClusterNetwork
 			// nil while calling validateOVNKubernetesSubnet to avoid subnet length check.
@@ -2195,7 +2194,7 @@ func validateOVNKubernetesSubnets(conf *operv1.NetworkSpec) error {
 		}
 		if oc.GatewayConfig.IPv6.InternalMasqueradeSubnet != "" {
 			if !cnHasIPv6 {
-				out = append(out, errors.Errorf("v6InternalMasqueradeSubnet %s and ClusterNetwork must have matching IP families", oc.GatewayConfig.IPv6.InternalMasqueradeSubnet))
+				out = append(out, fmt.Errorf("v6InternalMasqueradeSubnet %s and ClusterNetwork must have matching IP families", oc.GatewayConfig.IPv6.InternalMasqueradeSubnet))
 			}
 			// Masquerade subnet does not need subnet length check. Sending ClusterNetwork
 			// nil while calling validateOVNKubernetesSubnet to avoid subnet length check.

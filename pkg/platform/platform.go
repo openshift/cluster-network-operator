@@ -14,7 +14,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	mcutil "github.com/openshift/cluster-network-operator/pkg/util/machineconfig"
 	"github.com/openshift/cluster-network-operator/pkg/version"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -259,7 +258,7 @@ func consolePluginCRDExists(cl cnoclient.Client) (bool, error) {
 			log.Printf("consoleplugins.console.openshift.io CRD was not found: %v", err)
 			return false, nil
 		} else {
-			return false, errors.Wrap(err, "failed to get consoleplugins.console.openshift.io CRD")
+			return false, fmt.Errorf("failed to get consoleplugins.console.openshift.io CRD: %w", err)
 		}
 	}
 	return true, nil
