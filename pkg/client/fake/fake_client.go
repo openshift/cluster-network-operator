@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -45,6 +46,8 @@ type FakeClusterClient struct {
 	crclient crclient.Client
 
 	osOperClient osoperclient.Interface
+
+	scheme *runtime.Scheme
 }
 
 func (fc *FakeClient) ClientFor(name string) cnoclient.ClusterClient {
@@ -100,53 +103,30 @@ func NewFakeClient(objs ...crclient.Object) cnoclient.Client {
 		}
 	}
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: ""}}
+
+	s := runtime.NewScheme()
+	if err := scheme.AddToScheme(s); err != nil {
+		panic(err)
+	}
+
+	metav1.AddToGroupVersion(s, schema.GroupVersion{Version: "v1"})
+	s.AddKnownTypeWithName(
+		schema.GroupVersionKind{Group: "test", Version: "test", Kind: "test"},
+		&metav1.PartialObjectMetadata{},
+	)
+
 	fc := FakeClusterClient{
 		kClient:      faketyped.NewSimpleClientset(ooTyped...),
 		dynclient:    fakedynamic.NewSimpleDynamicClient(scheme.Scheme, oo...),
 		crclient:     crfake.NewClientBuilder().WithStatusSubresource(co).WithObjects(objs...).Build(),
 		osOperClient: osoperfakeclient.NewSimpleClientset(),
+		scheme:       s,
 	}
 	return &FakeClient{
 		clusterClients: map[string]*FakeClusterClient{
 			names.DefaultClusterName: &fc,
 		},
 	}
-}
-
-type fakeRESTMapper struct {
-	kindForInput schema.GroupVersionResource
-}
-
-func (f *fakeRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
-	f.kindForInput = resource
-	return schema.GroupVersionKind{
-		Group:   "test",
-		Version: "test",
-		Kind:    "test"}, nil
-}
-
-func (f *fakeRESTMapper) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
-	return nil, nil
-}
-
-func (f *fakeRESTMapper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error) {
-	return schema.GroupVersionResource{}, nil
-}
-
-func (f *fakeRESTMapper) ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
-	return nil, nil
-}
-
-func (f *fakeRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
-	return nil, nil
-}
-
-func (f *fakeRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
-	return nil, nil
-}
-
-func (f *fakeRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
-	return "", nil
 }
 
 func (fc *FakeClusterClient) Kubernetes() kubernetes.Interface {
@@ -170,12 +150,13 @@ func (fc *FakeClusterClient) CRClient() crclient.Client {
 }
 
 func (fc *FakeClusterClient) RESTMapper() meta.RESTMapper {
-	return &fakeRESTMapper{}
+	return testrestmapper.TestOnlyStaticRESTMapper(fc.scheme)
 }
 
 func (fc *FakeClusterClient) Scheme() *runtime.Scheme {
-	panic("not implemented!")
+	return fc.scheme
 }
+
 func (fc *FakeClusterClient) OperatorHelperClient() operatorv1helpers.OperatorClient {
 	panic("not implemented!")
 }
