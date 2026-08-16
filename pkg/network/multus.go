@@ -67,7 +67,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 	data.Data["KUBERNETES_SERVICE_HOST"] = apihost
 	data.Data["KUBERNETES_SERVICE_PORT"] = apiport
 	data.Data["RenderDHCP"] = useDHCP
-	data.Data["RenderIpReconciler"] = useWhereabouts
+	data.Data["RenderWhereaboutsAuxillary"] = useWhereabouts
 	data.Data["MultusCNIConfDir"] = MultusCNIConfDir
 	data.Data["SystemCNIConfDir"] = SystemCNIConfDir
 	data.Data["DefaultNetworkType"] = defaultNetworkType
