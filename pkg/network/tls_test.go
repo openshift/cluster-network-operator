@@ -1,6 +1,7 @@
 package network
 
 import (
+	"strings"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -173,6 +174,48 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 		expectedNginxCiphers := ""
 		if v, ok := data[NginxTLSCiphersKey]; !ok || v != expectedNginxCiphers {
 			t.Errorf("Expected %s to be %q, got %v", NginxTLSCiphersKey, expectedNginxCiphers, v)
+		}
+	})
+
+	t.Run("should filter out ciphers unsupported by Go crypto/tls", func(t *testing.T) {
+		data := make(map[string]interface{})
+		bootstrapResult := &bootstrap.BootstrapResult{
+			TLSProfile: bootstrap.TLSProfile{
+				Spec: configv1.TLSProfileSpec{
+					MinTLSVersion: configv1.VersionTLS12,
+					Ciphers: []string{
+						// Supported ciphers
+						"ECDHE-ECDSA-AES128-GCM-SHA256",
+						"ECDHE-RSA-AES128-GCM-SHA256",
+						// Unsupported ciphers (Go doesn't implement CBC mode for these)
+						"ECDHE-ECDSA-AES256-SHA384",
+						"ECDHE-RSA-AES256-SHA384",
+						"AES256-SHA256",
+						// More supported ciphers
+						"ECDHE-ECDSA-AES256-GCM-SHA384",
+					},
+				},
+				Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
+			},
+		}
+
+		addTLSInfoToRenderData(data, bootstrapResult, true)
+
+		// Should use TLS profile
+		if v, ok := data[UseTLSProfileKey]; !ok || v != true {
+			t.Errorf("Expected %s to be true, got %v", UseTLSProfileKey, v)
+		}
+
+		// Only supported ciphers should be in the IANA list (unsupported ones filtered out)
+		expectedCiphers := "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+		if v, ok := data[TLSCipherSuitesKey]; !ok || v != expectedCiphers {
+			t.Errorf("Expected %s to be %q, got %q", TLSCipherSuitesKey, expectedCiphers, v)
+		}
+
+		// NGINX should keep all ciphers (original OpenSSL names)
+		expectedNginxCiphers := strings.Join(bootstrapResult.TLSProfile.Spec.Ciphers, ":")
+		if v, ok := data[NginxTLSCiphersKey]; !ok || v != expectedNginxCiphers {
+			t.Errorf("Expected %s to be %q, got %q", NginxTLSCiphersKey, expectedNginxCiphers, v)
 		}
 	})
 }
