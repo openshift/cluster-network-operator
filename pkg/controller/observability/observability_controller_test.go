@@ -122,8 +122,8 @@ func createTestClusterExtension(t *testing.T, name string, installed bool) *unst
 	ce.SetName(name)
 
 	// Set status conditions
-	conditions := []interface{}{
-		map[string]interface{}{
+	conditions := []any{
+		map[string]any{
 			"type": "Installed",
 			"status": func() string {
 				if installed {
@@ -674,8 +674,8 @@ func TestIsNetObservOperatorInstalled_OLMv1InstallationFailed(t *testing.T) {
 		Kind:    "ClusterExtension",
 	})
 	ce.SetName("netobserv-operator")
-	conditions := []interface{}{
-		map[string]interface{}{
+	conditions := []any{
+		map[string]any{
 			"type":    "Installed",
 			"status":  "False",
 			"reason":  "InstallationFailed",
@@ -715,8 +715,8 @@ func TestIsNetObservOperatorInstalled_OLMv1NotInstalledYet(t *testing.T) {
 		Kind:    "ClusterExtension",
 	})
 	ce.SetName("netobserv-operator")
-	conditions := []interface{}{
-		map[string]interface{}{
+	conditions := []any{
+		map[string]any{
 			"type":    "Installed",
 			"status":  "Unknown",
 			"reason":  "Installing",
@@ -1468,8 +1468,8 @@ func TestReconcile_RecoveryAfterOperatorBecomesReady(t *testing.T) {
 	g.Expect(result1.RequeueAfter).To(Equal(requeueAfterStandard))
 
 	// Update ClusterExtension to Installed status
-	conditions := []interface{}{
-		map[string]interface{}{
+	conditions := []any{
+		map[string]any{
 			"type":    "Installed",
 			"status":  "True",
 			"reason":  "InstallSucceeded",
@@ -1527,7 +1527,7 @@ func TestReconcile_ConcurrentReconciliations(t *testing.T) {
 
 	// Run 5 concurrent reconciliations
 	errChan := make(chan error, 5)
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		go func() {
 			_, err := r.Reconcile(context.TODO(), req)
 			errChan <- err
@@ -1536,7 +1536,7 @@ func TestReconcile_ConcurrentReconciliations(t *testing.T) {
 
 	// Wait for all to complete and collect errors
 	var unexpectedErrors []error
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if err := <-errChan; err != nil {
 			// Filter out 409 conflict errors which are expected when multiple
 			// goroutines try to update the same resource status concurrently

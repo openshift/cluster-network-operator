@@ -12,7 +12,7 @@ import (
 
 // ToUnstructured converts an arbitrary object (which MUST obey the
 // k8s object conventions) to an Unstructured
-func ToUnstructured(obj interface{}) (*uns.Unstructured, error) {
+func ToUnstructured(obj any) (*uns.Unstructured, error) {
 	b, err := json.Marshal(obj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert to unstructured (marshal): %w", err)
@@ -25,7 +25,7 @@ func ToUnstructured(obj interface{}) (*uns.Unstructured, error) {
 }
 
 // CalculateHash computes SHA256 sum of the JSONfied object passed as obj.
-func CalculateHash(obj interface{}) (string, error) {
+func CalculateHash(obj any) (string, error) {
 	configStr, err := json.Marshal(obj)
 	if err != nil {
 		return "", err

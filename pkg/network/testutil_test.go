@@ -32,7 +32,7 @@ type KubeObjectMatcher struct {
 	kind, namespace, name string
 }
 
-func (k *KubeObjectMatcher) Match(actual interface{}) (bool, error) {
+func (k *KubeObjectMatcher) Match(actual any) (bool, error) {
 	obj, ok := actual.(*uns.Unstructured)
 	if !ok {
 		return false, fmt.Errorf("cannot match object of type %t", actual)
@@ -44,7 +44,7 @@ func (k *KubeObjectMatcher) Match(actual interface{}) (bool, error) {
 	return ok, nil
 }
 
-func (k *KubeObjectMatcher) FailureMessage(actual interface{}) string {
+func (k *KubeObjectMatcher) FailureMessage(actual any) string {
 	obj, ok := actual.(*uns.Unstructured)
 	if !ok {
 		return "not of type Unstructured"
@@ -55,7 +55,7 @@ func (k *KubeObjectMatcher) FailureMessage(actual interface{}) string {
 		obj.GetKind(), obj.GetNamespace(), obj.GetName())
 }
 
-func (k *KubeObjectMatcher) NegatedFailureMessage(actual interface{}) string {
+func (k *KubeObjectMatcher) NegatedFailureMessage(actual any) string {
 	obj, ok := actual.(*uns.Unstructured)
 	if !ok {
 		return "not of type Unstructured"

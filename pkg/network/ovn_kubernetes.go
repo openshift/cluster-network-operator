@@ -470,10 +470,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	//there only needs to be two cluster managers
-	clusterManagerReplicas := 2
-	if bootstrapResult.OVN.ControlPlaneReplicaCount < 2 {
-		clusterManagerReplicas = bootstrapResult.OVN.ControlPlaneReplicaCount
-	}
+	clusterManagerReplicas := min(bootstrapResult.OVN.ControlPlaneReplicaCount, 2)
 	data.Data["ClusterManagerReplicas"] = clusterManagerReplicas
 
 	commonManifestDir := filepath.Join(manifestDir, "network/ovn-kubernetes/common")
@@ -1557,7 +1554,7 @@ func bootstrapOVN(conf *operv1.Network, kubeClient cnoclient.Client, infraStatus
 
 	// preserve any default masquerade subnet values that might have been set previously
 	if masqueradeCIDRs, ok := nodeDaemonSet.GetAnnotations()[names.MasqueradeCIDRsAnnotation]; ok {
-		for _, masqueradeCIDR := range strings.Split(masqueradeCIDRs, ",") {
+		for masqueradeCIDR := range strings.SplitSeq(masqueradeCIDRs, ",") {
 			if utilnet.IsIPv6CIDRString(masqueradeCIDR) {
 				klog.Infof("Found the DefaultV6MasqueradeSubnet(%s) in the %q annotation", masqueradeCIDR, names.MasqueradeCIDRsAnnotation)
 				res.DefaultV6MasqueradeSubnet = masqueradeCIDR
@@ -1784,12 +1781,7 @@ func isCNOIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
 // are already present in both master and worker nodes, otherwise returns false.
 func isUserDefinedIPsecMachineConfigPresent(infra bootstrap.InfraStatus) bool {
 	isUserDefinedMachineConfigPresentIn := func(mcs []*mcfgv1.MachineConfig) bool {
-		for _, mc := range mcs {
-			if mcutil.IsUserDefinedIPsecMachineConfig(mc) {
-				return true
-			}
-		}
-		return false
+		return slices.ContainsFunc(mcs, mcutil.IsUserDefinedIPsecMachineConfig)
 	}
 	return isUserDefinedMachineConfigPresentIn(infra.MasterIPsecMachineConfigs) &&
 		isUserDefinedMachineConfigPresentIn(infra.WorkerIPsecMachineConfigs)

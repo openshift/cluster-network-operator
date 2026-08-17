@@ -105,7 +105,7 @@ func TestOVNKubernetesNodeModeTemplates(t *testing.T) {
 
 				var containerNames []string
 				for _, container := range containers {
-					cmap := container.(map[string]interface{})
+					cmap := container.(map[string]any)
 					name, found, err := uns.NestedString(cmap, "name")
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(found).To(BeTrue())
@@ -113,7 +113,7 @@ func TestOVNKubernetesNodeModeTemplates(t *testing.T) {
 				}
 
 				// Verify container list exactly matches expected containers
-				expectedContainersInterface := make([]interface{}, len(mode.expectedContainers))
+				expectedContainersInterface := make([]any, len(mode.expectedContainers))
 				for i, container := range mode.expectedContainers {
 					expectedContainersInterface[i] = container
 				}

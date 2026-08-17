@@ -34,7 +34,7 @@ type patchAnnotations struct {
 	Metadata md `json:"metadata"`
 }
 type md struct {
-	Annotations map[string]interface{} `json:"annotations"`
+	Annotations map[string]any `json:"annotations"`
 }
 
 func (status *StatusManager) setAnnotation(ctx context.Context, obj crclient.Object, key string, value *string) error {
@@ -48,7 +48,7 @@ func (status *StatusManager) setAnnotation(ctx context.Context, obj crclient.Obj
 	}
 	patch := &patchAnnotations{
 		Metadata: md{
-			Annotations: map[string]interface{}{
+			Annotations: map[string]any{
 				key: value,
 			},
 		},

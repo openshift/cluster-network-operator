@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"maps"
 	"strings"
 
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
@@ -14,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	utilpointer "k8s.io/utils/ptr"
 )
 
 type Object interface {
@@ -111,7 +111,7 @@ func ApplyObject(ctx context.Context, client cnoclient.Client, obj Object, subco
 	// Use server-side apply to merge the desired object with the object on disk
 	patchOptions := metav1.PatchOptions{
 		// It is considered best-practice for controllers to force
-		Force:        utilpointer.To(true),
+		Force:        new(true),
 		FieldManager: fieldManager,
 	}
 	// Send the full object to be applied on the server side.
@@ -186,9 +186,7 @@ func getCopySource(ctx context.Context, obj Object, client cnoclient.Client) (Ob
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
-	for k, v := range obj.GetAnnotations() {
-		annotations[k] = v
-	}
+	maps.Copy(annotations, obj.GetAnnotations())
 	ret.SetAnnotations(annotations)
 
 	return ret, nil

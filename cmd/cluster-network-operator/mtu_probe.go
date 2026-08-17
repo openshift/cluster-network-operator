@@ -69,7 +69,7 @@ func newMTUProberCommand() *cobra.Command {
 		}
 
 		// Write the CM in the apiserver, retrying as needed.
-		for tries := 0; tries < 10; tries++ {
+		for range 10 {
 			_, err = clientSet.CoreV1().ConfigMaps(namespace).Create(context.Background(), &cm, metav1.CreateOptions{})
 			if err != nil && apierrors.IsAlreadyExists(err) {
 				_, err = clientSet.CoreV1().ConfigMaps(namespace).Update(context.Background(), &cm, metav1.UpdateOptions{})

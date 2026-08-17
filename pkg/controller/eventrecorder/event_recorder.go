@@ -16,14 +16,14 @@ var _ events.Recorder = &LoggingRecorder{}
 func (r *LoggingRecorder) Event(reason, message string) {
 	log.Println(message)
 }
-func (r *LoggingRecorder) Eventf(reason, messageFmt string, args ...interface{}) {
+func (r *LoggingRecorder) Eventf(reason, messageFmt string, args ...any) {
 	log.Printf(messageFmt, args...)
 }
 func (r *LoggingRecorder) Warning(reason, message string) {
 	log.Println(message)
 }
 
-func (r *LoggingRecorder) Warningf(reason, messageFmt string, args ...interface{}) {
+func (r *LoggingRecorder) Warningf(reason, messageFmt string, args ...any) {
 	log.Printf(messageFmt, args...)
 }
 
