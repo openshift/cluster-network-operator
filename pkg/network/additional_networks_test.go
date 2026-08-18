@@ -7,6 +7,7 @@ import (
 
 	. "github.com/onsi/gomega"
 	operv1 "github.com/openshift/api/operator/v1"
+	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var NetworkAttachmentConfigRaw = operv1.Network{
@@ -77,6 +78,25 @@ func TestRenderAdditionalNetworksCRD(t *testing.T) {
 	objs, err := renderAdditionalNetworksCRD(manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(HaveLen(4))
+
+	var nadCRD *uns.Unstructured
+	for _, obj := range objs {
+		if obj.GetKind() == "CustomResourceDefinition" &&
+			obj.GetName() == "network-attachment-definitions.k8s.cni.cncf.io" {
+			nadCRD = obj
+			break
+		}
+	}
+	g.Expect(nadCRD).NotTo(BeNil())
+
+	shortNames, found, err := uns.NestedStringSlice(nadCRD.Object, "spec", "names", "shortNames")
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(found).To(BeTrue())
+	g.Expect(shortNames).To(Equal([]string{
+		"nad",
+		"net-attach-def",
+		"networkattachmentdefinition",
+	}))
 }
 
 func TestRenderRawCNIConfig(t *testing.T) {
