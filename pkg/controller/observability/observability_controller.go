@@ -15,9 +15,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,18 +32,16 @@ import (
 const (
 	OperatorYAML         = "bindata/observability/07-observability-operator.yaml"
 	FlowCollectorYAML    = "bindata/observability/08-flowcollector.yaml"
-	NetObservNamespace   = "netobserv"
-	OperatorNamespace    = "netobserv-operator"
+	OperatorNamespace    = "openshift-netobserv-operator"
 	FlowCollectorVersion = "v1beta2"
 	FlowCollectorName    = "cluster"
 	NetworkCRName        = "cluster"
 
 	NetworkObservabilityDeployed = "NetworkObservabilityDeployed"
 
-	checkInterval        = 10 * time.Second
-	checkTimeout         = 10 * time.Minute
 	requeueAfterOLM      = 5 * time.Minute  // Requeue interval for OLM operations (install/wait)
 	requeueAfterStandard = 30 * time.Second // Requeue interval for standard operations
+	installTimeout       = 20 * time.Minute // Stop retrying installation after this duration
 )
 
 // Add creates a new controller. Referenced in add_networkconfig.go.
@@ -108,6 +104,14 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 		return reconcile.Result{}, nil
 	}
 
+	// Check if installation has been failing for too long
+	if r.hasInstallTimedOut(ctx) {
+		klog.Warning("Network Observability installation timed out, giving up")
+		_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentTimedOut",
+			fmt.Sprintf("Network Observability installation timed out after %v", installTimeout))
+		return reconcile.Result{}, nil
+	}
+
 	// Proceed with installation/reinstallation
 	installed, ceExists, err := r.isNetObservOperatorInstalled(ctx)
 	if err != nil {
@@ -118,23 +122,25 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 	}
 	if !installed {
 		if !ceExists {
-			// ClusterExtension doesn't exist yet, create it
+			// Operator not yet installed, apply OLM v0 Subscription
 			if err := r.installNetObservOperator(ctx); err != nil {
 				klog.Warningf("Failed to install Network Observability Operator: %v. Will retry in %v.", err, requeueAfterOLM)
 				_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentFailed", fmt.Sprintf("Failed to install Network Observability Operator: %v", err))
 				return reconcile.Result{RequeueAfter: requeueAfterOLM}, nil
 			}
-			klog.Infof("Created ClusterExtension netobserv-operator, will check installation status in %v", requeueAfterOLM)
+			klog.Infof("Applied OLM v0 Subscription for netobserv-operator, will check installation status in %v", requeueAfterOLM)
+			_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "InstallationInProgress", "Network Observability Operator installation initiated")
 			return reconcile.Result{RequeueAfter: requeueAfterOLM}, nil
 		}
 
-		// ClusterExtension exists but installation not complete yet
-		klog.Infof("ClusterExtension netobserv-operator installation in progress, will recheck in %v", requeueAfterOLM)
+		// OLM v1 ClusterExtension exists but installation not complete yet
+		klog.Infof("netobserv-operator installation in progress, will recheck in %v", requeueAfterOLM)
+		_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "InstallationInProgress", "Network Observability Operator installation in progress")
 		return reconcile.Result{RequeueAfter: requeueAfterOLM}, nil
 	}
 
 	// Operator installation completed
-	klog.Info("ClusterExtension netobserv-operator installation completed, proceeding to FlowCollector creation")
+	klog.Info("Network Observability Operator installation completed, proceeding to FlowCollector creation")
 
 	// Check if FlowCollector already exists
 	flowCollectorExists, err := r.isFlowCollectorExists(ctx)
@@ -145,7 +151,7 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 
 	if !flowCollectorExists {
 		// Create FlowCollector
-		if err := r.createFlowCollector(ctx); err != nil {
+		if err := r.applyManifest(ctx, FlowCollectorYAML, "FlowCollector"); err != nil {
 			klog.Warningf("Failed to create FlowCollector: %v. Will retry in %v.", err, requeueAfterStandard)
 			// Mark deployment as failed
 			_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentFailed", fmt.Sprintf("Failed to create FlowCollector: %v", err))
@@ -192,6 +198,25 @@ func (r *ReconcileObservability) wasNetworkObservabilityDeployed(ctx context.Con
 	}
 
 	return false, nil
+}
+
+// hasInstallTimedOut returns true if the installation has been in a non-success
+// state for longer than installTimeout, or has already been marked as timed out.
+func (r *ReconcileObservability) hasInstallTimedOut(ctx context.Context) bool {
+	network := &operatorv1.Network{}
+	if err := r.client.Get(ctx, types.NamespacedName{Name: NetworkCRName}, network); err != nil {
+		return false
+	}
+
+	condition := operatorv1helpers.FindOperatorCondition(network.Status.Conditions, NetworkObservabilityDeployed)
+	if condition == nil || condition.Status != operatorv1.ConditionFalse {
+		return false
+	}
+	if condition.Reason == "DeploymentTimedOut" {
+		return true
+	}
+
+	return time.Since(condition.LastTransitionTime.Time) > installTimeout
 }
 
 // setNetworkObservabilityCondition sets the NetworkObservabilityDeployed condition
@@ -447,8 +472,8 @@ func (r *ReconcileObservability) checkOLMv0Installation(ctx context.Context) (bo
 	// Look for netobserv operator CSV
 	for _, item := range csvList.Items {
 		name := item.GetName()
-		// CSV names typically follow pattern: netobserv-operator.v1.2.3
-		if strings.HasPrefix(name, "netobserv-operator") {
+		// CSV name for OLMv0 is like this: network-observability-operator.v1.2.3 or netobserv-operator.v0.0.0-sha-xxx
+		if strings.HasPrefix(name, "network-observability-operator") || strings.HasPrefix(name, "netobserv-operator") {
 			// Check the CSV phase
 			phase, found, err := unstructured.NestedString(item.Object, "status", "phase")
 			if err != nil {
@@ -539,23 +564,4 @@ func (r *ReconcileObservability) isFlowCollectorExists(ctx context.Context) (boo
 	}
 
 	return true, nil
-}
-
-func (r *ReconcileObservability) createFlowCollector(ctx context.Context) error {
-	// Ensure the netobserv namespace exists before applying manifests.
-	ns := &corev1.Namespace{}
-	if err := r.client.Get(ctx, types.NamespacedName{Name: NetObservNamespace}, ns); err != nil {
-		if errors.IsNotFound(err) {
-			if err := r.client.Create(ctx, &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: NetObservNamespace},
-			}); err != nil {
-				return fmt.Errorf("failed to create namespace %s: %w", NetObservNamespace, err)
-			}
-			klog.Infof("Created namespace %s", NetObservNamespace)
-		} else {
-			return err
-		}
-	}
-
-	return r.applyManifest(ctx, FlowCollectorYAML, "FlowCollector")
 }
