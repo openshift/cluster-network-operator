@@ -3,7 +3,10 @@ package network
 import (
 	"context"
 	"fmt"
+	"slices"
+	"testing"
 
+	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
@@ -11,6 +14,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Fun matcher for testing the presence of Kubernetes objects
@@ -107,4 +111,22 @@ func createProxy(client client.Client) error {
 		},
 	}
 	return client.Default().CRClient().Create(context.TODO(), proxy)
+}
+
+// mustFindRenderedObj finds and converts an unstructured object from a list of rendered objects.
+// It uses Go generics to return the properly typed object.
+func mustFindRenderedObj[T any](t *testing.T, objs []*uns.Unstructured, kind, name string) T {
+	t.Helper()
+	g := NewWithT(t)
+
+	index := slices.IndexFunc(objs, func(obj *uns.Unstructured) bool {
+		return obj.GetKind() == kind && obj.GetName() == name
+	})
+	g.Expect(index).NotTo(Equal(-1), "Could not find object with kind %q and name %q", kind, name)
+
+	var result T
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(objs[index].Object, &result)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	return result
 }
