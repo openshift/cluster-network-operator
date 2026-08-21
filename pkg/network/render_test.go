@@ -782,4 +782,41 @@ func Test_renderNetworkingConsolePlugin(t *testing.T) {
 			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_prefer_server_ciphers"))
 		})
 	})
+
+	t.Run("config hash annotation should be present in deployment and change when TLS config changes", func(t *testing.T) {
+		g := NewWithT(t)
+		t.Setenv("NETWORKING_CONSOLE_PLUGIN_IMAGE", "quay.io/openshift/networking-console-plugin:latest")
+		bootstrapResult := fakeBootstrapResult()
+		bootstrapResult.Infra.ConsolePluginCRDExists = true
+		bootstrapResult.TLSProfile = bootstrap.TLSProfile{
+			Spec: configv1.TLSProfileSpec{
+				MinTLSVersion: configv1.VersionTLS12,
+				Ciphers:       []string{"ECDHE-RSA-AES128-GCM-SHA256"},
+			},
+			Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
+		}
+
+		objs, err := renderNetworkingConsolePlugin(manifestDir, bootstrapResult)
+		g.Expect(err).NotTo(HaveOccurred())
+
+		deploy := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "networking-console-plugin")
+		hash1, ok := deploy.Spec.Template.Annotations["network.operator.openshift.io/config-hash"]
+		g.Expect(ok).To(BeTrue(), "config-hash annotation should be present")
+		g.Expect(hash1).NotTo(BeEmpty(), "config-hash should not be empty")
+
+		// Render with different TLS config
+		bootstrapResult.TLSProfile = bootstrap.TLSProfile{
+			Spec: configv1.TLSProfileSpec{
+				MinTLSVersion: configv1.VersionTLS13,
+				Ciphers:       nil,
+			},
+			Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
+		}
+		objs2, err := renderNetworkingConsolePlugin(manifestDir, bootstrapResult)
+		g.Expect(err).NotTo(HaveOccurred())
+		deploy2 := mustFindRenderedObj[*appsv1.Deployment](t, objs2, "Deployment", "networking-console-plugin")
+		hash2 := deploy2.Spec.Template.Annotations["network.operator.openshift.io/config-hash"]
+
+		g.Expect(hash1).NotTo(Equal(hash2), "config-hash should change when TLS config changes")
+	})
 }
