@@ -743,7 +743,6 @@ egressip-node-healthcheck-port=9107
 enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
-enable-multi-networkpolicy=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
 
@@ -838,7 +837,6 @@ egressip-node-healthcheck-port=9107
 enable-multi-network=true
 enable-network-segmentation=true
 enable-preconfigured-udn-addresses=true
-enable-multi-networkpolicy=true
 enable-admin-network-policy=true
 enable-multi-external-gateway=true
 
