@@ -48,6 +48,12 @@ const CreateOnlyAnnotation = "networkoperator.openshift.io/create-only"
 // tells the CNO reconciliation engine to ignore creating this object until conditions are met.
 const CreateWaitAnnotation = "networkoperator.openshift.io/create-wait"
 
+// PrePatchAnnotation is an annotation whose value is a JSON object applied as a
+// strategic-merge-patch to the live object before the SSA apply. This is needed
+// when SSA cannot remove a field it does not own (e.g. removing defaulted
+// rollingUpdate when switching a Deployment strategy to Recreate).
+const PrePatchAnnotation = "networkoperator.openshift.io/pre-patch"
+
 // NonCriticalAnnotation is an annotation on Deployments/DaemonSets to indicate
 // that they are not critical to the functioning of the pod network
 const NonCriticalAnnotation = "networkoperator.openshift.io/non-critical"
