@@ -4700,6 +4700,75 @@ func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
 	})
 }
 
+func TestRenderOVNKubernetes_AllowNoUplink(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	renderWithGatewayConfig := func(gatewayConfig *operv1.GatewayConfig) []*uns.Unstructured {
+		crd := OVNKubernetesConfig.DeepCopy()
+		config := &crd.Spec
+		fillDefaults(config, nil)
+		config.DefaultNetwork.OVNKubernetesConfig.GatewayConfig = gatewayConfig
+
+		bootstrapResult := fakeBootstrapResult()
+		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+			ControlPlaneReplicaCount: 3,
+			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+				DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+				DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+				SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+				MgmtPortResourceName:      "",
+				DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+				DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+					Enabled: false,
+				},
+			},
+		}
+		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, cnofake.NewFakeClient(), getDefaultFeatureGates())
+		g.Expect(err).NotTo(HaveOccurred())
+		return objs
+	}
+
+	scriptLibHash := func(objs []*uns.Unstructured) string {
+		nodeDS := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+		g.Expect(nodeDS).NotTo(BeNil())
+		ds := appsv1.DaemonSet{}
+		g.Expect(convert(nodeDS, &ds)).To(Succeed())
+		return ds.Spec.Template.Annotations["network.operator.openshift.io/ovnkube-script-lib-hash"]
+	}
+
+	t.Run("renders --allow-no-uplink when gatewayConfig.allowNoUplink is true", func(t *testing.T) {
+		ovnkubeScriptLib := extractOVNScriptLib(g, renderWithGatewayConfig(&operv1.GatewayConfig{
+			RoutingViaHost: true,
+			AllowNoUplink:  true,
+		}))
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`allow_no_uplink_flag="--allow-no-uplink"`))
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`${allow_no_uplink_flag}`))
+	})
+
+	t.Run("omits --allow-no-uplink when gatewayConfig.allowNoUplink is false", func(t *testing.T) {
+		ovnkubeScriptLib := extractOVNScriptLib(g, renderWithGatewayConfig(&operv1.GatewayConfig{
+			RoutingViaHost: true,
+			AllowNoUplink:  false,
+		}))
+		g.Expect(ovnkubeScriptLib).NotTo(ContainSubstring(`allow_no_uplink_flag="--allow-no-uplink"`))
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`${allow_no_uplink_flag}`))
+	})
+
+	t.Run("omits --allow-no-uplink when gatewayConfig is nil", func(t *testing.T) {
+		ovnkubeScriptLib := extractOVNScriptLib(g, renderWithGatewayConfig(nil))
+		g.Expect(ovnkubeScriptLib).NotTo(ContainSubstring(`allow_no_uplink_flag="--allow-no-uplink"`))
+	})
+
+	t.Run("changes ovnkube-node script-lib hash", func(t *testing.T) {
+		hashWithout := scriptLibHash(renderWithGatewayConfig(&operv1.GatewayConfig{RoutingViaHost: true}))
+		hashWith := scriptLibHash(renderWithGatewayConfig(&operv1.GatewayConfig{RoutingViaHost: true, AllowNoUplink: true}))
+		g.Expect(hashWithout).NotTo(BeEmpty())
+		g.Expect(hashWith).NotTo(BeEmpty())
+		g.Expect(hashWith).NotTo(Equal(hashWithout))
+	})
+}
+
 // TestDaemonSetProgressing verifies daemonSetProgressing returns the correct
 // result for a variety of DaemonSet status scenarios, including the zero-worker
 // HyperShift case where DesiredNumberScheduled==0 must not be treated as progressing.

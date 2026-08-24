@@ -360,6 +360,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["IP_FORWARDING_MODE"] = c.GatewayConfig.IPForwarding
 	}
 
+	data.Data["AllowNoUplink"] = c.GatewayConfig != nil && c.GatewayConfig.AllowNoUplink
+
 	// No-overlay mode configuration
 	// The NoOverlayMode feature gate enables no-overlay networking for both the default network
 	// and CUDNs (Cluster User-Defined Networks). BGP managed configuration is cluster-wide and

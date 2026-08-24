@@ -650,6 +650,14 @@ type GatewayConfig struct {
 	// +kubebuilder:default:=false
 	// +optional
 	RoutingViaHost bool `json:"routingViaHost,omitempty"`
+	// allowNoUplink allows the external gateway bridge (br-ex) to start in local
+	// gateway mode when it has no physical uplink port.
+	// When set to true, ovn-kubernetes will not require an uplink on the gateway bridge.
+	// When omitted or set to false, ovn-kubernetes requires an uplink (the current behavior).
+	// This setting only takes effect when routingViaHost is true (local gateway mode).
+	// +kubebuilder:default:=false
+	// +optional
+	AllowNoUplink bool `json:"allowNoUplink,omitempty"`
 	// ipForwarding controls IP forwarding for all traffic on OVN-Kubernetes managed interfaces (such as br-ex).
 	// By default this is set to Restricted, and Kubernetes related traffic is still forwarded appropriately, but other
 	// IP traffic will not be routed by the OCP node. If there is a desire to allow the host to forward traffic across
