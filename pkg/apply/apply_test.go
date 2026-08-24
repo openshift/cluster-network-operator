@@ -1,7 +1,6 @@
 package apply
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -58,7 +57,7 @@ func TestApplyObjectPrePatchRunsBeforeSSA(t *testing.T) {
 		names.PrePatchAnnotation: prePatchValue,
 	})
 
-	err := ApplyObject(context.Background(), client, obj, "test-controller")
+	err := ApplyObject(t.Context(), client, obj, "test-controller")
 	g.Expect(err).To(Succeed())
 	g.Expect(patchTypes).To(HaveLen(2))
 	g.Expect(patchTypes[0]).To(Equal(types.StrategicMergePatchType), "pre-patch should be strategic-merge-patch")
@@ -81,7 +80,7 @@ func TestApplyObjectPrePatchNotFoundAllowsSSA(t *testing.T) {
 		names.PrePatchAnnotation: prePatchValue,
 	})
 
-	err := ApplyObject(context.Background(), client, obj, "test-controller")
+	err := ApplyObject(t.Context(), client, obj, "test-controller")
 	g.Expect(err).To(Succeed())
 	g.Expect(patchTypes).To(HaveLen(2))
 	g.Expect(patchTypes[0]).To(Equal(types.StrategicMergePatchType), "pre-patch was attempted")
@@ -103,7 +102,7 @@ func TestApplyObjectPrePatchErrorStopsReconciliation(t *testing.T) {
 		names.PrePatchAnnotation: prePatchValue,
 	})
 
-	err := ApplyObject(context.Background(), client, obj, "test-controller")
+	err := ApplyObject(t.Context(), client, obj, "test-controller")
 	g.Expect(err).To(HaveOccurred())
 	g.Expect(err.Error()).To(ContainSubstring("failed to pre-patch"))
 	g.Expect(patchTypes).To(HaveLen(1), "SSA apply should not have been reached")
@@ -123,7 +122,7 @@ func TestApplyObjectNoPrePatchAnnotationSkipsPrePatch(t *testing.T) {
 
 	obj := newTestDeployment(nil)
 
-	err := ApplyObject(context.Background(), client, obj, "test-controller")
+	err := ApplyObject(t.Context(), client, obj, "test-controller")
 	g.Expect(err).To(Succeed())
 	g.Expect(patchTypes).To(HaveLen(1))
 	g.Expect(patchTypes[0]).To(Equal(types.ApplyPatchType), "only SSA apply should have run")
