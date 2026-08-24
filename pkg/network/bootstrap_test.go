@@ -1,7 +1,6 @@
 package network_test
 
 import (
-	"context"
 	"os"
 	"reflect"
 	"testing"
@@ -127,7 +126,7 @@ func TestBootstrap(t *testing.T) {
 			setupHyperShift(t)
 
 			t.Run("should set the TLS profile info from the APIServer spec", func(t *testing.T) {
-				ctx := context.Background()
+				ctx := t.Context()
 				client := fakeclient.NewFakeClient(baseClientObjs...)
 
 				// Create HostedControlPlane with TLS configuration
@@ -178,7 +177,7 @@ func TestBootstrap(t *testing.T) {
 			})
 
 			t.Run("and the APIServer spec doesn't exist", func(t *testing.T) {
-				ctx := context.Background()
+				ctx := t.Context()
 				client := fakeclient.NewFakeClient(baseClientObjs...)
 
 				// Create HostedControlPlane without APIServer spec

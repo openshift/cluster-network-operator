@@ -202,7 +202,7 @@ func TestShouldInstallNetworkObservability_NilNonSNO(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).Build()
 	r := &ReconcileObservability{client: client}
 
-	result, err := r.shouldInstallNetworkObservability(context.TODO())
+	result, err := r.shouldInstallNetworkObservability(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(BeTrue())
@@ -234,7 +234,7 @@ func TestShouldInstallNetworkObservability_NilSNO(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).Build()
 	r := &ReconcileObservability{client: client}
 
-	result, err := r.shouldInstallNetworkObservability(context.TODO())
+	result, err := r.shouldInstallNetworkObservability(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(BeFalse())
@@ -268,7 +268,7 @@ func TestShouldInstallNetworkObservability_ExplicitInstallAndEnableNonSNO(t *tes
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).Build()
 	r := &ReconcileObservability{client: client}
 
-	result, err := r.shouldInstallNetworkObservability(context.TODO())
+	result, err := r.shouldInstallNetworkObservability(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(BeTrue())
@@ -302,7 +302,7 @@ func TestShouldInstallNetworkObservability_ExplicitInstallAndEnableSNO(t *testin
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).Build()
 	r := &ReconcileObservability{client: client}
 
-	result, err := r.shouldInstallNetworkObservability(context.TODO())
+	result, err := r.shouldInstallNetworkObservability(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(BeTrue())
@@ -335,7 +335,7 @@ func TestShouldInstallNetworkObservability_ExplicitNoAction(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, infra).Build()
 	r := &ReconcileObservability{client: client}
 
-	result, err := r.shouldInstallNetworkObservability(context.TODO())
+	result, err := r.shouldInstallNetworkObservability(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(BeFalse())
@@ -369,7 +369,7 @@ func TestShouldInstallNetworkObservability_EmptyStringNonSNO(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).Build()
 	r := &ReconcileObservability{client: client}
 
-	result, err := r.shouldInstallNetworkObservability(context.TODO())
+	result, err := r.shouldInstallNetworkObservability(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(BeTrue())
@@ -390,7 +390,7 @@ func TestIsSingleNodeCluster_SNO(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(infra).Build()
 	r := &ReconcileObservability{client: client}
 
-	isSNO, err := r.isSingleNodeCluster(context.TODO())
+	isSNO, err := r.isSingleNodeCluster(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(isSNO).To(BeTrue())
@@ -409,7 +409,7 @@ func TestIsSingleNodeCluster_HighlyAvailable(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(infra).Build()
 	r := &ReconcileObservability{client: client}
 
-	isSNO, err := r.isSingleNodeCluster(context.TODO())
+	isSNO, err := r.isSingleNodeCluster(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(isSNO).To(BeFalse())
@@ -433,7 +433,7 @@ func TestReconcile_IgnoresNonClusterNetwork(t *testing.T) {
 	}
 
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "not-cluster"}}
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(Equal(reconcile.Result{}))
@@ -457,7 +457,7 @@ func TestReconcile_SkipsWhenDisabled(t *testing.T) {
 	}
 
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(Equal(reconcile.Result{}))
@@ -498,7 +498,7 @@ func TestReconcile_InstallsWhenNil(t *testing.T) {
 	}
 
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 
 	// When nil, controller should try to install (opt-out behavior)
 	// This will fail because the manifest doesn't exist, but it requeues instead of erroring
@@ -540,7 +540,7 @@ func TestReconcile_SkipsInstallWhenNilOnSNO(t *testing.T) {
 	}
 
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 
 	// On SNO with nil, controller should skip installation
 	g.Expect(err).NotTo(HaveOccurred())
@@ -548,7 +548,7 @@ func TestReconcile_SkipsInstallWhenNilOnSNO(t *testing.T) {
 
 	// Verify that the operator namespace was NOT created
 	ns := &corev1.Namespace{}
-	nsErr := client.Get(context.TODO(), types.NamespacedName{Name: OperatorNamespace}, ns)
+	nsErr := client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace}, ns)
 	g.Expect(nsErr).To(HaveOccurred())
 	g.Expect(nsErr.Error()).To(ContainSubstring("not found"))
 }
@@ -568,7 +568,7 @@ func TestReconcile_IgnoresNotFound(t *testing.T) {
 	}
 
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(Equal(reconcile.Result{}))
@@ -588,7 +588,7 @@ func TestIsNetObservOperatorInstalled_True(t *testing.T) {
 
 	r := &ReconcileObservability{client: client}
 
-	installed, ceExists, err := r.isNetObservOperatorInstalled(context.TODO())
+	installed, ceExists, err := r.isNetObservOperatorInstalled(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(installed).To(BeTrue())
@@ -604,7 +604,7 @@ func TestIsNetObservOperatorInstalled_False(t *testing.T) {
 
 	r := &ReconcileObservability{client: client}
 
-	installed, ceExists, err := r.isNetObservOperatorInstalled(context.TODO())
+	installed, ceExists, err := r.isNetObservOperatorInstalled(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(installed).To(BeFalse())
@@ -625,7 +625,7 @@ func TestIsNetObservOperatorInstalled_Multiple(t *testing.T) {
 
 	r := &ReconcileObservability{client: client}
 
-	installed, ceExists, err := r.isNetObservOperatorInstalled(context.TODO())
+	installed, ceExists, err := r.isNetObservOperatorInstalled(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(installed).To(BeTrue())
@@ -644,7 +644,7 @@ func TestIsNetObservOperatorInstalled_CRDExistsButNoOLM(t *testing.T) {
 
 	r := &ReconcileObservability{client: client}
 
-	installed, ceExists, err := r.isNetObservOperatorInstalled(context.TODO())
+	installed, ceExists, err := r.isNetObservOperatorInstalled(t.Context())
 
 	// Should return error because CRD exists but no OLM installation found
 	g.Expect(err).To(HaveOccurred())
@@ -684,7 +684,7 @@ func TestIsNetObservOperatorInstalled_OLMv1InstallationFailed(t *testing.T) {
 
 	r := &ReconcileObservability{client: client}
 
-	installed, ceExists, err := r.isNetObservOperatorInstalled(context.TODO())
+	installed, ceExists, err := r.isNetObservOperatorInstalled(t.Context())
 
 	// Should return error because installation failed
 	g.Expect(err).To(HaveOccurred())
@@ -725,7 +725,7 @@ func TestIsNetObservOperatorInstalled_OLMv1NotInstalledYet(t *testing.T) {
 
 	r := &ReconcileObservability{client: client}
 
-	installed, ceExists, err := r.isNetObservOperatorInstalled(context.TODO())
+	installed, ceExists, err := r.isNetObservOperatorInstalled(t.Context())
 
 	// Should return an error because the controller could not identify how NOO was installed
 	g.Expect(err).To(HaveOccurred())
@@ -746,7 +746,7 @@ func TestIsNetObservOperatorInstalled_CRDMissingButOLMv1Present(t *testing.T) {
 
 	r := &ReconcileObservability{client: client}
 
-	installed, ceExists, err := r.isNetObservOperatorInstalled(context.TODO())
+	installed, ceExists, err := r.isNetObservOperatorInstalled(t.Context())
 
 	// Should return error because operator was deployed but CRD is missing
 	g.Expect(err).To(HaveOccurred())
@@ -769,7 +769,7 @@ func TestIsNetObservOperatorInstalled_OLMv0InstallationFailed(t *testing.T) {
 
 	r := &ReconcileObservability{client: client}
 
-	installed, ceExists, err := r.isNetObservOperatorInstalled(context.TODO())
+	installed, ceExists, err := r.isNetObservOperatorInstalled(t.Context())
 
 	g.Expect(err).To(HaveOccurred())
 	g.Expect(err.Error()).To(ContainSubstring("OLMv0 installation error"))
@@ -790,7 +790,7 @@ func TestIsNetObservOperatorInstalled_OLMv0NotInstalledYet(t *testing.T) {
 
 	r := &ReconcileObservability{client: client}
 
-	installed, ceExists, err := r.isNetObservOperatorInstalled(context.TODO())
+	installed, ceExists, err := r.isNetObservOperatorInstalled(t.Context())
 
 	// CRD exists, CSV is installing — neither OLM reports success
 	g.Expect(err).To(HaveOccurred())
@@ -811,7 +811,7 @@ func TestIsNetObservOperatorInstalled_CRDMissingButOLMv0Present(t *testing.T) {
 
 	r := &ReconcileObservability{client: client}
 
-	installed, ceExists, err := r.isNetObservOperatorInstalled(context.TODO())
+	installed, ceExists, err := r.isNetObservOperatorInstalled(t.Context())
 
 	// Should return error because operator was deployed but CRD is missing
 	g.Expect(err).To(HaveOccurred())
@@ -833,7 +833,7 @@ func TestIsFlowCollectorExists_True(t *testing.T) {
 
 	r := &ReconcileObservability{client: client}
 
-	exists, err := r.isFlowCollectorExists(context.TODO())
+	exists, err := r.isFlowCollectorExists(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(exists).To(BeTrue())
@@ -848,7 +848,7 @@ func TestIsFlowCollectorExists_False(t *testing.T) {
 
 	r := &ReconcileObservability{client: client}
 
-	exists, err := r.isFlowCollectorExists(context.TODO())
+	exists, err := r.isFlowCollectorExists(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(exists).To(BeFalse())
@@ -866,7 +866,7 @@ func TestIsFlowCollectorExists_OnlyChecksCluster(t *testing.T) {
 
 	r := &ReconcileObservability{client: client}
 
-	exists, err := r.isFlowCollectorExists(context.TODO())
+	exists, err := r.isFlowCollectorExists(t.Context())
 
 	// Should return false because we only check for "cluster"
 	g.Expect(err).NotTo(HaveOccurred())
@@ -888,7 +888,7 @@ func TestCreateFlowCollector_ManifestNotFound(t *testing.T) {
 	r := &ReconcileObservability{client: client}
 
 	// Test with non-existent manifest by calling applyManifest directly
-	err := r.applyManifest(context.TODO(), "/non/existent/path.yaml", "test")
+	err := r.applyManifest(t.Context(), "/non/existent/path.yaml", "test")
 
 	g.Expect(err).To(HaveOccurred())
 	g.Expect(err.Error()).To(ContainSubstring("failed to read"))
@@ -906,7 +906,7 @@ func TestInstallNetObservOperator_ManifestNotFound(t *testing.T) {
 	r := &ReconcileObservability{client: client}
 
 	// Test applyManifest with non-existent path directly
-	err := r.applyManifest(context.TODO(), "/non/existent/operator.yaml", "Network Observability Operator")
+	err := r.applyManifest(t.Context(), "/non/existent/operator.yaml", "Network Observability Operator")
 
 	g.Expect(err).To(HaveOccurred())
 	g.Expect(err.Error()).To(ContainSubstring("failed to read"))
@@ -934,7 +934,7 @@ metadata:
 `
 	manifestPath := createTempManifest(t, manifestContent)
 
-	err := r.applyManifest(context.TODO(), manifestPath, "test resource")
+	err := r.applyManifest(t.Context(), manifestPath, "test resource")
 
 	g.Expect(err).NotTo(HaveOccurred())
 }
@@ -961,7 +961,7 @@ metadata:
 `
 	manifestPath := createTempManifest(t, manifestContent)
 
-	err := r.applyManifest(context.TODO(), manifestPath, "test resources")
+	err := r.applyManifest(t.Context(), manifestPath, "test resources")
 
 	g.Expect(err).NotTo(HaveOccurred())
 }
@@ -980,7 +980,7 @@ func TestApplyManifest_EmptyDocuments(t *testing.T) {
 `
 	manifestPath := createTempManifest(t, manifestContent)
 
-	err := r.applyManifest(context.TODO(), manifestPath, "empty resources")
+	err := r.applyManifest(t.Context(), manifestPath, "empty resources")
 
 	// Should not error on empty documents
 	g.Expect(err).NotTo(HaveOccurred())
@@ -1002,7 +1002,7 @@ invalid: yaml: content:
 `
 	manifestPath := createTempManifest(t, manifestContent)
 
-	err := r.applyManifest(context.TODO(), manifestPath, "invalid resource")
+	err := r.applyManifest(t.Context(), manifestPath, "invalid resource")
 
 	g.Expect(err).To(HaveOccurred())
 }
@@ -1042,7 +1042,7 @@ func TestReconcile_SkipsFlowCollectorWhenExists(t *testing.T) {
 	}
 
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 
 	// Should complete without error
 	g.Expect(err).NotTo(HaveOccurred())
@@ -1080,7 +1080,7 @@ func TestReconcile_SkipsInstallWhenExists(t *testing.T) {
 
 	// Since operator is already installed, it should proceed to FlowCollector creation
 	// which will fail (manifest doesn't exist) but will requeue instead of erroring
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 
 	// We expect no error, just a requeue
 	g.Expect(err).ToNot(HaveOccurred())
@@ -1124,12 +1124,12 @@ func TestReconcile_MultipleInvocations(t *testing.T) {
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
 	// First reconciliation
-	result1, err1 := r.Reconcile(context.TODO(), req)
+	result1, err1 := r.Reconcile(t.Context(), req)
 	g.Expect(err1).NotTo(HaveOccurred())
 	g.Expect(result1).To(Equal(reconcile.Result{}))
 
 	// Second reconciliation should be idempotent
-	result2, err2 := r.Reconcile(context.TODO(), req)
+	result2, err2 := r.Reconcile(t.Context(), req)
 	g.Expect(err2).NotTo(HaveOccurred())
 	g.Expect(result2).To(Equal(reconcile.Result{}))
 
@@ -1163,7 +1163,7 @@ func TestReconcile_OperatorNotReady(t *testing.T) {
 
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	result, err := r.Reconcile(ctx, req)
@@ -1210,7 +1210,7 @@ func TestReconcile_FlowCollectorDeleted(t *testing.T) {
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
 	// Reconciliation should skip everything since deployment condition is set
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(Equal(reconcile.Result{}))
 }
@@ -1250,7 +1250,7 @@ func TestReconcile_OperatorDeleted(t *testing.T) {
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
 	// Reconciliation should skip everything since deployment condition is set
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(Equal(reconcile.Result{}))
 }
@@ -1289,7 +1289,7 @@ func TestReconcile_BothDeleted(t *testing.T) {
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
 	// Reconciliation should skip everything since deployment condition is set
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(Equal(reconcile.Result{}))
 }
@@ -1331,7 +1331,7 @@ func TestReconcile_InstallAndEnable_DoesNotReinstallWhenDeployed(t *testing.T) {
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
 	// Reconciliation should skip everything since deployment condition is set
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(Equal(reconcile.Result{}))
 }
@@ -1366,7 +1366,7 @@ func TestShouldInstallNetworkObservability_InstallAndEnable_AlreadyDeployed(t *t
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).Build()
 	r := &ReconcileObservability{client: client}
 
-	result, err := r.shouldInstallNetworkObservability(context.TODO())
+	result, err := r.shouldInstallNetworkObservability(t.Context())
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(BeFalse()) // Should NOT install when already deployed
@@ -1406,7 +1406,7 @@ func TestReconcile_NetworkCRUpdated(t *testing.T) {
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
 	// First reconciliation - should skip
-	result1, err1 := r.Reconcile(context.TODO(), req)
+	result1, err1 := r.Reconcile(t.Context(), req)
 	g.Expect(err1).NotTo(HaveOccurred())
 	g.Expect(result1).To(Equal(reconcile.Result{}))
 
@@ -1414,12 +1414,12 @@ func TestReconcile_NetworkCRUpdated(t *testing.T) {
 	network.Spec.NetworkObservability = configv1.NetworkObservabilitySpec{
 		InstallationPolicy: configv1.NetworkObservabilityInstallAndEnable,
 	}
-	err := client.Update(context.TODO(), network)
+	err := client.Update(t.Context(), network)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Second reconciliation - should now try to install
 	// This will fail because manifest doesn't exist, but will requeue instead of erroring
-	result2, err2 := r.Reconcile(context.TODO(), req)
+	result2, err2 := r.Reconcile(t.Context(), req)
 
 	// Should requeue, not error
 	g.Expect(err2).ToNot(HaveOccurred())
@@ -1461,7 +1461,7 @@ func TestReconcile_PartialFailure_OperatorInstallFails(t *testing.T) {
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
 	// Reconciliation should requeue when install fails (manifest doesn't exist)
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 
 	// Should requeue, not error
 	g.Expect(err).ToNot(HaveOccurred())
@@ -1498,7 +1498,7 @@ func TestReconcile_RecoveryAfterOperatorBecomesReady(t *testing.T) {
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
 	// First reconciliation will fail creating FlowCollector (returns no error but RequeueAfter=30s)
-	ctx1, cancel1 := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx1, cancel1 := context.WithTimeout(t.Context(), 1*time.Second)
 	defer cancel1()
 
 	result1, err1 := r.Reconcile(ctx1, req)
@@ -1517,12 +1517,12 @@ func TestReconcile_RecoveryAfterOperatorBecomesReady(t *testing.T) {
 	if err := unstructured.SetNestedSlice(clusterExtension.Object, conditions, "status", "conditions"); err != nil {
 		t.Fatalf("Failed to set status conditions: %v", err)
 	}
-	err := client.Update(context.TODO(), clusterExtension)
+	err := client.Update(t.Context(), clusterExtension)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Second reconciliation should proceed past operator wait
 	// and attempt to create FlowCollector (which will fail due to missing manifest)
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx2, cancel2 := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel2()
 
 	result2, err2 := r.Reconcile(ctx2, req)
@@ -1567,7 +1567,7 @@ func TestReconcile_ConcurrentReconciliations(t *testing.T) {
 	errChan := make(chan error, 5)
 	for range 5 {
 		go func() {
-			_, err := r.Reconcile(context.TODO(), req)
+			_, err := r.Reconcile(t.Context(), req)
 			errChan <- err
 		}()
 	}
@@ -1622,7 +1622,7 @@ func TestReconcile_SetsConditionFalseOnError(t *testing.T) {
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
 	// Reconciliation should fail trying to install operator (manifest doesn't exist)
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 
 	// Should requeue without error
 	g.Expect(err).ToNot(HaveOccurred())
@@ -1630,7 +1630,7 @@ func TestReconcile_SetsConditionFalseOnError(t *testing.T) {
 
 	// Verify that NetworkObservabilityDeployed condition is set to False
 	updatedNetwork := &operatorv1.Network{}
-	err = client.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, updatedNetwork)
+	err = client.Get(t.Context(), types.NamespacedName{Name: "cluster"}, updatedNetwork)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	conditionFound := false
@@ -1681,13 +1681,13 @@ func TestReconcile_SetsConditionTrueOnSuccess(t *testing.T) {
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
 	// Reconciliation should succeed (FlowCollector already exists)
-	_, err := r.Reconcile(context.TODO(), req)
+	_, err := r.Reconcile(t.Context(), req)
 
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Verify that NetworkObservabilityDeployed condition is set to True
 	updatedNetwork := &operatorv1.Network{}
-	err = client.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, updatedNetwork)
+	err = client.Get(t.Context(), types.NamespacedName{Name: "cluster"}, updatedNetwork)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	conditionFound := false
@@ -1734,7 +1734,7 @@ func TestReconcile_SkipsWhenNoActionPolicy(t *testing.T) {
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
 	// Reconciliation should succeed and skip installation
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result).To(Equal(reconcile.Result{}))
@@ -1770,7 +1770,7 @@ func TestReconcile_RequeuesOnInfrastructureError(t *testing.T) {
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
 
 	// Reconciliation should requeue when checking Infrastructure fails
-	result, err := r.Reconcile(context.TODO(), req)
+	result, err := r.Reconcile(t.Context(), req)
 
 	// Should requeue without error (errors are logged and requeued)
 	g.Expect(err).ToNot(HaveOccurred())
