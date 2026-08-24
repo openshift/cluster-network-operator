@@ -16,6 +16,10 @@ linters:
     - unused
     - usetesting
     - wastedassign
+  settings:
+    usetesting:
+      context-background: true
+      context-todo: true
   exclusions:
     generated: lax
     presets:
