@@ -655,7 +655,8 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 	}
 }
 
-func Test_renderFRRStatusCleanerStrategy(t *testing.T) {
+func Test_renderFRRWebhookServerStrategy(t *testing.T) {
+	// On 4.20 the hostNetwork workload is frr-k8s-webhook-server; statuscleaner was split out in 4.21.
 	frrConf := &operv1.NetworkSpec{
 		AdditionalRoutingCapabilities: &operv1.AdditionalRoutingCapabilities{
 			Providers: []operv1.RoutingCapabilitiesProvider{
@@ -670,7 +671,7 @@ func Test_renderFRRStatusCleanerStrategy(t *testing.T) {
 		br.OVN.ControlPlaneReplicaCount = replicaCount
 		objs, err := renderAdditionalRoutingCapabilities(frrConf, br, manifestDir)
 		g.Expect(err).NotTo(HaveOccurred())
-		return mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "frr-k8s-statuscleaner")
+		return mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "frr-k8s-webhook-server")
 	}
 
 	t.Run("SNO: strategy is Recreate", func(t *testing.T) {
