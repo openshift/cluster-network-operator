@@ -250,30 +250,33 @@ func TestStatusManager_set(t *testing.T) {
 
 	obj := &uns.Unstructured{}
 	gvk := schema.GroupVersionKind{
-		Group:   "test",
-		Version: "test",
-		Kind:    "test",
+		Group:   "",
+		Version: "v1",
+		Kind:    "ConfigMap",
 	}
 	obj.SetGroupVersionKind(gvk)
 	obj.SetName("current")
+	obj.SetNamespace("default")
 	set(t, client, obj)
 
 	co.Status.RelatedObjects = []configv1.ObjectReference{
 		{
-			Group:    "test",
-			Resource: "test",
-			Name:     "current",
+			Group:     "",
+			Resource:  "configmaps",
+			Name:      "current",
+			Namespace: "default",
 		},
 	}
 	status.relatedObjects = []configv1.ObjectReference{
 		{
-			Group:    "test",
-			Resource: "test",
-			Name:     "related",
+			Group:     "",
+			Resource:  "configmaps",
+			Name:      "related",
+			Namespace: "default",
 		},
 	}
 	status.deleteRelatedObjectsNotRendered(co)
-	err = status.client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Name: "current"}, obj)
+	err = status.client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Namespace: "default", Name: "current"}, obj)
 	if err == nil {
 		t.Fatalf("unexpected related object in ClusterOperator object was not deleted")
 	}
