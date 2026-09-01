@@ -64,12 +64,12 @@ const OVN_NODE_SELECTOR_DEFAULT_DPU = "network.operator.openshift.io/dpu="
 const OVN_NODE_SELECTOR_DEFAULT_SMART_NIC = "network.operator.openshift.io/smart-nic="
 const OVN_NODE_IDENTITY_CERT_DURATION = "24h"
 
-// Default DPU health check lease configuration.
+// DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT and DPU_NODE_LEASE_DURATION_DEFAULT are the default DPU health check lease configuration.
 // Setting renew-interval to 0 disables the health check.
 const DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT = 10
 const DPU_NODE_LEASE_DURATION_DEFAULT = 40
 
-// gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
+// OVN_EGRESSIP_HEALTHCHECK_PORT is the gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
 const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
 
 const frrK8sNamespace = "openshift-frr-k8s"

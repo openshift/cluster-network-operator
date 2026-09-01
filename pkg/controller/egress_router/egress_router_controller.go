@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// Attach control loop to the manager and watch for Egress Router objects
+// Add attaches control loop to the manager and watch for Egress Router objects
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, cli cnoclient.Client, _ featuregates.FeatureGate) error {
 	r, err := newEgressRouterReconciler(mgr, status, cli)
 	if err != nil {

@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// and Start it when the Manager is Started.
+// Add to the given Manager and start it when the Manager is started.
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, _ featuregates.FeatureGate) error {
 	reconciler := newReconciler(mgr, status, c)
 	if reconciler == nil {

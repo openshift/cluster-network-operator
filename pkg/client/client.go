@@ -312,7 +312,7 @@ func (c *OperatorClusterClient) AddCustomInformer(inf cache.SharedInformer) {
 	}
 }
 
-// URL returns the host and port of the apiserver endpoint for this client
+// HostPort returns the host and port of the apiserver endpoint for this client
 func (c *OperatorClusterClient) HostPort() (string, string) {
 	url, _, err := rest.DefaultServerURL(c.cfg.Host, c.cfg.APIPath, schema.GroupVersion{}, true)
 	if err != nil { // can't happen, url was validated earlier when we created the client
