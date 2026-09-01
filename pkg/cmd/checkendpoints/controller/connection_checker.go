@@ -157,6 +157,7 @@ func (c *connectionChecker) getTCPConnectLatency(ctx context.Context, address st
 
 	// perform tls handshake to avoid spamming the logs of tls endpoints
 	host, _, _ := net.SplitHostPort(address)
+	//nolint:gosec // G402: InsecureSkipVerify is intentional - this is a connectivity checker, not validating certs
 	tlsConn := tls.Client(tcpConn, &tls.Config{Certificates: c.clientCertGetter(), ServerName: host, InsecureSkipVerify: true})
 	if err = tlsConn.Handshake(); err != nil {
 		// ignore any error. most likely non-tls connection, plus we're not really testing tls
