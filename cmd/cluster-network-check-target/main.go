@@ -28,6 +28,7 @@ func checktargetHandler(w http.ResponseWriter, r *http.Request) {
 		server = tcpAddr.IP.String()
 	}
 
+	//nolint:gosec // False positive for G705 - plain text response with network addresses, not HTML
 	fmt.Fprintf(w, "Hello, %s. You have reached %s on %s", client, server, nodeName)
 }
 
