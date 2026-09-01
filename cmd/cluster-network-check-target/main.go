@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 )
 
 const port = "8080"
@@ -34,7 +35,13 @@ func checktargetHandler(w http.ResponseWriter, r *http.Request) {
 
 func listenAndServe(port string) {
 	fmt.Printf("serving on %s\n", port)
-	err := http.ListenAndServe(":"+port, nil)
+
+	server := &http.Server{
+		Addr:         ":" + port,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+	}
+	err := server.ListenAndServe()
 	if err != nil {
 		panic("ListenAndServe: " + err.Error())
 	}
