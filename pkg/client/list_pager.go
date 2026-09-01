@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/tools/pager"
 )
 
-// for use with dynamic client
+// ListAllOfSpecifiedType is for use with dynamic client
 func ListAllOfSpecifiedType(resourceType schema.GroupVersionResource, ctx context.Context, client Client) ([]*uns.Unstructured, error) {
 	list := []*uns.Unstructured{}
 	err := pager.New(func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {

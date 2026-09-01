@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	// if a rollout has not made any progress by this time,
+	// ProgressTimeout is the time period after which if a rollout has not made any progress by this time,
 	// mark ourselves as Degraded
 	ProgressTimeout = 10 * time.Minute
 

@@ -45,12 +45,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// The periodic resync interval.
+// ResyncPeriod is the periodic resync interval.
 // We will re-run the reconciliation logic, even if the network configuration
 // hasn't changed.
 var ResyncPeriod = 3 * time.Minute
 
-// ManifestPaths is the path to the manifest templates
+// ManifestPath is the path to the manifest templates
 // bad, but there's no way to pass configuration to the reconciler right now
 var ManifestPath = "./bindata"
 

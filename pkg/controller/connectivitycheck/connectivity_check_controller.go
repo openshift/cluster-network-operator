@@ -39,17 +39,17 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type NetworkConnectivityCheckController interface {
-	connectivitycheckcontroller.ConnectivityCheckController
-}
-
-// NetworkConnectivyCheckController consumes a series of clients, informers and a recorders.
+// NetworkConnectivityCheckController consumes a series of clients, informers and a recorders.
 // With those objects it generates a series of templates for creating PodNetworkConnectivityChecks CRs,
 // in particular:
 // Checks between network-check-source pod and every kube apiserver service and endpoints
 // Checks between network-check-source pod and every openshift apiserver service and endpoints
 // Checks between network-check-source pod and every LB
 // Checks between network-check-source pod and network-check-target service and endpoints this being managed by a Daemonset
+type NetworkConnectivityCheckController interface {
+	connectivitycheckcontroller.ConnectivityCheckController
+}
+
 func NewNetworkConnectivityCheckController(
 	operatorClient v1helpers.OperatorClient,
 	configClient *configv1client.Clientset,

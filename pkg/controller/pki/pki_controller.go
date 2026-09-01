@@ -92,7 +92,7 @@ type PKIReconciler struct {
 	pkiProfileProvider pki.PKIProfileProvider
 }
 
-// The periodic resync interval.
+// ResyncPeriod is the periodic resync interval.
 // We will re-run the reconciliation logic, even if the configuration
 // hasn't changed.
 var ResyncPeriod = 5 * time.Minute

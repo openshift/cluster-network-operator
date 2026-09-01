@@ -4,7 +4,7 @@ import "k8s.io/apimachinery/pkg/types"
 
 // some names
 
-// OperatorConfig is the name of the CRD that defines the complete
+// OPERATOR_CONFIG is the name of the CRD that defines the complete
 // operator configuration
 const OPERATOR_CONFIG = "cluster"
 
@@ -70,7 +70,7 @@ const GenerateStatusLabel = "networkoperator.openshift.io/generates-operator-sta
 // StandAloneClusterName is a value used for GenerateStatusLabel label when running in non-Hypershift environments
 const StandAloneClusterName = "stand-alone"
 
-// NetworkIPFamilyAnnotation is an annotation on the OVN networks.operator.openshift.io daemonsets
+// NetworkIPFamilyModeAnnotation is an annotation on the OVN networks.operator.openshift.io daemonsets
 // to indicate the current IP Family mode of the cluster: "single-stack" or "dual-stack"
 const NetworkIPFamilyModeAnnotation = "networkoperator.openshift.io/ip-family-mode"
 
@@ -84,7 +84,7 @@ const ClusterNetworkCIDRsAnnotation = "networkoperator.openshift.io/cluster-netw
 // OVNKubernetesConfig.GatewayConfig.IPv[4|6].InternalMasqueradeSubnet API field.
 const MasqueradeCIDRsAnnotation = "networkoperator.openshift.io/default-masquerade-network-cidrs"
 
-// NetworkHybridOverlayAnnotatiion is an annotation on the OVN networks.operator.io.daemonsets
+// NetworkHybridOverlayAnnotation is an annotation on the OVN networks.operator.io.daemonsets
 // to indicate the current state of the Hybrid overlay on the cluster: "enabled" or "disabled"
 const NetworkHybridOverlayAnnotation = "networkoperator.openshift.io/hybrid-overlay-status"
 
@@ -194,32 +194,33 @@ func TrustedCABundleConfigMap() types.NamespacedName {
 }
 
 // constants for namespace and custom resource names
-// namespace in which ingress controller objects are created
+
+// IngressControllerNamespace is the namespace in which ingress controller objects are created
 const IngressControllerNamespace = "openshift-ingress-operator"
 
-// namespace representing host network traffic
+// HostNetworkNamespace is the namespace representing host network traffic
 // this is also the namespace where to set the ingress label
 const HostNetworkNamespace = "openshift-host-network"
 
-// label for ingress policy group
+// PolicyGroupLabelIngress is the label for the ingress policy group
 const PolicyGroupLabelIngress = "policy-group.network.openshift.io/ingress"
 
-// legacy label for ingress policy group
+// PolicyGroupLabelLegacy is the label for the legacy ingress policy group
 const PolicyGroupLabelLegacy = "network.openshift.io/policy-group"
 
-// we use empty label values for policy groups
+// PolicyGroupLabelIngressValue is the label value for policy groups
 const PolicyGroupLabelIngressValue = ""
 
-// value for legacy policy group label
+// PolicyGroupLabelLegacyValue is the value for the legacy policy group label
 const PolicyGroupLabelLegacyValue = "ingress"
 
-// default ingress controller name
+// DefaultIngressControllerName is the default ingress controller name
 const DefaultIngressControllerName = "default"
 
-// single stack IP family mode
+// IPFamilySingleStack is the single stack IP family mode
 const IPFamilySingleStack = "single-stack"
 
-// dual stack IP family mode
+// IPFamilyDualStack is the dual stack IP family mode
 const IPFamilyDualStack = "dual-stack"
 
 // EnvApiOverrideHost is an environment variable that, if set, allows overriding the host / port

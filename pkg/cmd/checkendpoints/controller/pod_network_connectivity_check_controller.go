@@ -41,7 +41,7 @@ type controller struct {
 	updaters map[string]ConnectionChecker
 }
 
-// Returns a new PodNetworkConnectivityCheckController that performs network connectivity checks
+// NewPodNetworkConnectivityCheckController returns a new PodNetworkConnectivityCheckController that performs network connectivity checks
 // as specified in the PodNetworkConnectivityChecks defined in the specified namespace, for the specified pod.
 func NewPodNetworkConnectivityCheckController(podName, podNamespace string,
 	checksGetter operatorcontrolplaneclientv1alpha1.PodNetworkConnectivityChecksGetter,
