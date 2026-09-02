@@ -776,7 +776,7 @@ func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootst
 	// OVN IPsec is disabled.
 	renderIPsecDaemonSetAsCreateWaitOnly = isOVNIPsecActive && !renderIPsecOVN
 
-	return
+	return renderCNOIPsecMachineConfig, renderIPsecDaemonSet, renderIPsecOVN, renderIPsecHostDaemonSet, renderIPsecContainerizedDaemonSet, renderIPsecDaemonSetAsCreateWaitOnly
 }
 
 // renderOVNFlowsConfig renders the bootstrapped information from the ovs-flows-config ConfigMap
