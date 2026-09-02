@@ -105,11 +105,11 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(ctx context.Context, proxyCon
 				return fmt.Errorf("failed to merge system and trustedCA trust bundles: %w", err)
 			}
 			if scheme == schemeHTTPS && isSpecHTTPSProxySet(proxyConfig) {
-				if err := validateReadinessEndpoint(trustBundle, proxyConfig.HTTPSProxy, endpoint); err != nil {
+				if err := validateReadinessEndpoint(ctx, trustBundle, proxyConfig.HTTPSProxy, endpoint); err != nil {
 					return fmt.Errorf("readinessEndpoint probe failed for endpoint '%s': %w", endpoint, err)
 				}
 			} else {
-				if err := validateReadinessEndpoint(trustBundle, proxyConfig.HTTPProxy, endpoint); err != nil {
+				if err := validateReadinessEndpoint(ctx, trustBundle, proxyConfig.HTTPProxy, endpoint); err != nil {
 					return fmt.Errorf("readinessEndpoint probe failed for endpoint '%s': %w", endpoint, err)
 				}
 			}
@@ -189,7 +189,7 @@ func (r *ReconcileProxyConfig) validateSystemTrustBundle(trustBundle string) ([]
 
 // validateReadinessEndpoint validates endpoint using proxy. If caBundle
 // is not nil, TLS is used for the probe with caBundle as the cert pool.
-func validateReadinessEndpoint(caBundle []*x509.Certificate, proxy, endpoint string) error {
+func validateReadinessEndpoint(ctx context.Context, caBundle []*x509.Certificate, proxy, endpoint string) error {
 	proxyURL, err := url.Parse(proxy)
 	if err != nil {
 		return fmt.Errorf("failed to parse proxy url '%s': %w", proxy, err)
@@ -208,7 +208,7 @@ func validateReadinessEndpoint(caBundle []*x509.Certificate, proxy, endpoint str
 		return fmt.Errorf("https proxy probe requires at least one CA certificate")
 	}
 
-	if err := validateReadinessEndpointWithRetries(caBundle, proxyURL, endpointURL, proxyProbeMaxRetries); err != nil {
+	if err := validateReadinessEndpointWithRetries(ctx, caBundle, proxyURL, endpointURL, proxyProbeMaxRetries); err != nil {
 		return err
 	}
 
@@ -217,10 +217,10 @@ func validateReadinessEndpoint(caBundle []*x509.Certificate, proxy, endpoint str
 
 // validateReadinessEndpointWithRetries tries to validate endpoint in a
 // finite loop using proxy and returns the last result if it never succeeds.
-func validateReadinessEndpointWithRetries(caBundle []*x509.Certificate, proxy, endpoint *url.URL, retries int) error {
+func validateReadinessEndpointWithRetries(ctx context.Context, caBundle []*x509.Certificate, proxy, endpoint *url.URL, retries int) error {
 	var err error
 	for range retries {
-		err = runReadinessProbe(caBundle, proxy, endpoint)
+		err = runReadinessProbe(ctx, caBundle, proxy, endpoint)
 		if err == nil {
 			return nil
 		}
@@ -234,7 +234,7 @@ func validateReadinessEndpointWithRetries(caBundle []*x509.Certificate, proxy, e
 // returns an error if a 2XX or 3XX http status code is not returned.
 // caBundle is used to authenticate endpoint if endpoint contains an
 // https scheme.
-func runReadinessProbe(caBundle []*x509.Certificate, proxyURL, endpoint *url.URL) error {
+func runReadinessProbe(ctx context.Context, caBundle []*x509.Certificate, proxyURL, endpoint *url.URL) error {
 	transport := &http.Transport{
 		Proxy: http.ProxyURL(proxyURL),
 	}
@@ -268,7 +268,7 @@ func runReadinessProbe(caBundle []*x509.Certificate, proxyURL, endpoint *url.URL
 		Transport: transport,
 	}
 
-	request, err := http.NewRequest("GET", endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, "GET", endpoint.String(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request for '%s' using proxy '%s': %w", endpoint.String(),
 			proxyURL.String(), err)
