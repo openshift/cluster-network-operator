@@ -187,7 +187,7 @@ func getAllowedDestinationsConfigJSON(redirectRules []netopv1.L4RedirectRule) (s
 
 	jsonByte, err := json.Marshal(config)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	return string(jsonByte), nil
