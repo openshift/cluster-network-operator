@@ -10,8 +10,8 @@ import (
 )
 
 type fieldSynchronizer interface {
-	VipsSynchronize(*configv1.Infrastructure) *configv1.Infrastructure
-	SpecStatusSynchronize(*configv1.Infrastructure) (*configv1.Infrastructure, error)
+	VipsSynchronize(infraConfig *configv1.Infrastructure) *configv1.Infrastructure
+	SpecStatusSynchronize(infraConfig *configv1.Infrastructure) (*configv1.Infrastructure, error)
 }
 
 type synchronizer struct{}
