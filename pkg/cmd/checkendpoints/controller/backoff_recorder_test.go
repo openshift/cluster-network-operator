@@ -31,13 +31,13 @@ func TestWithShortWindow(t *testing.T) {
 	// wait short window
 	<-time.After(shortDuration)
 	// excessive events for short window
-	for i := 0; i < shortCountMax+excessiveEventCount; i++ {
+	for range shortCountMax + excessiveEventCount {
 		r.Eventf(t.Name(), "TEST")
 	}
 	// wait for backoff period to end
 	<-time.After(backoffDuration)
 	// some more events
-	for i := 0; i < shortCountMax-1; i++ {
+	for range shortCountMax - 1 {
 		r.Eventf(t.Name(), "TEST")
 	}
 	assert.Len(t, inMemoryRecorder.Events(), 1+shortCountMax+1+shortCountMax-1)
@@ -74,7 +74,7 @@ func TestWithLongWindow(t *testing.T) {
 		// start timer for short window
 		afterShortDuration := time.After(shortDuration)
 		// fire some events, not enough to trigger short window
-		for i := 0; i < shortCountMax-1; i++ {
+		for range shortCountMax - 1 {
 			r.Eventf(t.Name(), "TEST")
 		}
 		// wait short window
