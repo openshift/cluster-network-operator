@@ -1912,6 +1912,8 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 }
 
 // daemonSetProgressing returns true if a daemonset is rolling out a change.
+// A DaemonSet with no desired pods is complete, because there are no pods to
+// roll out. This can occur in zero-node clusters.
 // If allowHung is true, then treat a daemonset hung at 90% as "done" for our purposes.
 func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 	status := ds.Status
@@ -1950,6 +1952,8 @@ func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 }
 
 // deploymentProgressing returns true if a deployment is rolling out a change.
+// A Deployment with zero desired replicas is complete, because there are no
+// replicas to roll out. This can occur in zero-node clusters.
 func deploymentProgressing(d *appsv1.Deployment) bool {
 	status := d.Status
 
