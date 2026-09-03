@@ -648,11 +648,6 @@ data:
         route_advertisements_enable_flag="--enable-route-advertisements"
       fi
 
-      evpn_enable_flag=
-      if [[ "{{.OVN_EVPN_ENABLE}}" == "true" ]]; then
-        evpn_enable_flag="--enable-evpn"
-      fi
-
       network_observability_enabled_flag=
       if [[ "{{.OVN_OBSERVABILITY_ENABLE}}" == "true" ]]; then
         network_observability_enabled_flag="--enable-observability"
@@ -748,7 +743,6 @@ data:
         --disable-snat-multiple-gws \
         ${export_network_flows_flags} \
         ${route_advertisements_enable_flag} \
-        ${evpn_enable_flag} \
         ${network_observability_enabled_flag} \
         --zone ${K8S_NODE} \
         ${enable_interconnect_flag} \
