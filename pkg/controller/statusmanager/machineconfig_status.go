@@ -80,11 +80,11 @@ func (status *StatusManager) SetMachineConfigs(ctx context.Context, newRenderedM
 				status.renderedMachineConfigs[role].Insert(newlyRenderedMachineConfigs.UnsortedList()...)
 				annotateUpdate = true
 			} else {
-				new := newlyRenderedMachineConfigs.Difference(status.renderedMachineConfigs[role])
-				if len(new) == 0 {
+				newMCs := newlyRenderedMachineConfigs.Difference(status.renderedMachineConfigs[role])
+				if len(newMCs) == 0 {
 					continue
 				}
-				status.renderedMachineConfigs[role].Insert(new.UnsortedList()...)
+				status.renderedMachineConfigs[role].Insert(newMCs.UnsortedList()...)
 				annotateUpdate = true
 			}
 		}

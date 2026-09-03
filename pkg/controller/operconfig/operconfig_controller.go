@@ -91,11 +91,11 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 			if !ok {
 				return true
 			}
-			new, ok := evt.ObjectNew.(*configv1.Network)
+			newObj, ok := evt.ObjectNew.(*configv1.Network)
 			if !ok {
 				return true
 			}
-			if reflect.DeepEqual(old.Spec.NetworkDiagnostics, new.Spec.NetworkDiagnostics) {
+			if reflect.DeepEqual(old.Spec.NetworkDiagnostics, newObj.Spec.NetworkDiagnostics) {
 				return false
 			}
 			return true
@@ -112,11 +112,11 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 			if !ok {
 				return true
 			}
-			new, ok := evt.ObjectNew.(*operv1.Network)
+			newObj, ok := evt.ObjectNew.(*operv1.Network)
 			if !ok {
 				return true
 			}
-			if reflect.DeepEqual(old.Spec, new.Spec) {
+			if reflect.DeepEqual(old.Spec, newObj.Spec) {
 				log.Printf("Skipping reconcile of Network.operator.openshift.io: spec unchanged")
 				return false
 			}
