@@ -16,6 +16,7 @@ import (
 
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -77,6 +78,7 @@ type EgressRouterReconciler struct {
 
 var ResyncPeriod = 5 * time.Minute
 
+// newEgressRouterReconciler wires up the reconciler with a shared client and status manager.
 func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) (reconcile.Reconciler, error) {
 
 	return &EgressRouterReconciler{
@@ -89,6 +91,7 @@ func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.Status
 	}, nil
 }
 
+// Reconcile fetches the EgressRouter CR, renders its manifests, and applies them to the cluster.
 func (r EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	klog.Infof("Reconciling egressrouter.network.operator.openshift.io %s\n", request.NamespacedName)
@@ -194,13 +197,11 @@ func getAllowedDestinationsConfigJSON(RedirectRules []netopv1.L4RedirectRule) (s
 	return string(jsonByte), nil
 }
 
-func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifestDir string, namespace string, router *netopv1.EgressRouter, EgressRouterOwnerReferences []metav1.OwnerReference) error {
-	var err error
+// buildEgressRouterRenderData populates template render data from an EgressRouter CR.
+func buildEgressRouterRenderData(data *render.RenderData, namespace string, router *netopv1.EgressRouter) error {
 	if len(router.Spec.Addresses) == 0 {
 		return fmt.Errorf("router without addresses")
 	}
-	out := []*uns.Unstructured{}
-	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["EgressRouterNamespace"] = namespace
 	if isItValidCidr(router.Spec.Addresses[0].IP) {
@@ -209,17 +210,37 @@ func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifes
 	if isItValidIPAddress(router.Spec.Addresses[0].Gateway) {
 		data.Data["Gateway"] = router.Spec.Addresses[0].Gateway
 	}
+	var err error
 	data.Data["AllowedDestinations"], err = getAllowedDestinationsConfigJSON(router.Spec.Redirect.RedirectRules)
 	if err != nil {
 		return fmt.Errorf("failed to render AllowedDestinations config: %w", err)
 	}
 	data.Data["FallbackIP"] = router.Spec.Redirect.FallbackIP
 	data.Data["mode"] = router.Spec.Mode
-	data.Data["network_interfaces"] = router.Spec.NetworkInterface
+	master := router.Spec.NetworkInterface.Macvlan.Master
+	if err := validateMacvlanMaster(master); err != nil {
+		return fmt.Errorf("validate macvlan master: %w", err)
+	}
+	data.Data["MacvlanMaster"] = master
+	if master != "" {
+		klog.Infof("EgressRouter %s/%s: using explicit macvlan master %q", namespace, router.Name, master)
+	}
+	data.Data["MacvlanMode"] = strings.ToLower(string(router.Spec.NetworkInterface.Macvlan.Mode))
 	data.Data["EgressRouterPodImage"] = os.Getenv("EGRESS_ROUTER_CNI_IMAGE")
+	return nil
+}
+
+// ensureEgressRouter builds render data from the CR, renders the NAD/pod/service
+// templates under bindata/egress-router/, and applies them with owner references.
+func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifestDir string, namespace string, router *netopv1.EgressRouter, EgressRouterOwnerReferences []metav1.OwnerReference) error {
+	out := []*uns.Unstructured{}
+	data := render.MakeRenderData()
+	if err := buildEgressRouterRenderData(&data, namespace, router); err != nil {
+		return err
+	}
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "egress-router"), &data)
 	if err != nil {
-		return err
+		return fmt.Errorf("render egress-router manifests: %w", err)
 	}
 	out = append(out, manifests...)
 
@@ -228,8 +249,7 @@ func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifes
 		obj.SetOwnerReferences(EgressRouterOwnerReferences)
 		klog.Infof("Applying manifest")
 		if err := apply.ApplyObject(ctx, r.client, obj, "egress_router"); err != nil {
-			klog.Infof("could not apply egress router object: %v", err)
-			return err
+			return fmt.Errorf("apply egress-router object: %w", err)
 		}
 	}
 
@@ -247,4 +267,19 @@ func isItValidCidr(cidr string) bool {
 
 func isItValidIPAddress(ip string) bool {
 	return net.ParseIP(ip) != nil
+}
+
+// macvlanMasterRE allows only characters that appear in real Linux interface
+// names and enforces IFNAMSIZ (15 usable chars). Full CRD-level validation
+// belongs in openshift/api via +kubebuilder:validation:Pattern.
+var macvlanMasterRE = regexp.MustCompile(`^[a-zA-Z0-9._@:-]{1,15}$`)
+
+func validateMacvlanMaster(master string) error {
+	if master == "" {
+		return nil
+	}
+	if !macvlanMasterRE.MatchString(master) {
+		return fmt.Errorf("invalid macvlan master interface name %q: must be 1-15 chars of [a-zA-Z0-9._@:-]", master)
+	}
+	return nil
 }
