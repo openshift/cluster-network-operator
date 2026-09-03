@@ -19,7 +19,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
@@ -160,7 +159,7 @@ func (r *EgressRouterReconciler) setStatus(ctx context.Context) {
 	if len(r.egressrouterErrs) == 0 {
 		r.status.SetNotDegraded(ctx, statusmanager.EgressRouterConfig)
 	} else {
-		msgs := []string{}
+		msgs := make([]string, 0, len(r.egressrouterErrs))
 		for _, e := range r.egressrouterErrs {
 			msgs = append(msgs, e.Error())
 		}
@@ -198,7 +197,6 @@ func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifes
 	if len(router.Spec.Addresses) == 0 {
 		return fmt.Errorf("router without addresses")
 	}
-	out := []*uns.Unstructured{}
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["EgressRouterNamespace"] = namespace
@@ -220,9 +218,8 @@ func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifes
 	if err != nil {
 		return err
 	}
-	out = append(out, manifests...)
 
-	for _, obj := range out {
+	for _, obj := range manifests {
 		klog.Infof("Assigning owner references")
 		obj.SetOwnerReferences(egressRouterOwnerReferences)
 		klog.Infof("Applying manifest")

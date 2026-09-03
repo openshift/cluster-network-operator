@@ -688,17 +688,14 @@ func renderMultusAdmissionController(ctx context.Context, conf *operv1.NetworkSp
 		return nil, nil
 	}
 
-	var err error
-	out := []*uns.Unstructured{}
-
 	hsc := hypershift.NewHyperShiftConfig()
 	objs, err := renderMultusAdmissonControllerConfig(ctx, manifestDir, externalControlPlane,
 		bootstrapResult, client, hsc, names.ManagementClusterName, featureGates)
 	if err != nil {
 		return nil, err
 	}
-	out = append(out, objs...)
-	return out, nil
+
+	return objs, nil
 }
 
 // renderMultiNetworkpolicy generates the manifests of MultiNetworkPolicy
@@ -712,15 +709,12 @@ func renderMultiNetworkpolicy(conf *operv1.NetworkSpec, manifestDir string) ([]*
 		return nil, nil
 	}
 
-	var err error
-	out := []*uns.Unstructured{}
-
 	objs, err := renderMultiNetworkpolicyConfig(manifestDir)
 	if err != nil {
 		return nil, err
 	}
-	out = append(out, objs...)
-	return out, nil
+
+	return objs, nil
 }
 
 // renderNetworkDiagnostics renders the connectivity checks

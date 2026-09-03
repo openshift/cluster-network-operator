@@ -1629,7 +1629,7 @@ func bootstrapFlowsConfig(ctx context.Context, cl crclient.Reader) *bootstrap.Fl
 
 func getClusterCIDRsFromConfig(conf *operv1.NetworkSpec) string {
 	// pretty print the clusterNetwork CIDR (possibly only one) in its annotation
-	var clusterNetworkCIDRs []string
+	clusterNetworkCIDRs := make([]string, 0, len(conf.ClusterNetwork))
 	for _, c := range conf.ClusterNetwork {
 		clusterNetworkCIDRs = append(clusterNetworkCIDRs, c.CIDR)
 	}

@@ -56,7 +56,6 @@ func getOpenshiftNamespaces(ctx context.Context, client cnoclient.Client) (strin
 
 // renderMultusAdmissonControllerConfig returns the manifests of Multus Admisson Controller
 func renderMultusAdmissonControllerConfig(ctx context.Context, manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client, hsc *hypershift.HyperShiftConfig, clientName string, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, error) {
-	objs := []*uns.Unstructured{}
 	var err error
 
 	replicas := getMultusAdmissionControllerReplicas(bootstrapResult, hsc.Enabled)
@@ -151,8 +150,8 @@ func renderMultusAdmissonControllerConfig(ctx context.Context, manifestDir strin
 	if err != nil {
 		return nil, fmt.Errorf("failed to render multus admission controller manifests: %w", err)
 	}
-	objs = append(objs, manifests...)
-	return objs, nil
+
+	return manifests, nil
 }
 
 func findContainer(conts []corev1.Container, name string) (corev1.Container, bool) {

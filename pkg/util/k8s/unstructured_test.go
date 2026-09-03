@@ -82,7 +82,7 @@ spec:
   a: c`,
 	}
 
-	objs := []*uns.Unstructured{}
+	objs := make([]*uns.Unstructured, 0, len(specs))
 	for _, spec := range specs {
 		objs = append(objs, parseManifest(t, spec))
 	}
@@ -141,7 +141,7 @@ spec:
   a: c`,
 	}
 
-	objs := []*uns.Unstructured{}
+	objs := make([]*uns.Unstructured, 0, len(specs))
 	for _, spec := range specs {
 		objs = append(objs, parseManifest(t, spec))
 	}

@@ -244,8 +244,9 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForKubernetesDefaultServ
 }
 
 func (c *connectivityCheckTemplateProvider) getTemplatesForKubernetesServiceMonitorService(recorder events.Recorder) []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration {
-	var templates []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration
-	for _, address := range c.listAddressesForKubernetesServiceMonitorService(recorder) {
+	addresses := c.listAddressesForKubernetesServiceMonitorService(recorder)
+	templates := make([]*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration, 0, len(addresses))
+	for _, address := range addresses {
 		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(address, "openshift-network-diagnostics", withTarget("kubernetes-apiserver-service", "cluster")))
 	}
 	return templates
@@ -363,9 +364,10 @@ func (c *connectivityCheckTemplateProvider) listAddressesForOpenShiftAPIServerSe
 	}
 	return results, nil
 }
-func (c *connectivityCheckTemplateProvider) getTemplatesForGenericPodServiceCheck(recorder events.Recorder) []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration {
-	var templates []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration
-	return append(templates, NewPodNetworkConnectivityCheckTemplate("network-check-target:80", "openshift-network-diagnostics", withTarget("network-check-target-service", "cluster")))
+func (c *connectivityCheckTemplateProvider) getTemplatesForGenericPodServiceCheck(_ events.Recorder) []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration {
+	return []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration{
+		NewPodNetworkConnectivityCheckTemplate("network-check-target:80", "openshift-network-diagnostics", withTarget("network-check-target-service", "cluster")),
+	}
 }
 
 func (c *connectivityCheckTemplateProvider) getTemplatesForGenericPodServiceEndpointsChecks(recorder events.Recorder) []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration {

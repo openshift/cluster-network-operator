@@ -16,15 +16,13 @@ import (
 
 // renderAdditionalNetworksCRD returns the manifests of the NetworkAttachmentDefinition.
 func renderAdditionalNetworksCRD(manifestDir string) ([]*uns.Unstructured, error) {
-	objs := []*uns.Unstructured{}
 	// render the manifests on disk
 	data := render.MakeRenderData()
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "network/additional-networks/crd"), &data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render additional network manifests: %w", err)
 	}
-	objs = append(objs, manifests...)
-	return objs, nil
+	return manifests, nil
 }
 
 // renderRawCNIConfig returns the RawCNIConfig manifests
