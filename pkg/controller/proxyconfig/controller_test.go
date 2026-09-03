@@ -1,7 +1,6 @@
 package proxyconfig
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -42,7 +41,7 @@ func TestReconcileUpdatesProxyStatusOnNetworkChange(t *testing.T) {
 	}
 
 	network.Status.ClusterNetwork = []configv1.ClusterNetworkEntry{{CIDR: expandedCIDR}}
-	if err := client.Update(context.TODO(), network); err != nil {
+	if err := client.Update(t.Context(), network); err != nil {
 		t.Fatalf("failed to update network: %v", err)
 	}
 	reconcileRequest(t, reconciler, reconcile.Request{NamespacedName: types.NamespacedName{Name: "network-event"}})
@@ -73,7 +72,7 @@ func TestReconcileUpdatesProxyStatusOnInfrastructureChange(t *testing.T) {
 	}
 
 	infra.Status.APIServerInternalURL = "https://" + updatedAPIServer + ":6443"
-	if err := client.Update(context.TODO(), infra); err != nil {
+	if err := client.Update(t.Context(), infra); err != nil {
 		t.Fatalf("failed to update infrastructure: %v", err)
 	}
 	reconcileRequest(t, reconciler, reconcile.Request{NamespacedName: types.NamespacedName{Name: "infrastructure-event"}})
@@ -134,7 +133,7 @@ func TestReconcileHandlesMissingResources(t *testing.T) {
 				status: statusmanager.New(fakeClient, "network", names.StandAloneClusterName),
 			}
 
-			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: names.Proxy()})
+			_, err := reconciler.Reconcile(t.Context(), reconcile.Request{NamespacedName: names.Proxy()})
 			if err == nil {
 				t.Fatalf("expected error containing %q, got nil", tt.errorContains)
 			}
@@ -162,7 +161,7 @@ func reconcileProxyConfig(t *testing.T, reconciler *ReconcileProxyConfig) {
 
 func reconcileRequest(t *testing.T, reconciler *ReconcileProxyConfig, request reconcile.Request) {
 	t.Helper()
-	_, err := reconciler.Reconcile(context.TODO(), request)
+	_, err := reconciler.Reconcile(t.Context(), request)
 	if err != nil {
 		t.Fatalf("reconcile failed: %v", err)
 	}
@@ -171,7 +170,7 @@ func reconcileRequest(t *testing.T, reconciler *ReconcileProxyConfig, request re
 func getProxyStatus(t *testing.T, client crclient.Client) configv1.ProxyStatus {
 	t.Helper()
 	proxy := &configv1.Proxy{}
-	if err := client.Get(context.TODO(), names.Proxy(), proxy); err != nil {
+	if err := client.Get(t.Context(), names.Proxy(), proxy); err != nil {
 		t.Fatalf("failed to get proxy: %v", err)
 	}
 	return proxy.Status
