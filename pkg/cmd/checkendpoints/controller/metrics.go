@@ -18,6 +18,8 @@ var (
 
 // RegisterMetrics in the controller-runtime global registry
 func RegisterMetrics() {
+	//nolint:promlinter // Prometheus guidelines specify that any metric of type Counter must end with the suffix _total. Also,
+	// it favors label names to be written in snake_case. However, renaming would be a breaking change.
 	registerMetrics.Do(func() {
 		endpointCheckCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "pod_network_connectivity_check_count",
