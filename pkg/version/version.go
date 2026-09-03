@@ -34,6 +34,7 @@ func Get() version.Info {
 }
 
 func init() {
+	//nolint:promlinter // Prometheus guidelines favor label names to be written in snake_case. However, renaming would be a breaking change.
 	buildInfo := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "openshift_csi_snapshot_controller_operator",
