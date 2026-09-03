@@ -181,7 +181,7 @@ func (r *PKIReconciler) setStatus(ctx context.Context) {
 	if len(r.pkiErrs) == 0 {
 		r.status.SetNotDegraded(ctx, statusmanager.PKIConfig)
 	} else {
-		msgs := []string{}
+		msgs := make([]string, 0, len(r.pkiErrs))
 		for _, e := range r.pkiErrs {
 			msgs = append(msgs, e.Error())
 		}

@@ -56,8 +56,6 @@ func renderMultus(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bootstrap
 
 // renderMultusConfig returns the manifests of Multus
 func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, useWhereabouts bool, apihost, apiport string, bootstrapResult *bootstrap.BootstrapResult) ([]*uns.Unstructured, error) {
-	objs := []*uns.Unstructured{}
-
 	// render the manifests on disk
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
@@ -102,15 +100,11 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 	if err != nil {
 		return nil, fmt.Errorf("failed to render multus manifests: %w", err)
 	}
-	objs = append(objs, manifests...)
-	return objs, nil
+	return manifests, nil
 }
 
 // renderNetworkMetricsDaemon returns the manifests of the Network Metrics Daemon
 func renderNetworkMetricsDaemon(manifestDir string, bootstrapResult *bootstrap.BootstrapResult) ([]*uns.Unstructured, error) {
-
-	objs := []*uns.Unstructured{}
-
 	// render the manifests on disk
 	data := render.MakeRenderData()
 
@@ -124,8 +118,8 @@ func renderNetworkMetricsDaemon(manifestDir string, bootstrapResult *bootstrap.B
 	if err != nil {
 		return nil, fmt.Errorf("failed to render multus admission controller manifests: %w", err)
 	}
-	objs = append(objs, manifests...)
-	return objs, nil
+
+	return manifests, nil
 }
 
 // pluginCNIDir is the directory where plugins should install their CNI

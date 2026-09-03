@@ -167,7 +167,7 @@ func New(client cnoclient.Client, name, cluster string) *StatusManager {
 
 // setClusterOperAnnotation sets an annotation on the clusterOperator network object
 func (status *StatusManager) setClusterOperAnnotation(ctx context.Context, obj *configv1.ClusterOperator) error {
-	value := []string{}
+	value := make([]string, 0, len(status.hyperShiftConfig.RelatedObjects))
 	for _, obj := range status.hyperShiftConfig.RelatedObjects {
 		value = append(value, fmt.Sprintf("%s/%s/%s/%s/%s", obj.ClusterName, obj.Group, obj.Resource, obj.Namespace, obj.Name))
 	}
