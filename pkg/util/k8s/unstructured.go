@@ -46,14 +46,14 @@ func Same(obj1, obj2 *uns.Unstructured) bool {
 // ReplaceObj will replace a given object in a list of objects with another.
 // It will match on the object's group, kind, and identity. If the object isn't found
 // in the list, `new` will not be added.
-func ReplaceObj(objs []*uns.Unstructured, new *uns.Unstructured) []*uns.Unstructured {
+func ReplaceObj(objs []*uns.Unstructured, newObj *uns.Unstructured) []*uns.Unstructured {
 	out := make([]*uns.Unstructured, 0, len(objs))
 
 	replaced := false
 	for _, obj := range objs {
 		// if the object in the list
-		if Same(obj, new) {
-			out = append(out, new)
+		if Same(obj, newObj) {
+			out = append(out, newObj)
 			replaced = true
 		} else {
 			out = append(out, obj)
@@ -62,7 +62,7 @@ func ReplaceObj(objs []*uns.Unstructured, new *uns.Unstructured) []*uns.Unstruct
 
 	if !replaced {
 		klog.V(3).Infof("Warning: ReplaceObj() didn't find replacement for %s %s/%s, skipping",
-			new.GroupVersionKind().GroupKind(), new.GetNamespace(), new.GetName())
+			newObj.GroupVersionKind().GroupKind(), newObj.GetNamespace(), newObj.GetName())
 	}
 
 	return out

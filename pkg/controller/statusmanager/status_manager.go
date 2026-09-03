@@ -177,8 +177,8 @@ func (status *StatusManager) setClusterOperAnnotation(ctx context.Context, obj *
 
 // getClusterOperAnnotation gets an annotation from the clusterOperator network object
 func (status *StatusManager) getClusterOperAnnotation(obj *configv1.ClusterOperator) ([]hypershift.RelatedObject, error) {
-	new := obj.DeepCopy()
-	anno := new.GetAnnotations()
+	newObj := obj.DeepCopy()
+	anno := newObj.GetAnnotations()
 	objs := []hypershift.RelatedObject{}
 
 	value, set := anno[names.RelatedClusterObjectsAnnotation]
