@@ -49,6 +49,7 @@ func getCO(client cnoclient.Client, name string) (*configv1.ClusterOperator, err
 }
 
 func setCO(t *testing.T, client cnoclient.Client, name string) {
+	t.Helper()
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	err := client.ClientFor("").CRClient().Update(t.Context(), co)
 	if apierrors.IsNotFound(err) {

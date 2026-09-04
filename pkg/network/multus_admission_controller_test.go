@@ -91,6 +91,7 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 
 	// Test TLS rendering for webhook container
 	testTLSArgRendering(t, "multus-admission-controller webhook", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+		t.Helper()
 		testBootstrap := *bootstrapResult
 		testBootstrap.TLSProfile = tlsProfile
 		objs, err := renderMultusAdmissionController(t.Context(), config, manifestDir, false, &testBootstrap, fakeClient)
@@ -103,6 +104,7 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	testTLSArgRendering(t, "multus-admission-controller kube-rbac-proxy", "",
 		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			testBootstrap := *bootstrapResult
 			testBootstrap.TLSProfile = tlsProfile
 			objs, err := renderMultusAdmissionController(t.Context(), config, manifestDir, false, &testBootstrap, fakeClient)
@@ -200,6 +202,7 @@ func TestRenderMultusAdmissonControllerConfigForHyperShift(t *testing.T) {
 
 	// Test TLS rendering for webhook container in HyperShift mode
 	testTLSArgRendering(t, "multus-admission-controller webhook (HyperShift)", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+		t.Helper()
 		testBootstrap := *bootstrapResult
 		testBootstrap.TLSProfile = tlsProfile
 		objs, err := renderMultusAdmissonControllerConfig(t.Context(), manifestDir, false, &testBootstrap, fakeClient, hsc, "")
@@ -245,6 +248,7 @@ func TestRenderMultusAdmissionControllerGetNamespace(t *testing.T) {
 }
 
 func mustFindMultusAdmissionDeployment(t *testing.T, objs []*unstructured.Unstructured) *appsv1.Deployment {
+	t.Helper()
 	return mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "multus-admission-controller")
 }
 

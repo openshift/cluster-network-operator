@@ -112,6 +112,7 @@ func TestBootstrap(t *testing.T) {
 		)
 
 		setupHyperShift := func(t *testing.T) {
+			t.Helper()
 			t.Setenv("HYPERSHIFT", "true")
 			t.Setenv("HOSTED_CLUSTER_NAME", hostedClusterName)
 			t.Setenv("HOSTED_CLUSTER_NAMESPACE", hostedClusterNamespace)

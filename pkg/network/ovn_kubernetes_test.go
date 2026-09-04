@@ -205,6 +205,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	testTLSArgRendering(t, "ovnkube-script-lib kube-rbac-proxy", "",
 		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			testBootstrap := *bootstrapResult
 			testBootstrap.TLSProfile = tlsProfile
 			objs, _, err = renderOVNKubernetes(config, &testBootstrap, manifestDirOvn, featureGatesCNO)
@@ -223,6 +224,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	// Test TLS rendering for ovnkube in HyperShift managed ovnkube-control-plane
 	testTLSArgRendering(t, "HyperShift ovnkube-control-plane", "", "",
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			testBootstrap := *bootstrapResult
 			testBootstrap.TLSProfile = tlsProfile
 			testBootstrap.Infra = bootstrap.InfraStatus{}

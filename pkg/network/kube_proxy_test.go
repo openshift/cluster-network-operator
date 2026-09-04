@@ -497,6 +497,7 @@ winkernel:
 	testTLSArgRendering(t, "kube-proxy kube-rbac-proxy", "",
 		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			testBootstrap := FakeKubeProxyBootstrapResult
 			testBootstrap.TLSProfile = tlsProfile
 			objs, err := renderStandaloneKubeProxy(c, &testBootstrap, manifestDir)

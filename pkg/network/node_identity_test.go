@@ -34,6 +34,7 @@ func TestRenderNetworkNodeIdentity(t *testing.T) {
 	)
 
 	setupTest := func(t *testing.T) (*operv1.NetworkSpec, *bootstrap.BootstrapResult, cnoclient.Client) {
+		t.Helper()
 		networkConfig := &operv1.NetworkSpec{
 			ServiceNetwork: []string{"172.30.0.0/16"},
 			ClusterNetwork: []operv1.ClusterNetworkEntry{
@@ -69,6 +70,7 @@ func TestRenderNetworkNodeIdentity(t *testing.T) {
 
 	assertRenderSuccess := func(t *testing.T, networkConfig *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult,
 		client cnoclient.Client) []*uns.Unstructured {
+		t.Helper()
 		g := NewWithT(t)
 		objs, err := renderNetworkNodeIdentity(t.Context(), networkConfig, bootstrapResult, manifestDir, client)
 		g.Expect(err).NotTo(HaveOccurred())
@@ -98,6 +100,7 @@ func TestRenderNetworkNodeIdentity(t *testing.T) {
 	})
 
 	testTLSArgRendering(t, "webhook ovnkube-identity", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+		t.Helper()
 		networkConfig, bootstrapResult, client := setupTest(t)
 		bootstrapResult.TLSProfile = tlsProfile
 		daemonSet := mustFindRenderedObj[*appsv1.DaemonSet](t, assertRenderSuccess(t, networkConfig, bootstrapResult, client),
@@ -156,6 +159,7 @@ func TestRenderNetworkNodeIdentity(t *testing.T) {
 		})
 
 		testTLSArgRendering(t, "webhook ovnkube-identity", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			bootstrapResult.TLSProfile = tlsProfile
 			deployment := mustFindRenderedObj[*appsv1.Deployment](t, assertRenderSuccess(t, networkConfig, bootstrapResult, client),
 				"Deployment", "network-node-identity")
@@ -174,6 +178,7 @@ func TestRenderNetworkNodeIdentity(t *testing.T) {
 }
 
 func testTLSArgRendering(t *testing.T, name string, defaultMinVersion string, defaultCiphers string, getCommandStr func(*testing.T, bootstrap.TLSProfile) string) {
+	t.Helper()
 	t.Run("when TLS profile adherence is LegacyAdheringComponentsOnly", func(t *testing.T) {
 		t.Run(fmt.Sprintf("should render the %s command with default TLS CLI args", name), func(t *testing.T) {
 			g := NewWithT(t)
@@ -238,5 +243,6 @@ func testTLSArgRendering(t *testing.T, name string, defaultMinVersion string, de
 }
 
 func findOvnkubeIdentityExec(t *testing.T, cmdArgs []string) string {
+	t.Helper()
 	return findExecCommand(t, cmdArgs, "ovnkube-identity")
 }

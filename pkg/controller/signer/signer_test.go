@@ -170,6 +170,7 @@ func TestSigner_reconciler_withInvalidUserName(t *testing.T) {
 }
 
 func TestDecodePrivateKey(t *testing.T) {
+	//nolint:thelper // Helper functions are inside test cases
 	testCases := []struct {
 		name    string
 		pemData func(t *testing.T) []byte

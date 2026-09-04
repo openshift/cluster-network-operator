@@ -507,7 +507,7 @@ func setupTestInfraAndBasicRenderConfigs(t *testing.T, prevType, nextType operv1
 	*bootstrap.InfraStatus,
 	*operv1.NetworkSpec,
 	*operv1.NetworkSpec) {
-
+	t.Helper()
 	g := NewGomegaWithT(t)
 	infra := &fakeBootstrapResult().Infra
 
@@ -571,6 +571,7 @@ func Test_renderNetworkDiagnostics(t *testing.T) {
 	// Test TLS args rendering for network-check-source
 	t.Run("TLS args rendering", func(t *testing.T) {
 		testTLSArgRendering(t, "network-check-source", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			operConf := &operv1.NetworkSpec{}
 			clusterConf := &configv1.NetworkSpec{
 				NetworkDiagnostics: configv1.NetworkDiagnostics{
@@ -655,6 +656,7 @@ func Test_renderFRRRoutingCapabilities(t *testing.T) {
 	}
 
 	getDaemonsetContainerArgs := func(t *testing.T, tlsProfile bootstrap.TLSProfile, containerName string) string {
+		t.Helper()
 		daemonSet := mustFindRenderedObj[*appsv1.DaemonSet](t, getRenderedObjs(t, tlsProfile), "DaemonSet", "frr-k8s")
 		container := mustFindContainer(t, daemonSet.Spec.Template.Spec.Containers, containerName)
 		return strings.Join(container.Args, " ")
@@ -663,18 +665,21 @@ func Test_renderFRRRoutingCapabilities(t *testing.T) {
 	// Test TLS rendering for frr-metrics container
 	testTLSArgRendering(t, "frr-metrics", "", "",
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			return getDaemonsetContainerArgs(t, tlsProfile, "frr-metrics")
 		})
 
 	// Test TLS rendering for controller container
 	testTLSArgRendering(t, "frr-k8s controller", "", "",
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			return getDaemonsetContainerArgs(t, tlsProfile, "controller")
 		})
 
 	// Test TLS rendering for statuscleaner container
 	testTLSArgRendering(t, "frr-k8s-statuscleaner", "", "",
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			deployment := mustFindRenderedObj[*appsv1.Deployment](t, getRenderedObjs(t, tlsProfile), "Deployment", "frr-k8s-statuscleaner")
 			g.Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
 			return strings.Join(deployment.Spec.Template.Spec.Containers[0].Args, " ")
@@ -721,6 +726,7 @@ func Test_renderFRRStatusCleanerStrategy(t *testing.T) {
 
 func Test_renderNetworkingConsolePlugin(t *testing.T) {
 	renderAndFindNginxConfig := func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+		t.Helper()
 		g := NewWithT(t)
 		t.Setenv("NETWORKING_CONSOLE_PLUGIN_IMAGE", "quay.io/openshift/networking-console-plugin:latest")
 		bootstrapResult := fakeBootstrapResult()
