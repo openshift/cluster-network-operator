@@ -3995,7 +3995,7 @@ func Test_getDisableUDPAggregation(t *testing.T) {
 	var disable bool
 
 	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{configMap: nil})
-	assert.Equal(t, false, disable, "with no configmap")
+	assert.False(t, disable, "with no configmap")
 
 	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
@@ -4004,7 +4004,7 @@ func Test_getDisableUDPAggregation(t *testing.T) {
 			},
 		},
 	})
-	assert.Equal(t, false, disable, "with bad configmap")
+	assert.False(t, disable, "with bad configmap")
 
 	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
@@ -4013,7 +4013,7 @@ func Test_getDisableUDPAggregation(t *testing.T) {
 			},
 		},
 	})
-	assert.Equal(t, false, disable, "with configmap that sets 'disable-udp-aggregation' to 'false'")
+	assert.False(t, disable, "with configmap that sets 'disable-udp-aggregation' to 'false'")
 
 	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
@@ -4022,7 +4022,7 @@ func Test_getDisableUDPAggregation(t *testing.T) {
 			},
 		},
 	})
-	assert.Equal(t, false, disable, "with configmap that sets 'disable-udp-aggregation' to 'bad'")
+	assert.False(t, disable, "with configmap that sets 'disable-udp-aggregation' to 'bad'")
 
 	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
@@ -4031,7 +4031,7 @@ func Test_getDisableUDPAggregation(t *testing.T) {
 			},
 		},
 	})
-	assert.Equal(t, true, disable, "with configmap that sets 'disable-udp-aggregation' to 'true'")
+	assert.True(t, disable, "with configmap that sets 'disable-udp-aggregation' to 'true'")
 }
 
 func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
@@ -4497,7 +4497,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 			if !reflect.DeepEqual(tt.expectErr, err) {
 				t.Errorf("renderOVNKubernetes() err = %v, want %v", err, tt.expectErr)
 			}
-			assert.Equalf(t, tt.expectNumObjs, len(got), "renderOVNKubernetes() got %d objects, want %d", len(got), tt.expectNumObjs)
+			assert.Lenf(t, got, tt.expectNumObjs, "renderOVNKubernetes() got %d objects, want %d", len(got), tt.expectNumObjs)
 		})
 	}
 }
