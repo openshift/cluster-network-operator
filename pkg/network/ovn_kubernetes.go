@@ -360,7 +360,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		data.Data["IP_FORWARDING_MODE"] = c.GatewayConfig.IPForwarding
 	}
 
-	data.Data["AllowNoUplink"] = c.GatewayConfig != nil && c.GatewayConfig.AllowNoUplink
+	data.Data["AllowNoUplink"] = slices.Contains(featureGates.KnownFeatures(), apifeatures.FeatureGateOVNKubernetesUplinkMode) &&
+		featureGates.Enabled(apifeatures.FeatureGateOVNKubernetesUplinkMode) &&
+		c.GatewayConfig != nil && c.GatewayConfig.UplinkMode == operv1.UplinkModeOptional
 
 	// No-overlay mode configuration
 	// The NoOverlayMode feature gate enables no-overlay networking for both the default network

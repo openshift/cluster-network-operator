@@ -296,15 +296,6 @@ spec:
                         description: gatewayConfig holds the configuration for node
                           gateway options.
                         properties:
-                          allowNoUplink:
-                            default: false
-                            description: |-
-                              allowNoUplink allows the external gateway bridge (br-ex) to start in local
-                              gateway mode when it has no physical uplink port.
-                              When set to true, ovn-kubernetes will not require an uplink on the gateway bridge.
-                              When omitted or set to false, ovn-kubernetes requires an uplink (the current behavior).
-                              This setting only takes effect when routingViaHost is true (local gateway mode).
-                            type: boolean
                           ipForwarding:
                             description: |-
                               ipForwarding controls IP forwarding for all traffic on OVN-Kubernetes managed interfaces (such as br-ex).

@@ -78,6 +78,13 @@ var manifestDirOvn = "../../bindata"
 func getDefaultFeatureGates() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
 		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver, apifeatures.FeatureGateOVNObservability, apifeatures.FeatureGateNoOverlayMode},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateEVPN, apifeatures.FeatureGateNetworkConnect, apifeatures.FeatureGateOVNKubernetesUplinkMode},
+	)
+}
+
+func getFeatureGatesWithUplinkMode() featuregates.FeatureGate {
+	return featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver, apifeatures.FeatureGateOVNObservability, apifeatures.FeatureGateNoOverlayMode, apifeatures.FeatureGateOVNKubernetesUplinkMode},
 		[]configv1.FeatureGateName{apifeatures.FeatureGateEVPN, apifeatures.FeatureGateNetworkConnect},
 	)
 }
@@ -4703,7 +4710,7 @@ func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
 func TestRenderOVNKubernetes_AllowNoUplink(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	renderWithGatewayConfig := func(gatewayConfig *operv1.GatewayConfig) []*uns.Unstructured {
+	renderWithGatewayConfig := func(gatewayConfig *operv1.GatewayConfig, featureGatesCNO featuregates.FeatureGate) []*uns.Unstructured {
 		crd := OVNKubernetesConfig.DeepCopy()
 		config := &crd.Spec
 		fillDefaults(config, nil)
@@ -4724,7 +4731,7 @@ func TestRenderOVNKubernetes_AllowNoUplink(t *testing.T) {
 				},
 			},
 		}
-		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, cnofake.NewFakeClient(), getDefaultFeatureGates())
+		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, cnofake.NewFakeClient(), featureGatesCNO)
 		g.Expect(err).NotTo(HaveOccurred())
 		return objs
 	}
@@ -4737,32 +4744,42 @@ func TestRenderOVNKubernetes_AllowNoUplink(t *testing.T) {
 		return ds.Spec.Template.Annotations["network.operator.openshift.io/ovnkube-script-lib-hash"]
 	}
 
-	t.Run("renders --allow-no-uplink when gatewayConfig.allowNoUplink is true", func(t *testing.T) {
+	t.Run("renders --allow-no-uplink when gatewayConfig.uplinkMode is Optional", func(t *testing.T) {
+		featureGatesCNO := getFeatureGatesWithUplinkMode()
 		ovnkubeScriptLib := extractOVNScriptLib(g, renderWithGatewayConfig(&operv1.GatewayConfig{
 			RoutingViaHost: true,
-			AllowNoUplink:  true,
-		}))
+			UplinkMode:     operv1.UplinkModeOptional,
+		}, featureGatesCNO))
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`allow_no_uplink_flag="--allow-no-uplink"`))
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`${allow_no_uplink_flag}`))
 	})
 
-	t.Run("omits --allow-no-uplink when gatewayConfig.allowNoUplink is false", func(t *testing.T) {
+	t.Run("omits --allow-no-uplink when gatewayConfig.uplinkMode is Required", func(t *testing.T) {
 		ovnkubeScriptLib := extractOVNScriptLib(g, renderWithGatewayConfig(&operv1.GatewayConfig{
 			RoutingViaHost: true,
-			AllowNoUplink:  false,
-		}))
+			UplinkMode:     operv1.UplinkModeRequired,
+		}, getDefaultFeatureGates()))
 		g.Expect(ovnkubeScriptLib).NotTo(ContainSubstring(`allow_no_uplink_flag="--allow-no-uplink"`))
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`${allow_no_uplink_flag}`))
 	})
 
 	t.Run("omits --allow-no-uplink when gatewayConfig is nil", func(t *testing.T) {
-		ovnkubeScriptLib := extractOVNScriptLib(g, renderWithGatewayConfig(nil))
+		ovnkubeScriptLib := extractOVNScriptLib(g, renderWithGatewayConfig(nil, getDefaultFeatureGates()))
+		g.Expect(ovnkubeScriptLib).NotTo(ContainSubstring(`allow_no_uplink_flag="--allow-no-uplink"`))
+	})
+
+	t.Run("omits --allow-no-uplink when the feature gate is disabled", func(t *testing.T) {
+		ovnkubeScriptLib := extractOVNScriptLib(g, renderWithGatewayConfig(&operv1.GatewayConfig{
+			RoutingViaHost: true,
+			UplinkMode:     operv1.UplinkModeOptional,
+		}, getDefaultFeatureGates()))
 		g.Expect(ovnkubeScriptLib).NotTo(ContainSubstring(`allow_no_uplink_flag="--allow-no-uplink"`))
 	})
 
 	t.Run("changes ovnkube-node script-lib hash", func(t *testing.T) {
-		hashWithout := scriptLibHash(renderWithGatewayConfig(&operv1.GatewayConfig{RoutingViaHost: true}))
-		hashWith := scriptLibHash(renderWithGatewayConfig(&operv1.GatewayConfig{RoutingViaHost: true, AllowNoUplink: true}))
+		featureGatesCNO := getFeatureGatesWithUplinkMode()
+		hashWithout := scriptLibHash(renderWithGatewayConfig(&operv1.GatewayConfig{RoutingViaHost: true}, featureGatesCNO))
+		hashWith := scriptLibHash(renderWithGatewayConfig(&operv1.GatewayConfig{RoutingViaHost: true, UplinkMode: operv1.UplinkModeOptional}, featureGatesCNO))
 		g.Expect(hashWithout).NotTo(BeEmpty())
 		g.Expect(hashWith).NotTo(BeEmpty())
 		g.Expect(hashWith).NotTo(Equal(hashWithout))
