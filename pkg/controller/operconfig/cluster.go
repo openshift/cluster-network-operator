@@ -73,11 +73,11 @@ func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConf
 	// retrieve the existing cluster config object
 	clusterConfig := &configv1.Network{
 		TypeMeta:   metav1.TypeMeta{APIVersion: configv1.GroupVersion.String(), Kind: "Network"},
-		ObjectMeta: metav1.ObjectMeta{Name: names.CLUSTER_CONFIG},
+		ObjectMeta: metav1.ObjectMeta{Name: names.ClusterConfig},
 	}
 
 	err := r.client.Default().CRClient().Get(ctx, types.NamespacedName{
-		Name: names.CLUSTER_CONFIG,
+		Name: names.ClusterConfig,
 	}, clusterConfig)
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil, nil

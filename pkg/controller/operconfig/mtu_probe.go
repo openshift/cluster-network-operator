@@ -136,8 +136,8 @@ func renderMTUProber(infra *bootstrap.InfraStatus) ([]*uns.Unstructured, error) 
 	data.Data["CNOImage"] = os.Getenv("NETWORK_CHECK_TARGET_IMAGE")
 	data.Data["KUBERNETES_SERVICE_HOST"] = infra.APIServers[bootstrap.APIServerDefault].Host
 	data.Data["KUBERNETES_SERVICE_PORT"] = infra.APIServers[bootstrap.APIServerDefault].Port
-	data.Data["DestNS"] = util.MTU_CM_NAMESPACE
-	data.Data["DestName"] = util.MTU_CM_NAME
+	data.Data["DestNS"] = util.MTUConfigMapNamespace
+	data.Data["DestName"] = util.MTUConfigMapName
 	data.Data["HTTP_PROXY"] = ""
 	data.Data["HTTPS_PROXY"] = ""
 	data.Data["NO_PROXY"] = ""

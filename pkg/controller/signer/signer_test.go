@@ -50,7 +50,7 @@ func TestSigner_reconciler(t *testing.T) {
 
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: coName}}
 	setCO(t, client, co)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	csr, err := generateCSR()
@@ -127,7 +127,7 @@ func TestSigner_reconciler_withInvalidUserName(t *testing.T) {
 
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: coName}}
 	setCO(t, client, co)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	csr, err := generateCSR()
@@ -344,7 +344,7 @@ func getStatuses(client cnoclient.Client, name string) (*configv1.ClusterOperato
 	if err != nil {
 		return nil, nil, err
 	}
-	oc, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OPERATOR_CONFIG, metav1.GetOptions{})
+	oc, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OperatorConfig, metav1.GetOptions{})
 	return co, oc, err
 }
 

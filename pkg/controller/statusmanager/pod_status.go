@@ -451,7 +451,7 @@ func (status *StatusManager) isClusterRunningOVNKubernetes() bool {
 	daemonSets, _, _ := status.listAllStatusObjects()
 	for _, ds := range daemonSets {
 		dsName := NewClusteredName(ds)
-		if dsName.Namespace == util.OVN_NAMESPACE {
+		if dsName.Namespace == util.OVNNamespace {
 			return true
 		}
 	}

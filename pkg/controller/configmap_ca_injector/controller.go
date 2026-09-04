@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var labelSelector = labels.Set{names.TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL: "true"}
+var labelSelector = labels.Set{names.TrustedCABundleConfigMapLabel: "true"}
 
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, _ featuregates.FeatureGate) error {
 	reconciler := newReconciler(mgr, status, c)
@@ -54,7 +54,7 @@ func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c c
 		})
 	ni := v1coreinformers.NewConfigMapInformer(
 		c.Default().Kubernetes(),
-		names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS,
+		names.TrustedCABundleConfigMapNS,
 		0, // no resync
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
@@ -125,16 +125,16 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	log.Printf("Reconciling configmap from  %s/%s\n", request.Namespace, request.Name)
 
-	trustedCAbundleConfigMap, err := r.nsLister.ConfigMaps(names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS).Get(names.TRUSTED_CA_BUNDLE_CONFIGMAP)
+	trustedCAbundleConfigMap, err := r.nsLister.ConfigMaps(names.TrustedCABundleConfigMapNS).Get(names.TrustedCABundleConfigMapName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS, names.TRUSTED_CA_BUNDLE_CONFIGMAP)
+			log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", names.TrustedCABundleConfigMapNS, names.TrustedCABundleConfigMapName)
 			return reconcile.Result{}, nil
 		}
 		log.Println(err)
 		return reconcile.Result{}, err
 	}
-	_, trustedCAbundleData, err := validation.TrustBundleConfigMap(trustedCAbundleConfigMap, names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY)
+	_, trustedCAbundleData, err := validation.TrustBundleConfigMap(trustedCAbundleConfigMap, names.TrustedCABundleConfigMapKey)
 
 	if err != nil {
 		log.Println(err)
@@ -146,7 +146,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 	configMapsToChange := []*corev1.ConfigMap{}
 
 	// The trusted-ca-bundle changed.
-	if request.Name == names.TRUSTED_CA_BUNDLE_CONFIGMAP && request.Namespace == names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS {
+	if request.Name == names.TrustedCABundleConfigMapName && request.Namespace == names.TrustedCABundleConfigMapNS {
 		cms, err := r.labelLister.List(labelSelector.AsSelector())
 		if err != nil { // unlikely -- informer list
 			log.Println(err)
@@ -156,7 +156,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 
 		}
 		configMapsToChange = cms
-		log.Printf("%s changed, updating %d configMaps", names.TRUSTED_CA_BUNDLE_CONFIGMAP, len(configMapsToChange))
+		log.Printf("%s changed, updating %d configMaps", names.TrustedCABundleConfigMapName, len(configMapsToChange))
 	} else {
 		// Changing a single labeled configmap.
 
@@ -181,9 +181,9 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 	for _, configMap := range configMapsToChange {
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			needsOwner := len(configMap.Annotations[names.OpenShiftComponent]) == 0
-			if existing, ok := configMap.Data[names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY]; !needsOwner && ok && existing == string(trustedCAbundleData) {
+			if existing, ok := configMap.Data[names.TrustedCABundleConfigMapKey]; !needsOwner && ok && existing == string(trustedCAbundleData) {
 				// Nothing to update the new and old configmap object would be the same.
-				log.Printf("ConfigMap %s/%s %s unchanged, skipping", configMap.Namespace, configMap.Name, names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY)
+				log.Printf("ConfigMap %s/%s %s unchanged, skipping", configMap.Namespace, configMap.Name, names.TrustedCABundleConfigMapKey)
 				return nil
 			}
 
@@ -198,7 +198,7 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 					},
 				},
 				Data: map[string]string{
-					names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY: string(trustedCAbundleData),
+					names.TrustedCABundleConfigMapKey: string(trustedCAbundleData),
 				},
 			}
 			// this lets a configmap writer to claim ownership
@@ -232,5 +232,5 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 }
 
 func isCABundle(meta crclient.Object) bool {
-	return (meta.GetName() == names.TRUSTED_CA_BUNDLE_CONFIGMAP && meta.GetNamespace() == names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS)
+	return (meta.GetName() == names.TrustedCABundleConfigMapName && meta.GetNamespace() == names.TrustedCABundleConfigMapNS)
 }

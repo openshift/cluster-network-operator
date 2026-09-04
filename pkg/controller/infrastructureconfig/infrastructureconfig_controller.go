@@ -79,8 +79,8 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 	log.Printf("Reconciling Infrastructure.config.openshift.io %s\n", request.Name)
 
 	// Only check on the default infrastructure config
-	if request.Name != names.INFRASTRUCTURE_CONFIG {
-		log.Printf("Ignoring Infrastructure config %s. Only handling Infrastructure config with default name %s", request.Name, names.INFRASTRUCTURE_CONFIG)
+	if request.Name != names.InfrastructureConfig {
+		log.Printf("Ignoring Infrastructure config %s. Only handling Infrastructure config with default name %s", request.Name, names.InfrastructureConfig)
 		return reconcile.Result{}, nil
 	}
 

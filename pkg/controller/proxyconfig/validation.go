@@ -92,10 +92,10 @@ func (r *ReconcileProxyConfig) ValidateProxyConfig(ctx context.Context, proxyCon
 				}
 			} else {
 				// No trustedCA is set, so use the system trust bundle for readinessEndpoints.
-				systemData, err = os.ReadFile(names.SYSTEM_TRUST_BUNDLE)
+				systemData, err = os.ReadFile(names.SystemTrustBundle)
 				if err != nil {
 					return fmt.Errorf("failed to read system trust bundle '%s': %w",
-						names.SYSTEM_TRUST_BUNDLE, err)
+						names.SystemTrustBundle, err)
 				}
 			}
 			var trustBundle []*x509.Certificate
@@ -136,9 +136,9 @@ func (r *ReconcileProxyConfig) validateTrustedCA(ctx context.Context, trustedCA 
 			trustedCA, err)
 	}
 
-	systemData, err := r.validateSystemTrustBundle(names.SYSTEM_TRUST_BUNDLE)
+	systemData, err := r.validateSystemTrustBundle(names.SystemTrustBundle)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to validate system trust bundle '%s': %w", names.SYSTEM_TRUST_BUNDLE, err)
+		return nil, nil, fmt.Errorf("failed to validate system trust bundle '%s': %w", names.SystemTrustBundle, err)
 	}
 
 	return bundleData, systemData, nil
@@ -148,12 +148,12 @@ func (r *ReconcileProxyConfig) validateTrustedCA(ctx context.Context, trustedCA 
 // returning the validated ConfigMap.
 func (r *ReconcileProxyConfig) validateConfigMapRef(ctx context.Context, trustedCA string) (*corev1.ConfigMap, error) {
 	cfgMap := &corev1.ConfigMap{}
-	ns := names.ADDL_TRUST_BUNDLE_CONFIGMAP_NS
-	if trustedCA == names.TRUSTED_CA_BUNDLE_CONFIGMAP {
-		ns = names.TRUSTED_CA_BUNDLE_CONFIGMAP_NS
+	ns := names.AdditionalTrustBundleConfigMapNS
+	if trustedCA == names.TrustedCABundleConfigMapName {
+		ns = names.TrustedCABundleConfigMapNS
 	}
 	if err := r.client.Get(ctx, types.NamespacedName{Namespace: ns, Name: trustedCA}, cfgMap); err != nil {
-		return nil, fmt.Errorf("failed to get trustedCA configmap for proxy %s: %w", names.PROXY_CONFIG, err)
+		return nil, fmt.Errorf("failed to get trustedCA configmap for proxy %s: %w", names.ProxyConfig, err)
 	}
 
 	return cfgMap, nil
@@ -164,7 +164,7 @@ func (r *ReconcileProxyConfig) validateConfigMapRef(ctx context.Context, trusted
 // of the key is one or more valid PEM encoded certificates, returning slices of
 // the validated certificates and certificate data.
 func (r *ReconcileProxyConfig) validateTrustBundle(cfgMap *corev1.ConfigMap) ([]*x509.Certificate, []byte, error) {
-	certBundle, bundleData, err := validation.TrustBundleConfigMap(cfgMap, names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY)
+	certBundle, bundleData, err := validation.TrustBundleConfigMap(cfgMap, names.TrustedCABundleConfigMapKey)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -156,7 +156,7 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 	var checks []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration
 	var anySourcePodScheduled bool
 	nodes := make(map[string]*v1.Node)
-	nodeApiVersion := "v1"
+	nodeAPIVersion := "v1"
 	nodeKind := "Node"
 	for _, pod := range pods {
 		if pod.Spec.NodeName == "" {
@@ -181,7 +181,7 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 			nodeUID := node.GetUID()
 			nodeName := node.GetName()
 			nodeRef := applyconfigmetav1.OwnerReferenceApplyConfiguration{
-				APIVersion: &nodeApiVersion,
+				APIVersion: &nodeAPIVersion,
 				Kind:       &nodeKind,
 				UID:        &nodeUID,
 				Name:       &nodeName,
@@ -214,7 +214,7 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 			WithLastTransitionTime(metav1.NewTime(time.Now())).
 			WithReason(currentStatus.Reason).
 			WithMessage(currentStatus.Message)
-		netConfig := applyconfigv1.Network(names.CLUSTER_CONFIG).WithStatus(applyconfigv1.NetworkStatus().WithConditions(condition))
+		netConfig := applyconfigv1.Network(names.ClusterConfig).WithStatus(applyconfigv1.NetworkStatus().WithConditions(condition))
 		_, err := c.configClient.ConfigV1().Networks().Apply(ctx, netConfig, metav1.ApplyOptions{
 			Force:        true,
 			FieldManager: "cluster-network-operator/connectivity-check-controller",
@@ -413,19 +413,19 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForAPILoadBalancerChecks
 		return nil
 	}
 
-	apiUrl, err := url.Parse(infrastructure.Status.APIServerURL)
+	apiURL, err := url.Parse(infrastructure.Status.APIServerURL)
 	if err != nil {
 		recorder.Warningf("EndpointDetectionFailure", "error detecting external api load balancer endpoint: %v", err)
 
 	} else {
-		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(apiUrl.Host, "openshift-network-diagnostics", withTarget("load-balancer", "api-external")))
+		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(apiURL.Host, "openshift-network-diagnostics", withTarget("load-balancer", "api-external")))
 	}
 
-	apiInternalUrl, err := url.Parse(infrastructure.Status.APIServerInternalURL)
+	apiInternalURL, err := url.Parse(infrastructure.Status.APIServerInternalURL)
 	if err != nil {
 		recorder.Warningf("EndpointDetectionFailure", "error detecting internal api load balancer endpoint: %v", err)
 	} else {
-		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(apiInternalUrl.Host, "openshift-network-diagnostics", withTarget("load-balancer", "api-internal")))
+		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(apiInternalURL.Host, "openshift-network-diagnostics", withTarget("load-balancer", "api-internal")))
 	}
 	return templates
 }

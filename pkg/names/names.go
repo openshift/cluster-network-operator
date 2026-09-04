@@ -4,28 +4,28 @@ import "k8s.io/apimachinery/pkg/types"
 
 // some names
 
-// OPERATOR_CONFIG is the name of the CRD that defines the complete
+// OperatorConfig is the name of the CRD that defines the complete
 // operator configuration
-const OPERATOR_CONFIG = "cluster"
+const OperatorConfig = "cluster"
 
-// CLUSTER_CONFIG is the name of the higher-level cluster configuration
+// ClusterConfig is the name of the higher-level cluster configuration
 // and status object.
-const CLUSTER_CONFIG = "cluster"
+const ClusterConfig = "cluster"
 
-// PROXY_CONFIG is the name of the default proxy object.
-const PROXY_CONFIG = "cluster"
+// ProxyConfig is the name of the default proxy object.
+const ProxyConfig = "cluster"
 
-// INFRASTRUCTURE_CONFIG is the name of the default infrastructure object.
-const INFRASTRUCTURE_CONFIG = "cluster"
+// InfrastructureConfig is the name of the default infrastructure object.
+const InfrastructureConfig = "cluster"
 
-// APPLIED_PREFIX is the prefix applied to the config maps
+// AppliedPrefix is the prefix applied to the config maps
 // where we store previously applied configuration
-const APPLIED_PREFIX = "applied-"
+const AppliedPrefix = "applied-"
 
-// APPLIED_NAMESPACE is the namespace where applied configuration
+// AppliedNamespace is the namespace where applied configuration
 // configmaps are stored.
 // Should match 00_namespace.yaml
-const APPLIED_NAMESPACE = "openshift-network-operator"
+const AppliedNamespace = "openshift-network-operator"
 
 // MultusNamespace is the namespace where applied configuration
 // configmaps are stored.
@@ -107,34 +107,34 @@ const ClusterNameAnnotation = "network.operator.openshift.io/cluster-name"
 // value format: cluster/group/resource/namespace/name
 const RelatedClusterObjectsAnnotation = "network.operator.openshift.io/relatedClusterObjects"
 
-// MULTUS_VALIDATING_WEBHOOK is the name of the ValidatingWebhookConfiguration for multus-admission-controller
+// MultusValidatingWebhook is the name of the ValidatingWebhookConfiguration for multus-admission-controller
 // that is used in multus admission controller deployment
-const MULTUS_VALIDATING_WEBHOOK = "multus.openshift.io"
+const MultusValidatingWebhook = "multus.openshift.io"
 
-// ADDL_TRUST_BUNDLE_CONFIGMAP_NS is the namespace for one or more
+// AdditionalTrustBundleConfigMapNS is the namespace for one or more
 // ConfigMaps that contain user provided trusted CA bundles.
-const ADDL_TRUST_BUNDLE_CONFIGMAP_NS = "openshift-config"
+const AdditionalTrustBundleConfigMapNS = "openshift-config"
 
-// TRUSTED_CA_BUNDLE_CONFIGMAP_KEY is the name of the data key containing
+// TrustedCABundleConfigMapKey is the name of the data key containing
 // the PEM encoded trust bundle.
-const TRUSTED_CA_BUNDLE_CONFIGMAP_KEY = "ca-bundle.crt"
+const TrustedCABundleConfigMapKey = "ca-bundle.crt"
 
-// TRUSTED_CA_BUNDLE_CONFIGMAP is the name of the ConfigMap
+// TrustedCABundleConfigMapName is the name of the ConfigMap
 // containing the combined user/system trust bundle.
-const TRUSTED_CA_BUNDLE_CONFIGMAP = "trusted-ca-bundle"
+const TrustedCABundleConfigMapName = "trusted-ca-bundle"
 
-// TRUSTED_CA_BUNDLE_CONFIGMAP_NS is the namespace that hosts the
+// TrustedCABundleConfigMapNS is the namespace that hosts the
 // ADDL_TRUST_BUNDLE_CONFIGMAP and TRUST_BUNDLE_CONFIGMAP
 // ConfigMaps.
-const TRUSTED_CA_BUNDLE_CONFIGMAP_NS = "openshift-config-managed"
+const TrustedCABundleConfigMapNS = "openshift-config-managed"
 
-// TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL is the name of the label that
+// TrustedCABundleConfigMapLabel is the name of the label that
 // determines whether or not to inject the combined ca certificate
-const TRUSTED_CA_BUNDLE_CONFIGMAP_LABEL = "config.openshift.io/inject-trusted-cabundle"
+const TrustedCABundleConfigMapLabel = "config.openshift.io/inject-trusted-cabundle"
 
-// SYSTEM_TRUST_BUNDLE is the full path to the file containing
+// SystemTrustBundle is the full path to the file containing
 // the system trust bundle.
-const SYSTEM_TRUST_BUNDLE = "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
+const SystemTrustBundle = "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
 
 // OpenShiftComponent mirrors https://github.com/openshift/api/blob/master/annotations/annotations.go#L33 but a zero-diff
 // tidy and vendor result in a non-building project, so working from a copy here until the next dep update.
@@ -180,7 +180,7 @@ func UserDefinedIPsecMachineConfigAnnotation() map[string]string {
 // default namespace.
 func Proxy() types.NamespacedName {
 	return types.NamespacedName{
-		Name: PROXY_CONFIG,
+		Name: ProxyConfig,
 	}
 }
 
@@ -188,8 +188,8 @@ func Proxy() types.NamespacedName {
 // openshift-config-managed/trusted-ca-bundle trust bundle.
 func TrustedCABundleConfigMap() types.NamespacedName {
 	return types.NamespacedName{
-		Namespace: TRUSTED_CA_BUNDLE_CONFIGMAP_NS,
-		Name:      TRUSTED_CA_BUNDLE_CONFIGMAP,
+		Namespace: TrustedCABundleConfigMapNS,
+		Name:      TrustedCABundleConfigMapName,
 	}
 }
 
@@ -223,10 +223,10 @@ const IPFamilySingleStack = "single-stack"
 // IPFamilyDualStack is the dual stack IP family mode
 const IPFamilyDualStack = "dual-stack"
 
-// EnvApiOverrideHost is an environment variable that, if set, allows overriding the host / port
+// EnvAPIOverrideHost is an environment variable that, if set, allows overriding the host / port
 // of the apiserver, but only for rendered manifests. CNO itself will not use it
-const EnvApiOverrideHost = "APISERVER_OVERRIDE_HOST"
-const EnvApiOverridePort = "APISERVER_OVERRIDE_PORT"
+const EnvAPIOverrideHost = "APISERVER_OVERRIDE_HOST"
+const EnvAPIOverridePort = "APISERVER_OVERRIDE_PORT"
 
 // ManagementClusterName provides the name of the management cluster, for use with Hypershift.
 const ManagementClusterName = "management"

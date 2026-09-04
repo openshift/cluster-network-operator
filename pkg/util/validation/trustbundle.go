@@ -16,11 +16,11 @@ import (
 // a byte slice of <caDataKey> contents upon success.
 func TrustBundleConfigMap(cfgMap *corev1.ConfigMap, caDataKey string) ([]*x509.Certificate, []byte, error) {
 	if _, ok := cfgMap.Data[caDataKey]; !ok {
-		return nil, nil, fmt.Errorf("ConfigMap %q is missing %q", cfgMap.Name, names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY)
+		return nil, nil, fmt.Errorf("ConfigMap %q is missing %q", cfgMap.Name, names.TrustedCABundleConfigMapKey)
 	}
 	trustBundleData := []byte(cfgMap.Data[caDataKey])
 	if len(trustBundleData) == 0 {
-		return nil, nil, fmt.Errorf("data key %q is empty from ConfigMap %q", names.TRUSTED_CA_BUNDLE_CONFIGMAP_KEY, cfgMap.Name)
+		return nil, nil, fmt.Errorf("data key %q is empty from ConfigMap %q", names.TrustedCABundleConfigMapKey, cfgMap.Name)
 	}
 	certBundle, err := crypto.CertsFromPEM(trustBundleData)
 	if err != nil {

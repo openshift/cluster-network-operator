@@ -32,7 +32,7 @@ const NetworkNodeIdentityNamespace = "openshift-network-node-identity"
 // isBootstrapComplete checks whether the bootstrap phase of openshift installation completed
 func isBootstrapComplete(ctx context.Context, cli cnoclient.Client) (bool, error) {
 	clusterBootstrap := &corev1.ConfigMap{}
-	clusterBootstrapLookup := types.NamespacedName{Name: "bootstrap", Namespace: CLUSTER_CONFIG_NAMESPACE}
+	clusterBootstrapLookup := types.NamespacedName{Name: "bootstrap", Namespace: ClusterConfigNamespace}
 	if err := cli.ClientFor("").CRClient().Get(ctx, clusterBootstrapLookup, clusterBootstrap); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return false, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %w", err)

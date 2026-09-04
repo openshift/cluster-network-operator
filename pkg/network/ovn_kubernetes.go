@@ -49,28 +49,28 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
-const CLUSTER_CONFIG_NAME = "cluster-config-v1"
-const CLUSTER_CONFIG_NAMESPACE = "kube-system"
-const OVN_CERT_CN = "ovn"
-const OVN_LOCAL_GW_MODE = "local"
-const OVN_SHARED_GW_MODE = "shared"
-const OVN_LOG_PATTERN_CONSOLE = "%D{%Y-%m-%dT%H:%M:%S.###Z}|%05N|%c%T|%p|%m"
-const OVN_NODE_MODE_FULL = "full"
-const OVN_NODE_MODE_DPU_HOST = "dpu-host"
-const OVN_NODE_MODE_DPU = "dpu"
-const OVN_NODE_MODE_SMART_NIC = "smart-nic"
-const OVN_NODE_SELECTOR_DEFAULT_DPU_HOST = "network.operator.openshift.io/dpu-host="
-const OVN_NODE_SELECTOR_DEFAULT_DPU = "network.operator.openshift.io/dpu="
-const OVN_NODE_SELECTOR_DEFAULT_SMART_NIC = "network.operator.openshift.io/smart-nic="
-const OVN_NODE_IDENTITY_CERT_DURATION = "24h"
+const ClusterConfigName = "cluster-config-v1"
+const ClusterConfigNamespace = "kube-system"
+const OVNCertCN = "ovn"
+const OVNLocalGWMode = "local"
+const OVNSharedGWMode = "shared"
+const OVNLogPatternConsole = "%D{%Y-%m-%dT%H:%M:%S.###Z}|%05N|%c%T|%p|%m"
+const OVNNodeModeFull = "full"
+const OVNNodeModeDPUHost = "dpu-host"
+const OVNNodeModeDPU = "dpu"
+const OVNNodeModeSmartNIC = "smart-nic"
+const OVNNodeSelectorDefaultDPUHost = "network.operator.openshift.io/dpu-host="
+const OVNNodeSelectorDefaultDPU = "network.operator.openshift.io/dpu="
+const OVNNodeSelectorDefaultSmartNIC = "network.operator.openshift.io/smart-nic="
+const OVNNodeIdentityCertDuration = "24h"
 
-// DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT and DPU_NODE_LEASE_DURATION_DEFAULT are the default DPU health check lease configuration.
+// DPUNodeLeaseRenewIntervalDefault and DPUNodeLeaseDurationDefault are the default DPU health check lease configuration.
 // Setting renew-interval to 0 disables the health check.
-const DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT = 10
-const DPU_NODE_LEASE_DURATION_DEFAULT = 40
+const DPUNodeLeaseRenewIntervalDefault = 10
+const DPUNodeLeaseDurationDefault = 40
 
-// OVN_EGRESSIP_HEALTHCHECK_PORT is the gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
-const OVN_EGRESSIP_HEALTHCHECK_PORT = "9107"
+// OVNEgressIPHealthCheckPort is the gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
+const OVNEgressIPHealthCheckPort = "9107"
 
 const frrK8sNamespace = "openshift-frr-k8s"
 
@@ -78,7 +78,7 @@ const (
 	OVSFlowsConfigMapName              = "ovs-flows-config"
 	OVNKubernetesConfigOverridesCMName = "ovn-kubernetes-config-overrides"
 
-	OVSFlowsConfigNamespace = names.APPLIED_NAMESPACE
+	OVSFlowsConfigNamespace = names.AppliedNamespace
 
 	defaultV4MasqueradeSubnet = "169.254.0.0/17"
 	defaultV6MasqueradeSubnet = "fd69::/112"
@@ -186,7 +186,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	data.Data["EnableUDPAggregation"] = !bootstrapResult.OVN.OVNKubernetesConfig.DisableUDPAggregation
 	data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = bootstrapResult.Infra.NetworkNodeIdentityEnabled
-	data.Data["NodeIdentityCertDuration"] = OVN_NODE_IDENTITY_CERT_DURATION
+	data.Data["NodeIdentityCertDuration"] = OVNNodeIdentityCertDuration
 	data.Data["AdvertisedUDNIsolationMode"] = bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["advertised-udn-isolation-mode"]
 	data.Data["OpenFlowProbe"] = ""
 	if raw, ok := bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["openflow-probe"]; ok {
@@ -231,7 +231,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["GenevePort"] = c.GenevePort
 	data.Data["CNIConfDir"] = pluginCNIConfDir(conf)
 	data.Data["CNIBinDir"] = CNIBinDir
-	data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_FULL
+	data.Data["OVN_NODE_MODE"] = OVNNodeModeFull
 	data.Data["DpuHostModeLabel"] = bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeLabel
 	data.Data["DpuHostModeValue"] = bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeValue
 	data.Data["DpuModeLabel"] = bootstrapResult.OVN.OVNKubernetesConfig.DpuModeLabel
@@ -263,7 +263,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNControlPlaneResourceRequestMemory"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNControlPlaneResourceRequestMemory
 	data.Data["Socks5ProxyResourceRequestCPU"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Socks5ProxyResourceRequestCPU
 	data.Data["Socks5ProxyResourceRequestMemory"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Socks5ProxyResourceRequestMemory
-	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
+	data.Data["OVN_CERT_CN"] = OVNCertCN
 	data.Data["NetFlowCollectors"] = ""
 	data.Data["SFlowCollectors"] = ""
 	data.Data["IPFIXCollectors"] = ""
@@ -275,7 +275,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNPolicyAuditMaxLogFiles"] = c.PolicyAuditConfig.MaxLogFiles
 	data.Data["OVNPolicyAuditDestination"] = c.PolicyAuditConfig.Destination
 	data.Data["OVNPolicyAuditSyslogFacility"] = c.PolicyAuditConfig.SyslogFacility
-	data.Data["OVN_LOG_PATTERN_CONSOLE"] = OVN_LOG_PATTERN_CONSOLE
+	data.Data["OVN_LOG_PATTERN_CONSOLE"] = OVNLogPatternConsole
 	data.Data["PlatformType"] = bootstrapResult.Infra.PlatformType
 	if bootstrapResult.Infra.PlatformType == configv1.AzurePlatformType {
 		data.Data["OVNPlatformAzure"] = true
@@ -328,9 +328,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	klog.V(5).Infof("IPsec: is MachineConfig enabled: %v, is East-West DaemonSet enabled: %v", data.Data["IPsecMachineConfigEnable"], data.Data["OVNIPsecDaemonsetEnable"])
 
 	if c.GatewayConfig != nil && c.GatewayConfig.RoutingViaHost {
-		data.Data["OVN_GATEWAY_MODE"] = OVN_LOCAL_GW_MODE
+		data.Data["OVN_GATEWAY_MODE"] = OVNLocalGWMode
 	} else {
-		data.Data["OVN_GATEWAY_MODE"] = OVN_SHARED_GW_MODE
+		data.Data["OVN_GATEWAY_MODE"] = OVNSharedGWMode
 	}
 
 	// We accept 3 valid inputs:
@@ -412,12 +412,12 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	data.Data["ReachabilityTotalTimeoutSeconds"] = c.EgressIPConfig.ReachabilityTotalTimeoutSeconds
 
-	reachability_node_port := os.Getenv("OVN_EGRESSIP_HEALTHCHECK_PORT")
-	if len(reachability_node_port) == 0 {
-		reachability_node_port = OVN_EGRESSIP_HEALTHCHECK_PORT
-		klog.Infof("OVN_EGRESSIP_HEALTHCHECK_PORT env var is not defined. Using: %s", reachability_node_port)
+	reachabilityNodePort := os.Getenv("OVN_EGRESSIP_HEALTHCHECK_PORT")
+	if len(reachabilityNodePort) == 0 {
+		reachabilityNodePort = OVNEgressIPHealthCheckPort
+		klog.Infof("OVN_EGRESSIP_HEALTHCHECK_PORT env var is not defined. Using: %s", reachabilityNodePort)
 	}
-	data.Data["ReachabilityNodePort"] = reachability_node_port
+	data.Data["ReachabilityNodePort"] = reachabilityNodePort
 	data.Data["RHOBSMonitoring"] = os.Getenv("RHOBS_MONITORING")
 
 	exportNetworkFlows := conf.ExportNetworkFlows
@@ -531,7 +531,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	if len(bootstrapResult.OVN.OVNKubernetesConfig.SmartNicModeNodes) > 0 {
-		data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_SMART_NIC
+		data.Data["OVN_NODE_MODE"] = OVNNodeModeSmartNIC
 		manifests, err = render.RenderTemplate(filepath.Join(manifestSubDir, "ovnkube-node.yaml"), &data)
 		if err != nil {
 			return nil, progressing, fmt.Errorf("failed to render manifests for smart-nic: %w", err)
@@ -540,7 +540,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	}
 
 	if len(bootstrapResult.OVN.OVNKubernetesConfig.DpuHostModeNodes) > 0 {
-		data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_DPU_HOST
+		data.Data["OVN_NODE_MODE"] = OVNNodeModeDPUHost
 		manifests, err = render.RenderTemplate(filepath.Join(manifestSubDir, "ovnkube-node.yaml"), &data)
 		if err != nil {
 			return nil, progressing, fmt.Errorf("failed to render manifests for dpu-host: %w", err)
@@ -551,7 +551,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	if len(bootstrapResult.OVN.OVNKubernetesConfig.DpuModeNodes) > 0 {
 		// "OVN_NODE_MODE" not set when render.RenderDir() called above,
 		// so render just the error-cni.yaml with "OVN_NODE_MODE" set.
-		data.Data["OVN_NODE_MODE"] = OVN_NODE_MODE_DPU
+		data.Data["OVN_NODE_MODE"] = OVNNodeModeDPU
 		manifests, err = render.RenderTemplate(filepath.Join(commonManifestDir, "error-cni.yaml"), &data)
 		if err != nil {
 			return nil, progressing, fmt.Errorf("failed to render manifests for dpu: %w", err)
@@ -585,18 +585,18 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	// Skip rendering ovn-ipsec-host daemonset when renderIPsecHostDaemonSet flag is not set.
 	if !renderIPsecHostDaemonSet {
-		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-host")
+		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVNNamespace, "ovn-ipsec-host")
 	}
 
 	// Skip rendering ovn-ipsec-containerized daemonset when renderIPsecContainerizedDaemonSet flag is not set.
 	if !renderIPsecContainerizedDaemonSet {
-		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-containerized")
+		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVNNamespace, "ovn-ipsec-containerized")
 	}
 
 	// When disabling IPsec deployment, avoid any updates until IPsec is completely
 	// disabled from OVN.
 	if renderIPsecDaemonSetAsCreateWaitOnly {
-		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-host", func(o *uns.Unstructured) {
+		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVNNamespace, "ovn-ipsec-host", func(o *uns.Unstructured) {
 			anno := o.GetAnnotations()
 			if anno == nil {
 				anno = map[string]string{}
@@ -605,7 +605,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 			o.SetAnnotations(anno)
 		})
 
-		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovn-ipsec-containerized", func(o *uns.Unstructured) {
+		k8s.UpdateObjByGroupKindName(objs, "apps", "DaemonSet", util.OVNNamespace, "ovn-ipsec-containerized", func(o *uns.Unstructured) {
 			anno := o.GetAnnotations()
 			if anno == nil {
 				anno = map[string]string{}
@@ -624,11 +624,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	if !updateControlPlane { // no-op if object is not found
 		annotationKey := names.CreateOnlyAnnotation // skip only if object doesn't exist already
 		klog.Infof("annotate local copy of ovnkube-control-plane deployment with %s", annotationKey)
-		namespace := util.OVN_NAMESPACE
+		namespace := util.OVNNamespace
 		if bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Enabled {
 			namespace = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Namespace
 		}
-		k8s.UpdateObjByGroupKindName(objs, "apps", "Deployment", namespace, util.OVN_CONTROL_PLANE, func(o *uns.Unstructured) {
+		k8s.UpdateObjByGroupKindName(objs, "apps", "Deployment", namespace, util.OVNControlPlane, func(o *uns.Unstructured) {
 			anno := o.GetAnnotations()
 			if anno == nil {
 				anno = map[string]string{}
@@ -654,7 +654,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	if !renderPrePull {
 		// remove prepull from the list of objects to render.
-		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVN_NAMESPACE, "ovnkube-upgrades-prepuller")
+		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVNNamespace, "ovnkube-upgrades-prepuller")
 	}
 
 	return objs, progressing, nil
@@ -839,7 +839,7 @@ func bootstrapOVNHyperShiftConfig(ctx context.Context, hc *hypershift.HyperShift
 
 	// Preserve any customizations to the resource requests on the three containers in the ovn-control-plane pod
 	controlPlaneClient := kubeClient.ClientFor(names.ManagementClusterName)
-	tokenMinterCPURequest, tokenMinterMemoryRequest := getResourceRequestsForDeployment(ctx, controlPlaneClient.CRClient(), hc.Namespace, util.OVN_CONTROL_PLANE, "token-minter")
+	tokenMinterCPURequest, tokenMinterMemoryRequest := getResourceRequestsForDeployment(ctx, controlPlaneClient.CRClient(), hc.Namespace, util.OVNControlPlane, "token-minter")
 	if tokenMinterCPURequest > 0 {
 		ovnHypershiftResult.TokenMinterResourceRequestCPU = strconv.FormatInt(tokenMinterCPURequest, 10)
 	}
@@ -847,7 +847,7 @@ func bootstrapOVNHyperShiftConfig(ctx context.Context, hc *hypershift.HyperShift
 		ovnHypershiftResult.TokenMinterResourceRequestMemory = strconv.FormatInt(tokenMinterMemoryRequest, 10)
 	}
 
-	ovnControlPlaneCPURequest, ovnControlPlaneMemoryRequest := getResourceRequestsForDeployment(ctx, controlPlaneClient.CRClient(), hc.Namespace, util.OVN_CONTROL_PLANE, "ovnkube-control-plane")
+	ovnControlPlaneCPURequest, ovnControlPlaneMemoryRequest := getResourceRequestsForDeployment(ctx, controlPlaneClient.CRClient(), hc.Namespace, util.OVNControlPlane, "ovnkube-control-plane")
 	if ovnControlPlaneCPURequest > 0 {
 		ovnHypershiftResult.OVNControlPlaneResourceRequestCPU = strconv.FormatInt(ovnControlPlaneCPURequest, 10)
 	}
@@ -855,7 +855,7 @@ func bootstrapOVNHyperShiftConfig(ctx context.Context, hc *hypershift.HyperShift
 		ovnHypershiftResult.OVNControlPlaneResourceRequestMemory = strconv.FormatInt(ovnControlPlaneMemoryRequest, 10)
 	}
 
-	socksProxyCPURequest, socksProxyMemoryRequest := getResourceRequestsForDeployment(ctx, controlPlaneClient.CRClient(), hc.Namespace, util.OVN_CONTROL_PLANE, "socks-proxy")
+	socksProxyCPURequest, socksProxyMemoryRequest := getResourceRequestsForDeployment(ctx, controlPlaneClient.CRClient(), hc.Namespace, util.OVNControlPlane, "socks-proxy")
 	if socksProxyCPURequest > 0 {
 		ovnHypershiftResult.Socks5ProxyResourceRequestCPU = strconv.FormatInt(socksProxyCPURequest, 10)
 	}
@@ -1002,12 +1002,12 @@ func findCommonNode(nodeLists ...[]string) (bool, string) {
 // if it exists, otherwise returns default configuration for OCP clusters using OVN-Kubernetes
 func bootstrapOVNConfig(ctx context.Context, conf *operv1.Network, kubeClient cnoclient.Client, hc *hypershift.HyperShiftConfig, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNConfigBoostrapResult, error) {
 	ovnConfigResult := &bootstrap.OVNConfigBoostrapResult{
-		DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-		DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-		SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+		DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+		DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+		SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 		MgmtPortResourceName:      "",
-		DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-		DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+		DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+		DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 	}
 	if conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig == nil {
 		bootstrapOVNGatewayConfig(ctx, conf, kubeClient.ClientFor("").CRClient())
@@ -1032,21 +1032,21 @@ func bootstrapOVNConfig(ctx context.Context, conf *operv1.Network, kubeClient cn
 		if exists && validateLabel(dpuHostModeLabel) {
 			ovnConfigResult.DpuHostModeLabel = dpuHostModeLabel
 		} else if exists {
-			klog.Warningf("Invalid dpu-host-mode-label format %q, using default %q", dpuHostModeLabel, OVN_NODE_SELECTOR_DEFAULT_DPU_HOST)
+			klog.Warningf("Invalid dpu-host-mode-label format %q, using default %q", dpuHostModeLabel, OVNNodeSelectorDefaultDPUHost)
 		}
 
 		dpuModeLabel, exists := cm.Data["dpu-mode-label"]
 		if exists && validateLabel(dpuModeLabel) {
 			ovnConfigResult.DpuModeLabel = dpuModeLabel
 		} else if exists {
-			klog.Warningf("Invalid dpu-mode-label format %q, using default %q", dpuModeLabel, OVN_NODE_SELECTOR_DEFAULT_DPU)
+			klog.Warningf("Invalid dpu-mode-label format %q, using default %q", dpuModeLabel, OVNNodeSelectorDefaultDPU)
 		}
 
 		smartNicModeLabel, exists := cm.Data["smart-nic-mode-label"]
 		if exists && validateLabel(smartNicModeLabel) {
 			ovnConfigResult.SmartNicModeLabel = smartNicModeLabel
 		} else if exists {
-			klog.Warningf("Invalid smart-nic-mode-label format %q, using default %q", smartNicModeLabel, OVN_NODE_SELECTOR_DEFAULT_SMART_NIC)
+			klog.Warningf("Invalid smart-nic-mode-label format %q, using default %q", smartNicModeLabel, OVNNodeSelectorDefaultSmartNIC)
 		}
 
 		mgmtPortresourceName, exists := cm.Data["mgmt-port-resource-name"]
@@ -1074,7 +1074,7 @@ func bootstrapOVNConfig(ctx context.Context, conf *operv1.Network, kubeClient cn
 			if err == nil && parsed >= 0 {
 				ovnConfigResult.DpuNodeLeaseRenewInterval = parsed
 			} else {
-				klog.Warningf("Invalid dpu-node-lease-renew-interval %q, using default %d", val, DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT)
+				klog.Warningf("Invalid dpu-node-lease-renew-interval %q, using default %d", val, DPUNodeLeaseRenewIntervalDefault)
 			}
 		}
 		if val, exists := cm.Data["dpu-node-lease-duration"]; exists {
@@ -1082,19 +1082,19 @@ func bootstrapOVNConfig(ctx context.Context, conf *operv1.Network, kubeClient cn
 			if err == nil && parsed > 0 {
 				ovnConfigResult.DpuNodeLeaseDuration = parsed
 			} else {
-				klog.Warningf("Invalid dpu-node-lease-duration %q (must be > 0), using default %d", val, DPU_NODE_LEASE_DURATION_DEFAULT)
+				klog.Warningf("Invalid dpu-node-lease-duration %q (must be > 0), using default %d", val, DPUNodeLeaseDurationDefault)
 			}
 		}
 
 		// Setting renew-interval to 0 disables the DPU health check.
 		// Duration must always be > 0 (required by ovn-kubernetes).
 		if ovnConfigResult.DpuNodeLeaseRenewInterval == 0 {
-			ovnConfigResult.DpuNodeLeaseDuration = DPU_NODE_LEASE_DURATION_DEFAULT
+			ovnConfigResult.DpuNodeLeaseDuration = DPUNodeLeaseDurationDefault
 		} else if ovnConfigResult.DpuNodeLeaseDuration <= ovnConfigResult.DpuNodeLeaseRenewInterval {
 			klog.Warningf("dpu-node-lease-duration (%d) must be greater than dpu-node-lease-renew-interval (%d), using defaults",
 				ovnConfigResult.DpuNodeLeaseDuration, ovnConfigResult.DpuNodeLeaseRenewInterval)
-			ovnConfigResult.DpuNodeLeaseRenewInterval = DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT
-			ovnConfigResult.DpuNodeLeaseDuration = DPU_NODE_LEASE_DURATION_DEFAULT
+			ovnConfigResult.DpuNodeLeaseRenewInterval = DPUNodeLeaseRenewIntervalDefault
+			ovnConfigResult.DpuNodeLeaseDuration = DPUNodeLeaseDurationDefault
 		}
 	}
 
@@ -1384,20 +1384,20 @@ func bootstrapOVNGatewayConfig(ctx context.Context, conf *operv1.Network, kubeCl
 	cm := &corev1.ConfigMap{}
 	nsn := types.NamespacedName{Namespace: "openshift-network-operator", Name: "gateway-mode-config"}
 	err := kubeClient.Get(ctx, nsn, cm)
-	modeOverride := OVN_SHARED_GW_MODE
+	modeOverride := OVNSharedGWMode
 	routeViaHost := false
 
 	if err != nil {
-		klog.Infof("Did not find gateway-mode-config. Using default gateway mode: %s", OVN_SHARED_GW_MODE)
+		klog.Infof("Did not find gateway-mode-config. Using default gateway mode: %s", OVNSharedGWMode)
 	} else {
 		modeOverride = cm.Data["mode"]
-		if modeOverride != OVN_SHARED_GW_MODE && modeOverride != OVN_LOCAL_GW_MODE {
+		if modeOverride != OVNSharedGWMode && modeOverride != OVNLocalGWMode {
 			klog.Warningf("gateway-mode-config does not match %q or %q, is: %q. Using default gateway mode: %s",
-				OVN_LOCAL_GW_MODE, OVN_SHARED_GW_MODE, modeOverride, OVN_SHARED_GW_MODE)
-			modeOverride = OVN_SHARED_GW_MODE
+				OVNLocalGWMode, OVNSharedGWMode, modeOverride, OVNSharedGWMode)
+			modeOverride = OVNSharedGWMode
 		}
 	}
-	if modeOverride == OVN_LOCAL_GW_MODE {
+	if modeOverride == OVNLocalGWMode {
 		routeViaHost = true
 	}
 	conf.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig = &operv1.GatewayConfig{
@@ -1408,7 +1408,7 @@ func bootstrapOVNGatewayConfig(ctx context.Context, conf *operv1.Network, kubeCl
 
 func bootstrapOVN(ctx context.Context, conf *operv1.Network, kubeClient cnoclient.Client, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNBootstrapResult, error) {
 	clusterConfig := &corev1.ConfigMap{}
-	clusterConfigLookup := types.NamespacedName{Name: CLUSTER_CONFIG_NAME, Namespace: CLUSTER_CONFIG_NAMESPACE}
+	clusterConfigLookup := types.NamespacedName{Name: ClusterConfigName, Namespace: ClusterConfigNamespace}
 
 	if err := kubeClient.ClientFor("").CRClient().Get(ctx, clusterConfigLookup, clusterConfig); err != nil {
 		return nil, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %w", err)
@@ -1439,7 +1439,7 @@ func bootstrapOVN(ctx context.Context, conf *operv1.Network, kubeClient cnoclien
 	ovnIPsecStatus := &bootstrap.OVNIPsecStatus{}
 	prepullerStatus := &bootstrap.OVNUpdateStatus{}
 
-	namespaceForControlPlane := util.OVN_NAMESPACE
+	namespaceForControlPlane := util.OVNNamespace
 	clusterClientForControlPlane := kubeClient.ClientFor("")
 
 	if hc.Enabled {
@@ -1454,12 +1454,12 @@ func bootstrapOVN(ctx context.Context, conf *operv1.Network, kubeClient cnoclien
 		},
 	}
 
-	nsn = types.NamespacedName{Namespace: namespaceForControlPlane, Name: util.OVN_CONTROL_PLANE}
+	nsn = types.NamespacedName{Namespace: namespaceForControlPlane, Name: util.OVNControlPlane}
 	if err := clusterClientForControlPlane.CRClient().Get(ctx, nsn, controlPlaneDeployment); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to retrieve %s deployment: %w", util.OVN_CONTROL_PLANE, err)
+			return nil, fmt.Errorf("failed to retrieve %s deployment: %w", util.OVNControlPlane, err)
 		} else {
-			klog.Infof("%s deployment not running", util.OVN_CONTROL_PLANE)
+			klog.Infof("%s deployment not running", util.OVNControlPlane)
 			controlPlaneStatus = nil
 		}
 	} else {
@@ -1472,7 +1472,7 @@ func bootstrapOVN(ctx context.Context, conf *operv1.Network, kubeClient cnoclien
 		controlPlaneStatus.Progressing = deploymentProgressing(controlPlaneDeployment)
 
 		klog.Infof("%s deployment status: progressing=%t",
-			util.OVN_CONTROL_PLANE, controlPlaneStatus.Progressing)
+			util.OVNControlPlane, controlPlaneStatus.Progressing)
 
 	}
 
@@ -1483,7 +1483,7 @@ func bootstrapOVN(ctx context.Context, conf *operv1.Network, kubeClient cnoclien
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
 	}
-	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: util.OVN_NODE}
+	nsn = types.NamespacedName{Namespace: util.OVNNamespace, Name: util.OVNNode}
 	if err := kubeClient.ClientFor("").CRClient().Get(ctx, nsn, nodeDaemonSet); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to retrieve existing ovnkube-node DaemonSet: %w", err)
@@ -1512,7 +1512,7 @@ func bootstrapOVN(ctx context.Context, conf *operv1.Network, kubeClient cnoclien
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
 	}
-	nsn = types.NamespacedName{Namespace: util.OVN_NAMESPACE, Name: "ovnkube-upgrades-prepuller"}
+	nsn = types.NamespacedName{Namespace: util.OVNNamespace, Name: "ovnkube-upgrades-prepuller"}
 	if err := kubeClient.ClientFor("").CRClient().Get(ctx, nsn, prePullerDaemonSet); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to retrieve existing prepuller DaemonSet: %w", err)
@@ -1968,8 +1968,8 @@ func setOVNObjectAnnotation(objs []*uns.Unstructured, key, value string) error {
 	for _, obj := range objs {
 		if obj.GetAPIVersion() == "apps/v1" &&
 			(obj.GetKind() == "DaemonSet" || obj.GetKind() == "Deployment") &&
-			(obj.GetName() == util.OVN_NODE ||
-				obj.GetName() == util.OVN_CONTROL_PLANE) {
+			(obj.GetName() == util.OVNNode ||
+				obj.GetName() == util.OVNControlPlane) {
 			// set daemonset annotation
 			anno := obj.GetAnnotations()
 			if anno == nil {
@@ -2045,7 +2045,7 @@ func isOVNIPsecNotActiveInDaemonSet(ds *appsv1.DaemonSet) bool {
 	}
 	// If IPsec is running with older version and ipsec=true is found from nbdb container, then return false.
 	if !version.IsVersionGreaterThanOrEqualTo(annotations["release.openshift.io/version"], 4, 15) &&
-		isIPSecEnabledInPod(ds.Spec.Template, util.OVN_NBDB) {
+		isIPSecEnabledInPod(ds.Spec.Template, util.OVNNBDBName) {
 		return false
 	}
 	// All other cases, return true.
@@ -2217,7 +2217,7 @@ func validateOVNKubernetesSubnet(name, subnet string, otherSubnets *iputil.IPPoo
 func getOVNKubernetesConfigOverrides(ctx context.Context, client cnoclient.Client) (map[string]string, error) {
 	configMap := &corev1.ConfigMap{}
 	if err := client.Default().CRClient().Get(ctx,
-		types.NamespacedName{Name: OVNKubernetesConfigOverridesCMName, Namespace: names.APPLIED_NAMESPACE}, configMap); err != nil {
+		types.NamespacedName{Name: OVNKubernetesConfigOverridesCMName, Namespace: names.AppliedNamespace}, configMap); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil
 		}

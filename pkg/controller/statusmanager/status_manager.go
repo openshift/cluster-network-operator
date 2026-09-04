@@ -358,7 +358,7 @@ func (status *StatusManager) set(ctx context.Context, reachedAvailableLevel bool
 
 	// Set status on the network.operator object
 	err := func() error {
-		oc, err := status.client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(ctx, names.OPERATOR_CONFIG, metav1.GetOptions{})
+		oc, err := status.client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(ctx, names.OperatorConfig, metav1.GetOptions{})
 		if err != nil {
 			// Should never happen outside of unit tests
 			return err
@@ -426,7 +426,7 @@ func (status *StatusManager) set(ctx context.Context, reachedAvailableLevel bool
 		}
 
 		// Use applyconfigurations to change only the specified fields
-		net := applyoperv1.Network(names.OPERATOR_CONFIG).
+		net := applyoperv1.Network(names.OperatorConfig).
 			WithStatus(applyoperv1.NetworkStatus().WithVersion(oc.Status.Version))
 		for _, condition := range oc.Status.Conditions {
 			net.Status.WithConditions(applyoperv1.OperatorCondition().
