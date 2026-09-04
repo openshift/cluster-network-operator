@@ -268,7 +268,7 @@ func runReadinessProbe(ctx context.Context, caBundle []*x509.Certificate, proxyU
 		Transport: transport,
 	}
 
-	request, err := http.NewRequestWithContext(ctx, "GET", endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request for '%s' using proxy '%s': %w", endpoint.String(),
 			proxyURL.String(), err)
