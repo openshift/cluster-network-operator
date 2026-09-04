@@ -564,7 +564,7 @@ func Test_renderNetworkDiagnostics(t *testing.T) {
 			if !reflect.DeepEqual(tt.expectedErr, err) {
 				t.Errorf("Test_renderNetworkDiagnostics() err = %v, want %v", err, tt.expectedErr)
 			}
-			assert.Equalf(t, tt.want, len(got), "renderNetworkDiagnostics(%v, %v, %v)", tt.args.operConf, tt.args.clusterConf, manifestDir)
+			assert.Lenf(t, got, tt.want, "renderNetworkDiagnostics(%v, %v, %v)", tt.args.operConf, tt.args.clusterConf, manifestDir)
 		})
 	}
 
@@ -631,7 +631,7 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 			if !reflect.DeepEqual(tt.expectedErr, err) {
 				t.Errorf("renderAdditionalRoutingCapabilities() err = %v, want %v", err, tt.expectedErr)
 			}
-			assert.Equalf(t, tt.want, len(got), "renderAdditionalRoutingCapabilities(%v, %v)", tt.args.operConf, manifestDir)
+			assert.Lenf(t, got, tt.want, "renderAdditionalRoutingCapabilities(%v, %v)", tt.args.operConf, manifestDir)
 		})
 	}
 }

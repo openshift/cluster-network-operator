@@ -202,7 +202,7 @@ func TestUpdatesManager_Add(t *testing.T) {
 			t.Log(updatesManager.processingQueue)
 			t.Log(updateResults)
 
-			assert.EqualValues(t, tc.expectedUpdates, updateResults)
+			assert.Equal(t, tc.expectedUpdates, updateResults)
 
 		})
 	}
