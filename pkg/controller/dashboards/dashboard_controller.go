@@ -37,7 +37,7 @@ var (
 	netstatsContent string
 	//go:embed ovn-health.json
 	ovnHealthContent string
-	dashboardRefs    []dashboardRef = []dashboardRef{
+	dashboardRefs    = []dashboardRef{
 		{
 			name: "grafana-dashboard-network-stats",
 			json: netstatsContent,

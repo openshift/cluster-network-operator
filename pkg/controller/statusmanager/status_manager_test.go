@@ -105,7 +105,7 @@ func setStatus(t *testing.T, client cnoclient.Client, obj crclient.Object) {
 }
 
 // sl: labels that all status-havers have
-var sl map[string]string = map[string]string{names.GenerateStatusLabel: names.StandAloneClusterName}
+var sl = map[string]string{names.GenerateStatusLabel: names.StandAloneClusterName}
 
 // Tests that the parts of newConditions that are set match what's in oldConditions (but
 // doesn't look at anything else in oldConditions)
