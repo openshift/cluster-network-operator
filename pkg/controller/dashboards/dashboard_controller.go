@@ -118,7 +118,7 @@ func (r *ReconcileDashboard) Reconcile(ctx context.Context, _ reconcile.Request)
 
 	// Fetch the Network.operator.openshift.io instance to get Network Type
 	operConfig := &operv1.Network{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}}
-	err := r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, operConfig)
+	err := r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: names.ClusterConfig}, operConfig)
 	if err != nil {
 		err = fmt.Errorf("unable to retrieve Network.operator.openshift.io object: %w", err)
 		klog.Error(err)

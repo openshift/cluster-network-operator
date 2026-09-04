@@ -12,18 +12,17 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 )
 
-const OVN_NAMESPACE = "openshift-ovn-kubernetes"
-const OVN_CONTROL_PLANE = "ovnkube-control-plane"
-const OVN_NODE = "ovnkube-node"
-const OVN_CONTROLLER = "ovnkube-controller"
-const MTU_CM_NAMESPACE = "openshift-network-operator"
-const MTU_CM_NAME = "mtu"
-const OVN_NBDB = "nbdb"
+const OVNNamespace = "openshift-ovn-kubernetes"
+const OVNControlPlane = "ovnkube-control-plane"
+const OVNNode = "ovnkube-node"
+const MTUConfigMapNamespace = "openshift-network-operator"
+const MTUConfigMapName = "mtu"
+const OVNNBDBName = "nbdb"
 
 func ReadMTUConfigMap(ctx context.Context, client cnoclient.Client) (int, error) {
-	klog.V(4).Infof("Looking for ConfigMap %s/%s", MTU_CM_NAMESPACE, MTU_CM_NAME)
+	klog.V(4).Infof("Looking for ConfigMap %s/%s", MTUConfigMapNamespace, MTUConfigMapName)
 	cm := &corev1.ConfigMap{}
-	err := client.Default().CRClient().Get(ctx, types.NamespacedName{Namespace: MTU_CM_NAMESPACE, Name: MTU_CM_NAME}, cm)
+	err := client.Default().CRClient().Get(ctx, types.NamespacedName{Namespace: MTUConfigMapNamespace, Name: MTUConfigMapName}, cm)
 	if err != nil {
 		return 0, err
 	}

@@ -72,8 +72,8 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	log.Printf("Reconciling Network.config.openshift.io %s\n", request.Name)
 
 	// We won't create more than one network
-	if request.Name != names.CLUSTER_CONFIG {
-		log.Printf("Ignoring Network without default name " + names.CLUSTER_CONFIG)
+	if request.Name != names.ClusterConfig {
+		log.Printf("Ignoring Network without default name " + names.ClusterConfig)
 		return reconcile.Result{}, nil
 	}
 
@@ -114,7 +114,7 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	// This will cause only the fields we change to be set.
 	operConfig := &operv1.Network{
 		TypeMeta:   metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"},
-		ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+		ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig},
 	}
 	network.MergeClusterConfig(&operConfig.Spec, clusterConfig.Spec)
 

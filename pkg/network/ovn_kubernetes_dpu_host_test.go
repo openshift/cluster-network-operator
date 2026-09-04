@@ -159,8 +159,8 @@ func createTestRenderData(ovnNodeMode string) render.RenderData {
 	data.Data["SmartNicModeValue"] = ""
 	data.Data["DpuModeLabel"] = ""
 	data.Data["MgmtPortResourceName"] = ""
-	data.Data["DpuNodeLeaseRenewInterval"] = strconv.Itoa(DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT)
-	data.Data["DpuNodeLeaseDuration"] = strconv.Itoa(DPU_NODE_LEASE_DURATION_DEFAULT)
+	data.Data["DpuNodeLeaseRenewInterval"] = strconv.Itoa(DPUNodeLeaseRenewIntervalDefault)
+	data.Data["DpuNodeLeaseDuration"] = strconv.Itoa(DPUNodeLeaseDurationDefault)
 	data.Data["HTTP_PROXY"] = ""
 	data.Data["HTTPS_PROXY"] = ""
 	data.Data["NO_PROXY"] = ""
@@ -253,8 +253,8 @@ func TestOVNKubernetesLeaseEnvVars(t *testing.T) {
 
 	// Env vars with literal values
 	leaseEnvVars := map[string]string{
-		"OVNKUBE_NODE_LEASE_RENEW_INTERVAL": strconv.Itoa(DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT),
-		"OVNKUBE_NODE_LEASE_DURATION":       strconv.Itoa(DPU_NODE_LEASE_DURATION_DEFAULT),
+		"OVNKUBE_NODE_LEASE_RENEW_INTERVAL": strconv.Itoa(DPUNodeLeaseRenewIntervalDefault),
+		"OVNKUBE_NODE_LEASE_DURATION":       strconv.Itoa(DPUNodeLeaseDurationDefault),
 	}
 	for _, template := range templates {
 		for _, tc := range testCases {

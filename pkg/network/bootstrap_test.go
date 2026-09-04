@@ -22,7 +22,7 @@ import (
 func TestBootstrap(t *testing.T) {
 	// Base setup - runs for all tests
 	baseOperConfig := &operv1.Network{
-		ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+		ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig},
 		Spec: operv1.NetworkSpec{
 			DefaultNetwork: operv1.DefaultNetworkDefinition{
 				Type: operv1.NetworkTypeOVNKubernetes,
@@ -47,8 +47,8 @@ func TestBootstrap(t *testing.T) {
 		},
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      network.CLUSTER_CONFIG_NAME,
-				Namespace: network.CLUSTER_CONFIG_NAMESPACE,
+				Name:      network.ClusterConfigName,
+				Namespace: network.ClusterConfigNamespace,
 			},
 			Data: map[string]string{
 				"install-config": "controlPlane:\n  replicas: 3\n",

@@ -3,8 +3,8 @@ package observability
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	goerrors "errors"
 	"io"
 	"os"
 	"strings"
@@ -17,7 +17,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -314,7 +314,7 @@ func (r *ReconcileObservability) teardownNetObservOperator(ctx context.Context) 
 	})
 	subscription.SetName(OperatorNamespace)
 	subscription.SetNamespace(OperatorNamespace)
-	if err := r.client.Delete(ctx, subscription); err != nil && !errors.IsNotFound(err) {
+	if err := r.client.Delete(ctx, subscription); err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("failed to delete Subscription: %w", err)
 	}
 
@@ -326,7 +326,7 @@ func (r *ReconcileObservability) teardownNetObservOperator(ctx context.Context) 
 	})
 	operatorGroup.SetName(OperatorNamespace)
 	operatorGroup.SetNamespace(OperatorNamespace)
-	if err := r.client.Delete(ctx, operatorGroup); err != nil && !errors.IsNotFound(err) {
+	if err := r.client.Delete(ctx, operatorGroup); err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("failed to delete OperatorGroup: %w", err)
 	}
 
@@ -337,7 +337,7 @@ func (r *ReconcileObservability) teardownNetObservOperator(ctx context.Context) 
 		Kind:    "ClusterServiceVersion",
 	})
 	if err := r.client.List(ctx, csvList, crclient.InNamespace(OperatorNamespace)); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return nil
 		}
 		return fmt.Errorf("failed to list ClusterServiceVersions: %w", err)
@@ -347,7 +347,7 @@ func (r *ReconcileObservability) teardownNetObservOperator(ctx context.Context) 
 		if !strings.HasPrefix(csv.GetName(), "network-observability-operator") {
 			continue
 		}
-		if err := r.client.Delete(ctx, csv); err != nil && !errors.IsNotFound(err) {
+		if err := r.client.Delete(ctx, csv); err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete ClusterServiceVersion %s: %w", csv.GetName(), err)
 		}
 	}
@@ -356,7 +356,7 @@ func (r *ReconcileObservability) teardownNetObservOperator(ctx context.Context) 
 	// namespace would cascade-delete independently created resources.
 	namespace := &corev1.Namespace{}
 	if err := r.client.Get(ctx, types.NamespacedName{Name: OperatorNamespace}, namespace); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return nil
 		}
 		return fmt.Errorf("failed to get namespace: %w", err)
@@ -365,7 +365,7 @@ func (r *ReconcileObservability) teardownNetObservOperator(ctx context.Context) 
 		klog.Infof("Namespace %s was not created by CNO; leaving it in place", OperatorNamespace)
 		return nil
 	}
-	if err := r.client.Delete(ctx, namespace); err != nil && !errors.IsNotFound(err) {
+	if err := r.client.Delete(ctx, namespace); err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("failed to delete namespace: %w", err)
 	}
 
@@ -416,7 +416,7 @@ func (r *ReconcileObservability) shouldInstallNetworkObservability(ctx context.C
 	// Get Network CR information
 	var network configv1.Network
 	if err := r.client.Get(ctx, types.NamespacedName{Name: NetworkCRName}, &network); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		return false, err
@@ -488,7 +488,7 @@ func (r *ReconcileObservability) isNetObservOperatorInstalled(ctx context.Contex
 	})
 
 	if err := r.client.Get(ctx, types.NamespacedName{Name: "flowcollectors.flows.netobserv.io"}, crd); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		return false, err
@@ -508,7 +508,7 @@ func (r *ReconcileObservability) applyManifest(ctx context.Context, yamlPath, de
 	for {
 		obj := &unstructured.Unstructured{}
 		if err := dec.Decode(obj); err != nil {
-			if goerrors.Is(err, io.EOF) {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return err
@@ -555,7 +555,7 @@ func (r *ReconcileObservability) markNamespaceIfCNOOwned(ctx context.Context, ob
 	existing := &corev1.Namespace{}
 	err := r.client.Get(ctx, types.NamespacedName{Name: obj.GetName()}, existing)
 	switch {
-	case errors.IsNotFound(err):
+	case apierrors.IsNotFound(err):
 		// CNO is creating the namespace. Mark it as CNO-created.
 	case err != nil:
 		// Ownership cannot be determined so do not claim it.
@@ -587,7 +587,7 @@ func (r *ReconcileObservability) isFlowCollectorExists(ctx context.Context) (boo
 
 	err := r.client.Get(ctx, types.NamespacedName{Name: FlowCollectorName}, flowCollector)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		return false, err

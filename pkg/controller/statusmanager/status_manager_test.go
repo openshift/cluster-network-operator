@@ -60,7 +60,7 @@ func setCO(t *testing.T, client cnoclient.Client, name string) {
 }
 
 func getOC(client cnoclient.Client) (*operv1.Network, error) {
-	return client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OPERATOR_CONFIG, metav1.GetOptions{})
+	return client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OperatorConfig, metav1.GetOptions{})
 }
 
 func getStatuses(client cnoclient.Client, name string) (*configv1.ClusterOperator, *operv1.Network, error) {
@@ -69,7 +69,7 @@ func getStatuses(client cnoclient.Client, name string) (*configv1.ClusterOperato
 	if err != nil {
 		return nil, nil, err
 	}
-	oc, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OPERATOR_CONFIG, metav1.GetOptions{})
+	oc, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OperatorConfig, metav1.GetOptions{})
 	return co, oc, err
 }
 
@@ -158,7 +158,7 @@ func TestStatusManager_set(t *testing.T) {
 
 	// make the network.operator object
 	log.Print("Creating Network Operator Config")
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	condUpdate := operv1.OperatorCondition{
@@ -288,7 +288,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	if !apierrors.IsNotFound(err) {
 		t.Fatalf("unexpected error (expected Not Found): %v", err)
 	}
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	condUpdate := operv1.OperatorCondition{
@@ -380,7 +380,7 @@ func TestStatusManagerMaybeSetDegradedDebouncing(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 	setCO(t, client, "testing")
 
@@ -424,7 +424,7 @@ func TestStatusManagerMaybeSetDegradedMultipleLevels(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 	setCO(t, client, "testing")
 
@@ -480,7 +480,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
 	status.clock = testingclock.NewFakeClock(time.Now())
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig},
 		Spec: operv1.NetworkSpec{DefaultNetwork: operv1.DefaultNetworkDefinition{
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}}}}}
 	setOC(t, client, no)
@@ -828,7 +828,7 @@ func TestStatusManagerSetFromMachineConfigPoolIgnoresNodeRebootChurn(t *testing.
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig},
 		Spec: operv1.NetworkSpec{DefaultNetwork: operv1.DefaultNetworkDefinition{
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}}}}}
 	setOC(t, client, no)
@@ -880,7 +880,7 @@ func TestStatusManagerSetFromMachineConfigPoolWaitsForAllMatchingPoolsOnRemoval(
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig},
 		Spec: operv1.NetworkSpec{DefaultNetwork: operv1.DefaultNetworkDefinition{
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}}}}}
 	setOC(t, client, no)
@@ -988,7 +988,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	status.SetFromPods(t.Context())
@@ -1533,7 +1533,7 @@ func TestStatusManagerIgnoresDaemonSetNodeScaleChurnAfterInstall(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	ds := &appsv1.DaemonSet{
@@ -1623,7 +1623,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	status.SetFromPods(t.Context())
@@ -1972,7 +1972,7 @@ func TestStatusManagerRestoresInstallCompleteAfterRestart(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	depA := &appsv1.Deployment{
@@ -2050,7 +2050,7 @@ func TestStatusManagerRestoresInstallCompleteFromLegacyAnnotation(t *testing.T) 
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	depA := &appsv1.Deployment{
@@ -2150,7 +2150,7 @@ func TestStatusManagerRestoresActiveRolloutAfterRestart(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	depA := &appsv1.Deployment{
@@ -2229,7 +2229,7 @@ func TestStatusManagerRestoresStatefulSetActiveRolloutAfterRestart(t *testing.T)
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	ssA := &appsv1.StatefulSet{
@@ -2342,7 +2342,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	dsA := &appsv1.DaemonSet{
@@ -2594,7 +2594,7 @@ func TestStatusManagerHyperShift(t *testing.T) {
 	mgmtClient := fake.NewFakeClient()
 	mgmtStatus := New(mgmtClient, "testing", names.StandAloneClusterName)
 	setFakeListers(mgmtStatus)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, mgmtClient, no)
 	mgmtStatus.set(t.Context(), true, validConditions...)
 
@@ -2654,7 +2654,7 @@ func TestStatusManagerSetFromDeploymentsWithExcluded(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	status.SetFromPods(t.Context())

@@ -132,7 +132,7 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 	// Need to do this with a custom namespaced informer.
 	cmInformer := v1coreinformers.NewConfigMapInformer(
 		r.client.Default().Kubernetes(),
-		names.APPLIED_NAMESPACE,
+		names.AppliedNamespace,
 		0, // don't resync
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
@@ -201,7 +201,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	log.Printf("Reconciling Network.operator.openshift.io %s\n", request.Name)
 
 	// We won't create more than one network
-	if request.Name != names.OPERATOR_CONFIG {
+	if request.Name != names.OperatorConfig {
 		log.Printf("Ignoring Network.operator.openshift.io without default name")
 		return reconcile.Result{}, nil
 	}
@@ -232,7 +232,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	// Fetch the Network.config.openshift.io instance
 	clusterConfig := &configv1.Network{}
-	err = r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, clusterConfig)
+	err = r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: names.ClusterConfig}, clusterConfig)
 	if err != nil {
 		log.Printf("Unable to retrieve network.config.openshift.io object: %v", err)
 		return reconcile.Result{}, err
@@ -279,7 +279,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// mtu to be created for consistancy with other non-hypershift clusters.
 	// A hypershift cluster may not have any worker nodes for running the mtu prober.
 	mtu := 0
-	err = r.client.Default().CRClient().Get(ctx, types.NamespacedName{Namespace: util.MTU_CM_NAMESPACE, Name: util.MTU_CM_NAME}, &corev1.ConfigMap{})
+	err = r.client.Default().CRClient().Get(ctx, types.NamespacedName{Namespace: util.MTUConfigMapNamespace, Name: util.MTUConfigMapName}, &corev1.ConfigMap{})
 	if network.NeedMTUProbe(prev, &operConfig.Spec) || (apierrors.IsNotFound(err) && infraStatus.HostedControlPlane == nil) {
 		mtu, err = r.probeMTU(ctx, operConfig, infraStatus)
 		if err != nil {
@@ -445,7 +445,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	relatedObjects = append(relatedObjects, configv1.ObjectReference{
 		Resource: "namespaces",
-		Name:     names.APPLIED_NAMESPACE,
+		Name:     names.AppliedNamespace,
 	})
 
 	// Add operator.openshift.io/v1/network to relatedObjects for must-gather
@@ -567,6 +567,6 @@ func reconcileOperConfig(_ context.Context, obj crclient.Object) []reconcile.Req
 	// Update reconcile.Request object to align with unnamespaced default network,
 	// to ensure we don't have multiple requeueing reconcilers running
 	return []reconcile.Request{{NamespacedName: types.NamespacedName{
-		Name: names.OPERATOR_CONFIG,
+		Name: names.OperatorConfig,
 	}}}
 }

@@ -70,7 +70,7 @@ func renderMultusAdmissonControllerConfig(ctx context.Context, manifestDir strin
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["MultusAdmissionControllerImage"] = os.Getenv("MULTUS_ADMISSION_CONTROLLER_IMAGE")
 	data.Data["IgnoredNamespace"] = ignoredNamespaces
-	data.Data["MultusValidatingWebhookName"] = names.MULTUS_VALIDATING_WEBHOOK
+	data.Data["MultusValidatingWebhookName"] = names.MultusValidatingWebhook
 	data.Data["KubeRBACProxyImage"] = os.Getenv("KUBE_RBAC_PROXY_IMAGE")
 	data.Data["ExternalControlPlane"] = externalControlPlane
 	data.Data["Replicas"] = replicas

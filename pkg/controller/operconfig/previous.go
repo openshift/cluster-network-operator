@@ -21,7 +21,7 @@ import (
 // Returns nil with no error if no previous configuration was observed.
 func GetAppliedConfiguration(ctx context.Context, client crclient.Client, name string) (*operv1.NetworkSpec, error) {
 	cm := &corev1.ConfigMap{}
-	err := client.Get(ctx, types.NamespacedName{Namespace: names.APPLIED_NAMESPACE, Name: names.APPLIED_PREFIX + name}, cm)
+	err := client.Get(ctx, types.NamespacedName{Namespace: names.AppliedNamespace, Name: names.AppliedPrefix + name}, cm)
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil, nil
 	} else if err != nil {
@@ -49,8 +49,8 @@ func AppliedConfiguration(applied *operv1.Network) (*uns.Unstructured, error) {
 			Kind:       "ConfigMap",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: names.APPLIED_NAMESPACE,
-			Name:      names.APPLIED_PREFIX + applied.Name,
+			Namespace: names.AppliedNamespace,
+			Name:      names.AppliedPrefix + applied.Name,
 		},
 		Data: map[string]string{
 			"applied": string(app),

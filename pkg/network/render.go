@@ -424,11 +424,11 @@ func isClusterNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
 	// since we do not allow the clusterNetwork[] size to change, it should be safe to compare
 	// prev[i] to next[i] in this validation
 	for i, e := range prev.ClusterNetwork {
-		prevIp, prevMask, err := net.ParseCIDR(e.CIDR)
+		prevIP, prevMask, err := net.ParseCIDR(e.CIDR)
 		if err != nil {
 			return fmt.Errorf("error parsing CIDR from ClusterNetwork entry %s: %w", e.CIDR, err)
 		}
-		nextIp, nextMask, err := net.ParseCIDR(next.ClusterNetwork[i].CIDR)
+		nextIP, nextMask, err := net.ParseCIDR(next.ClusterNetwork[i].CIDR)
 		if err != nil {
 			return fmt.Errorf("error parsing CIDR from ClusterNetwork entry %s: %w", next.ClusterNetwork[i].CIDR, err)
 		}
@@ -440,7 +440,7 @@ func isClusterNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
 			return fmt.Errorf("modifying a clusterNetwork's hostPrefix value is unsupported")
 		}
 
-		if !prevIp.Equal(nextIp) {
+		if !prevIP.Equal(nextIP) {
 			return fmt.Errorf("modifying IP network value for clusterNetwork CIDR is unsupported")
 		}
 

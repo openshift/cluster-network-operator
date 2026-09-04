@@ -35,7 +35,7 @@ var cloudProviderConfig = types.NamespacedName{
 // If the configmap doesn't exist, it returns true (the feature is enabled by default).
 func isNetworkNodeIdentityEnabled(ctx context.Context, client cnoclient.Client) (bool, error) {
 	nodeIdentity := &corev1.ConfigMap{}
-	nodeIdentityLookup := types.NamespacedName{Name: "network-node-identity", Namespace: names.APPLIED_NAMESPACE}
+	nodeIdentityLookup := types.NamespacedName{Name: "network-node-identity", Namespace: names.AppliedNamespace}
 	if err := client.ClientFor("").CRClient().Get(ctx, nodeIdentityLookup, nodeIdentity); err != nil {
 		if apierrors.IsNotFound(err) {
 			return true, nil
@@ -86,8 +86,8 @@ func InfraStatus(ctx context.Context, client cnoclient.Client) (*bootstrap.Infra
 	// Allow overriding the "default" apiserver via the environment var APISERVER_OVERRIDE_HOST / _PORT
 	// This is used by Hypershift, since the cno connects to a "local" ServiceIP, but rendered manifests
 	// that run on a hosted cluster need to talk to the external URL
-	if h := os.Getenv(names.EnvApiOverrideHost); h != "" {
-		p := os.Getenv(names.EnvApiOverridePort)
+	if h := os.Getenv(names.EnvAPIOverrideHost); h != "" {
+		p := os.Getenv(names.EnvAPIOverridePort)
 		if p == "" {
 			p = "443"
 		}
