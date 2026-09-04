@@ -9,7 +9,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
-	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
@@ -70,7 +69,7 @@ func (r *ReconcileOperConfig) UpdateOperConfig(ctx context.Context, operConfig *
 
 // ClusterNetworkStatus generates the cluster config Status based on the operator
 // config.
-func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConfig *operv1.Network, bootstrapResult *bootstrap.BootstrapResult) (*uns.Unstructured, error) {
+func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConfig *operv1.Network) (*uns.Unstructured, error) {
 	// retrieve the existing cluster config object
 	clusterConfig := &configv1.Network{
 		TypeMeta:   metav1.TypeMeta{APIVersion: configv1.GroupVersion.String(), Kind: "Network"},

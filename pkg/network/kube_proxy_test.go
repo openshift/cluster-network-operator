@@ -367,7 +367,7 @@ func TestFillKubeProxyDefaults(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		fillKubeProxyDefaults(tc.in, nil)
+		fillKubeProxyDefaults(tc.in)
 		g.Expect(tc.in).To(Equal(tc.out))
 	}
 }
@@ -401,7 +401,7 @@ func TestRenderKubeProxy(t *testing.T) {
 		},
 	}
 
-	fillKubeProxyDefaults(c, nil)
+	fillKubeProxyDefaults(c)
 
 	objs, err := renderStandaloneKubeProxy(c, &FakeKubeProxyBootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())

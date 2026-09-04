@@ -54,7 +54,7 @@ func newNetworkOperatorCommand() *cobra.Command {
 		Use:   "network-operator",
 		Short: "Openshift Cluster Network Operator",
 		Long:  "Run the network operator",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(cmd *cobra.Command, _ []string) {
 			_ = cmd.Help()
 			os.Exit(1)
 		},
@@ -84,7 +84,7 @@ func newCommandWithTLSCustomization(cmdcfg *controllercmd.ControllerCommandConfi
 	cmd.Flags().StringVar(&inClusterClientName, "in-cluster-client-name", names.DefaultClusterName, "client name for in-cluster config(service account or kubeconfig)")
 
 	// Replace with custom Run that intercepts to customize TLS
-	cmd.Run = func(cmd *cobra.Command, args []string) {
+	cmd.Run = func(cmd *cobra.Command, _ []string) {
 		// Standard boilerplate from library-go
 		logs.InitLogs()
 

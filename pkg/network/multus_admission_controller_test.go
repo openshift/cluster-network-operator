@@ -65,14 +65,14 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	bootstrapResult := fakeBootstrapResult()
 
 	// disable MultusAdmissionController
-	objs, err := renderMultusAdmissionController(t.Context(), config, manifestDir, false, bootstrapResult, fakeClient, getDefaultFeatureGates())
+	objs, err := renderMultusAdmissionController(t.Context(), config, manifestDir, false, bootstrapResult, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 
 	// enable MultusAdmissionController
 	enabled := false
 	config.DisableMultiNetwork = &enabled
-	objs, err = renderMultusAdmissionController(t.Context(), config, manifestDir, false, bootstrapResult, fakeClient, getDefaultFeatureGates())
+	objs, err = renderMultusAdmissionController(t.Context(), config, manifestDir, false, bootstrapResult, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 
@@ -93,7 +93,7 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	testTLSArgRendering(t, "multus-admission-controller webhook", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
 		testBootstrap := *bootstrapResult
 		testBootstrap.TLSProfile = tlsProfile
-		objs, err := renderMultusAdmissionController(t.Context(), config, manifestDir, false, &testBootstrap, fakeClient, getDefaultFeatureGates())
+		objs, err := renderMultusAdmissionController(t.Context(), config, manifestDir, false, &testBootstrap, fakeClient)
 		g.Expect(err).NotTo(HaveOccurred())
 		return findMultusWebhookExec(t, objs)
 	})
@@ -105,7 +105,7 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
 			testBootstrap := *bootstrapResult
 			testBootstrap.TLSProfile = tlsProfile
-			objs, err := renderMultusAdmissionController(t.Context(), config, manifestDir, false, &testBootstrap, fakeClient, getDefaultFeatureGates())
+			objs, err := renderMultusAdmissionController(t.Context(), config, manifestDir, false, &testBootstrap, fakeClient)
 			g.Expect(err).NotTo(HaveOccurred())
 			deployment := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "multus-admission-controller")
 			container := mustFindContainer(t, deployment.Spec.Template.Spec.Containers, "kube-rbac-proxy")
@@ -174,7 +174,7 @@ func TestRenderMultusAdmissonControllerConfigForHyperShift(t *testing.T) {
 	hsc.ReleaseImage = "MyImage"
 	hsc.ControlPlaneImage = "MyCPOImage"
 
-	objs, err := renderMultusAdmissonControllerConfig(t.Context(), manifestDir, false, bootstrapResult, fakeClient, hsc, "", getDefaultFeatureGates())
+	objs, err := renderMultusAdmissonControllerConfig(t.Context(), manifestDir, false, bootstrapResult, fakeClient, hsc, "")
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Check rendered object
@@ -202,7 +202,7 @@ func TestRenderMultusAdmissonControllerConfigForHyperShift(t *testing.T) {
 	testTLSArgRendering(t, "multus-admission-controller webhook (HyperShift)", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
 		testBootstrap := *bootstrapResult
 		testBootstrap.TLSProfile = tlsProfile
-		objs, err := renderMultusAdmissonControllerConfig(t.Context(), manifestDir, false, &testBootstrap, fakeClient, hsc, "", getDefaultFeatureGates())
+		objs, err := renderMultusAdmissonControllerConfig(t.Context(), manifestDir, false, &testBootstrap, fakeClient, hsc, "")
 		g.Expect(err).NotTo(HaveOccurred())
 		return findMultusWebhookExec(t, objs)
 	})

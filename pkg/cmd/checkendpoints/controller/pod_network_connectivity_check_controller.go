@@ -66,7 +66,7 @@ func NewPodNetworkConnectivityCheckController(podName, podNamespace string,
 
 // Sync ensures that the status updaters for each PodNetworkConnectivityCheck is started
 // and then performs each check.
-func (c *controller) Sync(ctx context.Context, syncContext factory.SyncContext) error {
+func (c *controller) Sync(ctx context.Context, _ factory.SyncContext) error {
 	checkList, err := c.checkLister.List(labels.Everything())
 	if err != nil {
 		return err

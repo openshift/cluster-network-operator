@@ -29,7 +29,7 @@ import (
 
 // Add to the given Manager and start it when the Manager is started.
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, _ featuregates.FeatureGate) error {
-	reconciler := newReconciler(mgr, status, c)
+	reconciler := newReconciler(status, c)
 	if reconciler == nil {
 		return fmt.Errorf("failed to create reconciler")
 	}
@@ -38,7 +38,7 @@ func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.C
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) *ReconcileProxyConfig {
+func newReconciler(status *statusmanager.StatusManager, c cnoclient.Client) *ReconcileProxyConfig {
 	// Watch just the namespace that contains trusted-ca-bundle
 	cmInformer := v1coreinformers.NewConfigMapInformer(
 		c.Default().Kubernetes(),

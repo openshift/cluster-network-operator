@@ -28,7 +28,7 @@ func renderMultiNetworkpolicyConfig(manifestDir string) ([]*uns.Unstructured, er
 
 // isMultiNetworkpolicyChangeSafe is noop, but it would check if the proposed kube-proxy
 // change is safe.
-func isMultiNetworkpolicyChangeSafe(prev, next *operv1.NetworkSpec) []error {
+func isMultiNetworkpolicyChangeSafe(_, _ *operv1.NetworkSpec) []error {
 	// At present, all multiNetworkPolicy changes are safe to deploy
 	return nil
 }

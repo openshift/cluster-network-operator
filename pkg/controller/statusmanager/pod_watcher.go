@@ -116,7 +116,7 @@ func (s *StatusManager) AddPodWatcher(mgr manager.Manager) error {
 }
 
 // Reconcile triggers a re-update of Status.
-func (p *PodWatcher) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (p *PodWatcher) Reconcile(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(p.status.SetDegradedOnPanicAndCrash)
 	if p.status.isOVNKubernetes == nil {
 		val := p.status.isClusterRunningOVNKubernetes()
@@ -128,7 +128,7 @@ func (p *PodWatcher) Reconcile(ctx context.Context, request reconcile.Request) (
 
 // enqueueRP ensure we always have, at most, a single request in the queue.
 // by always enquing the same name, it will be coalesced
-func enqueueRP(ctx context.Context, obj crclient.Object) []reconcile.Request {
+func enqueueRP(_ context.Context, obj crclient.Object) []reconcile.Request {
 	klog.Infof("Operand %s %s/%s updated, re-generating status", obj.GetObjectKind().GroupVersionKind().String(), obj.GetNamespace(), obj.GetName())
 	return []reconcile.Request{
 		{

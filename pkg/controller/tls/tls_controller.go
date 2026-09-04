@@ -46,7 +46,7 @@ func Add(mgr manager.Manager, client cnoclient.Client, triggerRestart context.Ca
 	// Watch APIServer for TLS profile changes
 	err = c.Watch(source.Kind(mgr.GetCache(), &configv1.APIServer{}, &handler.TypedEnqueueRequestForObject[*configv1.APIServer]{},
 		predicate.TypedFuncs[*configv1.APIServer]{
-			CreateFunc: func(evt event.TypedCreateEvent[*configv1.APIServer]) bool {
+			CreateFunc: func(_ event.TypedCreateEvent[*configv1.APIServer]) bool {
 				// Don't reconcile on initial creation
 				return false
 			},
@@ -94,7 +94,7 @@ func Add(mgr manager.Manager, client cnoclient.Client, triggerRestart context.Ca
 
 		err = c.Watch(&source.Informer{
 			Informer: hostedControlPlaneInformer,
-			Handler: handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj crclient.Object) []reconcile.Request {
+			Handler: handler.EnqueueRequestsFromMapFunc(func(_ context.Context, _ crclient.Object) []reconcile.Request {
 				return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: "cluster"}}}
 			}),
 			Predicates: []predicate.TypedPredicate[crclient.Object]{
@@ -103,7 +103,7 @@ func Add(mgr manager.Manager, client cnoclient.Client, triggerRestart context.Ca
 					return obj.GetName() == hc.Name && obj.GetNamespace() == hc.Namespace
 				}),
 				predicate.Funcs{
-					CreateFunc: func(evt event.CreateEvent) bool {
+					CreateFunc: func(_ event.CreateEvent) bool {
 						// Don't reconcile on initial creation/add events
 						return false
 					},
@@ -139,7 +139,7 @@ func Add(mgr manager.Manager, client cnoclient.Client, triggerRestart context.Ca
 	return nil
 }
 
-func (r *ReconcileTLS) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileTLS) Reconcile(_ context.Context, _ reconcile.Request) (reconcile.Result, error) {
 	klog.Infof("TLS profile or adherence changed, triggering graceful operator restart")
 
 	r.triggerRestart()

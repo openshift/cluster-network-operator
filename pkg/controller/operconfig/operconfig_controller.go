@@ -518,7 +518,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// Update Network.config.openshift.io.Status
-	status, err := r.ClusterNetworkStatus(ctx, operConfig, bootstrapResult)
+	status, err := r.ClusterNetworkStatus(ctx, operConfig)
 	if err != nil {
 		log.Printf("Could not generate network status: %v", err)
 		r.status.MaybeSetDegraded(ctx, statusmanager.OperatorConfig, "StatusError",
@@ -562,7 +562,7 @@ func updateIPsecMetric(newOperConfigSpec *operv1.NetworkSpec) {
 	}
 }
 
-func reconcileOperConfig(ctx context.Context, obj crclient.Object) []reconcile.Request {
+func reconcileOperConfig(_ context.Context, obj crclient.Object) []reconcile.Request {
 	log.Printf("%s %s/%s changed, triggering operconf reconciliation", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
 	// Update reconcile.Request object to align with unnamespaced default network,
 	// to ensure we don't have multiple requeueing reconcilers running

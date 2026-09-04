@@ -80,7 +80,7 @@ func (s *StatusManager) AddMachineConfigWatchers(mgr manager.Manager) error {
 }
 
 // Reconcile triggers a re-update of Status.
-func (m *MachineConfigWatcher) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (m *MachineConfigWatcher) Reconcile(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(m.status.SetDegradedOnPanicAndCrash)
 	mcPools := &mcfgv1.MachineConfigPoolList{}
 	err := m.cache.List(ctx, mcPools)
@@ -92,7 +92,7 @@ func (m *MachineConfigWatcher) Reconcile(ctx context.Context, request reconcile.
 }
 
 // Reconcile triggers a re-update of Status.
-func (p *MachineConfigPoolWatcher) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (p *MachineConfigPoolWatcher) Reconcile(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(p.status.SetDegradedOnPanicAndCrash)
 	mcPools := &mcfgv1.MachineConfigPoolList{}
 	err := p.cache.List(ctx, mcPools)
