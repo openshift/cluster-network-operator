@@ -106,7 +106,7 @@ func (c *connectionChecker) Run(ctx context.Context) {
 		}
 	}()
 	go wait.UntilWithContext(ctx2, func(ctx context.Context) {
-		c.checkConnection(ctx2)
+		c.checkConnection(ctx)
 	}, checkPeriod)
 	klog.V(1).Infof("Started connectivity check %s.", c.name)
 	<-ctx2.Done()
@@ -120,7 +120,7 @@ func (c *connectionChecker) Stop(ctx context.Context) {
 
 // updateStatus applies updates. If an error occurs applying an update,
 // it remain on the queue and retried on the next call to updateStatus.
-func (c *connectionChecker) updateStatus(ctx context.Context, flush bool) {
+func (c *connectionChecker) updateStatus(ctx context.Context, _ bool) {
 	if err := c.updates.Process(ctx, false); err != nil {
 		klog.Warningf("Unable to update status of %s: %v", c.name, err)
 	}

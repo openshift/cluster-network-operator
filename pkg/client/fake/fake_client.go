@@ -160,6 +160,6 @@ func (fc *FakeClusterClient) HostPort() (string, string) {
 	return "testing", "9999"
 }
 
-func (fc *FakeClusterClient) AddCustomInformer(inf cache.SharedInformer) {
+func (fc *FakeClusterClient) AddCustomInformer(_ cache.SharedInformer) {
 	klog.Warningf("the fake Kubernetes client doesn't support informers!")
 }

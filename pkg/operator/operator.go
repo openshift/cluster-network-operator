@@ -67,7 +67,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	// initialize the controller-runtime environment
 	o.manager, err = manager.New(o.client.Default().Config(), manager.Options{
-		MapperProvider: func(cfg *rest.Config, httpClient *http.Client) (meta.RESTMapper, error) {
+		MapperProvider: func(_ *rest.Config, _ *http.Client) (meta.RESTMapper, error) {
 			return o.client.Default().RESTMapper(), nil
 		},
 		Metrics: metricsserver.Options{BindAddress: "0"},

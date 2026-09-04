@@ -268,14 +268,14 @@ func TestDecodePrivateKey(t *testing.T) {
 		},
 		{
 			name: "empty PEM data",
-			pemData: func(t *testing.T) []byte {
+			pemData: func(_ *testing.T) []byte {
 				return []byte{}
 			},
 			wantErr: true,
 		},
 		{
 			name: "unsupported PEM block type only",
-			pemData: func(t *testing.T) []byte {
+			pemData: func(_ *testing.T) []byte {
 				return pem.EncodeToMemory(&pem.Block{
 					Type:  "CERTIFICATE",
 					Bytes: []byte("not a key"),

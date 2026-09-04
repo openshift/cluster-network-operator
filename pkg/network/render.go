@@ -59,8 +59,7 @@ func Render(ctx context.Context, operConf *operv1.NetworkSpec, clusterConf *conf
 	objs = append(objs, o...)
 
 	// render MultusAdmissionController
-	o, err = renderMultusAdmissionController(ctx, operConf, manifestDir,
-		bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode, bootstrapResult, client, featureGates)
+	o, err = renderMultusAdmissionController(ctx, operConf, manifestDir, bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode, bootstrapResult, client)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -74,7 +73,7 @@ func Render(ctx context.Context, operConf *operv1.NetworkSpec, clusterConf *conf
 	objs = append(objs, o...)
 
 	// render default network
-	o, progressing, err = renderDefaultNetwork(operConf, bootstrapResult, manifestDir, client, featureGates)
+	o, progressing, err = renderDefaultNetwork(operConf, bootstrapResult, manifestDir, featureGates)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -125,7 +124,7 @@ func Render(ctx context.Context, operConf *operv1.NetworkSpec, clusterConf *conf
 	}
 	objs = append(objs, o...)
 
-	o, err = renderIPTablesAlerter(operConf, bootstrapResult, manifestDir)
+	o, err = renderIPTablesAlerter(bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -265,7 +264,7 @@ func FillDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 	}
 
 	fillDefaultNetworkDefaults(conf, previous, hostMTU)
-	fillKubeProxyDefaults(conf, previous)
+	fillKubeProxyDefaults(conf)
 }
 
 // IsChangeSafe checks to see if the change between prev and next are allowed
@@ -574,14 +573,14 @@ func validateMigration(conf *operv1.NetworkSpec) []error {
 // renderDefaultNetwork generates the manifests corresponding to the requested
 // default network
 func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string,
-	client cnoclient.Client, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, bool, error) {
+	featureGates featuregates.FeatureGate) ([]*uns.Unstructured, bool, error) {
 	dn := conf.DefaultNetwork
 	if errs := validateDefaultNetwork(conf); len(errs) > 0 {
 		return nil, false, fmt.Errorf("invalid Default Network configuration: %v", errs)
 	}
 
 	if dn.Type == operv1.NetworkTypeOVNKubernetes {
-		return renderOVNKubernetes(conf, bootstrapResult, manifestDir, client, featureGates)
+		return renderOVNKubernetes(conf, bootstrapResult, manifestDir, featureGates)
 	}
 
 	log.Printf("NOTICE: Unknown network type %s, ignoring", dn.Type)
@@ -683,14 +682,14 @@ func getMultusAdmissionControllerReplicas(bootstrapResult *bootstrap.BootstrapRe
 }
 
 // renderMultusAdmissionController generates the manifests of Multus Admission Controller
-func renderMultusAdmissionController(ctx context.Context, conf *operv1.NetworkSpec, manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, error) {
+func renderMultusAdmissionController(ctx context.Context, conf *operv1.NetworkSpec, manifestDir string, externalControlPlane bool,
+	bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client) ([]*uns.Unstructured, error) {
 	if *conf.DisableMultiNetwork {
 		return nil, nil
 	}
 
 	hsc := hypershift.NewHyperShiftConfig()
-	objs, err := renderMultusAdmissonControllerConfig(ctx, manifestDir, externalControlPlane,
-		bootstrapResult, client, hsc, names.ManagementClusterName, featureGates)
+	objs, err := renderMultusAdmissonControllerConfig(ctx, manifestDir, externalControlPlane, bootstrapResult, client, hsc, names.ManagementClusterName)
 	if err != nil {
 		return nil, err
 	}
@@ -778,7 +777,7 @@ func renderCNO(manifestDir string) ([]*uns.Unstructured, error) {
 }
 
 // renderIPTablesAlerter generates the manifests for the pod iptables usage alerter
-func renderIPTablesAlerter(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+func renderIPTablesAlerter(bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	if !bootstrapResult.IPTablesAlerter.Enabled {
 		return nil, nil
 	}

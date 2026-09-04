@@ -112,7 +112,7 @@ func validateKubeProxy(conf *operv1.NetworkSpec) []error {
 
 // fillKubeProxyDefaults inserts kube-proxy defaults, if kube-proxy will be deployed
 // explicitly.
-func fillKubeProxyDefaults(conf, previous *operv1.NetworkSpec) {
+func fillKubeProxyDefaults(conf *operv1.NetworkSpec) {
 	if conf.DeployKubeProxy == nil {
 		v := usesKubeProxy(conf)
 		conf.DeployKubeProxy = &v
@@ -144,7 +144,7 @@ func fillKubeProxyDefaults(conf, previous *operv1.NetworkSpec) {
 
 // isKubeProxyChangeSafe is noop, but it would check if the proposed kube-proxy
 // change is safe.
-func isKubeProxyChangeSafe(prev, next *operv1.NetworkSpec) []error {
+func isKubeProxyChangeSafe(_, _ *operv1.NetworkSpec) []error {
 	// At present, all kube-proxy changes are safe to deploy
 	return nil
 }

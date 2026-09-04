@@ -109,9 +109,8 @@ func TestRenderOVNKubernetes(t *testing.T) {
 		},
 	}
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
 
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-ovn-kubernetes", "ovnkube-control-plane")))
@@ -208,7 +207,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
 			testBootstrap := *bootstrapResult
 			testBootstrap.TLSProfile = tlsProfile
-			objs, _, err = renderOVNKubernetes(config, &testBootstrap, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err = renderOVNKubernetes(config, &testBootstrap, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			cm := mustFindRenderedObj[*v1.ConfigMap](t, objs, "ConfigMap", "ovnkube-script-lib")
@@ -233,7 +232,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 				Enabled: true,
 			}
 			testBootstrap.OVN.OVNKubernetesConfig = &ovnConfig
-			objs, _, err = renderOVNKubernetes(config, &testBootstrap, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err = renderOVNKubernetes(config, &testBootstrap, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			deployment := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "ovnkube-control-plane")
@@ -288,8 +287,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 		},
 	}
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	err = checkOVNKubernetesPostStart(objs)
@@ -310,7 +308,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 			},
 		},
 	}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	err = checkOVNKubernetesPostStart(objs)
@@ -1067,7 +1065,7 @@ logfile-maxage=0`,
 	g := NewGomegaWithT(t)
 
 	for i, tc := range testcases {
-		t.Run(fmt.Sprintf("%d:%s", i, tc.desc), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d:%s", i, tc.desc), func(_ *testing.T) {
 			OVNKubeConfig := OVNKubernetesConfig.DeepCopy()
 			if tc.hybridOverlayConfig != nil {
 				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = tc.hybridOverlayConfig
@@ -1134,15 +1132,14 @@ logfile-maxage=0`,
 			}
 
 			featureGatesCNO := featuregates.NewFeatureGate(enabled, disabled)
-			fakeClient := cnofake.NewFakeClient()
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 			confFile := extractOVNKubeConfig(g, objs)
 			msg := fmt.Sprintf("XXX TC Desc: %s\n\nXXX GOT: %s\n\nXXX Expected: %s\n", tc.desc, confFile, strings.TrimSpace(tc.expected))
 			g.Expect(confFile).To(Equal(strings.TrimSpace(tc.expected)), msg)
 			// check that the daemonset has the IP family mode annotations
 			ipFamilyMode := names.IPFamilySingleStack
-			g.Expect(checkDaemonsetAnnotation(g, objs, names.NetworkIPFamilyModeAnnotation, ipFamilyMode)).To(BeTrue())
+			g.Expect(checkDaemonsetAnnotation(objs, names.NetworkIPFamilyModeAnnotation, ipFamilyMode)).To(BeTrue())
 		})
 	}
 
@@ -2319,8 +2316,7 @@ status:
 				PrePullerUpdateStatus: prepullerStatus,
 			}
 			featureGatesCNO := getDefaultFeatureGates()
-			fakeClient := cnofake.NewFakeClient()
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
@@ -2627,8 +2623,7 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 
 	// At the 1st pass, ensure IPsec MachineConfigs are not rolled out until MCO is ready.
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2658,7 +2653,7 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 
 	// At the 2nd pass, ensure IPsec MachineConfigs are rolled out when MCO is ready.
 	bootstrapResult.Infra.MachineConfigClusterOperatorReady = true
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2692,7 +2687,7 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].OwnerReferences = networkOwnerRef()
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2726,7 +2721,7 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2760,7 +2755,7 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2855,11 +2850,10 @@ func TestRenderOVNKubernetesEnableIPsecForHostedControlPlane(t *testing.T) {
 	}
 
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
 	// Set is as Hypershift hosted control plane.
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.HostedControlPlane = &hypershift.HostedControlPlane{}
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2969,9 +2963,8 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
 
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3073,9 +3066,9 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 
 	// Upgrade starts and it's going to rollout IPsec Machine Configs without making any changes into existing IPsec configs.
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
+
 	// Now it's going to rollout IPsec Machine Configs.
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3123,7 +3116,7 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3226,9 +3219,9 @@ func TestRenderOVNKubernetesIPsecUpgradeWithHypershiftHostedCluster(t *testing.T
 	bootstrapResult.Infra.HostedControlPlane = &hypershift.HostedControlPlane{}
 	// Upgrade starts and it's going to get only ovn-ipsec-containerized DS.
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
+
 	// Now it must get IPsec containerized daemonset without MachineConfigs.
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3327,7 +3320,6 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 	}
 	featureGatesCNO := getDefaultFeatureGates()
 
-	fakeClient := cnofake.NewFakeClient()
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MachineConfigClusterOperatorReady = true
 	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
@@ -3340,7 +3332,7 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3376,7 +3368,7 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 
 	// Ensure renderOVNKubernetes removes MachineConfigs and IPsec daemonset.
 	bootstrapResult.OVN.IPsecUpdateStatus.IsOVNIPsecActiveOrRollingOut = false
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3413,7 +3405,7 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3446,7 +3438,7 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 	bootstrapResult.OVN.IPsecUpdateStatus.IsOVNIPsecActiveOrRollingOut = false
 	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3540,7 +3532,6 @@ func TestRenderOVNKubernetesEnableIPsecWithUserInstalledIPsecMachineConfigs(t *t
 
 	featureGatesCNO := getDefaultFeatureGates()
 
-	fakeClient := cnofake.NewFakeClient()
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
@@ -3554,7 +3545,7 @@ func TestRenderOVNKubernetesEnableIPsecWithUserInstalledIPsecMachineConfigs(t *t
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 0, UpdatedMachineCount: 0,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3590,7 +3581,7 @@ func TestRenderOVNKubernetesEnableIPsecWithUserInstalledIPsecMachineConfigs(t *t
 	bootstrapResult.Infra.MasterMCPStatuses[0].UpdatedMachineCount = 1
 	bootstrapResult.Infra.WorkerMCPStatuses[0].ReadyMachineCount = 1
 	bootstrapResult.Infra.WorkerMCPStatuses[0].UpdatedMachineCount = 1
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3687,7 +3678,6 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 	}
 	featureGatesCNO := getDefaultFeatureGates()
 
-	fakeClient := cnofake.NewFakeClient()
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
@@ -3699,7 +3689,7 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3735,7 +3725,7 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 
 	// Ensure renderOVNKubernetes removes IPsec daemonset.
 	bootstrapResult.OVN.IPsecUpdateStatus.IsOVNIPsecActiveOrRollingOut = false
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3830,8 +3820,7 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 
 	// the new rendered config should hold the node to do the dualstack conversion
 	// the upgrade code holds the controlPlanes to update the nodes first
-	fakeClient := cnofake.NewFakeClient()
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3925,8 +3914,7 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 				FlowsConfig: tc.FlowsConfig,
 			}
 			featureGatesCNO := getDefaultFeatureGates()
-			fakeClient := cnofake.NewFakeClient()
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).ToNot(HaveOccurred())
 			nodeDS := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 			ds := appsv1.DaemonSet{}
@@ -4082,9 +4070,8 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 			apifeatures.FeatureGateNetworkConnect,
 		},
 	)
-	fakeClient := cnofake.NewFakeClient()
 
-	objs, progressing, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, progressing, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(progressing).To(BeFalse())
 
@@ -4170,11 +4157,11 @@ func TestRenderOVNKubernetesFlags(t *testing.T) {
 			}
 
 			featureGatesCNO := getDefaultFeatureGates()
-			fakeClient := cnofake.NewFakeClient()
+
 			// Set is as Hypershift hosted control plane.
 			bootstrapResult.Infra = bootstrap.InfraStatus{}
 			bootstrapResult.Infra.HostedControlPlane = &hypershift.HostedControlPlane{}
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			var configMap *uns.Unstructured
@@ -4251,7 +4238,7 @@ type fakeClientReader struct {
 	configMap *v1.ConfigMap
 }
 
-func (f *fakeClientReader) Get(_ context.Context, _ crclient.ObjectKey, obj crclient.Object, opts ...crclient.GetOption) error {
+func (f *fakeClientReader) Get(_ context.Context, _ crclient.ObjectKey, obj crclient.Object, _ ...crclient.GetOption) error {
 	if cmPtr, ok := obj.(*v1.ConfigMap); !ok {
 		return fmt.Errorf("expecting *v1.ConfigMap, got %T", obj)
 	} else if f.configMap == nil {
@@ -4313,7 +4300,7 @@ func extractOVNScriptLib(g *WithT, objs []*uns.Unstructured) string {
 
 // checkDaemonsetAnnotation check that all the daemonset have the annotation with the
 // same key and value
-func checkDaemonsetAnnotation(g *WithT, objs []*uns.Unstructured, key, value string) bool {
+func checkDaemonsetAnnotation(objs []*uns.Unstructured, key, value string) bool {
 	if key == "" || value == "" {
 		return false
 	}
@@ -4506,7 +4493,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, _, err := renderOVNKubernetes(tt.args.conf(), tt.args.bootstrapResult(), tt.args.manifestDir, tt.args.client, tt.args.featureGates())
+			got, _, err := renderOVNKubernetes(tt.args.conf(), tt.args.bootstrapResult(), tt.args.manifestDir, tt.args.featureGates())
 			if !reflect.DeepEqual(tt.expectErr, err) {
 				t.Errorf("renderOVNKubernetes() err = %v, want %v", err, tt.expectErr)
 			}
@@ -4540,19 +4527,18 @@ func TestRenderOVNKubernetes_AdvertisedUDNIsolationModeOverride(t *testing.T) {
 			},
 		}
 		featureGatesCNO := getDefaultFeatureGates()
-		fakeClient := cnofake.NewFakeClient()
 
-		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 		g.Expect(err).NotTo(HaveOccurred())
 		return extractOVNScriptLib(g, objs)
 	}
 
-	t.Run("with advertised-udn-isolation-mode override", func(t *testing.T) {
+	t.Run("with advertised-udn-isolation-mode override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"advertised-udn-isolation-mode": "loose"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--advertised-udn-isolation-mode=loose"`))
 	})
 
-	t.Run("without advertised-udn-isolation-mode override", func(t *testing.T) {
+	t.Run("without advertised-udn-isolation-mode override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(nil)
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--advertised-udn-isolation-mode="`))
 	})
@@ -4583,24 +4569,23 @@ func TestRenderOVNKubernetes_OpenFlowProbeOverride(t *testing.T) {
 			},
 		}
 		featureGatesCNO := getDefaultFeatureGates()
-		fakeClient := cnofake.NewFakeClient()
 
-		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 		g.Expect(err).NotTo(HaveOccurred())
 		return extractOVNScriptLib(g, objs)
 	}
 
-	t.Run("with openflow-probe override", func(t *testing.T) {
+	t.Run("with openflow-probe override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"openflow-probe": "60"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--openflow-probe=60"`))
 	})
 
-	t.Run("without openflow-probe override", func(t *testing.T) {
+	t.Run("without openflow-probe override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(nil)
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--openflow-probe="`))
 	})
 
-	t.Run("with invalid openflow-probe override", func(t *testing.T) {
+	t.Run("with invalid openflow-probe override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"openflow-probe": "-60"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--openflow-probe="`))
 	})
@@ -4632,9 +4617,8 @@ func TestRenderOVNKubernetes_NodeDaemonSetEnvOverridesVolume(t *testing.T) {
 		},
 	}
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
 
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	nodeDS := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
@@ -4697,14 +4681,13 @@ func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
 			},
 		}
 		featureGatesCNO := getDefaultFeatureGates()
-		fakeClient := cnofake.NewFakeClient()
 
-		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 		g.Expect(err).NotTo(HaveOccurred())
 		return extractOVNScriptLib(g, objs)
 	}
 
-	t.Run("with allow-icmp-network-policy override", func(t *testing.T) {
+	t.Run("with allow-icmp-network-policy override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"allow-icmp-network-policy": "true"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
   if [[ "true" != "" ]]; then
@@ -4712,7 +4695,7 @@ func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
   fi`))
 	})
 
-	t.Run("without allow-icmp-network-policy override", func(t *testing.T) {
+	t.Run("without allow-icmp-network-policy override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(nil)
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
   if [[ "" != "" ]]; then
@@ -4720,7 +4703,7 @@ func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
   fi`))
 	})
 
-	t.Run("with invalid allow-icmp-network-policy override", func(t *testing.T) {
+	t.Run("with invalid allow-icmp-network-policy override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"allow-icmp-network-policy": "-60"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
   if [[ "" != "" ]]; then
@@ -4931,7 +4914,7 @@ func TestRenderOVNKubernetesNoOverlay(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(_ *testing.T) {
 			crd := OVNKubernetesConfig.DeepCopy()
 			config := &crd.Spec
 			config.DefaultNetwork.OVNKubernetesConfig.MTU = new(uint32(1500))
@@ -4962,8 +4945,7 @@ func TestRenderOVNKubernetesNoOverlay(t *testing.T) {
 				},
 			}
 
-			fakeClient := cnofake.NewFakeClient()
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, tc.featureGates())
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, tc.featureGates())
 
 			if tc.expectErr {
 				g.Expect(err).To(HaveOccurred())
@@ -5113,8 +5095,7 @@ func TestDpuLeaseConfig(t *testing.T) {
 			}
 
 			featureGatesCNO := getDefaultFeatureGates()
-			fakeClient := cnofake.NewFakeClient()
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			envVars := extractDaemonSetEnvVars(g, objs, "ovnkube-node-dpu-host", "ovnkube-controller")
@@ -5135,7 +5116,7 @@ func TestDpuLeaseConfig(t *testing.T) {
 func TestFillOVNKubernetesDefaultsMTUNoOverlay(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	t.Run("no-overlay mode sets MTU to hostMTU (no overhead subtraction)", func(t *testing.T) {
+	t.Run("no-overlay mode sets MTU to hostMTU (no overhead subtraction)", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
@@ -5148,7 +5129,7 @@ func TestFillOVNKubernetesDefaultsMTUNoOverlay(t *testing.T) {
 		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(uint32(hostMTU)))
 	})
 
-	t.Run("Geneve mode subtracts encapsulation overhead from hostMTU", func(t *testing.T) {
+	t.Run("Geneve mode subtracts encapsulation overhead from hostMTU", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionGeneve
@@ -5162,7 +5143,7 @@ func TestFillOVNKubernetesDefaultsMTUNoOverlay(t *testing.T) {
 		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(uint32(hostMTU - 100)))
 	})
 
-	t.Run("empty transport (defaults to Geneve) subtracts overhead", func(t *testing.T) {
+	t.Run("empty transport (defaults to Geneve) subtracts overhead", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = "" // empty
@@ -5176,7 +5157,7 @@ func TestFillOVNKubernetesDefaultsMTUNoOverlay(t *testing.T) {
 		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(uint32(hostMTU - 100)))
 	})
 
-	t.Run("previous MTU is preserved also in no-overlay mode", func(t *testing.T) {
+	t.Run("previous MTU is preserved also in no-overlay mode", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
@@ -5198,7 +5179,7 @@ func TestFillOVNKubernetesDefaultsMTUNoOverlay(t *testing.T) {
 func TestValidateMTUForNoOverlay(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	t.Run("valid MTU equal to hostMTU", func(t *testing.T) {
+	t.Run("valid MTU equal to hostMTU", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		mtu := uint32(9000)
@@ -5209,7 +5190,7 @@ func TestValidateMTUForNoOverlay(t *testing.T) {
 		g.Expect(err).To(BeNil())
 	})
 
-	t.Run("valid MTU less than hostMTU", func(t *testing.T) {
+	t.Run("valid MTU less than hostMTU", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		mtu := uint32(1500)
@@ -5220,7 +5201,7 @@ func TestValidateMTUForNoOverlay(t *testing.T) {
 		g.Expect(err).To(BeNil())
 	})
 
-	t.Run("invalid MTU greater than hostMTU", func(t *testing.T) {
+	t.Run("invalid MTU greater than hostMTU", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		mtu := uint32(9001)
@@ -5232,7 +5213,7 @@ func TestValidateMTUForNoOverlay(t *testing.T) {
 		g.Expect(err.Error()).To(ContainSubstring("cannot exceed host MTU"))
 	})
 
-	t.Run("hostMTU of 0 skips validation", func(t *testing.T) {
+	t.Run("hostMTU of 0 skips validation", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		mtu := uint32(1500)

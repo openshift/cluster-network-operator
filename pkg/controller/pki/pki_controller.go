@@ -51,7 +51,7 @@ func SetPKIProfileProvider(p pki.PKIProfileProvider) {
 }
 
 // Add attaches our control loop to the manager and watches for PKI objects
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, client cnoclient.Client, featureGates featuregates.FeatureGate) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client, featureGates featuregates.FeatureGate) error {
 	r, err := newPKIReconciler(mgr, status, featureGates, pkiProvider)
 	if err != nil {
 		return err
@@ -149,7 +149,7 @@ func (r *PKIReconciler) Reconcile(ctx context.Context, request reconcile.Request
 		}
 	}
 	if existing == nil {
-		existing, err = newPKI(obj, r.clientset, r.mgr, r.certDuration, r.pkiProfileProvider)
+		existing, err = newPKI(obj, r.clientset, r.certDuration, r.pkiProfileProvider)
 		if err != nil {
 			log.Println(err)
 			r.pkiErrs[request.NamespacedName] =
@@ -197,7 +197,7 @@ type operatorPKI struct {
 }
 
 // newPKI creates a CertRotationController for the supplied configuration
-func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr manager.Manager, certDuration time.Duration, pkiProfileProvider pki.PKIProfileProvider) (*operatorPKI, error) {
+func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, certDuration time.Duration, pkiProfileProvider pki.PKIProfileProvider) (*operatorPKI, error) {
 	spec := config.Spec
 
 	// Ugly: the existing cache + informers used as part of the controller-manager

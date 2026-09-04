@@ -113,7 +113,7 @@ type ReconcileDashboard struct {
 	status *statusmanager.StatusManager
 }
 
-func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileDashboard) Reconcile(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
 	klog.Info("Reconcile dashboards")
 
 	// Fetch the Network.operator.openshift.io instance to get Network Type

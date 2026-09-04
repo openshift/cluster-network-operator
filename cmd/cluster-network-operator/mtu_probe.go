@@ -36,7 +36,7 @@ func newMTUProberCommand() *cobra.Command {
 	flags.StringVar(&namespace, "namespace", "", "the namespace in which to write the config map")
 	flags.StringVar(&name, "name", "", "the name of the ConfigMap to create")
 
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+	cmd.RunE = func(_ *cobra.Command, _ []string) error {
 		if namespace == "" || name == "" {
 			return fmt.Errorf("--namespace and --name are required")
 		}

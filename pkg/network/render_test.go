@@ -639,7 +639,7 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 func Test_renderFRRRoutingCapabilities(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	getRenderedObjs := func(t *testing.T, tlsProfile bootstrap.TLSProfile) []*unstructured.Unstructured {
+	getRenderedObjs := func(_ *testing.T, tlsProfile bootstrap.TLSProfile) []*unstructured.Unstructured {
 		testBootstrap := fakeBootstrapResult()
 		testBootstrap.TLSProfile = tlsProfile
 		objs, err := renderAdditionalRoutingCapabilities(&operv1.NetworkSpec{

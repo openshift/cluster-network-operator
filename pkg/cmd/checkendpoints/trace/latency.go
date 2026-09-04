@@ -19,7 +19,7 @@ func (r *LatencyInfo) dnsStart() {
 	r.DNSStart = time.Now()
 }
 
-func (r *LatencyInfo) connectStart(addr string) {
+func (r *LatencyInfo) connectStart() {
 	if r.ConnectStart.IsZero() {
 		r.ConnectStart = time.Now()
 	}
@@ -29,7 +29,7 @@ func (r *LatencyInfo) dnsDone() {
 	r.DNS = time.Since(r.DNSStart)
 }
 
-func (r *LatencyInfo) connectDone(addr string) {
+func (r *LatencyInfo) connectDone() {
 	r.Connect = time.Since(r.ConnectStart)
 }
 
@@ -45,11 +45,11 @@ func WithLatencyInfoCapture(ctx context.Context) (context.Context, *LatencyInfo)
 			klog.V(5).Infof("DNSDone: %v\n", info)
 		},
 		ConnectStart: func(network, addr string) {
-			trace.connectStart(addr)
+			trace.connectStart()
 			klog.V(5).Infof("ConnectStart: %s %s\n", network, addr)
 		},
 		ConnectDone: func(network, addr string, err error) {
-			trace.connectDone(addr)
+			trace.connectDone()
 			klog.V(5).Infof("ConnectDone: %s,%s,%v\n", network, addr, err)
 		},
 	}), trace

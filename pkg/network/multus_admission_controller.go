@@ -21,7 +21,6 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 
-	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
@@ -55,7 +54,7 @@ func getOpenshiftNamespaces(ctx context.Context, client cnoclient.Client) (strin
 }
 
 // renderMultusAdmissonControllerConfig returns the manifests of Multus Admisson Controller
-func renderMultusAdmissonControllerConfig(ctx context.Context, manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client, hsc *hypershift.HyperShiftConfig, clientName string, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, error) {
+func renderMultusAdmissonControllerConfig(ctx context.Context, manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client, hsc *hypershift.HyperShiftConfig, clientName string) ([]*uns.Unstructured, error) {
 	var err error
 
 	replicas := getMultusAdmissionControllerReplicas(bootstrapResult, hsc.Enabled)
