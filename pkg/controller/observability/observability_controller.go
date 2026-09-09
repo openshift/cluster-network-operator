@@ -32,7 +32,7 @@ import (
 const (
 	OperatorYAML         = "bindata/observability/07-observability-operator.yaml"
 	FlowCollectorYAML    = "bindata/observability/08-flowcollector.yaml"
-	OperatorNamespace    = "netobserv-operator"
+	OperatorNamespace    = "openshift-netobserv-operator"
 	FlowCollectorVersion = "v1beta2"
 	FlowCollectorName    = "cluster"
 	NetworkCRName        = "cluster"
