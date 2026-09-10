@@ -17,6 +17,7 @@ data:
     transport="{{.DefaultNetworkTransport}}"
     {{- end }}
     encap-port="{{.GenevePort}}"
+    inactivity-probe=0
     enable-lflow-cache=true
     lflow-cache-limit-kb=1048576
     enable-udp-aggregation={{.EnableUDPAggregation}}
