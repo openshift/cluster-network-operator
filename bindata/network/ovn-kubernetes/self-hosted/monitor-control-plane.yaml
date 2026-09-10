@@ -24,6 +24,7 @@ spec:
   selector:
     matchLabels:
       app: ovnkube-control-plane
+  serviceDiscoveryRole: EndpointSlice
 ---
 apiVersion: v1
 kind: Service

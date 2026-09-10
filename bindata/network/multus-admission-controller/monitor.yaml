@@ -58,6 +58,7 @@ spec:
   selector:
     matchLabels:
       app: multus-admission-controller
+  serviceDiscoveryRole: EndpointSlice
 {{- if not .HyperShiftEnabled}}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -72,6 +73,14 @@ rules:
   - services
   - endpoints
   - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
   verbs:
   - get
   - list
