@@ -57,7 +57,6 @@ func NewMetricsContext(componentName, checkName string) *metricsContext {
 		componentName: componentName,
 		checkName:     checkName,
 	}
-
 }
 
 // Update the pod network connectivity check metrics for the given check results.

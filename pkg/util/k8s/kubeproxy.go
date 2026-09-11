@@ -327,5 +327,4 @@ func (ka *kpcArgs) getFeatureGates(key string) map[string]bool {
 		return nil
 	}
 	return fgMap
-
 }

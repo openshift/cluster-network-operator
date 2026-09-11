@@ -138,7 +138,6 @@ func fillKubeProxyDefaults(conf *operv1.NetworkSpec) {
 		} else {
 			conf.KubeProxyConfig.BindAddress = "::"
 		}
-
 	}
 }
 

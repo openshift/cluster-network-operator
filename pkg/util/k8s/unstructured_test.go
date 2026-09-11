@@ -117,7 +117,6 @@ spec:
 }
 
 func TestUpdate(t *testing.T) {
-
 	specs := []string{
 		`
 kind: DaemonSet

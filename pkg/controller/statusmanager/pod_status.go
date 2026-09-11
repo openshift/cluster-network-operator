@@ -368,7 +368,6 @@ func (status *StatusManager) setLastPodState(ctx context.Context,
 	deps map[ClusteredName]deploymentState,
 	sss map[ClusteredName]statefulsetState,
 	installComplete bool) error {
-
 	ps := podState{
 		DaemonsetStates:   make([]daemonsetState, 0, len(dss)),
 		DeploymentStates:  make([]deploymentState, 0, len(deps)),

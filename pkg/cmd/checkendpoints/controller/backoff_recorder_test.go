@@ -11,7 +11,6 @@ import (
 )
 
 func TestWithShortWindow(t *testing.T) {
-
 	shortDuration := 20 * time.Millisecond
 	shortCountMax := 3
 	longDuration := 2 * shortDuration
@@ -50,11 +49,9 @@ func TestWithShortWindow(t *testing.T) {
 			prev = event.LastTimestamp
 		}
 	}
-
 }
 
 func TestWithLongWindow(t *testing.T) {
-
 	shortDuration := 20 * time.Millisecond
 	shortCountMax := 3
 	longDuration := 5 * shortDuration
@@ -105,5 +102,4 @@ func TestWithLongWindow(t *testing.T) {
 			prev = event.LastTimestamp
 		}
 	}
-
 }

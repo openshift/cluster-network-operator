@@ -10,7 +10,6 @@ import (
 )
 
 func TestSetPodNetworkConnectivityCheckCondition(t *testing.T) {
-
 	testCases := []struct {
 		conditions         []v1alpha1.PodNetworkConnectivityCheckCondition
 		condition          v1alpha1.PodNetworkConnectivityCheckCondition

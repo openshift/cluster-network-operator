@@ -1,9 +1,10 @@
 package ip
 
 import (
-	configv1 "github.com/openshift/api/config/v1"
 	"net"
 	"testing"
+
+	configv1 "github.com/openshift/api/config/v1"
 
 	. "github.com/onsi/gomega"
 )
@@ -91,7 +92,6 @@ func TestNetsOverlap(t *testing.T) {
 		g.Expect(err).NotTo(HaveOccurred())
 
 		g.Expect(NetsOverlap(*c1, *c2)).To(Equal(tc.expected))
-
 	}
 }
 

@@ -1144,7 +1144,6 @@ logfile-maxage=0`,
 			g.Expect(checkDaemonsetAnnotation(objs, names.NetworkIPFamilyModeAnnotation, ipFamilyMode)).To(BeTrue())
 		})
 	}
-
 }
 
 func checkOVNKubernetesPostStart(objects []*uns.Unstructured) error {
@@ -1164,7 +1163,6 @@ func checkOVNKubernetesPostStart(objects []*uns.Unstructured) error {
 	var ovnkubeNode *uns.Unstructured
 	for _, obj := range objects {
 		if obj.GetKind() == "DaemonSet" && obj.GetNamespace() == "openshift-ovn-kubernetes" && obj.GetName() == "ovnkube-node" {
-
 			ovnkubeNode = obj
 		}
 	}
@@ -1248,7 +1246,6 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 	fillOVNKubernetesDefaults(conf, nil, 9000)
 
 	g.Expect(conf).To(Equal(&expected))
-
 }
 
 func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
@@ -1290,8 +1287,8 @@ func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
 	fillOVNKubernetesDefaults(conf, conf, 9000)
 
 	g.Expect(conf).To(Equal(&expected))
-
 }
+
 func TestValidateOVNKubernetes(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -1663,7 +1660,6 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 
 // TestOVNKubernetesShouldUpdateMasterOnUpgrade checks to see that
 func TestOVNKubernetestShouldUpdateMasterOnUpgrade(t *testing.T) {
-
 	for idx, tc := range []struct {
 		expectNode         bool // true if node changed
 		expectControlPlane bool // true if master changed
@@ -2352,7 +2348,6 @@ status:
 }
 
 func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
-
 	for _, tc := range []struct {
 		name               string
 		node               *appsv1.DaemonSet
@@ -2533,7 +2528,6 @@ func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
 			ipFamilyMode:       names.IPFamilyDualStack,
 		},
 	} {
-
 		t.Run(tc.name, func(t *testing.T) {
 			controlPlaneStatus := &bootstrap.OVNUpdateStatus{}
 			nodeStatus := &bootstrap.OVNUpdateStatus{}
@@ -2555,10 +2549,8 @@ func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
 			if updateControlPlane != tc.expectControlPlane {
 				t.Errorf("Expected node update: %v received %v", tc.expectNode, updateNode)
 			}
-
 		})
 	}
-
 }
 
 func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
@@ -4209,7 +4201,6 @@ func TestRenderOVNKubernetesFlags(t *testing.T) {
 					ContainSubstring(fmt.Sprintf("--egressip-reachability-total-timeout %d", *tc.reachabilityTimeout)),
 					"ovnkube-node pod template should contain the configured reachability timeout value",
 				)
-
 			} else {
 				g.Expect(scriptCP).NotTo(
 					ContainSubstring("--egressip-reachability-total-timeout"),
@@ -4311,7 +4302,6 @@ func checkDaemonsetAnnotation(objs []*uns.Unstructured, key, value string) bool 
 		if obj.GetAPIVersion() == "apps/v1" &&
 			(obj.GetName() == "ovnkube-control-plane" && obj.GetKind() == "Deployment" ||
 				obj.GetName() == "ovnkube-node" && obj.GetKind() == "DaemonSet") {
-
 			// check daemonset annotation
 			anno := obj.GetAnnotations()
 			if anno == nil {

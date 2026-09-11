@@ -90,7 +90,6 @@ func set(t *testing.T, client cnoclient.Client, obj crclient.Object) {
 	err := client.ClientFor("").CRClient().Update(t.Context(), obj)
 	if apierrors.IsNotFound(err) {
 		err = client.ClientFor("").CRClient().Create(t.Context(), obj)
-
 	}
 	if err != nil {
 		t.Fatalf("Failed to set: %v", err)
@@ -2722,7 +2721,6 @@ func TestStatusManagerSetFromDeploymentsWithExcluded(t *testing.T) {
 	if len(co.Status.Versions) != 1 {
 		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
-
 }
 
 func networkOwnerRef() []metav1.OwnerReference {

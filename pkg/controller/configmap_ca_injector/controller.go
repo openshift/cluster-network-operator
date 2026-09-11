@@ -153,7 +153,6 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 			r.status.SetDegraded(ctx, statusmanager.InjectorConfig, "ListConfigMapError",
 				fmt.Sprintf("Error getting the list of affected configmaps: %v", err))
 			return reconcile.Result{}, err
-
 		}
 		configMapsToChange = cms
 		log.Printf("%s changed, updating %d configMaps", names.TrustedCABundleConfigMapName, len(configMapsToChange))
