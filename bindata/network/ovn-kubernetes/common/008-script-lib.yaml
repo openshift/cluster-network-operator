@@ -352,12 +352,10 @@ data:
     # of options in NB_Globals to configure OVN global settings
     nbdb-post-start()
     {
-      local northd_probe_interval=${1:-10000}
-
       rm -f ${nbdb_pidfile}
 
-      # set inactivity probe
-      if ! retry 60 "inactivity-probe" "ovn-nbctl -t 5 --inactivity-probe={{.OVN_NB_INACTIVITY_PROBE}} set-connection punix:${nbdb_sock}"; then
+      # Local Unix socket connections report peer closure without inactivity probes.
+      if ! retry 60 "inactivity-probe" "ovn-nbctl -t 5 --inactivity-probe=0 set-connection punix:${nbdb_sock}"; then
         exit 1
       fi
 
@@ -365,9 +363,8 @@ data:
       echo "Setting the IC zone to ${K8S_NODE}"
       IC_OPTION="name=\"${K8S_NODE}\" options:name=\"${K8S_NODE}\""
 
-      # northd probe interval
-      echo "Setting northd probe interval to ${northd_probe_interval} ms"
-      NORTHD_PROBE_OPTION="options:northd_probe_interval=${northd_probe_interval}"
+      # northd connects to both local databases over Unix sockets.
+      NORTHD_PROBE_OPTION="options:northd_probe_interval=0"
 
       # let northd sleep so it takes less CPU
       NORTHD_SLEEP_OPTION="options:northd-backoff-interval-ms={{.OVN_NORTHD_BACKOFF_MS}}"
@@ -473,8 +470,8 @@ data:
     {
       rm -f ${sbdb_pidfile}
 
-      # set inactivity probe
-      if ! retry 60 "inactivity-probe" "ovn-sbctl -t 5 --inactivity-probe={{.OVN_CONTROLLER_INACTIVITY_PROBE}} set-connection punix:${sbdb_sock}"; then
+      # Local Unix socket connections report peer closure without inactivity probes.
+      if ! retry 60 "inactivity-probe" "ovn-sbctl -t 5 --inactivity-probe=0 set-connection punix:${sbdb_sock}"; then
         exit 1
       fi
     }
@@ -735,7 +732,6 @@ data:
         --config-file=/run/ovnkube-config/ovnkube.conf \
         --ovn-empty-lb-events \
         --loglevel "${log_level}" \
-        --inactivity-probe="${OVN_CONTROLLER_INACTIVITY_PROBE}" \
         ${gateway_mode_flags} \
         ${node_mgmt_port_netdev_flags} \
         ${ovnkube_node_mode} \

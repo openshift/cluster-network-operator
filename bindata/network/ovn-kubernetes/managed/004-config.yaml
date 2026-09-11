@@ -14,6 +14,7 @@ data:
     {{- end }}
     cluster-subnets="{{.OVN_cidr}}"
     encap-port="{{.GenevePort}}"
+    inactivity-probe=0
     enable-lflow-cache=true
     lflow-cache-limit-kb=1048576
     enable-udp-aggregation={{.EnableUDPAggregation}}
@@ -99,6 +100,7 @@ data:
     {{- end }}
     cluster-subnets="{{.OVN_cidr}}"
     encap-port="{{.GenevePort}}"
+    inactivity-probe=0
     enable-lflow-cache=true
     lflow-cache-limit-kb=1048576
     udn-allowed-default-services="default/kubernetes,openshift-dns/dns-default"

@@ -242,18 +242,6 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["MgmtPortResourceCount"] = strconv.FormatInt(bootstrapResult.OVN.OVNKubernetesConfig.MgmtPortResourceCount, 10)
 	data.Data["DpuNodeLeaseRenewInterval"] = strconv.Itoa(bootstrapResult.OVN.OVNKubernetesConfig.DpuNodeLeaseRenewInterval)
 	data.Data["DpuNodeLeaseDuration"] = strconv.Itoa(bootstrapResult.OVN.OVNKubernetesConfig.DpuNodeLeaseDuration)
-	data.Data["OVN_CONTROLLER_INACTIVITY_PROBE"] = os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
-	controller_inactivity_probe := os.Getenv("OVN_CONTROLLER_INACTIVITY_PROBE")
-	if len(controller_inactivity_probe) == 0 {
-		controller_inactivity_probe = "180000"
-		klog.Infof("OVN_CONTROLLER_INACTIVITY_PROBE env var is not defined. Using: %s", controller_inactivity_probe)
-	}
-	data.Data["OVN_CONTROLLER_INACTIVITY_PROBE"] = controller_inactivity_probe
-	nb_inactivity_probe := os.Getenv("OVN_NB_INACTIVITY_PROBE")
-	if len(nb_inactivity_probe) == 0 {
-		nb_inactivity_probe = "60000"
-		klog.Infof("OVN_NB_INACTIVITY_PROBE env var is not defined. Using: %s", nb_inactivity_probe)
-	}
 	// Tell northd to sleep a bit to save CPU
 	data.Data["OVN_NORTHD_BACKOFF_MS"] = "300"
 
@@ -276,9 +264,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVNControlPlaneResourceRequestMemory"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.OVNControlPlaneResourceRequestMemory
 	data.Data["Socks5ProxyResourceRequestCPU"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Socks5ProxyResourceRequestCPU
 	data.Data["Socks5ProxyResourceRequestMemory"] = bootstrapResult.OVN.OVNKubernetesConfig.HyperShiftConfig.Socks5ProxyResourceRequestMemory
-	data.Data["OVN_NB_INACTIVITY_PROBE"] = nb_inactivity_probe
 	data.Data["OVN_CERT_CN"] = OVN_CERT_CN
-	data.Data["OVN_NORTHD_PROBE_INTERVAL"] = os.Getenv("OVN_NORTHD_PROBE_INTERVAL")
 	data.Data["NetFlowCollectors"] = ""
 	data.Data["SFlowCollectors"] = ""
 	data.Data["IPFIXCollectors"] = ""
