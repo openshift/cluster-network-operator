@@ -77,7 +77,7 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 
 	// Check rendered object
-	g.Expect(len(objs)).To(Equal(11))
+	g.Expect(objs).To(HaveLen(11))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Service", "openshift-multus", "multus-admission-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "multus-admission-controller-webhook")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "multus-admission-controller-webhook")))
@@ -183,11 +183,11 @@ func TestRenderMultusAdmissonControllerConfigForHyperShift(t *testing.T) {
 	for _, obj := range objs {
 		if obj.GetKind() == "Service" && obj.GetName() == "multus-admission-controller" {
 			labels := obj.GetLabels()
-			g.Expect(len(labels)).To(Equal(2))
+			g.Expect(labels).To(HaveLen(2))
 			g.Expect(labels["hypershift.openshift.io/allow-guest-webhooks"]).To(Equal("true"))
 
 			annotations := obj.GetAnnotations()
-			g.Expect(len(annotations)).To(Equal(1))
+			g.Expect(annotations).To(HaveLen(1))
 			g.Expect(annotations["network.operator.openshift.io/cluster-name"]).To(Equal("management"))
 		}
 	}

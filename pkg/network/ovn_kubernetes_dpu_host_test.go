@@ -200,7 +200,7 @@ func getMatchExpression(g *WithT, ds *appsv1.DaemonSet, label string) (corev1.No
 	for _, expr := range matchExpressions {
 		if expr.Key == label {
 			if expr.Operator == corev1.NodeSelectorOpIn {
-				g.Expect(len(expr.Values)).To(Equal(1), "In operator should have exactly one value")
+				g.Expect(expr.Values).To(HaveLen(1), "In operator should have exactly one value")
 				return expr.Operator, expr.Values[0]
 			} else {
 				return expr.Operator, ""

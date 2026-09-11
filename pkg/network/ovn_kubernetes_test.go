@@ -90,7 +90,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	config := &crd.Spec
 
 	errs := validateOVNKubernetes(config)
-	g.Expect(errs).To(HaveLen(0))
+	g.Expect(errs).To(BeEmpty())
 	fillDefaults(config, nil)
 
 	bootstrapResult := fakeBootstrapResult()
@@ -270,7 +270,7 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	config := &crd.Spec
 
 	errs := validateOVNKubernetes(config)
-	g.Expect(errs).To(HaveLen(0))
+	g.Expect(errs).To(BeEmpty())
 	fillDefaults(config, nil)
 
 	bootstrapResult := fakeBootstrapResult()
@@ -1095,7 +1095,7 @@ logfile-maxage=0`,
 			config := &crd.Spec
 
 			errs := validateOVNKubernetes(config)
-			g.Expect(errs).To(HaveLen(0))
+			g.Expect(errs).To(BeEmpty())
 			fillDefaults(config, nil)
 
 			bootstrapResult := fakeBootstrapResult()
@@ -2252,7 +2252,7 @@ status:
 			t.Setenv("RELEASE_VERSION", tc.rv)
 
 			errs := validateOVNKubernetes(config)
-			g.Expect(errs).To(HaveLen(0))
+			g.Expect(errs).To(BeEmpty())
 			fillDefaults(config, nil)
 
 			node = &appsv1.DaemonSet{}
@@ -4035,7 +4035,7 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 	config := &crd.Spec
 
 	errs := validateOVNKubernetes(config)
-	g.Expect(errs).To(HaveLen(0))
+	g.Expect(errs).To(BeEmpty())
 	fillDefaults(config, nil)
 
 	bootstrapResult := fakeBootstrapResult()
@@ -4130,7 +4130,7 @@ func TestRenderOVNKubernetesFlags(t *testing.T) {
 			config.UseMultiNetworkPolicy = &tc.enableMultiNetworkPolicy
 
 			errs := validateOVNKubernetes(config)
-			g.Expect(errs).To(HaveLen(0))
+			g.Expect(errs).To(BeEmpty())
 			fillDefaults(config, nil)
 
 			// at the same time we have an upgrade
@@ -4920,7 +4920,7 @@ func TestRenderOVNKubernetesNoOverlay(t *testing.T) {
 			}
 
 			errs := validateOVNKubernetes(config)
-			g.Expect(errs).To(HaveLen(0))
+			g.Expect(errs).To(BeEmpty())
 			fillDefaults(config, nil)
 
 			bootstrapResult := fakeBootstrapResult()
@@ -5066,7 +5066,7 @@ func TestDpuLeaseConfig(t *testing.T) {
 			crd := OVNKubernetesConfig.DeepCopy()
 			config := &crd.Spec
 			errs := validateOVNKubernetes(config)
-			g.Expect(errs).To(HaveLen(0))
+			g.Expect(errs).To(BeEmpty())
 			fillDefaults(config, nil)
 
 			bootstrapResult := fakeBootstrapResult()
@@ -5178,8 +5178,7 @@ func TestValidateMTUForNoOverlay(t *testing.T) {
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
 		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
 
-		err := ValidateMTUForNoOverlay(conf, 9000)
-		g.Expect(err).To(BeNil())
+		g.Expect(ValidateMTUForNoOverlay(conf, 9000)).To(Succeed())
 	})
 
 	t.Run("valid MTU less than hostMTU", func(_ *testing.T) {
@@ -5189,8 +5188,7 @@ func TestValidateMTUForNoOverlay(t *testing.T) {
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
 		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
 
-		err := ValidateMTUForNoOverlay(conf, 9000)
-		g.Expect(err).To(BeNil())
+		g.Expect(ValidateMTUForNoOverlay(conf, 9000)).To(Succeed())
 	})
 
 	t.Run("invalid MTU greater than hostMTU", func(_ *testing.T) {
@@ -5201,7 +5199,7 @@ func TestValidateMTUForNoOverlay(t *testing.T) {
 		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
 
 		err := ValidateMTUForNoOverlay(conf, 9000)
-		g.Expect(err).NotTo(BeNil())
+		g.Expect(err).To(HaveOccurred())
 		g.Expect(err.Error()).To(ContainSubstring("cannot exceed host MTU"))
 	})
 
@@ -5212,8 +5210,7 @@ func TestValidateMTUForNoOverlay(t *testing.T) {
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
 		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
 
-		err := ValidateMTUForNoOverlay(conf, 0)
-		g.Expect(err).To(BeNil())
+		g.Expect(ValidateMTUForNoOverlay(conf, 0)).To(Succeed())
 	})
 }
 

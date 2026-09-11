@@ -73,7 +73,7 @@ func TestKubeProxyConfig(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	errs := validateKubeProxy(&config)
-	g.Expect(errs).To(HaveLen(0))
+	g.Expect(errs).To(BeEmpty())
 
 	cfg, err := kubeProxyConfiguration(map[string]operv1.ProxyArgumentList{
 		// special address+port combo
@@ -160,7 +160,7 @@ func TestKubeProxyIPv6Config(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	errs := validateKubeProxy(&configIPv6)
-	g.Expect(errs).To(HaveLen(0))
+	g.Expect(errs).To(BeEmpty())
 
 	cfg, err := kubeProxyConfiguration(
 		map[string]operv1.ProxyArgumentList{

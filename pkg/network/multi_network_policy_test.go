@@ -45,7 +45,7 @@ func TestRenderMultiNetworkPolicy(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus-networkpolicy")))
 
 	// Check rendered object
-	g.Expect(len(objs)).To(Equal(5))
+	g.Expect(objs).To(HaveLen(5))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("CustomResourceDefinition", "", "multi-networkpolicies.k8s.cni.cncf.io")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "openshift-multus-networkpolicy")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "openshift-multus-networkpolicy")))
