@@ -118,7 +118,6 @@ func getStaticIPAMConfigJSON(conf *operv1.StaticIPAMConfig) (string, error) {
 
 // getIPAMConfigJSON generates IPAM CNI json config
 func getIPAMConfigJSON(conf *operv1.IPAMConfig) (string, error) {
-
 	if conf == nil || conf.Type == operv1.IPAMTypeDHCP {
 		// DHCP does not have additional config
 		return `{ "type": "dhcp" }`, nil
@@ -145,7 +144,6 @@ func renderSimpleMacvlanConfig(conf *operv1.AdditionalNetworkDefinition, manifes
 		if err != nil {
 			return nil, fmt.Errorf("failed to render ipam config: %w", err)
 		}
-
 	} else {
 		macvlanConfig := conf.SimpleMacvlanConfig
 		data.Data["Master"] = macvlanConfig.Master

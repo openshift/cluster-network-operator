@@ -507,7 +507,6 @@ func setupTestInfraAndBasicRenderConfigs(t *testing.T, prevType, nextType operv1
 	*bootstrap.InfraStatus,
 	*operv1.NetworkSpec,
 	*operv1.NetworkSpec) {
-
 	g := NewGomegaWithT(t)
 	infra := &fakeBootstrapResult().Infra
 

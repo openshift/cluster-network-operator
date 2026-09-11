@@ -416,7 +416,6 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForAPILoadBalancerChecks
 	apiURL, err := url.Parse(infrastructure.Status.APIServerURL)
 	if err != nil {
 		recorder.Warningf("EndpointDetectionFailure", "error detecting external api load balancer endpoint: %v", err)
-
 	} else {
 		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(apiURL.Host, "openshift-network-diagnostics", withTarget("load-balancer", "api-external")))
 	}

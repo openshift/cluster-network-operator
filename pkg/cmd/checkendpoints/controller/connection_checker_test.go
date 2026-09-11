@@ -427,7 +427,6 @@ func TestManageStatusOutage(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func testTime(sec int) time.Time {

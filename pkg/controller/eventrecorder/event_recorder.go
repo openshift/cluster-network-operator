@@ -24,7 +24,6 @@ func (r *LoggingRecorder) Warning(_, message string) {
 }
 
 func (r *LoggingRecorder) Warningf(_, messageFmt string, args ...any) {
-
 	log.Printf(messageFmt, args...)
 }
 

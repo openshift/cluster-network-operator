@@ -16,7 +16,6 @@ import (
 // TestOVNKubernetesNodeModeTemplates tests that both managed and self-hosted templates
 // correctly handle different OVN_NODE_MODE values for container inclusion/exclusion and YAML validity
 func TestOVNKubernetesNodeModeTemplates(t *testing.T) {
-
 	templates := []struct {
 		name         string
 		templatePath string

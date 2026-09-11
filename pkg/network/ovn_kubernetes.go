@@ -688,7 +688,6 @@ func IsIPsecLegacyAPI(conf *operv1.OVNKubernetesConfig) bool {
 // or upgrading IPsec
 func shouldRenderIPsec(conf *operv1.OVNKubernetesConfig, bootstrapResult *bootstrap.BootstrapResult) (renderCNOIPsecMachineConfig, renderIPsecDaemonSet,
 	renderIPsecOVN, renderIPsecHostDaemonSet, renderIPsecContainerizedDaemonSet, renderIPsecDaemonSetAsCreateWaitOnly bool) {
-
 	// Note on IPsec install (or) upgrade for self managed clusters:
 	// During this process both host and containerized daemonsets are rendered.
 	// Internally, these damonsets coordinate when they are active or dormant:
@@ -1305,7 +1304,6 @@ func isOVNKubernetesChangeSafe(prev, next *operv1.NetworkSpec) []error {
 }
 
 func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
-
 	if conf.DefaultNetwork.OVNKubernetesConfig == nil {
 		conf.DefaultNetwork.OVNKubernetesConfig = &operv1.OVNKubernetesConfig{}
 	}
@@ -1363,7 +1361,6 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 	if sc.PolicyAuditConfig.SyslogFacility == "" {
 		sc.PolicyAuditConfig.SyslogFacility = "local0"
 	}
-
 }
 
 type replicaCountDecoder struct {
@@ -1469,7 +1466,6 @@ func bootstrapOVN(ctx context.Context, conf *operv1.Network, kubeClient cnoclien
 
 		klog.Infof("%s deployment status: progressing=%t",
 			util.OVNControlPlane, controlPlaneStatus.Progressing)
-
 	}
 
 	// ovnkube-node daemonset
@@ -1499,7 +1495,6 @@ func bootstrapOVN(ctx context.Context, conf *operv1.Network, kubeClient cnoclien
 		// config.
 		ovnIPsecStatus.IsOVNIPsecActiveOrRollingOut = !isOVNIPsecNotActiveInDaemonSet(nodeDaemonSet)
 		klog.Infof("ovnkube-node DaemonSet status: progressing=%t", nodeStatus.Progressing)
-
 	}
 
 	prePullerDaemonSet := &appsv1.DaemonSet{
@@ -1637,7 +1632,6 @@ func getClusterCIDRsFromConfig(conf *operv1.NetworkSpec) string {
 // If the config value is different from the current mode, then it applies
 // the new mode first to the ovnkube-node DaemonSet and then to the control plane.
 func handleIPFamilyAnnotationAndIPFamilyChange(conf *operv1.NetworkSpec, ovn bootstrap.OVNBootstrapResult, objs *[]*uns.Unstructured) (bool, bool, error) {
-
 	// obtain the new IP family mode from config: single or dual stack
 	ipFamilyModeFromConfig := names.IPFamilySingleStack
 	if len(conf.ServiceNetwork) == 2 {

@@ -47,7 +47,6 @@ func (s *StatusManager) initInformersFor(clusterName, namespace string, includeD
 		s.client.ClientFor(clusterName).AddCustomInformer(inf)
 		s.dsInformers[clusterName] = inf
 		s.dsListers[clusterName] = v1appslisters.NewDaemonSetLister(inf.GetIndexer())
-
 	}
 
 	inf := v1appsinformers.NewFilteredDeploymentInformer(

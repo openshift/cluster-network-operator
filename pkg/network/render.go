@@ -399,7 +399,6 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 }
 
 func isClusterNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
-
 	// quick check to make sure clusterNetwork slices are of same size as we do not
 	// support adding/removing additional clusterNetwork entries unless it's for a
 	// single/dual stack migration. in those cases validation is done in isNetworkChangeSafe()

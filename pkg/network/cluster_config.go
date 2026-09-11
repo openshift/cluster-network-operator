@@ -19,7 +19,6 @@ var pluginsUsingHostPrefix = sets.NewString(string(operv1.NetworkTypeOVNKubernet
 
 // ValidateClusterConfig ensures the cluster config is valid.
 func ValidateClusterConfig(clusterConfig *configv1.Network, infraRes *bootstrap.InfraStatus, featureGates featuregates.FeatureGate) error {
-
 	// Check all networks for overlaps
 	pool := iputil.IPPool{}
 

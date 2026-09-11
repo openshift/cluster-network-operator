@@ -324,7 +324,6 @@ func (status *StatusManager) writeHypershiftStatus(ctx context.Context, operStat
 		return
 	}
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-
 		hcp := &uns.Unstructured{}
 		hcp.SetGroupVersionKind(hypershift.HostedControlPlaneGVK)
 		err := status.client.ClientFor(names.ManagementClusterName).CRClient().Get(ctx, types.NamespacedName{Namespace: status.hyperShiftConfig.Namespace, Name: status.hyperShiftConfig.Name}, hcp)

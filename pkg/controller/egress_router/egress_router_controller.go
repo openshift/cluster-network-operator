@@ -73,7 +73,6 @@ type EgressRouterReconciler struct {
 var ResyncPeriod = 5 * time.Minute
 
 func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) reconcile.Reconciler {
-
 	return &EgressRouterReconciler{
 		mgr:    mgr,
 		status: status,
