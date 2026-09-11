@@ -102,9 +102,8 @@ func TestValidateClusterConfig(t *testing.T) {
 
 	cc = *ClusterConfig.DeepCopy()
 	cc.ClusterNetwork[1].HostPrefix = 0
-	res := ValidateClusterConfig(&configv1.Network{Spec: cc}, infraRes, featureGates)
 	// Since the NetworkType is None, and the hostprefix is unset we don't validate it
-	g.Expect(res).Should(BeNil())
+	g.Expect(ValidateClusterConfig(&configv1.Network{Spec: cc}, infraRes, featureGates)).To(Succeed())
 
 	cc = *ClusterConfig.DeepCopy()
 	cc.ClusterNetwork[1].HostPrefix = 21
