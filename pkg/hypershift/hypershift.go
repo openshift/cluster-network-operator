@@ -38,6 +38,27 @@ const (
 	HyperShiftConditionTypePrefix = "network.operator.openshift.io/"
 	// RestartDateAnnotation is used to trigger rolling restarts of control plane operands
 	RestartDateAnnotation = "hypershift.openshift.io/restart-date"
+
+	// ControlPlaneNodeRoleLabel is the well-known label the management-cluster infrastructure
+	// applies to control plane node pools to identify their scheduling role for the Minimal
+	// control plane availability-zone scheduling policy. It mirrors
+	// hypershift.openshift.io/v1beta1.ControlPlaneNodeRoleLabel and is also the key of the
+	// NoSchedule taint applied to zonal pools in hard (Required) placement mode.
+	ControlPlaneNodeRoleLabel = "hypershift.openshift.io/control-plane-node-role"
+	// ControlPlaneNodeRoleZonal labels the balanced, availability-zone-spread node pools.
+	ControlPlaneNodeRoleZonal = "zonal"
+	// ControlPlaneNodeRoleOverflow labels the non-zonal ("overflow") node pools.
+	ControlPlaneNodeRoleOverflow = "overflow"
+	// ControlPlaneSchedulingTierLabel records a control plane pod's scheduling tier so that
+	// colocation affinity is scoped per tier. It mirrors the hypershift API constant.
+	ControlPlaneSchedulingTierLabel = "hypershift.openshift.io/control-plane-scheduling-tier"
+
+	// MinimalAvailabilityZoneSchedulingPolicy is the opt-in policy value that minimizes the
+	// set of components spread across availability zones and places the rest on overflow
+	// capacity.
+	MinimalAvailabilityZoneSchedulingPolicy = "Minimal"
+	// NonZonalPlacementRequired is the hard placement-mode value; the default is Preferred.
+	NonZonalPlacementRequired = "Required"
 )
 
 type RelatedObject struct {
@@ -62,6 +83,13 @@ type HostedControlPlane struct {
 	PriorityClass                string
 	APIServerSpec                *configv1.APIServerSpec
 	RestartDate                  string
+	// AvailabilityZoneSchedulingPolicy is the control plane availability-zone scheduling
+	// policy (e.g. MinimalAvailabilityZoneSchedulingPolicy); empty when not opted in.
+	AvailabilityZoneSchedulingPolicy string
+	// NonZonalPlacement selects Preferred (soft, the default) or Required (hard) placement
+	// of non-zone-critical ("float") components onto overflow capacity under the Minimal
+	// policy.
+	NonZonalPlacement string
 }
 
 // AvailabilityPolicy specifies a high level availability policy for components.
@@ -274,18 +302,29 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 		}
 	}
 
+	azSchedulingPolicy, _, err := unstructured.NestedString(hcp.UnstructuredContent(), "spec", "controlPlaneAvailabilityZoneScheduling", "policy")
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract controlPlaneAvailabilityZoneScheduling.policy: %v", err)
+	}
+	nonZonalPlacement, _, err := unstructured.NestedString(hcp.UnstructuredContent(), "spec", "controlPlaneAvailabilityZoneScheduling", "nonZonalPlacement")
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract controlPlaneAvailabilityZoneScheduling.nonZonalPlacement: %v", err)
+	}
+
 	return &HostedControlPlane{
-		Namespace:                    hcp.GetNamespace(),
-		ControllerAvailabilityPolicy: AvailabilityPolicy(controllerAvailabilityPolicy),
-		ClusterID:                    clusterID,
-		NodeSelector:                 nodeSelector,
-		Labels:                       labels,
-		Tolerations:                  tolerationsYaml,
-		AdvertiseAddress:             advertiseAddress,
-		AdvertisePort:                int(advertisePort),
-		PriorityClass:                controlPlanePriorityClassAnnotation,
-		APIServerSpec:                apiServerSpec,
-		RestartDate:                  restartDate,
+		Namespace:                        hcp.GetNamespace(),
+		ControllerAvailabilityPolicy:     AvailabilityPolicy(controllerAvailabilityPolicy),
+		ClusterID:                        clusterID,
+		NodeSelector:                     nodeSelector,
+		Labels:                           labels,
+		Tolerations:                      tolerationsYaml,
+		AdvertiseAddress:                 advertiseAddress,
+		AdvertisePort:                    int(advertisePort),
+		PriorityClass:                    controlPlanePriorityClassAnnotation,
+		APIServerSpec:                    apiServerSpec,
+		RestartDate:                      restartDate,
+		AvailabilityZoneSchedulingPolicy: azSchedulingPolicy,
+		NonZonalPlacement:                nonZonalPlacement,
 	}, nil
 }
 

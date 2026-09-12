@@ -151,6 +151,13 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 		return nil, progressing, err
 	}
 
+	// In HyperShift mode, apply the Minimal control plane availability-zone scheduling
+	// policy to the network control-plane operands when the hosted control plane has opted
+	// in. This is a no-op otherwise.
+	if err := applyMinimalZonalScheduling(objs, bootstrapResult.Infra.HostedControlPlane); err != nil {
+		return nil, progressing, err
+	}
+
 	log.Printf("Render phase done, rendered %d objects", len(objs))
 	return objs, progressing, nil
 }
