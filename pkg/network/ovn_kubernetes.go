@@ -211,6 +211,9 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		}
 	}
 
+	data.Data["EnableUDNARPProxy"] = bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["enable-udn-arp-proxy"]
+	data.Data["EnableUDNNDPProxy"] = bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["enable-udn-ndp-proxy"]
+
 	if conf.Migration != nil {
 		if conf.Migration.MTU != nil {
 			if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
