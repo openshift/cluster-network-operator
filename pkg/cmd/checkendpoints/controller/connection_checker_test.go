@@ -1,12 +1,16 @@
 package controller
 
 import (
+	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	. "github.com/onsi/gomega"
 	"github.com/openshift/api/operatorcontrolplane/v1alpha1"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/stretchr/testify/assert"
@@ -534,4 +538,86 @@ func logEntry(success bool, start int, reason, message string, options ...func(e
 		f(&entry)
 	}
 	return entry
+}
+
+func TestConnectionCheckerRun(t *testing.T) {
+	newConnectionChecker := func(getCheck GetCheckFunc) ConnectionChecker {
+		return NewConnectionChecker(ConnectionCheckerConfig{
+			Name:             "test-check",
+			PodName:          "test-pod",
+			PodNamespace:     "test-namespace",
+			GetCheck:         getCheck,
+			Client:           &mockClient{},
+			ClientCertGetter: func() []tls.Certificate { return nil },
+			Recorder:         events.NewInMemoryRecorder("test", clock.RealClock{}),
+			CheckPeriod:      50 * time.Millisecond,
+		})
+	}
+
+	runChecker := func(ctx context.Context) (ConnectionChecker, *atomic.Int32, chan struct{}) {
+		var checkCount atomic.Int32
+
+		checker := newConnectionChecker(func() *v1alpha1.PodNetworkConnectivityCheck {
+			checkCount.Add(1)
+			return nil
+		})
+
+		done := make(chan struct{})
+		go func() {
+			checker.Run(ctx)
+			close(done)
+		}()
+
+		return checker, &checkCount, done
+	}
+
+	t.Run("should stop when Stop is called", func(t *testing.T) {
+		g := NewGomegaWithT(t)
+
+		checker, checkCount, done := runChecker(context.Background())
+
+		// Wait for a few checks to run.
+		g.Eventually(func() int32 {
+			return checkCount.Load()
+		}).Within(time.Second).Should(BeNumerically(">", 2))
+
+		// Call Stop
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer stopCancel()
+		checker.Stop(stopCtx)
+
+		g.Eventually(done).Within(500*time.Millisecond).Should(BeClosed(), "Run did not exit after Stop was called")
+	})
+
+	t.Run("should stop when the context is cancelled", func(t *testing.T) {
+		g := NewGomegaWithT(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+
+		_, checkCount, done := runChecker(ctx)
+
+		// Wait for it to start.
+		g.Eventually(func() int32 {
+			return checkCount.Load()
+		}).Within(time.Second).Should(BeNumerically(">", 0))
+
+		// Cancel the context
+		cancel()
+
+		g.Eventually(done).Within(500*time.Millisecond).Should(BeClosed(), "Run did not exit after context was cancelled")
+	})
+}
+
+// mockClient is a mock implementation of PodNetworkConnectivityCheckClient
+type mockClient struct {
+}
+
+func (m *mockClient) UpdateStatus(ctx context.Context, check *v1alpha1.PodNetworkConnectivityCheck, opts metav1.UpdateOptions) (*v1alpha1.PodNetworkConnectivityCheck, error) {
+	return check, nil
+}
+
+func (m *mockClient) Get(name string) (*v1alpha1.PodNetworkConnectivityCheck, error) {
+	return &v1alpha1.PodNetworkConnectivityCheck{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+	}, nil
 }

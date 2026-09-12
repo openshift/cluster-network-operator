@@ -83,7 +83,15 @@ func (c *controller) Sync(ctx context.Context, syncContext factory.SyncContext) 
 	// create & start status updaters if needed
 	for _, check := range checks {
 		if updater := c.updaters[check.Name]; updater == nil {
-			c.updaters[check.Name] = NewConnectionChecker(check.Name, c.podName, c.podNamespace, c.newCheckFunc(check.Name), c, c.getClientCerts(check), c.recorder)
+			c.updaters[check.Name] = NewConnectionChecker(ConnectionCheckerConfig{
+				Name:             check.Name,
+				PodName:          c.podName,
+				PodNamespace:     c.podNamespace,
+				GetCheck:         c.newCheckFunc(check.Name),
+				Client:           c,
+				ClientCertGetter: c.getClientCerts(check),
+				Recorder:         c.recorder,
+			})
 			go c.updaters[check.Name].Run(ctx)
 		}
 	}
