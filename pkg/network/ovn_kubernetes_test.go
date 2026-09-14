@@ -78,7 +78,7 @@ var manifestDirOvn = "../../bindata"
 func getDefaultFeatureGates() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
 		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver, apifeatures.FeatureGateOVNObservability, apifeatures.FeatureGateNoOverlayMode},
-		[]configv1.FeatureGateName{apifeatures.FeatureGateEVPN, apifeatures.FeatureGateNetworkConnect},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateNetworkConnect},
 	)
 }
 
@@ -1119,7 +1119,6 @@ logfile-maxage=0`,
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
-				apifeatures.FeatureGateEVPN,
 				apifeatures.FeatureGateNoOverlayMode,
 			}
 			s := sets.New[configv1.FeatureGateName](tc.enabledFeatureGates...)
@@ -4078,7 +4077,6 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 			apifeatures.FeatureGateNoOverlayMode,
 		},
 		[]configv1.FeatureGateName{
-			apifeatures.FeatureGateEVPN,
 			apifeatures.FeatureGateNetworkConnect,
 		},
 	)
@@ -4410,7 +4408,6 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
-				apifeatures.FeatureGateEVPN,
 				apifeatures.FeatureGateNoOverlayMode,
 			},
 		)
@@ -4422,7 +4419,6 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
-				apifeatures.FeatureGateEVPN,
 				apifeatures.FeatureGateNoOverlayMode,
 			},
 		)
@@ -4434,7 +4430,6 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
-				apifeatures.FeatureGateEVPN,
 				apifeatures.FeatureGateNoOverlayMode,
 			},
 		)
@@ -4461,7 +4456,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				client:          cnofake.NewFakeClient(),
 				featureGates:    noFeatureGates,
 			},
-			expectNumObjs: 52,
+			expectNumObjs: 53,
 		},
 		{
 			name: "render routeadvertisements",
@@ -4476,7 +4471,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				client:          cnofake.NewFakeClient(),
 				featureGates:    noFeatureGates,
 			},
-			expectNumObjs: 53,
+			expectNumObjs: 54,
 		},
 		{
 			name: "render with UDN",
@@ -4487,7 +4482,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				client:          cnofake.NewFakeClient(),
 				featureGates:    udnFeatureGate,
 			},
-			expectNumObjs: 52,
+			expectNumObjs: 53,
 		},
 		{
 			name: "render with PreconfiguredUDNAddresses, UDN, persistent-IP, and RA",
@@ -4501,7 +4496,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				client:       cnofake.NewFakeClient(),
 				featureGates: preDefUDNFeatureGates,
 			},
-			expectNumObjs: 53,
+			expectNumObjs: 54,
 		},
 	}
 	for _, tt := range tests {
@@ -4847,7 +4842,6 @@ func TestRenderOVNKubernetesNoOverlay(t *testing.T) {
 				apifeatures.FeatureGateNoOverlayMode,
 			},
 			[]configv1.FeatureGateName{
-				apifeatures.FeatureGateEVPN,
 				apifeatures.FeatureGateNetworkConnect,
 			},
 		)
