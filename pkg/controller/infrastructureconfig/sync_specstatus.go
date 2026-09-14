@@ -182,6 +182,12 @@ func syncVips(spec *[]configv1.IP, status *[]string) error {
 	if spec == nil || status == nil {
 		return fmt.Errorf("passed nil value as spec or status vip")
 	}
+
+	// If status is not initialized, it will cause issues when committing "null" value to update
+	if *status == nil {
+		*status = []string{}
+	}
+
 	// `spec` is empty, `status` with value: copy status to spec
 	if len(*spec) == 0 {
 		*spec = ip.StringsToIPs(*status)
