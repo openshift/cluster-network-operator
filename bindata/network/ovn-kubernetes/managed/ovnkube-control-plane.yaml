@@ -194,6 +194,8 @@ spec:
           if [[ "{{.OVN_ROUTE_ADVERTISEMENTS_ENABLE}}" == "true" ]]; then
             route_advertisements_enable_flag="--enable-route-advertisements"
           fi
+          
+          evpn_enable_flag="--enable-evpn"
 
           multi_network_policy_enabled_flag=
           if [[ "{{.OVN_MULTI_NETWORK_POLICY_ENABLE}}" == "true" ]]; then
@@ -234,6 +236,7 @@ spec:
             ${persistent_ips_enabled_flag} \
             ${multi_network_policy_enabled_flag} \
             ${route_advertisements_enable_flag} \
+            ${evpn_enable_flag} \
             ${ovn_eip_reachability_timeout_opt}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
