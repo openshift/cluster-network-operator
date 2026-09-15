@@ -22,13 +22,22 @@ func main() {
 
 	ext.AddSuite(e.Suite{
 		Name:        "cluster-network-operator/conformance/serial",
-		Qualifiers:  []string{`labels.exists(l, l == "Serial")`},
+		Qualifiers:  []string{`labels.exists(l, l == "Serial") && !labels.exists(l, l == "Disruptive")`},
 		Parallelism: 1,
 	})
 
 	ext.AddSuite(e.Suite{
 		Name:       "cluster-network-operator/conformance/parallel",
-		Qualifiers: []string{`!labels.exists(l, l == "Serial")`},
+		Qualifiers: []string{`!labels.exists(l, l == "Serial") && !labels.exists(l, l == "Disruptive")`},
+	})
+
+	// Disruptive tests run one at a time under the disruptive cluster-stability
+	// classification and are excluded from the serial/parallel suites above.
+	ext.AddSuite(e.Suite{
+		Name:             "cluster-network-operator/conformance/disruptive",
+		Qualifiers:       []string{`labels.exists(l, l == "Disruptive")`},
+		Parallelism:      1,
+		ClusterStability: e.ClusterStabilityDisruptive,
 	})
 
 	specs, err := g.BuildExtensionTestSpecsFromOpenShiftGinkgoSuite()
