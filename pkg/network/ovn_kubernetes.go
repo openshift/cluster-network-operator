@@ -807,7 +807,7 @@ func renderOVNFlowsConfig(bootstrapResult *bootstrap.BootstrapResult, data *rend
 	}
 }
 
-func bootstrapOVNHyperShiftConfig(ctx context.Context, hc *hypershift.HyperShiftConfig, kubeClient cnoclient.Client, infraStatus *bootstrap.InfraStatus) (*bootstrap.OVNHyperShiftBootstrapResult, error) {
+func bootstrapOVNHyperShiftConfig(ctx context.Context, hc *hypershift.HyperShiftConfig, kubeClient cnoclient.Client, infraStatus *bootstrap.InfraStatus) *bootstrap.OVNHyperShiftBootstrapResult {
 	ovnHypershiftResult := &bootstrap.OVNHyperShiftBootstrapResult{
 		Enabled:           hc.Enabled,
 		Namespace:         hc.Namespace,
@@ -819,7 +819,7 @@ func bootstrapOVNHyperShiftConfig(ctx context.Context, hc *hypershift.HyperShift
 	}
 
 	if !hc.Enabled {
-		return ovnHypershiftResult, nil
+		return ovnHypershiftResult
 	}
 
 	hcp := infraStatus.HostedControlPlane
@@ -863,7 +863,7 @@ func bootstrapOVNHyperShiftConfig(ctx context.Context, hc *hypershift.HyperShift
 		ovnHypershiftResult.Socks5ProxyResourceRequestMemory = strconv.FormatInt(socksProxyMemoryRequest, 10)
 	}
 
-	return ovnHypershiftResult, nil
+	return ovnHypershiftResult
 }
 
 // getResourceRequestsForDeployment gets the cpu and memory resource requests for the specified deployment
@@ -1013,15 +1013,11 @@ func bootstrapOVNConfig(ctx context.Context, conf *operv1.Network, kubeClient cn
 		bootstrapOVNGatewayConfig(ctx, conf, kubeClient.ClientFor("").CRClient())
 	}
 
-	var err error
-	ovnConfigResult.HyperShiftConfig, err = bootstrapOVNHyperShiftConfig(ctx, hc, kubeClient, infraStatus)
-	if err != nil {
-		return nil, err
-	}
+	ovnConfigResult.HyperShiftConfig = bootstrapOVNHyperShiftConfig(ctx, hc, kubeClient, infraStatus)
 
 	cm := &corev1.ConfigMap{}
 	dmc := types.NamespacedName{Namespace: "openshift-network-operator", Name: "hardware-offload-config"}
-	err = kubeClient.ClientFor("").CRClient().Get(ctx, dmc, cm)
+	err := kubeClient.ClientFor("").CRClient().Get(ctx, dmc, cm)
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -1674,6 +1670,8 @@ func handleIPFamilyAnnotationAndIPFamilyChange(conf *operv1.NetworkSpec, ovn boo
 // We rollout changes on control-plane first when there is a configuration change.
 // Configuration changes take precedence over upgrades.
 // TODO is this really necessary now? MAYBE for IP family change, since IPAM is done in control plane?
+//
+//nolint:unparam // Ignore updateControlPlane is always true
 func shouldUpdateOVNKonIPFamilyChange(ovn bootstrap.OVNBootstrapResult, controlPlaneStatus *bootstrap.OVNUpdateStatus, ipFamilyMode string) (updateNode, updateControlPlane bool) {
 	// Fresh cluster - full steam ahead!
 	if ovn.NodeUpdateStatus == nil || controlPlaneStatus == nil {

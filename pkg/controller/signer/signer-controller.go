@@ -32,21 +32,17 @@ const signerName = "network.openshift.io/signer"
 
 // Add controller and start it when the Manager is started.
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, client cnoclient.Client, featureGates featuregates.FeatureGate) error {
-	reconciler, err := newReconciler(client, mgr, status, featureGates)
-	if err != nil {
-		return err
-	}
-	return add(mgr, reconciler)
+	return add(mgr, newReconciler(client, mgr, status, featureGates))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(client cnoclient.Client, mgr manager.Manager, status *statusmanager.StatusManager, featureGates featuregates.FeatureGate) (reconcile.Reconciler, error) {
+func newReconciler(client cnoclient.Client, mgr manager.Manager, status *statusmanager.StatusManager, featureGates featuregates.FeatureGate) reconcile.Reconciler {
 	certDuration := 5 * 365 * 24 * time.Hour
 	if featureGates.Enabled(features.FeatureShortCertRotation) {
 		certDuration = 3 * time.Hour
 	}
-	return &ReconcileCSR{client: client, scheme: mgr.GetScheme(), status: status, certDuration: certDuration}, nil
 
+	return &ReconcileCSR{client: client, scheme: mgr.GetScheme(), status: status, certDuration: certDuration}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler

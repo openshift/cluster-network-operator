@@ -130,7 +130,7 @@ func (r *ReconcileProxyConfig) validateTrustedCA(ctx context.Context, trustedCA 
 			trustedCA, err)
 	}
 
-	_, bundleData, err := r.validateTrustBundle(cfgMap)
+	bundleData, err := r.validateTrustBundle(cfgMap)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to validate trust bundle for proxy trustedCA '%s': %w",
 			trustedCA, err)
@@ -163,13 +163,13 @@ func (r *ReconcileProxyConfig) validateConfigMapRef(ctx context.Context, trusted
 // validates that cfgMap contains a data key named "ca-bundle.crt" and the value
 // of the key is one or more valid PEM encoded certificates, returning slices of
 // the validated certificates and certificate data.
-func (r *ReconcileProxyConfig) validateTrustBundle(cfgMap *corev1.ConfigMap) ([]*x509.Certificate, []byte, error) {
-	certBundle, bundleData, err := validation.TrustBundleConfigMap(cfgMap, names.TrustedCABundleConfigMapKey)
+func (r *ReconcileProxyConfig) validateTrustBundle(cfgMap *corev1.ConfigMap) ([]byte, error) {
+	_, bundleData, err := validation.TrustBundleConfigMap(cfgMap, names.TrustedCABundleConfigMapKey)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return certBundle, bundleData, nil
+	return bundleData, nil
 }
 
 // validateSystemTrustBundle reads the trustBundle file, ensuring each

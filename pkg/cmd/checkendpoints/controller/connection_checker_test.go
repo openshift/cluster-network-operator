@@ -466,8 +466,8 @@ func dnsResolveEntry(start int, options ...func(entry *v1alpha1.LogEntry)) v1alp
 	return logEntry(true, start, v1alpha1.LogEntryReasonDNSResolve, "target-endpoint: resolved host name host successfully", options...)
 }
 
-func tcpConnectEntry(start int, options ...func(entry *v1alpha1.LogEntry)) v1alpha1.LogEntry {
-	return logEntry(true, start, v1alpha1.LogEntryReasonTCPConnect, "target-endpoint: tcp connection to host:port succeeded", options...)
+func tcpConnectEntry(start int) v1alpha1.LogEntry {
+	return logEntry(true, start, v1alpha1.LogEntryReasonTCPConnect, "target-endpoint: tcp connection to host:port succeeded")
 }
 
 func withLogMessage(message string) func(*v1alpha1.LogEntry) {

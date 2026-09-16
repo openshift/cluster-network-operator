@@ -149,15 +149,7 @@ func (r *PKIReconciler) Reconcile(ctx context.Context, request reconcile.Request
 		}
 	}
 	if existing == nil {
-		existing, err = newPKI(obj, r.clientset, r.certDuration, r.pkiProfileProvider)
-		if err != nil {
-			log.Println(err)
-			r.pkiErrs[request.NamespacedName] =
-				fmt.Errorf("could not parse PKI.Spec %s: %w", request.NamespacedName, err)
-			r.setStatus(ctx)
-			return reconcile.Result{}, err
-		}
-		r.pkis[request.NamespacedName] = existing
+		r.pkis[request.NamespacedName] = newPKI(obj, r.clientset, r.certDuration, r.pkiProfileProvider)
 	}
 
 	err = existing.sync(ctx)
@@ -197,7 +189,7 @@ type operatorPKI struct {
 }
 
 // newPKI creates a CertRotationController for the supplied configuration
-func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, certDuration time.Duration, pkiProfileProvider pki.PKIProfileProvider) (*operatorPKI, error) {
+func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, certDuration time.Duration, pkiProfileProvider pki.PKIProfileProvider) *operatorPKI {
 	spec := config.Spec
 
 	// Ugly: the existing cache + informers used as part of the controller-manager
@@ -271,7 +263,7 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, certDu
 	inf.Start(ch)
 	inf.WaitForCacheSync(ch)
 
-	return out, nil
+	return out
 }
 
 // sync causes the underlying cert controller to try and reconcile
