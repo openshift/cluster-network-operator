@@ -22,4 +22,3 @@ spec:
   deploymentModel: Service
   loki:
     enable: false
-  namespace: netobserv
