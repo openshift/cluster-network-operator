@@ -101,18 +101,18 @@ data:
     apiVersion: events.k8s.io/v1
     kind: Event
     metadata:
-      namespace: ${pod_namespace}
+      namespace: "${pod_namespace}"
       generateName: iptables-alert-
       labels:
-        pod-uid: ${pod_uid}
+        pod-uid: "${pod_uid}"
     regarding:
       apiVersion: v1
       kind: Pod
-      namespace: ${pod_namespace}
-      name: ${pod_name}
-      uid: ${pod_uid}
+      namespace: "${pod_namespace}"
+      name: "${pod_name}"
+      uid: "${pod_uid}"
     reportingController: openshift.io/iptables-deprecation-alerter
-    reportingInstance: ${ALERTER_POD_NAME}
+    reportingInstance: "${ALERTER_POD_NAME}"
     action: IPTablesUsageObserved
     reason: IPTablesUsageObserved
     type: Normal
