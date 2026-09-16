@@ -24,6 +24,7 @@ spec:
   selector:
     matchLabels:
       app: kube-proxy
+  serviceDiscoveryRole: EndpointSlice
 ---
 apiVersion: v1
 kind: Service
@@ -59,6 +60,14 @@ rules:
   - services
   - endpoints
   - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
   verbs:
   - get
   - list
