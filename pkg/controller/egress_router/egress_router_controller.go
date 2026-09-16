@@ -37,10 +37,7 @@ import (
 
 // Add attaches control loop to the manager and watch for Egress Router objects
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, cli cnoclient.Client, _ featuregates.FeatureGate) error {
-	r, err := newEgressRouterReconciler(mgr, status, cli)
-	if err != nil {
-		return err
-	}
+	r := newEgressRouterReconciler(mgr, status, cli)
 
 	// Create a new controller
 	c, err := controller.New("egress-router-controller", mgr, controller.Options{Reconciler: r})
@@ -75,7 +72,7 @@ type EgressRouterReconciler struct {
 
 var ResyncPeriod = 5 * time.Minute
 
-func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) (reconcile.Reconciler, error) {
+func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) reconcile.Reconciler {
 
 	return &EgressRouterReconciler{
 		mgr:    mgr,
@@ -84,7 +81,7 @@ func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.Status
 
 		egressrouters:    map[types.NamespacedName]*egressrouter{},
 		egressrouterErrs: map[types.NamespacedName]error{},
-	}, nil
+	}
 }
 
 func (r *EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {

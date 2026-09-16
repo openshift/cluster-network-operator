@@ -57,23 +57,19 @@ var ManifestPath = "./bindata"
 // Add creates a new OperConfig Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, featureGates featuregates.FeatureGate) error {
-	rc, err := newReconciler(mgr, status, c, featureGates)
-	if err != nil {
-		return err
-	}
-	return add(mgr, rc)
+	return add(mgr, newReconciler(mgr, status, c, featureGates))
 }
 
 const ControllerName = "operconfig"
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, featureGates featuregates.FeatureGate) (*ReconcileOperConfig, error) {
+func newReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, featureGates featuregates.FeatureGate) *ReconcileOperConfig {
 	return &ReconcileOperConfig{
 		client:       c,
 		status:       status,
 		mapper:       mgr.GetRESTMapper(),
 		featureGates: featureGates,
-	}, nil
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler

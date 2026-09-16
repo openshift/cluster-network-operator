@@ -405,7 +405,7 @@ func (r *ReconcileProxyConfig) mergeTrustBundlesToConfigMap(additionalData, syst
 			names.TrustedCABundleConfigMapKey: string(combinedTrustData),
 		},
 	}
-	if _, _, err := r.validateTrustBundle(mergedCfgMap); err != nil {
+	if _, err := r.validateTrustBundle(mergedCfgMap); err != nil {
 		return nil, fmt.Errorf("failed to validate merged configmap '%s/%s': %w", mergedCfgMap.Namespace,
 			mergedCfgMap.Name, err)
 	}
