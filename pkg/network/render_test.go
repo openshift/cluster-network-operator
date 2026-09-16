@@ -819,4 +819,54 @@ func Test_renderNetworkingConsolePlugin(t *testing.T) {
 
 		g.Expect(hash1).NotTo(Equal(hash2), "config-hash should change when TLS config changes")
 	})
+
+	t.Run("should render nginx temp paths under /tmp for read-only root filesystem", func(t *testing.T) {
+		g := NewWithT(t)
+		nginxConf := renderAndFindNginxConfig(t, bootstrap.TLSProfile{
+			Spec: configv1.TLSProfileSpec{
+				MinTLSVersion: configv1.VersionTLS12,
+				Ciphers:       []string{"ECDHE-RSA-AES128-GCM-SHA256"},
+			},
+			Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
+		})
+		g.Expect(nginxConf).To(ContainSubstring("client_body_temp_path /tmp/nginx-client-body"))
+		g.Expect(nginxConf).To(ContainSubstring("proxy_temp_path       /tmp/nginx-proxy"))
+	})
+
+	t.Run("should enable readOnlyRootFilesystem with writable emptyDir mounts", func(t *testing.T) {
+		g := NewWithT(t)
+		t.Setenv("NETWORKING_CONSOLE_PLUGIN_IMAGE", "quay.io/openshift/networking-console-plugin:latest")
+		bootstrapResult := fakeBootstrapResult()
+		bootstrapResult.Infra.ConsolePluginCRDExists = true
+
+		objs, err := renderNetworkingConsolePlugin(manifestDir, bootstrapResult)
+		g.Expect(err).NotTo(HaveOccurred())
+
+		deploy := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "networking-console-plugin")
+		g.Expect(deploy.Spec.Template.Spec.Containers).To(HaveLen(1))
+
+		container := deploy.Spec.Template.Spec.Containers[0]
+		g.Expect(container.SecurityContext).NotTo(BeNil())
+		g.Expect(container.SecurityContext.ReadOnlyRootFilesystem).NotTo(BeNil())
+		g.Expect(*container.SecurityContext.ReadOnlyRootFilesystem).To(BeTrue())
+
+		writableMounts := map[string]string{
+			"tmp":           "/tmp",
+			"run":           "/run",
+			"var-lib-nginx": "/var/lib/nginx",
+			"var-log-nginx": "/var/log/nginx",
+		}
+		for volumeName, mountPath := range writableMounts {
+			g.Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{
+				Name:      volumeName,
+				MountPath: mountPath,
+			}))
+			g.Expect(deploy.Spec.Template.Spec.Volumes).To(ContainElement(corev1.Volume{
+				Name: volumeName,
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			}))
+		}
+	})
 }
