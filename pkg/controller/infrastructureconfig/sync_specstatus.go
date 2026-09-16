@@ -2,9 +2,10 @@ package infrastructureconfig
 
 import (
 	"fmt"
+	"log"
+
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/util/ip"
-	"log"
 )
 
 func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure) (*configv1.Infrastructure, error) {
