@@ -7,7 +7,7 @@ import (
 	applyconfigv1alpha1 "github.com/openshift/client-go/operatorcontrolplane/applyconfigurations/operatorcontrolplane/v1alpha1"
 )
 
-// new PodNetworkConnectivityCheck whose name is '$(SOURCE)-to-$(TARGET)'.
+// NewPodNetworkConnectivityCheckTemplate creates a PodNetworkConnectivityCheck whose name is '$(SOURCE)-to-$(TARGET)'.
 // Use the WithSource and WithTarget option funcs to replace the '$(SOURCE)' and '$(TARGET)' tokens.
 func NewPodNetworkConnectivityCheckTemplate(address, namespace string, options ...func(*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration)) *applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration {
 	check := applyconfigv1alpha1.PodNetworkConnectivityCheck("$(SOURCE)-to-$(TARGET)", namespace)

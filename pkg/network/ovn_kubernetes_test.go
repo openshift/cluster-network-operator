@@ -90,28 +90,27 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	config := &crd.Spec
 
 	errs := validateOVNKubernetes(config)
-	g.Expect(errs).To(HaveLen(0))
+	g.Expect(errs).To(BeEmpty())
 	fillDefaults(config, nil)
 
 	bootstrapResult := fakeBootstrapResult()
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		ControlPlaneReplicaCount: 3,
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
 		},
 	}
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
 
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-ovn-kubernetes", "ovnkube-control-plane")))
@@ -206,9 +205,10 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	testTLSArgRendering(t, "ovnkube-script-lib kube-rbac-proxy", "",
 		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			testBootstrap := *bootstrapResult
 			testBootstrap.TLSProfile = tlsProfile
-			objs, _, err = renderOVNKubernetes(config, &testBootstrap, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err = renderOVNKubernetes(config, &testBootstrap, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			cm := mustFindRenderedObj[*v1.ConfigMap](t, objs, "ConfigMap", "ovnkube-script-lib")
@@ -224,6 +224,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	// Test TLS rendering for ovnkube in HyperShift managed ovnkube-control-plane
 	testTLSArgRendering(t, "HyperShift ovnkube-control-plane", "", "",
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			testBootstrap := *bootstrapResult
 			testBootstrap.TLSProfile = tlsProfile
 			testBootstrap.Infra = bootstrap.InfraStatus{}
@@ -233,7 +234,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 				Enabled: true,
 			}
 			testBootstrap.OVN.OVNKubernetesConfig = &ovnConfig
-			objs, _, err = renderOVNKubernetes(config, &testBootstrap, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err = renderOVNKubernetes(config, &testBootstrap, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			deployment := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "ovnkube-control-plane")
@@ -269,27 +270,26 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	config := &crd.Spec
 
 	errs := validateOVNKubernetes(config)
-	g.Expect(errs).To(HaveLen(0))
+	g.Expect(errs).To(BeEmpty())
 	fillDefaults(config, nil)
 
 	bootstrapResult := fakeBootstrapResult()
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		ControlPlaneReplicaCount: 3,
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
 		},
 	}
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	err = checkOVNKubernetesPostStart(objs)
@@ -299,18 +299,18 @@ func TestRenderOVNKubernetesIPv6(t *testing.T) {
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		ControlPlaneReplicaCount: 3,
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
 		},
 	}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	err = checkOVNKubernetesPostStart(objs)
@@ -1067,7 +1067,7 @@ logfile-maxage=0`,
 	g := NewGomegaWithT(t)
 
 	for i, tc := range testcases {
-		t.Run(fmt.Sprintf("%d:%s", i, tc.desc), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d:%s", i, tc.desc), func(_ *testing.T) {
 			OVNKubeConfig := OVNKubernetesConfig.DeepCopy()
 			if tc.hybridOverlayConfig != nil {
 				OVNKubeConfig.Spec.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig = tc.hybridOverlayConfig
@@ -1095,19 +1095,19 @@ logfile-maxage=0`,
 			config := &crd.Spec
 
 			errs := validateOVNKubernetes(config)
-			g.Expect(errs).To(HaveLen(0))
+			g.Expect(errs).To(BeEmpty())
 			fillDefaults(config, nil)
 
 			bootstrapResult := fakeBootstrapResult()
 			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 				ControlPlaneReplicaCount: tc.controlPlaneReplicaCount,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-					DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-					DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-					SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+					DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+					DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+					SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 					MgmtPortResourceName:      "",
-					DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-					DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+					DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+					DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 						Enabled: false,
 					},
@@ -1134,18 +1134,16 @@ logfile-maxage=0`,
 			}
 
 			featureGatesCNO := featuregates.NewFeatureGate(enabled, disabled)
-			fakeClient := cnofake.NewFakeClient()
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 			confFile := extractOVNKubeConfig(g, objs)
 			msg := fmt.Sprintf("XXX TC Desc: %s\n\nXXX GOT: %s\n\nXXX Expected: %s\n", tc.desc, confFile, strings.TrimSpace(tc.expected))
 			g.Expect(confFile).To(Equal(strings.TrimSpace(tc.expected)), msg)
 			// check that the daemonset has the IP family mode annotations
 			ipFamilyMode := names.IPFamilySingleStack
-			g.Expect(checkDaemonsetAnnotation(g, objs, names.NetworkIPFamilyModeAnnotation, ipFamilyMode)).To(BeTrue())
+			g.Expect(checkDaemonsetAnnotation(objs, names.NetworkIPFamilyModeAnnotation, ipFamilyMode)).To(BeTrue())
 		})
 	}
-
 }
 
 func checkOVNKubernetesPostStart(objects []*uns.Unstructured) error {
@@ -1165,7 +1163,6 @@ func checkOVNKubernetesPostStart(objects []*uns.Unstructured) error {
 	var ovnkubeNode *uns.Unstructured
 	for _, obj := range objects {
 		if obj.GetKind() == "DaemonSet" && obj.GetNamespace() == "openshift-ovn-kubernetes" && obj.GetName() == "ovnkube-node" {
-
 			ovnkubeNode = obj
 		}
 	}
@@ -1249,7 +1246,6 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 	fillOVNKubernetesDefaults(conf, nil, 9000)
 
 	g.Expect(conf).To(Equal(&expected))
-
 }
 
 func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
@@ -1291,8 +1287,8 @@ func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
 	fillOVNKubernetesDefaults(conf, conf, 9000)
 
 	g.Expect(conf).To(Equal(&expected))
-
 }
+
 func TestValidateOVNKubernetes(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -1664,7 +1660,6 @@ func TestOVNKubernetesIsSafe(t *testing.T) {
 
 // TestOVNKubernetesShouldUpdateMasterOnUpgrade checks to see that
 func TestOVNKubernetestShouldUpdateMasterOnUpgrade(t *testing.T) {
-
 	for idx, tc := range []struct {
 		expectNode         bool // true if node changed
 		expectControlPlane bool // true if master changed
@@ -2257,7 +2252,7 @@ status:
 			t.Setenv("RELEASE_VERSION", tc.rv)
 
 			errs := validateOVNKubernetes(config)
-			g.Expect(errs).To(HaveLen(0))
+			g.Expect(errs).To(BeEmpty())
 			fillDefaults(config, nil)
 
 			node = &appsv1.DaemonSet{}
@@ -2306,12 +2301,12 @@ status:
 				ControlPlaneUpdateStatus: controlPlaneStatus,
 				NodeUpdateStatus:         nodeStatus,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-					DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-					DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-					SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+					DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+					DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+					SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 					MgmtPortResourceName:      "",
-					DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-					DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+					DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+					DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 						Enabled: false,
 					},
@@ -2319,8 +2314,7 @@ status:
 				PrePullerUpdateStatus: prepullerStatus,
 			}
 			featureGatesCNO := getDefaultFeatureGates()
-			fakeClient := cnofake.NewFakeClient()
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			renderedNode := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
@@ -2354,7 +2348,6 @@ status:
 }
 
 func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
-
 	for _, tc := range []struct {
 		name               string
 		node               *appsv1.DaemonSet
@@ -2535,7 +2528,6 @@ func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
 			ipFamilyMode:       names.IPFamilyDualStack,
 		},
 	} {
-
 		t.Run(tc.name, func(t *testing.T) {
 			controlPlaneStatus := &bootstrap.OVNUpdateStatus{}
 			nodeStatus := &bootstrap.OVNUpdateStatus{}
@@ -2557,10 +2549,8 @@ func TestShouldUpdateOVNKonIPFamilyChange(t *testing.T) {
 			if updateControlPlane != tc.expectControlPlane {
 				t.Errorf("Expected node update: %v received %v", tc.expectNode, updateNode)
 			}
-
 		})
 	}
-
 }
 
 func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
@@ -2613,12 +2603,12 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 			IPFamilyMode: names.IPFamilySingleStack,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -2627,8 +2617,7 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 
 	// At the 1st pass, ensure IPsec MachineConfigs are not rolled out until MCO is ready.
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2658,7 +2647,7 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 
 	// At the 2nd pass, ensure IPsec MachineConfigs are rolled out when MCO is ready.
 	bootstrapResult.Infra.MachineConfigClusterOperatorReady = true
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2692,7 +2681,7 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].Name = workerMachineConfigIPsecExtName
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs[0].OwnerReferences = networkOwnerRef()
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2726,7 +2715,7 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2760,7 +2749,7 @@ func TestRenderOVNKubernetesEnableIPsec(t *testing.T) {
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2842,12 +2831,12 @@ func TestRenderOVNKubernetesEnableIPsecForHostedControlPlane(t *testing.T) {
 			IPFamilyMode: names.IPFamilySingleStack,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -2855,11 +2844,10 @@ func TestRenderOVNKubernetesEnableIPsecForHostedControlPlane(t *testing.T) {
 	}
 
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
 	// Set is as Hypershift hosted control plane.
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.HostedControlPlane = &hypershift.HostedControlPlane{}
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -2945,12 +2933,12 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 			IsOVNIPsecActiveOrRollingOut: true,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -2969,9 +2957,8 @@ func TestRenderOVNKubernetesIPsecUpgradeWithMachineConfig(t *testing.T) {
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
 
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3059,12 +3046,12 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 			IsOVNIPsecActiveOrRollingOut: true,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -3073,9 +3060,9 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 
 	// Upgrade starts and it's going to rollout IPsec Machine Configs without making any changes into existing IPsec configs.
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
+
 	// Now it's going to rollout IPsec Machine Configs.
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3123,7 +3110,7 @@ func TestRenderOVNKubernetesIPsecUpgradeWithNoMachineConfig(t *testing.T) {
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3209,12 +3196,12 @@ func TestRenderOVNKubernetesIPsecUpgradeWithHypershiftHostedCluster(t *testing.T
 			IsOVNIPsecActiveOrRollingOut: true,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -3226,9 +3213,9 @@ func TestRenderOVNKubernetesIPsecUpgradeWithHypershiftHostedCluster(t *testing.T
 	bootstrapResult.Infra.HostedControlPlane = &hypershift.HostedControlPlane{}
 	// Upgrade starts and it's going to get only ovn-ipsec-containerized DS.
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
+
 	// Now it must get IPsec containerized daemonset without MachineConfigs.
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3314,12 +3301,12 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 			IsOVNIPsecActiveOrRollingOut: true,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -3327,7 +3314,6 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 	}
 	featureGatesCNO := getDefaultFeatureGates()
 
-	fakeClient := cnofake.NewFakeClient()
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MachineConfigClusterOperatorReady = true
 	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
@@ -3340,7 +3326,7 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3376,7 +3362,7 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 
 	// Ensure renderOVNKubernetes removes MachineConfigs and IPsec daemonset.
 	bootstrapResult.OVN.IPsecUpdateStatus.IsOVNIPsecActiveOrRollingOut = false
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3413,7 +3399,7 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.WorkerIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3446,7 +3432,7 @@ func TestRenderOVNKubernetesDisableIPsec(t *testing.T) {
 	bootstrapResult.OVN.IPsecUpdateStatus.IsOVNIPsecActiveOrRollingOut = false
 	bootstrapResult.Infra.MasterMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{}}}
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3526,12 +3512,12 @@ func TestRenderOVNKubernetesEnableIPsecWithUserInstalledIPsecMachineConfigs(t *t
 			IPFamilyMode: names.IPFamilySingleStack,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -3540,7 +3526,6 @@ func TestRenderOVNKubernetesEnableIPsecWithUserInstalledIPsecMachineConfigs(t *t
 
 	featureGatesCNO := getDefaultFeatureGates()
 
-	fakeClient := cnofake.NewFakeClient()
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
@@ -3554,7 +3539,7 @@ func TestRenderOVNKubernetesEnableIPsecWithUserInstalledIPsecMachineConfigs(t *t
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 0, UpdatedMachineCount: 0,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3590,7 +3575,7 @@ func TestRenderOVNKubernetesEnableIPsecWithUserInstalledIPsecMachineConfigs(t *t
 	bootstrapResult.Infra.MasterMCPStatuses[0].UpdatedMachineCount = 1
 	bootstrapResult.Infra.WorkerMCPStatuses[0].ReadyMachineCount = 1
 	bootstrapResult.Infra.WorkerMCPStatuses[0].UpdatedMachineCount = 1
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3674,12 +3659,12 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 			IsOVNIPsecActiveOrRollingOut: true,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -3687,7 +3672,6 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 	}
 	featureGatesCNO := getDefaultFeatureGates()
 
-	fakeClient := cnofake.NewFakeClient()
 	bootstrapResult.Infra = bootstrap.InfraStatus{}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs = []*mcfgv1.MachineConfig{{}}
 	bootstrapResult.Infra.MasterIPsecMachineConfigs[0].Name = masterMachineConfigIPsecExtName
@@ -3699,7 +3683,7 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	bootstrapResult.Infra.WorkerMCPStatuses = []mcfgv1.MachineConfigPoolStatus{{MachineCount: 1, ReadyMachineCount: 1, UpdatedMachineCount: 1,
 		Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}}
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3735,7 +3719,7 @@ func TestRenderOVNKubernetesDisableIPsecWithUserInstalledIPsecMachineConfigs(t *
 
 	// Ensure renderOVNKubernetes removes IPsec daemonset.
 	bootstrapResult.OVN.IPsecUpdateStatus.IsOVNIPsecActiveOrRollingOut = false
-	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err = renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3815,12 +3799,12 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 			IPFamilyMode: names.IPFamilySingleStack,
 		},
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -3830,8 +3814,7 @@ func TestRenderOVNKubernetesDualStackPrecedenceOverUpgrade(t *testing.T) {
 
 	// the new rendered config should hold the node to do the dualstack conversion
 	// the upgrade code holds the controlPlanes to update the nodes first
-	fakeClient := cnofake.NewFakeClient()
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -3925,8 +3908,7 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 				FlowsConfig: tc.FlowsConfig,
 			}
 			featureGatesCNO := getDefaultFeatureGates()
-			fakeClient := cnofake.NewFakeClient()
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).ToNot(HaveOccurred())
 			nodeDS := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
 			ds := appsv1.DaemonSet{}
@@ -3945,7 +3927,7 @@ func TestRenderOVNKubernetesOVSFlowsConfigMap(t *testing.T) {
 }
 
 func TestBootStrapOvsConfigMap_SharedTarget(t *testing.T) {
-	fc := bootstrapFlowsConfig(&fakeClientReader{
+	fc := bootstrapFlowsConfig(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"sharedTarget":       "1.2.3.4:3030",
@@ -3964,7 +3946,7 @@ func TestBootStrapOvsConfigMap_SharedTarget(t *testing.T) {
 }
 
 func TestBootStrapOvsConfigMap_NodePort(t *testing.T) {
-	fc := bootstrapFlowsConfig(&fakeClientReader{
+	fc := bootstrapFlowsConfig(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"nodePort":           "3131",
@@ -3982,7 +3964,7 @@ func TestBootStrapOvsConfigMap_NodePort(t *testing.T) {
 }
 
 func TestBootStrapOvsConfigMap_IncompleteMap(t *testing.T) {
-	fc := bootstrapFlowsConfig(&fakeClientReader{
+	fc := bootstrapFlowsConfig(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"cacheActiveTimeout": "3200ms",
@@ -3997,7 +3979,7 @@ func TestBootStrapOvsConfigMap_IncompleteMap(t *testing.T) {
 }
 
 func TestBootStrapOvsConfigMap_UnexistingMap(t *testing.T) {
-	fc := bootstrapFlowsConfig(&fakeClientReader{configMap: nil})
+	fc := bootstrapFlowsConfig(t.Context(), &fakeClientReader{configMap: nil})
 
 	// without sharedTarget nor nodePort, flow collection can't be set
 	assert.Nil(t, fc)
@@ -4006,44 +3988,44 @@ func TestBootStrapOvsConfigMap_UnexistingMap(t *testing.T) {
 func Test_getDisableUDPAggregation(t *testing.T) {
 	var disable bool
 
-	disable = getDisableUDPAggregation(&fakeClientReader{configMap: nil})
-	assert.Equal(t, false, disable, "with no configmap")
+	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{configMap: nil})
+	assert.False(t, disable, "with no configmap")
 
-	disable = getDisableUDPAggregation(&fakeClientReader{
+	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"friday": "2",
 			},
 		},
 	})
-	assert.Equal(t, false, disable, "with bad configmap")
+	assert.False(t, disable, "with bad configmap")
 
-	disable = getDisableUDPAggregation(&fakeClientReader{
+	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"disable-udp-aggregation": "false",
 			},
 		},
 	})
-	assert.Equal(t, false, disable, "with configmap that sets 'disable-udp-aggregation' to 'false'")
+	assert.False(t, disable, "with configmap that sets 'disable-udp-aggregation' to 'false'")
 
-	disable = getDisableUDPAggregation(&fakeClientReader{
+	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"disable-udp-aggregation": "bad",
 			},
 		},
 	})
-	assert.Equal(t, false, disable, "with configmap that sets 'disable-udp-aggregation' to 'bad'")
+	assert.False(t, disable, "with configmap that sets 'disable-udp-aggregation' to 'bad'")
 
-	disable = getDisableUDPAggregation(&fakeClientReader{
+	disable = getDisableUDPAggregation(t.Context(), &fakeClientReader{
 		configMap: &v1.ConfigMap{
 			Data: map[string]string{
 				"disable-udp-aggregation": "true",
 			},
 		},
 	})
-	assert.Equal(t, true, disable, "with configmap that sets 'disable-udp-aggregation' to 'true'")
+	assert.True(t, disable, "with configmap that sets 'disable-udp-aggregation' to 'true'")
 }
 
 func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
@@ -4053,19 +4035,19 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 	config := &crd.Spec
 
 	errs := validateOVNKubernetes(config)
-	g.Expect(errs).To(HaveLen(0))
+	g.Expect(errs).To(BeEmpty())
 	fillDefaults(config, nil)
 
 	bootstrapResult := fakeBootstrapResult()
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		ControlPlaneReplicaCount: 3,
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
@@ -4082,9 +4064,8 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 			apifeatures.FeatureGateNetworkConnect,
 		},
 	)
-	fakeClient := cnofake.NewFakeClient()
 
-	objs, progressing, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, progressing, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(progressing).To(BeFalse())
 
@@ -4149,7 +4130,7 @@ func TestRenderOVNKubernetesFlags(t *testing.T) {
 			config.UseMultiNetworkPolicy = &tc.enableMultiNetworkPolicy
 
 			errs := validateOVNKubernetes(config)
-			g.Expect(errs).To(HaveLen(0))
+			g.Expect(errs).To(BeEmpty())
 			fillDefaults(config, nil)
 
 			// at the same time we have an upgrade
@@ -4159,9 +4140,9 @@ func TestRenderOVNKubernetesFlags(t *testing.T) {
 			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 				ControlPlaneReplicaCount: 3,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-					DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-					DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-					SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+					DpuHostModeLabel:     OVNNodeSelectorDefaultDPUHost,
+					DpuModeLabel:         OVNNodeSelectorDefaultDPU,
+					SmartNicModeLabel:    OVNNodeSelectorDefaultSmartNIC,
 					MgmtPortResourceName: "",
 					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 						Enabled: false,
@@ -4170,11 +4151,11 @@ func TestRenderOVNKubernetesFlags(t *testing.T) {
 			}
 
 			featureGatesCNO := getDefaultFeatureGates()
-			fakeClient := cnofake.NewFakeClient()
+
 			// Set is as Hypershift hosted control plane.
 			bootstrapResult.Infra = bootstrap.InfraStatus{}
 			bootstrapResult.Infra.HostedControlPlane = &hypershift.HostedControlPlane{}
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			var configMap *uns.Unstructured
@@ -4220,7 +4201,6 @@ func TestRenderOVNKubernetesFlags(t *testing.T) {
 					ContainSubstring(fmt.Sprintf("--egressip-reachability-total-timeout %d", *tc.reachabilityTimeout)),
 					"ovnkube-node pod template should contain the configured reachability timeout value",
 				)
-
 			} else {
 				g.Expect(scriptCP).NotTo(
 					ContainSubstring("--egressip-reachability-total-timeout"),
@@ -4251,7 +4231,7 @@ type fakeClientReader struct {
 	configMap *v1.ConfigMap
 }
 
-func (f *fakeClientReader) Get(_ context.Context, _ crclient.ObjectKey, obj crclient.Object, opts ...crclient.GetOption) error {
+func (f *fakeClientReader) Get(_ context.Context, _ crclient.ObjectKey, obj crclient.Object, _ ...crclient.GetOption) error {
 	if cmPtr, ok := obj.(*v1.ConfigMap); !ok {
 		return fmt.Errorf("expecting *v1.ConfigMap, got %T", obj)
 	} else if f.configMap == nil {
@@ -4313,7 +4293,7 @@ func extractOVNScriptLib(g *WithT, objs []*uns.Unstructured) string {
 
 // checkDaemonsetAnnotation check that all the daemonset have the annotation with the
 // same key and value
-func checkDaemonsetAnnotation(g *WithT, objs []*uns.Unstructured, key, value string) bool {
+func checkDaemonsetAnnotation(objs []*uns.Unstructured, key, value string) bool {
 	if key == "" || value == "" {
 		return false
 	}
@@ -4322,7 +4302,6 @@ func checkDaemonsetAnnotation(g *WithT, objs []*uns.Unstructured, key, value str
 		if obj.GetAPIVersion() == "apps/v1" &&
 			(obj.GetName() == "ovnkube-control-plane" && obj.GetKind() == "Deployment" ||
 				obj.GetName() == "ovnkube-node" && obj.GetKind() == "DaemonSet") {
-
 			// check daemonset annotation
 			anno := obj.GetAnnotations()
 			if anno == nil {
@@ -4384,12 +4363,12 @@ func Test_renderOVNKubernetes(t *testing.T) {
 		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 			ControlPlaneReplicaCount: 3,
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-				DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-				SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+				DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+				DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+				SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 				MgmtPortResourceName:      "",
-				DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-				DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+				DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+				DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 					Enabled: false,
 				},
@@ -4506,11 +4485,11 @@ func Test_renderOVNKubernetes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, _, err := renderOVNKubernetes(tt.args.conf(), tt.args.bootstrapResult(), tt.args.manifestDir, tt.args.client, tt.args.featureGates())
+			got, _, err := renderOVNKubernetes(tt.args.conf(), tt.args.bootstrapResult(), tt.args.manifestDir, tt.args.featureGates())
 			if !reflect.DeepEqual(tt.expectErr, err) {
 				t.Errorf("renderOVNKubernetes() err = %v, want %v", err, tt.expectErr)
 			}
-			assert.Equalf(t, tt.expectNumObjs, len(got), "renderOVNKubernetes() got %d objects, want %d", len(got), tt.expectNumObjs)
+			assert.Lenf(t, got, tt.expectNumObjs, "renderOVNKubernetes() got %d objects, want %d", len(got), tt.expectNumObjs)
 		})
 	}
 }
@@ -4527,12 +4506,12 @@ func TestRenderOVNKubernetes_AdvertisedUDNIsolationModeOverride(t *testing.T) {
 		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 			ControlPlaneReplicaCount: 3,
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-				DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-				SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+				DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+				DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+				SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 				MgmtPortResourceName:      "",
-				DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-				DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+				DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+				DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 					Enabled: false,
 				},
@@ -4540,19 +4519,18 @@ func TestRenderOVNKubernetes_AdvertisedUDNIsolationModeOverride(t *testing.T) {
 			},
 		}
 		featureGatesCNO := getDefaultFeatureGates()
-		fakeClient := cnofake.NewFakeClient()
 
-		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 		g.Expect(err).NotTo(HaveOccurred())
 		return extractOVNScriptLib(g, objs)
 	}
 
-	t.Run("with advertised-udn-isolation-mode override", func(t *testing.T) {
+	t.Run("with advertised-udn-isolation-mode override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"advertised-udn-isolation-mode": "loose"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--advertised-udn-isolation-mode=loose"`))
 	})
 
-	t.Run("without advertised-udn-isolation-mode override", func(t *testing.T) {
+	t.Run("without advertised-udn-isolation-mode override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(nil)
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--advertised-udn-isolation-mode="`))
 	})
@@ -4570,12 +4548,12 @@ func TestRenderOVNKubernetes_OpenFlowProbeOverride(t *testing.T) {
 		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 			ControlPlaneReplicaCount: 3,
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-				DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-				SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+				DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+				DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+				SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 				MgmtPortResourceName:      "",
-				DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-				DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+				DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+				DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 					Enabled: false,
 				},
@@ -4583,24 +4561,23 @@ func TestRenderOVNKubernetes_OpenFlowProbeOverride(t *testing.T) {
 			},
 		}
 		featureGatesCNO := getDefaultFeatureGates()
-		fakeClient := cnofake.NewFakeClient()
 
-		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 		g.Expect(err).NotTo(HaveOccurred())
 		return extractOVNScriptLib(g, objs)
 	}
 
-	t.Run("with openflow-probe override", func(t *testing.T) {
+	t.Run("with openflow-probe override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"openflow-probe": "60"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--openflow-probe=60"`))
 	})
 
-	t.Run("without openflow-probe override", func(t *testing.T) {
+	t.Run("without openflow-probe override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(nil)
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--openflow-probe="`))
 	})
 
-	t.Run("with invalid openflow-probe override", func(t *testing.T) {
+	t.Run("with invalid openflow-probe override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"openflow-probe": "-60"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--openflow-probe="`))
 	})
@@ -4620,21 +4597,20 @@ func TestRenderOVNKubernetes_NodeDaemonSetEnvOverridesVolume(t *testing.T) {
 	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 		ControlPlaneReplicaCount: 3,
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 			HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 				Enabled: false,
 			},
 		},
 	}
 	featureGatesCNO := getDefaultFeatureGates()
-	fakeClient := cnofake.NewFakeClient()
 
-	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	nodeDS := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
@@ -4686,9 +4662,9 @@ func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
 		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 			ControlPlaneReplicaCount: 3,
 			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-				DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-				DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-				SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+				DpuHostModeLabel:     OVNNodeSelectorDefaultDPUHost,
+				DpuModeLabel:         OVNNodeSelectorDefaultDPU,
+				SmartNicModeLabel:    OVNNodeSelectorDefaultSmartNIC,
 				MgmtPortResourceName: "",
 				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 					Enabled: false,
@@ -4697,14 +4673,13 @@ func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
 			},
 		}
 		featureGatesCNO := getDefaultFeatureGates()
-		fakeClient := cnofake.NewFakeClient()
 
-		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 		g.Expect(err).NotTo(HaveOccurred())
 		return extractOVNScriptLib(g, objs)
 	}
 
-	t.Run("with allow-icmp-network-policy override", func(t *testing.T) {
+	t.Run("with allow-icmp-network-policy override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"allow-icmp-network-policy": "true"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
   if [[ "true" != "" ]]; then
@@ -4712,7 +4687,7 @@ func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
   fi`))
 	})
 
-	t.Run("without allow-icmp-network-policy override", func(t *testing.T) {
+	t.Run("without allow-icmp-network-policy override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(nil)
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
   if [[ "" != "" ]]; then
@@ -4720,7 +4695,7 @@ func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
   fi`))
 	})
 
-	t.Run("with invalid allow-icmp-network-policy override", func(t *testing.T) {
+	t.Run("with invalid allow-icmp-network-policy override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"allow-icmp-network-policy": "-60"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
   if [[ "" != "" ]]; then
@@ -4931,7 +4906,7 @@ func TestRenderOVNKubernetesNoOverlay(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(_ *testing.T) {
 			crd := OVNKubernetesConfig.DeepCopy()
 			config := &crd.Spec
 			config.DefaultNetwork.OVNKubernetesConfig.MTU = new(uint32(1500))
@@ -4945,16 +4920,16 @@ func TestRenderOVNKubernetesNoOverlay(t *testing.T) {
 			}
 
 			errs := validateOVNKubernetes(config)
-			g.Expect(errs).To(HaveLen(0))
+			g.Expect(errs).To(BeEmpty())
 			fillDefaults(config, nil)
 
 			bootstrapResult := fakeBootstrapResult()
 			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 				ControlPlaneReplicaCount: 3,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-					DpuHostModeLabel:     OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-					DpuModeLabel:         OVN_NODE_SELECTOR_DEFAULT_DPU,
-					SmartNicModeLabel:    OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+					DpuHostModeLabel:     OVNNodeSelectorDefaultDPUHost,
+					DpuModeLabel:         OVNNodeSelectorDefaultDPU,
+					SmartNicModeLabel:    OVNNodeSelectorDefaultSmartNIC,
 					MgmtPortResourceName: "",
 					HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
 						Enabled: false,
@@ -4962,8 +4937,7 @@ func TestRenderOVNKubernetesNoOverlay(t *testing.T) {
 				},
 			}
 
-			fakeClient := cnofake.NewFakeClient()
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, tc.featureGates())
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, tc.featureGates())
 
 			if tc.expectErr {
 				g.Expect(err).To(HaveOccurred())
@@ -5071,8 +5045,8 @@ func TestDpuLeaseConfig(t *testing.T) {
 		},
 		{
 			name:                  "defaults are rendered",
-			leaseRenewInterval:    DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			leaseDuration:         DPU_NODE_LEASE_DURATION_DEFAULT,
+			leaseRenewInterval:    DPUNodeLeaseRenewIntervalDefault,
+			leaseDuration:         DPUNodeLeaseDurationDefault,
 			expectedRenewInterval: "10",
 			expectedDuration:      "40",
 			expectPresent:         true,
@@ -5080,9 +5054,9 @@ func TestDpuLeaseConfig(t *testing.T) {
 		{
 			name:                  "zero renew interval disables health check",
 			leaseRenewInterval:    0,
-			leaseDuration:         DPU_NODE_LEASE_DURATION_DEFAULT,
+			leaseDuration:         DPUNodeLeaseDurationDefault,
 			expectedRenewInterval: "0",
-			expectedDuration:      strconv.Itoa(DPU_NODE_LEASE_DURATION_DEFAULT),
+			expectedDuration:      strconv.Itoa(DPUNodeLeaseDurationDefault),
 			expectPresent:         true,
 		},
 	} {
@@ -5092,16 +5066,16 @@ func TestDpuLeaseConfig(t *testing.T) {
 			crd := OVNKubernetesConfig.DeepCopy()
 			config := &crd.Spec
 			errs := validateOVNKubernetes(config)
-			g.Expect(errs).To(HaveLen(0))
+			g.Expect(errs).To(BeEmpty())
 			fillDefaults(config, nil)
 
 			bootstrapResult := fakeBootstrapResult()
 			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
 				ControlPlaneReplicaCount: 3,
 				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-					DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-					DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-					SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+					DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+					DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+					SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 					MgmtPortResourceName:      "",
 					DpuNodeLeaseRenewInterval: tc.leaseRenewInterval,
 					DpuNodeLeaseDuration:      tc.leaseDuration,
@@ -5113,8 +5087,7 @@ func TestDpuLeaseConfig(t *testing.T) {
 			}
 
 			featureGatesCNO := getDefaultFeatureGates()
-			fakeClient := cnofake.NewFakeClient()
-			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
+			objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			envVars := extractDaemonSetEnvVars(g, objs, "ovnkube-node-dpu-host", "ovnkube-controller")
@@ -5135,7 +5108,7 @@ func TestDpuLeaseConfig(t *testing.T) {
 func TestFillOVNKubernetesDefaultsMTUNoOverlay(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	t.Run("no-overlay mode sets MTU to hostMTU (no overhead subtraction)", func(t *testing.T) {
+	t.Run("no-overlay mode sets MTU to hostMTU (no overhead subtraction)", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
@@ -5148,7 +5121,7 @@ func TestFillOVNKubernetesDefaultsMTUNoOverlay(t *testing.T) {
 		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(uint32(hostMTU)))
 	})
 
-	t.Run("Geneve mode subtracts encapsulation overhead from hostMTU", func(t *testing.T) {
+	t.Run("Geneve mode subtracts encapsulation overhead from hostMTU", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionGeneve
@@ -5162,7 +5135,7 @@ func TestFillOVNKubernetesDefaultsMTUNoOverlay(t *testing.T) {
 		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(uint32(hostMTU - 100)))
 	})
 
-	t.Run("empty transport (defaults to Geneve) subtracts overhead", func(t *testing.T) {
+	t.Run("empty transport (defaults to Geneve) subtracts overhead", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = "" // empty
@@ -5176,7 +5149,7 @@ func TestFillOVNKubernetesDefaultsMTUNoOverlay(t *testing.T) {
 		g.Expect(*conf.DefaultNetwork.OVNKubernetesConfig.MTU).To(Equal(uint32(hostMTU - 100)))
 	})
 
-	t.Run("previous MTU is preserved also in no-overlay mode", func(t *testing.T) {
+	t.Run("previous MTU is preserved also in no-overlay mode", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
@@ -5198,29 +5171,27 @@ func TestFillOVNKubernetesDefaultsMTUNoOverlay(t *testing.T) {
 func TestValidateMTUForNoOverlay(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	t.Run("valid MTU equal to hostMTU", func(t *testing.T) {
+	t.Run("valid MTU equal to hostMTU", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		mtu := uint32(9000)
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
 		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
 
-		err := ValidateMTUForNoOverlay(conf, 9000)
-		g.Expect(err).To(BeNil())
+		g.Expect(ValidateMTUForNoOverlay(conf, 9000)).To(Succeed())
 	})
 
-	t.Run("valid MTU less than hostMTU", func(t *testing.T) {
+	t.Run("valid MTU less than hostMTU", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		mtu := uint32(1500)
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
 		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
 
-		err := ValidateMTUForNoOverlay(conf, 9000)
-		g.Expect(err).To(BeNil())
+		g.Expect(ValidateMTUForNoOverlay(conf, 9000)).To(Succeed())
 	})
 
-	t.Run("invalid MTU greater than hostMTU", func(t *testing.T) {
+	t.Run("invalid MTU greater than hostMTU", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		mtu := uint32(9001)
@@ -5228,19 +5199,18 @@ func TestValidateMTUForNoOverlay(t *testing.T) {
 		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
 
 		err := ValidateMTUForNoOverlay(conf, 9000)
-		g.Expect(err).NotTo(BeNil())
+		g.Expect(err).To(HaveOccurred())
 		g.Expect(err.Error()).To(ContainSubstring("cannot exceed host MTU"))
 	})
 
-	t.Run("hostMTU of 0 skips validation", func(t *testing.T) {
+	t.Run("hostMTU of 0 skips validation", func(_ *testing.T) {
 		crd := OVNKubernetesConfig.DeepCopy()
 		conf := &crd.Spec
 		mtu := uint32(1500)
 		conf.DefaultNetwork.OVNKubernetesConfig.Transport = operv1.TransportOptionNoOverlay
 		conf.DefaultNetwork.OVNKubernetesConfig.MTU = &mtu
 
-		err := ValidateMTUForNoOverlay(conf, 0)
-		g.Expect(err).To(BeNil())
+		g.Expect(ValidateMTUForNoOverlay(conf, 0)).To(Succeed())
 	})
 }
 

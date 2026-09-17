@@ -27,7 +27,7 @@ type Client interface {
 	Default() ClusterClient
 
 	// Start may start all informers for all clients, if applicable.
-	Start(context.Context) error
+	Start(ctx context.Context) error
 }
 
 // ClusterClient is the connection to a single cluster / apiserver. It exposes

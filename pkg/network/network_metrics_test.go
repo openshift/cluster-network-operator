@@ -49,7 +49,7 @@ func TestRenderNetworkMetricsDaemon(t *testing.T) {
 
 	// Check rendered object
 
-	g.Expect(len(objs)).To(Equal(34), "Expected 34 multus related objects")
+	g.Expect(objs).To(HaveLen(34), "Expected 34 multus related objects")
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "network-metrics-daemon")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Service", "openshift-multus", "network-metrics-service")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "metrics-daemon-role")))
@@ -62,6 +62,7 @@ func TestRenderNetworkMetricsDaemon(t *testing.T) {
 	testTLSArgRendering(t, "network-metrics kube-rbac-proxy", "",
 		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			testBootstrap := fakeBootstrapResult()
 			testBootstrap.TLSProfile = tlsProfile
 			objs, err := renderMultus(config, testBootstrap, manifestDir)

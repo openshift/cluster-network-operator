@@ -15,26 +15,26 @@ import (
 )
 
 // Bootstrap creates resources required by the network plugin on the cloud.
-func Bootstrap(conf *operv1.Network, client cnoclient.Client) (*bootstrap.BootstrapResult, error) {
+func Bootstrap(ctx context.Context, conf *operv1.Network, client cnoclient.Client) (*bootstrap.BootstrapResult, error) {
 	out := &bootstrap.BootstrapResult{}
 
-	infraStatus, err := platform.InfraStatus(client)
+	infraStatus, err := platform.InfraStatus(ctx, client)
 	if err != nil {
 		return nil, err
 	}
 	out.Infra = *infraStatus
 
 	if conf.Spec.DefaultNetwork.Type == operv1.NetworkTypeOVNKubernetes {
-		o, err := bootstrapOVN(conf, client, infraStatus)
+		o, err := bootstrapOVN(ctx, conf, client, infraStatus)
 		if err != nil {
 			return nil, err
 		}
 		out.OVN = *o
 	}
 
-	out.IPTablesAlerter = iptablesAlerterBootstrap(client.ClientFor("").CRClient())
+	out.IPTablesAlerter = iptablesAlerterBootstrap(ctx, client.ClientFor("").CRClient())
 
-	out.TLSProfile, err = GetTLSProfile(client, infraStatus.HostedControlPlane)
+	out.TLSProfile, err = GetTLSProfile(ctx, client, infraStatus.HostedControlPlane)
 	if err != nil {
 		return nil, err
 	}
@@ -42,13 +42,13 @@ func Bootstrap(conf *operv1.Network, client cnoclient.Client) (*bootstrap.Bootst
 	return out, nil
 }
 
-func iptablesAlerterBootstrap(cl crclient.Reader) bootstrap.IPTablesAlerterBootstrapResult {
+func iptablesAlerterBootstrap(ctx context.Context, cl crclient.Reader) bootstrap.IPTablesAlerterBootstrapResult {
 	result := bootstrap.IPTablesAlerterBootstrapResult{
 		Enabled: true,
 	}
 
 	cm := &corev1.ConfigMap{}
-	if err := cl.Get(context.TODO(), types.NamespacedName{
+	if err := cl.Get(ctx, types.NamespacedName{
 		Namespace: "openshift-network-operator",
 		Name:      "iptables-alerter-config",
 	}, cm); err != nil {

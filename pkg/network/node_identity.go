@@ -30,12 +30,12 @@ const NetworkNodeIdentityWebhookPort = "9743"
 const NetworkNodeIdentityNamespace = "openshift-network-node-identity"
 
 // isBootstrapComplete checks whether the bootstrap phase of openshift installation completed
-func isBootstrapComplete(cli cnoclient.Client) (bool, error) {
+func isBootstrapComplete(ctx context.Context, cli cnoclient.Client) (bool, error) {
 	clusterBootstrap := &corev1.ConfigMap{}
-	clusterBootstrapLookup := types.NamespacedName{Name: "bootstrap", Namespace: CLUSTER_CONFIG_NAMESPACE}
-	if err := cli.ClientFor("").CRClient().Get(context.TODO(), clusterBootstrapLookup, clusterBootstrap); err != nil {
+	clusterBootstrapLookup := types.NamespacedName{Name: "bootstrap", Namespace: ClusterConfigNamespace}
+	if err := cli.ClientFor("").CRClient().Get(ctx, clusterBootstrapLookup, clusterBootstrap); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return false, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %s", err)
+			return false, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %w", err)
 		}
 	}
 	status, ok := clusterBootstrap.Data["status"]
@@ -47,7 +47,7 @@ func isBootstrapComplete(cli cnoclient.Client) (bool, error) {
 }
 
 // renderNetworkNodeIdentity renders the network node identity component
-func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client cnoclient.Client) ([]*uns.Unstructured, error) {
+func renderNetworkNodeIdentity(ctx context.Context, conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string, client cnoclient.Client) ([]*uns.Unstructured, error) {
 	if !bootstrapResult.Infra.NetworkNodeIdentityEnabled {
 		klog.Infof("Network node identity is disabled")
 		return nil, nil
@@ -117,7 +117,7 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 			},
 		}
 		nsn := types.NamespacedName{Namespace: hcpCfg.Namespace, Name: "network-node-identity"}
-		if err := client.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(), nsn, webhookDeployment); err != nil {
+		if err := client.ClientFor(names.ManagementClusterName).CRClient().Get(ctx, nsn, webhookDeployment); err != nil {
 			if !apierrors.IsNotFound(err) {
 				return nil, fmt.Errorf("failed to retrieve existing network-node-identity deployment: %w", err)
 			} else {
@@ -152,7 +152,7 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 		data.Data["NetworkNodeIdentityAddress"] = net.JoinHostPort(networkNodeIdentityIP, NetworkNodeIdentityWebhookPort)
 
 		var err error
-		clusterBootstrapFinished, err = isBootstrapComplete(client)
+		clusterBootstrapFinished, err = isBootstrapComplete(ctx, client)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +164,7 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 			},
 		}
 		nsn := types.NamespacedName{Namespace: NetworkNodeIdentityNamespace, Name: "network-node-identity"}
-		if err := client.Default().CRClient().Get(context.TODO(), nsn, webhookDaemonSet); err != nil {
+		if err := client.Default().CRClient().Get(ctx, nsn, webhookDaemonSet); err != nil {
 			if !apierrors.IsNotFound(err) {
 				return nil, fmt.Errorf("failed to retrieve existing network-node-identity daemonset: %w", err)
 			} else {
@@ -178,10 +178,10 @@ func renderNetworkNodeIdentity(conf *operv1.NetworkSpec, bootstrapResult *bootst
 	}
 
 	var webhookCA []byte
-	if err := webhookCAClient.CRClient().Get(context.TODO(), webhookCALookup, webhookCAConfigMap); err != nil {
+	if err := webhookCAClient.CRClient().Get(ctx, webhookCALookup, webhookCAConfigMap); err != nil {
 		// If the CA doesn't exist, the ValidatingWebhookConfiguration will not be rendered
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("unable to retrieve ovnkube-identity webhook CA config: %s", err)
+			return nil, fmt.Errorf("unable to retrieve ovnkube-identity webhook CA config: %w", err)
 		}
 	} else {
 		_, webhookCA, err = validation.TrustBundleConfigMap(webhookCAConfigMap, caKey)

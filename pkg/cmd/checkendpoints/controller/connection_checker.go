@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"regexp"
@@ -105,7 +106,7 @@ func (c *connectionChecker) Run(ctx context.Context) {
 		}
 	}()
 	go wait.UntilWithContext(ctx2, func(ctx context.Context) {
-		c.checkConnection(ctx2)
+		c.checkConnection(ctx)
 	}, checkPeriod)
 	klog.V(1).Infof("Started connectivity check %s.", c.name)
 	<-ctx2.Done()
@@ -119,7 +120,7 @@ func (c *connectionChecker) Stop(ctx context.Context) {
 
 // updateStatus applies updates. If an error occurs applying an update,
 // it remain on the queue and retried on the next call to updateStatus.
-func (c *connectionChecker) updateStatus(ctx context.Context, flush bool) {
+func (c *connectionChecker) updateStatus(ctx context.Context, _ bool) {
 	if err := c.updates.Process(ctx, false); err != nil {
 		klog.Warningf("Unable to update status of %s: %v", c.name, err)
 	}
@@ -156,8 +157,9 @@ func (c *connectionChecker) getTCPConnectLatency(ctx context.Context, address st
 
 	// perform tls handshake to avoid spamming the logs of tls endpoints
 	host, _, _ := net.SplitHostPort(address)
+	//nolint:gosec // G402: InsecureSkipVerify is intentional - this is a connectivity checker, not validating certs
 	tlsConn := tls.Client(tcpConn, &tls.Config{Certificates: c.clientCertGetter(), ServerName: host, InsecureSkipVerify: true})
-	if err = tlsConn.Handshake(); err != nil {
+	if err = tlsConn.HandshakeContext(ctx); err != nil {
 		// ignore any error. most likely non-tls connection, plus we're not really testing tls
 		klog.V(4).Infof("%s: tls error ignored: %v", address, err)
 		_ = tcpConn.Close()
@@ -174,12 +176,8 @@ func (c *connectionChecker) getTCPConnectLatency(ctx context.Context, address st
 
 // isDNSError returns true if the cause of the net operation error is a DNS error
 func isDNSError(err error) bool {
-	if opErr, ok := err.(*net.OpError); ok {
-		if _, ok := opErr.Err.(*net.DNSError); ok {
-			return true
-		}
-	}
-	return false
+	var dnsErr *net.DNSError
+	return errors.As(err, &dnsErr)
 }
 
 // manageStatusLogs returns status update functions that updates the PodNetworkConnectivityCheck.Status's

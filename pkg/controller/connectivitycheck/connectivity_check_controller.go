@@ -39,17 +39,17 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type NetworkConnectivityCheckController interface {
-	connectivitycheckcontroller.ConnectivityCheckController
-}
-
-// NetworkConnectivyCheckController consumes a series of clients, informers and a recorders.
+// NetworkConnectivityCheckController consumes a series of clients, informers and a recorders.
 // With those objects it generates a series of templates for creating PodNetworkConnectivityChecks CRs,
 // in particular:
 // Checks between network-check-source pod and every kube apiserver service and endpoints
 // Checks between network-check-source pod and every openshift apiserver service and endpoints
 // Checks between network-check-source pod and every LB
 // Checks between network-check-source pod and network-check-target service and endpoints this being managed by a Daemonset
+type NetworkConnectivityCheckController interface {
+	connectivitycheckcontroller.ConnectivityCheckController
+}
+
 func NewNetworkConnectivityCheckController(
 	operatorClient v1helpers.OperatorClient,
 	configClient *configv1client.Clientset,
@@ -156,7 +156,7 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 	var checks []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration
 	var anySourcePodScheduled bool
 	nodes := make(map[string]*v1.Node)
-	nodeApiVersion := "v1"
+	nodeAPIVersion := "v1"
 	nodeKind := "Node"
 	for _, pod := range pods {
 		if pod.Spec.NodeName == "" {
@@ -181,7 +181,7 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 			nodeUID := node.GetUID()
 			nodeName := node.GetName()
 			nodeRef := applyconfigmetav1.OwnerReferenceApplyConfiguration{
-				APIVersion: &nodeApiVersion,
+				APIVersion: &nodeAPIVersion,
 				Kind:       &nodeKind,
 				UID:        &nodeUID,
 				Name:       &nodeName,
@@ -214,8 +214,8 @@ func (c *connectivityCheckTemplateProvider) generate(ctx context.Context, syncCo
 			WithLastTransitionTime(metav1.NewTime(time.Now())).
 			WithReason(currentStatus.Reason).
 			WithMessage(currentStatus.Message)
-		netConfig := applyconfigv1.Network(names.CLUSTER_CONFIG).WithStatus(applyconfigv1.NetworkStatus().WithConditions(condition))
-		_, err := c.configClient.ConfigV1().Networks().Apply(context.TODO(), netConfig, metav1.ApplyOptions{
+		netConfig := applyconfigv1.Network(names.ClusterConfig).WithStatus(applyconfigv1.NetworkStatus().WithConditions(condition))
+		_, err := c.configClient.ConfigV1().Networks().Apply(ctx, netConfig, metav1.ApplyOptions{
 			Force:        true,
 			FieldManager: "cluster-network-operator/connectivity-check-controller",
 		})
@@ -244,8 +244,9 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForKubernetesDefaultServ
 }
 
 func (c *connectivityCheckTemplateProvider) getTemplatesForKubernetesServiceMonitorService(recorder events.Recorder) []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration {
-	var templates []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration
-	for _, address := range c.listAddressesForKubernetesServiceMonitorService(recorder) {
+	addresses := c.listAddressesForKubernetesServiceMonitorService(recorder)
+	templates := make([]*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration, 0, len(addresses))
+	for _, address := range addresses {
 		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(address, "openshift-network-diagnostics", withTarget("kubernetes-apiserver-service", "cluster")))
 	}
 	return templates
@@ -267,7 +268,7 @@ func (c *connectivityCheckTemplateProvider) listAddressesForKubernetesServiceMon
 
 func (c *connectivityCheckTemplateProvider) getTemplatesForKubernetesServiceEndpointsChecks(recorder events.Recorder) []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration {
 	var templates []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration
-	addresses, err := c.listAddressesForKubeAPIServerServiceEndpoints(recorder)
+	addresses, err := c.listAddressesForKubeAPIServerServiceEndpoints()
 	if err != nil {
 		recorder.Warningf("EndpointDetectionFailure", "unable to determine openshift-kube-apiserver apiserver endpoints: %v", err)
 		return nil
@@ -280,7 +281,7 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForKubernetesServiceEndp
 }
 
 // listAddressesForKubeAPIServerServiceEndpoints returns kas api service endpoints ip
-func (c *connectivityCheckTemplateProvider) listAddressesForKubeAPIServerServiceEndpoints(recorder events.Recorder) ([]endpointInfo, error) {
+func (c *connectivityCheckTemplateProvider) listAddressesForKubeAPIServerServiceEndpoints() ([]endpointInfo, error) {
 	var results []endpointInfo
 	endpoints, err := c.kubeAPIServerEndpointsLister.Endpoints("openshift-kube-apiserver").Get("apiserver")
 	if err != nil {
@@ -302,7 +303,7 @@ func (c *connectivityCheckTemplateProvider) listAddressesForKubeAPIServerService
 
 func (c *connectivityCheckTemplateProvider) getTemplatesForOpenShiftAPIServerServiceCheck(recorder events.Recorder) []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration {
 	var templates []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration
-	ips, err := c.listAddressesForOpenShiftAPIServerService(recorder)
+	ips, err := c.listAddressesForOpenShiftAPIServerService()
 	if err != nil {
 		recorder.Warningf("EndpointDetectionFailure", "unable to determine openshift-apiserver apiserver service: %v", err)
 		return nil
@@ -316,7 +317,7 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForOpenShiftAPIServerSer
 	return templates
 }
 
-func (c *connectivityCheckTemplateProvider) listAddressesForOpenShiftAPIServerService(recorder events.Recorder) ([]string, error) {
+func (c *connectivityCheckTemplateProvider) listAddressesForOpenShiftAPIServerService() ([]string, error) {
 	service, err := c.openshiftAPIServerServiceLister.Services("openshift-apiserver").Get("api")
 	if err != nil {
 		return nil, err
@@ -331,7 +332,7 @@ func (c *connectivityCheckTemplateProvider) listAddressesForOpenShiftAPIServerSe
 
 func (c *connectivityCheckTemplateProvider) getTemplatesForOpenShiftAPIServerServiceEndpointsChecks(recorder events.Recorder) []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration {
 	var templates []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration
-	addresses, err := c.listAddressesForOpenShiftAPIServerServiceEndpoints(recorder)
+	addresses, err := c.listAddressesForOpenShiftAPIServerServiceEndpoints()
 	if err != nil {
 		recorder.Warningf("EndpointDetectionFailure", "unable to determine openshift-apiserver apiserver service endpoints: %v", err)
 		return nil
@@ -344,7 +345,7 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForOpenShiftAPIServerSer
 }
 
 // listAddressesForOpenShiftAPIServerServiceEndpoints returns oas api service endpoints ip
-func (c *connectivityCheckTemplateProvider) listAddressesForOpenShiftAPIServerServiceEndpoints(recorder events.Recorder) ([]endpointInfo, error) {
+func (c *connectivityCheckTemplateProvider) listAddressesForOpenShiftAPIServerServiceEndpoints() ([]endpointInfo, error) {
 	endpoints, err := c.openshiftAPIServerEndpointsLister.Endpoints("openshift-apiserver").Get("api")
 	if err != nil {
 		return nil, err
@@ -363,14 +364,15 @@ func (c *connectivityCheckTemplateProvider) listAddressesForOpenShiftAPIServerSe
 	}
 	return results, nil
 }
-func (c *connectivityCheckTemplateProvider) getTemplatesForGenericPodServiceCheck(recorder events.Recorder) []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration {
-	var templates []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration
-	return append(templates, NewPodNetworkConnectivityCheckTemplate("network-check-target:80", "openshift-network-diagnostics", withTarget("network-check-target-service", "cluster")))
+func (c *connectivityCheckTemplateProvider) getTemplatesForGenericPodServiceCheck(_ events.Recorder) []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration {
+	return []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration{
+		NewPodNetworkConnectivityCheckTemplate("network-check-target:80", "openshift-network-diagnostics", withTarget("network-check-target-service", "cluster")),
+	}
 }
 
 func (c *connectivityCheckTemplateProvider) getTemplatesForGenericPodServiceEndpointsChecks(recorder events.Recorder) []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration {
 	var templates []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration
-	addresses, err := c.listAddressesForGenericPodServiceEndpoints(recorder)
+	addresses, err := c.listAddressesForGenericPodServiceEndpoints()
 	if err != nil {
 		recorder.Warningf("EndpointDetectionFailure", "unable to determine openshift-network-diagnostics network-check-target endpoints: %v", err)
 		return nil
@@ -383,7 +385,7 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForGenericPodServiceEndp
 }
 
 // listAddressesForGenericPodServiceEndpoints returns network-check-target service endpoints ip
-func (c *connectivityCheckTemplateProvider) listAddressesForGenericPodServiceEndpoints(recorder events.Recorder) ([]endpointInfo, error) {
+func (c *connectivityCheckTemplateProvider) listAddressesForGenericPodServiceEndpoints() ([]endpointInfo, error) {
 	var results []endpointInfo
 	endpoints, err := c.diagnosticsEndpointsLister.Endpoints("openshift-network-diagnostics").Get("network-check-target")
 	if err != nil {
@@ -411,19 +413,18 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForAPILoadBalancerChecks
 		return nil
 	}
 
-	apiUrl, err := url.Parse(infrastructure.Status.APIServerURL)
+	apiURL, err := url.Parse(infrastructure.Status.APIServerURL)
 	if err != nil {
 		recorder.Warningf("EndpointDetectionFailure", "error detecting external api load balancer endpoint: %v", err)
-
 	} else {
-		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(apiUrl.Host, "openshift-network-diagnostics", withTarget("load-balancer", "api-external")))
+		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(apiURL.Host, "openshift-network-diagnostics", withTarget("load-balancer", "api-external")))
 	}
 
-	apiInternalUrl, err := url.Parse(infrastructure.Status.APIServerInternalURL)
+	apiInternalURL, err := url.Parse(infrastructure.Status.APIServerInternalURL)
 	if err != nil {
 		recorder.Warningf("EndpointDetectionFailure", "error detecting internal api load balancer endpoint: %v", err)
 	} else {
-		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(apiInternalUrl.Host, "openshift-network-diagnostics", withTarget("load-balancer", "api-internal")))
+		templates = append(templates, NewPodNetworkConnectivityCheckTemplate(apiInternalURL.Host, "openshift-network-diagnostics", withTarget("load-balancer", "api-internal")))
 	}
 	return templates
 }

@@ -3,6 +3,7 @@ package observability
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,7 +16,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -263,7 +264,7 @@ func (r *ReconcileObservability) shouldInstallNetworkObservability(ctx context.C
 	// Get Network CR information
 	var network configv1.Network
 	if err := r.client.Get(ctx, types.NamespacedName{Name: NetworkCRName}, &network); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		return false, err
@@ -347,7 +348,7 @@ func (r *ReconcileObservability) isNetObservOperatorInstalled(ctx context.Contex
 
 	crdExists := true
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			crdExists = false
 		} else {
 			return false, false, err
@@ -363,7 +364,7 @@ func (r *ReconcileObservability) isNetObservOperatorInstalled(ctx context.Contex
 
 	// Check OLMv0 (ClusterServiceVersion/Subscription) installation status
 	olmv0Installed, olmv0Err := r.checkOLMv0Installation(ctx)
-	if olmv0Err != nil && !errors.IsNotFound(olmv0Err) {
+	if olmv0Err != nil && !apierrors.IsNotFound(olmv0Err) {
 		// Installation error from OLMv0
 		return false, olmv1CEExists, fmt.Errorf("OLMv0 installation error: %w", olmv0Err)
 	}
@@ -409,7 +410,7 @@ func (r *ReconcileObservability) checkOLMv1Installation(ctx context.Context) (in
 	})
 
 	if err := r.client.Get(ctx, types.NamespacedName{Name: "netobserv-operator"}, clusterExtension); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return false, false, nil
 		}
 		return false, false, err
@@ -463,7 +464,7 @@ func (r *ReconcileObservability) checkOLMv0Installation(ctx context.Context) (bo
 	})
 
 	if err := r.client.List(ctx, csvList, crclient.InNamespace(OperatorNamespace)); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		return false, err
@@ -512,7 +513,7 @@ func (r *ReconcileObservability) applyManifest(ctx context.Context, yamlPath, de
 	for {
 		obj := &unstructured.Unstructured{}
 		if err := dec.Decode(obj); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return err
@@ -557,7 +558,7 @@ func (r *ReconcileObservability) isFlowCollectorExists(ctx context.Context) (boo
 
 	err := r.client.Get(ctx, types.NamespacedName{Name: FlowCollectorName}, flowCollector)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		return false, err

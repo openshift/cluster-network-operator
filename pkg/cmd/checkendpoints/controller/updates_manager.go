@@ -68,7 +68,6 @@ func (u *updatesManager) Add(timestamp time.Time, updates ...v1alpha1helpers.Upd
 	var requeue []time.Time
 	for _, timestamp := range u.timestamps {
 		switch {
-
 		// updates came in quickly after last set of updates
 		case timestamp.Sub(u.lastTimestamp) < u.checkPeriod*2:
 			fallthrough

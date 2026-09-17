@@ -13,25 +13,25 @@ type LoggingRecorder struct{}
 
 var _ events.Recorder = &LoggingRecorder{}
 
-func (r *LoggingRecorder) Event(reason, message string) {
+func (r *LoggingRecorder) Event(_, message string) {
 	log.Println(message)
 }
-func (r *LoggingRecorder) Eventf(reason, messageFmt string, args ...any) {
+func (r *LoggingRecorder) Eventf(_, messageFmt string, args ...any) {
 	log.Printf(messageFmt, args...)
 }
-func (r *LoggingRecorder) Warning(reason, message string) {
+func (r *LoggingRecorder) Warning(_, message string) {
 	log.Println(message)
 }
 
-func (r *LoggingRecorder) Warningf(reason, messageFmt string, args ...any) {
+func (r *LoggingRecorder) Warningf(_, messageFmt string, args ...any) {
 	log.Printf(messageFmt, args...)
 }
 
-func (r *LoggingRecorder) ForComponent(componentName string) events.Recorder {
+func (r *LoggingRecorder) ForComponent(_ string) events.Recorder {
 	return r
 }
 
-func (r *LoggingRecorder) WithComponentSuffix(componentNameSuffix string) events.Recorder {
+func (r *LoggingRecorder) WithComponentSuffix(_ string) events.Recorder {
 	return r
 }
 

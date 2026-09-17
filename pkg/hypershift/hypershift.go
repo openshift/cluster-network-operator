@@ -135,39 +135,39 @@ func (hc *HyperShiftConfig) SetRelatedObjects(relatedObjects []RelatedObject) {
 func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlane, error) {
 	clusterID, _, err := unstructured.NestedString(hcp.UnstructuredContent(), "spec", "clusterID")
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract clusterID: %v", err)
+		return nil, fmt.Errorf("failed to extract clusterID: %w", err)
 	}
 
 	controllerAvailabilityPolicy, _, err := unstructured.NestedString(hcp.UnstructuredContent(), "spec", "controllerAvailabilityPolicy")
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract controllerAvailabilityPolicy: %v", err)
+		return nil, fmt.Errorf("failed to extract controllerAvailabilityPolicy: %w", err)
 	}
 
 	controlPlanePriorityClassAnnotation, _, err := unstructured.NestedString(hcp.UnstructuredContent(), "metadata", "annotations", "hypershift.openshift.io/control-plane-priority-class")
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract control plane priority class annotation: %v", err)
+		return nil, fmt.Errorf("failed to extract control plane priority class annotation: %w", err)
 	}
 
 	restartDate, _, err := unstructured.NestedString(hcp.UnstructuredContent(), "metadata", "annotations", RestartDateAnnotation)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract restart date annotation: %v", err)
+		return nil, fmt.Errorf("failed to extract restart date annotation: %w", err)
 	}
 
 	nodeSelector, _, err := unstructured.NestedStringMap(hcp.UnstructuredContent(), "spec", "nodeSelector")
 	if err != nil {
-		return nil, fmt.Errorf("failed extract nodeSelector: %v", err)
+		return nil, fmt.Errorf("failed extract nodeSelector: %w", err)
 	}
 
 	labels, _, err := unstructured.NestedStringMap(hcp.UnstructuredContent(), "spec", "labels")
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract labels: %v", err)
+		return nil, fmt.Errorf("failed to extract labels: %w", err)
 	}
 
 	var tolerations []corev1.Toleration
 	var tolerationsYaml []string
 	tolerationsArray, tolerationsArrayFound, err := unstructured.NestedFieldCopy(hcp.UnstructuredContent(), "spec", "tolerations")
 	if err != nil {
-		return nil, fmt.Errorf("failed extract tolerations: %v", err)
+		return nil, fmt.Errorf("failed extract tolerations: %w", err)
 	}
 	if tolerationsArrayFound {
 		tolerationsArrayConverted, hasConverted := tolerationsArray.([]any)
@@ -217,20 +217,20 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 		}
 		tolerationsYaml, err = tolerationsToStringSliceYaml(tolerations)
 		if err != nil {
-			return nil, fmt.Errorf("failed to yaml marshal tolerations: %v", err)
+			return nil, fmt.Errorf("failed to yaml marshal tolerations: %w", err)
 		}
 	}
 
 	advertiseAddress, valueFound, err := unstructured.NestedString(hcp.UnstructuredContent(), "spec", "networking", "apiServer", "advertiseAddress")
 	if err != nil {
-		return nil, fmt.Errorf("failed extract advertiseAddress: %v", err)
+		return nil, fmt.Errorf("failed extract advertiseAddress: %w", err)
 	}
 	if !valueFound {
 		// default to ipv4 unless we can prove it is a ipv6 cluster
 		advertiseAddress = HostedClusterDefaultAdvertiseAddressIPV4
 		cidrArray, cidrArrayValueFound, err := unstructured.NestedFieldCopy(hcp.UnstructuredContent(), "spec", "networking", "serviceNetwork")
 		if err != nil {
-			return nil, fmt.Errorf("failed extract serviceNetwork: %v", err)
+			return nil, fmt.Errorf("failed extract serviceNetwork: %w", err)
 		}
 		if cidrArrayValueFound {
 			cidrArrayConverted, hasConverted := cidrArray.([]any)
@@ -251,7 +251,7 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 	}
 	advertisePort, valueFound, err := unstructured.NestedInt64(hcp.UnstructuredContent(), "spec", "networking", "apiServer", "port")
 	if err != nil {
-		return nil, fmt.Errorf("failed extract advertisePort: %v", err)
+		return nil, fmt.Errorf("failed extract advertisePort: %w", err)
 	}
 	if !valueFound {
 		advertisePort = HostedClusterDefaultAdvertisePort
@@ -261,7 +261,7 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 	var apiServerSpec *configv1.APIServerSpec
 	apiServerConfig, found, err := unstructured.NestedFieldCopy(hcp.UnstructuredContent(), "spec", "configuration", "apiServer")
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract apiServer config: %v", err)
+		return nil, fmt.Errorf("failed to extract apiServer config: %w", err)
 	}
 	if found && apiServerConfig != nil {
 		apiServerMap, ok := apiServerConfig.(map[string]any)
@@ -291,7 +291,7 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 
 // GetHostedControlPlane retrieves and parses the HostedControlPlane CR for the current HyperShift cluster.
 // Returns nil if HyperShift is not enabled.
-func GetHostedControlPlane(client cnoclient.Client) (*HostedControlPlane, error) {
+func GetHostedControlPlane(ctx context.Context, client cnoclient.Client) (*HostedControlPlane, error) {
 	hc := NewHyperShiftConfig()
 	if !hc.Enabled {
 		return nil, nil
@@ -299,7 +299,7 @@ func GetHostedControlPlane(client cnoclient.Client) (*HostedControlPlane, error)
 
 	hcp := &unstructured.Unstructured{}
 	hcp.SetGroupVersionKind(HostedControlPlaneGVK)
-	err := client.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(),
+	err := client.ClientFor(names.ManagementClusterName).CRClient().Get(ctx,
 		types.NamespacedName{Namespace: hc.Namespace, Name: hc.Name}, hcp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve HostedControlPlane %s/%s: %w", hc.Namespace, hc.Name, err)
@@ -332,14 +332,14 @@ func SetRestartDateAnnotation(objs []*unstructured.Unstructured, hcpNamespace, r
 
 		anno, _, err := unstructured.NestedStringMap(obj.Object, "spec", "template", "metadata", "annotations")
 		if err != nil {
-			return fmt.Errorf("failed to get pod template annotations from %s/%s: %v", kind, obj.GetName(), err)
+			return fmt.Errorf("failed to get pod template annotations from %s/%s: %w", kind, obj.GetName(), err)
 		}
 		if anno == nil {
 			anno = map[string]string{}
 		}
 		anno[RestartDateAnnotation] = restartDate
 		if err := unstructured.SetNestedStringMap(obj.Object, anno, "spec", "template", "metadata", "annotations"); err != nil {
-			return fmt.Errorf("failed to set restart-date annotation on %s/%s: %v", kind, obj.GetName(), err)
+			return fmt.Errorf("failed to set restart-date annotation on %s/%s: %w", kind, obj.GetName(), err)
 		}
 	}
 	return nil
@@ -350,7 +350,7 @@ func SetRestartDateAnnotation(objs []*unstructured.Unstructured, hcpNamespace, r
 func SetHostedControlPlaneConditions(hcp *unstructured.Unstructured, operStatus *operv1.NetworkStatus) ([]metav1.Condition, error) {
 	conditionsRaw, _, err := unstructured.NestedSlice(hcp.UnstructuredContent(), "status", "conditions")
 	if err != nil {
-		return nil, fmt.Errorf("failed extract conditions: %v", err)
+		return nil, fmt.Errorf("failed extract conditions: %w", err)
 	}
 
 	var conditions []metav1.Condition
@@ -416,7 +416,6 @@ func tolerationsToStringSliceYaml(tolerations []corev1.Toleration) ([]string, er
 
 	yamlStrs := []string{}
 	for arg := range strings.SplitSeq(string(yamlBytes), "\n") {
-
 		// filter out null and empty strings
 		if strings.Contains(arg, ": null") || strings.Contains(arg, ": \"\"") {
 			continue

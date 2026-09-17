@@ -37,7 +37,7 @@ const (
 	pluginName = "networking-console-plugin"
 )
 
-func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, manifestDir string, client cnoclient.Client, featureGates featuregates.FeatureGate, bootstrapResult *bootstrap.BootstrapResult) ([]*uns.Unstructured, bool, error) {
+func Render(ctx context.Context, operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, manifestDir string, client cnoclient.Client, featureGates featuregates.FeatureGate, bootstrapResult *bootstrap.BootstrapResult) ([]*uns.Unstructured, bool, error) {
 	log.Printf("Starting render phase")
 	var progressing bool
 	objs := []*uns.Unstructured{}
@@ -59,8 +59,7 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	objs = append(objs, o...)
 
 	// render MultusAdmissionController
-	o, err = renderMultusAdmissionController(operConf, manifestDir,
-		bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode, bootstrapResult, client, featureGates)
+	o, err = renderMultusAdmissionController(ctx, operConf, manifestDir, bootstrapResult.Infra.ControlPlaneTopology == configv1.ExternalTopologyMode, bootstrapResult, client)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -74,7 +73,7 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	objs = append(objs, o...)
 
 	// render default network
-	o, progressing, err = renderDefaultNetwork(operConf, bootstrapResult, manifestDir, client, featureGates)
+	o, progressing, err = renderDefaultNetwork(operConf, bootstrapResult, manifestDir, featureGates)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -113,7 +112,7 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	objs = append(objs, o...)
 
 	// render network node identity
-	o, err = renderNetworkNodeIdentity(operConf, bootstrapResult, manifestDir, client)
+	o, err = renderNetworkNodeIdentity(ctx, operConf, bootstrapResult, manifestDir, client)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -125,7 +124,7 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 	}
 	objs = append(objs, o...)
 
-	o, err = renderIPTablesAlerter(operConf, bootstrapResult, manifestDir)
+	o, err = renderIPTablesAlerter(bootstrapResult, manifestDir)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -146,7 +145,7 @@ func Render(operConf *operv1.NetworkSpec, clusterConf *configv1.NetworkSpec, man
 		objs = append(objs, o...)
 	}
 
-	err = registerNetworkingConsolePlugin(bootstrapResult, client)
+	err = registerNetworkingConsolePlugin(ctx, bootstrapResult, client)
 	if err != nil {
 		return nil, progressing, err
 	}
@@ -265,7 +264,7 @@ func FillDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) {
 	}
 
 	fillDefaultNetworkDefaults(conf, previous, hostMTU)
-	fillKubeProxyDefaults(conf, previous)
+	fillKubeProxyDefaults(conf)
 }
 
 // IsChangeSafe checks to see if the change between prev and next are allowed
@@ -400,7 +399,6 @@ func isNetworkChangeSafe(prev, next *operv1.NetworkSpec, infraRes *bootstrap.Inf
 }
 
 func isClusterNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
-
 	// quick check to make sure clusterNetwork slices are of same size as we do not
 	// support adding/removing additional clusterNetwork entries unless it's for a
 	// single/dual stack migration. in those cases validation is done in isNetworkChangeSafe()
@@ -425,13 +423,13 @@ func isClusterNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
 	// since we do not allow the clusterNetwork[] size to change, it should be safe to compare
 	// prev[i] to next[i] in this validation
 	for i, e := range prev.ClusterNetwork {
-		prevIp, prevMask, err := net.ParseCIDR(e.CIDR)
+		prevIP, prevMask, err := net.ParseCIDR(e.CIDR)
 		if err != nil {
-			return fmt.Errorf("error parsing CIDR from ClusterNetwork entry %s: %v", e.CIDR, err)
+			return fmt.Errorf("error parsing CIDR from ClusterNetwork entry %s: %w", e.CIDR, err)
 		}
-		nextIp, nextMask, err := net.ParseCIDR(next.ClusterNetwork[i].CIDR)
+		nextIP, nextMask, err := net.ParseCIDR(next.ClusterNetwork[i].CIDR)
 		if err != nil {
-			return fmt.Errorf("error parsing CIDR from ClusterNetwork entry %s: %v", next.ClusterNetwork[i].CIDR, err)
+			return fmt.Errorf("error parsing CIDR from ClusterNetwork entry %s: %w", next.ClusterNetwork[i].CIDR, err)
 		}
 		prevHostPrefix := e.HostPrefix
 		nextHostPrefix := next.ClusterNetwork[i].HostPrefix
@@ -441,7 +439,7 @@ func isClusterNetworkChangeSafe(prev, next *operv1.NetworkSpec) error {
 			return fmt.Errorf("modifying a clusterNetwork's hostPrefix value is unsupported")
 		}
 
-		if !prevIp.Equal(nextIp) {
+		if !prevIP.Equal(nextIP) {
 			return fmt.Errorf("modifying IP network value for clusterNetwork CIDR is unsupported")
 		}
 
@@ -477,7 +475,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 			ipv4Service = true
 		}
 		if err := pool.Add(*cidr); err != nil {
-			errs = append(errs, fmt.Errorf("whole or subset of ServiceNetwork CIDR %s is already in use: %s", snet, err))
+			errs = append(errs, fmt.Errorf("whole or subset of ServiceNetwork CIDR %s is already in use: %w", snet, err))
 		}
 	}
 
@@ -520,7 +518,7 @@ func validateIPPools(conf *operv1.NetworkSpec) []error {
 			}
 		}
 		if err := pool.Add(*cidr); err != nil {
-			errs = append(errs, fmt.Errorf("whole or subset of ClusterNetwork CIDR %s is already in use: %s", cnet.CIDR, err))
+			errs = append(errs, fmt.Errorf("whole or subset of ClusterNetwork CIDR %s is already in use: %w", cnet.CIDR, err))
 		}
 	}
 
@@ -574,14 +572,14 @@ func validateMigration(conf *operv1.NetworkSpec) []error {
 // renderDefaultNetwork generates the manifests corresponding to the requested
 // default network
 func renderDefaultNetwork(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string,
-	client cnoclient.Client, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, bool, error) {
+	featureGates featuregates.FeatureGate) ([]*uns.Unstructured, bool, error) {
 	dn := conf.DefaultNetwork
 	if errs := validateDefaultNetwork(conf); len(errs) > 0 {
 		return nil, false, fmt.Errorf("invalid Default Network configuration: %v", errs)
 	}
 
 	if dn.Type == operv1.NetworkTypeOVNKubernetes {
-		return renderOVNKubernetes(conf, bootstrapResult, manifestDir, client, featureGates)
+		return renderOVNKubernetes(conf, bootstrapResult, manifestDir, featureGates)
 	}
 
 	log.Printf("NOTICE: Unknown network type %s, ignoring", dn.Type)
@@ -683,22 +681,19 @@ func getMultusAdmissionControllerReplicas(bootstrapResult *bootstrap.BootstrapRe
 }
 
 // renderMultusAdmissionController generates the manifests of Multus Admission Controller
-func renderMultusAdmissionController(conf *operv1.NetworkSpec, manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, error) {
+func renderMultusAdmissionController(ctx context.Context, conf *operv1.NetworkSpec, manifestDir string, externalControlPlane bool,
+	bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client) ([]*uns.Unstructured, error) {
 	if *conf.DisableMultiNetwork {
 		return nil, nil
 	}
 
-	var err error
-	out := []*uns.Unstructured{}
-
 	hsc := hypershift.NewHyperShiftConfig()
-	objs, err := renderMultusAdmissonControllerConfig(manifestDir, externalControlPlane,
-		bootstrapResult, client, hsc, names.ManagementClusterName, featureGates)
+	objs, err := renderMultusAdmissonControllerConfig(ctx, manifestDir, externalControlPlane, bootstrapResult, client, hsc, names.ManagementClusterName)
 	if err != nil {
 		return nil, err
 	}
-	out = append(out, objs...)
-	return out, nil
+
+	return objs, nil
 }
 
 // renderMultiNetworkpolicy generates the manifests of MultiNetworkPolicy
@@ -712,15 +707,12 @@ func renderMultiNetworkpolicy(conf *operv1.NetworkSpec, manifestDir string) ([]*
 		return nil, nil
 	}
 
-	var err error
-	out := []*uns.Unstructured{}
-
 	objs, err := renderMultiNetworkpolicyConfig(manifestDir)
 	if err != nil {
 		return nil, err
 	}
-	out = append(out, objs...)
-	return out, nil
+
+	return objs, nil
 }
 
 // renderNetworkDiagnostics renders the connectivity checks
@@ -784,7 +776,7 @@ func renderCNO(manifestDir string) ([]*uns.Unstructured, error) {
 }
 
 // renderIPTablesAlerter generates the manifests for the pod iptables usage alerter
-func renderIPTablesAlerter(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
+func renderIPTablesAlerter(bootstrapResult *bootstrap.BootstrapResult, manifestDir string) ([]*uns.Unstructured, error) {
 	if !bootstrapResult.IPTablesAlerter.Enabled {
 		return nil, nil
 	}
@@ -854,13 +846,13 @@ func renderNetworkingConsolePlugin(manifestDir string, bootstrapResult *bootstra
 }
 
 // registerNetworkingConsolePlugin enables console plugin for networking-console if not already enabled
-func registerNetworkingConsolePlugin(bootstrapResult *bootstrap.BootstrapResult, cl cnoclient.Client) error {
+func registerNetworkingConsolePlugin(ctx context.Context, bootstrapResult *bootstrap.BootstrapResult, cl cnoclient.Client) error {
 	if !bootstrapResult.Infra.ConsolePluginCRDExists {
 		return nil
 	}
 
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		console, err := cl.ClientFor("").OpenshiftOperatorClient().OperatorV1().Consoles().Get(context.TODO(), "cluster", metav1.GetOptions{})
+		console, err := cl.ClientFor("").OpenshiftOperatorClient().OperatorV1().Consoles().Get(ctx, "cluster", metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to get Console Operator resource: %w", err)
 		}
@@ -870,7 +862,7 @@ func registerNetworkingConsolePlugin(bootstrapResult *bootstrap.BootstrapResult,
 		}
 		console.Spec.Plugins = append(console.Spec.Plugins, pluginName)
 
-		_, err = cl.Default().OpenshiftOperatorClient().OperatorV1().Consoles().Update(context.TODO(), console, metav1.UpdateOptions{})
+		_, err = cl.Default().OpenshiftOperatorClient().OperatorV1().Consoles().Update(ctx, console, metav1.UpdateOptions{})
 		return err
 	})
 }
@@ -881,23 +873,24 @@ func renderAdditionalRoutingCapabilities(conf *operv1.NetworkSpec, bootstrapResu
 	}
 	var out []*uns.Unstructured
 	for _, provider := range conf.AdditionalRoutingCapabilities.Providers {
-		switch provider {
-		case operv1.RoutingCapabilitiesProviderFRR:
-			data := render.MakeRenderData()
-
-			addTLSInfoToRenderData(data.Data, bootstrapResult, true)
-
-			data.Data["FRRK8sImage"] = os.Getenv("FRR_K8S_IMAGE")
-			data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
-			data.Data["NoOverlayManagedEnabled"] = conf.DefaultNetwork.OVNKubernetesConfig != nil &&
-				conf.DefaultNetwork.OVNKubernetesConfig.BGPManagedConfig.BGPTopology != ""
-			data.Data["IsSNO"] = bootstrapResult.OVN.ControlPlaneReplicaCount == 1
-			objs, err := render.RenderDir(filepath.Join(manifestDir, "network/frr-k8s"), &data)
-			if err != nil {
-				return nil, fmt.Errorf("failed to render frr-k8s manifests: %w", err)
-			}
-			out = append(out, objs...)
+		if provider != operv1.RoutingCapabilitiesProviderFRR {
+			continue
 		}
+
+		data := render.MakeRenderData()
+
+		addTLSInfoToRenderData(data.Data, bootstrapResult, true)
+
+		data.Data["FRRK8sImage"] = os.Getenv("FRR_K8S_IMAGE")
+		data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
+		data.Data["NoOverlayManagedEnabled"] = conf.DefaultNetwork.OVNKubernetesConfig != nil &&
+			conf.DefaultNetwork.OVNKubernetesConfig.BGPManagedConfig.BGPTopology != ""
+		data.Data["IsSNO"] = bootstrapResult.OVN.ControlPlaneReplicaCount == 1
+		objs, err := render.RenderDir(filepath.Join(manifestDir, "network/frr-k8s"), &data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to render frr-k8s manifests: %w", err)
+		}
+		out = append(out, objs...)
 	}
 
 	return out, nil

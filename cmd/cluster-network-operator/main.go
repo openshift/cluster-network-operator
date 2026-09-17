@@ -36,11 +36,14 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
 	logs.InitLogs()
-	defer logs.FlushLogs()
 
 	command := newNetworkOperatorCommand()
 
-	if err := command.Execute(); err != nil {
+	err := command.Execute()
+
+	logs.FlushLogs()
+
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
@@ -51,7 +54,7 @@ func newNetworkOperatorCommand() *cobra.Command {
 		Use:   "network-operator",
 		Short: "Openshift Cluster Network Operator",
 		Long:  "Run the network operator",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(cmd *cobra.Command, _ []string) {
 			_ = cmd.Help()
 			os.Exit(1)
 		},
@@ -81,7 +84,7 @@ func newCommandWithTLSCustomization(cmdcfg *controllercmd.ControllerCommandConfi
 	cmd.Flags().StringVar(&inClusterClientName, "in-cluster-client-name", names.DefaultClusterName, "client name for in-cluster config(service account or kubeconfig)")
 
 	// Replace with custom Run that intercepts to customize TLS
-	cmd.Run = func(cmd *cobra.Command, args []string) {
+	cmd.Run = func(cmd *cobra.Command, _ []string) {
 		// Standard boilerplate from library-go
 		logs.InitLogs()
 
@@ -181,13 +184,13 @@ func applyClusterTLSProfile(ctx context.Context, config *operatorv1alpha1.Generi
 	}
 
 	// Fetch HostedControlPlane for HyperShift (if applicable)
-	hcp, err := hypershift.GetHostedControlPlane(client)
+	hcp, err := hypershift.GetHostedControlPlane(ctx, client)
 	if err != nil {
 		return fmt.Errorf("failed to get HostedControlPlane: %w", err)
 	}
 
 	// Fetch TLS profile using network.GetTLSProfile (handles both standalone and HyperShift)
-	tlsProfile, err := network.GetTLSProfile(client, hcp)
+	tlsProfile, err := network.GetTLSProfile(ctx, client, hcp)
 	if err != nil {
 		return fmt.Errorf("failed to get TLS profile: %w", err)
 	}

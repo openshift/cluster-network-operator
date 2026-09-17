@@ -45,7 +45,6 @@ func TestURI(t *testing.T) {
 		_, err := URI(uri)
 		g.Expect(err).To(HaveOccurred())
 	}
-
 }
 
 func TestIPCIDR(t *testing.T) {

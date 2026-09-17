@@ -51,7 +51,7 @@ func SetPKIProfileProvider(p pki.PKIProfileProvider) {
 }
 
 // Add attaches our control loop to the manager and watches for PKI objects
-func Add(mgr manager.Manager, status *statusmanager.StatusManager, client cnoclient.Client, featureGates featuregates.FeatureGate) error {
+func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client, featureGates featuregates.FeatureGate) error {
 	r, err := newPKIReconciler(mgr, status, featureGates, pkiProvider)
 	if err != nil {
 		return err
@@ -92,7 +92,7 @@ type PKIReconciler struct {
 	pkiProfileProvider pki.PKIProfileProvider
 }
 
-// The periodic resync interval.
+// ResyncPeriod is the periodic resync interval.
 // We will re-run the reconciliation logic, even if the configuration
 // hasn't changed.
 var ResyncPeriod = 5 * time.Minute
@@ -149,43 +149,35 @@ func (r *PKIReconciler) Reconcile(ctx context.Context, request reconcile.Request
 		}
 	}
 	if existing == nil {
-		existing, err = newPKI(obj, r.clientset, r.mgr, r.certDuration, r.pkiProfileProvider)
-		if err != nil {
-			log.Println(err)
-			r.pkiErrs[request.NamespacedName] =
-				fmt.Errorf("could not parse PKI.Spec %s: %w", request.NamespacedName, err)
-			r.setStatus()
-			return reconcile.Result{}, err
-		}
-		r.pkis[request.NamespacedName] = existing
+		r.pkis[request.NamespacedName] = newPKI(obj, r.clientset, r.certDuration, r.pkiProfileProvider)
 	}
 
-	err = existing.sync()
+	err = existing.sync(ctx)
 	if err != nil {
 		log.Println(err)
 		r.pkiErrs[request.NamespacedName] =
 			fmt.Errorf("could not reconcile PKI %s: %w", request.NamespacedName, err)
-		r.setStatus()
+		r.setStatus(ctx)
 		return reconcile.Result{}, err
 	}
 
 	log.Println("successful reconciliation")
 	delete(r.pkiErrs, request.NamespacedName)
-	r.setStatus()
+	r.setStatus(ctx)
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
 }
 
 // setStatus summarizes the status of all PKI objects and updates the statusmanager
 // as appropriate.
-func (r *PKIReconciler) setStatus() {
+func (r *PKIReconciler) setStatus(ctx context.Context) {
 	if len(r.pkiErrs) == 0 {
-		r.status.SetNotDegraded(statusmanager.PKIConfig)
+		r.status.SetNotDegraded(ctx, statusmanager.PKIConfig)
 	} else {
-		msgs := []string{}
+		msgs := make([]string, 0, len(r.pkiErrs))
 		for _, e := range r.pkiErrs {
 			msgs = append(msgs, e.Error())
 		}
-		r.status.MaybeSetDegraded(statusmanager.PKIConfig, "PKIError", strings.Join(msgs, ", "))
+		r.status.MaybeSetDegraded(ctx, statusmanager.PKIConfig, "PKIError", strings.Join(msgs, ", "))
 	}
 }
 
@@ -197,7 +189,7 @@ type operatorPKI struct {
 }
 
 // newPKI creates a CertRotationController for the supplied configuration
-func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr manager.Manager, certDuration time.Duration, pkiProfileProvider pki.PKIProfileProvider) (*operatorPKI, error) {
+func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, certDuration time.Duration, pkiProfileProvider pki.PKIProfileProvider) *operatorPKI {
 	spec := config.Spec
 
 	// Ugly: the existing cache + informers used as part of the controller-manager
@@ -271,11 +263,11 @@ func newPKI(config *netopv1.OperatorPKI, clientset *kubernetes.Clientset, mgr ma
 	inf.Start(ch)
 	inf.WaitForCacheSync(ch)
 
-	return out, nil
+	return out
 }
 
 // sync causes the underlying cert controller to try and reconcile
-func (p *operatorPKI) sync() error {
-	runOnceCtx := context.WithValue(context.Background(), certrotation.RunOnceContextKey, true) //nolint:staticcheck
+func (p *operatorPKI) sync(ctx context.Context) error {
+	runOnceCtx := context.WithValue(ctx, certrotation.RunOnceContextKey, true) //nolint:staticcheck
 	return p.controller.Sync(runOnceCtx, nil)
 }

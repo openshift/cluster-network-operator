@@ -73,7 +73,7 @@ func TestKubeProxyConfig(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	errs := validateKubeProxy(&config)
-	g.Expect(errs).To(HaveLen(0))
+	g.Expect(errs).To(BeEmpty())
 
 	cfg, err := kubeProxyConfiguration(map[string]operv1.ProxyArgumentList{
 		// special address+port combo
@@ -160,7 +160,7 @@ func TestKubeProxyIPv6Config(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	errs := validateKubeProxy(&configIPv6)
-	g.Expect(errs).To(HaveLen(0))
+	g.Expect(errs).To(BeEmpty())
 
 	cfg, err := kubeProxyConfiguration(
 		map[string]operv1.ProxyArgumentList{
@@ -367,7 +367,7 @@ func TestFillKubeProxyDefaults(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		fillKubeProxyDefaults(tc.in, nil)
+		fillKubeProxyDefaults(tc.in)
 		g.Expect(tc.in).To(Equal(tc.out))
 	}
 }
@@ -375,12 +375,12 @@ func TestFillKubeProxyDefaults(t *testing.T) {
 var FakeKubeProxyBootstrapResult = bootstrap.BootstrapResult{
 	OVN: bootstrap.OVNBootstrapResult{
 		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
-			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
-			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
-			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
 			MgmtPortResourceName:      "",
-			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
-			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
 		},
 	},
 }
@@ -401,7 +401,7 @@ func TestRenderKubeProxy(t *testing.T) {
 		},
 	}
 
-	fillKubeProxyDefaults(c, nil)
+	fillKubeProxyDefaults(c)
 
 	objs, err := renderStandaloneKubeProxy(c, &FakeKubeProxyBootstrapResult, manifestDir)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -497,6 +497,7 @@ winkernel:
 	testTLSArgRendering(t, "kube-proxy kube-rbac-proxy", "",
 		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			testBootstrap := FakeKubeProxyBootstrapResult
 			testBootstrap.TLSProfile = tlsProfile
 			objs, err := renderStandaloneKubeProxy(c, &testBootstrap, manifestDir)

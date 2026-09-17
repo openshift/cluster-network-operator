@@ -79,8 +79,8 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 	log.Printf("Reconciling Infrastructure.config.openshift.io %s\n", request.Name)
 
 	// Only check on the default infrastructure config
-	if request.Name != names.INFRASTRUCTURE_CONFIG {
-		log.Printf("Ignoring Infrastructure config %s. Only handling Infrastructure config with default name %s", request.Name, names.INFRASTRUCTURE_CONFIG)
+	if request.Name != names.InfrastructureConfig {
+		log.Printf("Ignoring Infrastructure config %s. Only handling Infrastructure config with default name %s", request.Name, names.InfrastructureConfig)
 		return reconcile.Result{}, nil
 	}
 
@@ -110,7 +110,7 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 		err = fmt.Errorf("error while synchronizing spec and status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
 		log.Println(err)
 
-		r.status.SetDegraded(statusmanager.InfrastructureConfig, "SyncInfrastructureSpecAndStatus", err.Error())
+		r.status.SetDegraded(ctx, statusmanager.InfrastructureConfig, "SyncInfrastructureSpecAndStatus", err.Error())
 		return reconcile.Result{}, err
 	}
 
@@ -124,7 +124,7 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 			err = fmt.Errorf("error while updating infrastructures.%s/cluster: %w", configv1.GroupName, err)
 			log.Println(err)
 
-			r.status.MaybeSetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureSpecOrStatus", err.Error())
+			r.status.MaybeSetDegraded(ctx, statusmanager.InfrastructureConfig, "UpdateInfrastructureSpecOrStatus", err.Error())
 			return reconcile.Result{}, err
 		}
 		log.Printf("Successfully synchronized infrastructure config.")
@@ -135,13 +135,13 @@ func (r *ReconcileInfrastructureConfig) Reconcile(ctx context.Context, request r
 			err = fmt.Errorf("error while updating status of infrastructures.%s/cluster: %w", configv1.GroupName, err)
 			log.Println(err)
 
-			r.status.MaybeSetDegraded(statusmanager.InfrastructureConfig, "UpdateInfrastructureStatus", err.Error())
+			r.status.MaybeSetDegraded(ctx, statusmanager.InfrastructureConfig, "UpdateInfrastructureStatus", err.Error())
 			return reconcile.Result{}, err
 		}
 		log.Printf("Successfully synchronized infrastructure config status")
 	}
 
-	r.status.SetNotDegraded(statusmanager.InfrastructureConfig)
+	r.status.SetNotDegraded(ctx, statusmanager.InfrastructureConfig)
 	return reconcile.Result{}, nil
 }
 

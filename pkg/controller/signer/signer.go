@@ -17,6 +17,7 @@ import (
 func newCertificateTemplate(certReq *x509.CertificateRequest, certDuration time.Duration) *x509.Certificate {
 	// Like in openshift/library-go/pkg/crypto/crypto.go, we will generate a random
 	// serial number
+	//nolint:gosec // G404: Matches library-go pattern - serial uniqueness doesn't require crypto/rand
 	serialNumber := mathrand.New(mathrand.NewSource(time.Now().UTC().UnixNano())).Int63()
 
 	template := &x509.Certificate{

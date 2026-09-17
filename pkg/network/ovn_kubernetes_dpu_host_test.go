@@ -16,7 +16,6 @@ import (
 // TestOVNKubernetesNodeModeTemplates tests that both managed and self-hosted templates
 // correctly handle different OVN_NODE_MODE values for container inclusion/exclusion and YAML validity
 func TestOVNKubernetesNodeModeTemplates(t *testing.T) {
-
 	templates := []struct {
 		name         string
 		templatePath string
@@ -159,8 +158,8 @@ func createTestRenderData(ovnNodeMode string) render.RenderData {
 	data.Data["SmartNicModeValue"] = ""
 	data.Data["DpuModeLabel"] = ""
 	data.Data["MgmtPortResourceName"] = ""
-	data.Data["DpuNodeLeaseRenewInterval"] = strconv.Itoa(DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT)
-	data.Data["DpuNodeLeaseDuration"] = strconv.Itoa(DPU_NODE_LEASE_DURATION_DEFAULT)
+	data.Data["DpuNodeLeaseRenewInterval"] = strconv.Itoa(DPUNodeLeaseRenewIntervalDefault)
+	data.Data["DpuNodeLeaseDuration"] = strconv.Itoa(DPUNodeLeaseDurationDefault)
 	data.Data["HTTP_PROXY"] = ""
 	data.Data["HTTPS_PROXY"] = ""
 	data.Data["NO_PROXY"] = ""
@@ -201,7 +200,7 @@ func getMatchExpression(g *WithT, ds *appsv1.DaemonSet, label string) (corev1.No
 	for _, expr := range matchExpressions {
 		if expr.Key == label {
 			if expr.Operator == corev1.NodeSelectorOpIn {
-				g.Expect(len(expr.Values)).To(Equal(1), "In operator should have exactly one value")
+				g.Expect(expr.Values).To(HaveLen(1), "In operator should have exactly one value")
 				return expr.Operator, expr.Values[0]
 			} else {
 				return expr.Operator, ""
@@ -253,8 +252,8 @@ func TestOVNKubernetesLeaseEnvVars(t *testing.T) {
 
 	// Env vars with literal values
 	leaseEnvVars := map[string]string{
-		"OVNKUBE_NODE_LEASE_RENEW_INTERVAL": strconv.Itoa(DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT),
-		"OVNKUBE_NODE_LEASE_DURATION":       strconv.Itoa(DPU_NODE_LEASE_DURATION_DEFAULT),
+		"OVNKUBE_NODE_LEASE_RENEW_INTERVAL": strconv.Itoa(DPUNodeLeaseRenewIntervalDefault),
+		"OVNKUBE_NODE_LEASE_DURATION":       strconv.Itoa(DPUNodeLeaseDurationDefault),
 	}
 	for _, template := range templates {
 		for _, tc := range testCases {
@@ -549,13 +548,11 @@ func TestDpuHostModeResourceCount(t *testing.T) {
 					limQty, found := ovnkubeController.Resources.Limits[resourceName]
 					g.Expect(found).To(BeTrue(), "resource limit should be set")
 					g.Expect(limQty.String()).To(Equal(tc.expectedCount))
-				} else {
-					if tc.mgmtPortResourceName != "" {
-						_, found := ovnkubeController.Resources.Requests[resourceName]
-						g.Expect(found).To(BeFalse(), "resource request should not be set")
-						_, found = ovnkubeController.Resources.Limits[resourceName]
-						g.Expect(found).To(BeFalse(), "resource limit should not be set")
-					}
+				} else if tc.mgmtPortResourceName != "" {
+					_, found := ovnkubeController.Resources.Requests[resourceName]
+					g.Expect(found).To(BeFalse(), "resource request should not be set")
+					_, found = ovnkubeController.Resources.Limits[resourceName]
+					g.Expect(found).To(BeFalse(), "resource limit should not be set")
 				}
 			})
 		}

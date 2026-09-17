@@ -65,23 +65,23 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	bootstrapResult := fakeBootstrapResult()
 
 	// disable MultusAdmissionController
-	objs, err := renderMultusAdmissionController(config, manifestDir, false, bootstrapResult, fakeClient, getDefaultFeatureGates())
+	objs, err := renderMultusAdmissionController(t.Context(), config, manifestDir, false, bootstrapResult, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).NotTo(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 
 	// enable MultusAdmissionController
 	enabled := false
 	config.DisableMultiNetwork = &enabled
-	objs, err = renderMultusAdmissionController(config, manifestDir, false, bootstrapResult, fakeClient, getDefaultFeatureGates())
+	objs, err = renderMultusAdmissionController(t.Context(), config, manifestDir, false, bootstrapResult, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 
 	// Check rendered object
-	g.Expect(len(objs)).To(Equal(11))
+	g.Expect(objs).To(HaveLen(11))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Service", "openshift-multus", "multus-admission-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "multus-admission-controller-webhook")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRoleBinding", "", "multus-admission-controller-webhook")))
-	g.Expect(objs).To(ContainElement(HaveKubernetesID("ValidatingWebhookConfiguration", "", names.MULTUS_VALIDATING_WEBHOOK)))
+	g.Expect(objs).To(ContainElement(HaveKubernetesID("ValidatingWebhookConfiguration", "", names.MultusValidatingWebhook)))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("NetworkPolicy", "openshift-multus", "multus-admission-controller")))
 
@@ -91,9 +91,10 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 
 	// Test TLS rendering for webhook container
 	testTLSArgRendering(t, "multus-admission-controller webhook", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+		t.Helper()
 		testBootstrap := *bootstrapResult
 		testBootstrap.TLSProfile = tlsProfile
-		objs, err := renderMultusAdmissionController(config, manifestDir, false, &testBootstrap, fakeClient, getDefaultFeatureGates())
+		objs, err := renderMultusAdmissionController(t.Context(), config, manifestDir, false, &testBootstrap, fakeClient)
 		g.Expect(err).NotTo(HaveOccurred())
 		return findMultusWebhookExec(t, objs)
 	})
@@ -103,9 +104,10 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	testTLSArgRendering(t, "multus-admission-controller kube-rbac-proxy", "",
 		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
 		func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+			t.Helper()
 			testBootstrap := *bootstrapResult
 			testBootstrap.TLSProfile = tlsProfile
-			objs, err := renderMultusAdmissionController(config, manifestDir, false, &testBootstrap, fakeClient, getDefaultFeatureGates())
+			objs, err := renderMultusAdmissionController(t.Context(), config, manifestDir, false, &testBootstrap, fakeClient)
 			g.Expect(err).NotTo(HaveOccurred())
 			deployment := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "multus-admission-controller")
 			container := mustFindContainer(t, deployment.Spec.Template.Spec.Containers, "kube-rbac-proxy")
@@ -174,18 +176,18 @@ func TestRenderMultusAdmissonControllerConfigForHyperShift(t *testing.T) {
 	hsc.ReleaseImage = "MyImage"
 	hsc.ControlPlaneImage = "MyCPOImage"
 
-	objs, err := renderMultusAdmissonControllerConfig(manifestDir, false, bootstrapResult, fakeClient, hsc, "", getDefaultFeatureGates())
+	objs, err := renderMultusAdmissonControllerConfig(t.Context(), manifestDir, false, bootstrapResult, fakeClient, hsc, "")
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Check rendered object
 	for _, obj := range objs {
 		if obj.GetKind() == "Service" && obj.GetName() == "multus-admission-controller" {
 			labels := obj.GetLabels()
-			g.Expect(len(labels)).To(Equal(2))
+			g.Expect(labels).To(HaveLen(2))
 			g.Expect(labels["hypershift.openshift.io/allow-guest-webhooks"]).To(Equal("true"))
 
 			annotations := obj.GetAnnotations()
-			g.Expect(len(annotations)).To(Equal(1))
+			g.Expect(annotations).To(HaveLen(1))
 			g.Expect(annotations["network.operator.openshift.io/cluster-name"]).To(Equal("management"))
 		}
 	}
@@ -200,15 +202,16 @@ func TestRenderMultusAdmissonControllerConfigForHyperShift(t *testing.T) {
 
 	// Test TLS rendering for webhook container in HyperShift mode
 	testTLSArgRendering(t, "multus-admission-controller webhook (HyperShift)", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
+		t.Helper()
 		testBootstrap := *bootstrapResult
 		testBootstrap.TLSProfile = tlsProfile
-		objs, err := renderMultusAdmissonControllerConfig(manifestDir, false, &testBootstrap, fakeClient, hsc, "", getDefaultFeatureGates())
+		objs, err := renderMultusAdmissonControllerConfig(t.Context(), manifestDir, false, &testBootstrap, fakeClient, hsc, "")
 		g.Expect(err).NotTo(HaveOccurred())
 		return findMultusWebhookExec(t, objs)
 	})
 }
 
-// TestRenderMultusAdmissionControllerGetNamespace tests getOpenshiftNamespaces()
+// TestRenderMultusAdmissionControllerGetNamespace tests getOpenshiftNamespaces(context.Background(), )
 func TestRenderMultusAdmissionControllerGetNamespace(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -239,12 +242,13 @@ func TestRenderMultusAdmissionControllerGetNamespace(t *testing.T) {
 			},
 		},
 		})
-	namespaces, err := getOpenshiftNamespaces(fakeClient)
+	namespaces, err := getOpenshiftNamespaces(t.Context(), fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(namespaces).To(Equal("test1-ignored,test3-ignored"))
 }
 
 func mustFindMultusAdmissionDeployment(t *testing.T, objs []*unstructured.Unstructured) *appsv1.Deployment {
+	t.Helper()
 	return mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "multus-admission-controller")
 }
 

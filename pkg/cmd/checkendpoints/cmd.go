@@ -42,7 +42,7 @@ func NewCheckEndpointsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "check-endpoints",
 		Short: "Checks that a tcp connection can be opened to one or more endpoints.",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			logs.InitLogs()
 			defer logs.FlushLogs()
 

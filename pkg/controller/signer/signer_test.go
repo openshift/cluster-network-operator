@@ -50,7 +50,7 @@ func TestSigner_reconciler(t *testing.T) {
 
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: coName}}
 	setCO(t, client, co)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	csr, err := generateCSR()
@@ -127,7 +127,7 @@ func TestSigner_reconciler_withInvalidUserName(t *testing.T) {
 
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: coName}}
 	setCO(t, client, co)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	csr, err := generateCSR()
@@ -157,7 +157,7 @@ func TestSigner_reconciler_withInvalidUserName(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(csrObj.Status.Certificate).Should(BeEmpty())
 	csrConditions := csrObj.Status.Conditions
-	g.Expect(len(csrConditions)).To(Equal(1))
+	g.Expect(csrConditions).To(HaveLen(1))
 	g.Expect(csrConditions[0].Reason).To(Equal("CSRInvalidUser"))
 	g.Expect(csrConditions[0].Type).To(Equal(certificatev1.CertificateFailed))
 
@@ -166,10 +166,11 @@ func TestSigner_reconciler_withInvalidUserName(t *testing.T) {
 		t.Fatalf("error getting network.operator: %v", err)
 	}
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(len(co.Status.Conditions)).To(BeZero())
+	g.Expect(co.Status.Conditions).To(BeEmpty())
 }
 
 func TestDecodePrivateKey(t *testing.T) {
+	//nolint:thelper // Helper functions are inside test cases
 	testCases := []struct {
 		name    string
 		pemData func(t *testing.T) []byte
@@ -268,14 +269,14 @@ func TestDecodePrivateKey(t *testing.T) {
 		},
 		{
 			name: "empty PEM data",
-			pemData: func(t *testing.T) []byte {
+			pemData: func(_ *testing.T) []byte {
 				return []byte{}
 			},
 			wantErr: true,
 		},
 		{
 			name: "unsupported PEM block type only",
-			pemData: func(t *testing.T) []byte {
+			pemData: func(_ *testing.T) []byte {
 				return pem.EncodeToMemory(&pem.Block{
 					Type:  "CERTIFICATE",
 					Bytes: []byte("not a key"),
@@ -303,7 +304,7 @@ func generateCSR() (string, error) {
 	// Create private key.
 	csrKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate private key: %v", err)
+		return "", fmt.Errorf("failed to generate private key: %w", err)
 	}
 	// Create CSR with private key.
 	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{}, csrKey)
@@ -344,7 +345,7 @@ func getStatuses(client cnoclient.Client, name string) (*configv1.ClusterOperato
 	if err != nil {
 		return nil, nil, err
 	}
-	oc, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OPERATOR_CONFIG, metav1.GetOptions{})
+	oc, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OperatorConfig, metav1.GetOptions{})
 	return co, oc, err
 }
 

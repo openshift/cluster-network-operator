@@ -64,7 +64,6 @@ func (k *KubeObjectMatcher) NegatedFailureMessage(actual any) string {
 	return fmt.Sprintf("Expected Kind, Namespace, Name not to match (%v, %v, %v) but got (%v, %v, %v)",
 		k.kind, k.namespace, k.name,
 		obj.GetKind(), obj.GetNamespace(), obj.GetName())
-
 }
 
 func fakeBootstrapResult() *bootstrap.BootstrapResult {

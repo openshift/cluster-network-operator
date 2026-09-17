@@ -35,7 +35,7 @@ func TestProbeMTU(t *testing.T) {
 			name:  "AWS selfhosted, value from configmap is used",
 			infra: &bootstrap.InfraStatus{PlatformType: configv1.AWSPlatformType},
 			objects: []crclient.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Namespace: util.MTU_CM_NAMESPACE, Name: util.MTU_CM_NAME},
+				ObjectMeta: metav1.ObjectMeta{Namespace: util.MTUConfigMapNamespace, Name: util.MTUConfigMapName},
 				Data:       map[string]string{"mtu": "5000"},
 			}},
 			expectedMTU: 5000,
@@ -53,7 +53,7 @@ func TestProbeMTU(t *testing.T) {
 			name:  "Azure selfhosted, value from configmap is used",
 			infra: &bootstrap.InfraStatus{PlatformType: configv1.AzurePlatformType},
 			objects: []crclient.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Namespace: util.MTU_CM_NAMESPACE, Name: util.MTU_CM_NAME},
+				ObjectMeta: metav1.ObjectMeta{Namespace: util.MTUConfigMapNamespace, Name: util.MTUConfigMapName},
 				Data:       map[string]string{"mtu": "5000"},
 			}},
 			expectedMTU: 5000,
@@ -62,7 +62,7 @@ func TestProbeMTU(t *testing.T) {
 			name:  "Unknown platform on Hypershift, value from configmap is used",
 			infra: &bootstrap.InfraStatus{ControlPlaneTopology: configv1.ExternalTopologyMode, HostedControlPlane: &hypershift.HostedControlPlane{}},
 			objects: []crclient.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Namespace: util.MTU_CM_NAMESPACE, Name: util.MTU_CM_NAME},
+				ObjectMeta: metav1.ObjectMeta{Namespace: util.MTUConfigMapNamespace, Name: util.MTUConfigMapName},
 				Data:       map[string]string{"mtu": "5000"},
 			}},
 			expectedMTU: 5000,
@@ -71,7 +71,7 @@ func TestProbeMTU(t *testing.T) {
 			name:  "Unknown platform, value from configmap is used",
 			infra: &bootstrap.InfraStatus{},
 			objects: []crclient.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Namespace: util.MTU_CM_NAMESPACE, Name: util.MTU_CM_NAME},
+				ObjectMeta: metav1.ObjectMeta{Namespace: util.MTUConfigMapNamespace, Name: util.MTUConfigMapName},
 				Data:       map[string]string{"mtu": "5000"},
 			}},
 			expectedMTU: 5000,

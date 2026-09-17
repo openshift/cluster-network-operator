@@ -4,19 +4,146 @@ run:
 linters:
   default: none
   enable:
-    - copyloopvar
-    - errcheck
-    - govet
-    - ineffassign
-    - misspell
-    - nolintlint
-    - nosprintfhostport
-    - staticcheck
-    - unconvert
-    - unused
-    - usetesting
-    - wastedassign
+    - asasalint             # Check for pass []any as any in variadic func(...any)
+    - asciicheck            # Checks that all code identifiers does not have non-ASCII symbols in the name [fast]
+    - bidichk               # Checks for dangerous unicode character sequences [fast]
+    - bodyclose             # Checks whether HTTP response body is closed successfully
+    - canonicalheader       # Canonicalheader checks whether net/http.Header uses canonical header
+    - containedctx          # Containedctx is a linter that detects struct contained context.Context field
+    - contextcheck          # Check whether the function uses a non-inherited context
+    - copyloopvar           # Detects places where loop variables are copied [fast]
+    # - cyclop              # Checks function and package cyclomatic complexity (This is equivalent to gocyclo)
+    - decorder              # Check declaration order and count of types, constants, variables and functions [fast]
+    # - depguard            # Go linter that checks if package imports are in a list of acceptable packages
+    - dogsled               # Checks assignments with too many blank identifiers (e.g. x, _, _, _, := f()) [fast]
+    # - dupl                # Detects duplicate fragments of code [fast] (The signal-to-noise ratio is rather high. E.g. it flags
+                            # similar structure but different semantics (i.e. different fields, different contexts)).
+    - dupword               # Checks for duplicate words in the source code [fast]
+    - durationcheck         # Check for two durations multiplied together
+    - embeddedstructfieldcheck # Embedded types should be at the top of the field list of a struct [fast]
+    - err113                # Check errors handling expressions
+    - errcheck              # Checks for unchecked errors in Go code. These unchecked errors can be critical bugs in some cases.
+    - errchkjson            # Checks types passed to the json encoding functions
+    - errname               # Checks that sentinel errors are prefixed with the `Err` and error types are suffixed with the `Error`
+    - errorlint             # Find code that can cause problems with the error wrapping scheme introduced in Go 1.13
+    # - exhaustive          # Check exhaustiveness of enum switch statements (also excludes the default case, which is the idiomatic Go
+                            # way to handle "everything else")
+    # - exhaustruct         # Checks if all structure fields are initialized (This is too cumbersome as it requires all string, int,
+                            # pointer et al. fields to be initialized even when the type's default suffices, which is most of the time)
+    - exptostd              # Detects functions from golang.org/x/exp/ that can be replaced by std functions
+    - fatcontext            # Detects nested contexts in loops and function literals
+    # - forbidigo           # Forbids identifiers (No current use case or reason for this)
+    # - forcetypeassert     # Find forced type assertions (There are many unchecked type assertions that would be the result of a
+                            # programming error so the reasonable recourse would be to panic anyway if checked so this doesn't seem useful)
+    # - funcorder           # Checks the order of functions, methods, and constructors [fast]
+    # - funlen              # Checks for long functions [fast] (gocyclo is generally a better metric than simply LOC)
+    - ginkgolinter        # Enforces standards of using ginkgo and gomega
+    - gocheckcompilerdirectives # Checks that go compiler directive comments (//go:) are valid [fast]
+    # - gochecknoglobals    # Check that no global variables exist (Most uses of globals are legitimate and dangerous uses would likely
+                            # be caught by other means)
+    # - gochecknoinits      # Checks that no init functions are present in Go code [fast]
+    # - gochecksumtype      # Run exhaustiveness checks on Go "sum types" (The sum type pattern is not used)
+    # - gocognit            # Computes and checks the cognitive complexity of functions [fast]
+    # - goconst             # Finds repeated strings that could be replaced by a constant
+    - gocritic              # Provides diagnostics that check for bugs, performance and style issues
+    # - gocyclo             # Computes and checks the cyclomatic complexity of functions [fast] (not ready for this one yet :))
+    - godoclint             # Checks Golang's documentation practice (godoc) [fast]
+    # - godot               # Check if comments end in a period [fast] (This is a bit nitpicky)
+    # - godox               # Detects usage of FIXME, TODO and other keywords inside comments [fast] (These are widely used)
+    # - goheader            # Check if file header matches to pattern [fast] (Doesn't apply in this code base)
+    # - gomoddirectives     # Manage the use of 'replace', 'retract', and 'excludes' directives in go.mod [fast] (Not necessary)
+    # - gomodguard          # Allow and blocklist linter for direct Go module dependencies [fast] (Not necessary)
+    - goprintffuncname      # Checks that printf-like functions are named with `f` at the end [fast]
+    - gosec                 # Inspects source code for security problems
+    # - gosmopolitan        # Report certain i18n/l10n anti-patterns in your Go codebase (there's no internationalization in this project)
+    - govet                 # Examines Go source code and reports suspicious constructs
+    - grouper               # Analyze expression groups [fast]
+    - iface                 # Detect the incorrect use of interfaces, helping developers avoid interface pollution
+    - importas              # Enforces consistent import aliases
+    - inamedparam           # Reports interfaces with unnamed method parameters [fast]
+    - ineffassign           # Detects when assignments to existing variables are not used
+    - interfacebloat        # A linter that checks the number of methods inside an interface [fast]
+    - intrange              # Intrange is a linter to find places where for loops could make use of an integer range
+    - iotamixing            # Checks if iotas are being used in const blocks with other non-iota declarations [fast]
+    # - ireturn             # Accept Interfaces, Return Concrete Types (the strict rule to always "Return Concrete Types" doesn't seem compelling)
+    # - lll                 # Reports long lines [fast] (useful but produces a lot of violations - consider for the future)
+    - loggercheck           # Checks key value pairs for common logger libraries (kitlog,klog,logr,slog,zap)
+    # - maintidx            # Maintidx measures the maintainability index of each function [fast] (not ready for this one yet :))
+    - makezero              # Find slice declarations with non-zero initial length
+    - mirror                # Reports wrong mirror patterns of bytes/strings usage
+    - misspell              # Finds commonly misspelled English words
+    # - mnd                 # An analyzer to detect magic numbers [fast] (signal-to-noise ratio is too high)
+    - modernize             # A suite of analyzers that suggest simplifications to Go code, using modern language and library features
+    # - musttag             # Enforce field tags in (un)marshaled structs (implicit JSON unmarshaling via field name matching is used
+                            # currently; forcing tags everywhere would be noise without functional benefit)
+    - nakedret              # Checks that functions with naked returns are not longer than a maximum size (can be zero) [fast]
+    # - nestif              # Reports deeply nested if statements [fast] (this calculates cognitive complexity so has overlap with other linters)
+    - nilerr                # Find the code that returns nil even if it checks that the error is not nil
+    - nilnesserr            # Reports constructs that checks for err != nil, but returns a different nil value error
+    # - nilnil              # Checks that there is no simultaneous return of `nil` error and an invalid value (signal-to-noise ratio is
+                            # too high; many legit uses for "resource not found" case)
+    # - nlreturn            # Checks for a new line before return and branch statements to increase code clarity [fast] (too noisy)
+    - noctx                 # Detects function and method with missing usage of context.Context
+    # - noinlineerr         # Disallows inline error handling (`if err := ...; err != nil {`) (pedantic - inline errors are idiomatic Go)
+    - nolintlint            # Reports ill-formed or insufficient nolint directives
+    # - nonamedreturns      # Reports all named returns (these are useful for documentation)
+    - nosprintfhostport     # Checks for misuse of Sprintf to construct a host with port in a URL
+    # - paralleltest        # Detects missing usage of t.Parallel() method in your Go test (don't need to enforce parallelism everywhere)
+    # - perfsprint          # Checks that fmt.Sprintf can be replaced with a faster alternative (simpler to just consistently use
+                            # fmt.Sprintf over micro-optimizations)
+    # - prealloc            # Find slice declarations that could potentially be pre-allocated (useful but also premature optimization and
+                            # mostly negligible in this code base)
+    - predeclared           # Find code that shadows one of Go's predeclared identifiers [fast]
+    - promlinter            # Check Prometheus metrics naming via promlint [fast]
+    - protogetter           # Reports direct reads from proto message fields when getters should be used
+    - reassign              # Checks that package variables are not reassigned
+    - recvcheck             # Checks for receiver type consistency
+    - revive                # Fast, configurable, extensible, flexible, and beautiful linter for Go. Drop-in replacement of golint
+    # - rowserrcheck        # Checks whether Rows.Err of rows is checked successfully (SQL isn't used in this codebase)
+    # - sloglint            # Ensure consistent code style when using log/slog ( log/slog aren't used directly)
+    # - spancheck           # Checks for mistakes with OpenTelemetry/Census spans (OpenTelemetry/OpenCensus aren't used in this codebase)
+    # - sqlclosecheck       # Checks that sql.Rows, sql.Stmt, sqlx.NamedStmt, pgx.Query are closed (SQL isn't used in this codebase)
+    - staticcheck           # Performs advanced static analysis to find bugs, performance issues, and style problems
+    - tagalign              # Check that struct tags are well aligned [fast]
+    # - tagliatelle         # Checks the struct tags (enforcing strict casing doesn't seem compelling)
+    # - testableexamples    # Linter checks if examples are testable (have an expected output) [fast] (documentation examples aren't used)
+    - testifylint           # Checks usage of github.com/stretchr/testify
+    # - testpackage         # Linter that makes you use a separate _test package [fast] (useful but codebase heavily tests private functions directly)
+    - thelper               # Thelper detects tests helpers which do not start with the t.Helper() method
+    - tparallel             # Tparallel detects inappropriate usage of t.Parallel() method in your Go test codes
+    - unconvert             # Removes unnecessary type conversions
+    - unparam               # Reports unused function parameters
+    # - unqueryvet          # Detects SELECT * in SQL queries and SQL builders [fast] (SQL isn't used in this codebase)
+    - unused                # Checks Go code for unused constants, variables, functions and types
+    - usestdlibvars         # A linter that detect the possibility to use variables/constants from the Go standard library
+    - usetesting            # Reports uses of functions with replacement inside the testing package
+    # - varnamelen          # Checks that the length of a variable's name matches its scope (it doesn't seem compelling to enforce a
+                            # minimum variable name length)
+    - wastedassign          # Finds wasted assignment statements
+    - whitespace            # Whitespace is a linter that checks for unnecessary newlines at the start and end of functions, if, for, etc [fast]
+    # - wrapcheck           # Checks that errors returned from external packages are wrapped (useful but produces a lot of violations -
+                            # consider for the future)
+    # - wsl_v5              # Add or remove empty lines (very noisy and marginally useful)
+    # - zerologlint         # Detects the wrong usage of `zerolog` that a user forgets to dispatch with `Send` or `Msg` (zerolog isn't used)
   settings:
+    nlreturn:
+      # Size of the block including return statement that is still "OK"
+      block-size: 3
+    revive:
+      enable-default-rules: true
+      rules:
+        - name: dot-imports
+          arguments:
+            - allowed-packages: [ "github.com/onsi/ginkgo/v2", "github.com/onsi/gomega" ]
+        - name: exported
+          arguments:
+            - "disableStutteringCheck"
+        - name: unexported-return
+          disabled: true
+        - name: indent-error-flow
+          disabled: true
+        - name: superfluous-else
+          disabled: true
     usetesting:
       context-background: true
       context-todo: true
@@ -29,3 +156,54 @@ linters:
       - std-error-handling
     paths:
       - vendor
+    rules:
+      # Full text of the error is "there must be an empty line separating embedded fields from regular fields". This is a subjective
+      # stylistic preference with no real value to enforce.
+      - linters:
+          - embeddedstructfieldcheck
+        text: "there must be an empty line separating"
+      # Full text of the error is "do not define dynamic errors, use wrapped static errors instead". See
+      # https://github.com/Djarvur/go-err113/issues/10 for an interesting discussion of this error. While there are cases
+      # where wrapped sentinel errors are useful, it seems a bit pedantic to force that pattern in all cases.
+      - linters:
+          - err113
+        text: do not define dynamic errors
+      # Full text of the error is "commentFormatting: put a space between `//` and comment text". This is a subjective stylistic
+      # preference with no real value to enforce.
+      - linters:
+          - gocritic
+        text: commentFormatting
+      # Full text of the error is "ifElseChain: rewrite if-else to switch statement". This is a stylistic preference where both
+      # forms are valid, and forcing switch statements would be dogmatic without real benefit.
+      - linters:
+          - gocritic
+        text: ifElseChain
+      # Suppress noisy var-naming rules that flag valid package names in golangci-lint v2.10.1 (these are not flagged in newer versions).
+      - linters:
+          - revive
+        text: "var-naming: avoid package names that conflict with Go standard library package names"
+      - linters:
+          - revive
+        text: "var-naming: don't use an underscore in package name"
+      - linters:
+          - revive
+        text: "var-naming: avoid meaningless package names"
+      # G101 (hardcoded credentials) and G306 (file permissions) produce false positives in test files where dummy
+      # credentials and temporary test files are expected.
+      - linters:
+          - gosec
+        text: "G101|G306"
+        path: "_test\\.go$"
+      # G115 ("integer overflow conversion ...") has a high signal-to-noise ratio. This code base uses APIs that use uintX types to
+      # represent mask sizes, ports etc where we know overflow won't occur.
+      - linters:
+          - gosec
+        text: "G115"
+      # G704 ("SSRF via taint analysis") yields false positives in golangci-lint 2.10.1 but not in newer versions.
+      - linters:
+          - gosec
+        text: "G704"
+      # Ignore certain linters for test files
+      - linters:
+          - unparam
+        path: _test\.go|test/|fake/

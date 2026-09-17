@@ -178,7 +178,7 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 	})
 
 	t.Run("should filter out ciphers unsupported by Go crypto/tls", func(t *testing.T) {
-		data := make(map[string]interface{})
+		data := make(map[string]any)
 		bootstrapResult := &bootstrap.BootstrapResult{
 			TLSProfile: bootstrap.TLSProfile{
 				Spec: configv1.TLSProfileSpec{
