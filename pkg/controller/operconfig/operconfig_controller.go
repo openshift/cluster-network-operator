@@ -176,7 +176,39 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 		return err
 	}
 
+	// Reconcile immediately when a namespace enters or leaves the Multus
+	// admission controller's ignore set. This avoids waiting for the periodic
+	// resync after ACM creates a platform namespace.
+	err = c.Watch(source.Kind[crclient.Object](mgr.GetCache(), &corev1.Namespace{}, handler.EnqueueRequestsFromMapFunc(reconcileOperConfig), namespacePredicate()))
+	if err != nil {
+		return fmt.Errorf("failed to watch namespaces: %w", err)
+	}
+
 	return nil
+}
+
+// namespacePredicate returns a predicate that triggers reconciliation when a
+// namespace enters or leaves the Multus admission controller's ignore set.
+func namespacePredicate() predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc: func(evt event.CreateEvent) bool {
+			ns, ok := evt.Object.(*corev1.Namespace)
+			return ok && network.IsMultusAdmissionControllerIgnoredNamespace(ns)
+		},
+		UpdateFunc: func(evt event.UpdateEvent) bool {
+			oldNamespace, oldOK := evt.ObjectOld.(*corev1.Namespace)
+			newNamespace, newOK := evt.ObjectNew.(*corev1.Namespace)
+			if !oldOK || !newOK {
+				return true
+			}
+			return network.IsMultusAdmissionControllerIgnoredNamespace(oldNamespace) !=
+				network.IsMultusAdmissionControllerIgnoredNamespace(newNamespace)
+		},
+		DeleteFunc: func(evt event.DeleteEvent) bool {
+			ns, ok := evt.Object.(*corev1.Namespace)
+			return ok && network.IsMultusAdmissionControllerIgnoredNamespace(ns)
+		},
+	}
 }
 
 var _ reconcile.Reconciler = &ReconcileOperConfig{}
@@ -562,8 +594,14 @@ func updateIPsecMetric(newOperConfigSpec *operv1.NetworkSpec) {
 	}
 }
 
+// reconcileOperConfig enqueues the singleton operator configuration after a
+// watched resource changes.
 func reconcileOperConfig(ctx context.Context, obj crclient.Object) []reconcile.Request {
-	log.Printf("%s %s/%s changed, triggering operconf reconciliation", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
+	if _, ok := obj.(*corev1.Namespace); ok {
+		klog.Infof("Namespace changed, triggering operconf reconciliation")
+	} else {
+		klog.Infof("%s %s/%s changed, triggering operconf reconciliation", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
+	}
 	// Update reconcile.Request object to align with unnamespaced default network,
 	// to ensure we don't have multiple requeueing reconcilers running
 	return []reconcile.Request{{NamespacedName: types.NamespacedName{
