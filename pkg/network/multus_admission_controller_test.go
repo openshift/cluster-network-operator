@@ -237,21 +237,65 @@ func TestRenderMultusAdmissionControllerGetNamespace(t *testing.T) {
 			Annotations: map[string]string{
 				"workload.openshift.io/allowed": "management",
 			},
-		},
-		})
+		}},
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name: "user-label-only",
+			Labels: map[string]string{
+				"openshift.io/cluster-monitoring": "true",
+			},
+		}},
+	)
 	namespaces, err := getOpenshiftNamespaces(fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(namespaces).To(Equal("test1-ignored,test3-ignored"))
 }
 
+// mustFindMultusAdmissionDeployment returns the rendered Multus admission
+// controller Deployment or fails the test.
 func mustFindMultusAdmissionDeployment(t *testing.T, objs []*unstructured.Unstructured) *appsv1.Deployment {
 	return mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "multus-admission-controller")
 }
 
+// findMultusWebhookExec returns the Multus admission controller webhook command.
 func findMultusWebhookExec(t *testing.T, objs []*unstructured.Unstructured) string {
 	t.Helper()
 
 	deployment := mustFindMultusAdmissionDeployment(t, objs)
 	cmdArgs := mustFindContainer(t, deployment.Spec.Template.Spec.Containers, "multus-admission-controller").Command
 	return findExecCommand(t, cmdArgs, "webhook")
+}
+
+// TestRenderMultusAdmissionControllerRefreshesIgnoredNamespaces verifies that
+// rendering reflects namespaces created after the initial render.
+func TestRenderMultusAdmissionControllerRefreshesIgnoredNamespaces(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	fakeClient := cnofake.NewFakeClient()
+	bootstrap := fakeBootstrapResult()
+	hsc := hypershift.NewHyperShiftConfig()
+
+	objs, err := renderMultusAdmissonControllerConfig(manifestDir, false, bootstrap, fakeClient, hsc, "", getDefaultFeatureGates())
+	g.Expect(err).NotTo(HaveOccurred(), "failed to render the initial Multus admission controller configuration")
+	g.Expect(findMultusWebhookExec(t, objs)).NotTo(ContainSubstring("test-namespace"), "initial configuration should not contain the test namespace")
+
+	_, err = fakeClient.Default().Kubernetes().CoreV1().Namespaces().Create(
+		t.Context(),
+		&corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-namespace",
+				Labels: map[string]string{
+					"openshift.io/cluster-monitoring": "true",
+				},
+				Annotations: map[string]string{
+					"workload.openshift.io/allowed": "management",
+				},
+			},
+		},
+		metav1.CreateOptions{},
+	)
+	g.Expect(err).NotTo(HaveOccurred(), "failed to create the test namespace")
+
+	objs, err = renderMultusAdmissonControllerConfig(manifestDir, false, bootstrap, fakeClient, hsc, "", getDefaultFeatureGates())
+	g.Expect(err).NotTo(HaveOccurred(), "failed to render the refreshed Multus admission controller configuration")
+	g.Expect(findMultusWebhookExec(t, objs)).To(ContainSubstring("test-namespace"), "refreshed configuration should contain the test namespace")
 }
