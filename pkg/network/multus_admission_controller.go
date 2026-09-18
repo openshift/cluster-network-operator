@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
@@ -29,11 +30,19 @@ import (
 
 const bytesInMiB = 1024 * 1024
 
-// ignoredNamespaces contains the comma separated namespace list that should be ignored
-// to watch by multus admission controller. This only initialized first invocation.
-var ignoredNamespaces string
+// IsMultusAdmissionControllerIgnoredNamespace reports whether a namespace should
+// be excluded from Multus admission validation.
+func IsMultusAdmissionControllerIgnoredNamespace(ns *corev1.Namespace) bool {
+	if ns == nil {
+		return false
+	}
 
-// getOpenshiftNamespaces collect openshift related namespaces, as comma separate list
+	return metav1.HasAnnotation(ns.ObjectMeta, "workload.openshift.io/allowed") &&
+		ns.Annotations["workload.openshift.io/allowed"] == "management" &&
+		ns.Labels["openshift.io/cluster-monitoring"] == "true"
+}
+
+// getOpenshiftNamespaces returns OpenShift-related namespaces as a comma-separated list.
 func getOpenshiftNamespaces(client cnoclient.Client) (string, error) {
 	namespaces := []string{}
 
@@ -46,25 +55,23 @@ func getOpenshiftNamespaces(client cnoclient.Client) (string, error) {
 	}
 
 	for _, ns := range nsList.Items {
-		// add OpenShift components to ignored namespace
-		if metav1.HasAnnotation(ns.ObjectMeta, "workload.openshift.io/allowed") && ns.Annotations["workload.openshift.io/allowed"] == "management" {
+		if IsMultusAdmissionControllerIgnoredNamespace(&ns) {
 			namespaces = append(namespaces, ns.Name)
 		}
 	}
+	sort.Strings(namespaces)
 	return strings.Join(namespaces, ","), nil
 }
 
-// renderMultusAdmissonControllerConfig returns the manifests of Multus Admisson Controller
+// renderMultusAdmissonControllerConfig returns the manifests for the Multus admission controller.
 func renderMultusAdmissonControllerConfig(manifestDir string, externalControlPlane bool, bootstrapResult *bootstrap.BootstrapResult, client cnoclient.Client, hsc *hypershift.HyperShiftConfig, clientName string, featureGates featuregates.FeatureGate) ([]*uns.Unstructured, error) {
 	objs := []*uns.Unstructured{}
 	var err error
 
 	replicas := getMultusAdmissionControllerReplicas(bootstrapResult, hsc.Enabled)
-	if ignoredNamespaces == "" {
-		ignoredNamespaces, err = getOpenshiftNamespaces(client)
-		if err != nil {
-			klog.Warningf("failed to get openshift namespaces: %+v", err)
-		}
+	ignoredNamespaces, err := getOpenshiftNamespaces(client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get openshift namespaces: %w", err)
 	}
 
 	// render the manifests on disk
