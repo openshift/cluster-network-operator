@@ -135,6 +135,13 @@ This is the "main" controller, in that it is responsible for rendering the core 
 5. **Render** - process template files in `/bindata` and generate Kubernetes objects
 6. **Apply** - Create or update objects in the APIServer. Delete any un-rendered objects.
 
+The controller also watches Namespace events that affect the Multus admission
+controller's ignored-namespace list. A Namespace enters this set when it has
+`openshift.io/cluster-monitoring=true` and
+`workload.openshift.io/allowed=management`; changes that add or remove either
+attribute enqueue a reconciliation. The existing periodic resync remains as a
+fallback.
+
 ### Applied configuration
 
 The Network operator needs to make sure that the input configuration doesn't change unsafely, since we don't support rolling out most changes. To do that, it writes a ConfigMap with the applied changes. It then compares the existing configuration with the desired configuration, and sets a status of `Degraded` if it is asked to do something unsafe.
