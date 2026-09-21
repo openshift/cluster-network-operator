@@ -196,6 +196,7 @@ spec:
               fieldPath: spec.nodeName
         securityContext:
           privileged: true
+          readOnlyRootFilesystem: true
         volumeMounts:
 {{ if .NETWORK_NODE_IDENTITY_ENABLE }}
         - mountPath: /etc/ovn/
@@ -203,8 +204,14 @@ spec:
 {{ end }}
         - mountPath: /var/run/openvswitch
           name: host-var-run-ovs
+        - mountPath: /var/run
+          name: host-var-run
         - mountPath: /signer-ca
           name: signer-ca
+        - mountPath: /var/lib
+          name: host-var-lib
+        - mountPath: /etc
+          name: host-etc
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
         resources:
@@ -294,6 +301,7 @@ spec:
               fieldPath: spec.nodeName
         securityContext:
           privileged: true
+          readOnlyRootFilesystem: true
         volumeMounts:
         # To check that network setup is complete
         - mountPath: /etc/cni/net.d
@@ -302,6 +310,12 @@ spec:
           name: host-var-run-ovs
         - mountPath: /var/log/openvswitch/
           name: host-var-log-ovs
+        - mountPath: /var/run
+          name: host-var-run
+        - mountPath: /var/lib
+          name: host-var-lib
+        - mountPath: /etc
+          name: host-etc
         - mountPath: /etc/openvswitch
           name: etc-openvswitch
         resources:
@@ -345,6 +359,18 @@ spec:
         hostPath:
           path: /var/run/openvswitch
           type: DirectoryOrCreate
+      - name: host-var-run
+        hostPath:
+          path: /var/run
+          type: DirectoryOrCreate
+      - name: host-var-lib
+        hostPath:
+          path: /var/lib
+          type: DirectoryOrCreate
+      - name: host-etc
+        hostPath:
+          path: /etc
+          type: Directory
       - name: signer-ca
         configMap:
           name: signer-ca
