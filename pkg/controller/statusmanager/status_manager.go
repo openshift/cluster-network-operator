@@ -49,6 +49,7 @@ const (
 	ProxyConfig
 	InjectorConfig
 	MachineConfig
+	UplinkMode
 	PodDeployment
 	PKIConfig
 	EgressRouterConfig

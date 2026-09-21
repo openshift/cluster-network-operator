@@ -398,9 +398,9 @@ type OpenShiftSDNConfig struct {
 
 // ovnKubernetesConfig contains the configuration parameters for networks
 // using the ovn-kubernetes network project
-// +openshift:validation:FeatureGateAwareXValidation:featureGate=NoOverlayMode,rule="self.?transport.orValue(”) == 'NoOverlay' ? self.?routeAdvertisements.orValue(”) == 'Enabled' : true",message="routeAdvertisements must be Enabled when transport is NoOverlay"
-// +openshift:validation:FeatureGateAwareXValidation:featureGate=NoOverlayMode,rule="self.?transport.orValue(”) == 'NoOverlay' ? has(self.noOverlayConfig) : !has(self.noOverlayConfig)",message="noOverlayConfig must be set if transport is NoOverlay, and is forbidden otherwise"
-// +openshift:validation:FeatureGateAwareXValidation:featureGate=NoOverlayMode,rule="self.?noOverlayConfig.routing.orValue(”) == 'Managed' ? has(self.bgpManagedConfig) : true",message="bgpManagedConfig is required when noOverlayConfig.routing is Managed"
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=NoOverlayMode,rule="self.?transport.orValue('') == 'NoOverlay' ? self.?routeAdvertisements.orValue('') == 'Enabled' : true",message="routeAdvertisements must be Enabled when transport is NoOverlay"
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=NoOverlayMode,rule="self.?transport.orValue('') == 'NoOverlay' ? has(self.noOverlayConfig) : !has(self.noOverlayConfig)",message="noOverlayConfig must be set if transport is NoOverlay, and is forbidden otherwise"
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=NoOverlayMode,rule="self.?noOverlayConfig.routing.orValue('') == 'Managed' ? has(self.bgpManagedConfig) : true",message="bgpManagedConfig is required when noOverlayConfig.routing is Managed"
 // +openshift:validation:FeatureGateAwareXValidation:featureGate=NoOverlayMode,rule="!has(self.transport) || self.transport == 'Geneve' || has(oldSelf.transport)",message="transport can only be set to Geneve after installation"
 // +openshift:validation:FeatureGateAwareXValidation:featureGate=NoOverlayMode,rule="!has(oldSelf.transport) || has(self.transport)",message="transport may not be removed once set"
 // +openshift:validation:FeatureGateAwareXValidation:featureGate=NoOverlayMode,rule="!has(oldSelf.noOverlayConfig) || has(self.noOverlayConfig)",message="noOverlayConfig may not be removed once set"

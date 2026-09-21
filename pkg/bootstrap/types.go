@@ -45,6 +45,10 @@ type OVNConfigBoostrapResult struct {
 	MgmtPortResourceCount     int64
 	DpuNodeLeaseRenewInterval int
 	DpuNodeLeaseDuration      int
+	// MissingUplinkModeCapabilityNodes contains schedulable nodes that run
+	// ovnkube-node but have not advertised support for the uplink mode API.
+	// The list is sorted to keep status messages and rendered decisions stable.
+	MissingUplinkModeCapabilityNodes []string
 	// ConfigOverrides contains the overrides for the OVN Kubernetes configuration
 	// This is used to set the hidden OVN Kubernetes configuration in the cluster
 	// It is a map of key-value pairs where the key is the configuration option and the
