@@ -121,6 +121,7 @@ spec:
           start-ovn-controller ${OVN_LOG_LEVEL}
         securityContext:
           privileged: true
+          readOnlyRootFilesystem: true
         env:
         - name: OVN_LOG_LEVEL
           value: info
@@ -154,6 +155,8 @@ spec:
             memory: 300Mi
       - name: ovn-acl-logging
         image: "{{.OvnImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         command:
         - /bin/bash
         - -c
@@ -176,6 +179,8 @@ spec:
 {{ end }}
       - name: kube-rbac-proxy-node
         image: {{.KubeRBACProxyImage}}
+        securityContext:
+          readOnlyRootFilesystem: true
         command:
         - /bin/bash
         - -c
@@ -201,6 +206,8 @@ spec:
 {{ if ne .OVN_NODE_MODE "dpu-host" }}
       - name: kube-rbac-proxy-ovn-metrics
         image: {{.KubeRBACProxyImage}}
+        securityContext:
+          readOnlyRootFilesystem: true
         command:
         - /bin/bash
         - -c
@@ -228,6 +235,8 @@ spec:
       # ovn-northd: convert network objects in nbdb to flows in sbdb
       - name: northd
         image: "{{.OvnImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         command:
         - /bin/bash
         - -c
@@ -265,6 +274,8 @@ spec:
       # nbdb: the northbound, or logical network object DB. In standalone mode listening on unix socket.
       - name: nbdb
         image: "{{.OvnImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         command:
         - /bin/bash
         - -c
@@ -320,6 +331,8 @@ spec:
           name: run-ovn
         - mountPath: /env
           name: env-overrides
+        - mountPath: /tmp
+          name: tmp
         resources:
           requests:
             cpu: 10m
@@ -329,6 +342,8 @@ spec:
       # sbdb: the southbound, or flow DB. In standalone mode listening on unix socket
       - name: sbdb
         image: "{{.OvnImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         command:
         - /bin/bash
         - -c
@@ -380,6 +395,8 @@ spec:
           name: node-log
         - mountPath: /env
           name: env-overrides
+        - mountPath: /tmp
+          name: tmp
         resources:
           requests:
             cpu: 10m
@@ -470,6 +487,7 @@ spec:
           containerPort: 29105
         securityContext:
           privileged: true
+          readOnlyRootFilesystem: true
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /ovnkube-lib
@@ -627,6 +645,7 @@ spec:
               command: ["/bin/bash", "-c", "echo drop-icmp done"]
         securityContext:
           privileged: true
+          readOnlyRootFilesystem: true
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
 {{ if .NETWORK_NODE_IDENTITY_ENABLE }}
@@ -714,5 +733,7 @@ spec:
         configMap:
           name: ovnkube-script-lib
           defaultMode: 0744
+      - name: tmp
+        emptyDir: {}
       tolerations:
       - operator: "Exists"

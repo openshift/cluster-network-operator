@@ -114,6 +114,8 @@ spec:
       containers:
       - name: error-cni-init
         image: {{.OvnImage}}
+        securityContext:
+          readOnlyRootFilesystem: true
         terminationMessagePolicy: FallbackToLogsOnError
         command:
           - /bin/sh
