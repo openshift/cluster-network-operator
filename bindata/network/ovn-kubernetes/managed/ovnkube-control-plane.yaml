@@ -104,6 +104,8 @@ spec:
             This allows for pod-pod connectivity in postStart hooks the first time they run.
             EOF
         image: "{{.OvnControlPlaneImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         terminationMessagePolicy: FallbackToLogsOnError
       automountServiceAccountToken: false
       containers:
@@ -111,6 +113,8 @@ spec:
       # The token is read by ovn-k containers to authenticate against the hosted cluster api server
       - name: token-minter
         image: "{{.TokenMinterImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         command: ["/usr/bin/control-plane-operator", "token-minter"]
         args:
         - --service-account-namespace=openshift-ovn-kubernetes
@@ -131,6 +135,8 @@ spec:
       # ovnkube-control-plane: central component that allocates IPAM for each node in the cluster
       - name: ovnkube-control-plane
         image: "{{.OvnControlPlaneImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         command:
         - /bin/bash
         - -c
@@ -280,6 +286,8 @@ spec:
 
       - name: socks-proxy
         image: "{{.Socks5ProxyImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         command:
         - /usr/bin/control-plane-operator
         - konnectivity-socks5-proxy

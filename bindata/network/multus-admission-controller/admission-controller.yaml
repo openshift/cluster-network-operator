@@ -96,6 +96,8 @@ spec:
       initContainers:
         - name: hosted-cluster-kubecfg-setup
           image: "{{.CLIImage}}"
+          securityContext:
+            readOnlyRootFilesystem: true
           command:
             - /bin/bash
             - -c
@@ -120,6 +122,8 @@ spec:
       # The token path is included in the kubeconfig used by webhook container to talk to the hosted clusters API server
       - name: hosted-cluster-token
         image: "{{.TokenMinterImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         command: [ "/usr/bin/control-plane-operator", "token-minter" ]
         args:
           - --service-account-namespace=openshift-multus
@@ -140,6 +144,8 @@ spec:
 {{- end }}
       - name: multus-admission-controller
         image: {{.MultusAdmissionControllerImage}}
+        securityContext:
+          readOnlyRootFilesystem: true
         command:
         - /bin/bash
         - -c
@@ -173,6 +179,7 @@ spec:
             --tls-cipher-suites={{.TLSCipherSuites}} \
 {{- end }}
 {{- end }}
+            -logtostderr=true \
             -alsologtostderr=true \
             -ignore-namespaces=openshift-etcd,openshift-console,openshift-ingress-canary,{{.IgnoredNamespace}}
         terminationMessagePolicy: FallbackToLogsOnError
@@ -201,6 +208,8 @@ spec:
 {{- if not .HyperShiftEnabled}}
       - name: kube-rbac-proxy
         image: {{.KubeRBACProxyImage}}
+        securityContext:
+          readOnlyRootFilesystem: true
         args:
         - --logtostderr
         - --secure-listen-address=:8443

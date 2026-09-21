@@ -170,3 +170,25 @@ func TestCloudTokenMinterHasTokenAudience(t *testing.T) {
 	}
 	t.Fatal("Deployment object not found in rendered output")
 }
+
+func TestCloudNetworkConfigControllerReadOnlyRootFilesystems(t *testing.T) {
+	tests := []struct {
+		name      string
+		directory string
+		namespace string
+	}{
+		{name: "self-hosted", directory: "self-hosted", namespace: "openshift-cloud-network-config-controller"},
+		{name: "managed", directory: "managed", namespace: "test-ns"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			data := makeManagedControllerRenderData()
+			objs, err := render.RenderDir("../../bindata/cloud-network-config-controller/"+test.directory, &data)
+			if err != nil {
+				t.Fatalf("failed to render %s controller: %v", test.name, err)
+			}
+			expectReadOnlyRootFilesystems(t, objs, test.namespace)
+		})
+	}
+}

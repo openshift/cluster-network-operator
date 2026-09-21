@@ -203,6 +203,7 @@ spec:
               fieldPath: spec.nodeName
         securityContext:
           privileged: true
+          readOnlyRootFilesystem: true
         volumeMounts:
 {{ if .NETWORK_NODE_IDENTITY_ENABLE }}
         - mountPath: /etc/ovn/
@@ -281,7 +282,7 @@ spec:
               echo "openvswitch-ipsec PID mismatch: systemd reports $main_pid, PID file has $file_pid"
               exit 1
             fi
-            echo "$main_pid" > /tmp/ovs-monitor-ipsec-main.pid
+            echo "$main_pid" > /var/run/openvswitch/ovs-monitor-ipsec-main.pid
 
             while true; do
               chroot /proc/1/root journalctl -f "_SYSTEMD_INVOCATION_ID=$invocation_id" -n all
@@ -360,6 +361,7 @@ spec:
               fieldPath: spec.nodeName
         securityContext:
           privileged: true
+          readOnlyRootFilesystem: true
         volumeMounts:
         # To check that network setup is complete
         - mountPath: /etc/cni/net.d
@@ -395,9 +397,9 @@ spec:
                   echo "openvswitch-ipsec service is not active"
                   exit 1
                 fi
-                if [ -f /tmp/ovs-monitor-ipsec-main.pid ]; then
+                if [ -f /var/run/openvswitch/ovs-monitor-ipsec-main.pid ]; then
                   file_pid=$(cat /var/run/openvswitch/ovs-monitor-ipsec.pid 2>/dev/null)
-                  main_pid=$(cat /tmp/ovs-monitor-ipsec-main.pid)
+                  main_pid=$(cat /var/run/openvswitch/ovs-monitor-ipsec-main.pid)
                   if [ "$main_pid" != "$file_pid" ]; then
                     echo "openvswitch-ipsec service restarted (PID changed from $main_pid to $file_pid)"
                     exit 1
@@ -549,6 +551,7 @@ spec:
           done
         securityContext:
           privileged: true
+          readOnlyRootFilesystem: true
         volumeMounts:
 {{ if .NETWORK_NODE_IDENTITY_ENABLE }}
         - mountPath: /etc/ovn/
