@@ -3789,7 +3789,6 @@ spec:
               network:
                 description: Network is the user-defined-network spec
                 properties:
-{{- if .OVN_EVPN_ENABLE_API }}
                   evpn:
                     description: |-
                       EVPN contains configuration for EVPN mode.
@@ -3943,7 +3942,6 @@ spec:
                     - message: macVRF and ipVRF must use different VNIs
                       rule: '!has(self.macVRF) || !has(self.ipVRF) || self.macVRF.vni
                         != self.ipVRF.vni'
-{{- end }}
                   layer2:
                     description: Layer2 is the Layer2 topology configuration.
                     properties:
@@ -4485,7 +4483,6 @@ spec:
                     - Layer3
                     - Localnet
                     type: string
-{{- if .OVN_EVPN_ENABLE_API }}
                   transport:
                     description: |-
                       Transport describes the transport technology for pod-to-pod traffic.
@@ -4498,7 +4495,6 @@ spec:
                     - NoOverlay
                     - EVPN
                     type: string
-{{- end }}
                 required:
                 - topology
                 type: object
@@ -4515,7 +4511,6 @@ spec:
                     forbidden otherwise
                   rule: 'has(self.topology) && self.topology == ''Localnet'' ? has(self.localnet):
                     !has(self.localnet)'
-{{- if .OVN_EVPN_ENABLE_API }}
                 - message: transport 'EVPN' is only supported for Layer2 or Layer3
                     primary networks
                   rule: '!has(self.transport) || self.transport != ''EVPN'' || ((self.topology
@@ -4538,7 +4533,6 @@ spec:
                     when transport is 'EVPN'
                   rule: '!has(self.transport) || self.transport != ''EVPN'' || self.topology
                     != ''Layer3'' || !has(self.evpn) || !has(self.evpn.macVRF)'
-{{- end }}
                 - message: Network spec is immutable
                   rule: self == oldSelf
             required:
@@ -5251,10 +5245,6 @@ spec:
     subresources:
       status: {}
 {{- end }}
-# The VTEP CRD is guarded by OVN_EVPN_ENABLE (feature gate + route advertisements enabled),
-# same as RouteAdvertisements and FRRConfigurations CRDs. Once deployed, it won't be removed
-# when route advertisements is disabled (see keepCRDs) to prevent data loss.
-{{- if .OVN_EVPN_ENABLE }}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -5433,7 +5423,6 @@ spec:
     storage: true
     subresources:
       status: {}
-{{- end }}
 {{- if .OVN_NETWORK_CONNECT_ENABLE }}
 ---
 apiVersion: apiextensions.k8s.io/v1

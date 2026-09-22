@@ -267,7 +267,6 @@ rules:
   - patch
   - update
 {{- end}}
-{{- if .OVN_EVPN_ENABLE }}
 - apiGroups:
   - k8s.ovn.org
   resources:
@@ -285,7 +284,6 @@ rules:
   verbs:
   - patch
   - update
-{{- end}}
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
