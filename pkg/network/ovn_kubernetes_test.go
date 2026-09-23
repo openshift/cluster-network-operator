@@ -113,6 +113,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 
 	objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, fakeClient, featureGatesCNO)
 	g.Expect(err).NotTo(HaveOccurred())
+	expectReadOnlyRootFilesystems(t, objs, "openshift-ovn-kubernetes")
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-ovn-kubernetes", "ovnkube-control-plane")))
 
@@ -126,6 +127,9 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-ovn-kubernetes", "ovnkube-control-plane")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-ovn-kubernetes", "ovnkube-node")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ConfigMap", "openshift-ovn-kubernetes", "ovnkube-config")))
+	nodeDaemonSet := mustFindRenderedObj[*appsv1.DaemonSet](t, objs, "DaemonSet", "ovnkube-node")
+	expectWritableEmptyDirMount(t, &nodeDaemonSet.Spec.Template.Spec, "nbdb", "tmp", "/tmp")
+	expectWritableEmptyDirMount(t, &nodeDaemonSet.Spec.Template.Spec, "sbdb", "tmp", "/tmp")
 
 	ovnkubeScriptLib := extractOVNScriptLib(g, objs)
 	g.Expect(ovnkubeScriptLib).To(ContainSubstring("ovn-nbctl -t 5 --inactivity-probe=0 set-connection punix:${nbdb_sock}"))
@@ -235,6 +239,7 @@ func TestRenderOVNKubernetes(t *testing.T) {
 			testBootstrap.OVN.OVNKubernetesConfig = &ovnConfig
 			objs, _, err = renderOVNKubernetes(config, &testBootstrap, manifestDirOvn, fakeClient, featureGatesCNO)
 			g.Expect(err).NotTo(HaveOccurred())
+			expectReadOnlyRootFilesystems(t, objs, "openshift-ovn-kubernetes")
 
 			deployment := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "ovnkube-control-plane")
 			container := mustFindContainer(t, deployment.Spec.Template.Spec.Containers, "ovnkube-control-plane")
@@ -247,6 +252,35 @@ func TestRenderOVNKubernetes(t *testing.T) {
 
 			return commandScript[execStart:]
 		})
+}
+
+func expectReadOnlyRootFilesystems(t *testing.T, objs []*uns.Unstructured, namespace string) {
+	t.Helper()
+	g := NewGomegaWithT(t)
+
+	for _, obj := range objs {
+		if obj.GetNamespace() != namespace || (obj.GetKind() != "DaemonSet" && obj.GetKind() != "Deployment") {
+			continue
+		}
+
+		for _, containerField := range []string{"initContainers", "containers"} {
+			containers, found, err := uns.NestedSlice(obj.Object, "spec", "template", "spec", containerField)
+			g.Expect(err).NotTo(HaveOccurred(), "failed to read %s from %s/%s", containerField, obj.GetKind(), obj.GetName())
+			if !found {
+				continue
+			}
+
+			for _, rawContainer := range containers {
+				container := rawContainer.(map[string]interface{})
+				name, _, err := uns.NestedString(container, "name")
+				g.Expect(err).NotTo(HaveOccurred(), "failed to read container name from %s/%s %s", obj.GetKind(), obj.GetName(), containerField)
+				readOnly, found, err := uns.NestedBool(container, "securityContext", "readOnlyRootFilesystem")
+				g.Expect(err).NotTo(HaveOccurred(), "failed to read securityContext.readOnlyRootFilesystem from %s/%s container %q", obj.GetKind(), obj.GetName(), name)
+				g.Expect(found).To(BeTrue(), "%s/%s container %q must set securityContext.readOnlyRootFilesystem", obj.GetKind(), obj.GetName(), name)
+				g.Expect(readOnly).To(BeTrue(), "%s/%s container %q must use a read-only root filesystem", obj.GetKind(), obj.GetName(), name)
+			}
+		}
+	}
 }
 
 func encodeClusterRole(obj *uns.Unstructured) (*rbacv1.ClusterRole, error) {

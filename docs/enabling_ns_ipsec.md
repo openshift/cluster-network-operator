@@ -3,6 +3,16 @@ North-South IPsec
 
 N-S IPsec allow creating ipsec tunnels in/out of the cluster.
 
+IPsec workload filesystem behavior
+----------------------------------
+
+The Cluster Network Operator runs the OVN-Kubernetes IPsec containers with a
+read-only root filesystem. Runtime files continue to use writable host-backed
+mounts. In particular, the host-mode monitor records the systemd service PID in
+`/var/run/openvswitch/ovs-monitor-ipsec-main.pid`; its liveness probe reads the
+same file to detect a service restart. The file is runtime state and is safely
+recreated when the pod or service restarts.
+
 Prerequsits:
 -------------
 1. Enable ipsec os/extension and pluto service
@@ -89,4 +99,3 @@ storage:
 
 4. create your ipsec conf
       
-

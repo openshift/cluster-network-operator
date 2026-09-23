@@ -196,6 +196,7 @@ spec:
               fieldPath: spec.nodeName
         securityContext:
           privileged: true
+          readOnlyRootFilesystem: true
         volumeMounts:
 {{ if .NETWORK_NODE_IDENTITY_ENABLE }}
         - mountPath: /etc/ovn/
@@ -294,6 +295,7 @@ spec:
               fieldPath: spec.nodeName
         securityContext:
           privileged: true
+          readOnlyRootFilesystem: true
         volumeMounts:
         # To check that network setup is complete
         - mountPath: /etc/cni/net.d

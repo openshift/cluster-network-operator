@@ -36,6 +36,8 @@ spec:
             weight: 100
       containers:
       - name: network-operator
+        securityContext:
+          readOnlyRootFilesystem: true
         ports:
           - containerPort: 9104
             hostPort: 9104
