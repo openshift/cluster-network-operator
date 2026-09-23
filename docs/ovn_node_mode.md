@@ -15,4 +15,10 @@ The `OVN_NODE_MODE` environment variable is injected into the `ovnkube-node` Pod
 
 ### Feature configuration
 
-Feature enablement (egress IP, multicast, multi-network, network segmentation, admin network policy, etc.) is managed through the cluster-wide ConfigMap (`004-config.yaml`) which is passed to ovnkube via `--config-file`. These features are not gated per node mode.
+Feature enablement is managed through two mechanisms:
+
+- **ConfigMap-based** (`004-config.yaml`): Most features (egress IP, multi-network, network segmentation, admin network policy, etc.) are configured in the cluster-wide ConfigMap which is passed to ovnkube via `--config-file`.
+
+- **CLI flags** (`ovnkube-control-plane.yaml`): Features that require ovnkube-control-plane pod restarts on configuration changes (e.g., multicast) are enabled via CLI flags (e.g., `--enable-multicast`) to ensure the control-plane pods restart automatically when the feature is toggled. Similarly, ovnkube-node also restarts on configuration changes via specific CLI flags.
+
+These features are not gated per node mode.
