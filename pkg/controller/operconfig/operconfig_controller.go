@@ -162,11 +162,14 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 		},
 		UpdateFunc: func(ev event.UpdateEvent) bool {
 			// Node conditions change *a lot* and we don't care. We only care
-			// about updates when the labels change.
-			return !reflect.DeepEqual(
-				ev.ObjectOld.GetLabels(),
-				ev.ObjectNew.GetLabels(),
-			)
+			// about updates when labels, schedulability, or the OVN uplink-mode
+			// capability annotation change.
+			oldNode, oldOK := ev.ObjectOld.(*corev1.Node)
+			newNode, newOK := ev.ObjectNew.(*corev1.Node)
+			if oldOK && newOK {
+				return nodeUpdateTriggersReconcile(oldNode, newNode)
+			}
+			return !reflect.DeepEqual(ev.ObjectOld.GetLabels(), ev.ObjectNew.GetLabels())
 		},
 		DeleteFunc: func(_ event.DeleteEvent) bool {
 			return true
@@ -177,6 +180,12 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 	}
 
 	return nil
+}
+
+func nodeUpdateTriggersReconcile(oldNode, newNode *corev1.Node) bool {
+	return oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable ||
+		oldNode.Annotations[network.OVNUplinkModeCapabilityAnnotation] != newNode.Annotations[network.OVNUplinkModeCapabilityAnnotation] ||
+		!reflect.DeepEqual(oldNode.Labels, newNode.Labels)
 }
 
 var _ reconcile.Reconciler = &ReconcileOperConfig{}
@@ -258,6 +267,12 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			fmt.Sprintf("The operator configuration is invalid (%v). Use 'oc edit network.operator.openshift.io cluster' to fix.", err))
 		return reconcile.Result{}, err
 	}
+	if err := network.ValidateFeatureGates(&operConfig.Spec, r.featureGates); err != nil {
+		log.Printf("Failed to validate feature-gated Network.operator.openshift.io.Spec fields: %v", err)
+		r.status.SetDegraded(statusmanager.OperatorConfig, "InvalidOperatorConfig",
+			fmt.Sprintf("The operator configuration is invalid (%v). Use 'oc edit network.operator.openshift.io cluster' to fix.", err))
+		return reconcile.Result{}, err
+	}
 
 	// Retrieve the previously applied operator configuration
 	prev, err := GetAppliedConfiguration(ctx, r.client.Default().CRClient(), operConfig.Name)
@@ -329,6 +344,25 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		r.status.MaybeSetDegraded(statusmanager.OperatorConfig, "BootstrapError",
 			fmt.Sprintf("Internal error while reconciling platform networking resources: %v", err))
 		return reconcile.Result{}, err
+	}
+
+	if newOperConfig.Spec.DefaultNetwork.Type == operv1.NetworkTypeOVNKubernetes &&
+		newOperConfig.Spec.DefaultNetwork.OVNKubernetesConfig != nil &&
+		newOperConfig.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig != nil &&
+		newOperConfig.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig.UplinkMode == operv1.UplinkModeOptional &&
+		len(bootstrapResult.OVN.OVNKubernetesConfig.MissingUplinkModeCapabilityNodes) > 0 {
+		r.status.SetProgressing(statusmanager.UplinkMode, "WaitingForUplinkModeCapability",
+			fmt.Sprintf("Waiting for nodes to advertise OVN uplink-mode support: %s",
+				strings.Join(bootstrapResult.OVN.OVNKubernetesConfig.MissingUplinkModeCapabilityNodes, ", ")))
+	} else if newOperConfig.Spec.DefaultNetwork.Type == operv1.NetworkTypeOVNKubernetes &&
+		newOperConfig.Spec.DefaultNetwork.OVNKubernetesConfig != nil &&
+		newOperConfig.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig != nil &&
+		newOperConfig.Spec.DefaultNetwork.OVNKubernetesConfig.GatewayConfig.UplinkMode != "" &&
+		bootstrapResult.OVN.NodeUpdateStatus != nil && bootstrapResult.OVN.NodeUpdateStatus.Progressing {
+		r.status.SetProgressing(statusmanager.UplinkMode, "UplinkModeRolloutInProgress",
+			"Waiting for the ovnkube-node uplink-mode configuration rollout to complete")
+	} else {
+		r.status.UnsetProgressing(statusmanager.UplinkMode)
 	}
 
 	if !reflect.DeepEqual(operConfig, newOperConfig) {

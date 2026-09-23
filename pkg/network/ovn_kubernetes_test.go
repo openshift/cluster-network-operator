@@ -78,6 +78,13 @@ var manifestDirOvn = "../../bindata"
 func getDefaultFeatureGates() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
 		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver, apifeatures.FeatureGateOVNObservability, apifeatures.FeatureGateNoOverlayMode},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateEVPN, apifeatures.FeatureGateNetworkConnect, apifeatures.FeatureGateOVNKubernetesUplinkMode},
+	)
+}
+
+func getFeatureGatesWithUplinkMode() featuregates.FeatureGate {
+	return featuregates.NewFeatureGate(
+		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver, apifeatures.FeatureGateOVNObservability, apifeatures.FeatureGateNoOverlayMode, apifeatures.FeatureGateOVNKubernetesUplinkMode},
 		[]configv1.FeatureGateName{apifeatures.FeatureGateEVPN, apifeatures.FeatureGateNetworkConnect},
 	)
 }
@@ -152,6 +159,15 @@ func TestRenderOVNKubernetes(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("CustomResourceDefinition", "", "clusteruserdefinednetworks.k8s.ovn.org")), "UDN CRD should exist")
 
 	for _, obj := range objs {
+		if obj.GetKind() == "ClusterRole" && obj.GetName() == "openshift-ovn-kubernetes-node-limited" {
+			clusterRole, err := encodeClusterRole(obj)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(clusterRole.Rules).To(ContainElement(rbacv1.PolicyRule{
+				APIGroups: []string{""},
+				Resources: []string{"nodes"},
+				Verbs:     []string{"get", "list", "patch", "watch"},
+			}))
+		}
 		if obj.GetKind() == "ClusterRole" && obj.GetName() == "openshift-ovn-kubernetes-control-plane-limited" {
 			clusterRole, err := encodeClusterRole(obj)
 			g.Expect(err).ToNot(HaveOccurred())
@@ -4727,6 +4743,139 @@ func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
     allow_icmp_network_policy_flag="--allow-icmp-network-policy="
   fi`))
 	})
+}
+
+func TestRenderOVNKubernetes_AllowNoUplink(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	renderWithGatewayConfig := func(gatewayConfig *operv1.GatewayConfig, featureGatesCNO featuregates.FeatureGate, missingCapabilityNodes ...string) []*uns.Unstructured {
+		crd := OVNKubernetesConfig.DeepCopy()
+		config := &crd.Spec
+		fillDefaults(config, nil)
+		config.DefaultNetwork.OVNKubernetesConfig.GatewayConfig = gatewayConfig
+
+		bootstrapResult := fakeBootstrapResult()
+		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+			ControlPlaneReplicaCount: 3,
+			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+				DpuHostModeLabel:                 OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+				DpuModeLabel:                     OVN_NODE_SELECTOR_DEFAULT_DPU,
+				SmartNicModeLabel:                OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+				MgmtPortResourceName:             "",
+				DpuNodeLeaseRenewInterval:        DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+				DpuNodeLeaseDuration:             DPU_NODE_LEASE_DURATION_DEFAULT,
+				MissingUplinkModeCapabilityNodes: missingCapabilityNodes,
+				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+					Enabled: false,
+				},
+			},
+		}
+		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, cnofake.NewFakeClient(), featureGatesCNO)
+		g.Expect(err).NotTo(HaveOccurred())
+		return objs
+	}
+
+	scriptLibHash := func(objs []*uns.Unstructured) string {
+		nodeDS := findInObjs("apps", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes", objs)
+		g.Expect(nodeDS).NotTo(BeNil())
+		ds := appsv1.DaemonSet{}
+		g.Expect(convert(nodeDS, &ds)).To(Succeed())
+		return ds.Spec.Template.Annotations["network.operator.openshift.io/ovnkube-script-lib-hash"]
+	}
+
+	t.Run("renders --allow-no-uplink when gatewayConfig.uplinkMode is Optional", func(t *testing.T) {
+		featureGatesCNO := getFeatureGatesWithUplinkMode()
+		ovnkubeScriptLib := extractOVNScriptLib(g, renderWithGatewayConfig(&operv1.GatewayConfig{
+			RoutingViaHost: true,
+			UplinkMode:     operv1.UplinkModeOptional,
+		}, featureGatesCNO))
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`allow_no_uplink_flag="--allow-no-uplink"`))
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`${allow_no_uplink_flag}`))
+	})
+
+	t.Run("omits --allow-no-uplink when gatewayConfig.uplinkMode is Required", func(t *testing.T) {
+		ovnkubeScriptLib := extractOVNScriptLib(g, renderWithGatewayConfig(&operv1.GatewayConfig{
+			RoutingViaHost: true,
+			UplinkMode:     operv1.UplinkModeRequired,
+		}, getFeatureGatesWithUplinkMode()))
+		g.Expect(ovnkubeScriptLib).NotTo(ContainSubstring(`allow_no_uplink_flag="--allow-no-uplink"`))
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`${allow_no_uplink_flag}`))
+	})
+
+	t.Run("omits --allow-no-uplink when gatewayConfig is nil", func(t *testing.T) {
+		ovnkubeScriptLib := extractOVNScriptLib(g, renderWithGatewayConfig(nil, getDefaultFeatureGates()))
+		g.Expect(ovnkubeScriptLib).NotTo(ContainSubstring(`allow_no_uplink_flag="--allow-no-uplink"`))
+	})
+
+	t.Run("omits --allow-no-uplink when the feature gate is disabled", func(t *testing.T) {
+		ovnkubeScriptLib := extractOVNScriptLib(g, renderWithGatewayConfig(&operv1.GatewayConfig{
+			RoutingViaHost: true,
+			UplinkMode:     operv1.UplinkModeOptional,
+		}, getDefaultFeatureGates()))
+		g.Expect(ovnkubeScriptLib).NotTo(ContainSubstring(`allow_no_uplink_flag="--allow-no-uplink"`))
+	})
+
+	t.Run("retains required behavior while a node lacks the capability", func(t *testing.T) {
+		ovnkubeScriptLib := extractOVNScriptLib(g, renderWithGatewayConfig(&operv1.GatewayConfig{
+			RoutingViaHost: true,
+			UplinkMode:     operv1.UplinkModeOptional,
+		}, getFeatureGatesWithUplinkMode(), "worker-1"))
+		g.Expect(ovnkubeScriptLib).NotTo(ContainSubstring(`allow_no_uplink_flag="--allow-no-uplink"`))
+	})
+
+	t.Run("changes ovnkube-node script-lib hash", func(t *testing.T) {
+		featureGatesCNO := getFeatureGatesWithUplinkMode()
+		hashWithout := scriptLibHash(renderWithGatewayConfig(&operv1.GatewayConfig{RoutingViaHost: true}, featureGatesCNO))
+		hashWith := scriptLibHash(renderWithGatewayConfig(&operv1.GatewayConfig{RoutingViaHost: true, UplinkMode: operv1.UplinkModeOptional}, featureGatesCNO))
+		g.Expect(hashWithout).NotTo(BeEmpty())
+		g.Expect(hashWith).NotTo(BeEmpty())
+		g.Expect(hashWith).NotTo(Equal(hashWithout))
+	})
+}
+
+func TestValidateUplinkMode(t *testing.T) {
+	g := NewGomegaWithT(t)
+	config := OVNKubernetesConfig.Spec.DeepCopy()
+	fillDefaults(config, nil)
+
+	config.DefaultNetwork.OVNKubernetesConfig.GatewayConfig = &operv1.GatewayConfig{
+		UplinkMode: operv1.UplinkModeOptional,
+	}
+	g.Expect(validateOVNKubernetes(config)).To(ContainElement(MatchError(ContainSubstring("uplinkMode can only be set when routingViaHost is true"))))
+
+	config.DefaultNetwork.OVNKubernetesConfig.GatewayConfig = &operv1.GatewayConfig{
+		RoutingViaHost: true,
+		UplinkMode:     operv1.UplinkMode("Invalid"),
+	}
+	g.Expect(validateOVNKubernetes(config)).To(ContainElement(MatchError(ContainSubstring("uplinkMode must be Required or Optional"))))
+
+	config.DefaultNetwork.OVNKubernetesConfig.GatewayConfig = &operv1.GatewayConfig{
+		RoutingViaHost: true,
+		UplinkMode:     operv1.UplinkModeOptional,
+	}
+	g.Expect(validateOVNKubernetes(config)).To(BeEmpty())
+	g.Expect(ValidateFeatureGates(config, getDefaultFeatureGates())).To(MatchError(ContainSubstring("requires the OVNKubernetesUplinkMode feature gate")))
+	g.Expect(ValidateFeatureGates(config, getFeatureGatesWithUplinkMode())).To(Succeed())
+}
+
+func TestGetMissingUplinkModeCapabilityNodes(t *testing.T) {
+	g := NewGomegaWithT(t)
+	node := func(name string, annotations map[string]string, unschedulable bool, labels map[string]string) *v1.Node {
+		return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Annotations: annotations, Labels: labels}, Spec: v1.NodeSpec{Unschedulable: unschedulable}}
+	}
+	linux := map[string]string{v1.LabelOSStable: "linux"}
+	client := cnofake.NewFakeClient(
+		node("capable", map[string]string{OVNUplinkModeCapabilityAnnotation: ovnUplinkModeCapabilityVersion}, false, linux),
+		node("missing-b", nil, false, linux),
+		node("missing-a", nil, false, linux),
+		node("cordoned", nil, true, linux),
+		node("windows", nil, false, map[string]string{v1.LabelOSStable: "windows"}),
+		node("dpu", nil, false, linux),
+	)
+
+	missing, err := getMissingUplinkModeCapabilityNodes(client, []string{"dpu"})
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(missing).To(Equal([]string{"cordoned", "missing-a", "missing-b"}))
 }
 
 // TestDaemonSetProgressing verifies daemonSetProgressing returns the correct

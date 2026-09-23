@@ -150,6 +150,39 @@ spec:
                   This provides a mechanism to kick a previously failed deployment and provide a reason why you think it will work
                   this time instead of failing again on the same config.
                 type: string
+              irreconcilableValidationOverrides:
+                description: |-
+                  irreconcilableValidationOverrides is an optional field that can used to make changes to a MachineConfig that
+                  cannot be applied to existing nodes.
+                  When specified, the fields configured with validation overrides will no longer reject changes to those
+                  respective fields due to them not being able to be applied to existing nodes.
+                  Only newly provisioned nodes will have these configurations applied.
+                  Existing nodes will report observed configuration differences in their MachineConfigNode status.
+                minProperties: 1
+                properties:
+                  storage:
+                    description: |-
+                      storage can be used to allow making irreconcilable changes to the selected sections under the
+                      `spec.config.storage` field of MachineConfig CRs
+                      It must have at least one item, may not exceed 3 items and must not contain duplicates.
+                      Allowed element values are "Disks", "FileSystems", "Raid" and omitted.
+                      When contains "Disks" changes to the `spec.config.storage.disks` section of MachineConfig CRs are allowed.
+                      When contains "FileSystems" changes to the `spec.config.storage.filesystems` section of MachineConfig CRs are allowed.
+                      When contains "Raid" changes to the `spec.config.storage.raid` section of MachineConfig CRs are allowed.
+                      When omitted changes to the `spec.config.storage` section are forbidden.
+                    items:
+                      description: IrreconcilableValidationOverridesStorage defines
+                        available storage irreconcilable overrides.
+                      enum:
+                      - Disks
+                      - FileSystems
+                      - Raid
+                      type: string
+                    maxItems: 3
+                    minItems: 1
+                    type: array
+                    x-kubernetes-list-type: set
+                type: object
               logLevel:
                 default: Normal
                 description: |-
@@ -187,17 +220,19 @@ spec:
                         apiGroup:
                           description: |-
                             apiGroup is name of the APIGroup that the machine management resource belongs to.
-                            The only current valid value is machine.openshift.io.
+                            Valid values are machine.openshift.io and cluster.x-k8s.io.
                             machine.openshift.io means that the machine manager will only register resources that belong to OpenShift machine API group.
+                            cluster.x-k8s.io means that the machine manager will only register resources that belong to the Cluster API group.
                           enum:
                           - machine.openshift.io
                           type: string
                         resource:
                           description: |-
                             resource is the machine management resource's type.
-                            Valid values are machinesets and controlplanemachinesets.
+                            Valid values are machinesets, controlplanemachinesets and machinedeployments.
                             machinesets means that the machine manager will only register resources of the kind MachineSet.
                             controlplanemachinesets means that the machine manager will only register resources of the kind ControlPlaneMachineSet.
+                            machinedeployments means that the machine manager will only register resources of the kind MachineDeployment.
                           enum:
                           - machinesets
                           - controlplanemachinesets
@@ -328,7 +363,7 @@ spec:
                             actions represents the series of commands to be executed on changes to the file at
                             the corresponding file path. Actions will be applied in the order that
                             they are set in this list. If there are other incoming changes to other MachineConfig
-                            entries in the same update that require a reboot, the reboot will supercede these actions.
+                            entries in the same update that require a reboot, the reboot will supersede these actions.
                             Valid actions are Reboot, Drain, Reload, DaemonReload and None.
                             The Reboot action and the None action cannot be used in conjunction with any of the other actions.
                             This list supports a maximum of 10 entries.
@@ -454,7 +489,7 @@ spec:
                           actions represents the series of commands to be executed on changes to the file at
                           the corresponding file path. Actions will be applied in the order that
                           they are set in this list. If there are other incoming changes to other MachineConfig
-                          entries in the same update that require a reboot, the reboot will supercede these actions.
+                          entries in the same update that require a reboot, the reboot will supersede these actions.
                           Valid actions are Reboot, Drain, Reload, DaemonReload and None.
                           The Reboot action and the None action cannot be used in conjunction with any of the other actions.
                           This list supports a maximum of 10 entries.
@@ -573,7 +608,7 @@ spec:
                             actions represents the series of commands to be executed on changes to the file at
                             the corresponding file path. Actions will be applied in the order that
                             they are set in this list. If there are other incoming changes to other MachineConfig
-                            entries in the same update that require a reboot, the reboot will supercede these actions.
+                            entries in the same update that require a reboot, the reboot will supersede these actions.
                             Valid actions are Reboot, Drain, Reload, DaemonReload and None.
                             The Reboot action and the None action cannot be used in conjunction with any of the other actions.
                             This list supports a maximum of 10 entries.
@@ -960,17 +995,19 @@ spec:
                         apiGroup:
                           description: |-
                             apiGroup is name of the APIGroup that the machine management resource belongs to.
-                            The only current valid value is machine.openshift.io.
+                            Valid values are machine.openshift.io and cluster.x-k8s.io.
                             machine.openshift.io means that the machine manager will only register resources that belong to OpenShift machine API group.
+                            cluster.x-k8s.io means that the machine manager will only register resources that belong to the Cluster API group.
                           enum:
                           - machine.openshift.io
                           type: string
                         resource:
                           description: |-
                             resource is the machine management resource's type.
-                            Valid values are machinesets and controlplanemachinesets.
+                            Valid values are machinesets, controlplanemachinesets and machinedeployments.
                             machinesets means that the machine manager will only register resources of the kind MachineSet.
                             controlplanemachinesets means that the machine manager will only register resources of the kind ControlPlaneMachineSet.
+                            machinedeployments means that the machine manager will only register resources of the kind MachineDeployment.
                           enum:
                           - machinesets
                           - controlplanemachinesets
@@ -1097,7 +1134,7 @@ spec:
                                 actions represents the series of commands to be executed on changes to the file at
                                 the corresponding file path. Actions will be applied in the order that
                                 they are set in this list. If there are other incoming changes to other MachineConfig
-                                entries in the same update that require a reboot, the reboot will supercede these actions.
+                                entries in the same update that require a reboot, the reboot will supersede these actions.
                                 Valid actions are Reboot, Drain, Reload, DaemonReload and None.
                                 The Reboot action and the None action cannot be used in conjunction with any of the other actions.
                                 This list supports a maximum of 10 entries.
@@ -1222,7 +1259,7 @@ spec:
                               actions represents the series of commands to be executed on changes to the file at
                               the corresponding file path. Actions will be applied in the order that
                               they are set in this list. If there are other incoming changes to other MachineConfig
-                              entries in the same update that require a reboot, the reboot will supercede these actions.
+                              entries in the same update that require a reboot, the reboot will supersede these actions.
                               Valid actions are Reboot, Drain, Reload, DaemonReload and None.
                               The Reboot action and the None action cannot be used in conjunction with any of the other actions.
                               This list supports a maximum of 10 entries.
@@ -1341,7 +1378,7 @@ spec:
                                 actions represents the series of commands to be executed on changes to the file at
                                 the corresponding file path. Actions will be applied in the order that
                                 they are set in this list. If there are other incoming changes to other MachineConfig
-                                entries in the same update that require a reboot, the reboot will supercede these actions.
+                                entries in the same update that require a reboot, the reboot will supersede these actions.
                                 Valid actions are Reboot, Drain, Reload, DaemonReload and None.
                                 The Reboot action and the None action cannot be used in conjunction with any of the other actions.
                                 This list supports a maximum of 10 entries.
