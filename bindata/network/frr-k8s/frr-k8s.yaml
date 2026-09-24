@@ -25,7 +25,7 @@ spec:
         component: frr-k8s
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        openshift.io/required-scc: privileged
+        openshift.io/required-scc: frr-k8s
     spec:
       serviceAccountName: frr-k8s-daemon
       priorityClassName: system-node-critical
@@ -173,10 +173,13 @@ spec:
           readOnlyRootFilesystem: true
           capabilities:
             add:
+            - CHOWN
             - NET_ADMIN
-            - NET_RAW
-            - SYS_ADMIN
             - NET_BIND_SERVICE
+            - NET_RAW
+            - SETGID
+            - SETUID
+            - SYS_ADMIN
         image: {{.FRRK8sImage}}
         env:
         - name: TINI_SUBREAPER
