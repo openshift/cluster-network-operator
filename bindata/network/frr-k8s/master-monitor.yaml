@@ -1,0 +1,202 @@
+{{ if .BGPVIPManagement }}
+# Metrics companion for the frr-k8s static pods on control plane nodes.
+# Static pods cannot mount Secrets, so the FRR metrics exporter runs here
+# instead, reading the static pod's FRR through hostPath sockets. Only the
+# dataplane needs static pod survivability; metrics do not.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: frr-k8s-master-monitor
+  namespace: openshift-frr-k8s
+  labels:
+    app: frr-k8s
+    component: frr-k8s-master-monitor
+  annotations:
+    release.openshift.io/version: "{{.ReleaseVersion}}"
+spec:
+  selector:
+    matchLabels:
+      app: frr-k8s
+      component: frr-k8s-master-monitor
+  template:
+    metadata:
+      labels:
+        app: frr-k8s
+        component: frr-k8s-master-monitor
+    spec:
+      serviceAccountName: frr-k8s-daemon
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-role.kubernetes.io/master: ""
+      tolerations:
+      - operator: "Exists"
+      initContainers:
+      - name: cp-metrics
+        image: {{.FRRK8sImage}}
+        command: ["/bin/sh", "-c", "cp -f /frr-metrics /etc/frr_metrics/"]
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: metrics
+          mountPath: /etc/frr_metrics
+      containers:
+      - name: frr-metrics
+        image: {{.FRRK8sImage}}
+        command: ["/etc/frr_metrics/frr-metrics"]
+        args:
+        - --metrics-port=9141
+        - "--metrics-bind-address=[::]"
+        - --tls-cert-file=/etc/metrics/tls.crt
+        - --tls-private-key-file=/etc/metrics/tls.key
+        ports:
+        - containerPort: 9141
+          name: frrmetricshttps
+        # Root without extra capabilities except DAC_OVERRIDE: vtysh requires
+        # root, and the FRR vty sockets are owned by the frr user (100).
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+            add: ["DAC_OVERRIDE"]
+          seccompProfile:
+            type: RuntimeDefault
+        readinessProbe:
+          tcpSocket:
+            port: 9141
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 9141
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+          limits:
+            cpu: 500m
+            memory: 128Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: frr-sockets
+          mountPath: /var/run/frr
+        - name: frr-conf
+          mountPath: /etc/frr
+        - name: metrics
+          mountPath: /etc/frr_metrics
+        - name: metrics-certs
+          mountPath: /etc/metrics
+          readOnly: true
+      volumes:
+      - name: frr-sockets
+        hostPath:
+          path: /run/frr-k8s/sockets
+          type: DirectoryOrCreate
+      - name: frr-conf
+        hostPath:
+          path: /run/frr-k8s/conf
+          type: DirectoryOrCreate
+      - name: metrics
+        emptyDir: {}
+      - name: metrics-certs
+        secret:
+          secretName: frr-k8s-master-monitor-certs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frr-k8s-master-monitor
+  namespace: openshift-frr-k8s
+  labels:
+    name: frr-k8s-master-monitor
+  annotations:
+    prometheus.io/scrape: "true"
+    service.beta.openshift.io/serving-cert-secret-name: frr-k8s-master-monitor-certs
+spec:
+  selector:
+    app: frr-k8s
+    component: frr-k8s-master-monitor
+  clusterIP: None
+  ports:
+  - name: frrmetricshttps
+    port: 9141
+    targetPort: 9141
+  sessionAffinity: None
+  type: ClusterIP
+---
+# The namespace carries a default-deny NetworkPolicy; the worker DaemonSet
+# is exempt as hostNetwork, the pod-network companion is not.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frr-k8s-master-monitor
+  namespace: openshift-frr-k8s
+spec:
+  podSelector:
+    matchLabels:
+      component: frr-k8s-master-monitor
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-monitoring
+    ports:
+    - protocol: TCP
+      port: 9141
+  # TokenReview/SubjectAccessReview for scrape authentication. The API
+  # server endpoints are node IPs, not selectable by pod selectors.
+  egress:
+  - ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 6443
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: frr-k8s-master-monitor
+  namespace: openshift-frr-k8s
+  labels:
+    app: frr-k8s
+    component: frr-k8s-master-monitor
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+spec:
+  endpoints:
+  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    honorLabels: true
+    port: frrmetricshttps
+    scheme: https
+    tlsConfig:
+      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+      serverName: frr-k8s-master-monitor.openshift-frr-k8s.svc
+  jobLabel: app
+  namespaceSelector:
+    matchNames:
+    - openshift-frr-k8s
+  selector:
+    matchLabels:
+      name: frr-k8s-master-monitor
+{{ end }}
