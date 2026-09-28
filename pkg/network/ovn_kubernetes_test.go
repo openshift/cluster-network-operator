@@ -78,7 +78,7 @@ var manifestDirOvn = "../../bindata"
 func getDefaultFeatureGates() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
 		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver, apifeatures.FeatureGateOVNObservability, apifeatures.FeatureGateNoOverlayMode},
-		[]configv1.FeatureGateName{apifeatures.FeatureGateEVPN, apifeatures.FeatureGateNetworkConnect},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateEVPN, apifeatures.FeatureGateNetworkConnect, apifeatures.FeatureGateMACSecurity},
 	)
 }
 
@@ -1187,6 +1187,7 @@ logfile-maxage=0`,
 			}
 
 			knownFeatureGates := []configv1.FeatureGateName{
+				apifeatures.FeatureGateMACSecurity,
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
@@ -4139,6 +4140,7 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 		[]configv1.FeatureGateName{
 			apifeatures.FeatureGateEVPN,
 			apifeatures.FeatureGateNetworkConnect,
+			apifeatures.FeatureGateMACSecurity,
 		},
 	)
 
@@ -4463,6 +4465,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 		return featuregates.NewFeatureGate(
 			[]configv1.FeatureGateName{},
 			[]configv1.FeatureGateName{
+				apifeatures.FeatureGateMACSecurity,
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
@@ -4475,6 +4478,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 		return featuregates.NewFeatureGate(
 			[]configv1.FeatureGateName{},
 			[]configv1.FeatureGateName{
+				apifeatures.FeatureGateMACSecurity,
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
@@ -4487,6 +4491,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 		return featuregates.NewFeatureGate(
 			[]configv1.FeatureGateName{},
 			[]configv1.FeatureGateName{
+				apifeatures.FeatureGateMACSecurity,
 				apifeatures.FeatureGateDNSNameResolver,
 				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
@@ -4901,6 +4906,7 @@ func TestRenderOVNKubernetesNoOverlay(t *testing.T) {
 			[]configv1.FeatureGateName{
 				apifeatures.FeatureGateEVPN,
 				apifeatures.FeatureGateNetworkConnect,
+				apifeatures.FeatureGateMACSecurity,
 			},
 		)
 	}
