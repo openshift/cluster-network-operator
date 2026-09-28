@@ -3278,6 +3278,26 @@ spec:
               layer2:
                 description: Layer2 is the Layer2 topology configuration.
                 properties:
+{{- if .OVN_MAC_SECURITY_ENABLE_API }}
+                  macSecurity:
+                    description: macSecurity configures MAC spoof protection on the
+                      network's logical switch ports.
+                    properties:
+                      mode:
+                        description: |-
+                          mode controls the MAC spoof protection enforcement posture.
+                          `Enabled` (default) restricts traffic to assigned addresses.
+                          `Disabled` removes all MAC spoof protection restrictions and enables unknown MAC address
+                          handling for nested virtualization and NFV use cases.
+                          Only `Disabled` requires ipam.mode to be Disabled.
+                        enum:
+                        - Enabled
+                        - Disabled
+                        type: string
+                    required:
+                    - mode
+                    type: object
+{{- end }}
                   defaultGatewayIPs:
                     description: |-
                       defaultGatewayIPs specifies the default gateway IP used in the internal OVN topology.
@@ -3501,6 +3521,14 @@ spec:
                     host bits set)
                   rule: '!has(self.reservedSubnets) || self.reservedSubnets.all(s,
                     isCIDR(s) && cidr(s) == cidr(s).masked())'
+{{- if .OVN_MAC_SECURITY_ENABLE_API }}
+                - message: macSecurity.mode is only supported for Secondary networks
+                  rule: '!has(self.macSecurity) || self.role == ''Secondary'''
+                - message: macSecurity.mode Disabled requires ipam.mode to be Disabled
+                  rule: '!has(self.macSecurity) || self.macSecurity.mode != ''Disabled''
+                    || (has(self.ipam) && has(self.ipam.mode) && self.ipam.mode ==
+                    ''Disabled'')'
+{{- end }}
               layer3:
                 description: Layer3 is the Layer3 topology configuration.
                 properties:
@@ -3960,6 +3988,26 @@ spec:
                   layer2:
                     description: Layer2 is the Layer2 topology configuration.
                     properties:
+{{- if .OVN_MAC_SECURITY_ENABLE_API }}
+                      macSecurity:
+                        description: macSecurity configures MAC spoof protection on
+                          the network's logical switch ports.
+                        properties:
+                          mode:
+                            description: |-
+                              mode controls the MAC spoof protection enforcement posture.
+                              `Enabled` (default) restricts traffic to assigned addresses.
+                              `Disabled` removes all MAC spoof protection restrictions and enables unknown MAC address
+                              handling for nested virtualization and NFV use cases.
+                              Only `Disabled` requires ipam.mode to be Disabled.
+                            enum:
+                            - Enabled
+                            - Disabled
+                            type: string
+                        required:
+                        - mode
+                        type: object
+{{- end }}
                       defaultGatewayIPs:
                         description: |-
                           defaultGatewayIPs specifies the default gateway IP used in the internal OVN topology.
@@ -4124,6 +4172,14 @@ spec:
                     - message: Subnets is required with ipam.mode is Enabled or unset
                       rule: has(self.ipam) && has(self.ipam.mode) && self.ipam.mode
                         != 'Enabled' || has(self.subnets)
+{{- if .OVN_MAC_SECURITY_ENABLE_API }}
+                    - message: macSecurity.mode is only supported for Secondary networks
+                      rule: '!has(self.macSecurity) || self.role == ''Secondary'''
+                    - message: macSecurity.mode Disabled requires ipam.mode to be Disabled
+                      rule: '!has(self.macSecurity) || self.macSecurity.mode != ''Disabled''
+                        || (has(self.ipam) && has(self.ipam.mode) && self.ipam.mode ==
+                        ''Disabled'')'
+{{- end }}
                     - message: Subnets must be unset when ipam.mode is Disabled
                       rule: '!has(self.ipam) || !has(self.ipam.mode) || self.ipam.mode
                         != ''Disabled'' || !has(self.subnets)'
@@ -4292,6 +4348,26 @@ spec:
                   localnet:
                     description: Localnet is the Localnet topology configuration.
                     properties:
+{{- if .OVN_MAC_SECURITY_ENABLE_API }}
+                      macSecurity:
+                        description: macSecurity configures MAC spoof protection on
+                          the network's logical switch ports.
+                        properties:
+                          mode:
+                            description: |-
+                              mode controls the MAC spoof protection enforcement posture.
+                              `Enabled` (default) restricts traffic to assigned addresses.
+                              `Disabled` removes all MAC spoof protection restrictions and enables unknown MAC address
+                              handling for nested virtualization and NFV use cases.
+                              Only `Disabled` requires ipam.mode to be Disabled.
+                            enum:
+                            - Enabled
+                            - Disabled
+                            type: string
+                        required:
+                        - mode
+                        type: object
+{{- end }}
                       excludeSubnets:
                         description: |-
                           excludeSubnets is a list of CIDRs to be removed from the specified CIDRs in `subnets`.
@@ -4474,6 +4550,12 @@ spec:
                         and forbidden otherwise
                       rule: '!has(self.ipam) || !has(self.ipam.mode) || self.ipam.mode
                         == ''Enabled'' ? has(self.subnets) : !has(self.subnets)'
+{{- if .OVN_MAC_SECURITY_ENABLE_API }}
+                    - message: macSecurity.mode Disabled requires ipam.mode to be Disabled
+                      rule: '!has(self.macSecurity) || self.macSecurity.mode != ''Disabled''
+                        || (has(self.ipam) && has(self.ipam.mode) && self.ipam.mode ==
+                        ''Disabled'')'
+{{- end }}
                     - message: excludeSubnets must be unset when subnets is unset
                       rule: '!has(self.excludeSubnets) || has(self.subnets)'
                     - message: MTU should be greater than or equal to 1280 when an
