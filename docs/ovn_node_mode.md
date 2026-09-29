@@ -22,3 +22,11 @@ Feature enablement is managed through two mechanisms:
 - **CLI flags** (`ovnkube-control-plane.yaml`): Features that require ovnkube-control-plane pod restarts on configuration changes (e.g., multicast) are enabled via CLI flags (e.g., `--enable-multicast`) to ensure the control-plane pods restart automatically when the feature is toggled. Similarly, ovnkube-node also restarts on configuration changes via specific CLI flags.
 
 These features are not gated per node mode.
+
+The optional gateway-uplink setting is also rendered as a shared CLI flag. It
+applies to modes that execute the host gateway initialization path, including
+`full`, `smart-nic`, and `dpu-host`. DPU-mode nodes are excluded from CNO's
+uplink capability barrier because gateway initialization runs on the paired
+DPU-host rather than on the DPU pod. See
+[Optional OVN-Kubernetes gateway uplink](optional-gateway-uplink.md) for the
+configuration, rollout, and version-skew behavior.

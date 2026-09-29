@@ -73,11 +73,18 @@ rules:
 - apiGroups: [""]
   resources:
   - namespaces
-  - nodes
   - pods
   verbs:
   - get
   - list
+  - watch
+- apiGroups: [""]
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - patch
   - watch
 - apiGroups: [""]
   resources:

@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -82,6 +83,11 @@ const (
 
 	defaultV4MasqueradeSubnet = "169.254.0.0/17"
 	defaultV6MasqueradeSubnet = "fd69::/112"
+)
+
+const (
+	OVNUplinkModeCapabilityAnnotation = "k8s.ovn.org/uplink-mode-capability"
+	ovnUplinkModeCapabilityVersion    = "v1"
 )
 
 // renderOVNKubernetes returns the manifests for the ovn-kubernetes.
@@ -345,6 +351,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	if c.GatewayConfig != nil && c.GatewayConfig.IPForwarding == operv1.IPForwardingGlobal {
 		data.Data["IP_FORWARDING_MODE"] = c.GatewayConfig.IPForwarding
 	}
+
+	data.Data["AllowNoUplink"] = slices.Contains(featureGates.KnownFeatures(), apifeatures.FeatureGateOVNKubernetesUplinkMode) &&
+		featureGates.Enabled(apifeatures.FeatureGateOVNKubernetesUplinkMode) &&
+		c.GatewayConfig != nil && c.GatewayConfig.UplinkMode == operv1.UplinkModeOptional &&
+		len(bootstrapResult.OVN.OVNKubernetesConfig.MissingUplinkModeCapabilityNodes) == 0
 
 	// No-overlay mode configuration
 	// The NoOverlayMode feature gate enables no-overlay networking for both the default network
@@ -1138,6 +1149,11 @@ func bootstrapOVNConfig(conf *operv1.Network, kubeClient cnoclient.Client, hc *h
 	found, nodeName := findCommonNode(ovnConfigResult.DpuHostModeNodes, ovnConfigResult.DpuModeNodes, ovnConfigResult.SmartNicModeNodes)
 	if found {
 		return nil, fmt.Errorf("node %s has multiple hardware offload labels", nodeName)
+	}
+
+	ovnConfigResult.MissingUplinkModeCapabilityNodes, err = getMissingUplinkModeCapabilityNodes(kubeClient, ovnConfigResult.DpuModeNodes)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine OVN uplink-mode capability: %w", err)
 	}
 
 	ovnConfigResult.ConfigOverrides, err = getOVNKubernetesConfigOverrides(kubeClient)
@@ -2164,6 +2180,14 @@ func validateOVNKubernetesSubnets(conf *operv1.NetworkSpec) error {
 	// Gateway Configurable Subnet Checks
 	// Validate whether masquerade CIDR is from same IP family as clusterNetwork.
 	if oc.GatewayConfig != nil {
+		if oc.GatewayConfig.UplinkMode != "" {
+			if oc.GatewayConfig.UplinkMode != operv1.UplinkModeRequired && oc.GatewayConfig.UplinkMode != operv1.UplinkModeOptional {
+				out = append(out, fmt.Errorf("gatewayConfig.uplinkMode must be Required or Optional"))
+			}
+			if !oc.GatewayConfig.RoutingViaHost {
+				out = append(out, fmt.Errorf("gatewayConfig.uplinkMode can only be set when routingViaHost is true"))
+			}
+		}
 		if oc.GatewayConfig.IPv4.InternalMasqueradeSubnet != "" {
 			if !cnHasIPv4 {
 				out = append(out, fmt.Errorf("v4InternalMasqueradeSubnet %s and ClusterNetwork must have matching IP families", oc.GatewayConfig.IPv4.InternalMasqueradeSubnet))
@@ -2187,6 +2211,42 @@ func validateOVNKubernetesSubnets(conf *operv1.NetworkSpec) error {
 	}
 
 	return kerrors.NewAggregate(out)
+}
+
+// ValidateFeatureGates rejects gated fields that are not available in the
+// cluster's active feature set. The API server normally hides these fields,
+// but CNO validates defensively so version skew produces an actionable status.
+func ValidateFeatureGates(conf *operv1.NetworkSpec, featureGates featuregates.FeatureGate) error {
+	if conf.DefaultNetwork.Type != operv1.NetworkTypeOVNKubernetes || conf.DefaultNetwork.OVNKubernetesConfig == nil ||
+		conf.DefaultNetwork.OVNKubernetesConfig.GatewayConfig == nil ||
+		conf.DefaultNetwork.OVNKubernetesConfig.GatewayConfig.UplinkMode == "" {
+		return nil
+	}
+	if !slices.Contains(featureGates.KnownFeatures(), apifeatures.FeatureGateOVNKubernetesUplinkMode) ||
+		!featureGates.Enabled(apifeatures.FeatureGateOVNKubernetesUplinkMode) {
+		return fmt.Errorf("gatewayConfig.uplinkMode requires the %s feature gate", apifeatures.FeatureGateOVNKubernetesUplinkMode)
+	}
+	return nil
+}
+
+func getMissingUplinkModeCapabilityNodes(client cnoclient.Client, dpuModeNodes []string) ([]string, error) {
+	nodes := &corev1.NodeList{}
+	if err := client.Default().CRClient().List(context.TODO(), nodes); err != nil {
+		return nil, err
+	}
+	dpuNodes := sets.New[string](dpuModeNodes...)
+	missing := []string{}
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
+		if dpuNodes.Has(node.Name) || node.Labels[corev1.LabelOSStable] != "linux" {
+			continue
+		}
+		if node.Annotations[OVNUplinkModeCapabilityAnnotation] != ovnUplinkModeCapabilityVersion {
+			missing = append(missing, node.Name)
+		}
+	}
+	sort.Strings(missing)
+	return missing, nil
 }
 
 // Check subnet length and overlapping with other subnets
