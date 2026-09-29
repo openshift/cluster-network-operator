@@ -146,7 +146,7 @@ Other values are ignored. If you wish to use use a third-party network provider 
 
 
 ### Configuring OVNKubernetes
-OVNKubernetes supports the following configuration options, all of which are optional and once set at cluster creation, they can't be changed except for `gatewayConfig` and `IPsec` which can be changed at runtime:
+OVNKubernetes supports the following configuration options, all of which are optional and once set at cluster creation, they can't be changed except for `gatewayConfig`, `IPsec` and `reachabilityTotalTimeoutSeconds` which can be changed at runtime:
 * `MTU`: The MTU to use for the geneve overlay. The default is the MTU of the node that the cluster-network-operator is first run on, minus 100 bytes for geneve overhead. If the nodes in your cluster don't all have the same MTU then you may need to set this explicitly.
 * `genevePort`: The UDP port to use for the Geneve overlay. The default is 6081.
 * `hybridOverlayConfig`: hybrid linux/windows cluster (see below).

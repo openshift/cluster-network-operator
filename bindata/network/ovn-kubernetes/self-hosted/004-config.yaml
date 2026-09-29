@@ -37,9 +37,6 @@ data:
  
     [ovnkubernetesfeature]
 
-    {{- if .ReachabilityTotalTimeoutSeconds }}
-    egressip-reachability-total-timeout={{.ReachabilityTotalTimeoutSeconds}}
-    {{- end }}
 {{- if .ReachabilityNodePort }}
     egressip-node-healthcheck-port={{.ReachabilityNodePort}}
 {{- end }}

@@ -105,6 +105,11 @@ spec:
             source "/env/_master"
             set +o allexport
           fi
+          
+          ovn_eip_reachability_timeout_opt=
+          {{- if .ReachabilityTotalTimeoutSeconds }}        
+            ovn_eip_reachability_timeout_opt="--egressip-reachability-total-timeout {{.ReachabilityTotalTimeoutSeconds}}"
+          {{ end }}
 
           ovn_v4_join_subnet_opt=
           if [[ "{{.V4JoinSubnet}}" != "" ]]; then
@@ -203,7 +208,8 @@ spec:
             --enable-multicast \
             --enable-multi-external-gateway=true \
             ${multi_network_policy_enabled_flag} \
-            ${admin_network_policy_enabled_flag}
+            ${admin_network_policy_enabled_flag} \
+            ${ovn_eip_reachability_timeout_opt}
         volumeMounts:
         - mountPath: /run/ovnkube-config/
           name: ovnkube-config
