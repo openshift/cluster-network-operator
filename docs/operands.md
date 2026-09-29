@@ -116,6 +116,12 @@ just makes the error handling nicer, by causing certain failures to
 happen at pod creation time rather than being reported asynchronously
 after pod creation.)
 
+The Multus admission controller ignores namespaces that have both
+`openshift.io/cluster-monitoring=true` and
+`workload.openshift.io/allowed=management`. CNO recomputes this list during
+rendering and reconciles when a namespace enters or leaves the matching set,
+so newly created namespaces do not require a CNO restart.
+
 The network-metrics-daemon gathers metrics about Multus-created
 network interfaces, to provide to Prometheus.
 
