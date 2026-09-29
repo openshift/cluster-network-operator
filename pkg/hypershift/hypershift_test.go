@@ -89,6 +89,33 @@ spec:
       port: 2040
 `,
 		},
+		{
+			name: "Picks up the control plane availability-zone scheduling policy",
+			expectedOutput: &HostedControlPlane{
+				ClusterID:                        "31df7fa9-b1a7-4a66-98ef-c6920bf213d8",
+				ControllerAvailabilityPolicy:     HighlyAvailable,
+				NodeSelector:                     nil,
+				AdvertiseAddress:                 HostedClusterDefaultAdvertiseAddressIPV4,
+				AdvertisePort:                    int(HostedClusterDefaultAdvertisePort),
+				AvailabilityZoneSchedulingPolicy: MinimalAvailabilityZoneSchedulingPolicy,
+				NonZonalPlacement:                NonZonalPlacementRequired,
+			},
+			inputUnstructuredContent: `
+apiVersion: hypershift.openshift.io/v1beta1
+kind: HostedControlPlane
+spec:
+  autoscaling: {}
+  clusterID: 31df7fa9-b1a7-4a66-98ef-c6920bf213d8
+  controllerAvailabilityPolicy: HighlyAvailable
+  controlPlaneAvailabilityZoneScheduling:
+    policy: Minimal
+    nonZonalPlacement: Required
+  dns:
+    baseDomain: tf71faa489656c98b18e2-a383e1dc466c308d41a756a1a66c2b6a-c000.us-south.satellite.test.appdomain.cloud
+  infrastructureAvailabilityPolicy: HighlyAvailable
+  issuerURL: https://kubernetes.default.svc
+`,
+		},
 	}
 	g := NewGomegaWithT(t)
 	for _, tc := range testCases {
