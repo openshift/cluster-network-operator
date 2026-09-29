@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"maps"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -86,11 +88,32 @@ func setOC(t *testing.T, client cnoclient.Client, oc *operv1.Network) {
 
 func set(t *testing.T, client cnoclient.Client, obj crclient.Object) {
 	t.Helper()
-	err := client.ClientFor("").CRClient().Update(t.Context(), obj)
-	if apierrors.IsNotFound(err) {
-		err = client.ClientFor("").CRClient().Create(t.Context(), obj)
-
+	// Re-read the object to pick up any annotation writes (e.g.
+	// observed-stable-generation) that SetFromPods may have applied.
+	current := obj.DeepCopyObject().(crclient.Object)
+	err := client.ClientFor("").CRClient().Get(t.Context(), types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}, current)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			if err := client.ClientFor("").CRClient().Create(t.Context(), obj); err != nil {
+				t.Fatalf("Failed to create: %v", err)
+			}
+			return
+		} else {
+			t.Fatalf("Failed to get current object: %v", err)
+		}
 	}
+
+	// Avoid wiping annotations added by SetFromPods.
+	merged := current.GetAnnotations()
+	if merged == nil {
+		merged = map[string]string{}
+	}
+	maps.Copy(merged, current.GetAnnotations())
+	obj.SetAnnotations(merged)
+
+	obj.SetResourceVersion(current.GetResourceVersion())
+
+	err = client.ClientFor("").CRClient().Update(t.Context(), obj)
 	if err != nil {
 		t.Fatalf("Failed to set: %v", err)
 	}
@@ -98,8 +121,16 @@ func set(t *testing.T, client cnoclient.Client, obj crclient.Object) {
 
 func setStatus(t *testing.T, client cnoclient.Client, obj crclient.Object) {
 	t.Helper()
-	err := client.ClientFor("").CRClient().Status().Update(t.Context(), obj)
-	if err != nil {
+	// Re-read the object to pick up any annotation writes (e.g.
+	// observed-stable-generation) that SetFromPods may have applied.
+	current := obj.DeepCopyObject().(crclient.Object)
+	if err := client.ClientFor("").CRClient().Get(t.Context(),
+		types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}, current); err != nil {
+		t.Fatalf("Failed to get current object: %v", err)
+	}
+	obj.SetResourceVersion(current.GetResourceVersion())
+	obj.SetAnnotations(current.GetAnnotations())
+	if err := client.ClientFor("").CRClient().Status().Update(t.Context(), obj); err != nil {
 		t.Fatalf("Failed to set status: %v", err)
 	}
 }
@@ -1180,9 +1211,8 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("Progressing condition unexpectedly missing")
 	}
 
-	// Now, bump the generation of one of the daemonsets. Without the
-	// generation-based rollout signal, this alone should not enter
-	// Progressing until the daemonset status starts to reflect rollout work.
+	// Now, bump the generation of one of the daemonsets. We should observe the
+	// stale status and enter Progressing.
 	dsA.Generation = 2
 	set(t, client, dsA)
 	status.SetFromPods()
@@ -1198,7 +1228,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 		{
 			Type:   operv1.OperatorStatusTypeProgressing,
-			Status: operv1.ConditionFalse,
+			Status: operv1.ConditionTrue,
 		},
 		{
 			Type:   operv1.OperatorStatusTypeUpgradeable,
@@ -1314,9 +1344,8 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	// With the simplified rollout detection logic, once UpdatedNumberScheduled >= CurrentNumberScheduled,
-	// the rollout is complete. Unavailability after rollout completion is treated as
-	// reboot churn, not a network rollout, so Progressing should be False.
+	// We have a new rollout because observedGeneration was bumped. We are
+	// progressing=True until the rollout is complete.
 	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
 		{
 			Type:   operv1.OperatorStatusTypeDegraded,
@@ -1324,7 +1353,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 		{
 			Type:   operv1.OperatorStatusTypeProgressing,
-			Status: operv1.ConditionFalse,
+			Status: operv1.ConditionTrue,
 		},
 		{
 			Type:   operv1.OperatorStatusTypeUpgradeable,
@@ -1341,16 +1370,6 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
-	// With the new simplified logic, since the rollout is complete (UpdatedNumberScheduled >= CurrentNumberScheduled),
-	// the DaemonSet state is not tracked. Verify the state is empty.
-	ps := getLastPodState(t, client, "testing")
-	nsn := ClusteredName{Namespace: "one", Name: "alpha"}
-	for _, ds := range ps.DaemonsetStates {
-		if ds.ClusteredName == nsn {
-			t.Fatalf("DaemonSet state should not be tracked when rollout is complete, but found: %#v", ds)
-		}
-	}
-
 	// done: numberReady -> 1, numberUnavailable -> 0
 	dsA.Status = appsv1.DaemonSetStatus{
 		CurrentNumberScheduled: 1,
@@ -1363,6 +1382,15 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 	setStatus(t, client, dsA)
 	status.SetFromPods()
+
+	// Rollout is complete. Verify the pod state is empty.
+	ps := getLastPodState(t, client, "testing")
+	nsn := ClusteredName{Namespace: "one", Name: "alpha"}
+	for _, ds := range ps.DaemonsetStates {
+		if ds.ClusteredName == nsn {
+			t.Fatalf("DaemonSet state should not be tracked when rollout is complete, but found: %#v", ds)
+		}
+	}
 
 	// see that the pod state is sensible
 	co, oc, err = getStatuses(client, "testing")
@@ -1409,7 +1437,8 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 			Name:       "non-critical",
 			Generation: 1,
 			Annotations: map[string]string{
-				names.NonCriticalAnnotation: "",
+				names.NonCriticalAnnotation:              "",
+				names.ObservedStableGenerationAnnotation: "1",
 			},
 			Labels: sl,
 		},
@@ -1525,6 +1554,351 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 	if len(co.Status.Versions) != 1 {
 		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
+	}
+}
+
+func TestObjectSetsProgressing(t *testing.T) {
+	selectorSpec := &metav1.LabelSelector{
+		MatchLabels: map[string]string{"app": "test"},
+	}
+	dsSpec := appsv1.DaemonSetSpec{Selector: selectorSpec}
+	depSpec := appsv1.DeploymentSpec{Selector: selectorSpec}
+	ssSpec := appsv1.StatefulSetSpec{Selector: selectorSpec}
+
+	dsAvailableStatus := func(observedGeneration int64) appsv1.DaemonSetStatus {
+		return appsv1.DaemonSetStatus{
+			CurrentNumberScheduled: 1,
+			DesiredNumberScheduled: 1,
+			UpdatedNumberScheduled: 1,
+			NumberAvailable:        1,
+			NumberReady:            1,
+			NumberUnavailable:      0,
+			ObservedGeneration:     observedGeneration,
+		}
+	}
+	dsUnavailableStatus := func(observedGeneration int64) appsv1.DaemonSetStatus {
+		return appsv1.DaemonSetStatus{
+			CurrentNumberScheduled: 1,
+			DesiredNumberScheduled: 1,
+			UpdatedNumberScheduled: 1,
+			NumberUnavailable:      1,
+			ObservedGeneration:     observedGeneration,
+		}
+	}
+	depAvailableStatus := func(observedGeneration int64) appsv1.DeploymentStatus {
+		return appsv1.DeploymentStatus{
+			Replicas:            1,
+			UpdatedReplicas:     1,
+			AvailableReplicas:   1,
+			UnavailableReplicas: 0,
+			ObservedGeneration:  observedGeneration,
+		}
+	}
+	depUnavailableStatus := func(observedGeneration int64) appsv1.DeploymentStatus {
+		return appsv1.DeploymentStatus{
+			Replicas:            1,
+			UpdatedReplicas:     1,
+			AvailableReplicas:   0,
+			UnavailableReplicas: 1,
+			ObservedGeneration:  observedGeneration,
+		}
+	}
+	ssAvailableStatus := func(observedGeneration int64) appsv1.StatefulSetStatus {
+		return appsv1.StatefulSetStatus{
+			Replicas:           1,
+			UpdatedReplicas:    1,
+			ReadyReplicas:      1,
+			AvailableReplicas:  1,
+			ObservedGeneration: observedGeneration,
+		}
+	}
+	ssUnavailableStatus := func(observedGeneration int64) appsv1.StatefulSetStatus {
+		return appsv1.StatefulSetStatus{
+			Replicas:           1,
+			UpdatedReplicas:    1,
+			ReadyReplicas:      0,
+			AvailableReplicas:  0,
+			ObservedGeneration: observedGeneration,
+		}
+	}
+
+	for _, tt := range []struct {
+		name                     string
+		object                   crclient.Object
+		observedStableGeneration int64
+		expectProgressing        bool
+	}{
+		// DaemonSet cases
+		{
+			name: "New DaemonSet observed stable",
+			object: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Spec:       dsSpec,
+				Status:     dsAvailableStatus(1),
+			},
+			expectProgressing: false,
+		},
+		{
+			name: "New DaemonSet with unavailable pods",
+			object: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Spec:       dsSpec,
+				Status:     dsUnavailableStatus(1),
+			},
+			expectProgressing: true,
+		},
+		{
+			name: "New DaemonSet with no status",
+			object: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Spec:       dsSpec,
+			},
+			expectProgressing: true,
+		},
+		{
+			name: "Updated DaemonSet observed stable",
+			object: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Spec:       dsSpec,
+				Status:     dsAvailableStatus(2),
+			},
+			observedStableGeneration: 1,
+			expectProgressing:        false,
+		},
+		{
+			name: "Updated DaemonSet with unavailable pods",
+			object: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Spec:       dsSpec,
+				Status:     dsUnavailableStatus(2),
+			},
+			observedStableGeneration: 1,
+			expectProgressing:        true,
+		},
+		{
+			name: "Updated DaemonSet with out of date stable status",
+			object: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Spec: appsv1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "alpha"},
+					},
+				},
+				Status: dsAvailableStatus(1),
+			},
+			observedStableGeneration: 1,
+			expectProgressing:        true,
+		},
+		{
+			name: "Previously observed stable DaemonSet with unavailable pods (presumed reboot in progress)",
+			object: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Spec:       dsSpec,
+				Status:     dsUnavailableStatus(1),
+			},
+			observedStableGeneration: 1,
+			expectProgressing:        false,
+		},
+
+		// Deployment cases
+		{
+			name: "New Deployment observed stable",
+			object: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Spec:       depSpec,
+				Status:     depAvailableStatus(1),
+			},
+			expectProgressing: false,
+		},
+		{
+			name: "New Deployment with unavailable pods",
+			object: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Spec:       depSpec,
+				Status:     depUnavailableStatus(1),
+			},
+			expectProgressing: true,
+		},
+		{
+			name: "New Deployment with no status",
+			object: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Spec:       depSpec,
+			},
+			expectProgressing: true,
+		},
+		{
+			name: "Updated Deployment observed stable",
+			object: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Spec:       depSpec,
+				Status:     depAvailableStatus(2),
+			},
+			observedStableGeneration: 1,
+			expectProgressing:        false,
+		},
+		{
+			name: "Updated Deployment with unavailable pods",
+			object: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Spec:       depSpec,
+				Status:     depUnavailableStatus(2),
+			},
+			observedStableGeneration: 1,
+			expectProgressing:        true,
+		},
+		{
+			name: "Updated Deployment with out of date stable status",
+			object: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Spec:       depSpec,
+				Status:     depAvailableStatus(1),
+			},
+			observedStableGeneration: 1,
+			expectProgressing:        true,
+		},
+		{
+			name: "Previously observed stable Deployment with unavailable pods (presumed reboot in progress)",
+			object: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Spec:       depSpec,
+				Status:     depUnavailableStatus(1),
+			},
+			observedStableGeneration: 1,
+			expectProgressing:        false,
+		},
+
+		// StatefulSet cases
+		{
+			name: "New StatefulSet observed stable",
+			object: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Spec:       ssSpec,
+				Status:     ssAvailableStatus(1),
+			},
+			expectProgressing: false,
+		},
+		{
+			name: "New StatefulSet with unavailable pods",
+			object: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Spec:       ssSpec,
+				Status:     ssUnavailableStatus(1),
+			},
+			expectProgressing: true,
+		},
+		{
+			name: "New StatefulSet with no status",
+			object: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Spec:       ssSpec,
+			},
+			expectProgressing: true,
+		},
+		{
+			name: "Updated StatefulSet observed stable",
+			object: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Spec:       ssSpec,
+				Status:     ssAvailableStatus(2),
+			},
+			observedStableGeneration: 1,
+			expectProgressing:        false,
+		},
+		{
+			name: "Updated StatefulSet with unavailable pods",
+			object: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Spec:       ssSpec,
+				Status:     ssUnavailableStatus(2),
+			},
+			observedStableGeneration: 1,
+			expectProgressing:        true,
+		},
+		{
+			name: "Updated StatefulSet with out of date stable status",
+			object: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Spec:       ssSpec,
+				Status:     ssAvailableStatus(1),
+			},
+			observedStableGeneration: 1,
+			expectProgressing:        true,
+		},
+		{
+			name: "Previously observed stable StatefulSet with unavailable pods (presumed reboot in progress)",
+			object: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Spec:       ssSpec,
+				Status:     ssUnavailableStatus(1),
+			},
+			observedStableGeneration: 1,
+			expectProgressing:        false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			client := fake.NewFakeClient()
+			status := New(client, "testing", names.StandAloneClusterName)
+			status.clock = testingclock.NewFakeClock(time.Now())
+			setFakeListers(status)
+
+			no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+			setOC(t, client, no)
+
+			tt.object.SetName("test-object")
+			tt.object.SetNamespace("test-namespace")
+			tt.object.SetLabels(sl)
+			annotations := tt.object.GetAnnotations()
+			if annotations == nil {
+				annotations = make(map[string]string, 1)
+			}
+			annotations[names.ObservedStableGenerationAnnotation] = strconv.FormatInt(tt.observedStableGeneration, 10)
+			tt.object.SetAnnotations(annotations)
+
+			set(t, client, tt.object)
+			setStatus(t, client, tt.object)
+			status.SetFromPods()
+
+			_, oc, err := getStatuses(client, "testing")
+			if err != nil {
+				t.Fatalf("error getting ClusterOperator: %v", err)
+			}
+
+			var expectedProgressing operv1.ConditionStatus
+			if tt.expectProgressing {
+				expectedProgressing = operv1.ConditionTrue
+			} else {
+				expectedProgressing = operv1.ConditionFalse
+			}
+
+			// Both DSes have unavailable pods and neither has been observed stable
+			// at its current generation, so Progressing must be True.
+			if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+				{
+					Type:   operv1.OperatorStatusTypeProgressing,
+					Status: expectedProgressing,
+				},
+			}) {
+				t.Fatalf("expected Progressing=%v for %q, got: %#v", expectedProgressing, tt.name, oc.Status.Conditions)
+			}
+
+			// The observed stable generation should be set if we reported a stable state.
+			if !tt.expectProgressing {
+				current := tt.object.DeepCopyObject().(crclient.Object)
+				err := client.ClientFor("").CRClient().Get(t.Context(), types.NamespacedName{Namespace: tt.object.GetNamespace(), Name: tt.object.GetName()}, current)
+				if err != nil {
+					t.Fatalf("error getting current object: %v", err)
+				}
+
+				observedStableGeneration, err := strconv.ParseInt(current.GetAnnotations()[names.ObservedStableGenerationAnnotation], 10, 64)
+				if err != nil {
+					t.Fatalf("error parsing observed stable generation: %v", err)
+				}
+				if observedStableGeneration != tt.object.GetGeneration() {
+					t.Fatalf("expected observed stable generation %d, got %d", tt.object.GetGeneration(), observedStableGeneration)
+				}
+			}
+		})
 	}
 }
 
@@ -1747,8 +2121,8 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	// Generation skew by itself no longer starts rollout tracking. Until the
-	// deployment counters show an update in progress, we stay non-Progressing.
+	// We know depB is newly created because it does not have an observed-stable-generation annotation.
+	// Therefore, we expect Progressing to be True until the deployment counters show rollout is complete.
 	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
 		{
 			Type:   operv1.OperatorStatusTypeDegraded,
@@ -1756,7 +2130,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		},
 		{
 			Type:   operv1.OperatorStatusTypeProgressing,
-			Status: operv1.ConditionFalse,
+			Status: operv1.ConditionTrue,
 		},
 		{
 			Type:   operv1.OperatorStatusTypeUpgradeable,
@@ -1773,14 +2147,6 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
-	ps := getLastPodState(t, client, "testing")
-	nsn := ClusteredName{Namespace: "one", Name: "beta"}
-	for _, ds := range ps.DeploymentStates {
-		if ds.ClusteredName == nsn {
-			t.Fatalf("expected deployment rollout state for %s to stay empty before rollout counters change: %#v", nsn, ps.DeploymentStates)
-		}
-	}
-
 	err = client.ClientFor("").CRClient().Get(t.Context(), types.NamespacedName{Namespace: depB.Namespace, Name: depB.Name}, depB)
 	if err != nil {
 		t.Fatalf("error getting Deployment: %v", err)
@@ -1792,8 +2158,8 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depB.Status.UnavailableReplicas = 0
 	depB.Status.AvailableReplicas = depB.Status.Replicas
 
-	t0 := time.Now()
-	time.Sleep(time.Second / 10)
+	t0 := status.clock.Now()
+	status.clock.(*testingclock.FakeClock).Step(time.Second / 10)
 	setStatus(t, client, depB)
 	status.SetFromPods()
 
@@ -1826,7 +2192,8 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
 
-	ps = getLastPodState(t, client, "testing")
+	ps := getLastPodState(t, client, "testing")
+	nsn := ClusteredName{Namespace: depB.Namespace, Name: depB.Name}
 	found := false
 	for _, ds := range ps.DeploymentStates {
 		if ds.ClusteredName == nsn {
@@ -1861,9 +2228,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
 	}
-	// With the simplified rollout detection logic, once UpdatedReplicas >= Replicas,
-	// the rollout is complete. Unavailability after rollout completion is treated as
-	// reboot churn, not a network rollout, so Progressing should be False.
+	// Pods are unavailable, so Progressing should still be True.
 	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
 		{
 			Type:   operv1.OperatorStatusTypeDegraded,
@@ -1871,7 +2236,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 		},
 		{
 			Type:   operv1.OperatorStatusTypeProgressing,
-			Status: operv1.ConditionFalse,
+			Status: operv1.ConditionTrue,
 		},
 		{
 			Type:   operv1.OperatorStatusTypeUpgradeable,
@@ -2000,7 +2365,8 @@ func TestStatusManagerRestoresInstallCompleteAfterRestart(t *testing.T) {
 			Name:       "non-critical",
 			Generation: 1,
 			Annotations: map[string]string{
-				names.NonCriticalAnnotation: "",
+				names.NonCriticalAnnotation:              "",
+				names.ObservedStableGenerationAnnotation: "1",
 			},
 			Labels: sl,
 		},
@@ -2096,7 +2462,8 @@ func TestStatusManagerRestoresInstallCompleteFromLegacyAnnotation(t *testing.T) 
 			Name:       "non-critical",
 			Generation: 1,
 			Annotations: map[string]string{
-				names.NonCriticalAnnotation: "",
+				names.NonCriticalAnnotation:              "",
+				names.ObservedStableGenerationAnnotation: "1",
 			},
 			Labels: sl,
 		},
@@ -2167,13 +2534,15 @@ func TestStatusManagerRestoresActiveRolloutAfterRestart(t *testing.T) {
 	status.SetFromPods()
 
 	depB := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "beta", Generation: 1, Labels: sl},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "beta", Generation: 1, Labels: sl,
+			Annotations: map[string]string{names.ObservedStableGenerationAnnotation: "1"},
+		},
 		Status: appsv1.DeploymentStatus{
 			Replicas:            1,
-			UpdatedReplicas:     0,
-			AvailableReplicas:   1,
-			UnavailableReplicas: 0,
-			ObservedGeneration:  0,
+			UpdatedReplicas:     1,
+			AvailableReplicas:   0,
+			UnavailableReplicas: 1,
+			ObservedGeneration:  1,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
@@ -2182,13 +2551,6 @@ func TestStatusManagerRestoresActiveRolloutAfterRestart(t *testing.T) {
 		},
 	}
 	set(t, client, depB)
-	status.SetFromPods()
-
-	depB.Status.UpdatedReplicas = depB.Status.Replicas
-	depB.Status.AvailableReplicas = 0
-	depB.Status.UnavailableReplicas = 1
-	depB.Status.ObservedGeneration = depB.Generation
-	setStatus(t, client, depB)
 
 	restarted := New(client, "testing", names.StandAloneClusterName)
 	restarted.clock = testingclock.NewFakeClock(time.Now())
@@ -2246,13 +2608,15 @@ func TestStatusManagerRestoresStatefulSetActiveRolloutAfterRestart(t *testing.T)
 	status.SetFromPods()
 
 	ssB := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "beta", Generation: 1, Labels: sl},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "beta", Generation: 1, Labels: sl,
+			Annotations: map[string]string{names.ObservedStableGenerationAnnotation: "1"},
+		},
 		Status: appsv1.StatefulSetStatus{
 			Replicas:           2,
-			UpdatedReplicas:    0,
-			ReadyReplicas:      2,
-			AvailableReplicas:  2,
-			ObservedGeneration: 0,
+			UpdatedReplicas:    2,
+			ReadyReplicas:      1,
+			AvailableReplicas:  1,
+			ObservedGeneration: 1,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
@@ -2261,13 +2625,6 @@ func TestStatusManagerRestoresStatefulSetActiveRolloutAfterRestart(t *testing.T)
 		},
 	}
 	set(t, client, ssB)
-	status.SetFromPods()
-
-	ssB.Status.UpdatedReplicas = ssB.Status.Replicas
-	ssB.Status.ReadyReplicas = ssB.Status.Replicas - 1
-	ssB.Status.AvailableReplicas = ssB.Status.Replicas - 1
-	ssB.Status.ObservedGeneration = ssB.Generation
-	setStatus(t, client, ssB)
 
 	restarted := New(client, "testing", names.StandAloneClusterName)
 	restarted.clock = testingclock.NewFakeClock(time.Now())
@@ -2512,6 +2869,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 		},
 		Status: appsv1.DeploymentStatus{
 			UnavailableReplicas: 1,
+			ObservedGeneration:  1,
 		},
 	}
 	set(t, client, dep)

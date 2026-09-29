@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -94,25 +95,25 @@ func (status *StatusManager) SetFromPods() {
 	for _, ds := range daemonSets {
 		dsName := NewClusteredName(ds)
 		dsState, hadState := daemonsetStates[dsName]
-		dsRolloutActive := !status.installComplete || ds.Status.UpdatedNumberScheduled < ds.Status.CurrentNumberScheduled
+		dsNeverObservedStable := !isObservedStable(ds)
 
 		dsProgressing := false
 
 		if isNonCritical(ds) && ds.Status.NumberReady == 0 && !status.installComplete {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is waiting for other operators to become ready", dsName.String()))
 			dsProgressing = true
-		} else if ds.Status.UpdatedNumberScheduled < ds.Status.CurrentNumberScheduled {
+		} else if ds.Status.ObservedGeneration < ds.Generation || ds.Status.UpdatedNumberScheduled < ds.Status.CurrentNumberScheduled {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q update is rolling out (%d out of %d updated)", dsName.String(), ds.Status.UpdatedNumberScheduled, ds.Status.CurrentNumberScheduled))
 			dsProgressing = true
 		} else if ds.Status.NumberUnavailable > 0 {
-			if dsRolloutActive {
+			if dsNeverObservedStable {
 				progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not available (awaiting %d nodes)", dsName.String(), ds.Status.NumberUnavailable))
 				dsProgressing = true
 			}
 			if !isNonCritical(ds) {
 				clbo = append(clbo, status.CheckCrashLoopBackOffPods(dsName, ds.Spec.Selector.MatchLabels, "DaemonSet")...)
 			}
-		} else if ds.Status.NumberAvailable == 0 && dsRolloutActive {
+		} else if ds.Status.NumberAvailable == 0 && dsNeverObservedStable {
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not yet scheduled on any nodes", dsName.String()))
 			dsProgressing = true
 		}
@@ -127,7 +128,7 @@ func (status *StatusManager) SetFromPods() {
 			reachedAvailableLevel = false
 
 			if !hadState || !reflect.DeepEqual(dsState.LastSeenStatus, ds.Status) {
-				dsState.LastChangeTime = time.Now()
+				dsState.LastChangeTime = status.clock.Now()
 				ds.Status.DeepCopyInto(&dsState.LastSeenStatus)
 			}
 
@@ -146,23 +147,29 @@ func (status *StatusManager) SetFromPods() {
 		if err := status.setAnnotation(context.TODO(), ds, names.RolloutHungAnnotation, dsHung); err != nil {
 			log.Printf("Error setting DaemonSet %q annotation: %v", dsName, err)
 		}
+		if !dsProgressing && ds.Status.NumberUnavailable == 0 {
+			gen := strconv.FormatInt(ds.Status.ObservedGeneration, 10)
+			if err := status.setAnnotation(context.TODO(), ds, names.ObservedStableGenerationAnnotation, &gen); err != nil {
+				log.Printf("Error setting DaemonSet %q annotation: %v", dsName, err)
+			}
+		}
 	}
 
 	for _, ss := range statefulSets {
 		ssName := NewClusteredName(ss)
 		ssState, hadState := statefulsetStates[ssName]
-		ssRolloutActive := !status.installComplete || ss.Status.UpdatedReplicas < ss.Status.Replicas
+		ssNeverObservedStable := !isObservedStable(ss)
 
 		ssProgressing := false
 
 		if isNonCritical(ss) && ss.Status.ReadyReplicas == 0 && !status.installComplete {
 			progressing = append(progressing, fmt.Sprintf("StatefulSet %q is waiting for other operators to become ready", ssName.String()))
 			ssProgressing = true
-		} else if ss.Status.UpdatedReplicas < ss.Status.Replicas {
+		} else if ss.Status.ObservedGeneration < ss.Generation || ss.Status.UpdatedReplicas < ss.Status.Replicas {
 			progressing = append(progressing, fmt.Sprintf("StatefulSet %q update is rolling out (%d out of %d updated)", ssName.String(), ss.Status.UpdatedReplicas, ss.Status.Replicas))
 			ssProgressing = true
 		} else if ss.Status.ReadyReplicas > 0 && ss.Status.ReadyReplicas < ss.Status.Replicas {
-			if ssRolloutActive {
+			if ssNeverObservedStable {
 				progressing = append(progressing, fmt.Sprintf("StatefulSet %q is not available (awaiting %d nodes)", ssName.String(), (ss.Status.Replicas-ss.Status.ReadyReplicas)))
 				ssProgressing = true
 			}
@@ -170,7 +177,7 @@ func (status *StatusManager) SetFromPods() {
 			if !isNonCritical(ss) {
 				clbo = append(clbo, status.CheckCrashLoopBackOffPods(ssName, ss.Spec.Selector.MatchLabels, "StatefulSet")...)
 			}
-		} else if ss.Status.AvailableReplicas == 0 && ssRolloutActive {
+		} else if ss.Status.AvailableReplicas == 0 && ssNeverObservedStable {
 			progressing = append(progressing, fmt.Sprintf("StatefulSet %q is not yet scheduled on any nodes", ssName.String()))
 			ssProgressing = true
 		}
@@ -185,7 +192,7 @@ func (status *StatusManager) SetFromPods() {
 			reachedAvailableLevel = false
 
 			if !hadState || !reflect.DeepEqual(ssState.LastSeenStatus, ss.Status) {
-				ssState.LastChangeTime = time.Now()
+				ssState.LastChangeTime = status.clock.Now()
 				ss.Status.DeepCopyInto(&ssState.LastSeenStatus)
 			}
 
@@ -204,22 +211,28 @@ func (status *StatusManager) SetFromPods() {
 		if err := status.setAnnotation(context.TODO(), ss, names.RolloutHungAnnotation, ssHung); err != nil {
 			log.Printf("Error setting StatefulSet %q annotation: %v", ssName, err)
 		}
+		if !ssProgressing && ss.Status.ReadyReplicas == ss.Status.Replicas {
+			gen := strconv.FormatInt(ss.Status.ObservedGeneration, 10)
+			if err := status.setAnnotation(context.TODO(), ss, names.ObservedStableGenerationAnnotation, &gen); err != nil {
+				log.Printf("Error setting StatefulSet %q annotation: %v", ssName, err)
+			}
+		}
 	}
 
 	for _, dep := range deployments {
 		depName := NewClusteredName(dep)
 		depState, hadState := deploymentStates[depName]
-		depRolloutActive := !status.installComplete || dep.Status.UpdatedReplicas < dep.Status.Replicas
+		depNeverObservedStable := !isObservedStable(dep)
 		depProgressing := false
 
 		if isNonCritical(dep) && dep.Status.UnavailableReplicas > 0 && !status.installComplete {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q is waiting for other operators to become ready", depName.String()))
 			depProgressing = true
-		} else if dep.Status.UpdatedReplicas < dep.Status.Replicas {
+		} else if dep.Status.ObservedGeneration < dep.Generation || dep.Status.UpdatedReplicas < dep.Status.Replicas {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q update is rolling out (%d out of %d updated)", depName.String(), dep.Status.UpdatedReplicas, dep.Status.Replicas))
 			depProgressing = true
 		} else if dep.Status.UnavailableReplicas > 0 {
-			if depRolloutActive {
+			if depNeverObservedStable {
 				progressing = append(progressing, fmt.Sprintf("Deployment %q is not available (awaiting %d nodes)", depName.String(), dep.Status.UnavailableReplicas))
 				depProgressing = true
 			}
@@ -227,7 +240,7 @@ func (status *StatusManager) SetFromPods() {
 			if !isNonCritical(dep) {
 				clbo = append(clbo, status.CheckCrashLoopBackOffPods(depName, dep.Spec.Selector.MatchLabels, "Deployment")...)
 			}
-		} else if dep.Status.AvailableReplicas == 0 && depRolloutActive {
+		} else if dep.Status.AvailableReplicas == 0 && depNeverObservedStable {
 			progressing = append(progressing, fmt.Sprintf("Deployment %q is not yet scheduled on any nodes", depName.String()))
 			depProgressing = true
 		}
@@ -242,7 +255,7 @@ func (status *StatusManager) SetFromPods() {
 			reachedAvailableLevel = false
 
 			if !hadState || !reflect.DeepEqual(depState.LastSeenStatus, dep.Status) {
-				depState.LastChangeTime = time.Now()
+				depState.LastChangeTime = status.clock.Now()
 				dep.Status.DeepCopyInto(&depState.LastSeenStatus)
 			}
 
@@ -260,6 +273,12 @@ func (status *StatusManager) SetFromPods() {
 		}
 		if err := status.setAnnotation(context.TODO(), dep, names.RolloutHungAnnotation, depHung); err != nil {
 			log.Printf("Error setting Deployment %q annotation: %v", depName, err)
+		}
+		if !depProgressing && dep.Status.UnavailableReplicas == 0 {
+			gen := strconv.FormatInt(dep.Status.ObservedGeneration, 10)
+			if err := status.setAnnotation(context.TODO(), dep, names.ObservedStableGenerationAnnotation, &gen); err != nil {
+				log.Printf("Error setting Deployment %q annotation: %v", depName, err)
+			}
 		}
 	}
 
@@ -428,6 +447,13 @@ func (status *StatusManager) CheckCrashLoopBackOffPods(name ClusteredName, selec
 func isNonCritical(obj metav1.Object) bool {
 	_, exists := obj.GetAnnotations()[names.NonCriticalAnnotation]
 	return exists
+}
+
+// isObservedStable returns true if the object was last observed fully available
+// at its current metadata.generation. This is tracked via an annotation on the
+// object itself, so it survives controller restarts.
+func isObservedStable(obj metav1.Object) bool {
+	return obj.GetAnnotations()[names.ObservedStableGenerationAnnotation] == strconv.FormatInt(obj.GetGeneration(), 10)
 }
 
 func (status *StatusManager) listAllStatusObjects() (dss []*appsv1.DaemonSet, deps []*appsv1.Deployment, sss []*appsv1.StatefulSet) {
