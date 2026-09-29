@@ -15,6 +15,7 @@ import (
 	"github.com/openshift/cluster-network-operator/pkg/controller/statusmanager"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,9 +40,23 @@ const (
 
 	NetworkObservabilityDeployed = "NetworkObservabilityDeployed"
 
-	requeueAfterOLM      = 5 * time.Minute  // Requeue interval for OLM operations (install/wait)
-	requeueAfterStandard = 30 * time.Second // Requeue interval for standard operations
-	installTimeout       = 20 * time.Minute // Stop retrying installation after this duration
+	// Requeue interval for install/wait and standard operations
+	requeueInterval = 30 * time.Second
+	// Requeue interval while waiting for the cluster to become available
+	clusterAvailableRequeueInterval = 5 * time.Minute
+	// Deadline for the OLM resource rollback API calls
+	teardownTimeout = 30 * time.Second
+
+	// Max time to wait for the cluster to become available. On day 0, it may
+	// take some time to come up.
+	clusterAvailableTimeout = 90 * time.Minute
+	// Max time to install Network Observability and create FlowCollector
+	// once cluster is available
+	installTimeout = 20 * time.Minute
+
+	// Mark the resources that CNO created. Teardown only deletes the
+	// operator namespace when this marker is present.
+	createdByCNOAnnotation = "network.operator.openshift.io/created-by-cno"
 )
 
 // Add creates a new controller. Referenced in add_networkconfig.go.
@@ -97,8 +112,8 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 	// Check if Network Observability should be enabled
 	shouldInstall, err := r.shouldInstallNetworkObservability(ctx)
 	if err != nil {
-		klog.Warningf("Failed to determine if Network Observability should be installed: %v. Will retry in %v.", err, requeueAfterStandard)
-		return reconcile.Result{RequeueAfter: requeueAfterStandard}, nil
+		klog.Warningf("Failed to determine if Network Observability should be installed: %v. Will retry in %v.", err, requeueInterval)
+		return reconcile.Result{RequeueAfter: requeueInterval}, nil
 	}
 	if !shouldInstall {
 		return reconcile.Result{}, nil
@@ -106,37 +121,36 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 
 	// Check if installation has been failing for too long
 	if r.hasInstallTimedOut(ctx) {
-		klog.Warning("Network Observability installation timed out, giving up")
-		_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentTimedOut",
-			fmt.Sprintf("Network Observability installation timed out after %v", installTimeout))
+		if err := r.handleInstallTimeout(ctx); err != nil {
+			klog.Warningf("Failed to handle Network Observability install timeout: %v. Will retry in %v.", err, requeueInterval)
+			return reconcile.Result{RequeueAfter: requeueInterval}, nil
+		}
 		return reconcile.Result{}, nil
 	}
 
-	// Proceed with installation/reinstallation
-	installed, ceExists, err := r.isNetObservOperatorInstalled(ctx)
+	// Check if Network Observability Operator is installed
+	installed, err := r.isNetObservOperatorInstalled(ctx)
 	if err != nil {
-		klog.Warningf("Failed to check if Network Observability Operator is installed: %v. Will retry in %v.", err, requeueAfterStandard)
-		// Mark deployment as failed with the error details
+		klog.Warningf("Failed to check if Network Observability Operator is installed: %v. Will retry in %v.", err, requeueInterval)
 		_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentFailed", fmt.Sprintf("Failed to check Network Observability Operator status: %v", err))
-		return reconcile.Result{RequeueAfter: requeueAfterStandard}, nil
+		return reconcile.Result{RequeueAfter: requeueInterval}, nil
 	}
 	if !installed {
-		if !ceExists {
-			// Operator not yet installed, apply OLM v0 Subscription
-			if err := r.installNetObservOperator(ctx); err != nil {
-				klog.Warningf("Failed to install Network Observability Operator: %v. Will retry in %v.", err, requeueAfterOLM)
-				_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentFailed", fmt.Sprintf("Failed to install Network Observability Operator: %v", err))
-				return reconcile.Result{RequeueAfter: requeueAfterOLM}, nil
-			}
-			klog.Infof("Applied OLM v0 Subscription for netobserv-operator, will check installation status in %v", requeueAfterOLM)
-			_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "InstallationInProgress", "Network Observability Operator installation initiated")
-			return reconcile.Result{RequeueAfter: requeueAfterOLM}, nil
+		// Don't apply the Subscription until the cluster is available.
+		if available, _ := r.clusterVersionAvailableSince(ctx); !available {
+			klog.Infof("Cluster not available yet, will recheck in %v", clusterAvailableRequeueInterval)
+			_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "WaitingForCluster", "Waiting for the cluster to become available")
+			return reconcile.Result{RequeueAfter: clusterAvailableRequeueInterval}, nil
 		}
 
-		// OLM v1 ClusterExtension exists but installation not complete yet
-		klog.Infof("netobserv-operator installation in progress, will recheck in %v", requeueAfterOLM)
+		if err := r.installNetObservOperator(ctx); err != nil {
+			klog.Warningf("Failed to install Network Observability Operator: %v. Will retry in %v.", err, requeueInterval)
+			_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentFailed", fmt.Sprintf("Failed to install Network Observability Operator: %v", err))
+			return reconcile.Result{RequeueAfter: requeueInterval}, nil
+		}
+		klog.Infof("Applied Subscription for netobserv-operator, will check installation status in %v", requeueInterval)
 		_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "InstallationInProgress", "Network Observability Operator installation in progress")
-		return reconcile.Result{RequeueAfter: requeueAfterOLM}, nil
+		return reconcile.Result{RequeueAfter: requeueInterval}, nil
 	}
 
 	// Operator installation completed
@@ -145,25 +159,25 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 	// Check if FlowCollector already exists
 	flowCollectorExists, err := r.isFlowCollectorExists(ctx)
 	if err != nil {
-		klog.Warningf("Failed to check if FlowCollector exists: %v. Will retry in %v.", err, requeueAfterStandard)
-		return reconcile.Result{RequeueAfter: requeueAfterStandard}, nil
+		klog.Warningf("Failed to check if FlowCollector exists: %v. Will retry in %v.", err, requeueInterval)
+		return reconcile.Result{RequeueAfter: requeueInterval}, nil
 	}
 
 	if !flowCollectorExists {
 		// Create FlowCollector
 		if err := r.applyManifest(ctx, FlowCollectorYAML, "FlowCollector"); err != nil {
-			klog.Warningf("Failed to create FlowCollector: %v. Will retry in %v.", err, requeueAfterStandard)
+			klog.Warningf("Failed to create FlowCollector: %v. Will retry in %v.", err, requeueInterval)
 			// Mark deployment as failed
 			_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentFailed", fmt.Sprintf("Failed to create FlowCollector: %v", err))
-			return reconcile.Result{RequeueAfter: requeueAfterStandard}, nil
+			return reconcile.Result{RequeueAfter: requeueInterval}, nil
 		}
 		klog.Info("FlowCollector created successfully")
 	}
 
 	// Mark as deployed to track deployment status
 	if err := r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionTrue, "DeploymentComplete", "Network Observability has been deployed"); err != nil {
-		klog.Warningf("Failed to mark Network Observability as deployed: %v. Will retry in %v.", err, requeueAfterStandard)
-		return reconcile.Result{RequeueAfter: requeueAfterStandard}, nil
+		klog.Warningf("Failed to mark Network Observability as deployed: %v. Will retry in %v.", err, requeueInterval)
+		return reconcile.Result{RequeueAfter: requeueInterval}, nil
 	}
 
 	klog.V(4).Info("Network Observability is deployed")
@@ -200,8 +214,9 @@ func (r *ReconcileObservability) wasNetworkObservabilityDeployed(ctx context.Con
 	return false, nil
 }
 
-// hasInstallTimedOut returns true if the installation has been in a non-success
-// state for longer than installTimeout, or has already been marked as timed out.
+// hasInstallTimedOut returns true when the installation should be abandoned. On
+// day 0, the install clock only starts once the cluster is available. A backstop
+// from our own condition timestamp bounds the wait even if that read fails.
 func (r *ReconcileObservability) hasInstallTimedOut(ctx context.Context) bool {
 	network := &operatorv1.Network{}
 	if err := r.client.Get(ctx, types.NamespacedName{Name: NetworkCRName}, network); err != nil {
@@ -216,7 +231,144 @@ func (r *ReconcileObservability) hasInstallTimedOut(ctx context.Context) bool {
 		return true
 	}
 
-	return time.Since(condition.LastTransitionTime.Time) > installTimeout
+	// Absolute backstop, independent of any external read.
+	if time.Since(condition.LastTransitionTime.Time) > clusterAvailableTimeout {
+		return true
+	}
+
+	// Until the cluster is Available, keep waiting.
+	available, availableSince := r.clusterVersionAvailableSince(ctx)
+	if !available {
+		return false
+	}
+
+	// Start the install clock at the later of install attempt and cluster
+	// availability, so an already-up cluster does not consume the install budget.
+	installStart := condition.LastTransitionTime.Time
+	if availableSince.After(installStart) {
+		installStart = availableSince
+	}
+	return time.Since(installStart) > installTimeout
+}
+
+// clusterVersionAvailableSince reports whether ClusterVersion is Available and,
+// if so, when it became Available. A read error is treated as unknown, not down.
+func (r *ReconcileObservability) clusterVersionAvailableSince(ctx context.Context) (bool, time.Time) {
+	cv := &configv1.ClusterVersion{}
+	if err := r.client.Get(ctx, types.NamespacedName{Name: "version"}, cv); err != nil {
+		klog.Warningf("Failed to read ClusterVersion, treating cluster availability as unknown: %v", err)
+		return false, time.Time{}
+	}
+	for _, c := range cv.Status.Conditions {
+		if c.Type == configv1.OperatorAvailable {
+			return c.Status == configv1.ConditionTrue, c.LastTransitionTime.Time
+		}
+	}
+	return false, time.Time{}
+}
+
+// handleInstallTimeout gives up on the installation. It rolls back the OLM
+// resources CNO created and only then marks the installation as terminally timed
+// out. If rollback fails, it returns an error so the caller requeues and retries.
+func (r *ReconcileObservability) handleInstallTimeout(ctx context.Context) error {
+	// DeploymentTimedOut is only set after rollback succeeds, so its presence means
+	// there is nothing left to do.
+	network := &operatorv1.Network{}
+	if err := r.client.Get(ctx, types.NamespacedName{Name: NetworkCRName}, network); err == nil {
+		if condition := operatorv1helpers.FindOperatorCondition(network.Status.Conditions, NetworkObservabilityDeployed); condition != nil &&
+			condition.Reason == "DeploymentTimedOut" {
+			return nil
+		}
+	}
+
+	klog.Warning("Network Observability installation timed out, giving up")
+
+	// Roll back before latching the terminal condition, so a failed teardown is
+	// retried on the next reconcile.
+	if err := r.teardownNetObservOperator(ctx); err != nil {
+		_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "RollbackPending",
+			fmt.Sprintf("Network Observability install timed out, rolling back: %v", err))
+		return fmt.Errorf("failed to roll back Network Observability OLM resources: %w", err)
+	}
+	klog.Info("Rolled back Network Observability OLM resources")
+
+	message := fmt.Sprintf("Network Observability Operator failed to install within %v", installTimeout)
+	return r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentTimedOut", message)
+}
+
+// teardownNetObservOperator deletes the OLM resources CNO created for Network
+// Observability, which are the Subscription, OperatorGroup, any
+// ClusterServiceVersion, and the operator namespace.
+func (r *ReconcileObservability) teardownNetObservOperator(ctx context.Context) error {
+	// Bound the teardown so a stalled API request cannot block the
+	// reconciliation worker indefinitely.
+	ctx, cancel := context.WithTimeout(ctx, teardownTimeout)
+	defer cancel()
+
+	subscription := &unstructured.Unstructured{}
+	subscription.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "operators.coreos.com",
+		Version: "v1alpha1",
+		Kind:    "Subscription",
+	})
+	subscription.SetName(OperatorNamespace)
+	subscription.SetNamespace(OperatorNamespace)
+	if err := r.client.Delete(ctx, subscription); err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to delete Subscription: %w", err)
+	}
+
+	operatorGroup := &unstructured.Unstructured{}
+	operatorGroup.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "operators.coreos.com",
+		Version: "v1",
+		Kind:    "OperatorGroup",
+	})
+	operatorGroup.SetName(OperatorNamespace)
+	operatorGroup.SetNamespace(OperatorNamespace)
+	if err := r.client.Delete(ctx, operatorGroup); err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to delete OperatorGroup: %w", err)
+	}
+
+	csvList := &unstructured.UnstructuredList{}
+	csvList.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "operators.coreos.com",
+		Version: "v1alpha1",
+		Kind:    "ClusterServiceVersion",
+	})
+	if err := r.client.List(ctx, csvList, crclient.InNamespace(OperatorNamespace)); err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to list ClusterServiceVersions: %w", err)
+	}
+	for i := range csvList.Items {
+		csv := &csvList.Items[i]
+		if !strings.HasPrefix(csv.GetName(), "network-observability-operator") {
+			continue
+		}
+		if err := r.client.Delete(ctx, csv); err != nil && !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete ClusterServiceVersion %s: %w", csv.GetName(), err)
+		}
+	}
+
+	// Only delete the namespace when CNO created it. Deleting a pre-existing
+	// namespace would cascade-delete independently created resources.
+	namespace := &corev1.Namespace{}
+	if err := r.client.Get(ctx, types.NamespacedName{Name: OperatorNamespace}, namespace); err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to get namespace: %w", err)
+	}
+	if namespace.GetAnnotations()[createdByCNOAnnotation] != "true" {
+		klog.Infof("Namespace %s was not created by CNO; leaving it in place", OperatorNamespace)
+		return nil
+	}
+	if err := r.client.Delete(ctx, namespace); err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to delete namespace: %w", err)
+	}
+
+	return nil
 }
 
 // setNetworkObservabilityCondition sets the NetworkObservabilityDeployed condition
@@ -324,16 +476,9 @@ func (r *ReconcileObservability) isSingleNodeCluster(ctx context.Context) (bool,
 	return infra.Status.ControlPlaneTopology == configv1.SingleReplicaTopologyMode, nil
 }
 
-// isNetObservOperatorInstalled checks if the Network Observability Operator is installed
-// by verifying both the FlowCollector CRD existence and the installation status via OLM.
-// It checks both OLMv1 (ClusterExtension) and OLMv0 (ClusterServiceVersion) to determine
-// installation status.
-// Returns three values:
-// - installed: true if the operator is fully installed
-// - clusterExtensionExists: true if a ClusterExtension resource exists (relevant for OLMv1)
-// - err: error if there was a problem checking the installation
-func (r *ReconcileObservability) isNetObservOperatorInstalled(ctx context.Context) (installed bool, clusterExtensionExists bool, err error) {
-	// Check if the FlowCollector CRD exists
+// isNetObservOperatorInstalled returns true once the Network Observability
+// Operator is installed, detected by the presence of the FlowCollector CRD.
+func (r *ReconcileObservability) isNetObservOperatorInstalled(ctx context.Context) (bool, error) {
 	crd := &unstructured.Unstructured{}
 	crd.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "apiextensions.k8s.io",
@@ -341,164 +486,14 @@ func (r *ReconcileObservability) isNetObservOperatorInstalled(ctx context.Contex
 		Kind:    "CustomResourceDefinition",
 	})
 
-	err = r.client.Get(ctx, types.NamespacedName{
-		Name: "flowcollectors.flows.netobserv.io",
-	}, crd)
-
-	crdExists := true
-	if err != nil {
-		if errors.IsNotFound(err) {
-			crdExists = false
-		} else {
-			return false, false, err
-		}
-	}
-
-	// Check OLMv1 (ClusterExtension) installation status
-	olmv1Installed, olmv1CEExists, olmv1Err := r.checkOLMv1Installation(ctx)
-	if olmv1Err != nil {
-		// Installation error from OLMv1
-		return false, olmv1CEExists, fmt.Errorf("OLMv1 installation error: %w", olmv1Err)
-	}
-
-	// Check OLMv0 (ClusterServiceVersion/Subscription) installation status
-	olmv0Installed, olmv0Err := r.checkOLMv0Installation(ctx)
-	if olmv0Err != nil && !errors.IsNotFound(olmv0Err) {
-		// Installation error from OLMv0
-		return false, olmv1CEExists, fmt.Errorf("OLMv0 installation error: %w", olmv0Err)
-	}
-
-	// If CRD doesn't exist but either OLM installation is present, this is an error condition
-	if !crdExists {
-		if olmv0Installed || olmv1Installed {
-			olmVersion := "OLMv0"
-			if olmv1Installed {
-				olmVersion = "OLMv1"
-			}
-			return false, olmv1CEExists, fmt.Errorf("network Observability Operator was deployed via %s but FlowCollector CRD is missing (manually removed)", olmVersion)
-		}
-		// If CRD doesn't exist and no OLM installation, operator is not installed
-		return false, olmv1CEExists, nil
-	}
-
-	if olmv1Installed {
-		klog.V(4).Info("Network Observability Operator installed via OLMv1 (ClusterExtension)")
-		return true, true, nil
-	}
-
-	if olmv0Installed {
-		klog.V(4).Info("Network Observability Operator installed via OLMv0 (ClusterServiceVersion)")
-		return true, false, nil
-	}
-
-	// CRD exists but neither OLMv0 nor OLMv1 shows a successful installation
-	return false, olmv1CEExists, fmt.Errorf("FlowCollector CRD is present but could not identify how Network Observability Operator was installed (neither OLMv1 ClusterExtension nor OLMv0 ClusterServiceVersion found)")
-}
-
-// checkOLMv1Installation checks if the operator is installed via OLMv1 (ClusterExtension)
-// Returns three values:
-// - installed: true if the operator is fully installed via OLMv1
-// - clusterExtensionExists: true if the ClusterExtension resource exists (regardless of status)
-// - err: error if there was a problem checking the installation
-func (r *ReconcileObservability) checkOLMv1Installation(ctx context.Context) (installed bool, clusterExtensionExists bool, err error) {
-	clusterExtension := &unstructured.Unstructured{}
-	clusterExtension.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "olm.operatorframework.io",
-		Version: "v1",
-		Kind:    "ClusterExtension",
-	})
-
-	if err := r.client.Get(ctx, types.NamespacedName{Name: "netobserv-operator"}, clusterExtension); err != nil {
-		if errors.IsNotFound(err) {
-			return false, false, nil
-		}
-		return false, false, err
-	}
-
-	// ClusterExtension exists
-	// Check its status conditions
-	conditions, found, err := unstructured.NestedSlice(clusterExtension.Object, "status", "conditions")
-	if err != nil {
-		return false, true, fmt.Errorf("failed to get ClusterExtension status conditions: %w", err)
-	}
-	if !found {
-		return false, true, fmt.Errorf("ClusterExtension exists but has no status conditions")
-	}
-
-	// Check for "Installed" condition
-	for _, cond := range conditions {
-		condMap, ok := cond.(map[string]any)
-		if !ok {
-			continue
-		}
-		condType, _, _ := unstructured.NestedString(condMap, "type")
-		condStatus, _, _ := unstructured.NestedString(condMap, "status")
-		condReason, _, _ := unstructured.NestedString(condMap, "reason")
-		condMessage, _, _ := unstructured.NestedString(condMap, "message")
-
-		if condType == "Installed" {
-			switch condStatus {
-			case "True":
-				return true, true, nil
-			case "False":
-				return false, true, fmt.Errorf("ClusterExtension installation failed: %s - %s", condReason, condMessage)
-			default:
-				// Status is "Unknown" or other - not yet installed
-				return false, true, nil
-			}
-		}
-	}
-
-	// ClusterExtension exists but no "Installed" condition found
-	return false, true, nil
-}
-
-// checkOLMv0Installation checks if the operator is installed via OLMv0 (CSV)
-func (r *ReconcileObservability) checkOLMv0Installation(ctx context.Context) (bool, error) {
-	csvList := &unstructured.UnstructuredList{}
-	csvList.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "operators.coreos.com",
-		Version: "v1alpha1",
-		Kind:    "ClusterServiceVersion",
-	})
-
-	if err := r.client.List(ctx, csvList, crclient.InNamespace(OperatorNamespace)); err != nil {
+	if err := r.client.Get(ctx, types.NamespacedName{Name: "flowcollectors.flows.netobserv.io"}, crd); err != nil {
 		if errors.IsNotFound(err) {
 			return false, nil
 		}
 		return false, err
 	}
 
-	// Look for netobserv operator CSV
-	for _, item := range csvList.Items {
-		name := item.GetName()
-		// CSV name for OLMv0 is like this: network-observability-operator.v1.2.3
-		if strings.HasPrefix(name, "network-observability-operator") {
-			// Check the CSV phase
-			phase, found, err := unstructured.NestedString(item.Object, "status", "phase")
-			if err != nil {
-				return false, fmt.Errorf("failed to get ClusterServiceVersion status phase: %w", err)
-			}
-			if !found {
-				return false, fmt.Errorf("ClusterServiceVersion exists but has no status phase")
-			}
-
-			switch phase {
-			case "Succeeded":
-				return true, nil
-			case "Failed":
-				reason, _, _ := unstructured.NestedString(item.Object, "status", "reason")
-				message, _, _ := unstructured.NestedString(item.Object, "status", "message")
-				return false, fmt.Errorf("ClusterServiceVersion installation failed: %s - %s", reason, message)
-			default:
-				// Other phases (Installing, Pending, Replacing, Deleting, etc.) - not yet installed
-				return false, nil
-			}
-		}
-	}
-
-	// No CSV found
-	return false, nil
+	return true, nil
 }
 
 // applyManifest reads a YAML file and applies all resources using server-side apply
@@ -521,6 +516,7 @@ func (r *ReconcileObservability) applyManifest(ctx context.Context, yamlPath, de
 			continue
 		}
 		obj.SetManagedFields(nil)
+		r.markNamespaceIfCNOOwned(ctx, obj)
 
 		// Marshal object to JSON for RawPatch
 		data, err := obj.MarshalJSON()
@@ -535,14 +531,47 @@ func (r *ReconcileObservability) applyManifest(ctx context.Context, yamlPath, de
 		}); err != nil {
 			return fmt.Errorf("failed to apply %s %s: %w", obj.GetKind(), obj.GetName(), err)
 		}
-		klog.Infof("Applied %s %s", description, obj.GetName())
+		klog.V(4).Infof("Applied %s %s", description, obj.GetName())
 	}
-	klog.Infof("Successfully applied %s", description)
+	klog.V(4).Infof("Successfully applied %s", description)
 	return nil
 }
 
 func (r *ReconcileObservability) installNetObservOperator(ctx context.Context) error {
 	return r.applyManifest(ctx, OperatorYAML, "Network Observability Operator")
+}
+
+// markNamespaceIfCNOOwned adds the CNO ownership marker to a Namespace object
+// before it is applied, but only when CNO is creating the namespace (it does not
+// yet exist) or already owns it (the marker is already present). A namespace that
+// pre-existed the installation without the marker is left unmarked so teardown
+// will not delete it and cascade-delete unrelated resources.
+func (r *ReconcileObservability) markNamespaceIfCNOOwned(ctx context.Context, obj *unstructured.Unstructured) {
+	if obj.GetKind() != "Namespace" {
+		return
+	}
+
+	existing := &corev1.Namespace{}
+	err := r.client.Get(ctx, types.NamespacedName{Name: obj.GetName()}, existing)
+	switch {
+	case errors.IsNotFound(err):
+		// CNO is creating the namespace. Mark it as CNO-created.
+	case err != nil:
+		// Ownership cannot be determined so do not claim it.
+		klog.Warningf("Failed to check namespace %s ownership, not marking it as CNO-created: %v", obj.GetName(), err)
+		return
+	case existing.GetAnnotations()[createdByCNOAnnotation] != "true":
+		// Namespace pre-existed the installation and CNO does not own it. Leave it
+		// unmarked so teardown will not delete it.
+		return
+	}
+
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations[createdByCNOAnnotation] = "true"
+	obj.SetAnnotations(annotations)
 }
 
 // isFlowCollectorExists returns true if a FlowCollector instance exists.
