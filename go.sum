@@ -200,8 +200,8 @@ github.com/onsi/ginkgo/v2 v2.28.2 h1:DTrMfpqxiNUyQ3Y0zhn1n3cOO2euFgQPYIpkWwxVFps
 github.com/onsi/ginkgo/v2 v2.28.2/go.mod h1:CLtbVInNckU3/+gC8LzkGUb9oF+e8W8TdUsxPwvdOgE=
 github.com/onsi/gomega v1.40.0 h1:Vtol0e1MghCD2ZVIilPDIg44XSL9l2QAn8ZNaljWcJc=
 github.com/onsi/gomega v1.40.0/go.mod h1:M/Uqpu/8qTjtzCLUA2zJHX9Iilrau25x1PdoSRbWh5A=
-github.com/openshift/api v0.0.0-20260724065811-356624ff036f h1:jGACG1DZvxDvRvH76Eh6SsXO1pVNsOqzMmvau1Oc4bc=
-github.com/openshift/api v0.0.0-20260724065811-356624ff036f/go.mod h1:k6qH5QOVa5GDln2VVm8Jz4NV3Z7R2SATHFLwGS6Wh3M=
+github.com/openshift/api v0.0.0-20260820183036-3db6c4b03286 h1:zz+Bfuhq9gAlbICRli8wk9CKgGmRMe5yQSxzvnmX73Q=
+github.com/openshift/api v0.0.0-20260820183036-3db6c4b03286/go.mod h1:k6qH5QOVa5GDln2VVm8Jz4NV3Z7R2SATHFLwGS6Wh3M=
 github.com/openshift/build-machinery-go v0.0.0-20260427155009-b879704ce51f h1:1BFlEUEcsxW1gNx64MxQQwgJDuuJxg5i7zUeOkla3QU=
 github.com/openshift/build-machinery-go v0.0.0-20260427155009-b879704ce51f/go.mod h1:8jcm8UPtg2mCAsxfqKil1xrmRMI3a+XU2TZ9fF8A7TE=
 github.com/openshift/client-go v0.0.0-20260715172546-dac61734e0ec h1:UDjX+mot5IVLpcChyBqLXG1oSB29s4UkqFmgNb0Xsqc=

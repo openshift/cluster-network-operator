@@ -645,10 +645,7 @@ data:
         route_advertisements_enable_flag="--enable-route-advertisements"
       fi
 
-      evpn_enable_flag=
-      if [[ "{{.OVN_EVPN_ENABLE}}" == "true" ]]; then
-        evpn_enable_flag="--enable-evpn"
-      fi
+      evpn_enable_flag="--enable-evpn"
 
       network_observability_enabled_flag=
       if [[ "{{.OVN_OBSERVABILITY_ENABLE}}" == "true" ]]; then
