@@ -1239,6 +1239,7 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 				PolicyAuditConfig: &operv1.PolicyAuditConfig{
 					RateLimit:      new(uint32(20)),
 					MaxFileSize:    new(uint32(50)),
+					MaxLogFiles:    new(int32(5)),
 					Destination:    "null",
 					SyslogFacility: "local0",
 				},
@@ -1281,6 +1282,7 @@ func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
 				PolicyAuditConfig: &operv1.PolicyAuditConfig{
 					RateLimit:      new(uint32(20)),
 					MaxFileSize:    new(uint32(50)),
+					MaxLogFiles:    new(int32(5)),
 					Destination:    "null",
 					SyslogFacility: "local0",
 				},
@@ -1292,6 +1294,72 @@ func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
 
 	g.Expect(conf).To(Equal(&expected))
 
+}
+
+// TestOVNKubeScriptLibHashStableAcrossCRDDefaulting reproduces the install-time
+// sequence from OCPBUGS-87818: the first reconcile sees an operator CR without
+// policyAuditConfig (CRD defaults only apply once the parent object exists),
+// the CR is written back, and the second reconcile sees the API-server-defaulted
+// values. Both renders must produce the same ovnkube-script-lib hash, otherwise
+// the ovnkube-node DaemonSet pod template changes and a rollout is triggered.
+func TestOVNKubeScriptLibHashStableAcrossCRDDefaulting(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+		ControlPlaneReplicaCount: 3,
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			DpuHostModeLabel:          OVN_NODE_SELECTOR_DEFAULT_DPU_HOST,
+			DpuModeLabel:              OVN_NODE_SELECTOR_DEFAULT_DPU,
+			SmartNicModeLabel:         OVN_NODE_SELECTOR_DEFAULT_SMART_NIC,
+			DpuNodeLeaseRenewInterval: DPU_NODE_LEASE_RENEW_INTERVAL_DEFAULT,
+			DpuNodeLeaseDuration:      DPU_NODE_LEASE_DURATION_DEFAULT,
+			HyperShiftConfig:          &bootstrap.OVNHyperShiftBootstrapResult{Enabled: false},
+		},
+	}
+	featureGatesCNO := getDefaultFeatureGates()
+
+	scriptLibHash := func(conf *operv1.NetworkSpec) string {
+		objs, _, err := renderOVNKubernetes(conf, bootstrapResult, manifestDirOvn, cnofake.NewFakeClient(), featureGatesCNO)
+		g.Expect(err).NotTo(HaveOccurred(), "renderOVNKubernetes should succeed")
+		for _, obj := range objs {
+			if obj.GetKind() != "DaemonSet" || obj.GetName() != "ovnkube-node" {
+				continue
+			}
+			ann, found, annErr := uns.NestedStringMap(obj.Object, "spec", "template", "metadata", "annotations")
+			g.Expect(annErr).NotTo(HaveOccurred(), "reading ovnkube-node pod template annotations")
+			g.Expect(found).To(BeTrue(), "ovnkube-node pod template should have annotations")
+			g.Expect(ann["network.operator.openshift.io/ovnkube-script-lib-hash"]).NotTo(BeEmpty())
+			return ann["network.operator.openshift.io/ovnkube-script-lib-hash"]
+		}
+		t.Fatalf("ovnkube-node DaemonSet not found in rendered objects")
+		return ""
+	}
+
+	// First pass: installer-created CR, no policyAuditConfig at all.
+	firstPass := OVNKubernetesConfig.DeepCopy().Spec
+	firstPass.DefaultNetwork.OVNKubernetesConfig.PolicyAuditConfig = nil
+	fillDefaults(&firstPass, nil)
+
+	// Second pass: the CR as read back after the API server applied CRD defaults.
+	secondPass := OVNKubernetesConfig.DeepCopy().Spec
+	secondPass.DefaultNetwork.OVNKubernetesConfig.PolicyAuditConfig = &operv1.PolicyAuditConfig{
+		RateLimit:      new(uint32(20)),
+		MaxFileSize:    new(uint32(50)),
+		MaxLogFiles:    new(int32(5)),
+		Destination:    "null",
+		SyslogFacility: "local0",
+	}
+	fillDefaults(&secondPass, &firstPass)
+
+	g.Expect(scriptLibHash(&firstPass)).To(Equal(scriptLibHash(&secondPass)),
+		"ovnkube-script-lib hash must not change between the pre- and post-CRD-defaulting reconciles")
+
+	// A real script library change must still produce a different hash.
+	changed := secondPass.DeepCopy()
+	changed.DefaultNetwork.OVNKubernetesConfig.PolicyAuditConfig.MaxLogFiles = new(int32(7))
+	g.Expect(scriptLibHash(changed)).NotTo(Equal(scriptLibHash(&secondPass)),
+		"ovnkube-script-lib hash must change when the rendered script content changes")
 }
 func TestValidateOVNKubernetes(t *testing.T) {
 	g := NewGomegaWithT(t)

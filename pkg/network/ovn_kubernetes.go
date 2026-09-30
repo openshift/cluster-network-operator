@@ -1362,6 +1362,15 @@ func fillOVNKubernetesDefaults(conf, previous *operv1.NetworkSpec, hostMTU int) 
 		maxfilesize := uint32(50)
 		sc.PolicyAuditConfig.MaxFileSize = &maxfilesize
 	}
+	// Must match the CRD default. On a fresh install the operator CR has no
+	// policyAuditConfig, so CRD defaulting has not run yet when we first render;
+	// leaving this nil renders "<nil>" into ovnkube-script-lib, and once the CR
+	// is written back and the API server defaults it to 5, the ConfigMap hash
+	// flips and ovnkube-node is needlessly rolled out (OCPBUGS-87818).
+	if sc.PolicyAuditConfig.MaxLogFiles == nil {
+		maxlogfiles := int32(5)
+		sc.PolicyAuditConfig.MaxLogFiles = &maxlogfiles
+	}
 	if sc.PolicyAuditConfig.Destination == "" {
 		sc.PolicyAuditConfig.Destination = "null"
 	}
