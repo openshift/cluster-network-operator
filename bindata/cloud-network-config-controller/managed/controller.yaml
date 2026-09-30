@@ -165,6 +165,9 @@ spec:
               -platform-aws-ca-override={{.PlatformAWSCAPath}} \
               -platform-azure-environment={{.PlatformAzureEnvironment}} \
               -secret-name cloud-network-config-controller-creds \
+{{- if .OpenStackMaxAllowedAddressPairs }}
+              -platform-os-max-allowed-address-pairs={{ .OpenStackMaxAllowedAddressPairs }} \
+{{- end }}
               -kubeconfig /var/run/secrets/hosted_cluster/kubeconfig
         env:
         - name: CONTROLLER_NAMESPACE

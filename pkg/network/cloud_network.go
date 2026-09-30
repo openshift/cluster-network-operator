@@ -48,6 +48,7 @@ func renderCloudNetworkConfigController(conf *operv1.NetworkSpec, bootstrapResul
 	data.Data["ExternalControlPlane"] = cloudBootstrapResult.ControlPlaneTopology == configv1.ExternalTopologyMode
 	data.Data["PlatformAzureEnvironment"] = ""
 	data.Data["PlatformAWSCAPath"] = ""
+	data.Data["OpenStackMaxAllowedAddressPairs"] = bootstrapResult.CloudNetworkConfig.OpenStackMaxAllowedAddressPairs
 
 	// AWS and azure allow for funky endpoint overriding.
 	// in different ways, of course.
