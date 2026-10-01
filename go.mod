@@ -1,6 +1,8 @@
 module github.com/openshift/cluster-network-operator
 
-go 1.26.8
+go 1.26.0
+
+toolchain go1.26.8
 
 require (
 	github.com/Masterminds/semver v1.5.0
