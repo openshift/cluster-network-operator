@@ -16,7 +16,7 @@
 7. [Test Deliverables](#test-deliverables) — Test reports and automation
 8. [Test Tasks](#test-tasks) — Work breakdown
 9. [Pass/Fail Criteria](#passfail-criteria) — Exit criteria
-10. [Risks](#risks) — Known blockers and limitations
+10. [Risks and Mitigation](#risks-and-mitigation) — Known blockers and limitations
 
 ## References
 
@@ -64,7 +64,7 @@ The CNO propagates TLS curve preferences to the following networking components 
 
 ### FIPS Mode Behavior
 
-When OpenShift runs in FIPS mode (`/proc/sys/crypto/fips_enabled=1`), the TLS stack automatically filters out non-FIPS-approved curves.
+When OpenShift runs in FIPS mode (`/proc/sys/crypto/fips_enabled=1`), each CNO-managed component filters out non-FIPS-approved curves before TLS configuration, ensuring only FIPS-compliant groups are available during handshake negotiation.
 
 **FIPS-Approved Curves (Allowed):**
 - `secp256r1` (NIST P-256)
@@ -312,7 +312,7 @@ The feature is considered **ready for release** when all of the following condit
 The feature is **NOT ready for release** if any of the following occur:
 
 - ✗ **Critical defects** that block core TLS functionality
-- ✗ **FIPS compliance failures** — Non-FIPS curves accepted in FIPS mode
+- ✗ **FIPS compliance failures** — Non-FIPS curves negotiated during TLS handshake in FIPS mode
 - ✗ **Feature gate bypass** — PQC curves work without required feature gate
 - ✗ **Consistent test failures** on Prow CI
 - ✗ **Security vulnerabilities** identified in TLS configuration handling
