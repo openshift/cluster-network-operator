@@ -1755,6 +1755,34 @@ func TestStatusManagerDaemonSetMatchingZeroNodes(t *testing.T) {
 		t.Fatalf("Expected no rollout-hung annotation, but was present %s", val)
 	}
 
+	// The other side of the condition: with the generation observed, a
+	// DaemonSet that does desire pods but has none available must still be
+	// reported as not yet scheduled. The branch is gated on an active
+	// rollout, so this is evaluated during install (the install-complete
+	// latch set by the earlier phases is reset). The exact message pins
+	// that this branch fired, rather than an earlier one in the chain.
+	status.installComplete = false
+	ps = getLastPodState(t, client, "testing")
+	ps.InstallComplete = false
+	setLastPodState(t, client, "testing", ps)
+	ds.Status.DesiredNumberScheduled = 1
+	setStatus(t, client, ds)
+	status.SetFromPods()
+
+	_, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:    operv1.OperatorStatusTypeProgressing,
+			Status:  operv1.ConditionTrue,
+			Reason:  "Deploying",
+			Message: `DaemonSet "/one/alpha" is not yet scheduled on any nodes`,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
 }
 
 func TestStatusManagerSetFromDeployments(t *testing.T) {
