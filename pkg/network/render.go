@@ -2,6 +2,9 @@ package network
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -822,6 +825,25 @@ func renderNetworkingConsolePlugin(manifestDir string, bootstrapResult *bootstra
 	data.Data["NetworkingConsolePluginImage"] = consolePluginImage
 
 	addTLSInfoToRenderData(data.Data, bootstrapResult, true)
+
+	// Calculate hash of the ConfigMap to trigger pod restarts when TLS config changes
+	h := sha256.New()
+	configMapPath := filepath.Join(manifestDir, "networking-console-plugin", "002-config-map.yaml")
+	configMapManifests, err := render.RenderTemplate(configMapPath, &data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render ConfigMap template: %w", err)
+	}
+
+	for _, m := range configMapManifests {
+		bytes, err := json.Marshal(m)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal ConfigMap manifest: %w", err)
+		}
+		if _, err := h.Write(bytes); err != nil {
+			return nil, fmt.Errorf("failed to hash ConfigMap data: %w", err)
+		}
+	}
+	data.Data["NetworkingConsolePluginConfigHash"] = hex.EncodeToString(h.Sum(nil))
 
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "networking-console-plugin"), &data)
 	if err != nil {
