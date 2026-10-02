@@ -107,6 +107,12 @@ spec:
           requests:
             cpu: 10m
             memory: 50Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /etc/kubernetes
@@ -114,6 +120,8 @@ spec:
           readOnly: true
         - mountPath: /var/run/secrets/serving-cert
           name: metrics-tls
+        - mountPath: /tmp
+          name: tmp
       hostNetwork: true
       priorityClassName: system-cluster-critical
       restartPolicy: Always
@@ -140,3 +148,5 @@ spec:
         secret:
           optional: true
           secretName: metrics-tls
+      - emptyDir: {}
+        name: tmp
