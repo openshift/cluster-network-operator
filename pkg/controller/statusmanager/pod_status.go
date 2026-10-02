@@ -112,7 +112,11 @@ func (status *StatusManager) SetFromPods() {
 			if !isNonCritical(ds) {
 				clbo = append(clbo, status.CheckCrashLoopBackOffPods(dsName, ds.Spec.Selector.MatchLabels, "DaemonSet")...)
 			}
-		} else if ds.Status.NumberAvailable == 0 && dsRolloutActive {
+		} else if ds.Status.NumberAvailable == 0 && (ds.Status.DesiredNumberScheduled > 0 || ds.Status.ObservedGeneration < ds.Generation) && dsRolloutActive {
+			// A DaemonSet whose observed status desires zero pods (e.g. its
+			// node selector matches no nodes) is fully rolled out. Only treat
+			// NumberAvailable == 0 as "unscheduled" if pods are desired or the
+			// DaemonSet controller has not yet observed the current generation.
 			progressing = append(progressing, fmt.Sprintf("DaemonSet %q is not yet scheduled on any nodes", dsName.String()))
 			dsProgressing = true
 		}

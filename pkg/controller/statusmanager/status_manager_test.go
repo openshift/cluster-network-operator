@@ -1618,6 +1618,176 @@ func TestStatusManagerIgnoresDaemonSetNodeScaleChurnAfterInstall(t *testing.T) {
 	}
 }
 
+func TestStatusManagerDaemonSetMatchingZeroNodes(t *testing.T) {
+	// The availability level check compares the release annotation against
+	// RELEASE_VERSION; pin it so an inherited environment cannot skew the
+	// Available assertions below.
+	t.Setenv("RELEASE_VERSION", "")
+	client := fake.NewFakeClient()
+	status := New(client, "testing", names.StandAloneClusterName)
+	status.clock = testingclock.NewFakeClock(time.Now())
+	setFakeListers(status)
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	setOC(t, client, no)
+
+	// A DaemonSet whose scheduling constraints match zero nodes (e.g.
+	// frr-k8s on a compact cluster, where the control plane nodes run a
+	// static pod instead) is fully rolled out. It must not be reported as
+	// Progressing or Degraded, even during install.
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Generation: 1, Labels: sl},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "alpha"},
+			},
+		},
+		Status: appsv1.DaemonSetStatus{
+			CurrentNumberScheduled: 0,
+			DesiredNumberScheduled: 0,
+			UpdatedNumberScheduled: 0,
+			NumberAvailable:        0,
+			NumberReady:            0,
+			ObservedGeneration:     0,
+		},
+	}
+	// While the controller has not observed the generation yet, zero desired
+	// pods proves nothing: the DaemonSet must still report Progressing.
+	set(t, client, ds)
+	status.SetFromPods()
+
+	_, oc, err := getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+
+	// Once observed with zero desired pods, it is fully rolled out.
+	ds.Status.ObservedGeneration = 1
+	setStatus(t, client, ds)
+	status.SetFromPods()
+
+	_, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionFalse,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeUpgradeable,
+			Status: operv1.ConditionTrue,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeAvailable,
+			Status: operv1.ConditionTrue,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+
+	// The DaemonSet must not be tracked as an in-flight rollout, so it can
+	// never feed the hung-rollout degraded path.
+	ps := getLastPodState(t, client, "testing")
+	if len(ps.DaemonsetStates) != 0 {
+		t.Fatalf("expected no daemonset rollout state for a daemonset matching zero nodes: %#v", ps.DaemonsetStates)
+	}
+
+	// Regression guard for the hung-rollout path. Before this fix the
+	// DaemonSet evaluated as "not yet scheduled on any nodes", so stale
+	// rollout state older than ProgressTimeout would be kept and reported
+	// as RolloutHung. Now it is not progressing at all: the stale state must
+	// be pruned and no hung annotation set, regardless of its age. (The hung
+	// timer uses wall-clock time.Since, not status.clock, so no fake-clock
+	// stepping is involved here.) The branch is only evaluated during an
+	// active rollout, and the earlier phases latched the in-memory
+	// install-complete flag, so reset it along with the persisted state.
+	ps.DaemonsetStates = []daemonsetState{{
+		ClusteredName:  ClusteredName{Namespace: "one", Name: "alpha"},
+		LastSeenStatus: ds.Status,
+		LastChangeTime: time.Now().Add(-time.Hour),
+	}}
+	if age := time.Since(ps.DaemonsetStates[0].LastChangeTime); age <= ProgressTimeout {
+		t.Fatalf("test premise broken: injected state age %s must exceed ProgressTimeout %s to prove the hung path is skipped", age, ProgressTimeout)
+	}
+	status.installComplete = false
+	ps.InstallComplete = false
+	setLastPodState(t, client, "testing", ps)
+	status.SetFromPods()
+
+	_, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:   operv1.OperatorStatusTypeDegraded,
+			Status: operv1.ConditionFalse,
+		},
+		{
+			Type:   operv1.OperatorStatusTypeProgressing,
+			Status: operv1.ConditionFalse,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+
+	// The stale state must have been pruned, not marked hung.
+	ps = getLastPodState(t, client, "testing")
+	if len(ps.DaemonsetStates) != 0 {
+		t.Fatalf("expected stale daemonset rollout state to be pruned: %#v", ps.DaemonsetStates)
+	}
+
+	err = client.ClientFor("").CRClient().Get(t.Context(), types.NamespacedName{Namespace: "one", Name: "alpha"}, ds)
+	if err != nil {
+		t.Fatalf("error getting DaemonSet: %v", err)
+	}
+	if val, set := ds.GetAnnotations()[names.RolloutHungAnnotation]; set {
+		t.Fatalf("Expected no rollout-hung annotation, but was present %s", val)
+	}
+
+	// The other side of the condition: with the generation observed, a
+	// DaemonSet that does desire pods but has none available must still be
+	// reported as not yet scheduled. The branch is gated on an active
+	// rollout, so this is evaluated during install (the install-complete
+	// latch set by the earlier phases is reset). The exact message pins
+	// that this branch fired, rather than an earlier one in the chain.
+	status.installComplete = false
+	ps = getLastPodState(t, client, "testing")
+	ps.InstallComplete = false
+	setLastPodState(t, client, "testing", ps)
+	ds.Status.DesiredNumberScheduled = 1
+	setStatus(t, client, ds)
+	status.SetFromPods()
+
+	_, oc, err = getStatuses(client, "testing")
+	if err != nil {
+		t.Fatalf("error getting ClusterOperator: %v", err)
+	}
+	if !conditionsInclude(oc.Status.Conditions, []operv1.OperatorCondition{
+		{
+			Type:    operv1.OperatorStatusTypeProgressing,
+			Status:  operv1.ConditionTrue,
+			Reason:  "Deploying",
+			Message: `DaemonSet "/one/alpha" is not yet scheduled on any nodes`,
+		},
+	}) {
+		t.Fatalf("unexpected Status.Conditions: %#v", oc.Status.Conditions)
+	}
+}
+
 func TestStatusManagerSetFromDeployments(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
