@@ -1711,7 +1711,9 @@ func TestStatusManagerDaemonSetMatchingZeroNodes(t *testing.T) {
 	// as RolloutHung. Now it is not progressing at all: the stale state must
 	// be pruned and no hung annotation set, regardless of its age. (The hung
 	// timer uses wall-clock time.Since, not status.clock, so no fake-clock
-	// stepping is involved here.)
+	// stepping is involved here.) The branch is only evaluated during an
+	// active rollout, and the earlier phases latched the in-memory
+	// install-complete flag, so reset it along with the persisted state.
 	ps.DaemonsetStates = []daemonsetState{{
 		ClusteredName:  ClusteredName{Namespace: "one", Name: "alpha"},
 		LastSeenStatus: ds.Status,
@@ -1720,6 +1722,7 @@ func TestStatusManagerDaemonSetMatchingZeroNodes(t *testing.T) {
 	if age := time.Since(ps.DaemonsetStates[0].LastChangeTime); age <= ProgressTimeout {
 		t.Fatalf("test premise broken: injected state age %s must exceed ProgressTimeout %s to prove the hung path is skipped", age, ProgressTimeout)
 	}
+	status.installComplete = false
 	ps.InstallComplete = false
 	setLastPodState(t, client, "testing", ps)
 	status.SetFromPods()
