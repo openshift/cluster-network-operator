@@ -51,7 +51,7 @@ func createTestOperatorNetwork(name string) *operatorv1.Network {
 	}
 }
 
-func createTestOperatorNetworkWithDeployedCondition(name string) *operatorv1.Network {
+func createTestOperatorNetworkWithInstalledCondition(name string) *operatorv1.Network {
 	return &operatorv1.Network{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -60,16 +60,24 @@ func createTestOperatorNetworkWithDeployedCondition(name string) *operatorv1.Net
 			OperatorStatus: operatorv1.OperatorStatus{
 				Conditions: []operatorv1.OperatorCondition{
 					{
-						Type:               NetworkObservabilityDeployed,
+						Type:               NetworkObservabilityInstalledByCNO,
 						Status:             operatorv1.ConditionTrue,
-						Reason:             "DeploymentComplete",
-						Message:            "Network Observability has been deployed",
+						Reason:             "Installed",
+						Message:            "Network Observability has been installed. Will not be managed by CNO.",
 						LastTransitionTime: metav1.Now(),
 					},
 				},
 			},
 		},
 	}
+}
+
+// createTestOperatorNetworkInstalling returns an operator Network whose
+// NetworkObservabilityInstalledByCNO condition is in the in-progress
+// WaitingForOperator state with a recent transition time, i.e. CNO has applied
+// the operator manifest and is waiting for the operator to become available.
+func createTestOperatorNetworkInstalling(name string) *operatorv1.Network {
+	return createTestOperatorNetworkFailing(name, "WaitingForOperator", time.Now())
 }
 
 func createTestFlowCollector(name string) *unstructured.Unstructured {
@@ -210,7 +218,7 @@ func TestShouldInstallNetworkObservability_NilNonSNO(t *testing.T) {
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).Build()
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	result, err := r.shouldInstallNetworkObservability(t.Context())
 
@@ -241,8 +249,8 @@ func TestShouldInstallNetworkObservability_NilSNO(t *testing.T) {
 	operatorNetwork := createTestOperatorNetwork("cluster")
 	infra := createTestInfrastructure(configv1.SingleReplicaTopologyMode)
 
-	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).Build()
-	r := &ReconcileObservability{client: client}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).WithStatusSubresource(&operatorv1.Network{}).Build()
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	result, err := r.shouldInstallNetworkObservability(t.Context())
 
@@ -276,7 +284,7 @@ func TestShouldInstallNetworkObservability_ExplicitInstallAndEnableNonSNO(t *tes
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).Build()
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	result, err := r.shouldInstallNetworkObservability(t.Context())
 
@@ -310,7 +318,7 @@ func TestShouldInstallNetworkObservability_ExplicitInstallAndEnableSNO(t *testin
 	infra := createTestInfrastructure(configv1.SingleReplicaTopologyMode)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).Build()
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	result, err := r.shouldInstallNetworkObservability(t.Context())
 
@@ -340,10 +348,11 @@ func TestShouldInstallNetworkObservability_ExplicitNoAction(t *testing.T) {
 			},
 		},
 	}
+	operatorNetwork := createTestOperatorNetwork("cluster")
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
 
-	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, infra).Build()
-	r := &ReconcileObservability{client: client}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).WithStatusSubresource(&operatorv1.Network{}).Build()
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	result, err := r.shouldInstallNetworkObservability(t.Context())
 
@@ -377,7 +386,7 @@ func TestShouldInstallNetworkObservability_EmptyStringNonSNO(t *testing.T) {
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).Build()
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	result, err := r.shouldInstallNetworkObservability(t.Context())
 
@@ -398,7 +407,7 @@ func TestIsSingleNodeCluster_SNO(t *testing.T) {
 	infra := createTestInfrastructure(configv1.SingleReplicaTopologyMode)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(infra).Build()
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	isSNO, err := r.isSingleNodeCluster(t.Context())
 
@@ -417,7 +426,7 @@ func TestIsSingleNodeCluster_HighlyAvailable(t *testing.T) {
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(infra).Build()
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	isSNO, err := r.isSingleNodeCluster(t.Context())
 
@@ -456,10 +465,17 @@ func TestReconcile_SkipsWhenDisabled(t *testing.T) {
 	if err := configv1.AddToScheme(scheme); err != nil {
 		t.Fatalf("Failed to add configv1 to scheme: %v", err)
 	}
+	if err := operatorv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add operatorv1 to scheme: %v", err)
+	}
 
 	// Explicitly set to false (opt-out)
 	network := createTestNetwork("cluster", "NoAction")
-	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network).Build()
+	operatorNetwork := createTestOperatorNetwork("cluster")
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(network, operatorNetwork).
+		WithStatusSubresource(&operatorv1.Network{}).
+		Build()
 
 	r := &ReconcileObservability{
 		client:      client,
@@ -543,7 +559,10 @@ func TestReconcile_SkipsInstallWhenNilOnSNO(t *testing.T) {
 	operatorNetwork := createTestOperatorNetwork("cluster")
 	infra := createTestInfrastructure(configv1.SingleReplicaTopologyMode)
 
-	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).Build()
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(network, operatorNetwork, infra).
+		WithStatusSubresource(&operatorv1.Network{}).
+		Build()
 
 	r := &ReconcileObservability{
 		client:      client,
@@ -571,8 +590,17 @@ func TestReconcile_IgnoresNotFound(t *testing.T) {
 	if err := configv1.AddToScheme(scheme); err != nil {
 		t.Fatalf("Failed to add configv1 to scheme: %v", err)
 	}
+	if err := operatorv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add operatorv1 to scheme: %v", err)
+	}
 
-	client := fake.NewClientBuilder().WithScheme(scheme).Build()
+	// The operator Network CR exists (it is CNO's own singleton) so the
+	// FeatureGateDisabled condition can be persisted; the config Network does not.
+	operatorNetwork := createTestOperatorNetwork("cluster")
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(operatorNetwork).
+		WithStatusSubresource(&operatorv1.Network{}).
+		Build()
 
 	r := &ReconcileObservability{
 		client: client,
@@ -596,7 +624,7 @@ func TestIsNetObservOperatorInstalled_CRDExists(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(crd).Build()
 
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	installed, err := r.isNetObservOperatorInstalled(t.Context())
 
@@ -611,7 +639,7 @@ func TestIsNetObservOperatorInstalled_CRDMissing(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	installed, err := r.isNetObservOperatorInstalled(t.Context())
 
@@ -629,7 +657,7 @@ func TestIsNetObservOperatorInstalled_IgnoresOtherCRDs(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(crd).Build()
 
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	installed, err := r.isNetObservOperatorInstalled(t.Context())
 
@@ -648,7 +676,7 @@ func TestIsFlowCollectorExists_True(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(flowCollector).Build()
 
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	exists, err := r.isFlowCollectorExists(t.Context())
 
@@ -663,7 +691,7 @@ func TestIsFlowCollectorExists_False(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	exists, err := r.isFlowCollectorExists(t.Context())
 
@@ -681,7 +709,7 @@ func TestIsFlowCollectorExists_OnlyChecksCluster(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(fcOther).Build()
 
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	exists, err := r.isFlowCollectorExists(t.Context())
 
@@ -702,7 +730,7 @@ func TestCreateFlowCollector_ManifestNotFound(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	// Test with non-existent manifest by calling applyManifest directly
 	err := r.applyManifest(t.Context(), "/non/existent/path.yaml", "test")
@@ -720,7 +748,7 @@ func TestInstallNetObservOperator_ManifestNotFound(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	// Test applyManifest with non-existent path directly
 	err := r.applyManifest(t.Context(), "/non/existent/operator.yaml", "Network Observability Operator")
@@ -741,7 +769,7 @@ func TestApplyManifest_SingleResource(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	manifestContent := `
 apiVersion: v1
@@ -763,7 +791,7 @@ func TestApplyManifest_MultipleResources(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	manifestContent := `
 apiVersion: v1
@@ -790,7 +818,7 @@ func TestApplyManifest_EmptyDocuments(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	manifestContent := `---
 ---
@@ -810,7 +838,7 @@ func TestApplyManifest_InvalidYAML(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	manifestContent := `
 invalid: yaml: content:
@@ -843,7 +871,7 @@ func TestReconcile_SkipsFlowCollectorWhenExists(t *testing.T) {
 	}
 
 	network := createTestNetwork("cluster", "InstallAndEnable")
-	operatorNetwork := createTestOperatorNetwork("cluster")
+	operatorNetwork := createTestOperatorNetworkInstalling("cluster")
 	crd := createTestCRD("flowcollectors.flows.netobserv.io")
 	clusterExtension := createTestClusterExtension(t, "netobserv-operator", true)
 	flowCollector := createTestFlowCollector(FlowCollectorName)
@@ -878,14 +906,19 @@ func TestReconcile_SkipsInstallWhenExists(t *testing.T) {
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatalf("Failed to add corev1 to scheme: %v", err)
 	}
+	if err := operatorv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add operatorv1 to scheme: %v", err)
+	}
 
 	network := createTestNetwork("cluster", "InstallAndEnable")
+	operatorNetwork := createTestOperatorNetworkInstalling("cluster")
 	crd := createTestCRD("flowcollectors.flows.netobserv.io")
 	clusterExtension := createTestClusterExtension(t, "netobserv-operator", true)
 	operatorNs := createTestNamespace(OperatorNamespace)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(network, crd, clusterExtension, operatorNs).
+		WithObjects(network, operatorNetwork, crd, clusterExtension, operatorNs).
+		WithStatusSubresource(&operatorv1.Network{}).
 		Build()
 
 	r := &ReconcileObservability{
@@ -923,7 +956,7 @@ func TestReconcile_MultipleInvocations(t *testing.T) {
 	}
 
 	network := createTestNetwork("cluster", "InstallAndEnable")
-	operatorNetwork := createTestOperatorNetwork("cluster")
+	operatorNetwork := createTestOperatorNetworkInstalling("cluster")
 	crd := createTestCRD("flowcollectors.flows.netobserv.io")
 	clusterExtension := createTestClusterExtension(t, "netobserv-operator", true)
 	flowCollector := createTestFlowCollector(FlowCollectorName)
@@ -963,14 +996,19 @@ func TestReconcile_OperatorNotReady(t *testing.T) {
 	if err := configv1.AddToScheme(scheme); err != nil {
 		t.Fatalf("Failed to add configv1 to scheme: %v", err)
 	}
+	if err := operatorv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add operatorv1 to scheme: %v", err)
+	}
 
 	network := createTestNetwork("cluster", "InstallAndEnable")
+	operatorNetwork := createTestOperatorNetworkInstalling("cluster")
 	crd := createTestCRD("flowcollectors.flows.netobserv.io")
 	// CSV exists but not in Succeeded phase
 	clusterExtension := createTestClusterExtension(t, "netobserv-operator", false)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(network, crd, clusterExtension).
+		WithObjects(network, operatorNetwork, crd, clusterExtension).
+		WithStatusSubresource(&operatorv1.Network{}).
 		Build()
 
 	r := &ReconcileObservability{
@@ -1010,7 +1048,7 @@ func TestReconcile_FlowCollectorDeleted(t *testing.T) {
 	// FlowCollector is NOT present (deleted)
 	// Use default policy (empty string) - which should NOT reinstall after deployment
 	network := createTestNetwork("cluster", "")
-	operatorNetwork := createTestOperatorNetworkWithDeployedCondition("cluster")
+	operatorNetwork := createTestOperatorNetworkWithInstalledCondition("cluster")
 	crd := createTestCRD("flowcollectors.flows.netobserv.io")
 	clusterExtension := createTestClusterExtension(t, "netobserv-operator", true)
 
@@ -1051,7 +1089,7 @@ func TestReconcile_OperatorDeleted(t *testing.T) {
 	// Operator subscription and CSV are NOT present (simulating deletion)
 	// Use default policy (empty string) - which should NOT reinstall after deployment
 	network := createTestNetwork("cluster", "")
-	operatorNetwork := createTestOperatorNetworkWithDeployedCondition("cluster")
+	operatorNetwork := createTestOperatorNetworkWithInstalledCondition("cluster")
 	flowCollector := createTestFlowCollector(FlowCollectorName)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
@@ -1091,7 +1129,7 @@ func TestReconcile_BothDeleted(t *testing.T) {
 	// Neither operator nor FlowCollector are present (both deleted)
 	// Use default policy (empty string) - which should NOT reinstall after deployment
 	network := createTestNetwork("cluster", "")
-	operatorNetwork := createTestOperatorNetworkWithDeployedCondition("cluster")
+	operatorNetwork := createTestOperatorNetworkWithInstalledCondition("cluster")
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(network, operatorNetwork).
@@ -1131,7 +1169,7 @@ func TestReconcile_InstallAndEnable_DoesNotReinstallWhenDeployed(t *testing.T) {
 	// FlowCollector is NOT present (deleted)
 	// InstallAndEnable should NOT reinstall after deployment
 	network := createTestNetwork("cluster", string(configv1.NetworkObservabilityInstallAndEnable))
-	operatorNetwork := createTestOperatorNetworkWithDeployedCondition("cluster")
+	operatorNetwork := createTestOperatorNetworkWithInstalledCondition("cluster")
 	crd := createTestCRD("flowcollectors.flows.netobserv.io")
 	clusterExtension := createTestClusterExtension(t, "netobserv-operator", true)
 
@@ -1177,11 +1215,11 @@ func TestShouldInstallNetworkObservability_InstallAndEnable_AlreadyDeployed(t *t
 			},
 		},
 	}
-	operatorNetwork := createTestOperatorNetworkWithDeployedCondition("cluster")
+	operatorNetwork := createTestOperatorNetworkWithInstalledCondition("cluster")
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra).Build()
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	result, err := r.shouldInstallNetworkObservability(t.Context())
 
@@ -1299,14 +1337,19 @@ func TestReconcile_RecoveryAfterOperatorBecomesReady(t *testing.T) {
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatalf("Failed to add corev1 to scheme: %v", err)
 	}
+	if err := operatorv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add operatorv1 to scheme: %v", err)
+	}
 
 	network := createTestNetwork("cluster", "InstallAndEnable")
+	operatorNetwork := createTestOperatorNetworkInstalling("cluster")
 	crd := createTestCRD("flowcollectors.flows.netobserv.io")
 	// Start with CSV in Installing phase
 	clusterExtension := createTestClusterExtension(t, "netobserv-operator", false)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(network, crd, clusterExtension).
+		WithObjects(network, operatorNetwork, crd, clusterExtension).
+		WithStatusSubresource(&operatorv1.Network{}).
 		Build()
 
 	r := &ReconcileObservability{
@@ -1409,7 +1452,7 @@ func TestReconcile_ConcurrentReconciliations(t *testing.T) {
 
 // Status Manager Tests
 
-// TestReconcile_SetsConditionFalseOnError tests that NetworkObservabilityDeployed condition is set to False on errors
+// TestReconcile_SetsConditionFalseOnError tests that NetworkObservabilityInstalledByCNO condition is set to False on errors
 func TestReconcile_SetsConditionFalseOnError(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -1448,22 +1491,22 @@ func TestReconcile_SetsConditionFalseOnError(t *testing.T) {
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(result.RequeueAfter).To(Equal(requeueInterval))
 
-	// Verify that NetworkObservabilityDeployed condition is set to False
+	// Verify that NetworkObservabilityInstalledByCNO condition is set to False
 	updatedNetwork := &operatorv1.Network{}
 	err = client.Get(t.Context(), types.NamespacedName{Name: "cluster"}, updatedNetwork)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	conditionFound := false
 	for _, condition := range updatedNetwork.Status.Conditions {
-		if condition.Type == NetworkObservabilityDeployed {
+		if condition.Type == NetworkObservabilityInstalledByCNO {
 			conditionFound = true
 			g.Expect(condition.Status).To(Equal(operatorv1.ConditionFalse))
-			g.Expect(condition.Reason).To(Equal("DeploymentFailed"))
-			g.Expect(condition.Message).To(ContainSubstring("Failed to install Network Observability Operator"))
+			g.Expect(condition.Reason).To(Equal("InstallationInProgress"))
+			g.Expect(condition.Message).To(ContainSubstring("Installing Network Observability Operator"))
 			break
 		}
 	}
-	g.Expect(conditionFound).To(BeTrue(), "NetworkObservabilityDeployed condition should be set")
+	g.Expect(conditionFound).To(BeTrue(), "NetworkObservabilityInstalledByCNO condition should be set")
 }
 
 // TestReconcile_RequeuesWhenClusterNotAvailable verifies that when the operator is
@@ -1511,7 +1554,7 @@ func TestReconcile_RequeuesWhenClusterNotAvailable(t *testing.T) {
 
 	conditionFound := false
 	for _, condition := range updatedNetwork.Status.Conditions {
-		if condition.Type == NetworkObservabilityDeployed {
+		if condition.Type == NetworkObservabilityInstalledByCNO {
 			conditionFound = true
 			g.Expect(condition.Status).To(Equal(operatorv1.ConditionFalse))
 			g.Expect(condition.Reason).To(Equal("WaitingForCluster"))
@@ -1519,10 +1562,10 @@ func TestReconcile_RequeuesWhenClusterNotAvailable(t *testing.T) {
 			break
 		}
 	}
-	g.Expect(conditionFound).To(BeTrue(), "NetworkObservabilityDeployed condition should be set")
+	g.Expect(conditionFound).To(BeTrue(), "NetworkObservabilityInstalledByCNO condition should be set")
 }
 
-// TestReconcile_SetsConditionTrueOnSuccess tests that NetworkObservabilityDeployed condition is set to True on success
+// TestReconcile_SetsConditionTrueOnSuccess tests that NetworkObservabilityInstalledByCNO condition is set to True on success
 func TestReconcile_SetsConditionTrueOnSuccess(t *testing.T) {
 	g := NewGomegaWithT(t)
 
@@ -1538,7 +1581,7 @@ func TestReconcile_SetsConditionTrueOnSuccess(t *testing.T) {
 	}
 
 	network := createTestNetwork("cluster", "InstallAndEnable")
-	operatorNetwork := createTestOperatorNetwork("cluster")
+	operatorNetwork := createTestOperatorNetworkInstalling("cluster")
 	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
 	crd := createTestCRD("flowcollectors.flows.netobserv.io")
 	clusterExtension := createTestClusterExtension(t, "netobserv-operator", true)
@@ -1561,22 +1604,22 @@ func TestReconcile_SetsConditionTrueOnSuccess(t *testing.T) {
 
 	g.Expect(err).NotTo(HaveOccurred())
 
-	// Verify that NetworkObservabilityDeployed condition is set to True
+	// Verify that NetworkObservabilityInstalledByCNO condition is set to True
 	updatedNetwork := &operatorv1.Network{}
 	err = client.Get(t.Context(), types.NamespacedName{Name: "cluster"}, updatedNetwork)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	conditionFound := false
 	for _, condition := range updatedNetwork.Status.Conditions {
-		if condition.Type == NetworkObservabilityDeployed {
+		if condition.Type == NetworkObservabilityInstalledByCNO {
 			conditionFound = true
 			g.Expect(condition.Status).To(Equal(operatorv1.ConditionTrue))
-			g.Expect(condition.Reason).To(Equal("DeploymentComplete"))
-			g.Expect(condition.Message).To(Equal("Network Observability has been deployed"))
+			g.Expect(condition.Reason).To(Equal("Installed"))
+			g.Expect(condition.Message).To(Equal("Network Observability has been installed. Will not be managed by CNO."))
 			break
 		}
 	}
-	g.Expect(conditionFound).To(BeTrue(), "NetworkObservabilityDeployed condition should be set")
+	g.Expect(conditionFound).To(BeTrue(), "NetworkObservabilityInstalledByCNO condition should be set")
 }
 
 // TestReconcile_SkipsWhenNoActionPolicy tests that reconciliation skips when NoAction policy is set
@@ -1600,6 +1643,7 @@ func TestReconcile_SkipsWhenNoActionPolicy(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(network, operatorNetwork, infra).
+		WithStatusSubresource(&operatorv1.Network{}).
 		Build()
 
 	r := &ReconcileObservability{
@@ -1623,6 +1667,9 @@ func TestReconcile_RequeuesOnInfrastructureError(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := configv1.AddToScheme(scheme); err != nil {
 		t.Fatalf("Failed to add configv1 to scheme: %v", err)
+	}
+	if err := operatorv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add operatorv1 to scheme: %v", err)
 	}
 
 	// Create network with no NetworkObservability field (will trigger SNO check which needs Infrastructure)
@@ -1712,7 +1759,7 @@ func createTestOperatorGroup() *unstructured.Unstructured {
 }
 
 // createTestOperatorNetworkFailing returns an operator Network whose
-// NetworkObservabilityDeployed condition is failing with the given reason and
+// NetworkObservabilityInstalledByCNO condition is failing with the given reason and
 // transitioned at the given time.
 func createTestOperatorNetworkFailing(name, reason string, since time.Time) *operatorv1.Network {
 	return &operatorv1.Network{
@@ -1720,7 +1767,7 @@ func createTestOperatorNetworkFailing(name, reason string, since time.Time) *ope
 		Status: operatorv1.NetworkStatus{
 			OperatorStatus: operatorv1.OperatorStatus{
 				Conditions: []operatorv1.OperatorCondition{{
-					Type:               NetworkObservabilityDeployed,
+					Type:               NetworkObservabilityInstalledByCNO,
 					Status:             operatorv1.ConditionFalse,
 					Reason:             reason,
 					Message:            "installation in progress",
@@ -1732,7 +1779,7 @@ func createTestOperatorNetworkFailing(name, reason string, since time.Time) *ope
 }
 
 // createTestOperatorNetworkTimedOut returns an operator Network whose
-// NetworkObservabilityDeployed condition is failing with the given reason and a
+// NetworkObservabilityInstalledByCNO condition is failing with the given reason and a
 // LastTransitionTime that is older than installTimeout.
 func createTestOperatorNetworkTimedOut(name, reason string) *operatorv1.Network {
 	return createTestOperatorNetworkFailing(name, reason, time.Now().Add(-installTimeout-time.Minute))
@@ -1781,7 +1828,7 @@ func TestTeardownNetObservOperator_DeletesResources(t *testing.T) {
 	ns := createTestCNONamespace(OperatorNamespace)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sub, og, csv, ns).Build()
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	g.Expect(r.teardownNetObservOperator(t.Context())).To(Succeed())
 
@@ -1806,7 +1853,7 @@ func TestTeardownNetObservOperator_Idempotent(t *testing.T) {
 
 	// Nothing to delete; teardown must not error.
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 
 	g.Expect(r.teardownNetObservOperator(t.Context())).To(Succeed())
 }
@@ -1848,9 +1895,12 @@ func TestReconcile_TimeoutRollsBackWhenOperatorNotInstalled(t *testing.T) {
 	g.Expect(client.Get(t.Context(), types.NamespacedName{Name: "cluster"}, updated)).To(Succeed())
 	var found bool
 	for _, c := range updated.Status.Conditions {
-		if c.Type == NetworkObservabilityDeployed {
+		if c.Type == NetworkObservabilityInstalledByCNO {
 			found = true
-			g.Expect(c.Reason).To(Equal("DeploymentTimedOut"))
+			g.Expect(c.Reason).To(Equal("Failed"))
+			// The cluster was available, so the install clock (not the cluster
+			// wait) is what timed out.
+			g.Expect(c.Message).To(Equal("Failed to install Network Observability Operator after 20 minutes. Will not retry."))
 		}
 	}
 	g.Expect(found).To(BeTrue())
@@ -1860,6 +1910,49 @@ func TestReconcile_TimeoutRollsBackWhenOperatorNotInstalled(t *testing.T) {
 	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace, Namespace: OperatorNamespace}, gotSub))).To(BeTrue())
 	gotNS := &corev1.Namespace{}
 	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace}, gotNS))).To(BeTrue())
+}
+
+// TestReconcile_TimeoutWhenClusterNeverAvailable verifies that when the cluster
+// never becomes available within the backstop, the install is abandoned with a
+// message about the cluster wait rather than an install timeout (the install
+// never started).
+func TestReconcile_TimeoutWhenClusterNeverAvailable(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	if err := configv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add configv1 to scheme: %v", err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add corev1 to scheme: %v", err)
+	}
+	if err := operatorv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add operatorv1 to scheme: %v", err)
+	}
+
+	// Still waiting for the cluster past the backstop, and the cluster is still
+	// not available.
+	network := createTestNetwork("cluster", "InstallAndEnable")
+	operatorNetwork := createTestOperatorNetworkFailing("cluster", "WaitingForCluster", time.Now().Add(-clusterAvailableTimeout-time.Minute))
+	cv := createTestClusterVersionUnavailable()
+
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(network, operatorNetwork, cv).
+		WithStatusSubresource(&operatorv1.Network{}).
+		Build()
+
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "cluster"}}
+
+	_, err := r.Reconcile(t.Context(), req)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	updated := &operatorv1.Network{}
+	g.Expect(client.Get(t.Context(), types.NamespacedName{Name: "cluster"}, updated)).To(Succeed())
+	cond := findNetObservCondition(updated)
+	g.Expect(cond).ToNot(BeNil())
+	g.Expect(cond.Reason).To(Equal("Failed"))
+	g.Expect(cond.Message).To(Equal("Cluster did not become available within 90 minutes. Will not retry."))
 }
 
 func TestReconcile_TimeoutDoesNotDeleteUnownedNamespace(t *testing.T) {
@@ -1923,7 +2016,7 @@ func TestReconcile_TimeoutRollsBackEvenWhenOperatorInstalled(t *testing.T) {
 	// FlowCollector phase timed out, the CNO-created OLM resources are torn down so
 	// the install is left in a clean state rather than a partial one.
 	network := createTestNetwork("cluster", "InstallAndEnable")
-	operatorNetwork := createTestOperatorNetworkTimedOut("cluster", "DeploymentFailed")
+	operatorNetwork := createTestOperatorNetworkTimedOut("cluster", "WaitingForOperator")
 	cv := createTestClusterVersionAvailableSince(time.Now().Add(-installTimeout - time.Minute))
 	crd := createTestCRD("flowcollectors.flows.netobserv.io")
 	csv := createTestCSV("network-observability-operator.v1.12.2", "Succeeded")
@@ -1945,8 +2038,8 @@ func TestReconcile_TimeoutRollsBackEvenWhenOperatorInstalled(t *testing.T) {
 	updated := &operatorv1.Network{}
 	g.Expect(client.Get(t.Context(), types.NamespacedName{Name: "cluster"}, updated)).To(Succeed())
 	for _, c := range updated.Status.Conditions {
-		if c.Type == NetworkObservabilityDeployed {
-			g.Expect(c.Reason).To(Equal("DeploymentTimedOut"))
+		if c.Type == NetworkObservabilityInstalledByCNO {
+			g.Expect(c.Reason).To(Equal("Failed"))
 		}
 	}
 
@@ -1973,7 +2066,7 @@ func TestHandleInstallTimeout_SkipsWhenAlreadyTimedOut(t *testing.T) {
 	}
 
 	// Already terminal: handleInstallTimeout must not tear anything down again.
-	operatorNetwork := createTestOperatorNetworkTimedOut("cluster", "DeploymentTimedOut")
+	operatorNetwork := createTestOperatorNetworkTimedOut("cluster", "Failed")
 	sub := createTestSubscription()
 
 	client := fake.NewClientBuilder().WithScheme(scheme).
@@ -1981,7 +2074,7 @@ func TestHandleInstallTimeout_SkipsWhenAlreadyTimedOut(t *testing.T) {
 		WithStatusSubresource(&operatorv1.Network{}).
 		Build()
 
-	r := &ReconcileObservability{client: client}
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
 	g.Expect(r.handleInstallTimeout(t.Context())).To(Succeed())
 
 	// Subscription must still be present.
@@ -2007,7 +2100,7 @@ func TestReconcile_TimeoutRetriesRollbackAfterFailure(t *testing.T) {
 	}
 
 	network := createTestNetwork("cluster", "InstallAndEnable")
-	operatorNetwork := createTestOperatorNetworkTimedOut("cluster", "DeploymentFailed")
+	operatorNetwork := createTestOperatorNetworkTimedOut("cluster", "WaitingForOperator")
 	cv := createTestClusterVersionAvailableSince(time.Now().Add(-installTimeout - time.Minute))
 	sub := createTestSubscription()
 	og := createTestOperatorGroup()
@@ -2054,7 +2147,7 @@ func TestReconcile_TimeoutRetriesRollbackAfterFailure(t *testing.T) {
 	g.Expect(client.Get(t.Context(), types.NamespacedName{Name: "cluster"}, updated)).To(Succeed())
 	cond = findNetObservCondition(updated)
 	g.Expect(cond).ToNot(BeNil())
-	g.Expect(cond.Reason).To(Equal("DeploymentTimedOut"))
+	g.Expect(cond.Reason).To(Equal("Failed"))
 
 	gotSub = createTestSubscription()
 	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace, Namespace: OperatorNamespace}, gotSub))).To(BeTrue())
@@ -2064,10 +2157,10 @@ func TestReconcile_TimeoutRetriesRollbackAfterFailure(t *testing.T) {
 	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace}, gotNS))).To(BeTrue())
 }
 
-// findNetObservCondition returns the NetworkObservabilityDeployed condition, or nil.
+// findNetObservCondition returns the NetworkObservabilityInstalledByCNO condition, or nil.
 func findNetObservCondition(network *operatorv1.Network) *operatorv1.OperatorCondition {
 	for i := range network.Status.Conditions {
-		if network.Status.Conditions[i].Type == NetworkObservabilityDeployed {
+		if network.Status.Conditions[i].Type == NetworkObservabilityInstalledByCNO {
 			return &network.Status.Conditions[i]
 		}
 	}
@@ -2095,12 +2188,12 @@ func TestHasInstallTimedOut(t *testing.T) {
 	}{
 		{
 			name:    "already marked timed out",
-			network: createTestOperatorNetworkFailing("cluster", "DeploymentTimedOut", recent),
+			network: createTestOperatorNetworkFailing("cluster", "Failed", recent),
 			want:    true,
 		},
 		{
 			name:    "condition not False, install healthy",
-			network: createTestOperatorNetworkWithDeployedCondition("cluster"),
+			network: createTestOperatorNetworkWithInstalledCondition("cluster"),
 			want:    false,
 		},
 		{
