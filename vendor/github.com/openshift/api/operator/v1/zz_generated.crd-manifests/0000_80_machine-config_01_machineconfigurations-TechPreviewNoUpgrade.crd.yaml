@@ -220,20 +220,24 @@ spec:
                         apiGroup:
                           description: |-
                             apiGroup is name of the APIGroup that the machine management resource belongs to.
-                            The only current valid value is machine.openshift.io.
+                            Valid values are machine.openshift.io and cluster.x-k8s.io.
                             machine.openshift.io means that the machine manager will only register resources that belong to OpenShift machine API group.
+                            cluster.x-k8s.io means that the machine manager will only register resources that belong to the Cluster API group.
                           enum:
                           - machine.openshift.io
+                          - cluster.x-k8s.io
                           type: string
                         resource:
                           description: |-
                             resource is the machine management resource's type.
-                            Valid values are machinesets and controlplanemachinesets.
+                            Valid values are machinesets, controlplanemachinesets and machinedeployments.
                             machinesets means that the machine manager will only register resources of the kind MachineSet.
                             controlplanemachinesets means that the machine manager will only register resources of the kind ControlPlaneMachineSet.
+                            machinedeployments means that the machine manager will only register resources of the kind MachineDeployment.
                           enum:
                           - machinesets
                           - controlplanemachinesets
+                          - machinedeployments
                           type: string
                         selection:
                           description: selection allows granular control of the machine
@@ -248,6 +252,8 @@ spec:
                                 Partial requires specified selector(s) and allows customisation of which resources matched by the machine manager will be updated.
                                 Partial is not permitted for the controlplanemachinesets resource type as they are a singleton within the cluster.
                                 None means that every resource matched by the machine manager will not be updated.
+                                When boot image skew enforcement is in Automatic mode, only All is permitted for the
+                                machinesets and machinedeployments resource types, in any API group.
                               enum:
                               - All
                               - Partial
@@ -328,6 +334,14 @@ spec:
                           ControlPlaneMachineSets
                         rule: self.resource != 'controlplanemachinesets' || self.selection.mode
                           == 'All' || self.selection.mode == 'None'
+                      - message: the machinedeployments resource is only supported
+                          in the cluster.x-k8s.io API group
+                        rule: 'self.resource == ''machinedeployments'' ? self.apiGroup
+                          == ''cluster.x-k8s.io'' : true'
+                      - message: the controlplanemachinesets resource is only supported
+                          in the machine.openshift.io API group
+                        rule: 'self.resource == ''controlplanemachinesets'' ? self.apiGroup
+                          == ''machine.openshift.io'' : true'
                     maxItems: 5
                     type: array
                     x-kubernetes-list-map-keys:
@@ -361,7 +375,7 @@ spec:
                             actions represents the series of commands to be executed on changes to the file at
                             the corresponding file path. Actions will be applied in the order that
                             they are set in this list. If there are other incoming changes to other MachineConfig
-                            entries in the same update that require a reboot, the reboot will supercede these actions.
+                            entries in the same update that require a reboot, the reboot will supersede these actions.
                             Valid actions are Reboot, Drain, Reload, DaemonReload and None.
                             The Reboot action and the None action cannot be used in conjunction with any of the other actions.
                             This list supports a maximum of 10 entries.
@@ -487,7 +501,7 @@ spec:
                           actions represents the series of commands to be executed on changes to the file at
                           the corresponding file path. Actions will be applied in the order that
                           they are set in this list. If there are other incoming changes to other MachineConfig
-                          entries in the same update that require a reboot, the reboot will supercede these actions.
+                          entries in the same update that require a reboot, the reboot will supersede these actions.
                           Valid actions are Reboot, Drain, Reload, DaemonReload and None.
                           The Reboot action and the None action cannot be used in conjunction with any of the other actions.
                           This list supports a maximum of 10 entries.
@@ -606,7 +620,7 @@ spec:
                             actions represents the series of commands to be executed on changes to the file at
                             the corresponding file path. Actions will be applied in the order that
                             they are set in this list. If there are other incoming changes to other MachineConfig
-                            entries in the same update that require a reboot, the reboot will supercede these actions.
+                            entries in the same update that require a reboot, the reboot will supersede these actions.
                             Valid actions are Reboot, Drain, Reload, DaemonReload and None.
                             The Reboot action and the None action cannot be used in conjunction with any of the other actions.
                             This list supports a maximum of 10 entries.
@@ -993,20 +1007,24 @@ spec:
                         apiGroup:
                           description: |-
                             apiGroup is name of the APIGroup that the machine management resource belongs to.
-                            The only current valid value is machine.openshift.io.
+                            Valid values are machine.openshift.io and cluster.x-k8s.io.
                             machine.openshift.io means that the machine manager will only register resources that belong to OpenShift machine API group.
+                            cluster.x-k8s.io means that the machine manager will only register resources that belong to the Cluster API group.
                           enum:
                           - machine.openshift.io
+                          - cluster.x-k8s.io
                           type: string
                         resource:
                           description: |-
                             resource is the machine management resource's type.
-                            Valid values are machinesets and controlplanemachinesets.
+                            Valid values are machinesets, controlplanemachinesets and machinedeployments.
                             machinesets means that the machine manager will only register resources of the kind MachineSet.
                             controlplanemachinesets means that the machine manager will only register resources of the kind ControlPlaneMachineSet.
+                            machinedeployments means that the machine manager will only register resources of the kind MachineDeployment.
                           enum:
                           - machinesets
                           - controlplanemachinesets
+                          - machinedeployments
                           type: string
                         selection:
                           description: selection allows granular control of the machine
@@ -1021,6 +1039,8 @@ spec:
                                 Partial requires specified selector(s) and allows customisation of which resources matched by the machine manager will be updated.
                                 Partial is not permitted for the controlplanemachinesets resource type as they are a singleton within the cluster.
                                 None means that every resource matched by the machine manager will not be updated.
+                                When boot image skew enforcement is in Automatic mode, only All is permitted for the
+                                machinesets and machinedeployments resource types, in any API group.
                               enum:
                               - All
                               - Partial
@@ -1101,6 +1121,14 @@ spec:
                           ControlPlaneMachineSets
                         rule: self.resource != 'controlplanemachinesets' || self.selection.mode
                           == 'All' || self.selection.mode == 'None'
+                      - message: the machinedeployments resource is only supported
+                          in the cluster.x-k8s.io API group
+                        rule: 'self.resource == ''machinedeployments'' ? self.apiGroup
+                          == ''cluster.x-k8s.io'' : true'
+                      - message: the controlplanemachinesets resource is only supported
+                          in the machine.openshift.io API group
+                        rule: 'self.resource == ''controlplanemachinesets'' ? self.apiGroup
+                          == ''machine.openshift.io'' : true'
                     maxItems: 5
                     type: array
                     x-kubernetes-list-map-keys:
@@ -1130,7 +1158,7 @@ spec:
                                 actions represents the series of commands to be executed on changes to the file at
                                 the corresponding file path. Actions will be applied in the order that
                                 they are set in this list. If there are other incoming changes to other MachineConfig
-                                entries in the same update that require a reboot, the reboot will supercede these actions.
+                                entries in the same update that require a reboot, the reboot will supersede these actions.
                                 Valid actions are Reboot, Drain, Reload, DaemonReload and None.
                                 The Reboot action and the None action cannot be used in conjunction with any of the other actions.
                                 This list supports a maximum of 10 entries.
@@ -1255,7 +1283,7 @@ spec:
                               actions represents the series of commands to be executed on changes to the file at
                               the corresponding file path. Actions will be applied in the order that
                               they are set in this list. If there are other incoming changes to other MachineConfig
-                              entries in the same update that require a reboot, the reboot will supercede these actions.
+                              entries in the same update that require a reboot, the reboot will supersede these actions.
                               Valid actions are Reboot, Drain, Reload, DaemonReload and None.
                               The Reboot action and the None action cannot be used in conjunction with any of the other actions.
                               This list supports a maximum of 10 entries.
@@ -1374,7 +1402,7 @@ spec:
                                 actions represents the series of commands to be executed on changes to the file at
                                 the corresponding file path. Actions will be applied in the order that
                                 they are set in this list. If there are other incoming changes to other MachineConfig
-                                entries in the same update that require a reboot, the reboot will supercede these actions.
+                                entries in the same update that require a reboot, the reboot will supersede these actions.
                                 Valid actions are Reboot, Drain, Reload, DaemonReload and None.
                                 The Reboot action and the None action cannot be used in conjunction with any of the other actions.
                                 This list supports a maximum of 10 entries.
@@ -1519,6 +1547,34 @@ spec:
         - spec
         type: object
         x-kubernetes-validations:
+        - message: when skew enforcement is in Automatic mode, any CAPI MachineSet
+            MachineManager must use selection mode 'All'
+          rule: 'self.?status.bootImageSkewEnforcementStatus.mode.orValue("") == ''Automatic''
+            ? !(self.?spec.managedBootImages.machineManagers.hasValue()) || !self.spec.managedBootImages.machineManagers.exists(m,
+            m.resource == ''machinesets'' && m.apiGroup == ''cluster.x-k8s.io'') ||
+            self.spec.managedBootImages.machineManagers.exists(m, m.resource == ''machinesets''
+            && m.apiGroup == ''cluster.x-k8s.io'' && m.selection.mode == ''All'')
+            : true'
+        - message: when skew enforcement is in Automatic mode, managedBootImagesStatus
+            must contain a MachineManager opting in all CAPI MachineSets
+          rule: 'self.?status.bootImageSkewEnforcementStatus.mode.orValue("") == ''Automatic''
+            ? !(self.?status.managedBootImagesStatus.machineManagers.hasValue()) ||
+            self.status.managedBootImagesStatus.machineManagers.exists(m, m.selection.mode
+            == ''All'' && m.resource == ''machinesets'' && m.apiGroup == ''cluster.x-k8s.io''):
+            true'
+        - message: when skew enforcement is in Automatic mode, any CAPI MachineDeployment
+            MachineManager must use selection mode 'All'
+          rule: 'self.?status.bootImageSkewEnforcementStatus.mode.orValue("") == ''Automatic''
+            ? !(self.?spec.managedBootImages.machineManagers.hasValue()) || !self.spec.managedBootImages.machineManagers.exists(m,
+            m.resource == ''machinedeployments'' && m.apiGroup == ''cluster.x-k8s.io'')
+            || self.spec.managedBootImages.machineManagers.exists(m, m.resource ==
+            ''machinedeployments'' && m.selection.mode == ''All'') : true'
+        - message: when skew enforcement is in Automatic mode, managedBootImagesStatus
+            must contain a MachineManager opting in all CAPI MachineDeployments
+          rule: 'self.?status.bootImageSkewEnforcementStatus.mode.orValue("") == ''Automatic''
+            ? !(self.?status.managedBootImagesStatus.machineManagers.hasValue()) ||
+            self.status.managedBootImagesStatus.machineManagers.exists(m, m.selection.mode
+            == ''All'' && m.resource == ''machinedeployments''): true'
         - message: when skew enforcement is in Automatic mode, a boot image configuration
             is required
           rule: 'self.?status.bootImageSkewEnforcementStatus.mode.orValue("") == ''Automatic''
