@@ -1,11 +1,12 @@
 package hypershift
 
 import (
+	"testing"
+
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"testing"
 )
 
 func TestParseHostedControlPlane(t *testing.T) {
@@ -150,7 +151,7 @@ func TestSetRestartDateAnnotation(t *testing.T) {
 		}
 	}
 
-	t.Run("sets annotation on Deployment pod template", func(t *testing.T) {
+	t.Run("sets annotation on Deployment pod template", func(_ *testing.T) {
 		obj := makeObj("apps/v1", "Deployment", "cloud-network-config-controller", hcpNS)
 		err := SetRestartDateAnnotation([]*unstructured.Unstructured{obj}, hcpNS, "2024-01-15T10:30:00Z")
 		g.Expect(err).NotTo(HaveOccurred())
@@ -159,7 +160,7 @@ func TestSetRestartDateAnnotation(t *testing.T) {
 		g.Expect(anno).To(HaveKeyWithValue(RestartDateAnnotation, "2024-01-15T10:30:00Z"))
 	})
 
-	t.Run("sets annotation on DaemonSet pod template", func(t *testing.T) {
+	t.Run("sets annotation on DaemonSet pod template", func(_ *testing.T) {
 		obj := makeObj("apps/v1", "DaemonSet", "ovnkube-node", hcpNS)
 		err := SetRestartDateAnnotation([]*unstructured.Unstructured{obj}, hcpNS, "2024-01-15T10:30:00Z")
 		g.Expect(err).NotTo(HaveOccurred())
@@ -168,7 +169,7 @@ func TestSetRestartDateAnnotation(t *testing.T) {
 		g.Expect(anno).To(HaveKeyWithValue(RestartDateAnnotation, "2024-01-15T10:30:00Z"))
 	})
 
-	t.Run("sets annotation on StatefulSet pod template", func(t *testing.T) {
+	t.Run("sets annotation on StatefulSet pod template", func(_ *testing.T) {
 		obj := makeObj("apps/v1", "StatefulSet", "test-statefulset", hcpNS)
 		err := SetRestartDateAnnotation([]*unstructured.Unstructured{obj}, hcpNS, "2024-01-15T10:30:00Z")
 		g.Expect(err).NotTo(HaveOccurred())
@@ -177,7 +178,7 @@ func TestSetRestartDateAnnotation(t *testing.T) {
 		g.Expect(anno).To(HaveKeyWithValue(RestartDateAnnotation, "2024-01-15T10:30:00Z"))
 	})
 
-	t.Run("skips non-apps/v1 objects", func(t *testing.T) {
+	t.Run("skips non-apps/v1 objects", func(_ *testing.T) {
 		obj := makeObj("v1", "ConfigMap", "test-cm", hcpNS)
 		err := SetRestartDateAnnotation([]*unstructured.Unstructured{obj}, hcpNS, "2024-01-15T10:30:00Z")
 		g.Expect(err).NotTo(HaveOccurred())
@@ -186,7 +187,7 @@ func TestSetRestartDateAnnotation(t *testing.T) {
 		g.Expect(found).To(BeFalse())
 	})
 
-	t.Run("skips objects outside HCP namespace", func(t *testing.T) {
+	t.Run("skips objects outside HCP namespace", func(_ *testing.T) {
 		obj := makeObj("apps/v1", "DaemonSet", "ovnkube-node", "openshift-ovn-kubernetes")
 		err := SetRestartDateAnnotation([]*unstructured.Unstructured{obj}, hcpNS, "2024-01-15T10:30:00Z")
 		g.Expect(err).NotTo(HaveOccurred())
@@ -195,7 +196,7 @@ func TestSetRestartDateAnnotation(t *testing.T) {
 		g.Expect(found).To(BeFalse())
 	})
 
-	t.Run("preserves existing pod template annotations", func(t *testing.T) {
+	t.Run("preserves existing pod template annotations", func(_ *testing.T) {
 		obj := makeObj("apps/v1", "Deployment", "test-deploy", hcpNS)
 		err := unstructured.SetNestedStringMap(obj.Object, map[string]string{"existing": "value"}, "spec", "template", "metadata", "annotations")
 		g.Expect(err).NotTo(HaveOccurred())
@@ -207,7 +208,7 @@ func TestSetRestartDateAnnotation(t *testing.T) {
 		g.Expect(anno).To(HaveKeyWithValue(RestartDateAnnotation, "2024-01-15T10:30:00Z"))
 	})
 
-	t.Run("handles multiple objects", func(t *testing.T) {
+	t.Run("handles multiple objects", func(_ *testing.T) {
 		deploy := makeObj("apps/v1", "Deployment", "cncc", hcpNS)
 		ds := makeObj("apps/v1", "DaemonSet", "multus", hcpNS)
 		cm := makeObj("v1", "ConfigMap", "config", hcpNS)

@@ -40,12 +40,12 @@ func validateVipsWithVips(api, ingress []configv1.IP, elb bool) error {
 	if len(api) > 1 {
 		ok, err := utilnet.IsDualStackIPStrings(ip.IPsToStrings(api))
 		if !ok || err != nil {
-			return fmt.Errorf("with more than 1 API VIP at least one from each IP family is required, err: %v", err)
+			return fmt.Errorf("with more than 1 API VIP at least one from each IP family is required, err: %w", err)
 		}
 
 		ok, err = utilnet.IsDualStackIPStrings(ip.IPsToStrings(ingress))
 		if !ok || err != nil {
-			return fmt.Errorf("with more than 1 Ingress VIP at least one from each IP family is required, err: %v", err)
+			return fmt.Errorf("with more than 1 Ingress VIP at least one from each IP family is required, err: %w", err)
 		}
 	}
 

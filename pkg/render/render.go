@@ -2,6 +2,7 @@ package render
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -130,7 +131,7 @@ func RenderTemplate(path string, d *RenderData) ([]*unstructured.Unstructured, e
 	for {
 		u := unstructured.Unstructured{}
 		if err := decoder.Decode(&u); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return nil, fmt.Errorf("failed to unmarshal manifest %s: %w", path, err)

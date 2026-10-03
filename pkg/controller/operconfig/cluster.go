@@ -9,7 +9,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
-	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/network"
 	"github.com/openshift/cluster-network-operator/pkg/platform"
@@ -26,7 +25,7 @@ import (
 func (r *ReconcileOperConfig) MergeClusterConfig(ctx context.Context, operConfig *operv1.Network, clusterConfig *configv1.Network) error {
 	// Validate cluster config
 	// If invalid just warn and proceed.
-	infraRes, err := platform.InfraStatus(r.client)
+	infraRes, err := platform.InfraStatus(ctx, r.client)
 	if err != nil {
 		log.Printf("WARNING: ignoring Network.config.openshift.io/v1/cluster - failed to get infrastructure status: %v", err)
 		return nil
@@ -60,7 +59,7 @@ func (r *ReconcileOperConfig) UpdateOperConfig(ctx context.Context, operConfig *
 	config.TypeMeta = metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}
 	us, err := k8sutil.ToUnstructured(config)
 	if err != nil {
-		return fmt.Errorf("failed to transmute operator config, err: %v", err)
+		return fmt.Errorf("failed to transmute operator config, err: %w", err)
 	}
 	if err = apply.ApplyObject(ctx, r.client, us, "operconfig"); err != nil {
 		return fmt.Errorf("could not apply (%s) %s/%s, err: %w", operConfig.GroupVersionKind(), operConfig.GetNamespace(), operConfig.GetName(), err)
@@ -70,15 +69,15 @@ func (r *ReconcileOperConfig) UpdateOperConfig(ctx context.Context, operConfig *
 
 // ClusterNetworkStatus generates the cluster config Status based on the operator
 // config.
-func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConfig *operv1.Network, bootstrapResult *bootstrap.BootstrapResult) (*uns.Unstructured, error) {
+func (r *ReconcileOperConfig) ClusterNetworkStatus(ctx context.Context, operConfig *operv1.Network) (*uns.Unstructured, error) {
 	// retrieve the existing cluster config object
 	clusterConfig := &configv1.Network{
 		TypeMeta:   metav1.TypeMeta{APIVersion: configv1.GroupVersion.String(), Kind: "Network"},
-		ObjectMeta: metav1.ObjectMeta{Name: names.CLUSTER_CONFIG},
+		ObjectMeta: metav1.ObjectMeta{Name: names.ClusterConfig},
 	}
 
 	err := r.client.Default().CRClient().Get(ctx, types.NamespacedName{
-		Name: names.CLUSTER_CONFIG,
+		Name: names.ClusterConfig,
 	}, clusterConfig)
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil, nil

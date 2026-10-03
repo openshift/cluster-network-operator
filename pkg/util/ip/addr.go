@@ -38,8 +38,8 @@ func NetsOverlap(a, b net.IPNet) bool {
 
 // lastIP returns the last IP of a subnet
 func lastIP(subnet net.IPNet) net.IP {
-	var end net.IP
-	for i := 0; i < len(subnet.IP); i++ {
+	end := make(net.IP, 0, len(subnet.IP))
+	for i := range subnet.IP {
 		end = append(end, subnet.IP[i]|^subnet.Mask[i])
 	}
 	return end

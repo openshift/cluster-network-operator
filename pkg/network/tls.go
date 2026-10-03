@@ -66,7 +66,7 @@ func addTLSInfoToRenderData(data map[string]any, bootstrapResult *bootstrap.Boot
 }
 
 // GetTLSProfile fetches the TLS profile from either the APIServer (standalone) or HostedControlPlane (HyperShift)
-func GetTLSProfile(client cnoclient.Client, hcp *hypershift.HostedControlPlane) (bootstrap.TLSProfile, error) {
+func GetTLSProfile(ctx context.Context, client cnoclient.Client, hcp *hypershift.HostedControlPlane) (bootstrap.TLSProfile, error) {
 	// For HyperShift, read TLS profile from the already-parsed HostedControlPlane
 	if hcp != nil {
 		if hcp.APIServerSpec == nil {
@@ -78,7 +78,7 @@ func GetTLSProfile(client cnoclient.Client, hcp *hypershift.HostedControlPlane) 
 
 	// For non-HyperShift, read from APIServer CR in the default cluster
 	apiServer := &configv1.APIServer{}
-	if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: openshifttls.APIServerName}, apiServer); err != nil {
+	if err := client.Default().CRClient().Get(ctx, types.NamespacedName{Name: openshifttls.APIServerName}, apiServer); err != nil {
 		return bootstrap.TLSProfile{}, fmt.Errorf("failed to fetch apiserver.config.openshift.io/%s: %w", openshifttls.APIServerName, err)
 	}
 

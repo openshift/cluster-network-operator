@@ -12,23 +12,23 @@ type mockRESTMapper struct {
 	errorToReturn     error
 }
 
-func (m *mockRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
+func (m *mockRESTMapper) KindFor(_ schema.GroupVersionResource) (schema.GroupVersionKind, error) {
 	return schema.GroupVersionKind{}, nil
 }
 
-func (m *mockRESTMapper) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
+func (m *mockRESTMapper) KindsFor(_ schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
 	return nil, nil
 }
 
-func (m *mockRESTMapper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error) {
+func (m *mockRESTMapper) ResourceFor(_ schema.GroupVersionResource) (schema.GroupVersionResource, error) {
 	return schema.GroupVersionResource{}, nil
 }
 
-func (m *mockRESTMapper) ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
+func (m *mockRESTMapper) ResourcesFor(_ schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
 	return nil, nil
 }
 
-func (m *mockRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+func (m *mockRESTMapper) RESTMapping(_ schema.GroupKind, _ ...string) (*meta.RESTMapping, error) {
 	if m.shouldReturnError {
 		return nil, m.errorToReturn
 	}
@@ -42,11 +42,11 @@ func (m *mockRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*
 	}, nil
 }
 
-func (m *mockRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
+func (m *mockRESTMapper) RESTMappings(_ schema.GroupKind, _ ...string) ([]*meta.RESTMapping, error) {
 	return nil, nil
 }
 
-func (m *mockRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
+func (m *mockRESTMapper) ResourceSingularizer(_ string) (singular string, err error) {
 	return "", nil
 }
 

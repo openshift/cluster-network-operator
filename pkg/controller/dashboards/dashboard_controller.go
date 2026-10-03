@@ -37,7 +37,7 @@ var (
 	netstatsContent string
 	//go:embed ovn-health.json
 	ovnHealthContent string
-	dashboardRefs    []dashboardRef = []dashboardRef{
+	dashboardRefs    = []dashboardRef{
 		{
 			name: "grafana-dashboard-network-stats",
 			json: netstatsContent,
@@ -113,16 +113,16 @@ type ReconcileDashboard struct {
 	status *statusmanager.StatusManager
 }
 
-func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileDashboard) Reconcile(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
 	klog.Info("Reconcile dashboards")
 
 	// Fetch the Network.operator.openshift.io instance to get Network Type
 	operConfig := &operv1.Network{TypeMeta: metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"}}
-	err := r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: names.CLUSTER_CONFIG}, operConfig)
+	err := r.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: names.ClusterConfig}, operConfig)
 	if err != nil {
 		err = fmt.Errorf("unable to retrieve Network.operator.openshift.io object: %w", err)
 		klog.Error(err)
-		r.status.MaybeSetDegraded(statusmanager.DashboardConfig, "DashboardError", err.Error())
+		r.status.MaybeSetDegraded(ctx, statusmanager.DashboardConfig, "DashboardError", err.Error())
 		return reconcile.Result{}, err
 	}
 
@@ -130,11 +130,11 @@ func (r *ReconcileDashboard) Reconcile(ctx context.Context, request reconcile.Re
 	if err != nil {
 		err = fmt.Errorf("failed to apply dashboard manifests: %w", err)
 		klog.Error(err)
-		r.status.MaybeSetDegraded(statusmanager.DashboardConfig, "DashboardError", err.Error())
+		r.status.MaybeSetDegraded(ctx, statusmanager.DashboardConfig, "DashboardError", err.Error())
 		return reconcile.Result{}, err
 	}
 
-	r.status.SetNotDegraded(statusmanager.DashboardConfig)
+	r.status.SetNotDegraded(ctx, statusmanager.DashboardConfig)
 
 	return reconcile.Result{}, nil
 }
@@ -143,7 +143,7 @@ func (r *ReconcileDashboard) applyManifests(ctx context.Context, cfg *operv1.Net
 	klog.Info("Applying dashboards manifests")
 	manifests, err := renderManifests(cfg)
 	if err != nil {
-		return fmt.Errorf("could not render dashboards manifests: %v", err)
+		return fmt.Errorf("could not render dashboards manifests: %w", err)
 	}
 	for _, obj := range manifests {
 		if err := apply.ApplyObject(ctx, r.client, obj, "dashboards"); err != nil {

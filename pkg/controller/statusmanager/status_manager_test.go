@@ -60,7 +60,7 @@ func setCO(t *testing.T, client cnoclient.Client, name string) {
 }
 
 func getOC(client cnoclient.Client) (*operv1.Network, error) {
-	return client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OPERATOR_CONFIG, metav1.GetOptions{})
+	return client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OperatorConfig, metav1.GetOptions{})
 }
 
 func getStatuses(client cnoclient.Client, name string) (*configv1.ClusterOperator, *operv1.Network, error) {
@@ -69,7 +69,7 @@ func getStatuses(client cnoclient.Client, name string) (*configv1.ClusterOperato
 	if err != nil {
 		return nil, nil, err
 	}
-	oc, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OPERATOR_CONFIG, metav1.GetOptions{})
+	oc, err := client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OperatorConfig, metav1.GetOptions{})
 	return co, oc, err
 }
 
@@ -89,7 +89,6 @@ func set(t *testing.T, client cnoclient.Client, obj crclient.Object) {
 	err := client.ClientFor("").CRClient().Update(t.Context(), obj)
 	if apierrors.IsNotFound(err) {
 		err = client.ClientFor("").CRClient().Create(t.Context(), obj)
-
 	}
 	if err != nil {
 		t.Fatalf("Failed to set: %v", err)
@@ -105,7 +104,7 @@ func setStatus(t *testing.T, client cnoclient.Client, obj crclient.Object) {
 }
 
 // sl: labels that all status-havers have
-var sl map[string]string = map[string]string{names.GenerateStatusLabel: names.StandAloneClusterName}
+var sl = map[string]string{names.GenerateStatusLabel: names.StandAloneClusterName}
 
 // Tests that the parts of newConditions that are set match what's in oldConditions (but
 // doesn't look at anything else in oldConditions)
@@ -145,7 +144,7 @@ func TestStatusManager_set(t *testing.T) {
 	status.clock = testingclock.NewFakeClock(time.Now())
 
 	// No operator config yet; should reflect this in the cluster operator
-	status.set(false)
+	status.set(t.Context(), false)
 
 	co, err := getCO(client, "testing")
 	if err != nil {
@@ -158,7 +157,7 @@ func TestStatusManager_set(t *testing.T) {
 
 	// make the network.operator object
 	log.Print("Creating Network Operator Config")
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	condUpdate := operv1.OperatorCondition{
@@ -173,7 +172,7 @@ func TestStatusManager_set(t *testing.T) {
 		Message: "Message",
 	}
 	log.Printf("Setting statuses set to degraded")
-	status.set(false, condFail)
+	status.set(t.Context(), false, condFail)
 
 	co, oc, err := getStatuses(client, "testing")
 	if err != nil {
@@ -193,7 +192,7 @@ func TestStatusManager_set(t *testing.T) {
 	}
 
 	log.Print("Setting statuses to progressing")
-	status.set(false, condProgress)
+	status.set(t.Context(), false, condProgress)
 
 	oc, err = getOC(client)
 	if err != nil {
@@ -207,7 +206,7 @@ func TestStatusManager_set(t *testing.T) {
 		Type:   operv1.OperatorStatusTypeDegraded,
 		Status: operv1.ConditionFalse,
 	}
-	status.set(false, condNoFail)
+	status.set(t.Context(), false, condNoFail)
 
 	oc, err = getOC(client)
 	if err != nil {
@@ -225,7 +224,7 @@ func TestStatusManager_set(t *testing.T) {
 		Type:   operv1.OperatorStatusTypeAvailable,
 		Status: operv1.ConditionTrue,
 	}
-	status.set(true, condNoProgress, condAvailable)
+	status.set(t.Context(), true, condNoProgress, condAvailable)
 
 	oc, err = getOC(client)
 	if err != nil {
@@ -273,7 +272,7 @@ func TestStatusManager_set(t *testing.T) {
 			Name:     "related",
 		},
 	}
-	status.deleteRelatedObjectsNotRendered(co)
+	status.deleteRelatedObjectsNotRendered(t.Context(), co)
 	err = status.client.ClientFor("").CRClient().Get(t.Context(), types.NamespacedName{Name: "current"}, obj)
 	if err == nil {
 		t.Fatalf("unexpected related object in ClusterOperator object was not deleted")
@@ -288,7 +287,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	if !apierrors.IsNotFound(err) {
 		t.Fatalf("unexpected error (expected Not Found): %v", err)
 	}
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	condUpdate := operv1.OperatorCondition{
@@ -313,7 +312,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 
 	// Initial failure status - backdate so it sets Degraded immediately
 	status.failureFirstSeen[OperatorConfig] = time.Now().Add(-3 * time.Minute)
-	status.SetDegraded(OperatorConfig, "Operator", "")
+	status.SetDegraded(t.Context(), OperatorConfig, "Operator", "")
 	oc, err := getOC(client)
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -324,7 +323,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 
 	// Setting a higher-level status should override it - backdate this one too
 	status.failureFirstSeen[ClusterConfig] = time.Now().Add(-3 * time.Minute)
-	status.SetDegraded(ClusterConfig, "Cluster", "")
+	status.SetDegraded(t.Context(), ClusterConfig, "Cluster", "")
 	oc, err = getOC(client)
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -335,7 +334,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 
 	// Setting a lower-level status should be ignored - backdate
 	status.failureFirstSeen[PodDeployment] = time.Now().Add(-3 * time.Minute)
-	status.SetDegraded(PodDeployment, "Pods", "")
+	status.SetDegraded(t.Context(), PodDeployment, "Pods", "")
 	oc, err = getOC(client)
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -345,7 +344,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	}
 
 	// Clearing an unseen status should have no effect
-	status.SetNotDegraded(OperatorConfig)
+	status.SetNotDegraded(t.Context(), OperatorConfig)
 	oc, err = getOC(client)
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -355,7 +354,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	}
 
 	// Clearing the currently-seen status should reveal the higher-level status
-	status.SetNotDegraded(ClusterConfig)
+	status.SetNotDegraded(t.Context(), ClusterConfig)
 	oc, err = getOC(client)
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -365,7 +364,7 @@ func TestStatusManagerSetDegraded(t *testing.T) {
 	}
 
 	// Clearing all failing statuses should result in not failing
-	status.SetNotDegraded(PodDeployment)
+	status.SetNotDegraded(t.Context(), PodDeployment)
 	oc, err = getOC(client)
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -380,14 +379,14 @@ func TestStatusManagerMaybeSetDegradedDebouncing(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 	setCO(t, client, "testing")
 
-	status.SetNotDegraded(OperatorConfig)
+	status.SetNotDegraded(t.Context(), OperatorConfig)
 
 	// First call should not set Degraded
-	status.MaybeSetDegraded(OperatorConfig, "TestFailure", "Test failure message")
+	status.MaybeSetDegraded(t.Context(), OperatorConfig, "TestFailure", "Test failure message")
 	oc, err := getOC(client)
 	if err != nil {
 		t.Fatalf("error getting OperatorConfig: %v", err)
@@ -398,7 +397,7 @@ func TestStatusManagerMaybeSetDegradedDebouncing(t *testing.T) {
 
 	// After debounce threshold, should set Degraded
 	status.clock.(*testingclock.FakeClock).Step(3 * time.Minute)
-	status.MaybeSetDegraded(OperatorConfig, "TestFailure", "Test failure message")
+	status.MaybeSetDegraded(t.Context(), OperatorConfig, "TestFailure", "Test failure message")
 	oc, err = getOC(client)
 	if err != nil {
 		t.Fatalf("error getting OperatorConfig: %v", err)
@@ -408,7 +407,7 @@ func TestStatusManagerMaybeSetDegradedDebouncing(t *testing.T) {
 	}
 
 	// Clearing the status should work
-	status.SetNotDegraded(OperatorConfig)
+	status.SetNotDegraded(t.Context(), OperatorConfig)
 	oc, err = getOC(client)
 	if err != nil {
 		t.Fatalf("error getting OperatorConfig: %v", err)
@@ -424,14 +423,14 @@ func TestStatusManagerMaybeSetDegradedMultipleLevels(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 	setCO(t, client, "testing")
 
-	status.SetNotDegraded(OperatorConfig)
-	status.SetNotDegraded(ProxyConfig)
+	status.SetNotDegraded(t.Context(), OperatorConfig)
+	status.SetNotDegraded(t.Context(), ProxyConfig)
 
-	status.MaybeSetDegraded(OperatorConfig, "TestFailure", "OperatorConfig failure")
+	status.MaybeSetDegraded(t.Context(), OperatorConfig, "TestFailure", "OperatorConfig failure")
 	oc, err := getOC(client)
 	if err != nil {
 		t.Fatalf("error getting OperatorConfig: %v", err)
@@ -441,10 +440,10 @@ func TestStatusManagerMaybeSetDegradedMultipleLevels(t *testing.T) {
 	}
 
 	status.clock.(*testingclock.FakeClock).Step(1 * time.Minute)
-	status.MaybeSetDegraded(ProxyConfig, "TestFailure", "ProxyConfig failure")
+	status.MaybeSetDegraded(t.Context(), ProxyConfig, "TestFailure", "ProxyConfig failure")
 
 	status.clock.(*testingclock.FakeClock).Step(1 * time.Minute)
-	status.MaybeSetDegraded(OperatorConfig, "TestFailure", "OperatorConfig failure")
+	status.MaybeSetDegraded(t.Context(), OperatorConfig, "TestFailure", "OperatorConfig failure")
 	oc, err = getOC(client)
 	if err != nil {
 		t.Fatalf("error getting OperatorConfig: %v", err)
@@ -454,7 +453,7 @@ func TestStatusManagerMaybeSetDegradedMultipleLevels(t *testing.T) {
 	}
 
 	status.clock.(*testingclock.FakeClock).Step(1 * time.Minute)
-	status.MaybeSetDegraded(ProxyConfig, "TestFailure", "ProxyConfig failure")
+	status.MaybeSetDegraded(t.Context(), ProxyConfig, "TestFailure", "ProxyConfig failure")
 	oc, err = getOC(client)
 	if err != nil {
 		t.Fatalf("error getting OperatorConfig: %v", err)
@@ -464,7 +463,7 @@ func TestStatusManagerMaybeSetDegradedMultipleLevels(t *testing.T) {
 		t.Fatalf("OperatorConfig should still be the degraded reason, got: %v", degradedCond)
 	}
 
-	status.SetNotDegraded(OperatorConfig)
+	status.SetNotDegraded(t.Context(), OperatorConfig)
 	oc, err = getOC(client)
 	if err != nil {
 		t.Fatalf("error getting OperatorConfig: %v", err)
@@ -480,14 +479,14 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
 	status.clock = testingclock.NewFakeClock(time.Now())
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig},
 		Spec: operv1.NetworkSpec{DefaultNetwork: operv1.DefaultNetworkDefinition{
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}}}}}
 	setOC(t, client, no)
 	setCO(t, client, "testing")
 
 	mcPools := []mcfgv1.MachineConfigPool{}
-	err := status.SetFromMachineConfigPool(mcPools)
+	err := status.SetFromMachineConfigPool(t.Context(), mcPools)
 	if err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
 	}
@@ -518,7 +517,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		Status: mcfgv1.MachineConfigPoolStatus{Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
 			Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}}
 	mcPools = append(mcPools, masterIPsecmachineConfigPool)
-	err = status.SetFromMachineConfigPool(mcPools)
+	err = status.SetFromMachineConfigPool(t.Context(), mcPools)
 	if err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
 	}
@@ -562,7 +561,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 		Status: mcfgv1.MachineConfigPoolStatus{Conditions: []mcfgv1.MachineConfigPoolCondition{{Type: mcfgv1.MachineConfigPoolDegraded,
 			Status: v1.ConditionTrue}}}}
 	mcPools = append(mcPools, workerIPsecMachineConfigPool)
-	err = status.SetFromMachineConfigPool(mcPools)
+	err = status.SetFromMachineConfigPool(t.Context(), mcPools)
 	if err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
 	}
@@ -585,7 +584,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	// Update MachineConfigPool with progressing condition and ensure network operator is moved from degraded state into progressing state.
 	workerIPsecMachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{Conditions: []mcfgv1.MachineConfigPoolCondition{{Type: mcfgv1.MachineConfigPoolUpdating,
 		Status: v1.ConditionTrue}}}
-	err = status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+	err = status.SetFromMachineConfigPool(t.Context(), []mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
 		workerIPsecMachineConfigPool})
 	if err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
@@ -609,7 +608,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	// Clear MachineConfigPool progressing condition and ensure network operator is no longer either in degraded or progressing state.
 	workerIPsecMachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
 		Source: []v1.ObjectReference{{Name: workerMachineConfigIPsecExtName}}}}
-	err = status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+	err = status.SetFromMachineConfigPool(t.Context(), []mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
 		workerIPsecMachineConfigPool})
 	if err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
@@ -646,7 +645,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	}
 	// No updated to worker machine config pool, so status condition moving into
 	// progressing state.
-	err = status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+	err = status.SetFromMachineConfigPool(t.Context(), []mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
 		workerIPsecMachineConfigPool})
 	if err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
@@ -669,7 +668,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	// Update worker machine config pool status with empty source, now status
 	// condition moves into ready state.
 	workerIPsecMachineConfigPool.Status.Configuration.Source = []v1.ObjectReference{}
-	err = status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+	err = status.SetFromMachineConfigPool(t.Context(), []mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
 		workerIPsecMachineConfigPool})
 	if err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
@@ -706,7 +705,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	masterIPsecmachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{Conditions: []mcfgv1.MachineConfigPoolCondition{{Type: mcfgv1.MachineConfigPoolDegraded,
 		Status: v1.ConditionTrue}}, Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
 		Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}
-	err = status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+	err = status.SetFromMachineConfigPool(t.Context(), []mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
 		workerIPsecMachineConfigPool})
 	if err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
@@ -730,7 +729,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	// condition moves into progressing state.
 	masterIPsecmachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{Configuration: mcfgv1.MachineConfigPoolStatusConfiguration{
 		Source: []v1.ObjectReference{{Name: masterMachineConfigIPsecExtName}}}}
-	err = status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+	err = status.SetFromMachineConfigPool(t.Context(), []mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
 		workerIPsecMachineConfigPool})
 	if err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
@@ -761,7 +760,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	// Update master machine config pool status with empty source, now status
 	// condition moves into ready state.
 	masterIPsecmachineConfigPool.Status.Configuration.Source = []v1.ObjectReference{}
-	err = status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+	err = status.SetFromMachineConfigPool(t.Context(), []mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
 		workerIPsecMachineConfigPool})
 	if err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
@@ -794,7 +793,7 @@ func TestStatusManagerSetFromIPsecConfigs(t *testing.T) {
 	// doesn't go into degraded state.
 	masterIPsecmachineConfigPool.Status = mcfgv1.MachineConfigPoolStatus{Conditions: []mcfgv1.MachineConfigPoolCondition{{Type: mcfgv1.MachineConfigPoolDegraded,
 		Status: v1.ConditionTrue}}}
-	err = status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
+	err = status.SetFromMachineConfigPool(t.Context(), []mcfgv1.MachineConfigPool{masterIPsecmachineConfigPool,
 		workerIPsecMachineConfigPool})
 	if err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
@@ -828,7 +827,7 @@ func TestStatusManagerSetFromMachineConfigPoolIgnoresNodeRebootChurn(t *testing.
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig},
 		Spec: operv1.NetworkSpec{DefaultNetwork: operv1.DefaultNetworkDefinition{
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}}}}}
 	setOC(t, client, no)
@@ -860,7 +859,7 @@ func TestStatusManagerSetFromMachineConfigPoolIgnoresNodeRebootChurn(t *testing.
 			}},
 		},
 	}
-	if err := status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{masterPool}); err != nil {
+	if err := status.SetFromMachineConfigPool(t.Context(), []mcfgv1.MachineConfigPool{masterPool}); err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
 	}
 
@@ -880,7 +879,7 @@ func TestStatusManagerSetFromMachineConfigPoolWaitsForAllMatchingPoolsOnRemoval(
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig},
 		Spec: operv1.NetworkSpec{DefaultNetwork: operv1.DefaultNetworkDefinition{
 			OVNKubernetesConfig: &operv1.OVNKubernetesConfig{IPsecConfig: &operv1.IPsecConfig{Mode: operv1.IPsecModeFull}}}}}
 	setOC(t, client, no)
@@ -916,7 +915,7 @@ func TestStatusManagerSetFromMachineConfigPoolWaitsForAllMatchingPoolsOnRemoval(
 			},
 		},
 	}
-	if err := status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{workerPool, customWorkerPool}); err != nil {
+	if err := status.SetFromMachineConfigPool(t.Context(), []mcfgv1.MachineConfigPool{workerPool, customWorkerPool}); err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
 	}
 
@@ -925,7 +924,7 @@ func TestStatusManagerSetFromMachineConfigPoolWaitsForAllMatchingPoolsOnRemoval(
 	}
 
 	customWorkerPool.Status.Configuration.Source = nil
-	if err := status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{workerPool, customWorkerPool}); err != nil {
+	if err := status.SetFromMachineConfigPool(t.Context(), []mcfgv1.MachineConfigPool{workerPool, customWorkerPool}); err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
 	}
 
@@ -954,7 +953,7 @@ func TestStatusManagerSetFromMachineConfigPoolWaitsForAllMatchingPoolsOnRemoval(
 	}
 
 	workerPool.Status.Configuration.Source = nil
-	if err := status.SetFromMachineConfigPool([]mcfgv1.MachineConfigPool{workerPool, customWorkerPool}); err != nil {
+	if err := status.SetFromMachineConfigPool(t.Context(), []mcfgv1.MachineConfigPool{workerPool, customWorkerPool}); err != nil {
 		t.Fatalf("error processing machine config pools: %v", err)
 	}
 
@@ -988,10 +987,10 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 	co, oc, err := getStatuses(client, "testing")
 	if err != nil {
 		t.Fatalf("error getting ClusterOperator: %v", err)
@@ -1030,7 +1029,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}
 	set(t, client, dsB)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	// Since the DaemonSet.Status reports no pods Available, the status should be Progressing
 	co, oc, err = getStatuses(client, "testing")
@@ -1086,7 +1085,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	for dsA.Status.NumberUnavailable > 0 || dsB.Status.NumberUnavailable > 0 {
 		setStatus(t, client, dsA)
 		setStatus(t, client, dsB)
-		status.SetFromPods()
+		status.SetFromPods(t.Context())
 
 		co, oc, err = getStatuses(client, "testing")
 		if err != nil {
@@ -1140,7 +1139,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	setStatus(t, client, dsA)
 	setStatus(t, client, dsB)
 	time.Sleep(1 * time.Second) // minimum transition time fidelity
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1185,7 +1184,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	// Progressing until the daemonset status starts to reflect rollout work.
 	dsA.Generation = 2
 	set(t, client, dsA)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1226,7 +1225,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		ObservedGeneration:     2,
 	}
 	setStatus(t, client, dsA)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1266,7 +1265,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		ObservedGeneration:     2,
 	}
 	setStatus(t, client, dsA)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1308,7 +1307,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	}
 	setStatus(t, client, dsA)
 
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1362,7 +1361,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		UpdatedNumberScheduled: 1,
 	}
 	setStatus(t, client, dsA)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	// see that the pod state is sensible
 	co, oc, err = getStatuses(client, "testing")
@@ -1419,7 +1418,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		},
 	}
 	set(t, client, dsNC)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	// Non-critical daemonsets that are merely unavailable after install should not
 	// move the operator into Progressing without an actual rollout in flight.
@@ -1461,7 +1460,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 		}
 	}
 	setLastPodState(t, client, "testing", ps)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1497,7 +1496,7 @@ func TestStatusManagerSetFromDaemonSets(t *testing.T) {
 	dsNC.Status.DesiredNumberScheduled = 1
 	dsNC.Status.UpdatedNumberScheduled = 1
 	setStatus(t, client, dsNC)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1533,7 +1532,7 @@ func TestStatusManagerIgnoresDaemonSetNodeScaleChurnAfterInstall(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	ds := &appsv1.DaemonSet{
@@ -1553,7 +1552,7 @@ func TestStatusManagerIgnoresDaemonSetNodeScaleChurnAfterInstall(t *testing.T) {
 		},
 	}
 	set(t, client, ds)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	_, oc, err := getStatuses(client, "testing")
 	if err != nil {
@@ -1585,7 +1584,7 @@ func TestStatusManagerIgnoresDaemonSetNodeScaleChurnAfterInstall(t *testing.T) {
 	ds.Status.DesiredNumberScheduled = 2
 	ds.Status.NumberUnavailable = 1
 	setStatus(t, client, ds)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	_, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1623,10 +1622,10 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err := getStatuses(client, "testing")
 	if err != nil {
@@ -1649,7 +1648,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depA := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Labels: sl}}
 	set(t, client, depA)
 
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1687,7 +1686,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depA.Status.UnavailableReplicas = 0
 	depA.Status.AvailableReplicas = depA.Status.Replicas
 	setStatus(t, client, depA)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1741,7 +1740,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	}
 	set(t, client, ds)
 
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1795,7 +1794,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	t0 := time.Now()
 	time.Sleep(time.Second / 10)
 	setStatus(t, client, depB)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1851,11 +1850,11 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depB.Status.ObservedGeneration = depB.Generation
 
 	setStatus(t, client, depB)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	// RolloutHung is debounced for 2 min, so advance clock and call again
 	status.clock.(*testingclock.FakeClock).Step(3 * time.Minute)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1899,7 +1898,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depB.Status.AvailableReplicas = depB.Status.Replicas
 	depB.Status.ObservedGeneration = depB.Generation
 	setStatus(t, client, depB)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1937,7 +1936,7 @@ func TestStatusManagerSetFromDeployments(t *testing.T) {
 	depB.Status.UnavailableReplicas = 1
 	depB.Status.AvailableReplicas = 0
 	setStatus(t, client, depB)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	_, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -1972,7 +1971,7 @@ func TestStatusManagerRestoresInstallCompleteAfterRestart(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	depA := &appsv1.Deployment{
@@ -1987,7 +1986,7 @@ func TestStatusManagerRestoresInstallCompleteAfterRestart(t *testing.T) {
 	}
 	set(t, client, depA)
 
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	ps := getLastPodState(t, client, "testing")
 	if !ps.InstallComplete {
@@ -2017,7 +2016,7 @@ func TestStatusManagerRestoresInstallCompleteAfterRestart(t *testing.T) {
 	restarted := New(client, "testing", names.StandAloneClusterName)
 	restarted.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(restarted)
-	restarted.SetFromPods()
+	restarted.SetFromPods(t.Context())
 
 	_, oc, err := getStatuses(client, "testing")
 	if err != nil {
@@ -2050,7 +2049,7 @@ func TestStatusManagerRestoresInstallCompleteFromLegacyAnnotation(t *testing.T) 
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	depA := &appsv1.Deployment{
@@ -2065,7 +2064,7 @@ func TestStatusManagerRestoresInstallCompleteFromLegacyAnnotation(t *testing.T) 
 	}
 	set(t, client, depA)
 
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	ps := getLastPodState(t, client, "testing")
 	legacyPodState := struct {
@@ -2113,7 +2112,7 @@ func TestStatusManagerRestoresInstallCompleteFromLegacyAnnotation(t *testing.T) 
 	restarted := New(client, "testing", names.StandAloneClusterName)
 	restarted.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(restarted)
-	restarted.SetFromPods()
+	restarted.SetFromPods(t.Context())
 
 	if !restarted.installComplete {
 		t.Fatal("expected installComplete to be restored from ClusterOperator availability when legacy annotation omits it")
@@ -2150,7 +2149,7 @@ func TestStatusManagerRestoresActiveRolloutAfterRestart(t *testing.T) {
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	depA := &appsv1.Deployment{
@@ -2164,7 +2163,7 @@ func TestStatusManagerRestoresActiveRolloutAfterRestart(t *testing.T) {
 		},
 	}
 	set(t, client, depA)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	depB := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "beta", Generation: 1, Labels: sl},
@@ -2182,7 +2181,7 @@ func TestStatusManagerRestoresActiveRolloutAfterRestart(t *testing.T) {
 		},
 	}
 	set(t, client, depB)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	depB.Status.UpdatedReplicas = depB.Status.Replicas
 	depB.Status.AvailableReplicas = 0
@@ -2193,7 +2192,7 @@ func TestStatusManagerRestoresActiveRolloutAfterRestart(t *testing.T) {
 	restarted := New(client, "testing", names.StandAloneClusterName)
 	restarted.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(restarted)
-	restarted.SetFromPods()
+	restarted.SetFromPods(t.Context())
 
 	_, oc, err := getStatuses(client, "testing")
 	if err != nil {
@@ -2229,7 +2228,7 @@ func TestStatusManagerRestoresStatefulSetActiveRolloutAfterRestart(t *testing.T)
 	status := New(client, "testing", names.StandAloneClusterName)
 	status.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	ssA := &appsv1.StatefulSet{
@@ -2243,7 +2242,7 @@ func TestStatusManagerRestoresStatefulSetActiveRolloutAfterRestart(t *testing.T)
 		},
 	}
 	set(t, client, ssA)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	ssB := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "beta", Generation: 1, Labels: sl},
@@ -2261,7 +2260,7 @@ func TestStatusManagerRestoresStatefulSetActiveRolloutAfterRestart(t *testing.T)
 		},
 	}
 	set(t, client, ssB)
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	ssB.Status.UpdatedReplicas = ssB.Status.Replicas
 	ssB.Status.ReadyReplicas = ssB.Status.Replicas - 1
@@ -2272,7 +2271,7 @@ func TestStatusManagerRestoresStatefulSetActiveRolloutAfterRestart(t *testing.T)
 	restarted := New(client, "testing", names.StandAloneClusterName)
 	restarted.clock = testingclock.NewFakeClock(time.Now())
 	setFakeListers(restarted)
-	restarted.SetFromPods()
+	restarted.SetFromPods(t.Context())
 
 	_, oc, err := getStatuses(client, "testing")
 	if err != nil {
@@ -2342,7 +2341,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
 	dsA := &appsv1.DaemonSet{
@@ -2410,13 +2409,13 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	set(t, client, podB)
 
 	expected := []string{"DaemonSet \"/one/alpha\" rollout is not making progress - pod alpha-x0x0 is in CrashLoopBackOff State"}
-	hung := status.CheckCrashLoopBackOffPods(ClusteredName{Namespace: "one", Name: "alpha"}, map[string]string{"app": "alpha"}, "DaemonSet")
+	hung := status.CheckCrashLoopBackOffPods(t.Context(), ClusteredName{Namespace: "one", Name: "alpha"}, map[string]string{"app": "alpha"}, "DaemonSet")
 	if !reflect.DeepEqual(hung, expected) {
 		t.Fatalf("unexpected value in hung %v", hung)
 	}
 
 	expected = []string{}
-	hung = status.CheckCrashLoopBackOffPods(ClusteredName{Namespace: "two", Name: "beta"}, map[string]string{"app": "beta"}, "DaemonSet")
+	hung = status.CheckCrashLoopBackOffPods(t.Context(), ClusteredName{Namespace: "two", Name: "beta"}, map[string]string{"app": "beta"}, "DaemonSet")
 	if !reflect.DeepEqual(hung, expected) {
 		t.Fatalf("unexpected value in hung %v", hung)
 	}
@@ -2467,7 +2466,7 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	}
 	set(t, client, podnC)
 
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	oc, err := getOC(client)
 	if err != nil {
@@ -2536,14 +2535,14 @@ func TestStatusManagerCheckCrashLoopBackOffPods(t *testing.T) {
 	set(t, client, podC)
 
 	// First call to SetFromPods() will record the failure but not set Degraded yet
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	// Simulate time passing beyond the degraded threshold by setting failure first-seen time
 	// to 3 minutes ago
 	status.failureFirstSeen[PodCrashLoopBackOff] = time.Now().Add(-3 * time.Minute)
 
 	// Second call to SetFromPods() will now set Degraded since the failure has persisted
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	oc, err = getOC(client)
 	if err != nil {
@@ -2594,9 +2593,9 @@ func TestStatusManagerHyperShift(t *testing.T) {
 	mgmtClient := fake.NewFakeClient()
 	mgmtStatus := New(mgmtClient, "testing", names.StandAloneClusterName)
 	setFakeListers(mgmtStatus)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, mgmtClient, no)
-	mgmtStatus.set(true, validConditions...)
+	mgmtStatus.set(t.Context(), true, validConditions...)
 
 	// Create valid minimal Deployment in the management cluster
 	depMgmt := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alpha", Labels: sl}, Status: appsv1.DeploymentStatus{
@@ -2621,7 +2620,7 @@ func TestStatusManagerHyperShift(t *testing.T) {
 		}}
 	set(t, mgmtClient, depHCP)
 
-	mgmtStatus.SetFromPods()
+	mgmtStatus.SetFromPods(t.Context())
 
 	// mgmt conditions should not reflect the failures in hosted clusters namespace
 	oc, err := getOC(mgmtClient)
@@ -2654,10 +2653,10 @@ func TestStatusManagerSetFromDeploymentsWithExcluded(t *testing.T) {
 	client := fake.NewFakeClient()
 	status := New(client, "testing", names.StandAloneClusterName)
 	setFakeListers(status)
-	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG}}
+	no := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig}}
 	setOC(t, client, no)
 
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err := getStatuses(client, "testing")
 	if err != nil {
@@ -2692,7 +2691,7 @@ func TestStatusManagerSetFromDeploymentsWithExcluded(t *testing.T) {
 	}}
 	set(t, client, depB)
 
-	status.SetFromPods()
+	status.SetFromPods(t.Context())
 
 	co, oc, err = getStatuses(client, "testing")
 	if err != nil {
@@ -2721,7 +2720,6 @@ func TestStatusManagerSetFromDeploymentsWithExcluded(t *testing.T) {
 	if len(co.Status.Versions) != 1 {
 		t.Fatalf("unexpected Status.Versions: %#v", co.Status.Versions)
 	}
-
 }
 
 func networkOwnerRef() []metav1.OwnerReference {

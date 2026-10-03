@@ -67,7 +67,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	// initialize the controller-runtime environment
 	o.manager, err = manager.New(o.client.Default().Config(), manager.Options{
-		MapperProvider: func(cfg *rest.Config, httpClient *http.Client) (meta.RESTMapper, error) {
+		MapperProvider: func(_ *rest.Config, _ *http.Client) (meta.RESTMapper, error) {
 			return o.client.Default().RESTMapper(), nil
 		},
 		Metrics: metricsserver.Options{BindAddress: "0"},
@@ -91,8 +91,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		infraConfig := &configv1.Infrastructure{}
 
 		err := retry.OnError(backoff, func(error) bool { return true }, func() error {
-			if err := o.client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
-				return fmt.Errorf("failed to get infrastructure 'cluster': %v", err)
+			if err := o.client.Default().CRClient().Get(ctx, types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
+				return fmt.Errorf("failed to get infrastructure 'cluster': %w", err)
 			}
 			if infraConfig.Status.InfrastructureName == "" {
 				return fmt.Errorf("infrastructureName not set in infrastructure 'cluster'")
@@ -100,7 +100,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			return nil
 		})
 		if err != nil {
-			return fmt.Errorf("failed to get infrastructure name: %v", err)
+			return fmt.Errorf("failed to get infrastructure name: %w", err)
 		}
 		cluster = infraConfig.Status.InfrastructureName
 	}
@@ -125,7 +125,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controllerConfig.EventRecorder,
 	)
 
-	go featureGateAccessor.Run(context.TODO())
+	go featureGateAccessor.Run(ctx)
 	go configInformers.Start(wait.NeverStop)
 	klog.Infof("Waiting for feature gates initialization...")
 	select {

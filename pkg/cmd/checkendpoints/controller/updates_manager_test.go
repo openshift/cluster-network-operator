@@ -10,7 +10,6 @@ import (
 )
 
 func TestUpdatesManager_Add(t *testing.T) {
-
 	testcases := []struct {
 		name            string
 		lastTimestamp   time.Time
@@ -174,7 +173,6 @@ func TestUpdatesManager_Add(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			updatesManager := updatesManager{
 				checkPeriod:     1 * time.Second,
 				checkTimeout:    10 * time.Second,
@@ -186,7 +184,6 @@ func TestUpdatesManager_Add(t *testing.T) {
 			var updateResults []time.Time
 
 			for _, timestamp := range tc.timestamps {
-
 				updatesManager.Add(
 					timestamp, func(ts time.Time) v1alpha1helpers.UpdateStatusFunc {
 						return func(_ *v1alpha1.PodNetworkConnectivityCheckStatus) {
@@ -202,9 +199,7 @@ func TestUpdatesManager_Add(t *testing.T) {
 			t.Log(updatesManager.processingQueue)
 			t.Log(updateResults)
 
-			assert.EqualValues(t, tc.expectedUpdates, updateResults)
-
+			assert.Equal(t, tc.expectedUpdates, updateResults)
 		})
 	}
-
 }

@@ -8,19 +8,17 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"time"
 
 	"github.com/openshift/cluster-network-operator/pkg/apply"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
-	"path/filepath"
-	"reflect"
-	"strings"
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
@@ -37,12 +35,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// Attach control loop to the manager and watch for Egress Router objects
+// Add attaches control loop to the manager and watch for Egress Router objects
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, cli cnoclient.Client, _ featuregates.FeatureGate) error {
-	r, err := newEgressRouterReconciler(mgr, status, cli)
-	if err != nil {
-		return err
-	}
+	r := newEgressRouterReconciler(mgr, status, cli)
 
 	// Create a new controller
 	c, err := controller.New("egress-router-controller", mgr, controller.Options{Reconciler: r})
@@ -77,8 +72,7 @@ type EgressRouterReconciler struct {
 
 var ResyncPeriod = 5 * time.Minute
 
-func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) (reconcile.Reconciler, error) {
-
+func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) reconcile.Reconciler {
 	return &EgressRouterReconciler{
 		mgr:    mgr,
 		status: status,
@@ -86,10 +80,10 @@ func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.Status
 
 		egressrouters:    map[types.NamespacedName]*egressrouter{},
 		egressrouterErrs: map[types.NamespacedName]error{},
-	}, nil
+	}
 }
 
-func (r EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	klog.Infof("Reconciling egressrouter.network.operator.openshift.io %s\n", request.NamespacedName)
 
@@ -119,7 +113,7 @@ func (r EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile
 		klog.Infof("Creating a new Egress Router")
 		// Set owner reference to the controller
 		boolTrue := bool(true)
-		EgressRouterOwnerReferences := []metav1.OwnerReference{
+		egressRouterOwnerReferences := []metav1.OwnerReference{
 			{
 				APIVersion: "network.operator.openshift.io/v1",
 				Kind:       "EgressRouter",
@@ -128,13 +122,13 @@ func (r EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile
 				Controller: &boolTrue,
 			},
 		}
-		err := r.ensureEgressRouter(ctx, manifestDir, request.Namespace, obj, EgressRouterOwnerReferences)
+		err := r.ensureEgressRouter(ctx, manifestDir, request.Namespace, obj, egressRouterOwnerReferences)
 
 		if err != nil {
 			klog.Error(err)
 			r.egressrouterErrs[request.NamespacedName] =
 				fmt.Errorf("could not reconcile Egress Router %s: %w", request.NamespacedName, err)
-			r.setStatus()
+			r.setStatus(ctx)
 			return reconcile.Result{}, err
 		}
 
@@ -145,36 +139,36 @@ func (r EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile
 		klog.Error(err)
 		r.egressrouterErrs[request.NamespacedName] =
 			fmt.Errorf("could not reconcile Egress Router %s: %w", request.NamespacedName, err)
-		r.setStatus()
+		r.setStatus(ctx)
 		return reconcile.Result{}, err
 	}
 
 	klog.Infof("successful reconciliation")
 	delete(r.egressrouterErrs, request.NamespacedName)
-	r.setStatus()
+	r.setStatus(ctx)
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
 }
 
 // setStatus summarizes the status of all Egress Router objects and updates the statusmanager
 // as appropriate.
-func (r *EgressRouterReconciler) setStatus() {
+func (r *EgressRouterReconciler) setStatus(ctx context.Context) {
 	if len(r.egressrouterErrs) == 0 {
-		r.status.SetNotDegraded(statusmanager.EgressRouterConfig)
+		r.status.SetNotDegraded(ctx, statusmanager.EgressRouterConfig)
 	} else {
-		msgs := []string{}
+		msgs := make([]string, 0, len(r.egressrouterErrs))
 		for _, e := range r.egressrouterErrs {
 			msgs = append(msgs, e.Error())
 		}
-		r.status.MaybeSetDegraded(statusmanager.EgressRouterConfig, "EgressRouterError", strings.Join(msgs, ", "))
+		r.status.MaybeSetDegraded(ctx, statusmanager.EgressRouterConfig, "EgressRouterError", strings.Join(msgs, ", "))
 	}
 }
 
 // getAllowedDestinationsConfigJSONi generates AllowedDestinations json config
 // order of the fields need to match egress-route-cni macvlan module
-func getAllowedDestinationsConfigJSON(RedirectRules []netopv1.L4RedirectRule) (string, error) {
-	config := make([]string, len(RedirectRules))
+func getAllowedDestinationsConfigJSON(redirectRules []netopv1.L4RedirectRule) (string, error) {
+	config := make([]string, len(redirectRules))
 
-	for idx, rule := range RedirectRules {
+	for idx, rule := range redirectRules {
 		if rule.Port != 0 && len(rule.Protocol) != 0 {
 			if rule.TargetPort != 0 {
 				config[idx] = fmt.Sprintf("%d %s %s %d", rule.Port, rule.Protocol, rule.DestinationIP, rule.TargetPort)
@@ -188,18 +182,17 @@ func getAllowedDestinationsConfigJSON(RedirectRules []netopv1.L4RedirectRule) (s
 
 	jsonByte, err := json.Marshal(config)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	return string(jsonByte), nil
 }
 
-func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifestDir string, namespace string, router *netopv1.EgressRouter, EgressRouterOwnerReferences []metav1.OwnerReference) error {
+func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifestDir string, namespace string, router *netopv1.EgressRouter, egressRouterOwnerReferences []metav1.OwnerReference) error {
 	var err error
 	if len(router.Spec.Addresses) == 0 {
 		return fmt.Errorf("router without addresses")
 	}
-	out := []*uns.Unstructured{}
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["EgressRouterNamespace"] = namespace
@@ -221,11 +214,10 @@ func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifes
 	if err != nil {
 		return err
 	}
-	out = append(out, manifests...)
 
-	for _, obj := range out {
+	for _, obj := range manifests {
 		klog.Infof("Assigning owner references")
-		obj.SetOwnerReferences(EgressRouterOwnerReferences)
+		obj.SetOwnerReferences(egressRouterOwnerReferences)
 		klog.Infof("Applying manifest")
 		if err := apply.ApplyObject(ctx, r.client, obj, "egress_router"); err != nil {
 			klog.Infof("could not apply egress router object: %v", err)

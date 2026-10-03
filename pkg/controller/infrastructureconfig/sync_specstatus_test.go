@@ -5,6 +5,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -966,8 +967,8 @@ func Test_SpecStatusSynchronizer(t *testing.T) {
 			gotInfra, err := a.SpecStatusSynchronize(&tt.givenInfra)
 
 			if tt.wantedErr == "" {
-				assert.Equal(t, err, nil)
-				assert.EqualValues(t, &tt.wantedInfra, gotInfra, "should update infra correctly")
+				require.NoError(t, err)
+				assert.Equal(t, &tt.wantedInfra, gotInfra, "should update infra correctly")
 			} else {
 				assert.Contains(t, err.Error(), tt.wantedErr)
 			}

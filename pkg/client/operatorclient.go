@@ -36,7 +36,7 @@ func (c *OperatorHelperClient) Informer() cache.SharedIndexInformer {
 }
 
 func (c *OperatorHelperClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
-	instance, err := c.informer.Lister().Get(names.OPERATOR_CONFIG)
+	instance, err := c.informer.Lister().Get(names.OperatorConfig)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -45,7 +45,7 @@ func (c *OperatorHelperClient) GetOperatorState() (*operatorv1.OperatorSpec, *op
 }
 
 func (c *OperatorHelperClient) GetOperatorStateWithQuorum(ctx context.Context) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
-	instance, err := c.client.Get(ctx, names.OPERATOR_CONFIG, metav1.GetOptions{})
+	instance, err := c.client.Get(ctx, names.OperatorConfig, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -54,7 +54,7 @@ func (c *OperatorHelperClient) GetOperatorStateWithQuorum(ctx context.Context) (
 }
 
 func (c *OperatorHelperClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
-	instance, err := c.informer.Lister().Get(names.OPERATOR_CONFIG)
+	instance, err := c.informer.Lister().Get(names.OperatorConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (c *OperatorHelperClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
 }
 
 func (c *OperatorHelperClient) UpdateOperatorSpec(ctx context.Context, resourceVersion string, spec *operatorv1.OperatorSpec) (*operatorv1.OperatorSpec, string, error) {
-	original, err := c.informer.Lister().Get(names.OPERATOR_CONFIG)
+	original, err := c.informer.Lister().Get(names.OperatorConfig)
 	if err != nil {
 		return nil, "", err
 	}
@@ -79,7 +79,7 @@ func (c *OperatorHelperClient) UpdateOperatorSpec(ctx context.Context, resourceV
 }
 
 func (c *OperatorHelperClient) UpdateOperatorStatus(ctx context.Context, resourceVersion string, status *operatorv1.OperatorStatus) (*operatorv1.OperatorStatus, error) {
-	original, err := c.informer.Lister().Get(names.OPERATOR_CONFIG)
+	original, err := c.informer.Lister().Get(names.OperatorConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +103,9 @@ func (c *OperatorHelperClient) ApplyOperatorSpec(ctx context.Context, fieldManag
 	desiredSpec := &v1.NetworkSpecApplyConfiguration{
 		OperatorSpecApplyConfiguration: *desiredConfiguration,
 	}
-	desired := v1.Network(names.CLUSTER_CONFIG)
+	desired := v1.Network(names.ClusterConfig)
 	desired.WithSpec(desiredSpec)
-	instance, err := c.client.Get(ctx, names.CLUSTER_CONFIG, metav1.GetOptions{})
+	instance, err := c.client.Get(ctx, names.ClusterConfig, metav1.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
 	case err != nil:
@@ -136,11 +136,11 @@ func (c *OperatorHelperClient) ApplyOperatorStatus(ctx context.Context, fieldMan
 		return fmt.Errorf("desiredStatus must have a value")
 	}
 
-	desired := v1.Network(names.CLUSTER_CONFIG).WithStatus(&v1.NetworkStatusApplyConfiguration{
+	desired := v1.Network(names.ClusterConfig).WithStatus(&v1.NetworkStatusApplyConfiguration{
 		OperatorStatusApplyConfiguration: *desiredStatus,
 	})
 
-	instance, err := c.client.Get(ctx, names.CLUSTER_CONFIG, metav1.GetOptions{})
+	instance, err := c.client.Get(ctx, names.ClusterConfig, metav1.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
 		v1helpers.SetApplyConditionsLastTransitionTime(c.clock, &desiredStatus.Conditions, nil)
@@ -178,7 +178,7 @@ func (c *OperatorHelperClient) ApplyOperatorStatus(ctx context.Context, fieldMan
 		v1helpers.CanonicalizeOperatorStatus(desiredStatus)
 		v1helpers.CanonicalizeOperatorStatus(operatorStatus)
 
-		original := v1.Network(names.CLUSTER_CONFIG)
+		original := v1.Network(names.ClusterConfig)
 		if operatorStatus != nil {
 			originalStatus := &v1.NetworkStatusApplyConfiguration{
 				OperatorStatusApplyConfiguration: *operatorStatus,
@@ -212,6 +212,6 @@ func (c *OperatorHelperClient) PatchOperatorStatus(ctx context.Context, jsonPatc
 	if err != nil {
 		return err
 	}
-	_, err = c.client.Patch(ctx, names.CLUSTER_CONFIG, types.JSONPatchType, jsonPatchBytes, metav1.PatchOptions{}, "/status")
+	_, err = c.client.Patch(ctx, names.ClusterConfig, types.JSONPatchType, jsonPatchBytes, metav1.PatchOptions{}, "/status")
 	return err
 }

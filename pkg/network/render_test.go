@@ -355,12 +355,12 @@ func TestRenderUnknownNetwork(t *testing.T) {
 	err = IsChangeSafe(prev, next, &fakeBootstrapResult().Infra)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	bootstrapResult, err := Bootstrap(&config, client)
+	bootstrapResult, err := Bootstrap(t.Context(), &config, client)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	featureGatesCNO := getDefaultFeatureGatesWithDualStack()
 
-	objs, _, err := Render(prev, &configv1.NetworkSpec{}, manifestDir, client, featureGatesCNO, bootstrapResult)
+	objs, _, err := Render(t.Context(), prev, &configv1.NetworkSpec{}, manifestDir, client, featureGatesCNO, bootstrapResult)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Validate that ovn-kubernetes isn't rendered
@@ -507,7 +507,6 @@ func setupTestInfraAndBasicRenderConfigs(t *testing.T, prevType, nextType operv1
 	*bootstrap.InfraStatus,
 	*operv1.NetworkSpec,
 	*operv1.NetworkSpec) {
-
 	g := NewGomegaWithT(t)
 	infra := &fakeBootstrapResult().Infra
 
@@ -564,7 +563,7 @@ func Test_renderNetworkDiagnostics(t *testing.T) {
 			if !reflect.DeepEqual(tt.expectedErr, err) {
 				t.Errorf("Test_renderNetworkDiagnostics() err = %v, want %v", err, tt.expectedErr)
 			}
-			assert.Equalf(t, tt.want, len(got), "renderNetworkDiagnostics(%v, %v, %v)", tt.args.operConf, tt.args.clusterConf, manifestDir)
+			assert.Lenf(t, got, tt.want, "renderNetworkDiagnostics(%v, %v, %v)", tt.args.operConf, tt.args.clusterConf, manifestDir)
 		})
 	}
 
@@ -631,7 +630,7 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 			if !reflect.DeepEqual(tt.expectedErr, err) {
 				t.Errorf("renderAdditionalRoutingCapabilities() err = %v, want %v", err, tt.expectedErr)
 			}
-			assert.Equalf(t, tt.want, len(got), "renderAdditionalRoutingCapabilities(%v, %v)", tt.args.operConf, manifestDir)
+			assert.Lenf(t, got, tt.want, "renderAdditionalRoutingCapabilities(%v, %v)", tt.args.operConf, manifestDir)
 		})
 	}
 }
@@ -639,7 +638,7 @@ func Test_renderAdditionalRoutingCapabilities(t *testing.T) {
 func Test_renderFRRRoutingCapabilities(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	getRenderedObjs := func(t *testing.T, tlsProfile bootstrap.TLSProfile) []*unstructured.Unstructured {
+	getRenderedObjs := func(_ *testing.T, tlsProfile bootstrap.TLSProfile) []*unstructured.Unstructured {
 		testBootstrap := fakeBootstrapResult()
 		testBootstrap.TLSProfile = tlsProfile
 		objs, err := renderAdditionalRoutingCapabilities(&operv1.NetworkSpec{

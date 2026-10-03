@@ -178,14 +178,14 @@ func getProxyStatus(t *testing.T, client crclient.Client) configv1.ProxyStatus {
 
 func proxyWithSpec(spec configv1.ProxySpec) *configv1.Proxy {
 	return &configv1.Proxy{
-		ObjectMeta: metav1.ObjectMeta{Name: names.PROXY_CONFIG},
+		ObjectMeta: metav1.ObjectMeta{Name: names.ProxyConfig},
 		Spec:       spec,
 	}
 }
 
 func networkWithClusterCIDR(cidr string) *configv1.Network {
 	return &configv1.Network{
-		ObjectMeta: metav1.ObjectMeta{Name: names.CLUSTER_CONFIG},
+		ObjectMeta: metav1.ObjectMeta{Name: names.ClusterConfig},
 		Status: configv1.NetworkStatus{
 			ClusterNetwork: []configv1.ClusterNetworkEntry{{CIDR: cidr}},
 			ServiceNetwork: []string{"172.30.0.0/16"},
@@ -195,7 +195,7 @@ func networkWithClusterCIDR(cidr string) *configv1.Network {
 
 func infrastructureWithAPIServer(host string) *configv1.Infrastructure {
 	return &configv1.Infrastructure{
-		ObjectMeta: metav1.ObjectMeta{Name: names.CLUSTER_CONFIG},
+		ObjectMeta: metav1.ObjectMeta{Name: names.ClusterConfig},
 		Status: configv1.InfrastructureStatus{
 			APIServerInternalURL: "https://" + host + ":6443",
 			PlatformStatus: &configv1.PlatformStatus{

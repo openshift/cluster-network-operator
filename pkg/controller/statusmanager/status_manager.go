@@ -166,19 +166,19 @@ func New(client cnoclient.Client, name, cluster string) *StatusManager {
 }
 
 // setClusterOperAnnotation sets an annotation on the clusterOperator network object
-func (status *StatusManager) setClusterOperAnnotation(obj *configv1.ClusterOperator) error {
-	value := []string{}
+func (status *StatusManager) setClusterOperAnnotation(ctx context.Context, obj *configv1.ClusterOperator) error {
+	value := make([]string, 0, len(status.hyperShiftConfig.RelatedObjects))
 	for _, obj := range status.hyperShiftConfig.RelatedObjects {
 		value = append(value, fmt.Sprintf("%s/%s/%s/%s/%s", obj.ClusterName, obj.Group, obj.Resource, obj.Namespace, obj.Name))
 	}
 	anno := strings.Join(value, ",")
-	return status.setAnnotation(context.TODO(), obj, names.RelatedClusterObjectsAnnotation, &anno)
+	return status.setAnnotation(ctx, obj, names.RelatedClusterObjectsAnnotation, &anno)
 }
 
 // getClusterOperAnnotation gets an annotation from the clusterOperator network object
 func (status *StatusManager) getClusterOperAnnotation(obj *configv1.ClusterOperator) ([]hypershift.RelatedObject, error) {
-	new := obj.DeepCopy()
-	anno := new.GetAnnotations()
+	newObj := obj.DeepCopy()
+	anno := newObj.GetAnnotations()
 	objs := []hypershift.RelatedObject{}
 
 	value, set := anno[names.RelatedClusterObjectsAnnotation]
@@ -212,7 +212,7 @@ func (status *StatusManager) getClusterOperAnnotation(obj *configv1.ClusterOpera
 // deleteRelatedObjects checks for related objects attached to ClusterOperator and deletes
 // whatever is not being rendered from manifests. This is a mechanism to cleanup objects
 // that are no longer needed and are probably present from a previous version
-func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.ClusterOperator) {
+func (status *StatusManager) deleteRelatedObjectsNotRendered(ctx context.Context, co *configv1.ClusterOperator) {
 	if status.relatedObjects == nil && status.hyperShiftConfig.RelatedObjects == nil {
 		return
 	}
@@ -266,7 +266,7 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 			objToDelete.SetName(currentObj.Name)
 			objToDelete.SetNamespace(currentObj.Namespace)
 			objToDelete.SetGroupVersionKind(gvk)
-			err = status.client.ClientFor("").CRClient().Delete(context.TODO(), objToDelete, crclient.PropagationPolicy("Background"))
+			err = status.client.ClientFor("").CRClient().Delete(ctx, objToDelete, crclient.PropagationPolicy("Background"))
 			if err != nil {
 				log.Printf("Error deleting related object: %v", err)
 				if !errors.IsNotFound(err) {
@@ -306,7 +306,7 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 			objToDelete.SetName(currentObj.Name)
 			objToDelete.SetNamespace(currentObj.Namespace)
 			objToDelete.SetGroupVersionKind(gvk)
-			err = status.client.ClientFor(currentObj.ClusterName).CRClient().Delete(context.TODO(), objToDelete, crclient.PropagationPolicy("Background"))
+			err = status.client.ClientFor(currentObj.ClusterName).CRClient().Delete(ctx, objToDelete, crclient.PropagationPolicy("Background"))
 			if err != nil {
 				log.Printf("Error deleting related cluser object: %v", err)
 				if !errors.IsNotFound(err) {
@@ -319,29 +319,28 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(co *configv1.Cluste
 }
 
 // WriteHypershiftStatus mirrors network.operator status to HostedControlPlane status
-func (status *StatusManager) writeHypershiftStatus(operStatus *operv1.NetworkStatus) {
+func (status *StatusManager) writeHypershiftStatus(ctx context.Context, operStatus *operv1.NetworkStatus) {
 	if !status.hyperShiftConfig.Enabled {
 		return
 	}
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-
 		hcp := &uns.Unstructured{}
 		hcp.SetGroupVersionKind(hypershift.HostedControlPlaneGVK)
-		err := status.client.ClientFor(names.ManagementClusterName).CRClient().Get(context.TODO(), types.NamespacedName{Namespace: status.hyperShiftConfig.Namespace, Name: status.hyperShiftConfig.Name}, hcp)
+		err := status.client.ClientFor(names.ManagementClusterName).CRClient().Get(ctx, types.NamespacedName{Namespace: status.hyperShiftConfig.Namespace, Name: status.hyperShiftConfig.Name}, hcp)
 		if err != nil {
 			return err
 		}
 
 		updatedConditions, err := hypershift.SetHostedControlPlaneConditions(hcp, operStatus)
 		if err != nil {
-			return fmt.Errorf("failed to set HostedControlPlane conditions: %v", err)
+			return fmt.Errorf("failed to set HostedControlPlane conditions: %w", err)
 		}
 		if len(updatedConditions) == 0 {
 			// nothing changed, return
 			return nil
 		}
 
-		if err := status.client.ClientFor(names.ManagementClusterName).CRClient().Status().Update(context.TODO(), hcp); err != nil {
+		if err := status.client.ClientFor(names.ManagementClusterName).CRClient().Status().Update(ctx, hcp); err != nil {
 			return err
 		}
 		log.Printf("Set HostedControlPlane conditions:\n%v", updatedConditions)
@@ -353,12 +352,12 @@ func (status *StatusManager) writeHypershiftStatus(operStatus *operv1.NetworkSta
 }
 
 // Set updates the operator and clusteroperator statuses with the provided conditions.
-func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv1.OperatorCondition) {
+func (status *StatusManager) set(ctx context.Context, reachedAvailableLevel bool, conditions ...operv1.OperatorCondition) {
 	var operStatus *operv1.NetworkStatus
 
 	// Set status on the network.operator object
 	err := func() error {
-		oc, err := status.client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(context.TODO(), names.OPERATOR_CONFIG, metav1.GetOptions{})
+		oc, err := status.client.Default().OpenshiftOperatorClient().OperatorV1().Networks().Get(ctx, names.OperatorConfig, metav1.GetOptions{})
 		if err != nil {
 			// Should never happen outside of unit tests
 			return err
@@ -374,7 +373,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 		// a 4.6->4.7 upgrade).
 		if v1helpers.FindOperatorCondition(oc.Status.Conditions, operv1.OperatorStatusTypeAvailable) == nil {
 			co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
-			err := status.client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Name: status.name}, co)
+			err := status.client.ClientFor("").CRClient().Get(ctx, types.NamespacedName{Name: status.name}, co)
 			if err != nil {
 				log.Printf("failed to retrieve ClusterOperator object: %v - continuing", err)
 			}
@@ -426,7 +425,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 		}
 
 		// Use applyconfigurations to change only the specified fields
-		net := applyoperv1.Network(names.OPERATOR_CONFIG).
+		net := applyoperv1.Network(names.OperatorConfig).
 			WithStatus(applyoperv1.NetworkStatus().WithVersion(oc.Status.Version))
 		for _, condition := range oc.Status.Conditions {
 			net.Status.WithConditions(applyoperv1.OperatorCondition().
@@ -437,7 +436,7 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 				WithMessage(condition.Message))
 		}
 		if _, err := status.client.ClientFor("").OpenshiftOperatorClient().OperatorV1().Networks().ApplyStatus(
-			context.TODO(), net, metav1.ApplyOptions{Force: true, FieldManager: fieldManager}); err != nil {
+			ctx, net, metav1.ApplyOptions{Force: true, FieldManager: fieldManager}); err != nil {
 			return err
 		}
 		log.Printf("Network operator config updated with conditions:\n%s", buf)
@@ -453,20 +452,20 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 	// do this for us. We can't use that yet, because it doesn't allow dynamic RelatedObjects[].
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: status.name}}
-		err := status.client.ClientFor("").CRClient().Get(context.TODO(), types.NamespacedName{Name: status.name}, co)
+		err := status.client.ClientFor("").CRClient().Get(ctx, types.NamespacedName{Name: status.name}, co)
 		isNotFound := errors.IsNotFound(err)
 		if err != nil && !isNotFound {
 			return err
 		}
 
 		oldStatus := co.Status.DeepCopy()
-		status.deleteRelatedObjectsNotRendered(co)
+		status.deleteRelatedObjectsNotRendered(ctx, co)
 		if status.relatedObjects != nil {
 			co.Status.RelatedObjects = status.relatedObjects
 		}
 
 		if status.hyperShiftConfig.RelatedObjects != nil {
-			err := status.setClusterOperAnnotation(co)
+			err := status.setClusterOperAnnotation(ctx, co)
 			if err != nil {
 				return err
 			}
@@ -501,13 +500,13 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 		}
 
 		if isNotFound {
-			if err := status.client.ClientFor("").CRClient().Create(context.TODO(), co); err != nil {
+			if err := status.client.ClientFor("").CRClient().Create(ctx, co); err != nil {
 				return err
 			}
 			log.Printf("ClusterOperator config: %s created with conditions:\n%s", co.Name, buf)
 			return nil
 		}
-		if err := status.client.ClientFor("").CRClient().Status().Update(context.TODO(), co); err != nil {
+		if err := status.client.ClientFor("").CRClient().Status().Update(ctx, co); err != nil {
 			return err
 		}
 		log.Printf("ClusterOperator config status updated with conditions:\n%s", buf)
@@ -517,18 +516,19 @@ func (status *StatusManager) set(reachedAvailableLevel bool, conditions ...operv
 		log.Printf("Failed to set ClusterOperator: %v", err)
 	}
 
-	status.writeHypershiftStatus(operStatus)
+	status.writeHypershiftStatus(ctx, operStatus)
 }
 
 // syncDegraded syncs the current Degraded status
-func (status *StatusManager) syncDegraded() {
+func (status *StatusManager) syncDegraded(ctx context.Context) {
 	for _, c := range status.failing {
 		if c != nil && c.Type == operv1.OperatorStatusTypeDegraded {
-			status.set(false, *c)
+			status.set(ctx, false, *c)
 			return
 		}
 	}
 	status.set(
+		ctx,
 		false,
 		operv1.OperatorCondition{
 			Type:   operv1.OperatorStatusTypeDegraded,
@@ -537,7 +537,7 @@ func (status *StatusManager) syncDegraded() {
 	)
 }
 
-func (status *StatusManager) setDegraded(statusLevel StatusLevel, reason, message string) {
+func (status *StatusManager) setDegraded(ctx context.Context, statusLevel StatusLevel, reason, message string) {
 	status.failing[statusLevel] = &operv1.OperatorCondition{
 		Type:    operv1.OperatorStatusTypeDegraded,
 		Status:  operv1.ConditionTrue,
@@ -545,11 +545,11 @@ func (status *StatusManager) setDegraded(statusLevel StatusLevel, reason, messag
 		Message: message,
 	}
 	delete(status.failureFirstSeen, statusLevel) // Clear any debounce tracking
-	status.syncDegraded()
+	status.syncDegraded(ctx)
 }
 
 // maybeSetDegraded sets degraded ONLY after the failure persists for 2+ minutes
-func (status *StatusManager) maybeSetDegraded(statusLevel StatusLevel, reason, message string) {
+func (status *StatusManager) maybeSetDegraded(ctx context.Context, statusLevel StatusLevel, reason, message string) {
 	// Track when we first saw this failure
 	if _, exists := status.failureFirstSeen[statusLevel]; !exists {
 		status.failureFirstSeen[statusLevel] = status.clock.Now()
@@ -562,49 +562,50 @@ func (status *StatusManager) maybeSetDegraded(statusLevel StatusLevel, reason, m
 	}
 
 	// Set Degraded - failure has persisted for 2+ minutes
-	status.setDegraded(statusLevel, reason, message)
+	status.setDegraded(ctx, statusLevel, reason, message)
 }
 
-func (status *StatusManager) setNotDegraded(statusLevel StatusLevel) {
+func (status *StatusManager) setNotDegraded(ctx context.Context, statusLevel StatusLevel) {
 	status.failing[statusLevel] = nil
 	delete(status.failureFirstSeen, statusLevel) // Clear failure tracking
-	status.syncDegraded()
+	status.syncDegraded(ctx)
 }
 
-func (status *StatusManager) SetDegraded(statusLevel StatusLevel, reason, message string) {
+func (status *StatusManager) SetDegraded(ctx context.Context, statusLevel StatusLevel, reason, message string) {
 	status.Lock()
 	defer status.Unlock()
-	status.setDegraded(statusLevel, reason, message)
+	status.setDegraded(ctx, statusLevel, reason, message)
 }
 
-func (status *StatusManager) MaybeSetDegraded(statusLevel StatusLevel, reason, message string) {
+func (status *StatusManager) MaybeSetDegraded(ctx context.Context, statusLevel StatusLevel, reason, message string) {
 	status.Lock()
 	defer status.Unlock()
-	status.maybeSetDegraded(statusLevel, reason, message)
+	status.maybeSetDegraded(ctx, statusLevel, reason, message)
 }
 
 func (status *StatusManager) SetDegradedOnPanicAndCrash(panicVal any) {
 	status.Lock()
 	defer status.Unlock()
-	status.setDegraded(PanicLevel, "ReconcileError", fmt.Sprintf("Panic detected: %v", panicVal))
+	status.setDegraded(context.Background(), PanicLevel, "ReconcileError", fmt.Sprintf("Panic detected: %v", panicVal))
 	panic(panicVal)
 }
 
-func (status *StatusManager) SetNotDegraded(statusLevel StatusLevel) {
+func (status *StatusManager) SetNotDegraded(ctx context.Context, statusLevel StatusLevel) {
 	status.Lock()
 	defer status.Unlock()
-	status.setNotDegraded(statusLevel)
+	status.setNotDegraded(ctx, statusLevel)
 }
 
 // syncProgressing syncs the current Progressing status
-func (status *StatusManager) syncProgressing() {
+func (status *StatusManager) syncProgressing(ctx context.Context) {
 	for _, c := range status.failing {
 		if c != nil && c.Type == operv1.OperatorStatusTypeProgressing {
-			status.set(false, *c)
+			status.set(ctx, false, *c)
 			return
 		}
 	}
 	status.set(
+		ctx,
 		false,
 		operv1.OperatorCondition{
 			Type:   operv1.OperatorStatusTypeProgressing,
@@ -613,33 +614,33 @@ func (status *StatusManager) syncProgressing() {
 	)
 }
 
-func (status *StatusManager) setProgressing(statusLevel StatusLevel, reason, message string) {
+func (status *StatusManager) setProgressing(ctx context.Context, statusLevel StatusLevel, reason, message string) {
 	status.failing[statusLevel] = &operv1.OperatorCondition{
 		Type:    operv1.OperatorStatusTypeProgressing,
 		Status:  operv1.ConditionTrue,
 		Reason:  reason,
 		Message: message,
 	}
-	status.syncProgressing()
+	status.syncProgressing(ctx)
 }
 
-func (status *StatusManager) unsetProgressing(statusLevel StatusLevel) {
+func (status *StatusManager) unsetProgressing(ctx context.Context, statusLevel StatusLevel) {
 	if status.failing[statusLevel] != nil {
 		status.failing[statusLevel] = nil
 	}
-	status.syncProgressing()
+	status.syncProgressing(ctx)
 }
 
-func (status *StatusManager) SetProgressing(statusLevel StatusLevel, reason, message string) {
+func (status *StatusManager) SetProgressing(ctx context.Context, statusLevel StatusLevel, reason, message string) {
 	status.Lock()
 	defer status.Unlock()
-	status.setProgressing(statusLevel, reason, message)
+	status.setProgressing(ctx, statusLevel, reason, message)
 }
 
-func (status *StatusManager) UnsetProgressing(statusLevel StatusLevel) {
+func (status *StatusManager) UnsetProgressing(ctx context.Context, statusLevel StatusLevel) {
 	status.Lock()
 	defer status.Unlock()
-	status.unsetProgressing(statusLevel)
+	status.unsetProgressing(ctx, statusLevel)
 }
 
 func (status *StatusManager) SetRelatedObjects(relatedObjects []configv1.ObjectReference) {

@@ -221,7 +221,6 @@ func (r *backoffEventRecorder) event(eventType, reason, message string) {
 		}
 	}
 	r.events = map[string]map[string][]eventInfo{}
-
 }
 
 func joinEventMessages(eventInfos []eventInfo) string {

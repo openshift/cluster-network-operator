@@ -2,17 +2,18 @@ package infrastructureconfig
 
 import (
 	"fmt"
+	"log"
+
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/util/ip"
-	"log"
 )
 
 func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure) (*configv1.Infrastructure, error) {
 	updatedInfraConfig := infraConfig.DeepCopy()
 
 	var (
-		statusApiVips, statusIngressVips           *[]string
-		specApiVips, specIngressVips               *[]configv1.IP
+		statusAPIVIPs, statusIngressVIPs           *[]string
+		specAPIVIPs, specIngressVIPs               *[]configv1.IP
 		statusMachineNetworks, specMachineNetworks *[]configv1.CIDR
 		elb                                        bool
 	)
@@ -37,11 +38,11 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 			log.Print("Detected nil platform spec for baremetal, initializing")
 			updatedInfraConfig.Spec.PlatformSpec.BareMetal = &configv1.BareMetalPlatformSpec{}
 		}
-		statusApiVips = &updatedInfraConfig.Status.PlatformStatus.BareMetal.APIServerInternalIPs
-		specApiVips = &updatedInfraConfig.Spec.PlatformSpec.BareMetal.APIServerInternalIPs
+		statusAPIVIPs = &updatedInfraConfig.Status.PlatformStatus.BareMetal.APIServerInternalIPs
+		specAPIVIPs = &updatedInfraConfig.Spec.PlatformSpec.BareMetal.APIServerInternalIPs
 
-		statusIngressVips = &updatedInfraConfig.Status.PlatformStatus.BareMetal.IngressIPs
-		specIngressVips = &updatedInfraConfig.Spec.PlatformSpec.BareMetal.IngressIPs
+		statusIngressVIPs = &updatedInfraConfig.Status.PlatformStatus.BareMetal.IngressIPs
+		specIngressVIPs = &updatedInfraConfig.Spec.PlatformSpec.BareMetal.IngressIPs
 
 		statusMachineNetworks = &updatedInfraConfig.Status.PlatformStatus.BareMetal.MachineNetworks
 		specMachineNetworks = &updatedInfraConfig.Spec.PlatformSpec.BareMetal.MachineNetworks
@@ -64,11 +65,11 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 			log.Print("Detected nil platform spec for vSphere, initializing")
 			updatedInfraConfig.Spec.PlatformSpec.VSphere = &configv1.VSpherePlatformSpec{}
 		}
-		statusApiVips = &updatedInfraConfig.Status.PlatformStatus.VSphere.APIServerInternalIPs
-		specApiVips = &updatedInfraConfig.Spec.PlatformSpec.VSphere.APIServerInternalIPs
+		statusAPIVIPs = &updatedInfraConfig.Status.PlatformStatus.VSphere.APIServerInternalIPs
+		specAPIVIPs = &updatedInfraConfig.Spec.PlatformSpec.VSphere.APIServerInternalIPs
 
-		statusIngressVips = &updatedInfraConfig.Status.PlatformStatus.VSphere.IngressIPs
-		specIngressVips = &updatedInfraConfig.Spec.PlatformSpec.VSphere.IngressIPs
+		statusIngressVIPs = &updatedInfraConfig.Status.PlatformStatus.VSphere.IngressIPs
+		specIngressVIPs = &updatedInfraConfig.Spec.PlatformSpec.VSphere.IngressIPs
 
 		statusMachineNetworks = &updatedInfraConfig.Status.PlatformStatus.VSphere.MachineNetworks
 		specMachineNetworks = &updatedInfraConfig.Spec.PlatformSpec.VSphere.MachineNetworks
@@ -87,11 +88,11 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 			log.Print("Detected nil platform spec for openstack, initializing")
 			updatedInfraConfig.Spec.PlatformSpec.OpenStack = &configv1.OpenStackPlatformSpec{}
 		}
-		statusApiVips = &updatedInfraConfig.Status.PlatformStatus.OpenStack.APIServerInternalIPs
-		specApiVips = &updatedInfraConfig.Spec.PlatformSpec.OpenStack.APIServerInternalIPs
+		statusAPIVIPs = &updatedInfraConfig.Status.PlatformStatus.OpenStack.APIServerInternalIPs
+		specAPIVIPs = &updatedInfraConfig.Spec.PlatformSpec.OpenStack.APIServerInternalIPs
 
-		statusIngressVips = &updatedInfraConfig.Status.PlatformStatus.OpenStack.IngressIPs
-		specIngressVips = &updatedInfraConfig.Spec.PlatformSpec.OpenStack.IngressIPs
+		statusIngressVIPs = &updatedInfraConfig.Status.PlatformStatus.OpenStack.IngressIPs
+		specIngressVIPs = &updatedInfraConfig.Spec.PlatformSpec.OpenStack.IngressIPs
 
 		statusMachineNetworks = &updatedInfraConfig.Status.PlatformStatus.OpenStack.MachineNetworks
 		specMachineNetworks = &updatedInfraConfig.Spec.PlatformSpec.OpenStack.MachineNetworks
@@ -107,23 +108,23 @@ func (*synchronizer) SpecStatusSynchronize(infraConfig *configv1.Infrastructure)
 	}
 
 	if err := syncMachineNetworks(specMachineNetworks, statusMachineNetworks); err != nil {
-		return nil, fmt.Errorf("error on syncing machine networks: %v", err)
+		return nil, fmt.Errorf("error on syncing machine networks: %w", err)
 	}
-	if err := validateVipsWithVips(*specApiVips, *specIngressVips, elb); err != nil {
-		return nil, fmt.Errorf("error on validating VIPs: %v", err)
+	if err := validateVipsWithVips(*specAPIVIPs, *specIngressVIPs, elb); err != nil {
+		return nil, fmt.Errorf("error on validating VIPs: %w", err)
 	}
-	if err := validateVipsWithMachineNetworks(*specApiVips, *specMachineNetworks); err != nil {
-		return nil, fmt.Errorf("error on validating API VIPs and Machine Networks: %v", err)
+	if err := validateVipsWithMachineNetworks(*specAPIVIPs, *specMachineNetworks); err != nil {
+		return nil, fmt.Errorf("error on validating API VIPs and Machine Networks: %w", err)
 	}
-	if err := validateVipsWithMachineNetworks(*specIngressVips, *specMachineNetworks); err != nil {
-		return nil, fmt.Errorf("error on validating Ingress VIPs and Machine Networks: %v", err)
+	if err := validateVipsWithMachineNetworks(*specIngressVIPs, *specMachineNetworks); err != nil {
+		return nil, fmt.Errorf("error on validating Ingress VIPs and Machine Networks: %w", err)
 	}
 
-	if err := syncVips(specApiVips, statusApiVips); err != nil {
-		return nil, fmt.Errorf("error on syncing API VIPs: %v", err)
+	if err := syncVips(specAPIVIPs, statusAPIVIPs); err != nil {
+		return nil, fmt.Errorf("error on syncing API VIPs: %w", err)
 	}
-	if err := syncVips(specIngressVips, statusIngressVips); err != nil {
-		return nil, fmt.Errorf("error on syncing Ingress VIPs: %v", err)
+	if err := syncVips(specIngressVIPs, statusIngressVIPs); err != nil {
+		return nil, fmt.Errorf("error on syncing Ingress VIPs: %w", err)
 	}
 
 	return updatedInfraConfig, nil

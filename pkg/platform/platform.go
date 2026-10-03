@@ -33,14 +33,14 @@ var cloudProviderConfig = types.NamespacedName{
 // isNetworkNodeIdentityEnabled determines if network node identity should be enabled.
 // It checks the `enabled` key in the network-node-identity/openshift-network-operator configmap.
 // If the configmap doesn't exist, it returns true (the feature is enabled by default).
-func isNetworkNodeIdentityEnabled(client cnoclient.Client) (bool, error) {
+func isNetworkNodeIdentityEnabled(ctx context.Context, client cnoclient.Client) (bool, error) {
 	nodeIdentity := &corev1.ConfigMap{}
-	nodeIdentityLookup := types.NamespacedName{Name: "network-node-identity", Namespace: names.APPLIED_NAMESPACE}
-	if err := client.ClientFor("").CRClient().Get(context.TODO(), nodeIdentityLookup, nodeIdentity); err != nil {
+	nodeIdentityLookup := types.NamespacedName{Name: "network-node-identity", Namespace: names.AppliedNamespace}
+	if err := client.ClientFor("").CRClient().Get(ctx, nodeIdentityLookup, nodeIdentity); err != nil {
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %s", err)
+		return false, fmt.Errorf("unable to bootstrap OVN, unable to retrieve cluster config: %w", err)
 	}
 	enabled, ok := nodeIdentity.Data["enabled"]
 	if ok {
@@ -50,10 +50,10 @@ func isNetworkNodeIdentityEnabled(client cnoclient.Client) (bool, error) {
 	return true, nil
 }
 
-func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
+func InfraStatus(ctx context.Context, client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	infraConfig := &configv1.Infrastructure{}
-	if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
-		return nil, fmt.Errorf("failed to get infrastructure 'cluster': %v", err)
+	if err := client.Default().CRClient().Get(ctx, types.NamespacedName{Name: "cluster"}, infraConfig); err != nil {
+		return nil, fmt.Errorf("failed to get infrastructure 'cluster': %w", err)
 	}
 
 	res := &bootstrap.InfraStatus{
@@ -66,7 +66,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	}
 
 	proxy := &configv1.Proxy{}
-	if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "cluster"}, proxy); err != nil {
+	if err := client.Default().CRClient().Get(ctx, types.NamespacedName{Name: "cluster"}, proxy); err != nil {
 		return nil, fmt.Errorf("failed to get proxy 'cluster': %w", err)
 	}
 	res.Proxy = proxy.Status
@@ -86,8 +86,8 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	// Allow overriding the "default" apiserver via the environment var APISERVER_OVERRIDE_HOST / _PORT
 	// This is used by Hypershift, since the cno connects to a "local" ServiceIP, but rendered manifests
 	// that run on a hosted cluster need to talk to the external URL
-	if h := os.Getenv(names.EnvApiOverrideHost); h != "" {
-		p := os.Getenv(names.EnvApiOverridePort)
+	if h := os.Getenv(names.EnvAPIOverrideHost); h != "" {
+		p := os.Getenv(names.EnvAPIOverridePort)
 		if p == "" {
 			p = "443"
 		}
@@ -108,7 +108,7 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	// AWS and OpenStack specify a CA bundle via a config map; retrieve it.
 	if res.PlatformType == configv1.AWSPlatformType || res.PlatformType == configv1.OpenStackPlatformType {
 		cm := &corev1.ConfigMap{}
-		if err := client.Default().CRClient().Get(context.TODO(), cloudProviderConfig, cm); err != nil {
+		if err := client.Default().CRClient().Get(ctx, cloudProviderConfig, cm); err != nil {
 			if !apierrors.IsNotFound(err) {
 				return nil, fmt.Errorf("failed to retrieve ConfigMap %s: %w", cloudProviderConfig, err)
 			}
@@ -118,18 +118,18 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	}
 
 	var err error
-	res.HostedControlPlane, err = hypershift.GetHostedControlPlane(client)
+	res.HostedControlPlane, err = hypershift.GetHostedControlPlane(ctx, client)
 	if err != nil {
 		return nil, err
 	}
 
-	netIDEnabled, err := isNetworkNodeIdentityEnabled(client)
+	netIDEnabled, err := isNetworkNodeIdentityEnabled(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine if network node identity should be enabled: %w", err)
 	}
 	res.NetworkNodeIdentityEnabled = netIDEnabled
 
-	res.ConsolePluginCRDExists, err = consolePluginCRDExists(client)
+	res.ConsolePluginCRDExists, err = consolePluginCRDExists(ctx, client)
 	if err != nil {
 		return nil, err
 	}
@@ -146,46 +146,46 @@ func InfraStatus(client cnoclient.Client) (*bootstrap.InfraStatus, error) {
 	// The IPsecMachineConfig in 4.14 is created by user and can be created with any name and also is not managed by network operator, so find it by using the label
 	// and looking for the extension.
 
-	masterIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, names.MasterRoleMachineConfigLabel())
+	masterIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(ctx, client, names.MasterRoleMachineConfigLabel())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ipsec machine configs for master: %v", err)
+		return nil, fmt.Errorf("failed to get ipsec machine configs for master: %w", err)
 	}
 	res.MasterIPsecMachineConfigs = masterIPsecMachineConfigs
 
-	workerIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(client, names.WorkerRoleMachineConfigLabel())
+	workerIPsecMachineConfigs, err := findIPsecMachineConfigsWithLabel(ctx, client, names.WorkerRoleMachineConfigLabel())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ipsec machine configs for worker: %v", err)
+		return nil, fmt.Errorf("failed to get ipsec machine configs for worker: %w", err)
 	}
 	res.WorkerIPsecMachineConfigs = workerIPsecMachineConfigs
 
 	if res.MasterIPsecMachineConfigs != nil {
-		mcpMasterStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, names.MasterRoleMachineConfigLabel())
+		mcpMasterStatuses, err := getMachineConfigPoolStatuses(ctx, client, names.MasterRoleMachineConfigLabel())
 		if err != nil {
-			return nil, fmt.Errorf("failed to get machine config pools for master role: %v", err)
+			return nil, fmt.Errorf("failed to get machine config pools for master role: %w", err)
 		}
 		res.MasterMCPStatuses = mcpMasterStatuses
 	}
 
 	if res.WorkerIPsecMachineConfigs != nil {
-		mcpWorkerStatuses, err := getMachineConfigPoolStatuses(context.TODO(), client, names.WorkerRoleMachineConfigLabel())
+		mcpWorkerStatuses, err := getMachineConfigPoolStatuses(ctx, client, names.WorkerRoleMachineConfigLabel())
 		if err != nil {
-			return nil, fmt.Errorf("failed to get machine config pools for worker role: %v", err)
+			return nil, fmt.Errorf("failed to get machine config pools for worker role: %w", err)
 		}
 		res.WorkerMCPStatuses = mcpWorkerStatuses
 	}
 
-	machineConfigClusterOperatorReady, err := isMachineConfigClusterOperatorReady(client)
+	machineConfigClusterOperatorReady, err := isMachineConfigClusterOperatorReady(ctx, client)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to get machine config cluster operator: %v", err)
+		return nil, fmt.Errorf("failed to get machine config cluster operator: %w", err)
 	}
 	res.MachineConfigClusterOperatorReady = machineConfigClusterOperatorReady
 
 	return res, nil
 }
 
-func findIPsecMachineConfigsWithLabel(client cnoclient.Client, mcLabel labels.Set) ([]*mcfgv1.MachineConfig, error) {
+func findIPsecMachineConfigsWithLabel(ctx context.Context, client cnoclient.Client, mcLabel labels.Set) ([]*mcfgv1.MachineConfig, error) {
 	machineConfigs := &mcfgv1.MachineConfigList{}
-	err := client.Default().CRClient().List(context.TODO(), machineConfigs, &crclient.ListOptions{LabelSelector: mcLabel.AsSelector()})
+	err := client.Default().CRClient().List(ctx, machineConfigs, &crclient.ListOptions{LabelSelector: mcLabel.AsSelector()})
 	if err != nil {
 		return nil, err
 	}
@@ -199,9 +199,9 @@ func findIPsecMachineConfigsWithLabel(client cnoclient.Client, mcLabel labels.Se
 	return ipsecMachineConfigs, nil
 }
 
-func isMachineConfigClusterOperatorReady(client cnoclient.Client) (bool, error) {
+func isMachineConfigClusterOperatorReady(ctx context.Context, client cnoclient.Client) (bool, error) {
 	machineConfigClusterOperator := &configv1.ClusterOperator{}
-	if err := client.Default().CRClient().Get(context.TODO(), types.NamespacedName{Name: "machine-config"}, machineConfigClusterOperator); err != nil {
+	if err := client.Default().CRClient().Get(ctx, types.NamespacedName{Name: "machine-config"}, machineConfigClusterOperator); err != nil {
 		return false, err
 	}
 	available, degraded, progressing := false, true, true
@@ -249,10 +249,10 @@ func getMachineConfigPoolStatuses(ctx context.Context, client cnoclient.Client, 
 	return mcpStatuses, nil
 }
 
-func consolePluginCRDExists(cl cnoclient.Client) (bool, error) {
+func consolePluginCRDExists(ctx context.Context, cl cnoclient.Client) (bool, error) {
 	consolePluginCrdKey := crclient.ObjectKey{Name: "consoleplugins.console.openshift.io"}
 	consolePluginCrdObj := &apiextensionsv1.CustomResourceDefinition{}
-	err := cl.Default().CRClient().Get(context.TODO(), consolePluginCrdKey, consolePluginCrdObj)
+	err := cl.Default().CRClient().Get(ctx, consolePluginCrdKey, consolePluginCrdObj)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Printf("consoleplugins.console.openshift.io CRD was not found: %v", err)

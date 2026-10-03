@@ -28,19 +28,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// The periodic resync interval.
+// ResyncPeriod is the periodic resync interval.
 // We will re-run the reconciliation logic, even if the network configuration
 // hasn't changed.
 var ResyncPeriod = 3 * time.Minute
 
-// ManifestPaths is the path to the manifest templates
+// ManifestPath is the path to the manifest templates
 // bad, but there's no way to pass configuration to the reconciler right now
 var ManifestPath = "./bindata"
 
 // Add creates a new ingressConfig controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, _ cnoclient.Client, _ featuregates.FeatureGate) error {
-
 	return add(mgr, newIngressConfigReconciler(mgr.GetClient(), status))
 }
 
@@ -193,7 +192,7 @@ func (r *ReconcileIngressConfigs) updatePolicyGroupLabelOnNamespace(ctx context.
 
 	newNamespace.SetLabels(existingLabels)
 
-	return r.client.Patch(context.TODO(), newNamespace, crclient.MergeFrom(namespace), &crclient.PatchOptions{
+	return r.client.Patch(ctx, newNamespace, crclient.MergeFrom(namespace), &crclient.PatchOptions{
 		FieldManager: "cluster-network-operator/ingress_controller",
 	})
 }

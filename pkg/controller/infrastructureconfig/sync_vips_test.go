@@ -292,7 +292,7 @@ func Test_apiAndIngressVipsSynchronizer_VipsSynchronize(t *testing.T) {
 			a := &synchronizer{}
 			gotInfra := a.VipsSynchronize(givenInfra)
 
-			assert.EqualValues(t, tt.wantStatus, gotInfra.Status, "should update status correctly")
+			assert.Equal(t, tt.wantStatus, gotInfra.Status, "should update status correctly")
 		})
 	}
 }

@@ -3,6 +3,7 @@ package network_test
 import (
 	"os"
 	"reflect"
+	"slices"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -21,7 +22,7 @@ import (
 func TestBootstrap(t *testing.T) {
 	// Base setup - runs for all tests
 	baseOperConfig := &operv1.Network{
-		ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+		ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig},
 		Spec: operv1.NetworkSpec{
 			DefaultNetwork: operv1.DefaultNetworkDefinition{
 				Type: operv1.NetworkTypeOVNKubernetes,
@@ -46,8 +47,8 @@ func TestBootstrap(t *testing.T) {
 		},
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      network.CLUSTER_CONFIG_NAME,
-				Namespace: network.CLUSTER_CONFIG_NAMESPACE,
+				Name:      network.ClusterConfigName,
+				Namespace: network.ClusterConfigNamespace,
 			},
 			Data: map[string]string{
 				"install-config": "controlPlane:\n  replicas: 3\n",
@@ -56,7 +57,7 @@ func TestBootstrap(t *testing.T) {
 	}
 
 	t.Run("in standalone (non-HyperShift) mode", func(t *testing.T) {
-		clientObjs := append(baseClientObjs, &configv1.APIServer{
+		clientObjs := append(slices.Clone(baseClientObjs), &configv1.APIServer{
 			ObjectMeta: metav1.ObjectMeta{Name: openshifttls.APIServerName},
 			Spec: configv1.APIServerSpec{
 				TLSSecurityProfile: &configv1.TLSSecurityProfile{
@@ -77,7 +78,7 @@ func TestBootstrap(t *testing.T) {
 
 		t.Run("should set the TLS profile info from the APIServer CR", func(t *testing.T) {
 			client := fakeclient.NewFakeClient(clientObjs...)
-			result, err := network.Bootstrap(baseOperConfig, client)
+			result, err := network.Bootstrap(t.Context(), baseOperConfig, client)
 			if err != nil {
 				t.Fatalf("Bootstrap failed: %v", err)
 			}
@@ -151,7 +152,7 @@ func TestBootstrap(t *testing.T) {
 					t.Fatalf("Failed to create HostedControlPlane: %v", err)
 				}
 
-				result, err := network.Bootstrap(baseOperConfig, client)
+				result, err := network.Bootstrap(t.Context(), baseOperConfig, client)
 				if err != nil {
 					t.Fatalf("Bootstrap failed: %v", err)
 				}
@@ -194,7 +195,7 @@ func TestBootstrap(t *testing.T) {
 					t.Fatalf("Failed to create HostedControlPlane: %v", err)
 				}
 
-				result, err := network.Bootstrap(baseOperConfig, client)
+				result, err := network.Bootstrap(t.Context(), baseOperConfig, client)
 				if err != nil {
 					t.Fatalf("Bootstrap failed: %v", err)
 				}

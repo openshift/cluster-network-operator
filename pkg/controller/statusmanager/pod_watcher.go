@@ -47,7 +47,6 @@ func (s *StatusManager) initInformersFor(clusterName, namespace string, includeD
 		s.client.ClientFor(clusterName).AddCustomInformer(inf)
 		s.dsInformers[clusterName] = inf
 		s.dsListers[clusterName] = v1appslisters.NewDaemonSetLister(inf.GetIndexer())
-
 	}
 
 	inf := v1appsinformers.NewFilteredDeploymentInformer(
@@ -116,19 +115,19 @@ func (s *StatusManager) AddPodWatcher(mgr manager.Manager) error {
 }
 
 // Reconcile triggers a re-update of Status.
-func (p *PodWatcher) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (p *PodWatcher) Reconcile(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(p.status.SetDegradedOnPanicAndCrash)
 	if p.status.isOVNKubernetes == nil {
 		val := p.status.isClusterRunningOVNKubernetes()
 		p.status.isOVNKubernetes = &val
 	}
-	p.status.SetFromPods()
+	p.status.SetFromPods(ctx)
 	return reconcile.Result{}, nil
 }
 
 // enqueueRP ensure we always have, at most, a single request in the queue.
 // by always enquing the same name, it will be coalesced
-func enqueueRP(ctx context.Context, obj crclient.Object) []reconcile.Request {
+func enqueueRP(_ context.Context, obj crclient.Object) []reconcile.Request {
 	klog.Infof("Operand %s %s/%s updated, re-generating status", obj.GetObjectKind().GroupVersionKind().String(), obj.GetNamespace(), obj.GetName())
 	return []reconcile.Request{
 		{

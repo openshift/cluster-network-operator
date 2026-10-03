@@ -13,8 +13,6 @@ import (
 
 // renderMultiNetworkpolicyConfig returns the manifests of MultiNetworkPolicy
 func renderMultiNetworkpolicyConfig(manifestDir string) ([]*uns.Unstructured, error) {
-	objs := []*uns.Unstructured{}
-
 	// render the manifests on disk
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
@@ -24,13 +22,13 @@ func renderMultiNetworkpolicyConfig(manifestDir string) ([]*uns.Unstructured, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to render multus networkpolicy manifests: %w", err)
 	}
-	objs = append(objs, manifests...)
-	return objs, nil
+
+	return manifests, nil
 }
 
 // isMultiNetworkpolicyChangeSafe is noop, but it would check if the proposed kube-proxy
 // change is safe.
-func isMultiNetworkpolicyChangeSafe(prev, next *operv1.NetworkSpec) []error {
+func isMultiNetworkpolicyChangeSafe(_, _ *operv1.NetworkSpec) []error {
 	// At present, all multiNetworkPolicy changes are safe to deploy
 	return nil
 }

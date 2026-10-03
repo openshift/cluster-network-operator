@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// and Start it when the Manager is Started.
+// Add to the given Manager and start it when the Manager is started.
 func Add(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client, featureGates featuregates.FeatureGate) error {
 	return add(mgr, newReconciler(mgr, status, c, featureGates))
 }
@@ -72,8 +72,8 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	log.Printf("Reconciling Network.config.openshift.io %s\n", request.Name)
 
 	// We won't create more than one network
-	if request.Name != names.CLUSTER_CONFIG {
-		log.Printf("Ignoring Network without default name " + names.CLUSTER_CONFIG)
+	if request.Name != names.ClusterConfig {
+		log.Printf("Ignoring Network without default name " + names.ClusterConfig)
 		return reconcile.Result{}, nil
 	}
 
@@ -94,10 +94,10 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	}
 
 	// Fetch infrastructure status for validation
-	infraRes, err := platform.InfraStatus(r.client)
+	infraRes, err := platform.InfraStatus(ctx, r.client)
 	if err != nil {
 		log.Printf("Failed to get infrastructure status: %v", err)
-		r.status.MaybeSetDegraded(statusmanager.ClusterConfig, "InfraStatusError",
+		r.status.MaybeSetDegraded(ctx, statusmanager.ClusterConfig, "InfraStatusError",
 			fmt.Sprintf("Failed to get infrastructure status: %v", err))
 		return reconcile.Result{}, err
 	}
@@ -105,7 +105,7 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	// Validate the cluster config - degrade immediately since bad config won't recover on its own
 	if err := network.ValidateClusterConfig(clusterConfig, infraRes, r.featureGates); err != nil {
 		log.Printf("Failed to validate Network CR: %v", err)
-		r.status.SetDegraded(statusmanager.ClusterConfig, "InvalidClusterConfig",
+		r.status.SetDegraded(ctx, statusmanager.ClusterConfig, "InvalidClusterConfig",
 			fmt.Sprintf("The cluster configuration is invalid (%v). Use 'oc edit network.config.openshift.io cluster' to fix.", err))
 		return reconcile.Result{}, err
 	}
@@ -114,14 +114,14 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	// This will cause only the fields we change to be set.
 	operConfig := &operv1.Network{
 		TypeMeta:   metav1.TypeMeta{APIVersion: operv1.GroupVersion.String(), Kind: "Network"},
-		ObjectMeta: metav1.ObjectMeta{Name: names.OPERATOR_CONFIG},
+		ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig},
 	}
 	network.MergeClusterConfig(&operConfig.Spec, clusterConfig.Spec)
 
 	if err := apply.ApplyObject(ctx, r.client, operConfig, "clusterconfig"); err != nil {
 		// not set degraded if the err is a version conflict, but return a reconcile err for retry.
 		if !apierrors.IsConflict(err) {
-			r.status.MaybeSetDegraded(statusmanager.ClusterConfig, "ApplyOperatorConfig",
+			r.status.MaybeSetDegraded(ctx, statusmanager.ClusterConfig, "ApplyOperatorConfig",
 				fmt.Sprintf("Error while trying to update operator configuration: %v", err))
 		}
 		log.Printf("Could not propagate configuration from network.config.openshift.io to network.operator.openshift.io: %v", err)
@@ -129,6 +129,6 @@ func (r *ReconcileClusterConfig) Reconcile(ctx context.Context, request reconcil
 	}
 	log.Println("Successfully updated Operator config from Cluster config")
 
-	r.status.SetNotDegraded(statusmanager.ClusterConfig)
+	r.status.SetNotDegraded(ctx, statusmanager.ClusterConfig)
 	return reconcile.Result{}, nil
 }
