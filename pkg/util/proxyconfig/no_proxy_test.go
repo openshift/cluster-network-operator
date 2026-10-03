@@ -80,6 +80,33 @@ func infraConfig(platform configv1.PlatformType, domain, region string) *configv
 	}
 }
 
+func infraConfigWithClusterHostedDNS(platform configv1.PlatformType, domain, region string) *configv1.Infrastructure {
+	platformStatus := &configv1.PlatformStatus{}
+	switch platform {
+	case configv1.AWSPlatformType:
+		platformStatus = &configv1.PlatformStatus{
+			Type: configv1.AWSPlatformType,
+			AWS: &configv1.AWSPlatformStatus{
+				Region: region,
+				CloudLoadBalancerConfig: &configv1.CloudLoadBalancerConfig{
+					DNSType: configv1.ClusterHostedDNSType,
+				},
+			},
+		}
+	}
+	return &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-infra",
+		},
+		Status: configv1.InfrastructureStatus{
+			APIServerURL:         "https://api." + domain + ":6443",
+			APIServerInternalURL: "https://api-int." + domain + ":6443",
+			PlatformStatus:       platformStatus,
+			EtcdDiscoveryDomain:  domain,
+		},
+	}
+}
+
 func netConfig(cluster string, svcNet []string) *configv1.Network {
 	clusterNet := configv1.ClusterNetworkEntry{CIDR: cluster}
 	return &configv1.Network{
@@ -130,7 +157,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
 			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
-				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
+				"169.254.169.253,169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
 		{name: "valid proxy config with gcp provider",
@@ -152,7 +179,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
 			want: ".cluster.local,.ec2.internal,.svc,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
-				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
+				"169.254.169.253,169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
 		{name: "valid proxy config with single user noProxy",
@@ -163,7 +190,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
 			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
-				"169.254.169.254,172.30.0.0/16,172.30.0.1,api-int.test.cluster.com,localhost",
+				"169.254.169.253,169.254.169.254,172.30.0.0/16,172.30.0.1,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
 		{name: "valid proxy config with single user noProxy dual stack",
@@ -174,7 +201,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
 			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
-				"169.254.169.254,172.30.0.0/16,172.30.0.1,2001:db8::/32,api-int.test.cluster.com,localhost",
+				"169.254.169.253,169.254.169.254,172.30.0.0/16,172.30.0.1,2001:db8::/32,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
 		{name: "valid proxy config with multiple user noProxy",
@@ -185,7 +212,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
 			want: ".cluster.local,.foo.test.com,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
-				"169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,api-int.test.cluster.com,localhost",
+				"169.254.169.253,169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
 		{name: "valid proxy config with multiple user noProxy dual stack",
@@ -196,7 +223,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
 			want: ".cluster.local,.foo.test.com,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
-				"169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,2001:db8::/32,api-int.test.cluster.com,localhost",
+				"169.254.169.253,169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,2001:db8::/32,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
 		{name: "invalid api server url",
@@ -262,7 +289,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				getEnv:  func(v string) string { return strconv.FormatBool(v == "PROXY_INTERNAL_APISERVER_ADDRESS") },
 			},
 			want: ".cluster.local,.foo.test.com,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
-				"169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,localhost",
+				"169.254.169.253,169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,localhost",
 			wantErr: false,
 		},
 		{name: "valid proxy config with install config has default Machine CIDR",
@@ -273,7 +300,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapDataWithDefaultMachineCIDR),
 			},
 			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.128.0.0/14,127.0.0.1," +
-				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
+				"169.254.169.253,169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
 		{name: "valid proxy config with install config has default Machine Network CIDR",
@@ -284,7 +311,18 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapDataWithDefaultMachineNetworkCIDR),
 			},
 			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.128.0.0/14,127.0.0.1," +
-				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
+				"169.254.169.253,169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
+			wantErr: false,
+		},
+		{name: "valid proxy config with aws provider with ClusterHostedDNS",
+			args: args{
+				proxy:   proxyConfig(),
+				infra:   infraConfigWithClusterHostedDNS(configv1.AWSPlatformType, "test.cluster.com", "us-west-2"),
+				network: netConfig("10.128.0.0/14", []string{"172.30.0.0/16"}),
+				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
+			},
+			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
+				"169.254.169.253,169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
 	}
