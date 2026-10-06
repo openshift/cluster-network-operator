@@ -3830,7 +3830,7 @@ spec:
               network:
                 description: Network is the user-defined-network spec
                 properties:
-{{- if .OVN_EVPN_ENABLE_API }}
+{{- if .OVN_EVPN_ENABLE }}
                   evpn:
                     description: |-
                       EVPN contains configuration for EVPN mode.
@@ -4580,7 +4580,7 @@ spec:
                     - Layer3
                     - Localnet
                     type: string
-{{- if .OVN_EVPN_ENABLE_API }}
+{{- if .OVN_EVPN_ENABLE }}
                   transport:
                     description: |-
                       Transport describes the transport technology for pod-to-pod traffic.
@@ -4610,7 +4610,7 @@ spec:
                     forbidden otherwise
                   rule: 'has(self.topology) && self.topology == ''Localnet'' ? has(self.localnet):
                     !has(self.localnet)'
-{{- if .OVN_EVPN_ENABLE_API }}
+{{- if .OVN_EVPN_ENABLE }}
                 - message: transport 'EVPN' is only supported for Layer2 or Layer3
                     primary networks
                   rule: '!has(self.transport) || self.transport != ''EVPN'' || ((self.topology
@@ -5355,7 +5355,7 @@ spec:
     subresources:
       status: {}
 {{- end }}
-# The VTEP CRD is guarded by OVN_EVPN_ENABLE (feature gate + route advertisements enabled),
+# The VTEP CRD is guarded by OVN_EVPN_ENABLE (route advertisements enabled),
 # same as RouteAdvertisements and FRRConfigurations CRDs. Once deployed, it won't be removed
 # when route advertisements is disabled (see keepCRDs) to prevent data loss.
 {{- if .OVN_EVPN_ENABLE }}
