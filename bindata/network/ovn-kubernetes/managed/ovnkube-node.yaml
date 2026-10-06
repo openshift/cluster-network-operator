@@ -288,7 +288,7 @@ spec:
               - |
                 set -x
                 . /ovnkube-lib/ovnkube-lib.sh || exit 1
-                nbdb-post-start {{.OVN_NORTHD_PROBE_INTERVAL}}
+                nbdb-post-start
         readinessProbe:
 {{ if not .IsSNO }}
           initialDelaySeconds: 10
@@ -403,8 +403,6 @@ spec:
           value: "{{.KUBERNETES_SERVICE_PORT}}"
         - name: KUBERNETES_SERVICE_HOST
           value: "{{.KUBERNETES_SERVICE_HOST}}"
-        - name: OVN_CONTROLLER_INACTIVITY_PROBE
-          value: "{{.OVN_CONTROLLER_INACTIVITY_PROBE}}"
         - name: OVN_KUBE_LOG_LEVEL
           value: "4"
         - name: OVN_NODE_MODE
