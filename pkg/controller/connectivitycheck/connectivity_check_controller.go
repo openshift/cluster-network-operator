@@ -266,6 +266,7 @@ func (c *connectivityCheckTemplateProvider) listAddressesForKubernetesServiceMon
 	return []string{net.JoinHostPort(service.Spec.ClusterIP, "443")}
 }
 
+// getTemplatesForKubernetesServiceEndpointsChecks creates a connectivity check for each kube-apiserver HTTPS endpoint.
 func (c *connectivityCheckTemplateProvider) getTemplatesForKubernetesServiceEndpointsChecks(recorder events.Recorder) []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration {
 	var templates []*applyconfigv1alpha1.PodNetworkConnectivityCheckApplyConfiguration
 	addresses, err := c.listAddressesForKubeAPIServerServiceEndpoints()
@@ -280,16 +281,21 @@ func (c *connectivityCheckTemplateProvider) getTemplatesForKubernetesServiceEndp
 	return templates
 }
 
-// listAddressesForKubeAPIServerServiceEndpoints returns kas api service endpoints ip
+// listAddressesForKubeAPIServerServiceEndpoints returns the address for each kube-apiserver HTTPS endpoint on TCP 6443.
+// It skips the control-plane-only sidecar ports listed in the same Endpoints object.
 func (c *connectivityCheckTemplateProvider) listAddressesForKubeAPIServerServiceEndpoints() ([]endpointInfo, error) {
+	const kubeAPIServerEndpointPort = 6443
 	var results []endpointInfo
 	endpoints, err := c.kubeAPIServerEndpointsLister.Endpoints("openshift-kube-apiserver").Get("apiserver")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get kube-apiserver endpoints: %w", err)
 	}
 	for _, subset := range endpoints.Subsets {
 		for _, address := range subset.Addresses {
 			for _, port := range subset.Ports {
+				if port.Port != kubeAPIServerEndpointPort || (port.Protocol != "" && port.Protocol != v1.ProtocolTCP) {
+					continue
+				}
 				results = append(results, endpointInfo{
 					hostName: address.IP,
 					port:     strconv.Itoa(int(port.Port)),
@@ -297,6 +303,9 @@ func (c *connectivityCheckTemplateProvider) listAddressesForKubeAPIServerService
 				})
 			}
 		}
+	}
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no kube-apiserver endpoints found on TCP port %d", kubeAPIServerEndpointPort)
 	}
 	return results, nil
 }
