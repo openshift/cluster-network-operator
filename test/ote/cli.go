@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	o "github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -47,13 +47,9 @@ func NewCLIWithPodSecurityLevel(baseName string, level admissionapi.Level) *CLI 
 	}
 
 	config, err := cli.getConfig()
-	if err != nil {
-		e2e.Failf("Failed to get kubeconfig: %v", err)
-	}
+	Expect(err).NotTo(HaveOccurred(), "failed to get kubeconfig")
 	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		e2e.Failf("Failed to create Kubernetes clientset: %v", err)
-	}
+	Expect(err).NotTo(HaveOccurred(), "failed to create Kubernetes clientset")
 	cli.kubeFramework.ClientSet = clientset
 
 	return cli
@@ -62,22 +58,22 @@ func NewCLIWithPodSecurityLevel(baseName string, level admissionapi.Level) *CLI 
 func (c *CLI) SetupNamespace() {
 	nsName := fmt.Sprintf("e2e-test-%s-%s", c.kubeFramework.BaseName, getRandomString())
 
-	_, err := c.asAdminInternal().withoutNamespaceInternal().run("create", "namespace", nsName).output()
-	o.Expect(err).NotTo(o.HaveOccurred(), "Failed to create namespace")
+	err := c.AsAdmin().WithoutNamespace().Run("create").Args("namespace", nsName).Execute()
+	Expect(err).NotTo(HaveOccurred(), "Failed to create namespace")
 
 	c.namespace = nsName
 	c.namespacesToDelete = append(c.namespacesToDelete, nsName)
 
 	if c.kubeFramework.NamespacePodSecurityLevel != "" {
 		level := string(c.kubeFramework.NamespacePodSecurityLevel)
-		_, err = c.asAdminInternal().withoutNamespaceInternal().run("label", "namespace", nsName,
+		err = c.AsAdmin().WithoutNamespace().Run("label").Args("namespace", nsName,
 			fmt.Sprintf("pod-security.kubernetes.io/enforce=%s", level),
 			fmt.Sprintf("pod-security.kubernetes.io/warn=%s", level),
 			fmt.Sprintf("pod-security.kubernetes.io/audit=%s", level),
 			"security.openshift.io/scc.podSecurityLabelSync=false",
 			"--overwrite",
-		).output()
-		o.Expect(err).NotTo(o.HaveOccurred(), "Failed to label namespace")
+		).Execute()
+		Expect(err).NotTo(HaveOccurred(), "Failed to label namespace")
 	}
 
 	c.kubeFramework.Namespace = &corev1.Namespace{}
@@ -98,8 +94,7 @@ func (c *CLI) TeardownNamespace() {
 
 	for _, ns := range c.namespacesToDelete {
 		e2e.Logf("Deleting namespace: %s", ns)
-		_, err := c.asAdminInternal().withoutNamespaceInternal().run("delete", "namespace", ns, "--wait=false").output()
-		if err != nil {
+		if err := c.AsAdmin().WithoutNamespace().Run("delete").Args("namespace", ns, "--wait=false").Execute(); err != nil {
 			e2e.Logf("Warning: failed to delete namespace %s: %v", ns, err)
 		}
 	}
@@ -114,10 +109,6 @@ func (c *CLI) KubeFramework() *e2e.Framework {
 }
 
 func (c *CLI) AsAdmin() *CLI {
-	return c.asAdminInternal()
-}
-
-func (c *CLI) asAdminInternal() *CLI {
 	nc := *c
 	nc.asAdmin = true
 	nc.namespacesToDelete = append([]string(nil), c.namespacesToDelete...)
@@ -125,10 +116,6 @@ func (c *CLI) asAdminInternal() *CLI {
 }
 
 func (c *CLI) WithoutNamespace() *CLI {
-	return c.withoutNamespaceInternal()
-}
-
-func (c *CLI) withoutNamespaceInternal() *CLI {
 	nc := *c
 	nc.withoutNamespace = true
 	nc.namespacesToDelete = append([]string(nil), c.namespacesToDelete...)
@@ -151,27 +138,10 @@ func (c *CLI) Args(args ...string) *CLI {
 	return &nc
 }
 
+// Output runs the built command and returns its trimmed stdout. Callers that
+// need custom error handling use this; callers that simply assert success
+// should prefer MustOutput.
 func (c *CLI) Output() (string, error) {
-	return c.output()
-}
-
-func (c *CLI) Execute() error {
-	out, err := c.output()
-	if err != nil {
-		e2e.Logf("Command failed with output:\n%s", out)
-	}
-	return err
-}
-
-func (c *CLI) run(verb string, args ...string) *CLI {
-	nc := *c
-	nc.verb = verb
-	nc.args = args
-	nc.namespacesToDelete = append([]string(nil), c.namespacesToDelete...)
-	return &nc
-}
-
-func (c *CLI) output() (string, error) {
 	var cmdArgs []string
 
 	if c.kubeconfig != "" {
@@ -206,6 +176,23 @@ func (c *CLI) output() (string, error) {
 	}
 
 	return outStr, nil
+}
+
+// MustOutput runs the built command, asserts it succeeded, and returns its
+// trimmed stdout. This is the preferred form for the common case where any
+// command failure should fail the test.
+func (c *CLI) MustOutput() string {
+	out, err := c.Output()
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("command %q failed", c.verb))
+	return out
+}
+
+func (c *CLI) Execute() error {
+	out, err := c.Output()
+	if err != nil {
+		e2e.Logf("Command failed with output:\n%s", out)
+	}
+	return err
 }
 
 func (c *CLI) getConfig() (*rest.Config, error) {
