@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -72,6 +73,7 @@ type EgressRouterReconciler struct {
 
 var ResyncPeriod = 5 * time.Minute
 
+// newEgressRouterReconciler uses the manager for reads and the CNO client for resource applies.
 func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.StatusManager, c cnoclient.Client) reconcile.Reconciler {
 	return &EgressRouterReconciler{
 		mgr:    mgr,
@@ -83,6 +85,7 @@ func newEgressRouterReconciler(mgr manager.Manager, status *statusmanager.Status
 	}
 }
 
+// Reconcile keeps rendered resources and config status in sync with the current EgressRouter spec.
 func (r *EgressRouterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	klog.Infof("Reconciling egressrouter.network.operator.openshift.io %s\n", request.NamespacedName)
@@ -122,14 +125,14 @@ func (r *EgressRouterReconciler) Reconcile(ctx context.Context, request reconcil
 				Controller: &boolTrue,
 			},
 		}
-		err := r.ensureEgressRouter(ctx, manifestDir, request.Namespace, obj, egressRouterOwnerReferences)
+		ensureErr := r.ensureEgressRouter(ctx, manifestDir, request.Namespace, obj, egressRouterOwnerReferences)
 
-		if err != nil {
-			klog.Error(err)
+		if ensureErr != nil {
+			klog.Error(ensureErr)
 			r.egressrouterErrs[request.NamespacedName] =
-				fmt.Errorf("could not reconcile Egress Router %s: %w", request.NamespacedName, err)
+				fmt.Errorf("could not reconcile Egress Router %s: %w", request.NamespacedName, ensureErr)
 			r.setStatus(ctx)
-			return reconcile.Result{}, err
+			return reconcile.Result{}, ensureErr
 		}
 
 		r.egressrouters[request.NamespacedName] = existing
@@ -188,12 +191,11 @@ func getAllowedDestinationsConfigJSON(redirectRules []netopv1.L4RedirectRule) (s
 	return string(jsonByte), nil
 }
 
-func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifestDir string, namespace string, router *netopv1.EgressRouter, egressRouterOwnerReferences []metav1.OwnerReference) error {
-	var err error
+// buildEgressRouterRenderData keeps the NAD configuration in sync with the EgressRouter spec.
+func buildEgressRouterRenderData(data *render.RenderData, namespace string, router *netopv1.EgressRouter) error {
 	if len(router.Spec.Addresses) == 0 {
 		return fmt.Errorf("router without addresses")
 	}
-	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["EgressRouterNamespace"] = namespace
 	if isItValidCidr(router.Spec.Addresses[0].IP) {
@@ -202,26 +204,43 @@ func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifes
 	if isItValidIPAddress(router.Spec.Addresses[0].Gateway) {
 		data.Data["Gateway"] = router.Spec.Addresses[0].Gateway
 	}
-	data.Data["AllowedDestinations"], err = getAllowedDestinationsConfigJSON(router.Spec.Redirect.RedirectRules)
-	if err != nil {
-		return fmt.Errorf("failed to render AllowedDestinations config: %w", err)
+	allowedDestinations, destinationsErr := getAllowedDestinationsConfigJSON(router.Spec.Redirect.RedirectRules)
+	if destinationsErr != nil {
+		return fmt.Errorf("failed to render AllowedDestinations config: %w", destinationsErr)
 	}
+	data.Data["AllowedDestinations"] = allowedDestinations
 	data.Data["FallbackIP"] = router.Spec.Redirect.FallbackIP
 	data.Data["mode"] = router.Spec.Mode
-	data.Data["network_interfaces"] = router.Spec.NetworkInterface
+	master := router.Spec.NetworkInterface.Macvlan.Master
+	if validationErr := validateMacvlanMaster(master); validationErr != nil {
+		return fmt.Errorf("validate macvlan master: %w", validationErr)
+	}
+	data.Data["MacvlanMaster"] = master
+	if master != "" {
+		klog.Infof("EgressRouter %s/%s: using explicit macvlan master %q", namespace, router.Name, master)
+	}
+	data.Data["MacvlanMode"] = strings.ToLower(string(router.Spec.NetworkInterface.Macvlan.Mode))
 	data.Data["EgressRouterPodImage"] = os.Getenv("EGRESS_ROUTER_CNI_IMAGE")
+	return nil
+}
+
+// ensureEgressRouter keeps the NAD, pod, and service resources aligned with one EgressRouter spec.
+func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifestDir string, namespace string, router *netopv1.EgressRouter, egressRouterOwnerReferences []metav1.OwnerReference) error {
+	data := render.MakeRenderData()
+	if err := buildEgressRouterRenderData(&data, namespace, router); err != nil {
+		return fmt.Errorf("build egress-router render data: %w", err)
+	}
 	manifests, err := render.RenderDir(filepath.Join(manifestDir, "egress-router"), &data)
 	if err != nil {
-		return err
+		return fmt.Errorf("render egress-router manifests: %w", err)
 	}
 
 	for _, obj := range manifests {
 		klog.Infof("Assigning owner references")
 		obj.SetOwnerReferences(egressRouterOwnerReferences)
 		klog.Infof("Applying manifest")
-		if err := apply.ApplyObject(ctx, r.client, obj, "egress_router"); err != nil {
-			klog.Infof("could not apply egress router object: %v", err)
-			return err
+		if applyErr := apply.ApplyObject(ctx, r.client, obj, "egress_router"); applyErr != nil {
+			return fmt.Errorf("apply egress-router object: %w", applyErr)
 		}
 	}
 
@@ -239,4 +258,20 @@ func isItValidCidr(cidr string) bool {
 
 func isItValidIPAddress(ip string) bool {
 	return net.ParseIP(ip) != nil
+}
+
+// macvlanMasterRE allows common JSON-safe Linux interface-name characters and
+// enforces IFNAMSIZ (15 usable chars). Full CRD-level validation belongs in
+// openshift/api via +kubebuilder:validation:Pattern.
+var macvlanMasterRE = regexp.MustCompile("^[a-zA-Z0-9._@+-]{1,15}$")
+
+// validateMacvlanMaster rejects unsafe names and values that cannot identify a Linux link.
+func validateMacvlanMaster(master string) error {
+	if master == "" {
+		return nil
+	}
+	if master == "." || master == ".." || !macvlanMasterRE.MatchString(master) {
+		return fmt.Errorf("invalid macvlan master interface name %q: must be 1-15 chars from [a-zA-Z0-9._@+-] (not \".\" or \"..\")", master)
+	}
+	return nil
 }
