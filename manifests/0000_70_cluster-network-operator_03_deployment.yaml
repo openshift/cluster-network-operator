@@ -36,6 +36,12 @@ spec:
             weight: 100
       containers:
       - name: network-operator
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         ports:
           - containerPort: 9104
             hostPort: 9104
@@ -115,6 +121,11 @@ spec:
           readOnly: true
         - mountPath: /var/run/secrets/serving-cert
           name: metrics-tls
+        # CNO creates a temporary self-signed serving certificate under /tmp
+        # when the managed serving certificate is unavailable. Keep only this
+        # ephemeral path writable while the container root remains read-only.
+        - mountPath: /tmp
+          name: tmp
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -129,6 +140,8 @@ spec:
           secret:
             secretName: metrics-tls
             optional: true
+        - name: tmp
+          emptyDir: {}
       restartPolicy: Always
       securityContext:
         runAsNonRoot: true
