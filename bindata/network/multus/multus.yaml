@@ -652,7 +652,6 @@ spec:
       priorityClassName: "system-node-critical"
       tolerations:
       - operator: Exists
-        effect: NoSchedule
       containers:
       - name: whereabouts
         command: [ "/bin/sh" ]
