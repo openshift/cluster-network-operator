@@ -220,7 +220,7 @@ func TestBootstrap(t *testing.T) {
 	})
 }
 
-func TestBootstrapCloudNetworkConfig(t *testing.T) {
+func TestBootstrapOpenStackMaxAllowedAddressPairs(t *testing.T) {
 	baseOperConfig := &operv1.Network{
 		ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig},
 		Spec: operv1.NetworkSpec{
@@ -233,10 +233,22 @@ func TestBootstrapCloudNetworkConfig(t *testing.T) {
 		},
 	}
 
-	baseClientObjs := func(platformType configv1.PlatformType) []crclient.Object {
+	baseClientObjs := func(platformType configv1.PlatformType, maxAllowedAddressPairs int32) []crclient.Object {
+		var openStackSpec *configv1.OpenStackPlatformSpec
+		if platformType == configv1.OpenStackPlatformType {
+			openStackSpec = &configv1.OpenStackPlatformSpec{
+				MaxAllowedAddressPairs: maxAllowedAddressPairs,
+			}
+		}
 		return []crclient.Object{
 			&configv1.Infrastructure{
 				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						Type:      platformType,
+						OpenStack: openStackSpec,
+					},
+				},
 				Status: configv1.InfrastructureStatus{
 					PlatformStatus: &configv1.PlatformStatus{
 						Type: platformType,
@@ -262,123 +274,54 @@ func TestBootstrapCloudNetworkConfig(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		platformType configv1.PlatformType
-		configMap    *corev1.ConfigMap
-		expectValue  int
-		expectErr    bool
+		name                   string
+		platformType           configv1.PlatformType
+		maxAllowedAddressPairs int32
+		legacyConfigMap        *corev1.ConfigMap
+		expectValue            int32
 	}{
 		{
-			name:         "skipped on non-OpenStack platform",
-			platformType: configv1.NonePlatformType,
-			configMap: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "cloud-network-config",
-					Namespace: "openshift-network-operator",
-				},
-				Data: map[string]string{
-					"platform-os-max-allowed-address-pairs": "20",
-				},
-			},
-			expectValue: 0,
+			name:                   "ignored on non-OpenStack platform",
+			platformType:           configv1.NonePlatformType,
+			maxAllowedAddressPairs: 20,
+			expectValue:            0,
 		},
 		{
-			name:         "ConfigMap absent",
+			name:         "omitted Infrastructure field",
 			platformType: configv1.OpenStackPlatformType,
-			configMap:    nil,
 			expectValue:  0,
 		},
 		{
-			name:         "key missing from ConfigMap",
-			platformType: configv1.OpenStackPlatformType,
-			configMap: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "cloud-network-config",
-					Namespace: "openshift-network-operator",
-				},
-				Data: map[string]string{"other-key": "value"},
-			},
-			expectValue: 0,
-		},
-		{
-			name:         "valid value 20",
-			platformType: configv1.OpenStackPlatformType,
-			configMap: &corev1.ConfigMap{
+			name:                   "Infrastructure field is used without parsing the legacy ConfigMap",
+			platformType:           configv1.OpenStackPlatformType,
+			maxAllowedAddressPairs: 20,
+			legacyConfigMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "cloud-network-config",
 					Namespace: "openshift-network-operator",
 				},
 				Data: map[string]string{
-					"platform-os-max-allowed-address-pairs": "20",
+					"platform-os-max-allowed-address-pairs": "not-an-integer",
 				},
 			},
 			expectValue: 20,
-		},
-		{
-			name:         "zero value",
-			platformType: configv1.OpenStackPlatformType,
-			configMap: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "cloud-network-config",
-					Namespace: "openshift-network-operator",
-				},
-				Data: map[string]string{
-					"platform-os-max-allowed-address-pairs": "0",
-				},
-			},
-			expectErr: true,
-		},
-		{
-			name:         "negative value",
-			platformType: configv1.OpenStackPlatformType,
-			configMap: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "cloud-network-config",
-					Namespace: "openshift-network-operator",
-				},
-				Data: map[string]string{
-					"platform-os-max-allowed-address-pairs": "-5",
-				},
-			},
-			expectErr: true,
-		},
-		{
-			name:         "non-integer value",
-			platformType: configv1.OpenStackPlatformType,
-			configMap: &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "cloud-network-config",
-					Namespace: "openshift-network-operator",
-				},
-				Data: map[string]string{
-					"platform-os-max-allowed-address-pairs": "abc",
-				},
-			},
-			expectValue: 0,
-			expectErr:   true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			objs := baseClientObjs(tc.platformType)
-			if tc.configMap != nil {
-				objs = append(objs, tc.configMap)
+			objs := baseClientObjs(tc.platformType, tc.maxAllowedAddressPairs)
+			if tc.legacyConfigMap != nil {
+				objs = append(objs, tc.legacyConfigMap)
 			}
 			client := fakeclient.NewFakeClient(objs...)
 
 			result, err := network.Bootstrap(t.Context(), baseOperConfig, client)
-			if tc.expectErr {
-				if err == nil {
-					t.Errorf("expected error, got nil")
-				}
-				return
-			}
 			if err != nil {
 				t.Fatalf("Bootstrap failed: %v", err)
 			}
 
-			got := result.CloudNetworkConfig.OpenStackMaxAllowedAddressPairs
+			got := result.Infra.OpenStackMaxAllowedAddressPairs
 			if got != tc.expectValue {
 				t.Errorf("expected %d, got %d", tc.expectValue, got)
 			}

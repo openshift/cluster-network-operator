@@ -1,9 +1,8 @@
 package network
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -12,13 +11,7 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	crclient "sigs.k8s.io/controller-runtime/pkg/client"
-	crfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func makeManagedControllerRenderData() render.RenderData {
@@ -339,22 +332,18 @@ func TestOpenStackMaxAllowedAddressPairsSelfHostedTemplateRendering(t *testing.T
 	}
 }
 
-func TestOpenStackMaxAllowedAddressPairsRenderValidation(t *testing.T) {
+func TestOpenStackMaxAllowedAddressPairsRender(t *testing.T) {
 	tests := []struct {
-		name      string
-		value     int
-		expectErr bool
-		errSubstr string
+		name  string
+		value int32
 	}{
 		{
-			name:      "valid positive value - no error",
-			value:     20,
-			expectErr: false,
+			name:  "valid positive value",
+			value: 20,
 		},
 		{
-			name:      "not set - no error",
-			value:     0,
-			expectErr: false,
+			name:  "not set",
+			value: 0,
 		},
 	}
 
@@ -367,7 +356,8 @@ func TestOpenStackMaxAllowedAddressPairsRenderValidation(t *testing.T) {
 			}
 			br := &bootstrap.BootstrapResult{
 				Infra: bootstrap.InfraStatus{
-					PlatformType: configv1.OpenStackPlatformType,
+					PlatformType:                    configv1.OpenStackPlatformType,
+					OpenStackMaxAllowedAddressPairs: tc.value,
 					PlatformStatus: &configv1.PlatformStatus{
 						Type: configv1.OpenStackPlatformType,
 					},
@@ -377,102 +367,25 @@ func TestOpenStackMaxAllowedAddressPairsRenderValidation(t *testing.T) {
 					},
 					KubeCloudConfig: map[string]string{},
 				},
-				CloudNetworkConfig: bootstrap.CloudNetworkConfigBootstrapResult{
-					OpenStackMaxAllowedAddressPairs: tc.value,
-				},
 			}
 
-			_, err := renderCloudNetworkConfigController(conf, br, "../../bindata")
-			if tc.expectErr && err == nil {
-				t.Error("expected error, got nil")
-			}
-			if tc.expectErr && err != nil && tc.errSubstr != "" && !strings.Contains(err.Error(), tc.errSubstr) {
-				t.Errorf("expected error to contain %q, got: %v", tc.errSubstr, err)
-			}
-			if !tc.expectErr && err != nil {
-				t.Errorf("expected no error, got: %v", err)
-			}
-		})
-	}
-}
-
-type erroringReader struct {
-	err error
-}
-
-func (r *erroringReader) Get(_ context.Context, _ crclient.ObjectKey, _ crclient.Object, _ ...crclient.GetOption) error {
-	return r.err
-}
-
-func (r *erroringReader) List(_ context.Context, _ crclient.ObjectList, _ ...crclient.ListOption) error {
-	return r.err
-}
-
-func TestCloudNetworkConfigBootstrapErrorPropagation(t *testing.T) {
-	tests := []struct {
-		name      string
-		reader    crclient.Reader
-		expectErr bool
-		errSubstr string
-		expectRes bootstrap.CloudNetworkConfigBootstrapResult
-	}{
-		{
-			name:      "transient API error is propagated",
-			reader:    &erroringReader{err: fmt.Errorf("connection refused")},
-			expectErr: true,
-			errSubstr: "connection refused",
-		},
-		{
-			name: "forbidden error is propagated",
-			reader: &erroringReader{err: apierrors.NewForbidden(
-				schema.GroupResource{Group: "", Resource: "configmaps"}, "cloud-network-config", fmt.Errorf("access denied"),
-			)},
-			expectErr: true,
-			errSubstr: "forbidden",
-		},
-		{
-			name: "not-found error returns empty result without error",
-			reader: &erroringReader{err: apierrors.NewNotFound(
-				schema.GroupResource{Group: "", Resource: "configmaps"}, "cloud-network-config",
-			)},
-			expectErr: false,
-			expectRes: bootstrap.CloudNetworkConfigBootstrapResult{},
-		},
-		{
-			name: "ConfigMap present with valid value succeeds",
-			reader: crfake.NewClientBuilder().WithObjects(&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "cloud-network-config",
-					Namespace: "openshift-network-operator",
-				},
-				Data: map[string]string{
-					"platform-os-max-allowed-address-pairs": "15",
-				},
-			}).Build(),
-			expectErr: false,
-			expectRes: bootstrap.CloudNetworkConfigBootstrapResult{
-				OpenStackMaxAllowedAddressPairs: 15,
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			result, err := cloudNetworkConfigBootstrap(t.Context(), tc.reader)
-			if tc.expectErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				if !strings.Contains(err.Error(), tc.errSubstr) {
-					t.Errorf("expected error containing %q, got: %v", tc.errSubstr, err)
-				}
-				return
-			}
+			manifests, err := renderCloudNetworkConfigController(conf, br, "../../bindata")
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				t.Fatalf("failed to render cloud network config controller: %v", err)
 			}
-			if !reflect.DeepEqual(result, tc.expectRes) {
-				t.Errorf("result mismatch:\n  got:  %+v\n  want: %+v", result, tc.expectRes)
+
+			manifestJSON, err := json.Marshal(manifests)
+			if err != nil {
+				t.Fatalf("failed to marshal rendered manifests: %v", err)
+			}
+			rendered := string(manifestJSON)
+			flag := "-platform-os-max-allowed-address-pairs="
+			if tc.value == 0 {
+				if strings.Contains(rendered, flag) {
+					t.Errorf("did not expect %q in rendered manifests", flag)
+				}
+			} else if expected := fmt.Sprintf("%s%d", flag, tc.value); !strings.Contains(rendered, expected) {
+				t.Errorf("expected rendered manifests to contain %q", expected)
 			}
 		})
 	}
