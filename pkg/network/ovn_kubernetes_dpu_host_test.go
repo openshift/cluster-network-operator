@@ -146,8 +146,6 @@ func createTestRenderData(ovnNodeMode string) render.RenderData {
 	data.Data["ReleaseVersion"] = "4.14.0"
 	data.Data["KUBERNETES_SERVICE_PORT"] = "443"
 	data.Data["KUBERNETES_SERVICE_HOST"] = "kubernetes.default.svc"
-	data.Data["OVN_CONTROLLER_INACTIVITY_PROBE"] = "30000"
-	data.Data["OVN_NORTHD_PROBE_INTERVAL"] = "30000"
 	data.Data["CNIBinDir"] = "/var/lib/cni/bin"
 	data.Data["CNIConfDir"] = "/etc/cni/net.d"
 	data.Data["IsSNO"] = false

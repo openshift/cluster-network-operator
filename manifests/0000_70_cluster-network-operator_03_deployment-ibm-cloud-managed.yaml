@@ -74,12 +74,6 @@ spec:
           value: "10"
         - name: OVN_SB_RAFT_ELECTION_TIMER
           value: "16"
-        - name: OVN_NORTHD_PROBE_INTERVAL
-          value: "10000"
-        - name: OVN_CONTROLLER_INACTIVITY_PROBE
-          value: "180000"
-        - name: OVN_NB_INACTIVITY_PROBE
-          value: "60000"
         - name: EGRESS_ROUTER_CNI_IMAGE
           value: quay.io/openshift/origin-egress-router-cni:latest
         - name: NETWORK_METRICS_DAEMON_IMAGE
