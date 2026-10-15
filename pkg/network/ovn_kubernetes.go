@@ -211,6 +211,8 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 		}
 	}
 
+	data.Data["DisableUDNARPNDPFlood"] = bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["disable-udn-arp-ndp-flood"]
+
 	if conf.Migration != nil {
 		if conf.Migration.MTU != nil {
 			if *conf.Migration.MTU.Network.From > *conf.Migration.MTU.Network.To {
