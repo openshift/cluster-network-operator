@@ -108,6 +108,11 @@ var _ = Describe("[sig-network] CNO", func() {
 
 		applyPatchWithCleanup := func(customPatch, originalPatch string) {
 			DeferCleanup(func(ctx context.Context) {
+				// Rebind oc to the cleanup node's own context: the context
+				// captured at the top of the spec is cancelled once the spec
+				// body returns, which would make every command here fail with
+				// "context canceled".
+				oc := oc.WithContext(ctx)
 				patchResourceAsAdmin(oc, "Network.operator.openshift.io/cluster", originalPatch)
 				err := checkOVNKState(ctx, oc)
 				Expect(err).NotTo(HaveOccurred(), "OVNkube didn't rollout successfully after restoring original configuration")
@@ -141,7 +146,12 @@ var _ = Describe("[sig-network] CNO", func() {
 			Skip("This case requires 1 node, but the cluster has none")
 		}
 		worker := workerList.Items[0].Name
-		DeferCleanup(checkNodeStatus, oc, worker, "Ready")
+		// Rebind oc to the cleanup node's own context: the spec context bound at
+		// the top of the test is cancelled once the body returns, so checkNodeStatus
+		// would otherwise poll a cancelled context until the spec times out.
+		DeferCleanup(func(ctx context.Context) {
+			checkNodeStatus(ctx, oc.WithContext(ctx), worker, "Ready")
+		})
 		rebootNode(oc, worker)
 		checkNodeStatus(ctx, oc, worker, "NotReady")
 		checkNodeStatus(ctx, oc, worker, "Ready")
@@ -196,8 +206,14 @@ var _ = Describe("[sig-network] CNO", func() {
 		By("Create a new machineset, get the new node")
 		infrastructureName := getInfrastructureName(oc)
 		machineSetName := infrastructureName + "-72028"
-		DeferCleanup(waitForMachinesDisappear, oc, machineSetName)
-		DeferCleanup(deleteMachineSet, oc, machineSetName)
+		// Rebind oc to each cleanup node's own context; the spec context is
+		// cancelled once the body returns.
+		DeferCleanup(func(ctx context.Context) {
+			waitForMachinesDisappear(ctx, oc.WithContext(ctx), machineSetName)
+		})
+		DeferCleanup(func(ctx context.Context) {
+			deleteMachineSet(oc.WithContext(ctx), machineSetName)
+		})
 		createMachineSet(ctx, oc, machineSetName)
 
 		waitForMachineSetRunning(ctx, oc, machineSetName, 1)
@@ -208,7 +224,10 @@ var _ = Describe("[sig-network] CNO", func() {
 		ns2 := fmt.Sprintf("e2e-test-72028-%s", getRandomString())
 		err = oc.AsAdmin().WithoutNamespace().Run("create").Args("namespace", ns2).Execute()
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() {
+		DeferCleanup(func(ctx context.Context) {
+			// Rebind oc to the cleanup node's own context; the spec context is
+			// cancelled once the body returns.
+			oc := oc.WithContext(ctx)
 			_ = oc.AsAdmin().WithoutNamespace().Run("delete").Args("namespace", ns2, "--wait=false").Execute()
 		})
 		err = oc.AsAdmin().WithoutNamespace().Run("label").Args("namespace", ns2,
