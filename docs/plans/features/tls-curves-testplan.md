@@ -10,9 +10,9 @@
 1. [References](#references) — Enhancement proposals, JIRA tickets, and standards
 2. [Introduction](#introduction) — Feature overview and scope
 3. [Test Strategy](#test-strategy) — Testing approach for networking components
-4. [Test Scope](#test-scope) — Functional, negative, and FIPS compliance scenarios
+4. [Test Scope](#test-scope) — Functional and negative scenarios
 5. [Out of Scope](#out-of-scope) — What we're not testing
-6. [Target Environments](#target-environments) — OCP versions, FIPS, architectures
+6. [Target Environments](#target-environments) — OCP versions and architectures
 7. [Test Deliverables](#test-deliverables) — Test reports and automation
 8. [Test Tasks](#test-tasks) — Work breakdown
 9. [Pass/Fail Criteria](#passfail-criteria) — Exit criteria
@@ -38,7 +38,6 @@ The TLS curve/group preferences feature enables cluster administrators to config
 
 **Before OCP 5.1:**
 - OpenShift components used hardcoded default TLS curves from the Go `crypto/tls` library
-- FIPS-mode filtering was applied automatically without admin control
 
 **Starting in OCP 5.1, administrators can:**
 
@@ -62,25 +61,6 @@ The CNO propagates TLS curve preferences to the following networking components 
 | **cluster-network-operator** | `openshift-network-operator` | CNO's own metrics and health endpoints |
 | **networking-console-plugin** | `openshift-network-console` | OpenShift Console networking plugin backend |
 
-### FIPS Mode Behavior
-
-When OpenShift runs in FIPS mode (`/proc/sys/crypto/fips_enabled=1`), each CNO-managed component filters out non-FIPS-approved curves before TLS configuration, ensuring only FIPS-compliant groups are available during handshake negotiation.
-
-**FIPS-Approved Curves (Allowed):**
-- `secp256r1` (NIST P-256)
-- `secp384r1` (NIST P-384)
-- `secp521r1` (NIST P-521)
-- `SecP384r1MLKEM1024` (PQC hybrid, OCP 5.1+)
-
-**Non-FIPS Curves (Filtered):**
-- `X25519` (non-NIST classical curve)
-- `X25519MLKEM768` (contains non-FIPS X25519 component)
-
-**Future Availability:**
-- `SecP256r1MLKEM768` — FIPS-approved PQC hybrid curve (requires Go 1.26+)
-
-**Important:** FIPS filtering is **silent** — the configuration is accepted, but non-compliant curves are ignored during TLS handshake negotiation.
-
 ## Test Strategy
 
 ### Testing Approach
@@ -88,17 +68,15 @@ When OpenShift runs in FIPS mode (`/proc/sys/crypto/fips_enabled=1`), each CNO-m
 This test plan validates that CNO-managed networking components correctly:
 
 1. **Apply** configured TLS curves from the cluster-level `tlsSecurityProfile`
-2. **Filter** non-FIPS-approved curves when running in FIPS mode
-3. **Enforce** feature gate requirements for PQC hybrid curves
-4. **Negotiate** TLS handshakes using the configured curves
+2. **Enforce** feature gate requirements for PQC hybrid curves
+3. **Negotiate** TLS handshakes using the configured curves
 
 ### Test Methodology
 
 **Component Coverage:** Each of the 4 networking components will be tested independently
 
 **Environment Coverage:** Each component will be verified in:
-- Non-FIPS clusters
-- FIPS-enabled clusters
+- OCP clusters
 - Hypershift environments
 
 **Curve Coverage:** All supported TLS curves/groups will be tested (see [Supported TLS Curves/Groups](#supported-tls-curvesgroups))
@@ -129,15 +107,15 @@ This test plan focuses on downstream OpenShift networking components managed by 
 
 ### Supported TLS Curves/Groups
 
-| Curve / Group | Type | FIPS Status | Feature Gate Required | Availability |
-|---------------|------|-------------|----------------------|--------------|
-| **X25519** | Classical (non-NIST) | Filtered | No | All OCP versions |
-| **secp256r1** | Classical (NIST P-256) | Approved | No | All OCP versions |
-| **secp384r1** | Classical (NIST P-384) | Approved | No | All OCP versions |
-| **secp521r1** | Classical (NIST P-521) | Approved | No | All OCP versions |
-| **X25519MLKEM768** | PQC Hybrid | Filtered (contains X25519) | Yes | OCP 5.1+ |
-| **SecP256r1MLKEM768** | PQC Hybrid | Would be approved | Yes | Requires Go 1.26+ |
-| **SecP384r1MLKEM1024** | PQC Hybrid | Approved | Yes | OCP 5.1+ |
+| Curve / Group | Type | Feature Gate Required | Availability |
+|---------------|------|----------------------|--------------|
+| **X25519** | Classical (non-NIST) | No | All OCP versions |
+| **secp256r1** | Classical (NIST P-256) | No | All OCP versions |
+| **secp384r1** | Classical (NIST P-384) | No | All OCP versions |
+| **secp521r1** | Classical (NIST P-521) | No | All OCP versions |
+| **X25519MLKEM768** | PQC Hybrid | Yes | OCP 5.1+ |
+| **SecP256r1MLKEM768** | PQC Hybrid | Yes | Requires Go 1.26+ |
+| **SecP384r1MLKEM1024** | PQC Hybrid | Yes | OCP 5.1+ |
 
 ### E2E Test Cases
 
@@ -151,18 +129,15 @@ Validates that the multus admission controller webhook server correctly applies 
 
 **Test Coverage:**
 - ✓ Verify all supported TLS curves/groups (see [Supported TLS Curves/Groups](#supported-tls-curvesgroups))
-- ✓ Validate FIPS filtering behavior (non-FIPS curves are silently filtered in FIPS mode)
 - ✓ Validate successful TLS handshakes using the configured curves
 - ✓ Verify feature gate enforcement for PQC hybrid curves
 
 **Test Environments:**
-- Non-FIPS cluster
-- FIPS-enabled cluster
+- OCP cluster
 - Hypershift
 
 **Expected Results:**
 - TLS connections successfully negotiate using configured curves
-- Non-FIPS curves are filtered when FIPS mode is enabled
 - PQC hybrid curves require `TLSCurvePreferences` feature gate
 
 ---
@@ -177,18 +152,15 @@ Validates that OVN-Kubernetes node components (ovnkube-node, ovnkube-controller)
 
 **Test Coverage:**
 - ✓ Verify all supported TLS curves/groups (see [Supported TLS Curves/Groups](#supported-tls-curvesgroups))
-- ✓ Validate FIPS filtering behavior (non-FIPS curves are silently filtered in FIPS mode)
 - ✓ Validate successful TLS handshakes using the configured curves
 - ✓ Verify feature gate enforcement for PQC hybrid curves
 
 **Test Environments:**
-- Non-FIPS cluster
-- FIPS-enabled cluster
+- OCP cluster
 - Hypershift
 
 **Expected Results:**
 - TLS connections successfully negotiate using configured curves
-- Non-FIPS curves are filtered when FIPS mode is enabled
 - PQC hybrid curves require `TLSCurvePreferences` feature gate
 
 ---
@@ -203,18 +175,15 @@ Validates that the CNO's own metrics and health HTTPS endpoints correctly apply 
 
 **Test Coverage:**
 - ✓ Verify all supported TLS curves/groups (see [Supported TLS Curves/Groups](#supported-tls-curvesgroups))
-- ✓ Validate FIPS filtering behavior (non-FIPS curves are silently filtered in FIPS mode)
 - ✓ Validate successful TLS handshakes using the configured curves
 - ✓ Verify feature gate enforcement for PQC hybrid curves
 
 **Test Environments:**
-- Non-FIPS cluster
-- FIPS-enabled cluster
+- OCP cluster
 - Hypershift
 
 **Expected Results:**
 - TLS connections successfully negotiate using configured curves
-- Non-FIPS curves are filtered when FIPS mode is enabled
 - PQC hybrid curves require `TLSCurvePreferences` feature gate
 
 ---
@@ -229,18 +198,15 @@ Validates that the OpenShift Console networking plugin backend server correctly 
 
 **Test Coverage:**
 - ✓ Verify all supported TLS curves/groups (see [Supported TLS Curves/Groups](#supported-tls-curvesgroups))
-- ✓ Validate FIPS filtering behavior (non-FIPS curves are silently filtered in FIPS mode)
 - ✓ Validate successful TLS handshakes using the configured curves
 - ✓ Verify feature gate enforcement for PQC hybrid curves
 
 **Test Environments:**
-- Non-FIPS cluster
-- FIPS-enabled cluster
+- OCP cluster
 - Hypershift
 
 **Expected Results:**
 - TLS connections successfully negotiate using configured curves
-- Non-FIPS curves are filtered when FIPS mode is enabled
 - PQC hybrid curves require `TLSCurvePreferences` feature gate
 
 ## Out of Scope
@@ -267,9 +233,6 @@ The following components and scenarios are **explicitly excluded** from this tes
 | Environment Type | Version/Configuration | Priority | Notes |
 |-----------------|----------------------|----------|-------|
 | **OpenShift** | 5.1+ | Critical | Primary target release |
-| **Non-FIPS** | Standard OCP installation | Critical | Baseline functionality validation |
-| **FIPS-enabled** | FIPS mode enabled (`/proc/sys/crypto/fips_enabled=1`) | Critical | Compliance validation |
-| **Hypershift** | Hosted control plane | High | Cloud-native deployment model |
 
 ## Test Deliverables
 
@@ -277,7 +240,7 @@ The following components and scenarios are **explicitly excluded** from this tes
 |-------------|-------------|-----------------|
 | **E2E Test Automation** | Downstream PRs with e2e tests in `cluster-network-operator` repository | QE, CI/CD (Prow) |
 | **Test Execution Report** | Comprehensive test results with coverage metrics and findings | QE, Engineering |
-| **Documentation Feedback** | Configuration examples, FIPS behavior notes, known limitations | Docs team |
+| **Documentation Feedback** | Configuration examples and known limitations | Docs team |
 | **Bug Reports** | Detailed reports for any discrepancies between expected and actual behavior | Engineering |
 
 ## Test Tasks
@@ -285,8 +248,7 @@ The following components and scenarios are **explicitly excluded** from this tes
 | Task | Status | Owner | Notes |
 |------|--------|-------|-------|
 | Test plan creation and review | ☐ | QE Team | This document |
-| Execute e2e tests on non-FIPS cluster | ☐ | QE Team | All 4 components |
-| Execute e2e tests on FIPS cluster | ☐ | QE Team | Validate curve filtering |
+| Execute e2e tests on OCP cluster | ☐ | QE Team | All 4 components |
 | Execute e2e tests on Hypershift | ☐ | QE Team | Hosted control plane |
 | Automate curve validation script | ☐ | QE Team | For all 4 CNO-managed components |
 | Document test results | ☐ | QE Team | Create test execution report |
@@ -301,7 +263,6 @@ The feature is considered **ready for release** when all of the following condit
 
 - ✓ **Zero critical or major defects** remain open in Jira
 - ✓ **All e2e test cases** (E1-E4) pass consistently in Prow CI
-- ✓ **FIPS compliance validated** — Non-FIPS curves are correctly filtered in FIPS mode
 - ✓ **Feature gate enforcement verified** — PQC hybrid curves require `TLSCurvePreferences` feature gate
 - ✓ **Test automation complete** — All tests merged into `cluster-network-operator` repository
 - ✓ **Documentation feedback provided** — Configuration examples and known limitations shared with Docs team
@@ -312,7 +273,6 @@ The feature is considered **ready for release** when all of the following condit
 The feature is **NOT ready for release** if any of the following occur:
 
 - ✗ **Critical defects** that block core TLS functionality
-- ✗ **FIPS compliance failures** — Non-FIPS curves negotiated during TLS handshake in FIPS mode
 - ✗ **Feature gate bypass** — PQC curves work without required feature gate
 - ✗ **Consistent test failures** on Prow CI
 - ✗ **Security vulnerabilities** identified in TLS configuration handling
@@ -322,7 +282,6 @@ The feature is **NOT ready for release** if any of the following occur:
 | Risk | Impact | Probability | Mitigation |
 |------|--------|-------------|------------|
 | **Go version dependency** | `SecP256r1MLKEM768` requires Go 1.26+ | Medium | Document as future availability; test other PQC curves |
-| **FIPS certification delays** | PQC hybrid curves may need additional FIPS approval | Low | Focus on classical curve validation first |
 | **Platform-specific issues** | Different behavior on ARM64, s390x, ppc64le | Low | Test on all supported architectures |
 | **Third-party client compatibility** | Older clients may not support PQC curves | Medium | Ensure graceful fallback to classical curves |
 
