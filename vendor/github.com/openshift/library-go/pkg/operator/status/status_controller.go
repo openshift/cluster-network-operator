@@ -52,6 +52,7 @@ type StatusSyncer struct {
 	controllerFactory *factory.Factory
 	recorder          events.Recorder
 	degradedInertia   Inertia
+	availableInertia  Inertia
 
 	removeUnusedVersions bool
 }
@@ -120,6 +121,14 @@ func (c *StatusSyncer) Run(ctx context.Context, workers int) {
 func (c *StatusSyncer) WithDegradedInertia(inertia Inertia) *StatusSyncer {
 	output := *c
 	output.degradedInertia = inertia
+	return &output
+}
+
+// WithAvailableInertia returns a copy of the StatusSyncer with the
+// requested inertia function for available conditions.
+func (c *StatusSyncer) WithAvailableInertia(inertia Inertia) *StatusSyncer {
+	output := *c
+	output.availableInertia = inertia
 	return &output
 }
 
@@ -217,7 +226,7 @@ func (c StatusSyncer) Sync(ctx context.Context, syncCtx factory.SyncContext) err
 
 	configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, UnionClusterCondition(configv1.OperatorDegraded, operatorv1.ConditionFalse, c.degradedInertia, currentDetailedStatus.Conditions...), c.clock)
 	configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, UnionClusterCondition(configv1.OperatorProgressing, operatorv1.ConditionFalse, nil, currentDetailedStatus.Conditions...), c.clock)
-	configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, UnionClusterCondition(configv1.OperatorAvailable, operatorv1.ConditionTrue, nil, currentDetailedStatus.Conditions...), c.clock)
+	configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, UnionClusterCondition(configv1.OperatorAvailable, operatorv1.ConditionTrue, c.availableInertia, currentDetailedStatus.Conditions...), c.clock)
 	configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, UnionClusterCondition(configv1.OperatorUpgradeable, operatorv1.ConditionTrue, nil, currentDetailedStatus.Conditions...), c.clock)
 	configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, UnionClusterCondition(configv1.EvaluationConditionsDetected, operatorv1.ConditionFalse, nil, currentDetailedStatus.Conditions...), c.clock)
 
