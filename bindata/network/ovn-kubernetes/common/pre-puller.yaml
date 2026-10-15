@@ -28,6 +28,8 @@ spec:
         # ovnkube-upgrades-prepuller: no-op container that simply pulls the new image during upgrades
       - name: ovnkube-upgrades-prepuller
         image: "{{.OvnImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         imagePullPolicy: IfNotPresent
         terminationMessagePolicy: FallbackToLogsOnError
         command:

@@ -36,6 +36,7 @@ spec:
       - name: controller
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           capabilities:
             drop:
             - ALL
@@ -88,6 +89,8 @@ spec:
         - name: bound-sa-token
           mountPath: /var/run/secrets/openshift/serviceaccount
           readOnly: true
+        - name: tmp
+          mountPath: /tmp
         terminationMessagePolicy: FallbackToLogsOnError
 {{- if not .ExternalControlPlane }}
       nodeSelector:
@@ -118,3 +121,5 @@ spec:
           - serviceAccountToken:
               path: token
               audience: openshift
+      - name: tmp
+        emptyDir: {}

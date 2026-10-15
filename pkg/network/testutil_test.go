@@ -143,6 +143,43 @@ func mustFindContainer(t *testing.T, in []corev1.Container, name string) *corev1
 	return &c
 }
 
+func expectWritableEmptyDirMount(t *testing.T, podSpec *corev1.PodSpec, containerName, volumeName, mountPath string) {
+	t.Helper()
+	g := NewWithT(t)
+
+	container := mustFindContainer(t, podSpec.Containers, containerName)
+	g.Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{
+		Name:      volumeName,
+		MountPath: mountPath,
+	}))
+
+	volumeIndex := slices.IndexFunc(podSpec.Volumes, func(volume corev1.Volume) bool {
+		return volume.Name == volumeName
+	})
+	g.Expect(volumeIndex).NotTo(Equal(-1), "Could not find volume with name %q", volumeName)
+	g.Expect(podSpec.Volumes[volumeIndex].EmptyDir).NotTo(BeNil(), "Volume %q must be an emptyDir", volumeName)
+}
+
+func expectHostPathMount(t *testing.T, podSpec *corev1.PodSpec, containerName, volumeName, mountPath, hostPath string) {
+	t.Helper()
+	g := NewWithT(t)
+
+	containers := append([]corev1.Container{}, podSpec.InitContainers...)
+	containers = append(containers, podSpec.Containers...)
+	container := mustFindContainer(t, containers, containerName)
+	g.Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{
+		Name:      volumeName,
+		MountPath: mountPath,
+	}))
+
+	volumeIndex := slices.IndexFunc(podSpec.Volumes, func(volume corev1.Volume) bool {
+		return volume.Name == volumeName
+	})
+	g.Expect(volumeIndex).NotTo(Equal(-1), "pod must define volume %q", volumeName)
+	g.Expect(podSpec.Volumes[volumeIndex].HostPath).NotTo(BeNil(), "volume %q must be a hostPath", volumeName)
+	g.Expect(podSpec.Volumes[volumeIndex].HostPath.Path).To(Equal(hostPath), "volume %q must use host path %q", volumeName, hostPath)
+}
+
 // findExecCommand finds and returns the exec command for the given binary in container command args.
 // It expects cmdArgs to have length 3 (bash, -c, script) and returns the portion from "exec /usr/bin/<binary>" onwards.
 func findExecCommand(t *testing.T, cmdArgs []string, binaryName string) string {
