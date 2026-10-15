@@ -145,6 +145,9 @@ type InfraStatus struct {
 
 	// ConsolePluginCRDExists set to true when the consoleplugins.console.openshift.io has been deployed.
 	ConsolePluginCRDExists bool
+
+	// OpenStackMaxAllowedAddressPairs is the Neutron address-pair limit from Infrastructure.spec.
+	OpenStackMaxAllowedAddressPairs int32
 }
 
 // APIServer is the hostname & port of a given APIServer. (This is the
