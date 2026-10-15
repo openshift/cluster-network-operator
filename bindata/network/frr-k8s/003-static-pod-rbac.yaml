@@ -1,0 +1,100 @@
+{{ if .BGPVIPManagement }}
+# RBAC for the frr-k8s static pod on control plane nodes (BGP VIP
+# management). The static pod authenticates with the node kubeconfig, whose
+# identity is the MCO node-bootstrapper ServiceAccount.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: frr-k8s-static-pod
+rules:
+- apiGroups:
+  - frrk8s.metallb.io
+  resources:
+  - frrconfigurations
+  - frrk8sconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+# No delete: stale state objects are removed by frr-k8s's status cleaner.
+- apiGroups:
+  - frrk8s.metallb.io
+  resources:
+  - frrnodestates
+  - bgpsessionstates
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+- apiGroups:
+  - frrk8s.metallb.io
+  resources:
+  - frrnodestates/status
+  - bgpsessionstates/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: frr-k8s-static-pod
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: frr-k8s-static-pod
+subjects:
+- kind: ServiceAccount
+  name: node-bootstrapper
+  namespace: openshift-machine-config-operator
+---
+# Read-only subset of the DaemonSet SA's Role in 002-rbac.yaml.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: frr-k8s-static-pod
+  namespace: openshift-frr-k8s
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: frr-k8s-static-pod
+  namespace: openshift-frr-k8s
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: frr-k8s-static-pod
+subjects:
+- kind: ServiceAccount
+  name: node-bootstrapper
+  namespace: openshift-machine-config-operator
+{{ end }}
