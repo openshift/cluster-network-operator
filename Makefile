@@ -25,6 +25,7 @@ check: | verify test-unit golangci-lint
 
 golangci-lint:
 	golangci-lint run --verbose --print-resources-usage --modules-download-mode=vendor --timeout=5m0s
+	cd test && golangci-lint run --verbose --modules-download-mode=mod --timeout=5m0s ./...
 .PHONY: golangci-lint
 
 install.tools:
@@ -45,5 +46,10 @@ verify: verify-update-codegen
 clean:
 	$(RM) cluster-network-operator cluster-network-check-endpoints cluster-network-check-target
 .PHONY: clean
+
+.PHONY: build-e2e-tests
+build-e2e-tests:
+	@echo "Building cluster-network-operator-tests-ext binary..."
+	$(MAKE) -C test build
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
