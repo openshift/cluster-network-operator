@@ -33,7 +33,7 @@ bindata/                # Go-template manifests, one dir per component; rendered
 manifests/              # CVO-applied manifests for the operator itself (namespace, CRDs, RBAC, deployment)
 profile-patches/        # Patches layered on manifests/ per install profile (see Makefile)
 docs/                   # architecture.md, operands.md, IPsec/DPU docs — kept in sync with behavior changes
-test/e2e/               # Ginkgo e2e suites
+test/e2e/               # Native Ginkgo e2e specs (make -C test test-e2e)
 hack/                   # Dev scripts: update-codegen.sh, test-go.sh, verify-style.sh, kind.yaml, ...
 ```
 
@@ -47,6 +47,7 @@ make check      # verify (incl. codegen diff) + test-unit + golangci-lint — ru
 make test-unit             # Unit tests only (./pkg/... ./cmd/...)
 make golangci-lint          # Lint only
 make verify-update-codegen  # Regenerate deepcopy/clientset code and diff-check
+make -C test test-e2e                  # Native Ginkgo e2e against KUBECONFIG (any OpenShift cluster)
 ```
 
 ## Key Conventions
