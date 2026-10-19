@@ -70,6 +70,9 @@ spec:
   {{- if .TLSCipherSuites }}
             - --tls-cipher-suites={{.TLSCipherSuites}}
   {{- end }}
+  {{- if .TLSCurvePreferences }}
+            - --tls-curve-preferences={{.TLSCurvePreferences}}
+  {{- end }}
 {{- else }}
             - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
 {{- end }}

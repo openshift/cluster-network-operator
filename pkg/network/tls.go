@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -21,6 +22,8 @@ const (
 	TLSMinVersionKey = "TLSMinVersion"
 	// TLSCipherSuitesKey is the template data key for the comma-separated cipher suites
 	TLSCipherSuitesKey = "TLSCipherSuites"
+	// TLSCurvePreferencesKey is the template data key for the comma-separated curve IDs
+	TLSCurvePreferencesKey = "TLSCurvePreferences"
 	// NginxTLSProtocolsKey is the template data key for NGINX ssl_protocols directive
 	NginxTLSProtocolsKey = "NginxTLSProtocols"
 	// NginxTLSCiphersKey is the template data key for NGINX ssl_ciphers directive
@@ -59,6 +62,7 @@ func addTLSInfoToRenderData(data map[string]any, bootstrapResult *bootstrap.Boot
 	// Add Go-style TLS parameters (IANA cipher names, comma-separated)
 	data[TLSMinVersionKey] = bootstrapResult.TLSProfile.Spec.MinTLSVersion
 	data[TLSCipherSuitesKey] = strings.Join(ianaCiphers, ",")
+	data[TLSCurvePreferencesKey] = strings.Join(tlsGroupsToCurveIDs(bootstrapResult.TLSProfile.Spec.Groups), ",")
 
 	// Add NGINX-style TLS parameters (OpenSSL cipher names, colon-separated)
 	data[NginxTLSProtocolsKey] = convertTLSVersionToNginx(bootstrapResult.TLSProfile.Spec.MinTLSVersion)
@@ -132,4 +136,14 @@ func tlsGroupsToNginxCurves(groups []configv1.TLSGroup) string {
 		curves[i] = string(group)
 	}
 	return strings.Join(curves, ":")
+}
+
+func tlsGroupsToCurveIDs(groups []configv1.TLSGroup) []string {
+	curveIDs, _ := crypto.TLSGroupsToCurvePreferences(groups)
+	curves := make([]string, len(curveIDs))
+	for i, id := range curveIDs {
+		curves[i] = strconv.Itoa(int(id))
+	}
+
+	return curves
 }

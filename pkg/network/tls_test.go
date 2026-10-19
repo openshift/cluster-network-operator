@@ -1,7 +1,9 @@
 package network
 
 import (
+	"crypto/tls"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -38,16 +40,10 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 				addTLSInfoToRenderData(data, bootstrapResult, tc.respectAdherence)
 
 				// Should always use TLS profile when adherence is StrictAllComponents
-				if v, ok := data[UseTLSProfileKey]; !ok || v != true {
-					t.Errorf("Expected %s to be true, got %v", UseTLSProfileKey, v)
-				}
-				if v, ok := data[TLSMinVersionKey]; !ok || v != configv1.VersionTLS12 {
-					t.Errorf("Expected %s to be %v, got %v", TLSMinVersionKey, configv1.VersionTLS12, v)
-				}
-				expectedCiphers := "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384"
-				if v, ok := data[TLSCipherSuitesKey]; !ok || v != expectedCiphers {
-					t.Errorf("Expected %s to be %v, got %v", TLSCipherSuitesKey, expectedCiphers, v)
-				}
+				g.Expect(data).To(HaveKeyWithValue(UseTLSProfileKey, true))
+				g.Expect(data).To(HaveKeyWithValue(TLSMinVersionKey, configv1.VersionTLS12))
+				g.Expect(data).To(HaveKeyWithValue(TLSCipherSuitesKey, "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384"))
+				g.Expect(data).To(HaveKeyWithValue(TLSCurvePreferencesKey, fmt.Sprintf("%d,%d", tls.CurveP256, tls.X25519)))
 
 				// Check NGINX parameters
 				g.Expect(data).To(HaveKeyWithValue(NginxTLSProtocolsKey, "TLSv1.2 TLSv1.3"))
@@ -86,15 +82,10 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 					addTLSInfoToRenderData(data, bootstrapResult, true)
 
 					// Should NOT use TLS profile when respecting adherence for these policies
-					if v, ok := data[UseTLSProfileKey]; !ok || v != false {
-						t.Errorf("Expected %s to be false, got %v", UseTLSProfileKey, v)
-					}
-					if _, ok := data[TLSMinVersionKey]; ok {
-						t.Errorf("Expected %s to not be present, but it was: %v", TLSMinVersionKey, data[TLSMinVersionKey])
-					}
-					if _, ok := data[TLSCipherSuitesKey]; ok {
-						t.Errorf("Expected %s to not be present, but it was: %v", TLSCipherSuitesKey, data[TLSCipherSuitesKey])
-					}
+					g.Expect(data).To(HaveKeyWithValue(UseTLSProfileKey, false))
+					g.Expect(data).NotTo(HaveKey(TLSMinVersionKey))
+					g.Expect(data).NotTo(HaveKey(TLSCipherSuitesKey))
+					g.Expect(data).NotTo(HaveKey(TLSCurvePreferencesKey))
 
 					// NGINX parameters should also not be set
 					g.Expect(data).NotTo(HaveKey(NginxTLSProtocolsKey))
@@ -119,16 +110,10 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 					addTLSInfoToRenderData(data, bootstrapResult, false)
 
 					// Should use TLS profile when not respecting adherence
-					if v, ok := data[UseTLSProfileKey]; !ok || v != true {
-						t.Errorf("Expected %s to be true, got %v", UseTLSProfileKey, v)
-					}
-					if v, ok := data[TLSMinVersionKey]; !ok || v != configv1.VersionTLS13 {
-						t.Errorf("Expected %s to be %v, got %v", TLSMinVersionKey, configv1.VersionTLS13, v)
-					}
-					expectedCiphers := "TLS_AES_128_GCM_SHA256"
-					if v, ok := data[TLSCipherSuitesKey]; !ok || v != expectedCiphers {
-						t.Errorf("Expected %s to be %v, got %v", TLSCipherSuitesKey, expectedCiphers, v)
-					}
+					g.Expect(data).To(HaveKeyWithValue(UseTLSProfileKey, true))
+					g.Expect(data).To(HaveKeyWithValue(TLSMinVersionKey, configv1.VersionTLS13))
+					g.Expect(data).To(HaveKeyWithValue(TLSCipherSuitesKey, "TLS_AES_128_GCM_SHA256"))
+					g.Expect(data).To(HaveKeyWithValue(TLSCurvePreferencesKey, strconv.Itoa(int(tls.CurveP256))))
 
 					// Check NGINX parameters
 					g.Expect(data).To(HaveKeyWithValue(NginxTLSProtocolsKey, "TLSv1.3"))
@@ -151,16 +136,10 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 		}
 
 		addTLSInfoToRenderData(data, bootstrapResult, false)
-
-		if v, ok := data[UseTLSProfileKey]; !ok || v != true {
-			t.Errorf("Expected %s to be true, got %v", UseTLSProfileKey, v)
-		}
-		if v, ok := data[TLSMinVersionKey]; !ok || v != configv1.VersionTLS12 {
-			t.Errorf("Expected %s to be %v, got %v", TLSMinVersionKey, configv1.VersionTLS12, v)
-		}
-		if v, ok := data[TLSCipherSuitesKey]; !ok || v != "" {
-			t.Errorf("Expected %s to be empty string, got %v", TLSCipherSuitesKey, v)
-		}
+		g.Expect(data).To(HaveKeyWithValue(UseTLSProfileKey, true))
+		g.Expect(data).To(HaveKeyWithValue(TLSMinVersionKey, configv1.VersionTLS12))
+		g.Expect(data).To(HaveKeyWithValue(TLSCipherSuitesKey, BeEmpty()))
+		g.Expect(data).To(HaveKeyWithValue(TLSCurvePreferencesKey, BeEmpty()))
 
 		// Check NGINX parameters
 		g.Expect(data).To(HaveKeyWithValue(NginxTLSProtocolsKey, "TLSv1.2 TLSv1.3"))
@@ -194,15 +173,11 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 		addTLSInfoToRenderData(data, bootstrapResult, true)
 
 		// Should use TLS profile
-		if v, ok := data[UseTLSProfileKey]; !ok || v != true {
-			t.Errorf("Expected %s to be true, got %v", UseTLSProfileKey, v)
-		}
+		g.Expect(data).To(HaveKeyWithValue(UseTLSProfileKey, true))
 
 		// Only supported ciphers should be in the IANA list (unsupported ones filtered out)
-		expectedCiphers := "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
-		if v, ok := data[TLSCipherSuitesKey]; !ok || v != expectedCiphers {
-			t.Errorf("Expected %s to be %q, got %q", TLSCipherSuitesKey, expectedCiphers, v)
-		}
+		g.Expect(data).To(HaveKeyWithValue(TLSCipherSuitesKey,
+			"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"))
 
 		// NGINX should keep all ciphers (original OpenSSL names)
 		g.Expect(data).To(HaveKeyWithValue(NginxTLSCiphersKey, strings.Join(bootstrapResult.TLSProfile.Spec.Ciphers, ":")))
