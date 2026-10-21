@@ -219,3 +219,112 @@ func TestBootstrap(t *testing.T) {
 		})
 	})
 }
+
+func TestBootstrapOpenStackMaxAllowedAddressPairs(t *testing.T) {
+	baseOperConfig := &operv1.Network{
+		ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig},
+		Spec: operv1.NetworkSpec{
+			DefaultNetwork: operv1.DefaultNetworkDefinition{
+				Type: operv1.NetworkTypeOVNKubernetes,
+				OVNKubernetesConfig: &operv1.OVNKubernetesConfig{
+					MTU: nil,
+				},
+			},
+		},
+	}
+
+	baseClientObjs := func(platformType configv1.PlatformType, maxAllowedAddressPairs int32) []crclient.Object {
+		var openStackSpec *configv1.OpenStackPlatformSpec
+		if platformType == configv1.OpenStackPlatformType {
+			openStackSpec = &configv1.OpenStackPlatformSpec{
+				MaxAllowedAddressPairs: maxAllowedAddressPairs,
+			}
+		}
+		return []crclient.Object{
+			&configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						Type:      platformType,
+						OpenStack: openStackSpec,
+					},
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: platformType,
+					},
+				},
+			},
+			&configv1.Proxy{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+			},
+			&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      network.ClusterConfigName,
+					Namespace: network.ClusterConfigNamespace,
+				},
+				Data: map[string]string{
+					"install-config": "controlPlane:\n  replicas: 3\n",
+				},
+			},
+			&configv1.APIServer{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+			},
+		}
+	}
+
+	tests := []struct {
+		name                   string
+		platformType           configv1.PlatformType
+		maxAllowedAddressPairs int32
+		legacyConfigMap        *corev1.ConfigMap
+		expectValue            int32
+	}{
+		{
+			name:                   "ignored on non-OpenStack platform",
+			platformType:           configv1.NonePlatformType,
+			maxAllowedAddressPairs: 20,
+			expectValue:            0,
+		},
+		{
+			name:         "omitted Infrastructure field",
+			platformType: configv1.OpenStackPlatformType,
+			expectValue:  0,
+		},
+		{
+			name:                   "Infrastructure field is used without parsing the legacy ConfigMap",
+			platformType:           configv1.OpenStackPlatformType,
+			maxAllowedAddressPairs: 20,
+			legacyConfigMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cloud-network-config",
+					Namespace: "openshift-network-operator",
+				},
+				Data: map[string]string{
+					"platform-os-max-allowed-address-pairs": "not-an-integer",
+				},
+			},
+			expectValue: 20,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			objs := baseClientObjs(tc.platformType, tc.maxAllowedAddressPairs)
+			if tc.legacyConfigMap != nil {
+				objs = append(objs, tc.legacyConfigMap)
+			}
+			client := fakeclient.NewFakeClient(objs...)
+
+			result, err := network.Bootstrap(t.Context(), baseOperConfig, client)
+			if err != nil {
+				t.Fatalf("Bootstrap failed: %v", err)
+			}
+
+			got := result.Infra.OpenStackMaxAllowedAddressPairs
+			if got != tc.expectValue {
+				t.Errorf("expected %d, got %d", tc.expectValue, got)
+			}
+		})
+	}
+}

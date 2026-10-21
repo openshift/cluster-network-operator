@@ -1,9 +1,15 @@
 package network
 
 import (
+	"encoding/json"
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
+	configv1 "github.com/openshift/api/config/v1"
+	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -40,6 +46,7 @@ func makeManagedControllerRenderData() render.RenderData {
 	data.Data["AzureManagedCredsPath"] = ""
 	data.Data["AzureManagedSecretProviderClass"] = ""
 	data.Data["GCPCredentialsPath"] = ""
+	data.Data["OpenStackMaxAllowedAddressPairs"] = 0
 	return data
 }
 
@@ -169,4 +176,217 @@ func TestCloudTokenMinterHasTokenAudience(t *testing.T) {
 		return
 	}
 	t.Fatal("Deployment object not found in rendered output")
+}
+
+func makeSelfHostedControllerRenderData() render.RenderData {
+	data := render.MakeRenderData()
+	data.Data["ReleaseVersion"] = "4.18.0"
+	data.Data["PlatformType"] = "OpenStack"
+	data.Data["PlatformRegion"] = "regionOne"
+	data.Data["PlatformTypeAWS"] = "AWS"
+	data.Data["PlatformTypeAzure"] = "Azure"
+	data.Data["PlatformTypeGCP"] = "GCP"
+	data.Data["CloudNetworkConfigControllerImage"] = "test-image"
+	data.Data["KubernetesServiceURL"] = "https://localhost:6443"
+	data.Data["ExternalControlPlane"] = false
+	data.Data["PlatformAzureEnvironment"] = ""
+	data.Data["PlatformAWSCAPath"] = ""
+	data.Data["PlatformAPIURL"] = ""
+	data.Data["HTTP_PROXY"] = ""
+	data.Data["HTTPS_PROXY"] = ""
+	data.Data["NO_PROXY"] = ""
+	data.Data["OpenStackMaxAllowedAddressPairs"] = 0
+	return data
+}
+
+func TestOpenStackMaxAllowedAddressPairsManagedTemplateRendering(t *testing.T) {
+	tests := []struct {
+		name        string
+		value       int
+		expectFlag  bool
+		expectValue string
+	}{
+		{
+			name:       "not set - flag absent",
+			value:      0,
+			expectFlag: false,
+		},
+		{
+			name:        "valid value 20 - flag present",
+			value:       20,
+			expectFlag:  true,
+			expectValue: "20",
+		},
+		{
+			name:        "valid value 1 - flag present",
+			value:       1,
+			expectFlag:  true,
+			expectValue: "1",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			data := makeManagedControllerRenderData()
+			data.Data["OpenStackMaxAllowedAddressPairs"] = tc.value
+
+			objs, err := render.RenderDir("../../bindata/cloud-network-config-controller/managed", &data)
+			if err != nil {
+				t.Fatalf("failed to render managed controller: %v", err)
+			}
+
+			for _, obj := range objs {
+				if obj.GetKind() != "Deployment" {
+					continue
+				}
+
+				container, found := findUnstructuredContainer(t, obj.Object, "controller")
+				if !found {
+					t.Fatal("controller container not found in Deployment")
+				}
+
+				cmdSlice, found, err := uns.NestedStringSlice(container, "command")
+				if err != nil || !found || len(cmdSlice) < 3 {
+					t.Fatal("command not found in controller container")
+				}
+				shellScript := cmdSlice[2]
+
+				flagStr := fmt.Sprintf("-platform-os-max-allowed-address-pairs=%s", tc.expectValue)
+				if tc.expectFlag && !strings.Contains(shellScript, flagStr) {
+					t.Errorf("expected shell script to contain %q, but it does not.\nScript:\n%s", flagStr, shellScript)
+				}
+				if !tc.expectFlag && strings.Contains(shellScript, "-platform-os-max-allowed-address-pairs=") {
+					t.Errorf("expected shell script to NOT contain the flag, but it does.\nScript:\n%s", shellScript)
+				}
+				return
+			}
+			t.Fatal("Deployment object not found in rendered output")
+		})
+	}
+}
+
+func TestOpenStackMaxAllowedAddressPairsSelfHostedTemplateRendering(t *testing.T) {
+	tests := []struct {
+		name        string
+		value       int
+		expectFlag  bool
+		expectValue string
+	}{
+		{
+			name:       "not set - flag absent",
+			value:      0,
+			expectFlag: false,
+		},
+		{
+			name:        "valid value 20 - flag present",
+			value:       20,
+			expectFlag:  true,
+			expectValue: "20",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			data := makeSelfHostedControllerRenderData()
+			data.Data["OpenStackMaxAllowedAddressPairs"] = tc.value
+
+			objs, err := render.RenderDir("../../bindata/cloud-network-config-controller/self-hosted", &data)
+			if err != nil {
+				t.Fatalf("failed to render self-hosted controller: %v", err)
+			}
+
+			for _, obj := range objs {
+				if obj.GetKind() != "Deployment" {
+					continue
+				}
+
+				container, found := findUnstructuredContainer(t, obj.Object, "controller")
+				if !found {
+					t.Fatal("controller container not found in Deployment")
+				}
+
+				args, found, err := uns.NestedStringSlice(container, "args")
+				if err != nil || !found {
+					t.Fatal("args not found in controller container")
+				}
+
+				flagStr := fmt.Sprintf("-platform-os-max-allowed-address-pairs=%s", tc.expectValue)
+				var hasFlag bool
+				for _, arg := range args {
+					if tc.expectFlag && arg == flagStr {
+						hasFlag = true
+						break
+					}
+					if !tc.expectFlag && strings.Contains(arg, "-platform-os-max-allowed-address-pairs=") {
+						t.Errorf("expected args to NOT contain the flag, but found %q", arg)
+						return
+					}
+				}
+				if tc.expectFlag && !hasFlag {
+					t.Errorf("expected args to contain %q, but it was not found.\nArgs: %v", flagStr, args)
+				}
+				return
+			}
+			t.Fatal("Deployment object not found in rendered output")
+		})
+	}
+}
+
+func TestOpenStackMaxAllowedAddressPairsRender(t *testing.T) {
+	tests := []struct {
+		name  string
+		value int32
+	}{
+		{
+			name:  "valid positive value",
+			value: 20,
+		},
+		{
+			name:  "not set",
+			value: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			conf := &operv1.NetworkSpec{
+				DefaultNetwork: operv1.DefaultNetworkDefinition{
+					Type: operv1.NetworkTypeOVNKubernetes,
+				},
+			}
+			br := &bootstrap.BootstrapResult{
+				Infra: bootstrap.InfraStatus{
+					PlatformType:                    configv1.OpenStackPlatformType,
+					OpenStackMaxAllowedAddressPairs: tc.value,
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: configv1.OpenStackPlatformType,
+					},
+					APIServers: map[string]bootstrap.APIServer{
+						bootstrap.APIServerDefault:      {Host: "localhost", Port: "6443"},
+						bootstrap.APIServerDefaultLocal: {Host: "localhost", Port: "6443"},
+					},
+					KubeCloudConfig: map[string]string{},
+				},
+			}
+
+			manifests, err := renderCloudNetworkConfigController(conf, br, "../../bindata")
+			if err != nil {
+				t.Fatalf("failed to render cloud network config controller: %v", err)
+			}
+
+			manifestJSON, err := json.Marshal(manifests)
+			if err != nil {
+				t.Fatalf("failed to marshal rendered manifests: %v", err)
+			}
+			rendered := string(manifestJSON)
+			flag := "-platform-os-max-allowed-address-pairs="
+			if tc.value == 0 {
+				if strings.Contains(rendered, flag) {
+					t.Errorf("did not expect %q in rendered manifests", flag)
+				}
+			} else if expected := fmt.Sprintf("%s%d", flag, tc.value); !strings.Contains(rendered, expected) {
+				t.Errorf("expected rendered manifests to contain %q", expected)
+			}
+		})
+	}
 }
