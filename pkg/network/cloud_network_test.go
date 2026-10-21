@@ -2,6 +2,7 @@ package network
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/openshift/cluster-network-operator/pkg/render"
@@ -166,6 +167,52 @@ func TestCloudTokenMinterHasTokenAudience(t *testing.T) {
 			return
 		}
 		t.Error("expected cloud-token minter to have --token-audience=openshift arg")
+		return
+	}
+	t.Fatal("Deployment object not found in rendered output")
+}
+
+func TestCloudNetworkConfigControllerReadOnlyRootFilesystems(t *testing.T) {
+	tests := []struct {
+		name      string
+		directory string
+		namespace string
+	}{
+		{name: "self-hosted", directory: "self-hosted", namespace: "openshift-cloud-network-config-controller"},
+		{name: "managed", directory: "managed", namespace: "test-ns"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			data := makeManagedControllerRenderData()
+			objs, err := render.RenderDir("../../bindata/cloud-network-config-controller/"+test.directory, &data)
+			if err != nil {
+				t.Fatalf("failed to render %s controller: %v", test.name, err)
+			}
+			expectReadOnlyRootFilesystems(t, objs, test.namespace)
+		})
+	}
+}
+
+func TestManagedCloudNetworkConfigControllerSafeToEvictLocalVolumes(t *testing.T) {
+	data := makeManagedControllerRenderData()
+	objs, err := render.RenderDir("../../bindata/cloud-network-config-controller/managed", &data)
+	if err != nil {
+		t.Fatalf("failed to render managed controller: %v", err)
+	}
+
+	for _, obj := range objs {
+		if obj.GetKind() != "Deployment" {
+			continue
+		}
+
+		annotation, found, err := uns.NestedString(obj.Object, "spec", "template", "metadata", "annotations", "cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes")
+		if err != nil || !found {
+			t.Fatal("safe-to-evict-local-volumes annotation not found in managed controller Deployment")
+		}
+		if !slices.Contains(strings.Split(annotation, ","), "tmp") {
+			t.Errorf("expected safe-to-evict-local-volumes annotation %q to include tmp", annotation)
+		}
 		return
 	}
 	t.Fatal("Deployment object not found in rendered output")

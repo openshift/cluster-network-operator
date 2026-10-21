@@ -79,8 +79,10 @@ func TestRenderNetworkNodeIdentity(t *testing.T) {
 	t.Run("should successfully render the network-node-identity DaemonSet", func(t *testing.T) {
 		g := NewWithT(t)
 		networkConfig, bootstrapResult, client := setupTest(t)
-		daemonSet := mustFindRenderedObj[*appsv1.DaemonSet](t, assertRenderSuccess(t, networkConfig, bootstrapResult, client),
+		objs := assertRenderSuccess(t, networkConfig, bootstrapResult, client)
+		daemonSet := mustFindRenderedObj[*appsv1.DaemonSet](t, objs,
 			"DaemonSet", "network-node-identity")
+		expectReadOnlyRootFilesystems(t, objs, NetworkNodeIdentityNamespace)
 		container := mustFindContainer(t, daemonSet.Spec.Template.Spec.Containers, "webhook")
 		execStr := findOvnkubeIdentityExec(t, container.Command)
 		apiserverArg := "--k8s-apiserver=https://" + net.JoinHostPort(bootstrapResult.Infra.APIServers[bootstrap.APIServerDefault].Host,
@@ -132,8 +134,10 @@ func TestRenderNetworkNodeIdentity(t *testing.T) {
 
 		t.Run("should successfully render the network-node-identity Deployment", func(t *testing.T) {
 			g := NewWithT(t)
-			deployment := mustFindRenderedObj[*appsv1.Deployment](t, assertRenderSuccess(t, networkConfig, bootstrapResult, client),
+			objs := assertRenderSuccess(t, networkConfig, bootstrapResult, client)
+			deployment := mustFindRenderedObj[*appsv1.Deployment](t, objs,
 				"Deployment", "network-node-identity")
+			expectReadOnlyRootFilesystems(t, objs, hostedClusterNS)
 			container := mustFindContainer(t, deployment.Spec.Template.Spec.Containers, "webhook")
 			execStr := findOvnkubeIdentityExec(t, container.Command)
 

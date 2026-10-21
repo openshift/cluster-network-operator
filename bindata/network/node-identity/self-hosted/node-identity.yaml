@@ -35,6 +35,8 @@ spec:
       containers:
       - name: webhook
         image: "{{.NetworkNodeIdentityImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         command:
           - /bin/bash
           - -c
@@ -96,6 +98,8 @@ spec:
             name: ovnkube-identity-cm
       - name: approver
         image: "{{.NetworkNodeIdentityImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         command:
           - /bin/bash
           - -c

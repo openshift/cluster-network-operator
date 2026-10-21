@@ -74,6 +74,7 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	config.DisableMultiNetwork = &enabled
 	objs, err = renderMultusAdmissionController(t.Context(), config, manifestDir, false, bootstrapResult, fakeClient)
 	g.Expect(err).NotTo(HaveOccurred())
+	expectReadOnlyRootFilesystems(t, objs, "openshift-multus")
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("Deployment", "openshift-multus", "multus-admission-controller")))
 
 	// Check rendered object
@@ -86,6 +87,10 @@ func TestRenderMultusAdmissionController(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("NetworkPolicy", "openshift-multus", "multus-admission-controller")))
 
 	weboookCmd := findMultusWebhookExec(t, objs)
+	// glog's alsologtostderr still writes log files; logtostderr keeps the
+	// read-only root filesystem usable while Kubernetes captures stderr.
+	g.Expect(weboookCmd).To(ContainSubstring("-logtostderr=true"))
+	g.Expect(weboookCmd).NotTo(ContainSubstring("-alsologtostderr"))
 	g.Expect(weboookCmd).To(ContainSubstring("-metrics-listen-address=127.0.0.1:9091"))
 	g.Expect(weboookCmd).NotTo(ContainSubstring("-encrypt-metrics"))
 
@@ -176,6 +181,7 @@ func TestRenderMultusAdmissonControllerConfigForHyperShift(t *testing.T) {
 
 	objs, err := renderMultusAdmissonControllerConfig(t.Context(), manifestDir, false, bootstrapResult, fakeClient, hsc, "")
 	g.Expect(err).NotTo(HaveOccurred())
+	expectReadOnlyRootFilesystems(t, objs, hsc.Namespace)
 
 	// Check rendered object
 	for _, obj := range objs {
@@ -191,6 +197,10 @@ func TestRenderMultusAdmissonControllerConfigForHyperShift(t *testing.T) {
 	}
 
 	weboookCmd := findMultusWebhookExec(t, objs)
+	// glog's alsologtostderr still writes log files; logtostderr keeps the
+	// read-only root filesystem usable while Kubernetes captures stderr.
+	g.Expect(weboookCmd).To(ContainSubstring("-logtostderr=true"))
+	g.Expect(weboookCmd).NotTo(ContainSubstring("-alsologtostderr"))
 	g.Expect(weboookCmd).To(ContainSubstring("-metrics-listen-address=:9091"))
 	g.Expect(weboookCmd).To(ContainSubstring("-encrypt-metrics=true"))
 

@@ -83,6 +83,8 @@ spec:
       initContainers:
         - name: hosted-cluster-kubecfg-setup
           image: "{{.CLIImage}}"
+          securityContext:
+            readOnlyRootFilesystem: true
           command:
             - /bin/bash
             - -c
@@ -103,6 +105,8 @@ spec:
       containers:
       - name: webhook
         image: "{{.NetworkNodeIdentityImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         command:
           - /bin/bash
           - -c
@@ -193,6 +197,8 @@ spec:
             name: ovnkube-identity-cm
       - name: approver
         image: "{{.NetworkNodeIdentityImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         command:
           - /bin/bash
           - -c
@@ -241,6 +247,8 @@ spec:
       # The token is read by the containers to authenticate against the hosted cluster api server
       - name: token-minter
         image: "{{.TokenMinterImage}}"
+        securityContext:
+          readOnlyRootFilesystem: true
         command: ["/usr/bin/control-plane-operator", "token-minter"]
         args:
           - --service-account-namespace=openshift-network-node-identity
