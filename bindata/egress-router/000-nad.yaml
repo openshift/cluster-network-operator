@@ -11,6 +11,11 @@ spec:
     "cniVersion": "0.4.0",
     "type": "egress-router",
     "name": "egress-router-cni-nad",
+    "interfaceType": "macvlan",
+    "interfaceArgs": {
+      {{ $master := .MacvlanMaster}} {{ if ne $master "" }}"master": "{{$master}}",{{ end }}
+      "mode": "{{.MacvlanMode}}"
+    },
     "ip": {
       "addresses": [
         "{{.Addresses}}"
