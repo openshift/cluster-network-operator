@@ -23,8 +23,11 @@ spec:
       labels:
         app: frr-k8s
         component: frr-k8s-master-monitor
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
     spec:
       serviceAccountName: frr-k8s-daemon
+      priorityClassName: system-cluster-critical
       nodeSelector:
         kubernetes.io/os: linux
         node-role.kubernetes.io/master: ""
@@ -38,9 +41,6 @@ spec:
           requests:
             cpu: 10m
             memory: 20Mi
-          limits:
-            cpu: 100m
-            memory: 128Mi
         securityContext:
           runAsNonRoot: true
           runAsUser: 65534
@@ -91,9 +91,6 @@ spec:
           requests:
             cpu: 10m
             memory: 20Mi
-          limits:
-            cpu: 500m
-            memory: 128Mi
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - name: frr-sockets
