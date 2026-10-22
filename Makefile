@@ -27,6 +27,11 @@ golangci-lint:
 	golangci-lint run --verbose --print-resources-usage --modules-download-mode=vendor --timeout=5m0s
 .PHONY: golangci-lint
 
+# Run the cluster-level tests against the current kubeconfig.
+test-e2e:
+	go test -tags=e2e -v ./test/e2e
+.PHONY: test-e2e
+
 install.tools:
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | bash -s -- -b ${GOPATH}/bin
 .PHONY: install.tools
