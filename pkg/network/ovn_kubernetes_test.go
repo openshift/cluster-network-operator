@@ -4611,6 +4611,12 @@ func TestRenderOVNKubernetes_AdvertisedUDNIsolationModeOverride(t *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(nil)
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--advertised-udn-isolation-mode="`))
 	})
+
+	t.Run("with shell-injection advertised-udn-isolation-mode override", func(_ *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"advertised-udn-isolation-mode": `loose"; rm -rf /; echo "`})
+		g.Expect(ovnkubeScriptLib).NotTo(ContainSubstring("rm -rf"))
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--advertised-udn-isolation-mode="`))
+	})
 }
 
 func TestRenderOVNKubernetes_OpenFlowProbeOverride(t *testing.T) {
@@ -4657,6 +4663,11 @@ func TestRenderOVNKubernetes_OpenFlowProbeOverride(t *testing.T) {
 	t.Run("with invalid openflow-probe override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"openflow-probe": "-60"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--openflow-probe="`))
+	})
+
+	t.Run("with non-canonical openflow-probe override", func(_ *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"openflow-probe": "007"})
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--openflow-probe=7"`))
 	})
 }
 
