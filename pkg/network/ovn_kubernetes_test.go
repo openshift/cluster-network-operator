@@ -4611,6 +4611,12 @@ func TestRenderOVNKubernetes_AdvertisedUDNIsolationModeOverride(t *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(nil)
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--advertised-udn-isolation-mode="`))
 	})
+
+	t.Run("with shell-injection advertised-udn-isolation-mode override", func(_ *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"advertised-udn-isolation-mode": `loose"; rm -rf /; echo "`})
+		g.Expect(ovnkubeScriptLib).NotTo(ContainSubstring("rm -rf"))
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--advertised-udn-isolation-mode="`))
+	})
 }
 
 func TestRenderOVNKubernetes_OpenFlowProbeOverride(t *testing.T) {
@@ -4657,6 +4663,11 @@ func TestRenderOVNKubernetes_OpenFlowProbeOverride(t *testing.T) {
 	t.Run("with invalid openflow-probe override", func(_ *testing.T) {
 		ovnkubeScriptLib := renderWithOverrides(map[string]string{"openflow-probe": "-60"})
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--openflow-probe="`))
+	})
+
+	t.Run("with non-canonical openflow-probe override", func(_ *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"openflow-probe": "007"})
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`--openflow-probe=7"`))
 	})
 }
 
@@ -4777,6 +4788,75 @@ func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
 		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
   if [[ "" != "" ]]; then
     allow_icmp_network_policy_flag="--allow-icmp-network-policy="
+  fi`))
+	})
+}
+
+func TestRenderOVNKubernetes_DisableUDNARPNDPFloodOverride(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+	fillDefaults(config, nil)
+
+	renderWithOverrides := func(overrides map[string]string) string {
+		bootstrapResult := fakeBootstrapResult()
+		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+					Enabled: false,
+				},
+				ConfigOverrides: overrides,
+			},
+		}
+		featureGatesCNO := getDefaultFeatureGates()
+
+		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
+		g.Expect(err).NotTo(HaveOccurred())
+		return extractOVNScriptLib(g, objs)
+	}
+
+	t.Run("with disable-udn-arp-ndp-flood override set to true", func(_ *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"disable-udn-arp-ndp-flood": "true"})
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "true" == "true" ]]; then
+    ovn_disable_udn_arp_ndp_flood_flag="--disable-udn-arp-ndp-flood"
+  fi`))
+	})
+
+	t.Run("with disable-udn-arp-ndp-flood override set to false", func(_ *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"disable-udn-arp-ndp-flood": "false"})
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "false" == "true" ]]; then
+    ovn_disable_udn_arp_ndp_flood_flag="--disable-udn-arp-ndp-flood"
+  fi`))
+	})
+
+	// Non-canonical but valid boolean spellings must be normalized to "true" so
+	// the shell comparison against "true" still enables the flag.
+	for _, truthy := range []string{"1", "True", "TRUE", "t"} {
+		t.Run("with disable-udn-arp-ndp-flood override set to "+truthy, func(_ *testing.T) {
+			ovnkubeScriptLib := renderWithOverrides(map[string]string{"disable-udn-arp-ndp-flood": truthy})
+			g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "true" == "true" ]]; then
+    ovn_disable_udn_arp_ndp_flood_flag="--disable-udn-arp-ndp-flood"
+  fi`))
+		})
+	}
+
+	t.Run("without disable-udn-arp-ndp-flood override", func(_ *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(nil)
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "" == "true" ]]; then
+    ovn_disable_udn_arp_ndp_flood_flag="--disable-udn-arp-ndp-flood"
+  fi`))
+	})
+
+	t.Run("with invalid disable-udn-arp-ndp-flood override", func(_ *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"disable-udn-arp-ndp-flood": "-60"})
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "" == "true" ]]; then
+    ovn_disable_udn_arp_ndp_flood_flag="--disable-udn-arp-ndp-flood"
   fi`))
 	})
 }
