@@ -192,6 +192,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["AdvertisedUDNIsolationMode"] = validateConfigOverrideString(overrides, "advertised-udn-isolation-mode")
 	data.Data["OpenFlowProbe"] = validateConfigOverrideUint(overrides, "openflow-probe")
 	data.Data["AllowICMPNetworkPolicy"] = validateConfigOverrideBool(overrides, "allow-icmp-network-policy")
+	data.Data["DisableUDNARPNDPFlood"] = validateConfigOverrideBool(overrides, "disable-udn-arp-ndp-flood")
 
 	if conf.Migration != nil {
 		if conf.Migration.MTU != nil {

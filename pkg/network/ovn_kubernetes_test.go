@@ -4792,6 +4792,75 @@ func TestRenderOVNKubernetes_AllowICMPNetworkPolicyOverride(t *testing.T) {
 	})
 }
 
+func TestRenderOVNKubernetes_DisableUDNARPNDPFloodOverride(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	crd := OVNKubernetesConfig.DeepCopy()
+	config := &crd.Spec
+	fillDefaults(config, nil)
+
+	renderWithOverrides := func(overrides map[string]string) string {
+		bootstrapResult := fakeBootstrapResult()
+		bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+			OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+				HyperShiftConfig: &bootstrap.OVNHyperShiftBootstrapResult{
+					Enabled: false,
+				},
+				ConfigOverrides: overrides,
+			},
+		}
+		featureGatesCNO := getDefaultFeatureGates()
+
+		objs, _, err := renderOVNKubernetes(config, bootstrapResult, manifestDirOvn, featureGatesCNO)
+		g.Expect(err).NotTo(HaveOccurred())
+		return extractOVNScriptLib(g, objs)
+	}
+
+	t.Run("with disable-udn-arp-ndp-flood override set to true", func(_ *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"disable-udn-arp-ndp-flood": "true"})
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "true" == "true" ]]; then
+    ovn_disable_udn_arp_ndp_flood_flag="--disable-udn-arp-ndp-flood"
+  fi`))
+	})
+
+	t.Run("with disable-udn-arp-ndp-flood override set to false", func(_ *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"disable-udn-arp-ndp-flood": "false"})
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "false" == "true" ]]; then
+    ovn_disable_udn_arp_ndp_flood_flag="--disable-udn-arp-ndp-flood"
+  fi`))
+	})
+
+	// Non-canonical but valid boolean spellings must be normalized to "true" so
+	// the shell comparison against "true" still enables the flag.
+	for _, truthy := range []string{"1", "True", "TRUE", "t"} {
+		t.Run("with disable-udn-arp-ndp-flood override set to "+truthy, func(_ *testing.T) {
+			ovnkubeScriptLib := renderWithOverrides(map[string]string{"disable-udn-arp-ndp-flood": truthy})
+			g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "true" == "true" ]]; then
+    ovn_disable_udn_arp_ndp_flood_flag="--disable-udn-arp-ndp-flood"
+  fi`))
+		})
+	}
+
+	t.Run("without disable-udn-arp-ndp-flood override", func(_ *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(nil)
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "" == "true" ]]; then
+    ovn_disable_udn_arp_ndp_flood_flag="--disable-udn-arp-ndp-flood"
+  fi`))
+	})
+
+	t.Run("with invalid disable-udn-arp-ndp-flood override", func(_ *testing.T) {
+		ovnkubeScriptLib := renderWithOverrides(map[string]string{"disable-udn-arp-ndp-flood": "-60"})
+		g.Expect(ovnkubeScriptLib).To(ContainSubstring(`
+  if [[ "" == "true" ]]; then
+    ovn_disable_udn_arp_ndp_flood_flag="--disable-udn-arp-ndp-flood"
+  fi`))
+	})
+}
+
 // TestDaemonSetProgressing verifies daemonSetProgressing returns the correct
 // result for a variety of DaemonSet status scenarios, including the zero-worker
 // HyperShift case where DesiredNumberScheduled==0 must not be treated as progressing.
