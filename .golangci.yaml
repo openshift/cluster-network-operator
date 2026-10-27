@@ -207,3 +207,11 @@ linters:
       - linters:
           - unparam
         path: _test\.go|test/|fake/
+      # Allow dot imports only for ginkgo/gomega packages. staticcheck's ST1001 has a
+      # built-in exception for _test.go files, but the OTE helper files (cli.go etc.) do
+      # not end in _test.go, so it flags their ginkgo/gomega dot imports. revive's
+      # dot-imports rule (configured above) remains the enforcer for everything else.
+      - linters:
+          - staticcheck
+        text: "ST1001"
+        source: "github\\.com/onsi/(ginkgo|gomega)"
