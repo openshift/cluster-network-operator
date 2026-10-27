@@ -18,11 +18,9 @@ import (
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,19 +31,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// OperatorYAML is the operator manifest path. It is a var (not a const) only so
-// tests can point it at a temporary manifest.
-var OperatorYAML = "bindata/observability/07-observability-operator.yaml"
-
 const (
+	OperatorYAML         = "bindata/observability/07-observability-operator.yaml"
 	FlowCollectorYAML    = "bindata/observability/08-flowcollector.yaml"
 	OperatorNamespace    = "netobserv-operator"
 	FlowCollectorVersion = "v1beta2"
 	FlowCollectorName    = "cluster"
 	NetworkCRName        = "cluster"
 
+	NetworkObservabilityDeployed = "NetworkObservabilityDeployed"
+
 	// Requeue interval for install/wait and standard operations
-	requeueInterval = 60 * time.Second
+	requeueInterval = 30 * time.Second
 	// Requeue interval while waiting for the cluster to become available
 	clusterAvailableRequeueInterval = 5 * time.Minute
 	// Deadline for the OLM resource rollback API calls
@@ -61,70 +58,6 @@ const (
 	// Mark the resources that CNO created. Teardown only deletes the
 	// operator namespace when this marker is present.
 	createdByCNOAnnotation = "network.operator.openshift.io/created-by-cno"
-)
-
-// NetworkObservabilityInstalledByCNO is the operator Network status condition
-// reporting whether CNO enabled and installed Network Observability and, if
-// not, why not. Its Reason is one of the reason* consts defined below, grouped
-// by lifecycle; each group's comment gives its Status and semantics.
-const NetworkObservabilityInstalledByCNO = "NetworkObservabilityInstalledByCNO"
-
-// Reasons for the NetworkObservabilityInstalledByCNO condition
-const (
-	// Re-evaluatable (Status False; re-checked every reconcile, can still install)
-	reasonFeatureGateDisabled = "FeatureGateDisabled"
-	reasonNoAction            = "NoAction"
-	reasonSNO                 = "SNO"
-
-	// In-progress (Status False; the install is underway)
-	reasonWaitingForCluster     = "WaitingForCluster"
-	reasonInstallingOperator    = "InstallingOperator"
-	reasonCreatingFlowCollector = "CreatingFlowCollector"
-
-	// Transient (Status False; a step failed and is being retried. These reasons are in
-	// installAttemptReasons, so the 20-minute install clock keeps running across the retry.)
-	reasonOperatorApplyFailed      = "OperatorApplyFailed"
-	reasonFlowCollectorApplyFailed = "FlowCollectorApplyFailed"
-	reasonRollbackFailed           = "RollbackFailed"
-
-	// Terminal (CNO stops acting; see terminalReasons. Installed is Status True; the rest are Status False)
-	reasonInstalled                 = "Installed"
-	reasonPreExisting               = "PreExisting"
-	reasonClusterNotAvailable       = "ClusterNotAvailable"
-	reasonOperatorInstallFailed     = "OperatorInstallFailed"
-	reasonFlowCollectorCreateFailed = "FlowCollectorCreateFailed"
-)
-
-// installFailureReasons are the terminal reasons CNO sets after abandoning and
-// rolling back an install that timed out, named for the phase that failed.
-var installFailureReasons = sets.New(
-	reasonClusterNotAvailable,
-	reasonOperatorInstallFailed,
-	reasonFlowCollectorCreateFailed,
-)
-
-// terminalReasons are the condition reasons after which CNO stops acting on
-// Network Observability. Installed means CNO completed the install; PreExisting
-// means something else owns the FlowCollector CRD; the install-failure reasons
-// mean the install was abandoned and rolled back.
-//
-// SNO is deliberately not here: it latches only against a topology change under the
-// default policy (adding control-plane nodes later must not silently start an
-// install the user never requested), but an explicit InstallAndEnable still
-// overrides it, so SNO must be re-evaluated against the policy each reconcile.
-var terminalReasons = sets.New(reasonInstalled, reasonPreExisting).Union(installFailureReasons)
-
-// installAttemptReasons are the condition reasons that represent an in-progress
-// install attempt. The install-timeout clock (hasInstallTimedOut) applies only to
-// these; the other Status-False reasons (FeatureGateDisabled, NoAction, SNO) must
-// be excluded, as their condition timestamp is unrelated to any install.
-var installAttemptReasons = sets.New(
-	reasonWaitingForCluster,
-	reasonInstallingOperator,
-	reasonOperatorApplyFailed,
-	reasonCreatingFlowCollector,
-	reasonFlowCollectorApplyFailed,
-	reasonRollbackFailed,
 )
 
 // Add creates a new controller. Referenced in add_networkconfig.go.
@@ -171,12 +104,14 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 		return reconcile.Result{}, nil // only reconcile the singleton Network object
 	}
 
-	// When it returns false, shouldInstallAndSetCondition has set the condition
-	// explaining why (feature gate disabled, NoAction, SNO, pre-existing CRD, or a
-	// latched terminal state). The feature gate check lives there, not here, so that
-	// disabling the gate mid-install or after a successful install cannot overwrite a
-	// correct result.
-	shouldInstall, err := r.shouldInstallAndSetCondition(ctx)
+	// Check if NetworkObservabilityInstall feature gate is enabled
+	if !r.isFeatureGateEnabled() {
+		klog.V(4).Info("NetworkObservabilityInstall feature gate is disabled, skipping Network Observability management")
+		return reconcile.Result{}, nil
+	}
+
+	// Check if Network Observability should be enabled
+	shouldInstall, err := r.shouldInstallNetworkObservability(ctx)
 	if err != nil {
 		klog.Warningf("Failed to determine if Network Observability should be installed: %v. Will retry in %v.", err, requeueInterval)
 		return reconcile.Result{RequeueAfter: requeueInterval}, nil
@@ -198,43 +133,24 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 	installed, err := r.isNetObservOperatorInstalled(ctx)
 	if err != nil {
 		klog.Warningf("Failed to check if Network Observability Operator is installed: %v. Will retry in %v.", err, requeueInterval)
+		_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentFailed", fmt.Sprintf("Failed to check Network Observability Operator status: %v", err))
 		return reconcile.Result{RequeueAfter: requeueInterval}, nil
 	}
 	if !installed {
 		// Don't apply the Subscription until the cluster is available.
 		if available, _ := r.clusterVersionAvailableSince(ctx); !available {
 			klog.Infof("Cluster not available yet, will recheck in %v", clusterAvailableRequeueInterval)
-			if err := r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, reasonWaitingForCluster, "Waiting for the cluster to be available"); err != nil {
-				klog.Warningf("Failed to set WaitingForCluster condition: %v. Will retry in %v.", err, requeueInterval)
-				return reconcile.Result{RequeueAfter: requeueInterval}, nil
-			}
+			_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "WaitingForCluster", "Waiting for the cluster to become available")
 			return reconcile.Result{RequeueAfter: clusterAvailableRequeueInterval}, nil
 		}
 
-		// Persist InstallingOperator before applying the manifest. If this write
-		// fails we must not apply, otherwise the manifest could create the FlowCollector
-		// CRD while the condition is still absent, and the next reconcile would
-		// misclassify that CNO-created CRD as PreExisting.
-		if err := r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, reasonInstallingOperator, "Installing Network Observability Operator..."); err != nil {
-			klog.Warningf("Failed to set InstallingOperator condition: %v. Will retry in %v.", err, requeueInterval)
-			return reconcile.Result{RequeueAfter: requeueInterval}, nil
-		}
-		// Reapply the operator manifest every reconcile until the operator appears.
-		// The apply is Server-Side Apply (idempotent), so this no-ops when nothing
-		// changed and recreates the OLM resources (namespace/Subscription/OperatorGroup)
-		// if they are deleted out from under us while we wait.
 		if err := r.installNetObservOperator(ctx); err != nil {
-			msg := fmt.Sprintf("Failed to install Network Observability Operator: %v. Will retry in %v.", err, requeueInterval)
-			klog.Warning(msg)
-			// Surface the apply failure (with its cause) in the status. This is transient:
-			// the next reconcile re-applies and flips back to InstallingOperator. Both
-			// reasons are install attempts, so the install clock keeps running across the flip.
-			if err := r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, reasonOperatorApplyFailed, msg); err != nil {
-				klog.Warningf("Failed to set OperatorApplyFailed condition: %v. Will retry in %v.", err, requeueInterval)
-			}
+			klog.Warningf("Failed to install Network Observability Operator: %v. Will retry in %v.", err, requeueInterval)
+			_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentFailed", fmt.Sprintf("Failed to install Network Observability Operator: %v", err))
 			return reconcile.Result{RequeueAfter: requeueInterval}, nil
 		}
-		klog.Infof("Waiting for Network Observability Operator, will check in %v", requeueInterval)
+		klog.Infof("Applied Subscription for netobserv-operator, will check installation status in %v", requeueInterval)
+		_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "InstallationInProgress", "Network Observability Operator installation in progress")
 		return reconcile.Result{RequeueAfter: requeueInterval}, nil
 	}
 
@@ -249,32 +165,23 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 	}
 
 	if !flowCollectorExists {
-		if err := r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, reasonCreatingFlowCollector, "Creating FlowCollector instance..."); err != nil {
-			klog.Warningf("Failed to set CreatingFlowCollector condition: %v. Will retry in %v.", err, requeueInterval)
-			return reconcile.Result{RequeueAfter: requeueInterval}, nil
-		}
 		// Create FlowCollector
 		if err := r.applyManifest(ctx, FlowCollectorYAML, "FlowCollector"); err != nil {
-			msg := fmt.Sprintf("Failed to create FlowCollector: %v. Will retry in %v.", err, requeueInterval)
-			klog.Warning(msg)
-			// Surface the apply failure (with its cause) in the status. This is transient:
-			// the next reconcile re-applies and flips back to CreatingFlowCollector. Both
-			// reasons are install attempts, so the install clock keeps running across the flip.
-			if err := r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, reasonFlowCollectorApplyFailed, msg); err != nil {
-				klog.Warningf("Failed to set FlowCollectorApplyFailed condition: %v. Will retry in %v.", err, requeueInterval)
-			}
+			klog.Warningf("Failed to create FlowCollector: %v. Will retry in %v.", err, requeueInterval)
+			// Mark deployment as failed
+			_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentFailed", fmt.Sprintf("Failed to create FlowCollector: %v", err))
 			return reconcile.Result{RequeueAfter: requeueInterval}, nil
 		}
 		klog.Info("FlowCollector created successfully")
 	}
 
-	// Mark as installed to track installation status
-	if err := r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionTrue, reasonInstalled, "Network Observability has been installed. Will not be managed by CNO."); err != nil {
-		klog.Warningf("Failed to mark Network Observability as installed: %v. Will retry in %v.", err, requeueInterval)
+	// Mark as deployed to track deployment status
+	if err := r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionTrue, "DeploymentComplete", "Network Observability has been deployed"); err != nil {
+		klog.Warningf("Failed to mark Network Observability as deployed: %v. Will retry in %v.", err, requeueInterval)
 		return reconcile.Result{RequeueAfter: requeueInterval}, nil
 	}
 
-	klog.V(4).Info("Network Observability has been installed")
+	klog.V(4).Info("Network Observability is deployed")
 	return reconcile.Result{}, nil
 }
 
@@ -291,6 +198,23 @@ func (r *ReconcileObservability) isFeatureGateEnabled() bool {
 	return r.featureGate.Enabled(featureGateName)
 }
 
+// wasNetworkObservabilityDeployed checks if the NetworkObservabilityDeployed condition
+// is set to True in the network.operator.openshift.io Network CR status
+func (r *ReconcileObservability) wasNetworkObservabilityDeployed(ctx context.Context) (bool, error) {
+	network := &operatorv1.Network{}
+	if err := r.client.Get(ctx, types.NamespacedName{Name: NetworkCRName}, network); err != nil {
+		return false, err
+	}
+
+	for _, condition := range network.Status.Conditions {
+		if condition.Type == NetworkObservabilityDeployed {
+			return condition.Status == operatorv1.ConditionTrue, nil
+		}
+	}
+
+	return false, nil
+}
+
 // hasInstallTimedOut returns true when the installation should be abandoned. On
 // day 0, the install clock only starts once the cluster is available. A backstop
 // from our own condition timestamp bounds the wait even if that read fails.
@@ -300,18 +224,12 @@ func (r *ReconcileObservability) hasInstallTimedOut(ctx context.Context) bool {
 		return false
 	}
 
-	condition := operatorv1helpers.FindOperatorCondition(network.Status.Conditions, NetworkObservabilityInstalledByCNO)
+	condition := operatorv1helpers.FindOperatorCondition(network.Status.Conditions, NetworkObservabilityDeployed)
 	if condition == nil || condition.Status != operatorv1.ConditionFalse {
 		return false
 	}
-	// Only an in-progress installation can time out. Re-evaluatable states that
-	// are not an install attempt (FeatureGateDisabled, NoAction, SNO) must not,
-	// as their condition timestamp is unrelated to the install clock.
-	if installFailureReasons.Has(condition.Reason) {
+	if condition.Reason == "DeploymentTimedOut" {
 		return true
-	}
-	if !installAttemptReasons.Has(condition.Reason) {
-		return false
 	}
 
 	// Absolute backstop, independent of any external read.
@@ -354,50 +272,29 @@ func (r *ReconcileObservability) clusterVersionAvailableSince(ctx context.Contex
 // resources CNO created and only then marks the installation as terminally timed
 // out. If rollback fails, it returns an error so the caller requeues and retries.
 func (r *ReconcileObservability) handleInstallTimeout(ctx context.Context) error {
-	// A terminal failure reason is only set after rollback succeeds, so its
-	// presence means there is nothing left to do.
+	// DeploymentTimedOut is only set after rollback succeeds, so its presence means
+	// there is nothing left to do.
 	network := &operatorv1.Network{}
 	if err := r.client.Get(ctx, types.NamespacedName{Name: NetworkCRName}, network); err == nil {
-		if condition := operatorv1helpers.FindOperatorCondition(network.Status.Conditions, NetworkObservabilityInstalledByCNO); condition != nil &&
-			installFailureReasons.Has(condition.Reason) {
+		if condition := operatorv1helpers.FindOperatorCondition(network.Status.Conditions, NetworkObservabilityDeployed); condition != nil &&
+			condition.Reason == "DeploymentTimedOut" {
 			return nil
 		}
 	}
 
 	klog.Warning("Network Observability installation timed out, giving up")
 
-	// Name the terminal failure for the phase that did not complete. This is derived
-	// from stable cluster facts, not the current condition reason, so it stays
-	// correct across RollbackFailed retries (teardown does not delete the CRD).
-	reason, message := r.installFailure(ctx)
-
 	// Roll back before latching the terminal condition, so a failed teardown is
 	// retried on the next reconcile.
 	if err := r.teardownNetObservOperator(ctx); err != nil {
-		// Best-effort status update: we return the teardown error below, so the
-		// caller requeues and retries regardless of whether this write lands.
-		_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, reasonRollbackFailed,
-			"Failed to roll back OLM resources. Retrying.")
+		_ = r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "RollbackPending",
+			fmt.Sprintf("Network Observability install timed out, rolling back: %v", err))
 		return fmt.Errorf("failed to roll back Network Observability OLM resources: %w", err)
 	}
 	klog.Info("Rolled back Network Observability OLM resources")
 
-	return r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, reason, message)
-}
-
-// installFailure returns the terminal reason and message for an abandoned install,
-// named for the phase that did not complete. If the cluster never became available
-// the install never started; otherwise the FlowCollector CRD's presence tells
-// whether the operator install or the FlowCollector creation was the phase that
-// timed out.
-func (r *ReconcileObservability) installFailure(ctx context.Context) (string, string) {
-	if available, _ := r.clusterVersionAvailableSince(ctx); !available {
-		return reasonClusterNotAvailable, "Cluster did not become available within 90 minutes. Will not retry."
-	}
-	if installed, err := r.isNetObservOperatorInstalled(ctx); err == nil && installed {
-		return reasonFlowCollectorCreateFailed, "Failed to create FlowCollector within 20 minutes. Rolled back. Will not retry."
-	}
-	return reasonOperatorInstallFailed, "Failed to install Network Observability Operator within 20 minutes. Rolled back. Will not retry."
+	message := fmt.Sprintf("Network Observability Operator failed to install within %v", installTimeout)
+	return r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, "DeploymentTimedOut", message)
 }
 
 // teardownNetObservOperator deletes the OLM resources CNO created for Network
@@ -475,7 +372,7 @@ func (r *ReconcileObservability) teardownNetObservOperator(ctx context.Context) 
 	return nil
 }
 
-// setNetworkObservabilityCondition sets the NetworkObservabilityInstalledByCNO condition
+// setNetworkObservabilityCondition sets the NetworkObservabilityDeployed condition
 // in the network.operator.openshift.io Network CR status
 func (r *ReconcileObservability) setNetworkObservabilityCondition(ctx context.Context, status operatorv1.ConditionStatus, reason, message string) error {
 	// Get the operator Network CR
@@ -484,23 +381,17 @@ func (r *ReconcileObservability) setNetworkObservabilityCondition(ctx context.Co
 		return fmt.Errorf("failed to get operator Network CR: %w", err)
 	}
 
-	existing := operatorv1helpers.FindOperatorCondition(network.Status.Conditions, NetworkObservabilityInstalledByCNO)
-	if existing != nil && existing.Status == status && existing.Reason == reason && existing.Message == message {
-		// Already set with same status, reason, and message, no need to update
+	if condition := operatorv1helpers.FindOperatorCondition(network.Status.Conditions, NetworkObservabilityDeployed); condition != nil &&
+		condition.Status == status &&
+		condition.Reason == reason {
+		// Already set with same status and reason, no need to update
 		klog.V(4).Infof("Network Observability condition already set to %s with reason %s", status, reason)
 		return nil
 	}
 
-	// Starting an install attempt from a non-install state keeps Status False, so
-	// SetOperatorCondition would preserve the stale LastTransitionTime and trip the
-	// timeout backstop. Stamp it now so the install clock starts with the attempt.
-	if existing != nil && installAttemptReasons.Has(reason) && !installAttemptReasons.Has(existing.Reason) {
-		existing.LastTransitionTime = metav1.NewTime(time.Now())
-	}
-
 	// Create the condition to add/update
 	operatorv1helpers.SetOperatorCondition(&network.Status.Conditions, operatorv1.OperatorCondition{
-		Type:    NetworkObservabilityInstalledByCNO,
+		Type:    NetworkObservabilityDeployed,
 		Status:  status,
 		Reason:  reason,
 		Message: message,
@@ -515,55 +406,13 @@ func (r *ReconcileObservability) setNetworkObservabilityCondition(ctx context.Co
 	return nil
 }
 
-// shouldInstallAndSetCondition determines whether Network Observability should be
-// installed. As a side effect, when it returns false it sets the
-// NetworkObservabilityInstalledByCNO condition explaining why (FeatureGateDisabled,
-// NoAction, SNO, or PreExisting); when it returns true the install is left to
-// Reconcile, which sets the in-progress condition.
-//
-// Terminal states (Installed, PreExisting, and the install-failure reasons) are permanent.
-// Re-evaluatable states (FeatureGateDisabled, NoAction, SNO) and the in-progress states
-// (InstallingOperator, CreatingFlowCollector, RollbackFailed) are checked each reconcile.
-// SNO is latched against topology changes under the default policy but is still overridden
-// by InstallAndEnable.
-//
-// network.Spec.NetworkObservability.InstallationPolicy values:
-//
-//	"InstallAndEnable": install Network Observability once (even on SNO clusters)
-//	"NoAction":         skip installation (user opted out)
-//	undefined (unset):  install Network Observability once (opt-out model), except for SNO clusters
-func (r *ReconcileObservability) shouldInstallAndSetCondition(ctx context.Context) (bool, error) {
-	// Terminal and in-progress states are decided from our own condition, before
-	// anything else, so the install is not re-evaluated once it has concluded or
-	// while it is already underway.
-	operatorNetwork := &operatorv1.Network{}
-	var currentReason string
-	if err := r.client.Get(ctx, types.NamespacedName{Name: NetworkCRName}, operatorNetwork); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return false, err
-		}
-	} else if condition := operatorv1helpers.FindOperatorCondition(operatorNetwork.Status.Conditions, NetworkObservabilityInstalledByCNO); condition != nil {
-		currentReason = condition.Reason
-		if terminalReasons.Has(condition.Reason) {
-			return false, nil
-		}
-		switch condition.Reason {
-		case reasonInstallingOperator, reasonOperatorApplyFailed, reasonCreatingFlowCollector, reasonFlowCollectorApplyFailed, reasonRollbackFailed:
-			// Install is underway (or being rolled back); keep driving it from
-			// Reconcile. This also prevents a CRD that CNO itself installed from
-			// being mistaken for a pre-existing one below.
-			return true, nil
-		}
-	}
-
-	// The feature gate check must be here (after the terminal/in-progress checks),
-	// not in Reconcile(). There is no way to abort, so disabling the gate midway
-	// would overwrite a correct result (e.g. Installed, Status True) with
-	// FeatureGateDisabled, Status False.
-	if !r.isFeatureGateEnabled() {
-		return false, r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, reasonFeatureGateDisabled, "NetworkObservabilityInstall feature gate is not enabled")
-	}
-
+// shouldInstallNetworkObservability returns true if Network Observability should be installed.
+// Valid values of network.Spec.NetworkObservability.InstallationPolicy: "", "InstallAndEnable", "NoAction"
+// "NoAction": skip installation (user opted out)
+// "InstallAndEnable": install Network Observability once (even on SNO clusters), do not reinstall if already deployed
+// "": install Network Observability once (opt-out model), except for SNO clusters, do not reinstall if already deployed
+// SNO (Single Node OpenShift) clusters: skip installation by default unless explicitly set to "InstallAndEnable"
+func (r *ReconcileObservability) shouldInstallNetworkObservability(ctx context.Context) (bool, error) {
 	// Get Network CR information
 	var network configv1.Network
 	if err := r.client.Get(ctx, types.NamespacedName{Name: NetworkCRName}, &network); err != nil {
@@ -577,38 +426,40 @@ func (r *ReconcileObservability) shouldInstallAndSetCondition(ctx context.Contex
 
 	// Explicit disable
 	if value == configv1.NetworkObservabilityNoAction {
-		return false, r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, reasonNoAction, "Installation policy is set to NoAction so it will not install Network Observability.")
+		return false, nil
 	}
 
-	// If the FlowCollector CRD already exists and CNO did not install it (the
-	// in-progress check above excluded that case), something else owns it.
-	crdExists, err := r.isNetObservOperatorInstalled(ctx)
+	// For both InstallAndEnable and default (empty): install once, do not reinstall
+	// Check if already deployed
+	deployed, err := r.wasNetworkObservabilityDeployed(ctx)
 	if err != nil {
 		return false, err
 	}
-	if crdExists {
-		return false, r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, reasonPreExisting, "FlowCollector CRD already exists. Will not be managed by CNO.")
+	if deployed {
+		// Already deployed, do not reinstall
+		policyName := "default"
+		if value == configv1.NetworkObservabilityInstallAndEnable {
+			policyName = "InstallAndEnable"
+		}
+		klog.V(4).Infof("Network Observability already deployed (%s policy), skipping reinstallation", policyName)
+		return false, nil
 	}
 
-	// InstallAndEnable installs regardless of topology, including overriding a
-	// previously recorded SNO decision.
+	// Not yet deployed - determine if we should install based on policy and topology
+	// InstallAndEnable: install regardless of topology
 	if value == configv1.NetworkObservabilityInstallAndEnable {
 		return true, nil
 	}
 
-	// Under the default policy, once SNO has been recorded, keep it latched.
-	// Adding control-plane nodes later will not trigger an install, but an
-	// explicit InstallAndEnable (handled above) will.
-	if currentReason == reasonSNO {
-		return false, nil
-	}
-
+	// Default behavior (empty string): install unless on SNO
 	isSNO, err := r.isSingleNodeCluster(ctx)
 	if err != nil {
 		return false, err
 	}
+
 	if isSNO {
-		return false, r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, reasonSNO, "Single control-plane cluster. Network Observability will not be installed, even if control-plane nodes are added later.")
+		// SNO clusters: don't install by default
+		return false, nil
 	}
 
 	// Non-SNO clusters: install by default (opt-out model)
