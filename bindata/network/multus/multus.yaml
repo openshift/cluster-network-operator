@@ -451,7 +451,7 @@ spec:
             function generateKubeConfig {
             # Check if we're running as a k8s pod.
             if [ -f "$SERVICE_ACCOUNT_PATH/token" ]; then
-              # We're running as a k8d pod - expect some variables.
+              # We're running as a k8s pod - expect some variables.
               if [ -z ${KUBERNETES_SERVICE_HOST} ]; then
                 error "KUBERNETES_SERVICE_HOST not set"; exit 1;
               fi
@@ -827,7 +827,7 @@ spec:
           function generateKubeConfig {
           # Check if we're running as a k8s pod.
           if [ -f "$SERVICE_ACCOUNT_PATH/token" ]; then
-            # We're running as a k8d pod - expect some variables.
+            # We're running as a k8s pod - expect some variables.
             if [ -z ${KUBERNETES_SERVICE_HOST} ]; then
               error "KUBERNETES_SERVICE_HOST not set"; exit 1;
             fi
