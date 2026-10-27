@@ -242,8 +242,9 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			r.status.SetDegraded(ctx, statusmanager.OperatorConfig, "NoOperatorConfig",
 				fmt.Sprintf("Operator configuration %s was deleted", request.String()))
 			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected, since we set
-			// the ownerReference (see https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/).
+			// Most owned objects are automatically garbage collected, since we
+			// set the ownerReference. CRDs are excluded from controller
+			// ownership to avoid conflicts with other operators.
 			// Return and don't requeue
 			return reconcile.Result{}, nil
 		}
@@ -499,50 +500,8 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	// Apply the objects to the cluster
-	setDegraded := false
-	var degradedErr error
-	for _, obj := range objs {
-		// TODO: OwnerRef for non default clusters. For HyperShift this should probably be HostedControlPlane CR
-		if apply.GetClusterName(obj) == "" {
-			// Mark the object to be GC'd if the owner is deleted.
-			if err := controllerutil.SetControllerReference(operConfig, obj, r.client.ClientFor(apply.GetClusterName(obj)).Scheme()); err != nil {
-				err = fmt.Errorf("could not set reference for (%s) %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
-				log.Println(err)
-				r.status.SetDegraded(ctx, statusmanager.OperatorConfig, "InternalError",
-					fmt.Sprintf("Internal error while updating operator configuration: %v", err))
-				return reconcile.Result{}, err
-			}
-		}
-
-		// Open question: should an error here indicate we will never retry?
-		if err := apply.ApplyObject(ctx, r.client, obj, ControllerName); err != nil {
-			err = fmt.Errorf("could not apply (%s) %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
-
-			// If error comes from nonexistent namespace print out a help message.
-			if obj.GroupVersionKind().Kind == "NetworkAttachmentDefinition" && strings.Contains(err.Error(), "namespaces") {
-				err = fmt.Errorf("could not apply (%s) %s/%s: %w; Namespace error for networkattachment definition, consider possible solutions: (1) Edit config files to include existing namespace (2) Create non-existent namespace (3) Delete erroneous network-attachment-definition", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
-			}
-
-			log.Println(err)
-
-			// Ignore errors if we've asked to do so.
-			anno := obj.GetAnnotations()
-			if anno != nil {
-				if _, ok := anno[names.IgnoreObjectErrorAnnotation]; ok {
-					log.Println("Object has ignore-errors annotation set, continuing")
-					continue
-				}
-			}
-			setDegraded = true
-			degradedErr = err
-		}
-	}
-
-	if setDegraded {
-		r.status.MaybeSetDegraded(ctx, statusmanager.OperatorConfig, "ApplyOperatorConfig",
-			fmt.Sprintf("Error while updating operator configuration: %v", degradedErr))
-		return reconcile.Result{}, degradedErr
+	if err := r.applyObjects(ctx, operConfig, objs); err != nil {
+		return reconcile.Result{}, err
 	}
 
 	// Update Network.config.openshift.io.Status
@@ -573,6 +532,64 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
 }
 
+// applyObjects applies the rendered objects to their clusters, marking objects in
+// the default cluster for garbage collection when operConfig is deleted. It sets
+// the operator Degraded and returns an error if any object cannot be applied,
+// except for objects carrying the ignore-errors annotation.
+func (r *ReconcileOperConfig) applyObjects(ctx context.Context, operConfig *operv1.Network, objs []*uns.Unstructured) error {
+	setDegraded := false
+	var degradedErr error
+	for _, obj := range objs {
+		// TODO: OwnerRef for non default clusters. For HyperShift this should probably be HostedControlPlane CR
+		clusterName := apply.GetClusterName(obj)
+		// Skip controller ownership on CRDs: GC-deleting a CRD destroys
+		// all its CRs (data loss), and other operators (e.g. MetalLB via
+		// ClusterExtension/boxcutter) may legitimately claim controller
+		// ownership of the same CRDs, which conflicts because Kubernetes
+		// only allows a single controller ownerReference per object.
+		if clusterName == "" && !isCRD(obj) {
+			// Mark the object to be GC'd if the owner is deleted.
+			if err := controllerutil.SetControllerReference(operConfig, obj, r.client.ClientFor(clusterName).Scheme()); err != nil {
+				err = fmt.Errorf("could not set reference for (%s) %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
+				log.Println(err)
+				r.status.SetDegraded(ctx, statusmanager.OperatorConfig, "InternalError",
+					fmt.Sprintf("Internal error while updating operator configuration: %v", err))
+				return err
+			}
+		}
+
+		// Open question: should an error here indicate we will never retry?
+		if err := apply.ApplyObject(ctx, r.client, obj, ControllerName); err != nil {
+			err = fmt.Errorf("could not apply (%s) %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
+
+			// If error comes from nonexistent namespace print out a help message.
+			if obj.GroupVersionKind().Kind == "NetworkAttachmentDefinition" && strings.Contains(err.Error(), "namespaces") {
+				err = fmt.Errorf("could not apply (%s) %s/%s: %w; Namespace error for networkattachment definition, consider possible solutions: (1) Edit config files to include existing namespace (2) Create non-existent namespace (3) Delete erroneous network-attachment-definition", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
+			}
+
+			log.Println(err)
+
+			// Ignore errors if we've asked to do so.
+			anno := obj.GetAnnotations()
+			if anno != nil {
+				if _, ok := anno[names.IgnoreObjectErrorAnnotation]; ok {
+					log.Println("Object has ignore-errors annotation set, continuing")
+					continue
+				}
+			}
+			setDegraded = true
+			degradedErr = err
+		}
+	}
+
+	if setDegraded {
+		r.status.MaybeSetDegraded(ctx, statusmanager.OperatorConfig, "ApplyOperatorConfig",
+			fmt.Sprintf("Error while updating operator configuration: %v", degradedErr))
+		return fmt.Errorf("failed to apply rendered objects: %w", degradedErr)
+	}
+	return nil
+}
+
 func updateIPsecMetric(newOperConfigSpec *operv1.NetworkSpec) {
 	if newOperConfigSpec == nil {
 		// spec is not initilized yet
@@ -588,6 +605,12 @@ func updateIPsecMetric(newOperConfigSpec *operv1.NetworkSpec) {
 
 		ipsecMetrics.UpdateIPsecMetric(mode, legacyAPI)
 	}
+}
+
+// isCRD reports whether obj is an apiextensions.k8s.io CustomResourceDefinition.
+func isCRD(obj *uns.Unstructured) bool {
+	gvk := obj.GroupVersionKind()
+	return gvk.Kind == "CustomResourceDefinition" && gvk.Group == "apiextensions.k8s.io"
 }
 
 // reconcileOperConfig enqueues the singleton operator configuration after a
