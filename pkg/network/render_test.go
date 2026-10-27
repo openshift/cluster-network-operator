@@ -904,6 +904,6 @@ func Test_renderAdditionalRoutingCapabilitiesBGPVIPManagement(t *testing.T) {
 
 	// BGP VIP management without the FRR provider is a configuration error:
 	// the FRRConfiguration CRD ships with the frr-k8s bundle.
-	_, err = renderBGPVIPFRRConfiguration(t.Context(), &operv1.NetworkSpec{}, fake.NewFakeClient(), true)
+	_, err = renderBGPVIPFRRConfiguration(t.Context(), &operv1.NetworkSpec{}, fake.NewFakeClient(), bootstrapResult, true)
 	g.Expect(err).To(MatchError(ContainSubstring("requires the FRR additional routing capability provider")))
 }
