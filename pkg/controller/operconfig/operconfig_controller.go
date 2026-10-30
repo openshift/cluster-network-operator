@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 
 	configv1 "github.com/openshift/api/config/v1"
+	apifeatures "github.com/openshift/api/features"
 	mcfgv1 "github.com/openshift/api/machineconfiguration/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/apply"
@@ -31,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	v1coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -147,6 +150,32 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 		},
 	}); err != nil {
 		return err
+	}
+
+	// Watch the BGPVIPConfig singleton so day-2 peering edits re-render the
+	// bgp-vip FRRConfiguration. Registered only when the feature gate is
+	// enabled: the CRD ships behind BGPBasedVIPManagement, and a watch on a
+	// missing CRD would block controller startup on cache sync.
+	if slices.Contains(r.featureGates.KnownFeatures(), apifeatures.FeatureGateBGPBasedVIPManagement) &&
+		r.featureGates.Enabled(apifeatures.FeatureGateBGPBasedVIPManagement) {
+		bgpVIPInformer := dynamicinformer.NewFilteredDynamicInformer(
+			r.client.Default().Dynamic(),
+			network.BGPVIPConfigGVR,
+			metav1.NamespaceAll,
+			0, // don't resync
+			cache.Indexers{},
+			nil,
+		).Informer()
+		r.client.Default().AddCustomInformer(bgpVIPInformer)
+		if err := c.Watch(&source.Informer{
+			Informer: bgpVIPInformer,
+			Handler:  handler.EnqueueRequestsFromMapFunc(reconcileOperConfig),
+			Predicates: []predicate.TypedPredicate[crclient.Object]{
+				predicate.GenerationChangedPredicate{},
+			},
+		}); err != nil {
+			return fmt.Errorf("failed to watch BGPVIPConfig: %w", err)
+		}
 	}
 
 	// Watch when nodes are created and updated.
