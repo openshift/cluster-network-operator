@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -187,29 +188,11 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["EnableUDPAggregation"] = !bootstrapResult.OVN.OVNKubernetesConfig.DisableUDPAggregation
 	data.Data["NETWORK_NODE_IDENTITY_ENABLE"] = bootstrapResult.Infra.NetworkNodeIdentityEnabled
 	data.Data["NodeIdentityCertDuration"] = OVNNodeIdentityCertDuration
-	data.Data["AdvertisedUDNIsolationMode"] = bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["advertised-udn-isolation-mode"]
-	data.Data["OpenFlowProbe"] = ""
-	if raw, ok := bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["openflow-probe"]; ok {
-		probe := strings.TrimSpace(raw)
-		if probe != "" {
-			if _, err := strconv.ParseUint(probe, 10, 32); err != nil {
-				klog.Warningf("Ignoring invalid openflow-probe override %q: expected non-negative integer", raw)
-			} else {
-				data.Data["OpenFlowProbe"] = probe
-			}
-		}
-	}
-	data.Data["AllowICMPNetworkPolicy"] = ""
-	if raw, ok := bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides["allow-icmp-network-policy"]; ok {
-		allowICMPNetworkPolicy := strings.TrimSpace(raw)
-		if allowICMPNetworkPolicy != "" {
-			if _, err := strconv.ParseBool(allowICMPNetworkPolicy); err != nil {
-				klog.Warningf("Ignoring invalid allow-icmp-network-policy override %q: expected boolean", raw)
-			} else {
-				data.Data["AllowICMPNetworkPolicy"] = allowICMPNetworkPolicy
-			}
-		}
-	}
+	overrides := bootstrapResult.OVN.OVNKubernetesConfig.ConfigOverrides
+	data.Data["AdvertisedUDNIsolationMode"] = validateConfigOverrideString(overrides, "advertised-udn-isolation-mode")
+	data.Data["OpenFlowProbe"] = validateConfigOverrideUint(overrides, "openflow-probe")
+	data.Data["AllowICMPNetworkPolicy"] = validateConfigOverrideBool(overrides, "allow-icmp-network-policy")
+	data.Data["DisableUDNARPNDPFlood"] = validateConfigOverrideBool(overrides, "disable-udn-arp-ndp-flood")
 
 	if conf.Migration != nil {
 		if conf.Migration.MTU != nil {
@@ -2217,4 +2200,76 @@ func getOVNKubernetesConfigOverrides(ctx context.Context, client cnoclient.Clien
 		return nil, fmt.Errorf("unable to retrieve config from configmap %v: %w", OVNKubernetesConfigOverridesCMName, err)
 	}
 	return configMap.Data, nil
+}
+
+// configOverrideStringRegexp restricts free-form string config overrides to a
+// safe character set. These values are interpolated verbatim into the
+// ovnkube-node startup shell script (text/template performs no escaping), so
+// permitting shell metacharacters would allow command injection.
+var configOverrideStringRegexp = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
+
+// getConfigOverride returns the raw and whitespace-trimmed value of the given
+// config override key. ok is false if the key is unset or the trimmed value is
+// empty.
+func getConfigOverride(overrides map[string]string, key string) (raw, value string, ok bool) {
+	raw, ok = overrides[key]
+	if !ok {
+		return "", "", false
+	}
+	value = strings.TrimSpace(raw)
+	return raw, value, value != ""
+}
+
+// validateConfigOverrideBool returns the canonical "true"/"false" value of the
+// given boolean config override key after trimming whitespace. It returns an
+// empty string if the key is unset, empty, or does not parse as a boolean,
+// logging a warning in the latter case. The value is normalized (e.g. "1",
+// "True" -> "true") so consumers can compare against a canonical form.
+func validateConfigOverrideBool(overrides map[string]string, key string) string {
+	raw, value, ok := getConfigOverride(overrides, key)
+	if !ok {
+		return ""
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		klog.Warningf("Ignoring invalid %s override %q: expected boolean", key, raw)
+		return ""
+	}
+	return strconv.FormatBool(parsed)
+}
+
+// validateConfigOverrideUint returns the canonical value of the given
+// non-negative integer config override key after trimming whitespace. It returns
+// an empty string if the key is unset, empty, or does not parse as a
+// non-negative integer, logging a warning in the latter case. The value is
+// normalized (e.g. "007" -> "7") so consumers receive a canonical form.
+func validateConfigOverrideUint(overrides map[string]string, key string) string {
+	raw, value, ok := getConfigOverride(overrides, key)
+	if !ok {
+		return ""
+	}
+	parsed, err := strconv.ParseUint(value, 10, 32)
+	if err != nil {
+		klog.Warningf("Ignoring invalid %s override %q: expected non-negative integer", key, raw)
+		return ""
+	}
+	return strconv.FormatUint(parsed, 10)
+}
+
+// validateConfigOverrideString returns the value of the given free-form string
+// config override key after trimming whitespace. It returns an empty string if
+// the key is unset, empty, or contains characters outside the safe set (see
+// configOverrideStringRegexp), logging a warning in the latter case. This guards
+// against shell injection since the value is interpolated verbatim into the
+// ovnkube-node startup script.
+func validateConfigOverrideString(overrides map[string]string, key string) string {
+	raw, value, ok := getConfigOverride(overrides, key)
+	if !ok {
+		return ""
+	}
+	if !configOverrideStringRegexp.MatchString(value) {
+		klog.Warningf("Ignoring invalid %s override %q: must match %s", key, raw, configOverrideStringRegexp)
+		return ""
+	}
+	return value
 }
