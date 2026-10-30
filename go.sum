@@ -191,12 +191,12 @@ github.com/onsi/ginkgo/v2 v2.32.1 h1:6tlvcDm/3sE8lGJbZ4+d4mO3RLy24/tQWOFzVSQNIfw
 github.com/onsi/ginkgo/v2 v2.32.1/go.mod h1:+aXOY+vzZ5mu2iI2HpTZUPmM//oQfsNFX6gU9kNcA44=
 github.com/onsi/gomega v1.43.0 h1:VlG/1FxqNxhSO+lq/OHBNaaqwiBK/mO8JbVkX9Y+FeU=
 github.com/onsi/gomega v1.43.0/go.mod h1:REff/hsDsodHoKlWsP2mAPhu1+5/6hVYNf9rIEBpeSg=
-github.com/openshift/api v0.0.0-20261002115817-f8795cdde518 h1:m0CfIxttdj/Wu0N/uHNgj3ZCB6zQpkWhbdr6rTK1q60=
-github.com/openshift/api v0.0.0-20261002115817-f8795cdde518/go.mod h1:2oI3aXQFDjjl7l4xA9ZPSkB+l+lyfWLg7P2sWg9yEvM=
+github.com/openshift/api v0.0.0-20261030121411-4ee683d000e5 h1:VR3p1gpa7RjtE3Y81/jCh6xiSv5BmsC7KPO+0Jp5AtQ=
+github.com/openshift/api v0.0.0-20261030121411-4ee683d000e5/go.mod h1:2oI3aXQFDjjl7l4xA9ZPSkB+l+lyfWLg7P2sWg9yEvM=
 github.com/openshift/build-machinery-go v0.0.0-20260902143904-520f675c892b h1:ErTc+6D1n/rpRaUYP++h0YlOzM+q7UaAdqDZrzhA0ho=
 github.com/openshift/build-machinery-go v0.0.0-20260902143904-520f675c892b/go.mod h1:8jcm8UPtg2mCAsxfqKil1xrmRMI3a+XU2TZ9fF8A7TE=
-github.com/openshift/client-go v0.0.0-20261001003915-dcaad1dc7fe8 h1:yHA+77VmVlO0aBdZLmocC3EBYNza0B+Hwu+8hmkjj2k=
-github.com/openshift/client-go v0.0.0-20261001003915-dcaad1dc7fe8/go.mod h1:VVl1SGimADe2vlYahxxxI87JOom7MPAiZqIDDhkedBU=
+github.com/openshift/client-go v0.0.0-20261027103500-48133ed95dad h1:KJ8Fs8QpXjtT854HjMLZyIjptLEHm4I6RC2OCZu6DvY=
+github.com/openshift/client-go v0.0.0-20261027103500-48133ed95dad/go.mod h1:g4WVqRD/NuQWnM6lQP+LhLSryRganEdhYq68YghbXi4=
 github.com/openshift/controller-runtime-common v0.0.0-20261008111711-8ec0dc844066 h1:dZ8exz2DPQdoQmjfb5p66b3hWwBrlbnMe0HifkouYgI=
 github.com/openshift/controller-runtime-common v0.0.0-20261008111711-8ec0dc844066/go.mod h1:wRo2jx/+tZd6HnYYmKayArJgL3T6LLbovLr28DGukMg=
 github.com/openshift/library-go v0.0.0-20261001144932-192662696fc7 h1:PDH/v+jap31Eb4N9q+Q3X05QHIXZA4sVyr4zb/n+Cv0=
