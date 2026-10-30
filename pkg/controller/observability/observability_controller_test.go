@@ -118,6 +118,24 @@ func createTestInfrastructure(topology configv1.TopologyMode) *configv1.Infrastr
 	}
 }
 
+// createTestClusterVersion returns a ClusterVersion whose status.history holds the
+// given versions newest-first, matching how CVO records them (history[0] is current,
+// the last entry is the initial install). Each entry gets a distinct Image derived
+// from its version, since isClusterUpgraded compares Image. Pass a single version for
+// a fresh cluster and two or more differing versions for one that was upgraded.
+func createTestClusterVersion(versions ...string) *configv1.ClusterVersion {
+	cv := &configv1.ClusterVersion{
+		ObjectMeta: metav1.ObjectMeta{Name: "version"},
+	}
+	for _, v := range versions {
+		cv.Status.History = append(cv.Status.History, configv1.UpdateHistory{
+			Version: v,
+			Image:   "quay.io/openshift-release-dev/ocp-release:" + v,
+		})
+	}
+	return cv
+}
+
 func createTestCRD(name string) *unstructured.Unstructured {
 	crd := &unstructured.Unstructured{}
 	crd.SetGroupVersionKind(schema.GroupVersionKind{
@@ -504,6 +522,286 @@ func TestShouldInstallNetworkObservability_SNOOverriddenByInstallAndEnable(t *te
 			result, err := r.shouldInstallAndSetCondition(t.Context())
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(result).To(BeTrue())
+		})
+	}
+}
+
+// TestShouldInstallNetworkObservability_FreshClusterInstalls verifies that a cluster
+// whose current version matches its initial-install version (never upgraded) still
+// installs under the default policy.
+func TestShouldInstallNetworkObservability_FreshClusterInstalls(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	if err := configv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add configv1 to scheme: %v", err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add corev1 to scheme: %v", err)
+	}
+	if err := operatorv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add operatorv1 to scheme: %v", err)
+	}
+
+	network := &configv1.Network{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}} // default policy
+	operatorNetwork := createTestOperatorNetwork("cluster")
+	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
+	cv := createTestClusterVersion("4.19.0")
+
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra, cv).Build()
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
+
+	result, err := r.shouldInstallAndSetCondition(t.Context())
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(result).To(BeTrue())
+}
+
+// TestShouldInstallNetworkObservability_UpgradedClusterSkips verifies that a cluster
+// upgraded into this feature (current version differs from the initial install) is not
+// auto-enabled under the default policy, and reports the UpgradedCluster reason.
+func TestShouldInstallNetworkObservability_UpgradedClusterSkips(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	if err := configv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add configv1 to scheme: %v", err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add corev1 to scheme: %v", err)
+	}
+	if err := operatorv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add operatorv1 to scheme: %v", err)
+	}
+
+	network := &configv1.Network{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}} // default policy
+	operatorNetwork := createTestOperatorNetwork("cluster")
+	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
+	cv := createTestClusterVersion("4.20.0", "4.19.0")
+
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(network, operatorNetwork, infra, cv).
+		WithStatusSubresource(&operatorv1.Network{}).
+		Build()
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
+
+	result, err := r.shouldInstallAndSetCondition(t.Context())
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(result).To(BeFalse())
+
+	updated := &operatorv1.Network{}
+	g.Expect(r.client.Get(t.Context(), types.NamespacedName{Name: "cluster"}, updated)).To(Succeed())
+	cond := findNetObservCondition(updated)
+	g.Expect(cond).NotTo(BeNil())
+	g.Expect(cond.Reason).To(Equal("UpgradedCluster"))
+	g.Expect(cond.Message).To(Equal("Cluster was upgraded; Network Observability is not enabled on upgrade. Set installationPolicy to InstallAndEnable to install it."))
+}
+
+// TestShouldInstallNetworkObservability_UpgradedClusterOverriddenByInstallAndEnable
+// verifies that an explicit InstallAndEnable installs even on an upgraded cluster, so
+// the upgrade skip behaves like SNO: a safe default, not a hard block.
+func TestShouldInstallNetworkObservability_UpgradedClusterOverriddenByInstallAndEnable(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	if err := configv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add configv1 to scheme: %v", err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add corev1 to scheme: %v", err)
+	}
+	if err := operatorv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add operatorv1 to scheme: %v", err)
+	}
+
+	network := &configv1.Network{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+		Spec: configv1.NetworkSpec{
+			NetworkObservability: configv1.NetworkObservabilitySpec{
+				InstallationPolicy: configv1.NetworkObservabilityInstallAndEnable,
+			},
+		},
+	}
+	operatorNetwork := createTestOperatorNetwork("cluster")
+	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
+	cv := createTestClusterVersion("4.20.0", "4.19.0")
+
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(network, operatorNetwork, infra, cv).Build()
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
+
+	result, err := r.shouldInstallAndSetCondition(t.Context())
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(result).To(BeTrue())
+}
+
+// TestShouldInstallNetworkObservability_UpgradedClusterNoActionWins verifies that an
+// explicit NoAction still takes precedence over the upgrade skip (NoAction is checked
+// first), so the reported reason stays NoAction rather than UpgradedCluster.
+func TestShouldInstallNetworkObservability_UpgradedClusterNoActionWins(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	if err := configv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add configv1 to scheme: %v", err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add corev1 to scheme: %v", err)
+	}
+	if err := operatorv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add operatorv1 to scheme: %v", err)
+	}
+
+	network := createTestNetwork("cluster", string(configv1.NetworkObservabilityNoAction))
+	operatorNetwork := createTestOperatorNetwork("cluster")
+	infra := createTestInfrastructure(configv1.HighlyAvailableTopologyMode)
+	cv := createTestClusterVersion("4.20.0", "4.19.0")
+
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(network, operatorNetwork, infra, cv).
+		WithStatusSubresource(&operatorv1.Network{}).
+		Build()
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
+
+	result, err := r.shouldInstallAndSetCondition(t.Context())
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(result).To(BeFalse())
+
+	updated := &operatorv1.Network{}
+	g.Expect(r.client.Get(t.Context(), types.NamespacedName{Name: "cluster"}, updated)).To(Succeed())
+	cond := findNetObservCondition(updated)
+	g.Expect(cond).NotTo(BeNil())
+	g.Expect(cond.Reason).To(Equal("NoAction"))
+}
+
+// TestShouldInstallNetworkObservability_UpgradedSNOReportsUpgraded verifies that the
+// upgrade check runs before the SNO check, so an upgraded single-node cluster reports
+// UpgradedCluster (the more actionable reason) rather than SNO.
+func TestShouldInstallNetworkObservability_UpgradedSNOReportsUpgraded(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	if err := configv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add configv1 to scheme: %v", err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add corev1 to scheme: %v", err)
+	}
+	if err := operatorv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add operatorv1 to scheme: %v", err)
+	}
+
+	network := &configv1.Network{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}} // default policy
+	operatorNetwork := createTestOperatorNetwork("cluster")
+	infra := createTestInfrastructure(configv1.SingleReplicaTopologyMode)
+	cv := createTestClusterVersion("4.20.0", "4.19.0")
+
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(network, operatorNetwork, infra, cv).
+		WithStatusSubresource(&operatorv1.Network{}).
+		Build()
+	r := &ReconcileObservability{client: client, featureGate: createEnabledFeatureGate()}
+
+	result, err := r.shouldInstallAndSetCondition(t.Context())
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(result).To(BeFalse())
+
+	updated := &operatorv1.Network{}
+	g.Expect(r.client.Get(t.Context(), types.NamespacedName{Name: "cluster"}, updated)).To(Succeed())
+	cond := findNetObservCondition(updated)
+	g.Expect(cond).NotTo(BeNil())
+	g.Expect(cond.Reason).To(Equal("UpgradedCluster"))
+}
+
+// Test isClusterUpgraded()
+
+func TestIsClusterUpgraded(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := configv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add configv1 to scheme: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		versions []string // status.history versions, newest first; nil means no ClusterVersion object
+		want     bool
+	}{
+		{name: "fresh single version", versions: []string{"4.19.0"}, want: false},
+		{name: "fresh with duplicate entries", versions: []string{"4.19.0", "4.19.0"}, want: false},
+		{name: "upgraded minor", versions: []string{"4.20.0", "4.19.0"}, want: true},
+		{name: "upgraded multiple hops", versions: []string{"4.20.1", "4.20.0", "4.19.0"}, want: true},
+		{name: "empty history", versions: []string{}, want: false},
+		{name: "no ClusterVersion object", versions: nil, want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+
+			builder := fake.NewClientBuilder().WithScheme(scheme)
+			if tc.versions != nil {
+				builder = builder.WithObjects(createTestClusterVersion(tc.versions...))
+			}
+			r := &ReconcileObservability{client: builder.Build()}
+
+			got, err := r.isClusterUpgraded(t.Context())
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(got).To(Equal(tc.want))
+		})
+	}
+}
+
+// TestIsClusterUpgraded_DistinctImagesSameVersion covers releases whose history
+// entries carry the same (or empty) Version but different Images. Version is optional,
+// so comparing it would miss the upgrade; comparing Image detects it.
+func TestIsClusterUpgraded_DistinctImagesSameVersion(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := configv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add configv1 to scheme: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		history []configv1.UpdateHistory
+		want    bool
+	}{
+		{
+			name: "equal non-empty version, distinct images",
+			history: []configv1.UpdateHistory{
+				{Version: "4.20.0", Image: "quay.io/ocp-release@sha256:new"},
+				{Version: "4.20.0", Image: "quay.io/ocp-release@sha256:old"},
+			},
+			want: true,
+		},
+		{
+			name: "empty version, distinct images",
+			history: []configv1.UpdateHistory{
+				{Version: "", Image: "quay.io/ocp-release@sha256:new"},
+				{Version: "", Image: "quay.io/ocp-release@sha256:old"},
+			},
+			want: true,
+		},
+		{
+			name: "equal version and image",
+			history: []configv1.UpdateHistory{
+				{Version: "4.20.0", Image: "quay.io/ocp-release@sha256:same"},
+				{Version: "4.20.0", Image: "quay.io/ocp-release@sha256:same"},
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+
+			cv := &configv1.ClusterVersion{
+				ObjectMeta: metav1.ObjectMeta{Name: "version"},
+			}
+			cv.Status.History = tc.history
+			r := &ReconcileObservability{client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(cv).Build()}
+
+			got, err := r.isClusterUpgraded(t.Context())
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(got).To(Equal(tc.want))
 		})
 	}
 }

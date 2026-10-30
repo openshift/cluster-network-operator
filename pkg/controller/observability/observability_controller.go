@@ -75,6 +75,7 @@ const (
 	reasonFeatureGateDisabled = "FeatureGateDisabled"
 	reasonNoAction            = "NoAction"
 	reasonSNO                 = "SNO"
+	reasonUpgradedCluster     = "UpgradedCluster"
 
 	// In-progress (Status False; the install is underway)
 	reasonWaitingForCluster     = "WaitingForCluster"
@@ -172,10 +173,10 @@ func (r *ReconcileObservability) Reconcile(ctx context.Context, req reconcile.Re
 	}
 
 	// When it returns false, shouldInstallAndSetCondition has set the condition
-	// explaining why (feature gate disabled, NoAction, SNO, pre-existing CRD, or a
-	// latched terminal state). The feature gate check lives there, not here, so that
-	// disabling the gate mid-install or after a successful install cannot overwrite a
-	// correct result.
+	// explaining why (feature gate disabled, NoAction, SNO, upgraded cluster,
+	// pre-existing CRD, or a latched terminal state). The feature gate check lives
+	// there, not here, so that disabling the gate mid-install or after a successful
+	// install cannot overwrite a correct result.
 	shouldInstall, err := r.shouldInstallAndSetCondition(ctx)
 	if err != nil {
 		klog.Warningf("Failed to determine if Network Observability should be installed: %v. Will retry in %v.", err, requeueInterval)
@@ -350,6 +351,27 @@ func (r *ReconcileObservability) clusterVersionAvailableSince(ctx context.Contex
 	return false, time.Time{}
 }
 
+// isClusterUpgraded reports whether the cluster has moved off the release it was
+// installed at. status.history is newest-first, so the last entry is the initial
+// install. A different current release means the cluster was upgraded. It compares
+// Image, not Version: Version is optional and may be empty or repeated across distinct
+// releases, whereas Image is always populated and uniquely identifies the release.
+func (r *ReconcileObservability) isClusterUpgraded(ctx context.Context) (bool, error) {
+	cv := &configv1.ClusterVersion{}
+	if err := r.client.Get(ctx, types.NamespacedName{Name: "version"}, cv); err != nil {
+		if apierrors.IsNotFound(err) {
+			// Absent only in tests; treat as a fresh cluster.
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to read ClusterVersion to determine upgrade state: %w", err)
+	}
+	history := cv.Status.History
+	if len(history) == 0 {
+		return false, nil
+	}
+	return history[len(history)-1].Image != history[0].Image, nil
+}
+
 // handleInstallTimeout gives up on the installation. It rolls back the OLM
 // resources CNO created and only then marks the installation as terminally timed
 // out. If rollback fails, it returns an error so the caller requeues and retries.
@@ -518,20 +540,22 @@ func (r *ReconcileObservability) setNetworkObservabilityCondition(ctx context.Co
 // shouldInstallAndSetCondition determines whether Network Observability should be
 // installed. As a side effect, when it returns false it sets the
 // NetworkObservabilityInstalledByCNO condition explaining why (FeatureGateDisabled,
-// NoAction, SNO, or PreExisting); when it returns true the install is left to
-// Reconcile, which sets the in-progress condition.
+// NoAction, SNO, UpgradedCluster, or PreExisting); when it returns true the install
+// is left to Reconcile, which sets the in-progress condition.
 //
 // Terminal states (Installed, PreExisting, and the install-failure reasons) are permanent.
-// Re-evaluatable states (FeatureGateDisabled, NoAction, SNO) and the in-progress states
-// (InstallingOperator, CreatingFlowCollector, RollbackFailed) are checked each reconcile.
-// SNO is latched against topology changes under the default policy but is still overridden
-// by InstallAndEnable.
+// Re-evaluatable states (FeatureGateDisabled, NoAction, SNO, UpgradedCluster) and the
+// in-progress states (InstallingOperator, CreatingFlowCollector, RollbackFailed) are
+// checked each reconcile. SNO (latched against topology changes under the default policy)
+// and UpgradedCluster both skip the default install but are still overridden by
+// InstallAndEnable.
 //
 // network.Spec.NetworkObservability.InstallationPolicy values:
 //
-//	"InstallAndEnable": install Network Observability once (even on SNO clusters)
+//	"InstallAndEnable": install Network Observability once (even on SNO or upgraded clusters)
 //	"NoAction":         skip installation (user opted out)
-//	undefined (unset):  install Network Observability once (opt-out model), except for SNO clusters
+//	undefined (unset):  install Network Observability once (opt-out model), except for SNO
+//	                    clusters and clusters upgraded into this feature
 func (r *ReconcileObservability) shouldInstallAndSetCondition(ctx context.Context) (bool, error) {
 	// Terminal and in-progress states are decided from our own condition, before
 	// anything else, so the install is not re-evaluated once it has concluded or
@@ -590,15 +614,25 @@ func (r *ReconcileObservability) shouldInstallAndSetCondition(ctx context.Contex
 		return false, r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, reasonPreExisting, "FlowCollector CRD already exists. Will not be managed by CNO.")
 	}
 
-	// InstallAndEnable installs regardless of topology, including overriding a
-	// previously recorded SNO decision.
+	// InstallAndEnable installs regardless of topology or upgrade state, including
+	// overriding a previously recorded SNO or UpgradedCluster decision.
 	if value == configv1.NetworkObservabilityInstallAndEnable {
 		return true, nil
 	}
 
+	// Don't enable Network Observability by default on a cluster that was upgraded.
+	// An explicit InstallAndEnable will enable it.
+	upgraded, err := r.isClusterUpgraded(ctx)
+	if err != nil {
+		return false, err
+	}
+	if upgraded {
+		return false, r.setNetworkObservabilityCondition(ctx, operatorv1.ConditionFalse, reasonUpgradedCluster, "Cluster was upgraded; Network Observability is not enabled on upgrade. Set installationPolicy to InstallAndEnable to install it.")
+	}
+
 	// Under the default policy, once SNO has been recorded, keep it latched.
 	// Adding control-plane nodes later will not trigger an install, but an
-	// explicit InstallAndEnable (handled above) will.
+	// explicit InstallAndEnable will enable it.
 	if currentReason == reasonSNO {
 		return false, nil
 	}
