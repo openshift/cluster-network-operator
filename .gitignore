@@ -1,8 +1,9 @@
 /cluster-network-operator
 /cluster-network-check-endpoints
 /cluster-network-check-target
-/test/bin/
-/test/vendor/
+/openshift-tests-ext/bin/
+/openshift-tests-ext/vendor/
+/test/e2e/vendor/
 
 # Temporary Build Files
 tmp/_output
