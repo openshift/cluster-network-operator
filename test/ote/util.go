@@ -2,10 +2,12 @@ package ote
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"math/rand"
 	"net"
 	"os"
+	"os/exec"
 	"regexp"
 	"slices"
 	"strconv"
@@ -686,4 +688,97 @@ func waitForMachinesDisappear(ctx context.Context, oc *CLI, machineSetName strin
 	if err != nil {
 		e2e.Logf("Warning: machines from machineset %s did not fully disappear: %v", machineSetName, err)
 	}
+}
+
+// forwardPortAndExecute forwards a port to a pod or service and executes a function with the local port.
+// This is a TLS-specific utility function for testing TLS endpoints.
+func forwardPortAndExecute(ctx context.Context, oc *CLI, resourceName, namespace, remotePort string, toExecute func(localPort int) error) error {
+	var err error
+	for i := 0; i < 3; i++ {
+		if err = func() error {
+			portFwdCtx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			localPort := rand.Intn(65534-1025) + 1025 //nolint:gosec // G404: test-only random port, not security-sensitive
+			args := []string{"port-forward", resourceName, fmt.Sprintf("%d:%s", localPort, remotePort), "-n", namespace}
+
+			e2e.Logf("Starting port-forward: oc %s", strings.Join(args, " "))
+			cmd := exec.CommandContext(portFwdCtx, "oc", args...)
+			if err := cmd.Start(); err != nil {
+				return fmt.Errorf("failed to start port-forward: %w", err)
+			}
+			defer func() {
+				if cmd.Process != nil {
+					_ = cmd.Process.Kill()
+				}
+			}()
+
+			if err := waitForLocalPort(portFwdCtx, localPort, 5*time.Second); err != nil {
+				return fmt.Errorf("port-forward failed to become ready: %w", err)
+			}
+
+			return toExecute(localPort)
+		}(); err == nil {
+			return nil
+		}
+		e2e.Logf("Port-forward attempt %d failed: %v, retrying...", i+1, err)
+		time.Sleep(2 * time.Second)
+	}
+	return fmt.Errorf("port-forward failed after 3 attempts: %w", err)
+}
+
+// waitForLocalPort waits until the forwarded local port accepts TCP connections.
+func waitForLocalPort(ctx context.Context, localPort int, timeout time.Duration) error {
+	addr := fmt.Sprintf("127.0.0.1:%d", localPort)
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, timeout, true,
+		func(ctx context.Context) (bool, error) {
+			conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
+			if err != nil {
+				return false, nil
+			}
+			conn.Close()
+			return true, nil
+		})
+}
+
+// checkTLSConnection verifies that a TLS connection works with the expected config and fails with the other.
+// This is a TLS-specific utility function for testing TLS version compliance.
+func checkTLSConnection(port int, tlsShouldWork, tlsShouldNotWork *tls.Config) error {
+	dialer := &tls.Dialer{
+		NetDialer: &net.Dialer{
+			Timeout: 10 * time.Second,
+		},
+		Config: tlsShouldWork,
+	}
+
+	conn, err := dialer.DialContext(context.Background(), "tcp", fmt.Sprintf("localhost:%d", port))
+	if err != nil {
+		return fmt.Errorf("should work: %w", err)
+	}
+	err = conn.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close connection: %w", err)
+	}
+
+	if tlsShouldNotWork == nil {
+		return nil
+	}
+
+	negDialer := &tls.Dialer{
+		NetDialer: &net.Dialer{
+			Timeout: 10 * time.Second,
+		},
+		Config: tlsShouldNotWork,
+	}
+
+	conn, err = negDialer.DialContext(context.Background(), "tcp", fmt.Sprintf("localhost:%d", port))
+	if err == nil {
+		return fmt.Errorf("should not work: connection unexpectedly succeeded, closing conn status: %v", conn.Close())
+	}
+	if !strings.Contains(err.Error(), "protocol version") &&
+		!strings.Contains(err.Error(), "no supported versions satisfy") &&
+		!strings.Contains(err.Error(), "handshake failure") {
+		return fmt.Errorf("should not work: got error, but not a TLS version mismatch: %w", err)
+	}
+	return nil
 }
