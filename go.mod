@@ -89,7 +89,7 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/crypto v0.23.0 // indirect
+	golang.org/x/crypto v0.33.0 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
@@ -156,6 +156,9 @@ require (
 
 replace (
 	github.com/openshift/hypershift/api => github.com/openshift/hypershift v0.0.0-20220323152148-c356b8b72d66
+
+	golang.org/x/net => github.com/openshift-sustaining/net v0.35.0-sec.3
+
 	k8s.io/client-go => k8s.io/client-go v0.27.2
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230515203736-54b630e78af5
 	// for Hypershift
