@@ -503,16 +503,12 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	setDegraded := false
 	var degradedErr error
 	for _, obj := range objs {
-		// TODO: OwnerRef for non default clusters. For HyperShift this should probably be HostedControlPlane CR
-		if apply.GetClusterName(obj) == "" {
-			// Mark the object to be GC'd if the owner is deleted.
-			if err := controllerutil.SetControllerReference(operConfig, obj, r.client.ClientFor(apply.GetClusterName(obj)).Scheme()); err != nil {
-				err = fmt.Errorf("could not set reference for (%s) %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
-				log.Println(err)
-				r.status.SetDegraded(ctx, statusmanager.OperatorConfig, "InternalError",
-					fmt.Sprintf("Internal error while updating operator configuration: %v", err))
-				return reconcile.Result{}, err
-			}
+		if err := setGCOwnerReference(operConfig, obj, bootstrapResult.Infra.HostedControlPlane, r.client.Default().Scheme()); err != nil {
+			err = fmt.Errorf("could not set reference for (%s) %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
+			klog.Error(err)
+			r.status.SetDegraded(ctx, statusmanager.OperatorConfig, "InternalError",
+				fmt.Sprintf("Internal error while updating operator configuration: %v", err))
+			return reconcile.Result{}, err
 		}
 
 		// Open question: should an error here indicate we will never retry?
@@ -571,6 +567,25 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// so we can reconcile state again.
 	log.Printf("Operconfig Controller complete")
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
+}
+
+// setGCOwnerReference marks the object to be garbage-collected with its owner:
+// the Network operconfig for default-cluster objects, or the HostedControlPlane
+// for objects rendered into the HCP namespace for the management cluster, so
+// they are removed in the same GC wave instead of lingering until namespace
+// deletion and outliving HCP-owned resources they reference (e.g. the root-ca
+// ConfigMap referenced by the rendered ServiceMonitors). Objects targeted at
+// guest clusters are left untouched.
+func setGCOwnerReference(operConfig *operv1.Network, obj apply.Object, hcp *hypershift.HostedControlPlane, scheme *runtime.Scheme) error {
+	if apply.GetClusterName(obj) == "" {
+		if err := controllerutil.SetControllerReference(operConfig, obj, scheme); err != nil {
+			return fmt.Errorf("could not set Network controller reference: %w", err)
+		}
+	}
+	if hcp != nil && apply.GetClusterName(obj) == names.ManagementClusterName && obj.GetNamespace() == hcp.Namespace {
+		obj.SetOwnerReferences([]metav1.OwnerReference{hcp.OwnerReference()})
+	}
+	return nil
 }
 
 func updateIPsecMetric(newOperConfigSpec *operv1.NetworkSpec) {
