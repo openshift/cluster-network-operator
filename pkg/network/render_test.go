@@ -734,33 +734,35 @@ func Test_renderNetworkingConsolePlugin(t *testing.T) {
 	}
 
 	t.Run("when TLS profile adherence is StrictAllComponents", func(t *testing.T) {
-		t.Run("should render ssl_protocols and ssl_ciphers directives", func(t *testing.T) {
+		t.Run("should render the ssl directives", func(t *testing.T) {
 			g := NewWithT(t)
 			nginxConf := renderAndFindNginxConfig(t, bootstrap.TLSProfile{
 				Spec: configv1.TLSProfileSpec{
 					MinTLSVersion: configv1.VersionTLS12,
 					Ciphers:       []string{"ECDHE-RSA-AES128-GCM-SHA256", "ECDHE-ECDSA-CHACHA20-POLY1305"},
+					Groups:        []configv1.TLSGroup{configv1.TLSGroupSecP256r1, configv1.TLSGroupSecP384r1MLKEM1024},
 				},
 				Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
 			})
 
 			g.Expect(nginxConf).To(MatchRegexp(`ssl_protocols\s+TLSv1\.2 TLSv1\.3;`))
 			g.Expect(nginxConf).To(MatchRegexp(`ssl_ciphers\s+ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;`))
+			g.Expect(nginxConf).To(MatchRegexp(`ssl_ecdh_curve\s+secp256r1:SecP384r1MLKEM1024;`))
 			g.Expect(nginxConf).To(MatchRegexp(`ssl_prefer_server_ciphers\s+on;`))
 		})
 
-		t.Run("with TLS 1.3 and empty ciphers", func(t *testing.T) {
+		t.Run("with TLS 1.3 and empty ciphers and curves", func(t *testing.T) {
 			g := NewWithT(t)
 			nginxConf := renderAndFindNginxConfig(t, bootstrap.TLSProfile{
 				Spec: configv1.TLSProfileSpec{
 					MinTLSVersion: configv1.VersionTLS13,
-					Ciphers:       nil,
 				},
 				Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
 			})
 
 			g.Expect(nginxConf).To(MatchRegexp(`ssl_protocols\s+TLSv1\.3;`))
 			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_ciphers"))
+			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_ecdh_curve"))
 			g.Expect(nginxConf).To(MatchRegexp(`ssl_prefer_server_ciphers\s+on;`))
 		})
 	})
@@ -772,12 +774,14 @@ func Test_renderNetworkingConsolePlugin(t *testing.T) {
 				Spec: configv1.TLSProfileSpec{
 					MinTLSVersion: configv1.VersionTLS12,
 					Ciphers:       []string{"ECDHE-RSA-AES128-GCM-SHA256"},
+					Groups:        []configv1.TLSGroup{configv1.TLSGroupSecP256r1},
 				},
 				Adherence: configv1.TLSAdherencePolicyLegacyAdheringComponentsOnly,
 			})
 
 			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_protocols"))
 			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_ciphers"))
+			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_ecdh_curve"))
 			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_prefer_server_ciphers"))
 		})
 	})

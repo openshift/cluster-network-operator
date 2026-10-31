@@ -34,9 +34,10 @@ import (
 
 func NewCheckEndpointsCommand() *cobra.Command {
 	var (
-		listenAddr      string
-		tlsMinVersion   string
-		tlsCipherSuites []string
+		listenAddr          string
+		tlsMinVersion       string
+		tlsCipherSuites     []string
+		tlsCurvePreferences []int32
 	)
 
 	cmd := &cobra.Command{
@@ -50,7 +51,7 @@ func NewCheckEndpointsCommand() *cobra.Command {
 			podName := os.Getenv("POD_NAME")
 			namespace := os.Getenv("POD_NAMESPACE")
 
-			if err := run(ctx, listenAddr, tlsMinVersion, tlsCipherSuites, podName, namespace); err != nil {
+			if err := run(ctx, listenAddr, tlsMinVersion, tlsCipherSuites, tlsCurvePreferences, podName, namespace); err != nil {
 				klog.Fatal(err)
 			}
 		},
@@ -59,14 +60,15 @@ func NewCheckEndpointsCommand() *cobra.Command {
 	cmd.Flags().StringVar(&listenAddr, "listen", ":17698", "The ip:port to serve metrics on.")
 	cmd.Flags().StringVar(&tlsMinVersion, "tls-min-version", "", "Minimum TLS version (e.g., VersionTLS12, VersionTLS13)")
 	cmd.Flags().StringSliceVar(&tlsCipherSuites, "tls-cipher-suites", nil, "Comma-separated list of TLS cipher suites")
+	cmd.Flags().Int32SliceVar(&tlsCurvePreferences, "tls-curve-preferences", nil, "Comma-separated list of TLS curve IDs")
 
 	return cmd
 }
 
-func run(ctx context.Context, listenAddr, tlsMinVersion string, tlsCipherSuites []string, podName, namespace string) error {
+func run(ctx context.Context, listenAddr, tlsMinVersion string, tlsCipherSuites []string, tlsCurvePreferences []int32, podName, namespace string) error {
 	restConfig := ctrl.GetConfigOrDie()
 
-	tlsOpts, err := buildTLSOptions(tlsMinVersion, tlsCipherSuites)
+	tlsOpts, err := buildTLSOptions(tlsMinVersion, tlsCipherSuites, tlsCurvePreferences)
 	if err != nil {
 		return fmt.Errorf("failed to build TLS options: %w", err)
 	}
@@ -183,7 +185,7 @@ func runControllers(ctx context.Context, restConfig *rest.Config, podName, names
 }
 
 // buildTLSOptions creates TLS config functions from CLI flags or falls back to library-go defaults
-func buildTLSOptions(tlsMinVersion string, tlsCipherSuites []string) ([]func(*tls.Config), error) {
+func buildTLSOptions(tlsMinVersion string, tlsCipherSuites []string, tlsCurvePreferences []int32) ([]func(*tls.Config), error) {
 	tlsMinVersionID, err := cliflag.TLSVersion(tlsMinVersion)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing TLS min version %q: %w", tlsMinVersion, err)
@@ -194,10 +196,16 @@ func buildTLSOptions(tlsMinVersion string, tlsCipherSuites []string) ([]func(*tl
 		return nil, fmt.Errorf("error parsing TLS cipher suites %v: %w", tlsCipherSuites, err)
 	}
 
+	tlsCurveIDs, err := cliflag.TLSCurvePreferences(tlsCurvePreferences)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing TLS curve preferences %v: %w", tlsCurvePreferences, err)
+	}
+
 	return []func(*tls.Config){func(cfg *tls.Config) {
 		// Set from CLI args first
 		cfg.MinVersion = tlsMinVersionID
 		cfg.CipherSuites = tlsCipherSuiteIDs
+		cfg.CurvePreferences = tlsCurveIDs
 
 		// Apply library-go strong defaults for any unset fields
 		crypto.SecureTLSConfig(cfg)

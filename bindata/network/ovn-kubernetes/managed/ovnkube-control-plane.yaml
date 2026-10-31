@@ -235,6 +235,9 @@ spec:
   {{- if .TLSCipherSuites }}
             --tls-cipher-suites={{.TLSCipherSuites}} \
   {{- end }}
+  {{- if .TLSCurvePreferences }}
+            --tls-curve-preferences={{.TLSCurvePreferences}} \
+  {{- end }}
 {{- end }}
             ${ovn_v4_join_subnet_opt} \
             ${ovn_v6_join_subnet_opt} \

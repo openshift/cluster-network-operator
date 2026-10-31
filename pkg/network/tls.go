@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -21,10 +22,14 @@ const (
 	TLSMinVersionKey = "TLSMinVersion"
 	// TLSCipherSuitesKey is the template data key for the comma-separated cipher suites
 	TLSCipherSuitesKey = "TLSCipherSuites"
+	// TLSCurvePreferencesKey is the template data key for the comma-separated curve IDs
+	TLSCurvePreferencesKey = "TLSCurvePreferences"
 	// NginxTLSProtocolsKey is the template data key for NGINX ssl_protocols directive
 	NginxTLSProtocolsKey = "NginxTLSProtocols"
 	// NginxTLSCiphersKey is the template data key for NGINX ssl_ciphers directive
 	NginxTLSCiphersKey = "NginxTLSCiphers"
+	// NginxTLSCurvesKey is the template data key for NGINX ssl_ecdh_curve directive
+	NginxTLSCurvesKey = "NginxTLSCurves"
 )
 
 // addTLSInfoToRenderData adds TLS-related template data to the render data.
@@ -57,10 +62,12 @@ func addTLSInfoToRenderData(data map[string]any, bootstrapResult *bootstrap.Boot
 	// Add Go-style TLS parameters (IANA cipher names, comma-separated)
 	data[TLSMinVersionKey] = bootstrapResult.TLSProfile.Spec.MinTLSVersion
 	data[TLSCipherSuitesKey] = strings.Join(ianaCiphers, ",")
+	data[TLSCurvePreferencesKey] = strings.Join(tlsGroupsToCurveIDs(bootstrapResult.TLSProfile.Spec.Groups), ",")
 
 	// Add NGINX-style TLS parameters (OpenSSL cipher names, colon-separated)
 	data[NginxTLSProtocolsKey] = convertTLSVersionToNginx(bootstrapResult.TLSProfile.Spec.MinTLSVersion)
 	data[NginxTLSCiphersKey] = strings.Join(bootstrapResult.TLSProfile.Spec.Ciphers, ":")
+	data[NginxTLSCurvesKey] = tlsGroupsToNginxCurves(bootstrapResult.TLSProfile.Spec.Groups)
 
 	data[UseTLSProfileKey] = true
 }
@@ -118,4 +125,25 @@ func convertTLSVersionToNginx(version configv1.TLSProtocolVersion) string {
 		// Default to TLS 1.2 and 1.3 for unknown versions
 		return "TLSv1.2 TLSv1.3"
 	}
+}
+
+// tlsGroupsToNginxCurves converts OpenShift TLS groups to NGINX ssl_ecdh_curve format.
+// All OCP TLSGroup values (including post-quantum MLKEM curves) are supported by
+// nginx with OpenSSL 3.5+, which is available in OCP 5.0 base images.
+func tlsGroupsToNginxCurves(groups []configv1.TLSGroup) string {
+	curves := make([]string, len(groups))
+	for i, group := range groups {
+		curves[i] = string(group)
+	}
+	return strings.Join(curves, ":")
+}
+
+func tlsGroupsToCurveIDs(groups []configv1.TLSGroup) []string {
+	curveIDs, _ := crypto.TLSGroupsToCurvePreferences(groups)
+	curves := make([]string, len(curveIDs))
+	for i, id := range curveIDs {
+		curves[i] = strconv.Itoa(int(id))
+	}
+
+	return curves
 }
