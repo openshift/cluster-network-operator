@@ -188,6 +188,9 @@ func getAllowedDestinationsConfigJSON(redirectRules []netopv1.L4RedirectRule) (s
 	return string(jsonByte), nil
 }
 
+// ensureEgressRouter validates the EgressRouter spec, renders the egress router
+// manifests, and applies them to the cluster. It returns an error if the spec
+// contains invalid addresses or if manifest rendering/application fails.
 func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifestDir string, namespace string, router *netopv1.EgressRouter, egressRouterOwnerReferences []metav1.OwnerReference) error {
 	var err error
 	if len(router.Spec.Addresses) == 0 {
@@ -196,11 +199,18 @@ func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifes
 	data := render.MakeRenderData()
 	data.Data["ReleaseVersion"] = os.Getenv("RELEASE_VERSION")
 	data.Data["EgressRouterNamespace"] = namespace
-	if isItValidCidr(router.Spec.Addresses[0].IP) {
-		data.Data["Addresses"] = router.Spec.Addresses[0].IP
+	if len(router.Spec.Addresses) > 1 {
+		klog.Warningf("EgressRouter %s/%s has %d addresses, only the first will be used", namespace, router.Name, len(router.Spec.Addresses))
 	}
-	if isItValidIPAddress(router.Spec.Addresses[0].Gateway) {
-		data.Data["Gateway"] = router.Spec.Addresses[0].Gateway
+	if !isValidCIDR(router.Spec.Addresses[0].IP) {
+		return fmt.Errorf("spec.addresses[0].ip is invalid: must be a valid IP address in CIDR form (e.g. 192.168.1.100/24)")
+	}
+	data.Data["Addresses"] = router.Spec.Addresses[0].IP
+	if gw := router.Spec.Addresses[0].Gateway; gw != "" {
+		if !isValidIPAddress(gw) {
+			return fmt.Errorf("spec.addresses[0].gateway is invalid: must be a valid IP address (e.g. 192.168.1.1)")
+		}
+		data.Data["Gateway"] = gw
 	}
 	data.Data["AllowedDestinations"], err = getAllowedDestinationsConfigJSON(router.Spec.Redirect.RedirectRules)
 	if err != nil {
@@ -228,15 +238,15 @@ func (r *EgressRouterReconciler) ensureEgressRouter(ctx context.Context, manifes
 	return nil
 }
 
-func isItValidCidr(cidr string) bool {
+// isValidCIDR returns true if the given string is in valid CIDR notation
+// (e.g. "192.168.1.100/24"). A bare IP address without a prefix length returns false.
+func isValidCIDR(cidr string) bool {
 	_, _, err := net.ParseCIDR(cidr)
-	if err != nil {
-		klog.Error(err)
-		return false
-	}
-	return true
+	return err == nil
 }
 
-func isItValidIPAddress(ip string) bool {
+// isValidIPAddress returns true if the given string is a valid IP address.
+// CIDR notation (e.g. "192.168.1.100/24") returns false.
+func isValidIPAddress(ip string) bool {
 	return net.ParseIP(ip) != nil
 }
