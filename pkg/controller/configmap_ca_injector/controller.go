@@ -22,6 +22,7 @@ import (
 	v1corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -116,11 +117,9 @@ type ReconcileConfigMapInjector struct {
 	nsLister      v1corelisters.ConfigMapLister
 }
 
-// Reconcile expects requests to refers to configmaps of two different types.
-// 1. a configmap named trusted-ca-bundle in namespace openshift-config-managed and will ensure that all configmaps with the label
-// config.openshift.io/inject-trusted-cabundle = true have the certificate information stored in trusted-ca-bundle's ca-bundle.crt entry.
-// 2. a configmap in any namespace with the label config.openshift.io/inject-trusted-cabundle = true and will insure that it contains the ca-bundle.crt
-// entry in the configmap named trusted-ca-bundle in namespace openshift-config-managed.
+// Reconcile injects openshift-config-managed/trusted-ca-bundle into labeled
+// ConfigMaps. A bundle change or a request for a deleted target reconciles all
+// remaining targets so that recovery does not hide other injection failures.
 func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	defer utilruntime.HandleCrash(r.status.SetDegradedOnPanicAndCrash)
 	log.Printf("Reconciling configmap from  %s/%s\n", request.Namespace, request.Name)
@@ -145,39 +144,46 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 	// Build a list of configMaps.
 	configMapsToChange := []*corev1.ConfigMap{}
 
-	// The trusted-ca-bundle changed.
-	if request.Name == names.TrustedCABundleConfigMapName && request.Namespace == names.TrustedCABundleConfigMapNamespace {
-		cms, err := r.labelLister.List(labelSelector.AsSelector())
-		if err != nil { // unlikely -- informer list
-			log.Println(err)
-			r.status.SetDegraded(ctx, statusmanager.InjectorConfig, "ListConfigMapError",
-				fmt.Sprintf("Error getting the list of affected configmaps: %v", err))
-			return reconcile.Result{}, err
-		}
-		configMapsToChange = cms
-		log.Printf("%s changed, updating %d configMaps", names.TrustedCABundleConfigMapName, len(configMapsToChange))
-	} else {
-		// Changing a single labeled configmap.
-
-		// Get the requested object.
-		cm, err := r.labelLister.ConfigMaps(request.Namespace).Get(request.Name)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				log.Printf("ConfigMap '%s/%s' not found; reconciliation will be skipped", request.Namespace, request.Name)
-				return reconcile.Result{}, nil
-			}
+	// An individual ConfigMap event normally updates only that target. If it has
+	// disappeared from the cache, fall through to reconcile all remaining targets.
+	if request.Name != names.TrustedCABundleConfigMapName || request.Namespace != names.TrustedCABundleConfigMapNamespace {
+		cm, getErr := r.labelLister.ConfigMaps(request.Namespace).Get(request.Name)
+		if getErr != nil && !apierrors.IsNotFound(getErr) {
 			// Unlikely -- this is an informer
 			r.status.SetDegraded(ctx, statusmanager.InjectorConfig, "ClusterConfigError",
-				fmt.Sprintf("failed to get configmap '%s/%s': %v", request.Namespace, request.Name, err))
-			log.Println(err)
+				fmt.Sprintf("failed to get configmap '%s/%s': %v", request.Namespace, request.Name, getErr))
+			return reconcile.Result{}, fmt.Errorf("failed to get configmap %s/%s: %w", request.Namespace, request.Name, getErr)
+		}
+		if getErr == nil {
+			configMapsToChange = append(configMapsToChange, cm)
+		}
+	}
+
+	listConfigMaps := func() ([]*corev1.ConfigMap, error) {
+		configMaps, err := r.labelLister.List(labelSelector.AsSelector())
+		if err != nil { // unlikely -- informer list
+			r.status.SetDegraded(ctx, statusmanager.InjectorConfig, "ListConfigMapError",
+				fmt.Sprintf("Error getting the list of affected configmaps: %v", err))
+			return nil, fmt.Errorf("failed to list configmaps for CA injection: %w", err)
+		}
+		klog.Infof("Updating trusted CA bundle in %d ConfigMaps", len(configMaps))
+		return configMaps, nil
+	}
+
+	// A bundle change or a deleted target requires checking all remaining targets
+	// before clearing the shared injector failure state.
+	checkingAllTargets := len(configMapsToChange) == 0
+	if checkingAllTargets {
+		configMapsToChange, err = listConfigMaps()
+		if err != nil {
 			return reconcile.Result{}, err
 		}
-		configMapsToChange = append(configMapsToChange, cm)
 	}
 
 	errs := []error{}
 
-	for _, configMap := range configMapsToChange {
+	for i := 0; i < len(configMapsToChange); i++ {
+		configMap := configMapsToChange[i]
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			needsOwner := len(configMap.Annotations[names.OpenShiftComponent]) == 0
 			if existing, ok := configMap.Data[names.TrustedCABundleConfigMapKey]; !needsOwner && ok && existing == string(trustedCAbundleData) {
@@ -205,14 +211,27 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 				configMapToUpdate.Annotations[names.OpenShiftComponent] = trustedCAbundleConfigMap.Annotations[names.OpenShiftComponent]
 			}
 
-			err = apply.ApplyObject(ctx, r.client, configMapToUpdate, "configmap_ca")
-			if err != nil {
-				log.Println(err)
-				return err
-			}
-			return nil
+			return apply.ApplyObject(ctx, r.client, configMapToUpdate, "configmap_ca")
 		})
+		if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+			klog.Infof("Skipping CA update for ConfigMap %s/%s: target or namespace is deleted or terminating", configMap.Namespace, configMap.Name)
+			if !checkingAllTargets {
+				remainingTargets, listErr := listConfigMaps()
+				if listErr != nil {
+					return reconcile.Result{}, listErr
+				}
+				// Expand this reconciliation once, excluding the target just attempted.
+				for _, target := range remainingTargets {
+					if target.Namespace != configMap.Namespace || target.Name != configMap.Name {
+						configMapsToChange = append(configMapsToChange, target)
+					}
+				}
+				checkingAllTargets = true
+			}
+			continue
+		}
 		if err != nil {
+			klog.ErrorS(err, "Failed to update trusted CA ConfigMap", "namespace", configMap.Namespace, "name", configMap.Name)
 			errs = append(errs, err)
 			if len(errs) > 5 {
 				r.status.MaybeSetDegraded(ctx, statusmanager.InjectorConfig, "ConfigMapUpdateFailure",

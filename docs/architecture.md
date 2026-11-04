@@ -204,6 +204,13 @@ The ProxyConfig controller has two functions:
 
 This controller is used for distributing certificates across the cluster. It watches ConfigMaps with a specific label. Any CM with that label will have the CA bundle injected.
 
+CA injection skips apply errors for missing targets or namespaces, and creation
+errors caused by namespace termination. Other API errors, including permission
+failures, remain reconciliation failures. When a queued target has already been
+removed from the informer cache, or its apply fails because the target or namespace
+was deleted or the namespace is terminating, the controller checks all remaining
+labeled ConfigMaps before clearing the injector's `Degraded` condition.
+
 ## Connectivity Check Controller
 
 TODO
