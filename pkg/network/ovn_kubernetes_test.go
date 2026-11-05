@@ -78,7 +78,7 @@ var manifestDirOvn = "../../bindata"
 func getDefaultFeatureGates() featuregates.FeatureGate {
 	return featuregates.NewFeatureGate(
 		[]configv1.FeatureGateName{apifeatures.FeatureGateDNSNameResolver, apifeatures.FeatureGateOVNObservability, apifeatures.FeatureGateNoOverlayMode},
-		[]configv1.FeatureGateName{apifeatures.FeatureGateNetworkConnect, apifeatures.FeatureGateMACSecurity},
+		[]configv1.FeatureGateName{apifeatures.FeatureGateNetworkConnect, apifeatures.FeatureGateMACSecurity, apifeatures.FeatureGateRouteAdvertisementNodeSelector},
 	)
 }
 
@@ -1271,6 +1271,7 @@ logfile-maxage=0`,
 				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGateNoOverlayMode,
+				apifeatures.FeatureGateRouteAdvertisementNodeSelector,
 			}
 			s := sets.New[configv1.FeatureGateName](tc.enabledFeatureGates...)
 			enabled := []configv1.FeatureGateName{}
@@ -5403,4 +5404,93 @@ func extractDaemonSetEnvVars(g *WithT, objs []*uns.Unstructured, dsName, contain
 	}
 	g.Expect(true).To(BeFalse(), "could not find DaemonSet %s with container %s", dsName, containerName)
 	return envVars
+}
+
+func TestRenderRouteAdvertisementNodeSelectorValidation(t *testing.T) {
+	defaultGates := getDefaultFeatureGates()
+	for _, tc := range []struct {
+		name                    string
+		nodeSelectorGateEnabled bool
+		expectValidationRule    bool
+	}{
+		{
+			name:                    "Feature gate disabled - validation rule present",
+			nodeSelectorGateEnabled: false,
+			expectValidationRule:    true,
+		},
+		{
+			name:                    "Feature gate enabled - validation rule absent",
+			nodeSelectorGateEnabled: true,
+			expectValidationRule:    false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+			config := OVNKubernetesConfig.DeepCopy()
+			config.Spec.DefaultNetwork.OVNKubernetesConfig.RouteAdvertisements = operv1.RouteAdvertisementsEnabled
+			fillDefaults(&config.Spec, nil)
+
+			bootstrapResult := fakeBootstrapResult()
+			bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+				ControlPlaneReplicaCount: 3,
+				OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+					DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+					DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+					SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
+					DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+					DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
+					HyperShiftConfig:          &bootstrap.OVNHyperShiftBootstrapResult{},
+				},
+			}
+
+			var enabled, disabled []configv1.FeatureGateName
+			for _, feature := range defaultGates.KnownFeatures() {
+				isEnabled := defaultGates.Enabled(feature)
+				if feature == apifeatures.FeatureGateRouteAdvertisementNodeSelector {
+					isEnabled = tc.nodeSelectorGateEnabled
+				}
+				if isEnabled {
+					enabled = append(enabled, feature)
+				} else {
+					disabled = append(disabled, feature)
+				}
+			}
+
+			objects, _, err := renderOVNKubernetes(&config.Spec, bootstrapResult, manifestDirOvn,
+				featuregates.NewFeatureGate(enabled, disabled))
+			g.Expect(err).NotTo(HaveOccurred(), "should render OVN manifests with RouteAdvertisements enabled")
+
+			var crd *uns.Unstructured
+			for _, obj := range objects {
+				if obj.GetKind() == "CustomResourceDefinition" && obj.GetName() == "routeadvertisements.k8s.ovn.org" {
+					crd = obj
+					break
+				}
+			}
+			g.Expect(crd).NotTo(BeNil(), "should find routeadvertisements.k8s.ovn.org CRD in rendered objects")
+
+			versions, found, err := uns.NestedSlice(crd.Object, "spec", "versions")
+			g.Expect(err).NotTo(HaveOccurred(), "should read CRD versions array")
+			g.Expect(found).To(BeTrue(), "CRD spec.versions must exist")
+
+			versionSchema := versions[0].(map[string]any)
+			validations, found, err := uns.NestedSlice(versionSchema,
+				"schema", "openAPIV3Schema", "properties", "spec", "x-kubernetes-validations")
+			g.Expect(err).NotTo(HaveOccurred(), "should read spec x-kubernetes-validations")
+			g.Expect(found).To(BeTrue(), "spec x-kubernetes-validations must exist")
+
+			podNetworkNodeSelectorRule := "(!has(self.nodeSelector.matchLabels) && !has(self.nodeSelector.matchExpressions)) || !('PodNetwork' in self.advertisements)"
+			foundRule := false
+			for _, validation := range validations {
+				validationMap := validation.(map[string]any)
+				if rule, ok := validationMap["rule"].(string); ok && rule == podNetworkNodeSelectorRule {
+					foundRule = true
+					break
+				}
+			}
+
+			g.Expect(foundRule).To(Equal(tc.expectValidationRule),
+				"PodNetwork nodeSelector validation rule presence should match feature gate state")
+		})
+	}
 }
