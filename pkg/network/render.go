@@ -138,7 +138,7 @@ func Render(ctx context.Context, operConf *operv1.NetworkSpec, clusterConf *conf
 	}
 	objs = append(objs, o...)
 
-	o, err = renderBGPVIPFRRConfiguration(ctx, operConf, client, bgpVIP)
+	o, err = renderBGPVIPFRRConfiguration(ctx, operConf, client, bootstrapResult, bgpVIP)
 	if err != nil {
 		return nil, progressing, err
 	}
