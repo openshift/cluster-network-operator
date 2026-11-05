@@ -117,6 +117,10 @@ func InfraStatus(ctx context.Context, client cnoclient.Client) (*bootstrap.Infra
 		}
 	}
 
+	if res.PlatformType == configv1.OpenStackPlatformType && infraConfig.Spec.PlatformSpec.OpenStack != nil {
+		res.OpenStackMaxAllowedAddressPairs = infraConfig.Spec.PlatformSpec.OpenStack.MaxAllowedAddressPairs
+	}
+
 	var err error
 	res.HostedControlPlane, err = hypershift.GetHostedControlPlane(ctx, client)
 	if err != nil {

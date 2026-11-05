@@ -5,9 +5,90 @@ import (
 	"strings"
 	"testing"
 
+	configv1 "github.com/openshift/api/config/v1"
+	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
+	"github.com/openshift/cluster-network-operator/pkg/hypershift"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
+
+func TestCloudNetworkConfigControllerOpenStackMaxAllowedAddressPairs(t *testing.T) {
+	for _, managed := range []bool{false, true} {
+		mode := "self-hosted"
+		if managed {
+			mode = "managed"
+		}
+		t.Run(mode, func(t *testing.T) {
+			for _, tc := range []struct {
+				name  string
+				limit int32
+				want  string
+			}{
+				{name: "unset"},
+				{name: "minimum", limit: 1, want: "-platform-os-max-allowed-address-pairs=1"},
+				{name: "configured", limit: 42, want: "-platform-os-max-allowed-address-pairs=42"},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					t.Setenv("HYPERSHIFT", "false")
+					if managed {
+						t.Setenv("HYPERSHIFT", "true")
+					}
+					t.Setenv("HOSTED_CLUSTER_NAMESPACE", "test-ns")
+					t.Setenv("CLOUD_NETWORK_CONFIG_CONTROLLER_IMAGE", "test-image")
+					t.Setenv("GCP_CNCC_CREDENTIALS_FILE", "")
+					conf := &operv1.NetworkSpec{DefaultNetwork: operv1.DefaultNetworkDefinition{Type: operv1.NetworkTypeOVNKubernetes}}
+					boot := &bootstrap.BootstrapResult{Infra: bootstrap.InfraStatus{
+						PlatformType:                    configv1.OpenStackPlatformType,
+						OpenStackMaxAllowedAddressPairs: tc.limit,
+						HostedControlPlane:              &hypershift.HostedControlPlane{},
+						APIServers: map[string]bootstrap.APIServer{
+							bootstrap.APIServerDefaultLocal: {Host: "localhost", Port: "6443"},
+						},
+					}}
+					objs, err := renderCloudNetworkConfigController(conf, boot, "../../bindata")
+					if err != nil {
+						t.Fatalf("failed to render CNCC: %v", err)
+					}
+					for _, obj := range objs {
+						if obj.GetKind() != "Deployment" {
+							continue
+						}
+						container, found := findUnstructuredContainer(t, obj.Object, "controller")
+						if !found {
+							t.Fatal("controller container not found in Deployment")
+						}
+						field := "args"
+						if managed {
+							field = "command"
+						}
+						args, found, err := uns.NestedStringSlice(container, field)
+						if err != nil || !found {
+							t.Fatalf("controller %s not found: %v", field, err)
+						}
+						var flags []string
+						for _, arg := range args {
+							for field := range strings.FieldsSeq(arg) {
+								if strings.HasPrefix(field, "-platform-os-max-allowed-address-pairs") {
+									flags = append(flags, field)
+								}
+							}
+						}
+						if tc.want == "" {
+							if len(flags) != 0 {
+								t.Errorf("unset limit should omit flag, got %v", flags)
+							}
+						} else if len(flags) != 1 || flags[0] != tc.want {
+							t.Errorf("expected exactly one %q flag, got %v", tc.want, flags)
+						}
+						return
+					}
+					t.Fatal("Deployment not found in rendered output")
+				})
+			}
+		})
+	}
+}
 
 func makeManagedControllerRenderData() render.RenderData {
 	data := render.MakeRenderData()
@@ -22,6 +103,7 @@ func makeManagedControllerRenderData() render.RenderData {
 	data.Data["ExternalControlPlane"] = true
 	data.Data["PlatformAzureEnvironment"] = ""
 	data.Data["PlatformAWSCAPath"] = ""
+	data.Data["OpenStackMaxAllowedAddressPairs"] = int32(0)
 	data.Data["PlatformAPIURL"] = ""
 	data.Data["CLIImage"] = "cli-image"
 	data.Data["TokenMinterImage"] = "token-minter-image"
