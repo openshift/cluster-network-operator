@@ -15,4 +15,4 @@ echo "Building CNO tests extension binary"
 CGO_ENABLED=0 go build -v \
     -o "${OUTPUT}/cluster-network-operator-tests-ext" \
     -mod=vendor \
-    "$ROOT/ote/cmd/"
+    "$ROOT/cmd/cluster-network-operator-tests-ext/"

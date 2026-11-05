@@ -25,7 +25,8 @@ check: | verify test-unit golangci-lint
 
 golangci-lint:
 	golangci-lint run --verbose --print-resources-usage --modules-download-mode=vendor --timeout=5m0s
-	cd test && golangci-lint run --verbose --modules-download-mode=mod --timeout=5m0s ./...
+	cd test/e2e && golangci-lint run --verbose --modules-download-mode=mod --timeout=5m0s ./...
+	cd openshift-tests-ext && golangci-lint run --verbose --modules-download-mode=mod --timeout=5m0s ./...
 .PHONY: golangci-lint
 
 install.tools:
@@ -50,6 +51,6 @@ clean:
 .PHONY: build-e2e-tests
 build-e2e-tests:
 	@echo "Building cluster-network-operator-tests-ext binary..."
-	cd test && ./hack/build-tests-ext.sh
+	$(MAKE) -C openshift-tests-ext build
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
