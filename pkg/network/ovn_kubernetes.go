@@ -410,6 +410,10 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 	data.Data["OVN_EVPN_ENABLE_API"] = featureGates.Enabled(apifeatures.FeatureGateEVPN)
 	data.Data["OVN_EVPN_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateEVPN) && c.RouteAdvertisements == operv1.RouteAdvertisementsEnabled
 	data.Data["OVN_MAC_SECURITY_ENABLE_API"] = featureGates.Enabled(apifeatures.FeatureGateMACSecurity)
+	// OVN_ROUTE_ADVERTISEMENTS_NODESELECTOR_ENABLE controls whether nodeSelector can be specified
+	// when PodNetwork is selected for route advertisement. When disabled (default), the validation
+	// rule enforces that PodNetwork advertisements must target all nodes (empty nodeSelector).
+	data.Data["OVN_ROUTE_ADVERTISEMENTS_NODESELECTOR_ENABLE"] = featureGates.Enabled(apifeatures.FeatureGateRouteAdvertisementNodeSelector)
 
 	data.Data["ReachabilityTotalTimeoutSeconds"] = c.EgressIPConfig.ReachabilityTotalTimeoutSeconds
 
