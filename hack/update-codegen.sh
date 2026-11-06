@@ -6,10 +6,9 @@ set -o pipefail
 
 SCRIPT_ROOT="$(dirname "${BASH_SOURCE[0]}")/.."
 
-bash "${SCRIPT_ROOT}/vendor/k8s.io/code-generator/kube_codegen.sh" deepcopy \
-  github.com/openshift/openshift-network-operator/pkg/generated github.com/openshift/cluster-network-operator/pkg/apis \
-  "network:v1" \
-  --go-header-file "${SCRIPT_ROOT}/hack/custom-boilerplate.go.txt"
+. "${SCRIPT_ROOT}/vendor/k8s.io/code-generator/kube_codegen.sh"
+
+GOFLAGS=-mod=readonly kube::codegen::gen_helpers --boilerplate "${SCRIPT_ROOT}/hack/custom-boilerplate.go.txt" ./pkg/apis
 
 
 echo "Generating CRDs"
