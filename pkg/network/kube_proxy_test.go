@@ -385,8 +385,8 @@ var FakeKubeProxyBootstrapResult = bootstrap.BootstrapResult{
 	},
 }
 
-func TestRenderKubeProxy(t *testing.T) {
-	g := NewGomegaWithT(t)
+func mustRenderKubeProxy(t *testing.T) (*operv1.NetworkSpec, []*uns.Unstructured) {
+	t.Helper()
 
 	c := &operv1.NetworkSpec{
 		ClusterNetwork: []operv1.ClusterNetworkEntry{
@@ -400,11 +400,37 @@ func TestRenderKubeProxy(t *testing.T) {
 			IptablesSyncPeriod: "42s",
 		},
 	}
-
 	fillKubeProxyDefaults(c)
 
 	objs, err := renderStandaloneKubeProxy(c, &FakeKubeProxyBootstrapResult, manifestDir)
-	g.Expect(err).NotTo(HaveOccurred())
+	NewWithT(t).Expect(err).NotTo(HaveOccurred())
+
+	return c, objs
+}
+
+// /healthz reports a node tainted ToBeDeletedByClusterAutoscaler as unhealthy,
+// so a liveness probe on it makes the kubelet kill a healthy kube-proxy for as
+// long as the drain lasts. /livez is served on the same port and ignores node
+// eligibility. Readiness keeps /healthz, which is the signal that the node is
+// no longer eligible for traffic.
+func TestKubeProxyProbes(t *testing.T) {
+	g := NewWithT(t)
+
+	_, objs := mustRenderKubeProxy(t)
+
+	ds := mustFindRenderedObj[*appsv1.DaemonSet](t, objs, "DaemonSet", "openshift-kube-proxy")
+	container := mustFindContainer(t, ds.Spec.Template.Spec.Containers, "kube-proxy")
+
+	g.Expect(container.LivenessProbe).ToNot(BeNil())
+	g.Expect(container.LivenessProbe.HTTPGet).ToNot(BeNil())
+	g.Expect(container.LivenessProbe.HTTPGet.Path).To(Equal("/livez"))
+	g.Expect(container.ReadinessProbe.HTTPGet.Path).To(Equal("/healthz"))
+}
+
+func TestRenderKubeProxy(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	c, objs := mustRenderKubeProxy(t)
 
 	g.Expect(objs).To(HaveLen(11))
 
