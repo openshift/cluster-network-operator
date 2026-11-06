@@ -129,7 +129,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				network: netConfig("10.128.0.0/14", []string{"172.30.0.0/16"}),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
-			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
+			want: ".cluster.local,.cluster.local.,.svc,.svc.,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
@@ -140,7 +140,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				network: netConfig("10.128.0.0/14", []string{"172.30.0.0/16"}),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
-			want: ".cluster.local,.svc,10.0.0.0/16,10.128.0.0/14,127.0.0.1,169.254.169.254,172.30.0.0/16," +
+			want: ".cluster.local,.cluster.local.,.svc,.svc.,10.0.0.0/16,10.128.0.0/14,127.0.0.1,169.254.169.254,172.30.0.0/16," +
 				"api-int.test.cluster.com,localhost,metadata,metadata.google.internal,metadata.google.internal.",
 			wantErr: false,
 		},
@@ -151,7 +151,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				network: netConfig("10.128.0.0/14", []string{"172.30.0.0/16"}),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
-			want: ".cluster.local,.ec2.internal,.svc,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
+			want: ".cluster.local,.cluster.local.,.ec2.internal,.svc,.svc.,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
@@ -162,7 +162,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				network: netConfig("10.128.0.0/14", []string{"172.30.0.0/16"}),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
-			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
+			want: ".cluster.local,.cluster.local.,.svc,.svc.,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,172.30.0.1,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
@@ -173,7 +173,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				network: netConfig("10.128.0.0/14", []string{"172.30.0.0/16", "2001:db8::/32"}),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
-			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
+			want: ".cluster.local,.cluster.local.,.svc,.svc.,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,172.30.0.1,2001:db8::/32,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
@@ -184,7 +184,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				network: netConfig("10.128.0.0/14", []string{"172.30.0.0/16"}),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
-			want: ".cluster.local,.foo.test.com,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
+			want: ".cluster.local,.cluster.local.,.foo.test.com,.svc,.svc.,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
@@ -195,7 +195,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				network: netConfig("10.128.0.0/14", []string{"172.30.0.0/16", "2001:db8::/32"}),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 			},
-			want: ".cluster.local,.foo.test.com,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
+			want: ".cluster.local,.cluster.local.,.foo.test.com,.svc,.svc.,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,2001:db8::/32,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
@@ -261,7 +261,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapData),
 				getEnv:  func(v string) string { return strconv.FormatBool(v == "PROXY_INTERNAL_APISERVER_ADDRESS") },
 			},
-			want: ".cluster.local,.foo.test.com,.svc,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
+			want: ".cluster.local,.cluster.local.,.foo.test.com,.svc,.svc.,.us-west-2.compute.internal,10.0.0.0/16,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,172.30.0.1,199.161.0.0/16,localhost",
 			wantErr: false,
 		},
@@ -272,7 +272,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				network: netConfig("10.128.0.0/14", []string{"172.30.0.0/16"}),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapDataWithDefaultMachineCIDR),
 			},
-			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.128.0.0/14,127.0.0.1," +
+			want: ".cluster.local,.cluster.local.,.svc,.svc.,.us-west-2.compute.internal,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
@@ -283,7 +283,7 @@ func TestMergeUserSystemNoProxy(t *testing.T) {
 				network: netConfig("10.128.0.0/14", []string{"172.30.0.0/16"}),
 				cluster: cfgMapWithInstallConfig(cfgMapKey, cfgMapDataWithDefaultMachineNetworkCIDR),
 			},
-			want: ".cluster.local,.svc,.us-west-2.compute.internal,10.128.0.0/14,127.0.0.1," +
+			want: ".cluster.local,.cluster.local.,.svc,.svc.,.us-west-2.compute.internal,10.128.0.0/14,127.0.0.1," +
 				"169.254.169.254,172.30.0.0/16,api-int.test.cluster.com,localhost",
 			wantErr: false,
 		},
