@@ -21,6 +21,13 @@ rules:
   - get
   - list
   - watch
+- apiGroups: ["networking.k8s.io"]
+  resources:
+  - servicecidrs
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups: ["authentication.k8s.io"]
   resources:
   - tokenreviews
