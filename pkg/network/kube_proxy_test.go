@@ -1,11 +1,13 @@
 package network
 
 import (
+	"slices"
 	"testing"
 
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	appsv1 "k8s.io/api/apps/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	. "github.com/onsi/gomega"
@@ -385,8 +387,8 @@ var FakeKubeProxyBootstrapResult = bootstrap.BootstrapResult{
 	},
 }
 
-func TestRenderKubeProxy(t *testing.T) {
-	g := NewGomegaWithT(t)
+func mustRenderKubeProxy(t *testing.T) (*operv1.NetworkSpec, []*uns.Unstructured) {
+	t.Helper()
 
 	c := &operv1.NetworkSpec{
 		ClusterNetwork: []operv1.ClusterNetworkEntry{
@@ -400,11 +402,41 @@ func TestRenderKubeProxy(t *testing.T) {
 			IptablesSyncPeriod: "42s",
 		},
 	}
-
 	fillKubeProxyDefaults(c)
 
 	objs, err := renderStandaloneKubeProxy(c, &FakeKubeProxyBootstrapResult, manifestDir)
-	g.Expect(err).NotTo(HaveOccurred())
+	NewWithT(t).Expect(err).NotTo(HaveOccurred())
+
+	return c, objs
+}
+
+// kube-proxy starts the ServiceCIDR config controller whenever the
+// MultiCIDRServiceAllocator feature gate is enabled, which it is by default
+// since Kubernetes 1.33. Without this rule the informer is refused on every
+// retry and kube-proxy logs the authorization error forever.
+func TestKubeProxyClusterRoleAllowsServiceCIDRs(t *testing.T) {
+	g := NewWithT(t)
+
+	_, objs := mustRenderKubeProxy(t)
+
+	role := mustFindRenderedObj[*rbacv1.ClusterRole](t, objs, "ClusterRole", "openshift-kube-proxy")
+
+	granted := false
+	for _, rule := range role.Rules {
+		if slices.Contains(rule.APIGroups, "networking.k8s.io") &&
+			slices.Contains(rule.Resources, "servicecidrs") &&
+			slices.Contains(rule.Verbs, "list") &&
+			slices.Contains(rule.Verbs, "watch") {
+			granted = true
+		}
+	}
+	g.Expect(granted).To(BeTrue(), "ClusterRole %q must grant list/watch on networking.k8s.io/servicecidrs", role.Name)
+}
+
+func TestRenderKubeProxy(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	c, objs := mustRenderKubeProxy(t)
 
 	g.Expect(objs).To(HaveLen(11))
 
