@@ -30,9 +30,13 @@ spec:
       app: ovnkube-node
       {{ end }}
   updateStrategy:
+    {{ if eq .OVN_NODE_MODE "dpu-host" }}
+    type: OnDelete
+    {{ else }}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 10%
+    {{end}}
   template:
     metadata:
       annotations:
