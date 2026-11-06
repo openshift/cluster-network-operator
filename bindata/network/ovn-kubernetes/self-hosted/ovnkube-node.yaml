@@ -189,7 +189,7 @@ spec:
         terminationMessagePolicy: FallbackToLogsOnError
         resources:
           requests:
-            cpu: 50m
+            cpu: 150m
             memory: 300Mi
       - name: ovn-acl-logging
         image: "{{.OvnImage}}"
@@ -305,7 +305,7 @@ spec:
           name: env-overrides
         resources:
           requests:
-            cpu: 10m
+            cpu: 100m
             memory: 70Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
@@ -373,7 +373,7 @@ spec:
           name: tmp
         resources:
           requests:
-            cpu: 10m
+            cpu: 100m
             memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
 
@@ -437,7 +437,7 @@ spec:
           name: tmp
         resources:
           requests:
-            cpu: 10m
+            cpu: 100m
             memory: 300Mi
         terminationMessagePolicy: FallbackToLogsOnError
 {{ end }}
@@ -569,7 +569,7 @@ spec:
           name: env-overrides
         resources:
           requests:
-            cpu: 10m
+            cpu: 100m
             memory: 600Mi
             {{ if and (.MgmtPortResourceName) (or (eq .OVN_NODE_MODE "smart-nic") (eq .OVN_NODE_MODE "dpu-host")) }}
             {{ .MgmtPortResourceName }}: '{{ .MgmtPortResourceCount }}'
