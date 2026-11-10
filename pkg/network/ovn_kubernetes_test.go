@@ -4219,6 +4219,7 @@ func TestRenderOVNKubernetesEnablePersistentIPs(t *testing.T) {
 		[]configv1.FeatureGateName{
 			apifeatures.FeatureGateNetworkConnect,
 			apifeatures.FeatureGateMACSecurity,
+			apifeatures.FeatureGateRouteAdvertisementNodeSelector,
 		},
 	)
 
@@ -4548,6 +4549,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGateNoOverlayMode,
+				apifeatures.FeatureGateRouteAdvertisementNodeSelector,
 			},
 		)
 	}
@@ -4560,6 +4562,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGateNoOverlayMode,
+				apifeatures.FeatureGateRouteAdvertisementNodeSelector,
 			},
 		)
 	}
@@ -4572,6 +4575,7 @@ func Test_renderOVNKubernetes(t *testing.T) {
 				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateOVNObservability,
 				apifeatures.FeatureGateNoOverlayMode,
+				apifeatures.FeatureGateRouteAdvertisementNodeSelector,
 			},
 		)
 	}
@@ -4981,6 +4985,7 @@ func TestRenderOVNKubernetesNoOverlay(t *testing.T) {
 			[]configv1.FeatureGateName{
 				apifeatures.FeatureGateNetworkConnect,
 				apifeatures.FeatureGateMACSecurity,
+				apifeatures.FeatureGateRouteAdvertisementNodeSelector,
 			},
 		)
 	}
