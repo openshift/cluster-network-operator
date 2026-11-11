@@ -1,4 +1,4 @@
-package ote
+package e2e
 
 import (
 	"context"
@@ -32,10 +32,10 @@ const (
 	APIServerOperatorTimeout  = 10 * time.Minute
 )
 
-var _ = Describe("[sig-network] TLS Profile Compliance", func() {
+var _ = Describe("TLS Profile Compliance", func() {
 	t := newTLSTestContext()
 
-	It("should verify TLS compliance across Modern and Intermediate profiles with different adherence policies [Disruptive][Timeout:300m]",
+	It("should verify TLS compliance across Modern and Intermediate profiles with different adherence policies [Timeout:300m]",
 		Label("Disruptive"), func(ctx context.Context) {
 			By("Configuring and verifying Modern TLS Profile with LegacyAdheringComponentsOnly")
 			t.configureTLSProfileWithAdherence(ctx, configv1.TLSProfileModernType, configv1.TLSAdherencePolicyLegacyAdheringComponentsOnly)
