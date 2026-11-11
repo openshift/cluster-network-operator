@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/cmd"
 
@@ -23,11 +24,14 @@ func main() {
 	// Disruptive tests run one at a time under the disruptive cluster-stability
 	// classification. Serial/parallel suites are intentionally omitted for now;
 	// the migrated tests are all disruptive.
+	// Extended timeout for disruptive tests that involve MCP rollouts.
+	testTimeout := 300 * time.Minute // 5 hours
 	ext.AddSuite(e.Suite{
 		Name:             "cluster-network-operator/conformance/disruptive",
 		Qualifiers:       []string{`labels.exists(l, l == "Disruptive")`},
 		Parallelism:      1,
 		ClusterStability: e.ClusterStabilityDisruptive,
+		TestTimeout:      &testTimeout,
 	})
 
 	specs, err := g.BuildExtensionTestSpecsFromOpenShiftGinkgoSuite()
