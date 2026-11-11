@@ -3,6 +3,7 @@
 /cluster-network-check-target
 /test/bin/
 /test/vendor/
+/test/.openshift-tests-extension/
 
 # Temporary Build Files
 tmp/_output
