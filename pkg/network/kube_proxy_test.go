@@ -385,8 +385,8 @@ var FakeKubeProxyBootstrapResult = bootstrap.BootstrapResult{
 	},
 }
 
-func TestRenderKubeProxy(t *testing.T) {
-	g := NewGomegaWithT(t)
+func mustRenderKubeProxy(t *testing.T) (*operv1.NetworkSpec, []*uns.Unstructured) {
+	t.Helper()
 
 	c := &operv1.NetworkSpec{
 		ClusterNetwork: []operv1.ClusterNetworkEntry{
@@ -404,7 +404,34 @@ func TestRenderKubeProxy(t *testing.T) {
 	fillKubeProxyDefaults(c)
 
 	objs, err := renderStandaloneKubeProxy(c, &FakeKubeProxyBootstrapResult, manifestDir)
-	g.Expect(err).NotTo(HaveOccurred())
+	NewWithT(t).Expect(err).NotTo(HaveOccurred())
+
+	return c, objs
+}
+
+// A failing liveness probe restarts the container, which cannot help a
+// kube-proxy whose iptables or nftables syncs are failing, and /healthz reports
+// a node tainted ToBeDeletedByClusterAutoscaler as unhealthy, so the probe
+// restart-loops a healthy kube-proxy for as long as a drain lasts. Readiness
+// keeps reporting /healthz, which is the signal the node is leaving.
+func TestKubeProxyHasNoLivenessProbe(t *testing.T) {
+	g := NewWithT(t)
+
+	_, objs := mustRenderKubeProxy(t)
+
+	ds := mustFindRenderedObj[*appsv1.DaemonSet](t, objs, "DaemonSet", "openshift-kube-proxy")
+	container := mustFindContainer(t, ds.Spec.Template.Spec.Containers, "kube-proxy")
+
+	g.Expect(container.LivenessProbe).To(BeNil())
+	g.Expect(container.ReadinessProbe).ToNot(BeNil())
+	g.Expect(container.ReadinessProbe.HTTPGet.Path).To(Equal("/healthz"))
+	g.Expect(container.ReadinessProbe.HTTPGet.Port.String()).To(Equal("healthz"))
+}
+
+func TestRenderKubeProxy(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	c, objs := mustRenderKubeProxy(t)
 
 	g.Expect(objs).To(HaveLen(11))
 
