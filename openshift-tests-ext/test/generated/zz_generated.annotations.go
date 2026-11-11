@@ -17,6 +17,12 @@ var AppendedAnnotations = map[string]string{
 
 	"CNO [JIRA:Networking][OTP] 72817- internalJoinSubnet and internalTransitSwitchSubnet should be configurable post install as a Day 2 operation": "[Disruptive][Suite:cluster-network-operator/conformance/disruptive]",
 
+	"CNO env-overrides _global key applies OVN_KUBE_LOG_LEVEL on all ovnkube-node pods": "[Disruptive][Suite:cluster-network-operator/conformance/disruptive]",
+
+	"CNO env-overrides node-specific env-overrides take precedence over _global": "[Disruptive][Suite:cluster-network-operator/conformance/disruptive]",
+
+	"CNO env-overrides without _global, node-specific override still applies and other nodes keep default": "[Disruptive][Suite:cluster-network-operator/conformance/disruptive]",
+
 	"TLS Profile Compliance should verify TLS compliance across Modern and Intermediate profiles with different adherence policies [Timeout:300m]": "[Disruptive][Suite:cluster-network-operator/conformance/disruptive]",
 }
 
