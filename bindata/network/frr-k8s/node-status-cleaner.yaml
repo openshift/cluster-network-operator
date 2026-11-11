@@ -46,6 +46,9 @@ spec:
   {{- if .TLSCipherSuites }}
         - --tls-cipher-suites={{.TLSCipherSuites}}
   {{- end }}
+  {{- if .TLSCurvePreferences }}
+        - --tls-curve-preferences={{.TLSCurvePreferences}}
+  {{- end }}
 {{- end }}
         - $(LOG_LEVEL)
         env:
