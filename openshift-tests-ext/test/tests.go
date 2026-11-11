@@ -20,4 +20,9 @@ var InformingTests = []string{
 
 // BlockingTests lists tests that are considered stable and should block CI jobs
 // if they fail.
-var BlockingTests = []string{}
+var BlockingTests = []string{
+	// env-overrides
+	`[cluster-network-operator-ote][sig-network] CNO env-overrides _global key applies OVN_KUBE_LOG_LEVEL on all ovnkube-node pods [Disruptive][Suite:cluster-network-operator/conformance/disruptive]`,
+	`[cluster-network-operator-ote][sig-network] CNO env-overrides node-specific env-overrides take precedence over _global [Disruptive][Suite:cluster-network-operator/conformance/disruptive]`,
+	`[cluster-network-operator-ote][sig-network] CNO env-overrides without _global, node-specific override still applies and other nodes keep default [Disruptive][Suite:cluster-network-operator/conformance/disruptive]`,
+}
