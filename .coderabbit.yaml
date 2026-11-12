@@ -225,26 +225,28 @@ reviews:
           vendor/, *_test.go, pure refactors with no behavioral change,
           and internal-only changes):
 
-          1. Check whether files under test/e2e/ are also added or
-          modified in this PR.
+          This repository has no in-tree e2e tests. E2E coverage comes
+          from the OpenShift CI lanes that run on the PR (openshift-tests
+          conformance and upgrade suites). Do not require, or look for,
+          e2e test files in this repository.
 
-          2. The PR description must include a "Testing" or "How to
-          verify it" section that describes which CI lanes or jobs are
-          running tests for this PR, what platforms have coverage (e.g.
-          AWS, GCP, Azure, bare-metal, vSphere, SNO, HyperShift), and
-          whether the tests passed.
+          The PR description must include a "Testing" or "How to verify
+          it" section that describes which CI lanes or jobs exercise
+          this change, what platforms have coverage (e.g. AWS, GCP,
+          Azure, bare-metal, vSphere, SNO, HyperShift), and whether the
+          tests passed.
 
           Fail if user-facing behavior changed or a bug was fixed and
-          either criterion 1 or 2 (or both) is not satisfied. If
-          failing, advise the author: if E2E tests are genuinely not
-          feasible for this change, document the justification in the
-          PR description under "How to verify it" and then, once all
-          other pre-merge checks are also addressed, use
-          "@coderabbitai ignore pre-merge checks" to override.
+          the PR description lacks that testing context. If failing,
+          advise the author: if no CI lane can exercise the change,
+          document the justification in the PR description under "How
+          to verify it" and then, once all other pre-merge checks are
+          also addressed, use "@coderabbitai ignore pre-merge checks"
+          to override.
 
           Pass only if no user-facing behavior changed and no bug was
-          fixed, or if both E2E test files are included and the PR
-          description contains the required testing context.
+          fixed, or if the PR description contains the required testing
+          context.
       - name: "RBAC Least Privilege"
         mode: "warning"
         instructions: >-
