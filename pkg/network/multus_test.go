@@ -8,6 +8,8 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/openshift/cluster-network-operator/pkg/render"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -58,6 +60,17 @@ func TestRenderMultus(t *testing.T) {
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("ClusterRole", "", "multus")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("DaemonSet", "openshift-multus", "multus")))
 	g.Expect(objs).To(ContainElement(HaveKubernetesID("NetworkPolicy", "openshift-multus", "default-deny")))
+
+	ds := mustFindRenderedObj[appsv1.DaemonSet](t, objs, "DaemonSet", "multus-additional-cni-plugins")
+	container := mustFindContainer(t, ds.Spec.Template.Spec.InitContainers, "cni-plugins")
+	var allowlistVolume corev1.Volume
+	g.Expect(ds.Spec.Template.Spec.Volumes).To(ContainElement(HaveField("Name", "allowlist-config"), &allowlistVolume))
+	g.Expect(allowlistVolume.ConfigMap).NotTo(BeNil())
+	g.Expect(allowlistVolume.ConfigMap.Name).To(Equal("cni-sysctl-allowlist"))
+	g.Expect(allowlistVolume.ConfigMap.Optional).To(Equal(new(true)))
+	g.Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{
+		Name: "allowlist-config", MountPath: "/allowlist-config", ReadOnly: true,
+	}))
 }
 
 // TestMultusServiceAccountWithoutNodeIdentity tests service account is set when node identity is disabled
