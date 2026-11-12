@@ -27,6 +27,7 @@ import (
 )
 
 const NetworkNodeIdentityWebhookPort = "9743"
+const NetworkNodeIdentityApproverMetricsPort = "9402"
 const NetworkNodeIdentityNamespace = "openshift-network-node-identity"
 
 // isBootstrapComplete checks whether the bootstrap phase of openshift installation completed
@@ -59,6 +60,7 @@ func renderNetworkNodeIdentity(ctx context.Context, conf *operv1.NetworkSpec, bo
 		data.Data["OVNHybridOverlayEnable"] = conf.DefaultNetwork.OVNKubernetesConfig.HybridOverlayConfig != nil
 	}
 	data.Data["NetworkNodeIdentityPort"] = NetworkNodeIdentityWebhookPort
+	data.Data["NetworkNodeIdentityApproverMetricsPort"] = NetworkNodeIdentityApproverMetricsPort
 
 	addTLSInfoToRenderData(data.Data, bootstrapResult, true)
 
@@ -77,9 +79,14 @@ func renderNetworkNodeIdentity(ctx context.Context, conf *operv1.NetworkSpec, bo
 	}
 
 	webhookReady := false
+	legacyDeploymentExists := false
+	newDeploymentReady := false
+	hostedClusterNamespace := ""
+
 	// HyperShift specific
 	if hcpCfg := hypershift.NewHyperShiftConfig(); hcpCfg.Enabled {
 		webhookCAClient = client.ClientFor(names.ManagementClusterName)
+		hostedClusterNamespace = hcpCfg.Namespace
 
 		data.Data["CAConfigMap"] = hcpCfg.CAConfigMap
 		data.Data["CAConfigMapKey"] = hcpCfg.CAConfigMapKey
@@ -110,21 +117,43 @@ func renderNetworkNodeIdentity(ctx context.Context, conf *operv1.NetworkSpec, bo
 		localAPIServer := bootstrapResult.Infra.APIServers[bootstrap.APIServerDefaultLocal]
 		data.Data["K8S_LOCAL_APISERVER"] = "https://" + net.JoinHostPort(localAPIServer.Host, localAPIServer.Port)
 
-		webhookDeployment := &appsv1.Deployment{
+		legacyDeployment := &appsv1.Deployment{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Deployment",
 				APIVersion: appsv1.SchemeGroupVersion.String(),
 			},
 		}
-		nsn := types.NamespacedName{Namespace: hcpCfg.Namespace, Name: "network-node-identity"}
-		if err := client.ClientFor(names.ManagementClusterName).CRClient().Get(ctx, nsn, webhookDeployment); err != nil {
+		legacyNSN := types.NamespacedName{Namespace: hcpCfg.Namespace, Name: "network-node-identity"}
+		if err := client.ClientFor(names.ManagementClusterName).CRClient().Get(ctx, legacyNSN, legacyDeployment); err != nil {
 			if !apierrors.IsNotFound(err) {
 				return nil, fmt.Errorf("failed to retrieve existing network-node-identity deployment: %w", err)
 			} else {
 				klog.Infof("network-node-identity deployment does not exist")
 			}
 		} else {
-			webhookReady = !deploymentProgressing(webhookDeployment)
+			legacyDeploymentExists = true
+			if !deploymentProgressing(legacyDeployment) {
+				webhookReady = true
+			}
+		}
+
+		newDeployment := &appsv1.Deployment{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Deployment",
+				APIVersion: appsv1.SchemeGroupVersion.String(),
+			},
+		}
+		newNSN := types.NamespacedName{Namespace: hcpCfg.Namespace, Name: "network-node-identity-v2"}
+		if err := client.ClientFor(names.ManagementClusterName).CRClient().Get(ctx, newNSN, newDeployment); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("failed to retrieve existing network-node-identity-v2 deployment: %w", err)
+			}
+			klog.Infof("network-node-identity-v2 deployment does not exist")
+		} else {
+			newDeploymentReady = deploymentReadyForCutover(newDeployment)
+			if newDeploymentReady {
+				webhookReady = true
+			}
 		}
 
 		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "network/node-identity/managed"))
@@ -196,6 +225,34 @@ func renderNetworkNodeIdentity(ctx context.Context, conf *operv1.NetworkSpec, bo
 		return nil, fmt.Errorf("failed to render network-node-identity manifests: %w", err)
 	}
 
+	if hostedClusterNamespace != "" {
+		if !legacyDeploymentExists || newDeploymentReady {
+			manifests = k8s.RemoveObjByGroupKindName(
+				manifests,
+				"apps",
+				"Deployment",
+				hostedClusterNamespace,
+				"network-node-identity",
+			)
+		} else {
+			k8s.UpdateObjByGroupKindName(
+				manifests,
+				"apps",
+				"Deployment",
+				hostedClusterNamespace,
+				"network-node-identity",
+				func(o *uns.Unstructured) {
+					anno := o.GetAnnotations()
+					if anno == nil {
+						anno = map[string]string{}
+					}
+					anno[names.CreateOnlyAnnotation] = "true"
+					o.SetAnnotations(anno)
+				},
+			)
+		}
+	}
+
 	applyWebhook := true
 	if !clusterBootstrapFinished {
 		applyWebhook = false
@@ -225,4 +282,15 @@ func renderNetworkNodeIdentity(ctx context.Context, conf *operv1.NetworkSpec, bo
 		})
 	}
 	return manifests, nil
+}
+
+func deploymentReadyForCutover(deployment *appsv1.Deployment) bool {
+	if deployment.Spec.Replicas == nil || *deployment.Spec.Replicas <= 0 {
+		return false
+	}
+
+	desiredReplicas := *deployment.Spec.Replicas
+	return deployment.Status.UpdatedReplicas >= desiredReplicas &&
+		deployment.Status.AvailableReplicas >= desiredReplicas &&
+		deployment.Status.ObservedGeneration >= deployment.Generation
 }

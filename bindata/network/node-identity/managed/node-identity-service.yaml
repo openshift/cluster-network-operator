@@ -19,4 +19,4 @@ spec:
       port: {{.NetworkNodeIdentityPort}}
       targetPort: {{.NetworkNodeIdentityPort}}
   selector:
-    app: network-node-identity
+    hypershift.openshift.io/control-plane-component: network-node-identity
