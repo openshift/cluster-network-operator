@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
@@ -25,6 +27,7 @@ import (
 	ipsecMetrics "github.com/openshift/cluster-network-operator/pkg/util/ipsec"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -34,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
+	v1appsinformers "k8s.io/client-go/informers/apps/v1"
 	v1coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -152,6 +156,25 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 		return err
 	}
 
+	// Watch the DaemonSets that gate a staged OVN-Kubernetes rollout, so the next stage starts
+	// when the previous one finishes and not at the next resync. Outside such a rollout these
+	// DaemonSets finish a rollout on every pod restart, which needs no reconcile.
+	dsInformer := v1appsinformers.NewDaemonSetInformer(
+		r.client.Default().Kubernetes(),
+		util.OVNNamespace,
+		0, // don't resync
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	r.client.Default().AddCustomInformer(dsInformer) // Tell the ClusterClient about this informer
+
+	if err := c.Watch(&source.Informer{
+		Informer:   dsInformer,
+		Handler:    handler.EnqueueRequestsFromMapFunc(reconcileOperConfig),
+		Predicates: []predicate.TypedPredicate[crclient.Object]{stagedRolloutPredicate(&r.stagedRolloutPending)},
+	}); err != nil {
+		return err
+	}
+
 	// Watch the BGPVIPConfig singleton so day-2 peering edits re-render the
 	// bgp-vip FRRConfiguration. Registered only when the feature gate is
 	// enabled: the CRD ships behind BGPBasedVIPManagement, and a watch on a
@@ -212,6 +235,21 @@ func add(mgr manager.Manager, r *ReconcileOperConfig) error {
 	return nil
 }
 
+// stagedRolloutPredicate returns a predicate that triggers reconciliation when a DaemonSet that
+// gates a staged OVN-Kubernetes rollout finishes rolling out while pending is set.
+func stagedRolloutPredicate(pending *atomic.Bool) predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc:  func(_ event.CreateEvent) bool { return false },
+		DeleteFunc:  func(_ event.DeleteEvent) bool { return false },
+		GenericFunc: func(_ event.GenericEvent) bool { return false },
+		UpdateFunc: func(ev event.UpdateEvent) bool {
+			old, okOld := ev.ObjectOld.(*appsv1.DaemonSet)
+			updated, okUpdated := ev.ObjectNew.(*appsv1.DaemonSet)
+			return okOld && okUpdated && pending.Load() && network.StagedRolloutDone(old, updated)
+		},
+	}
+}
+
 // namespacePredicate returns a predicate that triggers reconciliation when a
 // namespace enters or leaves the Multus admission controller's ignore set.
 func namespacePredicate() predicate.Predicate {
@@ -248,6 +286,8 @@ type ReconcileOperConfig struct {
 	mtuProberCleanedUp bool
 	// maintain the copy of feature gates in the cluster
 	featureGates featuregates.FeatureGate
+	// Set by Reconcile and read by the DaemonSet watch, which runs outside Reconcile.
+	stagedRolloutPending atomic.Bool
 }
 
 // Reconcile updates the state of the cluster to match that which is desired
@@ -387,6 +427,7 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			fmt.Sprintf("Internal error while reconciling platform networking resources: %v", err))
 		return reconcile.Result{}, err
 	}
+	r.stagedRolloutPending.Store(network.StagedRolloutPending(bootstrapResult.OVN, os.Getenv("RELEASE_VERSION")))
 
 	if !reflect.DeepEqual(operConfig, newOperConfig) {
 		if err := r.UpdateOperConfig(ctx, newOperConfig); err != nil {

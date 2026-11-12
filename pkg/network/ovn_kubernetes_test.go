@@ -5404,3 +5404,129 @@ func extractDaemonSetEnvVars(g *WithT, objs []*uns.Unstructured, dsName, contain
 	g.Expect(true).To(BeFalse(), "could not find DaemonSet %s with container %s", dsName, containerName)
 	return envVars
 }
+
+func TestStagedRolloutDone(t *testing.T) {
+	daemonSet := func(name string, updated, unavailable int32, annotations map[string]string) *appsv1.DaemonSet {
+		return &appsv1.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "openshift-ovn-kubernetes", Annotations: annotations},
+			Status: appsv1.DaemonSetStatus{
+				DesiredNumberScheduled: 10,
+				UpdatedNumberScheduled: updated,
+				NumberUnavailable:      unavailable,
+				NumberAvailable:        10 - unavailable,
+			},
+		}
+	}
+	hung := map[string]string{names.RolloutHungAnnotation: ""}
+
+	for _, tc := range []struct {
+		name     string
+		old      *appsv1.DaemonSet
+		updated  *appsv1.DaemonSet
+		expected bool
+	}{
+		{
+			name:     "last ovnkube-node pod becomes available",
+			old:      daemonSet("ovnkube-node", 10, 1, nil),
+			updated:  daemonSet("ovnkube-node", 10, 0, nil),
+			expected: true,
+		},
+		{
+			name:     "prepuller finishes pulling on the last node",
+			old:      daemonSet("ovnkube-upgrades-prepuller", 9, 1, nil),
+			updated:  daemonSet("ovnkube-upgrades-prepuller", 10, 0, nil),
+			expected: true,
+		},
+		{
+			name:     "rollout is marked hung with one node behind",
+			old:      daemonSet("ovnkube-node", 9, 1, nil),
+			updated:  daemonSet("ovnkube-node", 9, 1, hung),
+			expected: true,
+		},
+		{
+			name:    "rollout is marked hung with half the nodes behind",
+			old:     daemonSet("ovnkube-node", 5, 5, nil),
+			updated: daemonSet("ovnkube-node", 5, 5, hung),
+		},
+		{
+			name:    "rollout advances but is not done",
+			old:     daemonSet("ovnkube-node", 4, 1, nil),
+			updated: daemonSet("ovnkube-node", 5, 1, nil),
+		},
+		{
+			name:    "settled daemonset is updated again",
+			old:     daemonSet("ovnkube-node", 10, 0, nil),
+			updated: daemonSet("ovnkube-node", 10, 0, nil),
+		},
+		{
+			name:    "rollout starts",
+			old:     daemonSet("ovnkube-node", 10, 0, nil),
+			updated: daemonSet("ovnkube-node", 0, 0, nil),
+		},
+		{
+			name:    "daemonset that gates no stage finishes",
+			old:     daemonSet("ovn-ipsec-host", 10, 1, nil),
+			updated: daemonSet("ovn-ipsec-host", 10, 0, nil),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+			g.Expect(StagedRolloutDone(tc.old, tc.updated)).To(Equal(tc.expected))
+		})
+	}
+}
+
+func TestStagedRolloutPending(t *testing.T) {
+	status := func(version string) *bootstrap.OVNUpdateStatus {
+		return &bootstrap.OVNUpdateStatus{Version: version}
+	}
+
+	for _, tc := range []struct {
+		name         string
+		node         *bootstrap.OVNUpdateStatus
+		controlPlane *bootstrap.OVNUpdateStatus
+		expected     bool
+	}{
+		{
+			name: "fresh cluster",
+		},
+		{
+			name:         "settled at the release version",
+			node:         status("2.0.0"),
+			controlPlane: status("2.0.0"),
+		},
+		{
+			name:         "upgrade starts",
+			node:         status("1.9.9"),
+			controlPlane: status("1.9.9"),
+			expected:     true,
+		},
+		{
+			name:         "node is at the release version and the control plane is not",
+			node:         status("2.0.0"),
+			controlPlane: status("1.9.9"),
+			expected:     true,
+		},
+		{
+			name:     "node needs the upgrade and the control plane is missing",
+			node:     status("1.9.9"),
+			expected: true,
+		},
+		{
+			name: "node is at the release version and the control plane is missing",
+			node: status("2.0.0"),
+		},
+		{
+			name:         "downgrade moved the control plane first",
+			node:         status("2.0.1"),
+			controlPlane: status("2.0.0"),
+			expected:     true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+			ovn := bootstrap.OVNBootstrapResult{NodeUpdateStatus: tc.node, ControlPlaneUpdateStatus: tc.controlPlane}
+			g.Expect(StagedRolloutPending(ovn, "2.0.0")).To(Equal(tc.expected))
+		})
+	}
+}

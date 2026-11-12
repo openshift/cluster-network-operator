@@ -52,6 +52,7 @@ import (
 const ClusterConfigName = "cluster-config-v1"
 const ClusterConfigNamespace = "kube-system"
 const OVNCertCN = "ovn"
+const ovnPrePuller = "ovnkube-upgrades-prepuller"
 const OVNLocalGWMode = "local"
 const OVNSharedGWMode = "shared"
 const OVNLogPatternConsole = "%D{%Y-%m-%dT%H:%M:%S.###Z}|%05N|%c%T|%p|%m"
@@ -651,7 +652,7 @@ func renderOVNKubernetes(conf *operv1.NetworkSpec, bootstrapResult *bootstrap.Bo
 
 	if !renderPrePull {
 		// remove prepull from the list of objects to render.
-		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVNNamespace, "ovnkube-upgrades-prepuller")
+		objs = k8s.RemoveObjByGroupKindName(objs, "apps", "DaemonSet", util.OVNNamespace, ovnPrePuller)
 	}
 
 	return objs, progressing, nil
@@ -1500,7 +1501,7 @@ func bootstrapOVN(ctx context.Context, conf *operv1.Network, kubeClient cnoclien
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
 	}
-	nsn = types.NamespacedName{Namespace: util.OVNNamespace, Name: "ovnkube-upgrades-prepuller"}
+	nsn = types.NamespacedName{Namespace: util.OVNNamespace, Name: ovnPrePuller}
 	if err := kubeClient.ClientFor("").CRClient().Get(ctx, nsn, prePullerDaemonSet); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to retrieve existing prepuller DaemonSet: %w", err)
@@ -1891,12 +1892,7 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 // If allowHung is true, then treat a daemonset hung at 90% as "done" for our purposes.
 func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 	status := ds.Status
-
-	// Copy-pasted from status_manager: Determine if a DaemonSet is progressing
-	progressing := (status.UpdatedNumberScheduled < status.DesiredNumberScheduled ||
-		status.NumberUnavailable > 0 ||
-		(status.NumberAvailable == 0 && status.DesiredNumberScheduled > 0) ||
-		ds.Generation > status.ObservedGeneration)
+	progressing := daemonSetRollingOut(ds)
 
 	s := "progressing"
 	if !progressing {
@@ -1911,18 +1907,57 @@ func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 		return false
 	}
 
-	// If we're hung, but max(90% of nodes, 1) have been updated, then act as if not progressing
-	if allowHung {
-		_, hung := ds.GetAnnotations()[names.RolloutHungAnnotation]
-		maxBehind := int(math.Max(1, math.Floor(float64(status.DesiredNumberScheduled)*0.1)))
-		numBehind := int(status.DesiredNumberScheduled - status.UpdatedNumberScheduled)
-		if hung && numBehind <= maxBehind {
-			klog.Warningf("daemonset %s/%s rollout seems to have hung with %d/%d behind, force-continuing", ds.Namespace, ds.Name, numBehind, status.DesiredNumberScheduled)
-			return false
-		}
+	if allowHung && daemonSetHungNearlyDone(ds) {
+		klog.Warningf("daemonset %s/%s rollout seems to have hung with %d/%d behind, force-continuing", ds.Namespace, ds.Name,
+			status.DesiredNumberScheduled-status.UpdatedNumberScheduled, status.DesiredNumberScheduled)
+		return false
 	}
 
 	return true
+}
+
+func daemonSetRollingOut(ds *appsv1.DaemonSet) bool {
+	status := ds.Status
+
+	// Copy-pasted from status_manager: Determine if a DaemonSet is progressing
+	return status.UpdatedNumberScheduled < status.DesiredNumberScheduled ||
+		status.NumberUnavailable > 0 ||
+		(status.NumberAvailable == 0 && status.DesiredNumberScheduled > 0) ||
+		ds.Generation > status.ObservedGeneration
+}
+
+// daemonSetHungNearlyDone returns true if a rollout is marked hung, but max(90% of nodes, 1) have been updated.
+func daemonSetHungNearlyDone(ds *appsv1.DaemonSet) bool {
+	status := ds.Status
+	_, hung := ds.GetAnnotations()[names.RolloutHungAnnotation]
+	maxBehind := int(math.Max(1, math.Floor(float64(status.DesiredNumberScheduled)*0.1)))
+	numBehind := int(status.DesiredNumberScheduled - status.UpdatedNumberScheduled)
+	return hung && numBehind <= maxBehind
+}
+
+// StagedRolloutPending returns true while OVN-Kubernetes is moving to releaseVersion, which is when
+// renderOVNKubernetes can hold the node or control-plane rollout back.
+func StagedRolloutPending(ovn bootstrap.OVNBootstrapResult, releaseVersion string) bool {
+	if ovn.NodeUpdateStatus == nil {
+		return false
+	}
+	if ovn.NodeUpdateStatus.Version != releaseVersion {
+		return true
+	}
+	return ovn.ControlPlaneUpdateStatus != nil && ovn.ControlPlaneUpdateStatus.Version != releaseVersion
+}
+
+// StagedRolloutDone returns true if an update finished the rollout of a DaemonSet that a staged
+// OVN-Kubernetes rollout waits for. renderOVNKubernetes releases the next stage only when it runs
+// again, and it reads these DaemonSets without watching them.
+func StagedRolloutDone(old, updated *appsv1.DaemonSet) bool {
+	if updated.Namespace != util.OVNNamespace || (updated.Name != util.OVNNode && updated.Name != ovnPrePuller) {
+		return false
+	}
+	held := func(ds *appsv1.DaemonSet) bool {
+		return daemonSetRollingOut(ds) && !daemonSetHungNearlyDone(ds)
+	}
+	return held(old) && !held(updated)
 }
 
 // deploymentProgressing returns true if a deployment is rolling out a change.
