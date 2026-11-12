@@ -13,8 +13,13 @@ import (
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	cnofake "github.com/openshift/cluster-network-operator/pkg/client/fake"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 )
 
@@ -136,8 +141,11 @@ func TestRenderNetworkNodeIdentity(t *testing.T) {
 			g := NewWithT(t)
 			objs := assertRenderSuccess(t, networkConfig, bootstrapResult, client)
 			deployment := mustFindRenderedObj[*appsv1.Deployment](t, objs,
-				"Deployment", "network-node-identity")
+				"Deployment", "network-node-identity-v2")
 			expectReadOnlyRootFilesystems(t, objs, hostedClusterNS)
+			expectNetworkNodeIdentitySecurityContexts(t, deployment.Spec.Template.Spec)
+			expectNetworkNodeIdentityResources(t, deployment.Spec.Template.Spec)
+			expectNetworkNodeIdentityProbes(t, deployment.Spec.Template.Spec)
 			container := mustFindContainer(t, deployment.Spec.Template.Spec.Containers, "webhook")
 			execStr := findOvnkubeIdentityExec(t, container.Command)
 
@@ -147,7 +155,27 @@ func TestRenderNetworkNodeIdentity(t *testing.T) {
 			g.Expect(deployment.Labels["hypershift.openshift.io/hosted-control-plane"]).To(Equal(hostedClusterNS))
 			g.Expect(ptr.Deref(deployment.Spec.Replicas, 0)).To(Equal(int32(3)))
 			g.Expect(deployment.Spec.Strategy.Type).To(Equal(appsv1.RollingUpdateDeploymentStrategyType))
-			g.Expect(deployment.Spec.Template.Spec.Affinity.PodAntiAffinity).NotTo(BeNil())
+			podAntiAffinity := deployment.Spec.Template.Spec.Affinity.PodAntiAffinity
+			g.Expect(podAntiAffinity).NotTo(BeNil())
+			g.Expect(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).To(ConsistOf(
+				corev1.PodAffinityTerm{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "network-node-identity-v2"},
+					},
+					TopologyKey: corev1.LabelHostname,
+				},
+			))
+			g.Expect(podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).To(ConsistOf(
+				corev1.WeightedPodAffinityTerm{
+					Weight: 100,
+					PodAffinityTerm: corev1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "network-node-identity-v2"},
+						},
+						TopologyKey: corev1.LabelTopologyZone,
+					},
+				},
+			))
 			g.Expect(deployment.Spec.Template.Spec.PriorityClassName).To(Equal(bootstrapResult.Infra.HostedControlPlane.PriorityClass))
 			g.Expect(deployment.Spec.Template.Spec.NodeSelector).To(Equal(bootstrapResult.Infra.HostedControlPlane.NodeSelector))
 
@@ -157,13 +185,57 @@ func TestRenderNetworkNodeIdentity(t *testing.T) {
 			g.Expect(container.Image).To(Equal(tokenMinterImage))
 			expectedArg := "--token-audience=" + tokenAudience
 			g.Expect(container.Args).To(ContainElement(expectedArg))
+
+			service := mustFindRenderedObj[*corev1.Service](t, objs, "Service", "network-node-identity")
+			g.Expect(service.Spec.Selector).To(Equal(map[string]string{
+				"hypershift.openshift.io/control-plane-component": "network-node-identity",
+			}))
 		})
 
 		testTLSArgRendering(t, "webhook ovnkube-identity", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
 			bootstrapResult.TLSProfile = tlsProfile
 			deployment := mustFindRenderedObj[*appsv1.Deployment](t, assertRenderSuccess(t, networkConfig, bootstrapResult, client),
-				"Deployment", "network-node-identity")
+				"Deployment", "network-node-identity-v2")
 			return findOvnkubeIdentityExec(t, mustFindContainer(t, deployment.Spec.Template.Spec.Containers, "webhook").Command)
+		})
+
+		t.Run("should preserve the legacy Deployment while the v2 Deployment is not ready", func(t *testing.T) {
+			g := NewWithT(t)
+			seedManagedDeployment(t, client, hostedClusterNS, "network-node-identity", true)
+			seedManagedDeployment(t, client, hostedClusterNS, "network-node-identity-v2", false)
+
+			objs := assertRenderSuccess(t, networkConfig, bootstrapResult, client)
+			legacyDeployment := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "network-node-identity")
+			_, createOnly := legacyDeployment.Annotations[names.CreateOnlyAnnotation]
+			g.Expect(createOnly).To(BeTrue())
+			mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "network-node-identity-v2")
+		})
+
+		t.Run("should preserve the legacy Deployment when v2 reports zero replicas", func(t *testing.T) {
+			g := NewWithT(t)
+			seedManagedDeployment(t, client, hostedClusterNS, "network-node-identity", true)
+			seedManagedDeploymentWithStatus(t, client, hostedClusterNS, "network-node-identity-v2", 3,
+				appsv1.DeploymentStatus{ObservedGeneration: 1})
+
+			objs := assertRenderSuccess(t, networkConfig, bootstrapResult, client)
+			legacyDeployment := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "network-node-identity")
+			_, createOnly := legacyDeployment.Annotations[names.CreateOnlyAnnotation]
+			g.Expect(createOnly).To(BeTrue())
+			mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "network-node-identity-v2")
+		})
+
+		t.Run("should remove the legacy Deployment after the v2 Deployment is ready", func(t *testing.T) {
+			g := NewWithT(t)
+			seedManagedDeployment(t, client, hostedClusterNS, "network-node-identity-v2", true)
+
+			objs := assertRenderSuccess(t, networkConfig, bootstrapResult, client)
+			deploymentNames := make([]string, 0)
+			for _, obj := range objs {
+				if obj.GetKind() == "Deployment" {
+					deploymentNames = append(deploymentNames, obj.GetName())
+				}
+			}
+			g.Expect(deploymentNames).To(ConsistOf("network-node-identity-v2"))
 		})
 	})
 
@@ -175,6 +247,131 @@ func TestRenderNetworkNodeIdentity(t *testing.T) {
 		objs := assertRenderSuccess(t, networkConfig, bootstrapResult, client)
 		g.Expect(objs).To(BeEmpty())
 	})
+}
+
+func seedManagedDeployment(t *testing.T, client cnoclient.Client, namespace, name string, ready bool) {
+	t.Helper()
+
+	replicas := int32(3)
+	status := appsv1.DeploymentStatus{
+		Replicas:           3,
+		UpdatedReplicas:    3,
+		ReadyReplicas:      3,
+		AvailableReplicas:  3,
+		ObservedGeneration: 1,
+	}
+	if !ready {
+		status.UpdatedReplicas = 2
+		status.ReadyReplicas = 2
+		status.AvailableReplicas = 2
+	}
+	seedManagedDeploymentWithStatus(t, client, namespace, name, replicas, status)
+}
+
+func seedManagedDeploymentWithStatus(t *testing.T, client cnoclient.Client, namespace, name string, replicas int32, status appsv1.DeploymentStatus) {
+	t.Helper()
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       name,
+			Namespace:  namespace,
+			Generation: 1,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+		},
+		Status: status,
+	}
+	crClient := client.ClientFor(names.ManagementClusterName).CRClient()
+	err := crClient.Get(t.Context(), types.NamespacedName{Namespace: namespace, Name: name}, deployment)
+	if err == nil {
+		deployment.Generation = 1
+		deployment.Status = status
+		if err := crClient.Status().Update(t.Context(), deployment); err != nil {
+			t.Fatalf("failed to update Deployment %s: %v", name, err)
+		}
+		return
+	}
+	if !apierrors.IsNotFound(err) {
+		t.Fatalf("failed to get Deployment %s: %v", name, err)
+	}
+	if err := crClient.Create(t.Context(), deployment); err != nil {
+		t.Fatalf("failed to create Deployment %s: %v", name, err)
+	}
+}
+
+func expectNetworkNodeIdentitySecurityContexts(t *testing.T, podSpec corev1.PodSpec) {
+	t.Helper()
+
+	g := NewWithT(t)
+	g.Expect(podSpec.SecurityContext).NotTo(BeNil())
+	g.Expect(podSpec.SecurityContext.RunAsNonRoot).NotTo(BeNil())
+	g.Expect(*podSpec.SecurityContext.RunAsNonRoot).To(BeTrue())
+
+	containers := make([]corev1.Container, 0, len(podSpec.InitContainers)+len(podSpec.Containers))
+	containers = append(containers, podSpec.InitContainers...)
+	containers = append(containers, podSpec.Containers...)
+	g.Expect(containers).To(HaveLen(4))
+
+	for _, container := range containers {
+		securityContext := container.SecurityContext
+		g.Expect(securityContext).NotTo(BeNil())
+		g.Expect(securityContext.AllowPrivilegeEscalation).NotTo(BeNil())
+		g.Expect(*securityContext.AllowPrivilegeEscalation).To(BeFalse())
+		g.Expect(securityContext.Capabilities).NotTo(BeNil())
+		g.Expect(securityContext.Capabilities.Drop).To(ConsistOf(corev1.Capability("ALL")))
+	}
+}
+
+func expectNetworkNodeIdentityResources(t *testing.T, podSpec corev1.PodSpec) {
+	t.Helper()
+
+	g := NewWithT(t)
+	containers := make([]corev1.Container, 0, len(podSpec.InitContainers)+len(podSpec.Containers))
+	containers = append(containers, podSpec.InitContainers...)
+	containers = append(containers, podSpec.Containers...)
+	g.Expect(containers).To(HaveLen(4))
+
+	for _, container := range containers {
+		resources := container.Resources
+		g.Expect(resources.Requests).To(HaveKey(corev1.ResourceCPU))
+		g.Expect(resources.Requests).To(HaveKey(corev1.ResourceMemory))
+		g.Expect(resources.Limits.Cpu().String()).To(Equal("100m"))
+		g.Expect(resources.Limits.Memory().String()).To(Equal("100Mi"))
+	}
+}
+
+func expectNetworkNodeIdentityProbes(t *testing.T, podSpec corev1.PodSpec) {
+	t.Helper()
+
+	g := NewWithT(t)
+	approver := mustFindContainer(t, podSpec.Containers, "approver")
+	tokenMinter := mustFindContainer(t, podSpec.Containers, "token-minter")
+
+	approverCommand := strings.Join(approver.Command, " ")
+	g.Expect(approverCommand).To(ContainSubstring("--metrics-address=:" + NetworkNodeIdentityApproverMetricsPort))
+	g.Expect(approver.Ports).To(ContainElement(corev1.ContainerPort{
+		Name:          "metrics",
+		ContainerPort: 9402,
+		Protocol:      corev1.ProtocolTCP,
+	}))
+	g.Expect(approver.LivenessProbe).NotTo(BeNil())
+	g.Expect(approver.LivenessProbe.HTTPGet).NotTo(BeNil())
+	g.Expect(approver.LivenessProbe.HTTPGet.Path).To(Equal("/metrics"))
+	g.Expect(approver.LivenessProbe.HTTPGet.Port.String()).To(Equal("metrics"))
+	g.Expect(approver.ReadinessProbe).NotTo(BeNil())
+	g.Expect(approver.ReadinessProbe.HTTPGet).NotTo(BeNil())
+	g.Expect(approver.ReadinessProbe.HTTPGet.Path).To(Equal("/metrics"))
+	g.Expect(approver.ReadinessProbe.HTTPGet.Port.String()).To(Equal("metrics"))
+
+	g.Expect(tokenMinter.LivenessProbe).NotTo(BeNil())
+	g.Expect(tokenMinter.LivenessProbe.Exec).NotTo(BeNil())
+	g.Expect(tokenMinter.LivenessProbe.Exec.Command).To(ContainElement(
+		`[ -s /var/run/secrets/hosted_cluster/token ] && [ $(( $(date +%s) - $(stat -c %Y /var/run/secrets/hosted_cluster/token) )) -lt 4200 ]`,
+	))
+	g.Expect(tokenMinter.ReadinessProbe).NotTo(BeNil())
+	g.Expect(tokenMinter.ReadinessProbe.Exec).NotTo(BeNil())
+	g.Expect(tokenMinter.ReadinessProbe.Exec.Command).To(ContainElement("test -s /var/run/secrets/hosted_cluster/token"))
 }
 
 func testTLSArgRendering(t *testing.T, name string, defaultMinVersion string, defaultCiphers string, getCommandStr func(*testing.T, bootstrap.TLSProfile) string) {

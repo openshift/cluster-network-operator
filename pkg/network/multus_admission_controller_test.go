@@ -207,6 +207,27 @@ func TestRenderMultusAdmissonControllerConfigForHyperShift(t *testing.T) {
 	deployment := mustFindMultusAdmissionDeployment(t, objs)
 	_, ok := findContainer(deployment.Spec.Template.Spec.Containers, "kube-rbac-proxy")
 	g.Expect(ok).To(BeFalse(), "Found unexpected container \"kube-rbac-proxy\"")
+	podAntiAffinity := deployment.Spec.Template.Spec.Affinity.PodAntiAffinity
+	g.Expect(podAntiAffinity).NotTo(BeNil())
+	g.Expect(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).To(ConsistOf(
+		corev1.PodAffinityTerm{
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "multus-admission-controller"},
+			},
+			TopologyKey: corev1.LabelHostname,
+		},
+	))
+	g.Expect(podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).To(ConsistOf(
+		corev1.WeightedPodAffinityTerm{
+			Weight: 100,
+			PodAffinityTerm: corev1.PodAffinityTerm{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "multus-admission-controller"},
+				},
+				TopologyKey: corev1.LabelTopologyZone,
+			},
+		},
+	))
 
 	// Test TLS rendering for webhook container in HyperShift mode
 	testTLSArgRendering(t, "multus-admission-controller webhook (HyperShift)", "", "", func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
