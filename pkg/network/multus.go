@@ -10,6 +10,7 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/cluster-network-operator/pkg/render"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -83,6 +84,7 @@ func renderMultusConfig(manifestDir, defaultNetworkType string, useDHCP bool, us
 	data.Data["MultusSocketParentDir"] = MultusSocketParentDir
 	data.Data["CNIBinDir"] = CNIBinDir
 	data.Data["CniSysctlAllowlist"] = "default-cni-sysctl-allowlist"
+	data.Data["AllowlistConfigMap"] = names.AllowlistConfigName
 	data.Data["HTTP_PROXY"] = ""
 	data.Data["HTTPS_PROXY"] = ""
 	data.Data["NO_PROXY"] = ""
