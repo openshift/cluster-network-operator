@@ -782,6 +782,21 @@ func Test_renderNetworkingConsolePlugin(t *testing.T) {
 		})
 	})
 
+	t.Run("should reference the serving certificate and key through a constant map variable", func(t *testing.T) {
+		g := NewWithT(t)
+		nginxConf := renderAndFindNginxConfig(t, bootstrap.TLSProfile{})
+
+		// nginx accepts map only in the http context. Allowing only lines
+		// without braces between "http {" and the map keeps it out of the top
+		// level and of nested blocks such as server. Anchoring directives at
+		// the line start keeps commented-out lines from matching, and no
+		// active certificate or key directive may use a literal path.
+		g.Expect(nginxConf).To(MatchRegexp(`(?m)^http \{\n(?:[^{}\n]*\n)*\s*map "" \$plugin_certificate_dir \{ default /var/cert; \}`))
+		g.Expect(nginxConf).To(MatchRegexp(`(?m)^\s*ssl_certificate\s+\$plugin_certificate_dir/tls\.crt;`))
+		g.Expect(nginxConf).To(MatchRegexp(`(?m)^\s*ssl_certificate_key\s+\$plugin_certificate_dir/tls\.key;`))
+		g.Expect(nginxConf).NotTo(MatchRegexp(`(?m)^\s*ssl_certificate(_key)?\s+[^$\s]`))
+	})
+
 	t.Run("config hash annotation should be present in deployment and change when TLS config changes", func(t *testing.T) {
 		g := NewWithT(t)
 		t.Setenv("NETWORKING_CONSOLE_PLUGIN_IMAGE", "quay.io/openshift/networking-console-plugin:latest")
