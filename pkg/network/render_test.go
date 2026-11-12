@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -780,6 +781,106 @@ func Test_renderNetworkingConsolePlugin(t *testing.T) {
 			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_ciphers"))
 			g.Expect(nginxConf).NotTo(ContainSubstring("ssl_prefer_server_ciphers"))
 		})
+	})
+
+	// certDir is both the serving certificate secret mount path and the
+	// directory nginx loads the certificate from.
+	const certDir = "/var/cert"
+
+	t.Run("should reference the serving certificate through a constant directory variable", func(t *testing.T) {
+		for _, tc := range []struct {
+			name              string
+			apiServer         configv1.APIServerSpec
+			wantTLSDirectives bool
+			wantProtocols     string
+			wantCiphers       bool
+		}{
+			{
+				name:      "with the default APIServer TLS configuration",
+				apiServer: configv1.APIServerSpec{},
+			},
+			{
+				name: "with the Intermediate TLS profile",
+				apiServer: configv1.APIServerSpec{
+					TLSSecurityProfile: &configv1.TLSSecurityProfile{Type: configv1.TLSProfileIntermediateType},
+					TLSAdherence:       configv1.TLSAdherencePolicyStrictAllComponents,
+				},
+				wantTLSDirectives: true,
+				wantProtocols:     "TLSv1.2 TLSv1.3",
+				wantCiphers:       true,
+			},
+			{
+				name: "with the Modern TLS profile",
+				apiServer: configv1.APIServerSpec{
+					TLSSecurityProfile: &configv1.TLSSecurityProfile{Type: configv1.TLSProfileModernType},
+					TLSAdherence:       configv1.TLSAdherencePolicyStrictAllComponents,
+				},
+				wantTLSDirectives: true,
+				wantProtocols:     "TLSv1.3",
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				g := NewWithT(t)
+				tlsProfile, err := toTLSProfile(&tc.apiServer)
+				g.Expect(err).NotTo(HaveOccurred())
+				nginxConf := renderAndFindNginxConfig(t, tlsProfile)
+
+				// nginx only accepts map directly in the http context, so it must
+				// stay outside the server block.
+				mapDirective := `map "" $plugin_certificate_dir { default ` + certDir + `; }`
+				g.Expect(strings.Count(nginxConf, mapDirective)).To(Equal(1))
+				g.Expect(nginxConf).To(MatchRegexp(`(?s)\nhttp \{\n.*\n\s*` + regexp.QuoteMeta(mapDirective) + `\n\s*server \{\n`))
+
+				g.Expect(nginxConf).To(MatchRegexp(`(?m)^\s*ssl_certificate\s+\$plugin_certificate_dir/tls\.crt;$`))
+				g.Expect(nginxConf).To(MatchRegexp(`(?m)^\s*ssl_certificate_key\s+\$plugin_certificate_dir/tls\.key;$`))
+				g.Expect(nginxConf).NotTo(ContainSubstring(certDir + "/tls."))
+
+				if !tc.wantTLSDirectives {
+					g.Expect(nginxConf).NotTo(ContainSubstring("ssl_protocols"))
+					g.Expect(nginxConf).NotTo(ContainSubstring("ssl_ciphers"))
+					g.Expect(nginxConf).NotTo(ContainSubstring("ssl_prefer_server_ciphers"))
+					return
+				}
+				g.Expect(nginxConf).To(MatchRegexp(`(?m)^\s*ssl_protocols\s+` + regexp.QuoteMeta(tc.wantProtocols) + `;$`))
+				g.Expect(nginxConf).To(MatchRegexp(`(?m)^\s*ssl_prefer_server_ciphers\s+on;$`))
+				if tc.wantCiphers {
+					g.Expect(nginxConf).To(MatchRegexp(`(?m)^\s*ssl_ciphers\s+\S+;$`))
+				} else {
+					g.Expect(nginxConf).NotTo(ContainSubstring("ssl_ciphers"))
+				}
+			})
+		}
+	})
+
+	t.Run("should mount the serving certificate secret as a directory at the mapped path", func(t *testing.T) {
+		g := NewWithT(t)
+		t.Setenv("NETWORKING_CONSOLE_PLUGIN_IMAGE", "quay.io/openshift/networking-console-plugin:latest")
+		bootstrapResult := fakeBootstrapResult()
+		bootstrapResult.Infra.ConsolePluginCRDExists = true
+
+		objs, err := renderNetworkingConsolePlugin(manifestDir, bootstrapResult)
+		g.Expect(err).NotTo(HaveOccurred())
+
+		// The kubelet does not update subPath mounts, so rotated certificates
+		// only reach nginx through a directory mount. The files must stay
+		// readable by the non-root nginx worker processes that load them.
+		deploy := mustFindRenderedObj[*appsv1.Deployment](t, objs, "Deployment", "networking-console-plugin")
+		container := mustFindContainer(t, deploy.Spec.Template.Spec.Containers, "networking-console-plugin")
+		g.Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{
+			Name:      "networking-console-plugin-cert",
+			MountPath: certDir,
+			ReadOnly:  true,
+		}))
+		defaultMode := int32(0o644)
+		g.Expect(deploy.Spec.Template.Spec.Volumes).To(ContainElement(corev1.Volume{
+			Name: "networking-console-plugin-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  "networking-console-plugin-cert",
+					DefaultMode: &defaultMode,
+				},
+			},
+		}))
 	})
 
 	t.Run("config hash annotation should be present in deployment and change when TLS config changes", func(t *testing.T) {
