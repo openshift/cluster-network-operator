@@ -178,6 +178,7 @@ spec:
                 type: array
                 x-kubernetes-list-map-keys:
                 - name
+                - namespace
                 x-kubernetes-list-type: map
               additionalRoutingCapabilities:
                 description: |-
