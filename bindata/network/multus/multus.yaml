@@ -752,6 +752,8 @@ spec:
       securityContext: {}
       serviceAccountName: multus-ancillary-tools
       terminationGracePeriodSeconds: 30
+      tolerations:
+      - operator: Exists
       volumes:
         - hostPath:
             path: {{ .CNIBinDir }}
