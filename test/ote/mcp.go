@@ -15,71 +15,6 @@ import (
 	e2e "k8s.io/kubernetes/test/e2e/framework"
 )
 
-// AwaitMCPRolloutStart waits for any MachineConfigPool to start updating
-func AwaitMCPRolloutStart(ctx context.Context, client machineconfigclient.Interface, timeout time.Duration) {
-	e2e.Logf("Waiting for MCP rollout to start (timeout: %v)", timeout)
-
-	pollCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	Eventually(func(g Gomega, ctx context.Context) {
-		mcps, err := client.MachineconfigurationV1().MachineConfigPools().List(ctx, metav1.ListOptions{})
-		g.Expect(err).NotTo(HaveOccurred())
-
-		updating := false
-		for _, mcp := range mcps.Items {
-			for _, cond := range mcp.Status.Conditions {
-				if cond.Type == "Updating" && cond.Status == corev1.ConditionTrue {
-					updating = true
-					e2e.Logf("MCP %s has started updating", mcp.Name)
-					break
-				}
-			}
-			if updating {
-				break
-			}
-		}
-
-		g.Expect(updating).To(BeTrue(), "no MCP has started updating yet")
-	}).WithContext(pollCtx).WithPolling(10 * time.Second).Should(Succeed())
-}
-
-// AwaitAllMCPsComplete waits for all MachineConfigPools to finish updating
-func AwaitAllMCPsComplete(ctx context.Context, client machineconfigclient.Interface, timeout time.Duration) {
-	e2e.Logf("Waiting for MCP rollout to complete (timeout: %v)", timeout)
-
-	pollCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	Eventually(func(g Gomega, ctx context.Context) {
-		mcps, err := client.MachineconfigurationV1().MachineConfigPools().List(ctx, metav1.ListOptions{})
-		g.Expect(err).NotTo(HaveOccurred())
-
-		for _, mcp := range mcps.Items {
-			if mcp.Status.MachineCount == 0 {
-				e2e.Logf("Skipping MCP %s (no machines)", mcp.Name)
-				continue
-			}
-
-			updated := false
-			updating := false
-			for _, cond := range mcp.Status.Conditions {
-				if cond.Type == "Updated" && cond.Status == corev1.ConditionTrue {
-					updated = true
-				}
-				if cond.Type == "Updating" && cond.Status == corev1.ConditionTrue {
-					updating = true
-				}
-			}
-
-			g.Expect(updated && !updating).To(BeTrue(), "MCP %s not ready: Updated=%v Updating=%v (%d/%d machines)",
-				mcp.Name, updated, updating, mcp.Status.ReadyMachineCount, mcp.Status.MachineCount)
-		}
-	}).WithContext(pollCtx).WithPolling(10 * time.Second).Should(Succeed())
-
-	e2e.Logf("All MCPs completed successfully")
-}
-
 // GetMCPUpdatedTimestamps returns a map of MCP name to the LastTransitionTime of its Updated condition.
 // Used as a baseline before making a configuration change to detect when the update completes.
 func GetMCPUpdatedTimestamps(ctx context.Context, client machineconfigclient.Interface) (map[string]time.Time, error) {
@@ -115,7 +50,6 @@ func AwaitAllMCPsUpdatedSince(ctx context.Context, client machineconfigclient.In
 		for _, mcp := range mcps.Items {
 			// Skip MCPs with no machines
 			if mcp.Status.MachineCount == 0 {
-				e2e.Logf("Skipping MCP %s (no machines)", mcp.Name)
 				continue
 			}
 
@@ -125,20 +59,15 @@ func AwaitAllMCPsUpdatedSince(ctx context.Context, client machineconfigclient.In
 			}
 
 			var updatedCond *machineconfigv1.MachineConfigPoolCondition
-			var degradedCond *machineconfigv1.MachineConfigPoolCondition
 			for i := range mcp.Status.Conditions {
 				cond := &mcp.Status.Conditions[i]
 				if cond.Type == machineconfigv1.MachineConfigPoolUpdated {
 					updatedCond = cond
 				}
 				if cond.Type == machineconfigv1.MachineConfigPoolNodeDegraded {
-					degradedCond = cond
+					g.Expect(cond.Status).NotTo(Equal(corev1.ConditionTrue),
+						"MCP %s is degraded: %s", mcp.Name, cond.Message)
 				}
-			}
-
-			if degradedCond != nil {
-				g.Expect(degradedCond.Status).NotTo(Equal(corev1.ConditionTrue),
-					"MCP %s is degraded: %s", mcp.Name, degradedCond.Message)
 			}
 
 			g.Expect(updatedCond).NotTo(BeNil(), "MCP %s missing Updated condition", mcp.Name)

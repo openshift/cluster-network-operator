@@ -26,7 +26,6 @@ import (
 )
 
 const (
-	MCPRolloutStartTimeout    = 10 * time.Minute
 	MCPRolloutCompleteTimeout = 120 * time.Minute
 	NodeStabilityTimeout      = 90 * time.Minute
 	OperatorSettleTimeMinutes = 60
@@ -38,17 +37,14 @@ var _ = Describe("[sig-network] TLS Profile Compliance", func() {
 
 	It("should verify TLS compliance across Modern and Intermediate profiles with different adherence policies [Disruptive][Timeout:300m]",
 		Label("Disruptive"), func(ctx context.Context) {
-			// Scenario 1: Modern TLS Profile with LegacyAdheringComponentsOnly
 			By("Configuring and verifying Modern TLS Profile with LegacyAdheringComponentsOnly")
 			t.configureTLSProfileWithAdherence(ctx, configv1.TLSProfileModernType, configv1.TLSAdherencePolicyLegacyAdheringComponentsOnly)
 			t.verifyAllComponentsCompliance(ctx)
 
-			// Scenario 2: Modern TLS Profile with StrictAllComponents
 			By("Configuring and verifying Modern TLS Profile with StrictAllComponents")
 			t.configureTLSProfileWithAdherence(ctx, configv1.TLSProfileModernType, configv1.TLSAdherencePolicyStrictAllComponents)
 			t.verifyAllComponentsCompliance(ctx)
 
-			// Scenario 3: Intermediate TLS Profile with StrictAllComponents
 			By("Configuring and verifying Intermediate TLS Profile with StrictAllComponents")
 			t.configureTLSProfileWithAdherence(ctx, configv1.TLSProfileIntermediateType, configv1.TLSAdherencePolicyStrictAllComponents)
 			t.verifyAllComponentsCompliance(ctx)
@@ -102,19 +98,15 @@ func (t *TLSTestContext) awaitTLSConfigStability(ctx context.Context) {
 func (t *TLSTestContext) verifyAllComponentsCompliance(ctx context.Context) {
 	e2e.Logf("Starting TLS compliance checks with retry (timeout: %v, interval: %v)", 5*time.Minute, 30*time.Second)
 	Eventually(func(g Gomega, ctx context.Context) {
-		// Test multus-cni
 		By("Testing TLS compliance for multus-admission-controller in openshift-multus (ports 6443 & 8443)")
 		t.verifyMultusTLSComplianceInPod(ctx, g)
 
-		// Test ovn-kubernetes nodes
 		By("Testing TLS compliance for ovn-kubernetes nodes in openshift-ovn-kubernetes (ports 9103, 9105)")
 		t.verifyOVNKubernetesNodeTLSComplianceInPod(ctx, g)
 
-		// Test cluster-network-operator
 		By("Testing TLS compliance for cluster-network-operator in openshift-network-operator (ports 9104, 9103, 9105)")
 		t.verifyCNOTLSComplianceInPod(ctx, g)
 
-		// Test networking-console-plugin
 		By("Testing TLS compliance for networking-console-plugin in openshift-network-console (port 9443)")
 		t.verifyNetworkConsoleTLSComplianceInPod(ctx, g)
 
@@ -317,7 +309,6 @@ func (t *TLSTestContext) verifyTLSComplianceInPods(
 	ports []string,
 	componentName string,
 	isAdheringComponent bool,
-	skipTLS12ForModernStrict bool,
 ) {
 	apiserver, err := t.configClient.ConfigV1().APIServers().Get(ctx, "cluster", metav1.GetOptions{})
 	g.Expect(err).NotTo(HaveOccurred(), "failed to get APIServer config")
@@ -393,25 +384,18 @@ func (t *TLSTestContext) verifyTLSComplianceInPods(
 			g.Expect(err).NotTo(HaveOccurred(), "TLS 1.3 test failed on port %s", port)
 			e2e.Logf("TLS 1.3 test PASSED on port %s", port)
 
-			if skipTLS12ForModernStrict &&
-				apiserver.Spec.TLSSecurityProfile != nil &&
-				apiserver.Spec.TLSSecurityProfile.Type == configv1.TLSProfileModernType &&
-				apiserver.Spec.TLSAdherence == configv1.TLSAdherencePolicyStrictAllComponents {
-				e2e.Logf("Skipping TLS 1.2 test for %s on port %s (Modern + StrictAllComponents)", componentName, port)
+			//nolint:gosec // G402: InsecureSkipVerify required for testing TLS compliance
+			tls12Config := &tls.Config{MinVersion: tls.VersionTLS12, MaxVersion: tls.VersionTLS12, InsecureSkipVerify: true}
+			if expectTLS12Reject {
+				e2e.Logf("Testing TLS 1.2 on port %s (should be REJECTED)", port)
+				err := checkTLSConnection(ctx, localPort, tls13Config, tls12Config)
+				g.Expect(err).NotTo(HaveOccurred(), "TLS 1.2 rejection check failed on port %s", port)
+				e2e.Logf("TLS 1.2 correctly REJECTED on port %s", port)
 			} else {
-				//nolint:gosec // G402: InsecureSkipVerify required for testing TLS compliance
-				tls12Config := &tls.Config{MinVersion: tls.VersionTLS12, MaxVersion: tls.VersionTLS12, InsecureSkipVerify: true}
-				if expectTLS12Reject {
-					e2e.Logf("Testing TLS 1.2 on port %s (should be REJECTED)", port)
-					err := checkTLSConnection(ctx, localPort, tls13Config, tls12Config)
-					g.Expect(err).NotTo(HaveOccurred(), "TLS 1.2 rejection check failed on port %s", port)
-					e2e.Logf("TLS 1.2 correctly REJECTED on port %s", port)
-				} else {
-					e2e.Logf("Testing TLS 1.2 on port %s (should succeed)", port)
-					err := checkTLSConnection(ctx, localPort, tls12Config, nil)
-					g.Expect(err).NotTo(HaveOccurred(), "TLS 1.2 test failed on port %s", port)
-					e2e.Logf("TLS 1.2 test PASSED on port %s", port)
-				}
+				e2e.Logf("Testing TLS 1.2 on port %s (should succeed)", port)
+				err := checkTLSConnection(ctx, localPort, tls12Config, nil)
+				g.Expect(err).NotTo(HaveOccurred(), "TLS 1.2 test failed on port %s", port)
+				e2e.Logf("TLS 1.2 test PASSED on port %s", port)
 			}
 
 			return nil
@@ -424,22 +408,22 @@ func (t *TLSTestContext) verifyTLSComplianceInPods(
 
 func (t *TLSTestContext) verifyMultusTLSComplianceInPod(ctx context.Context, g Gomega) {
 	t.verifyTLSComplianceInPods(ctx, g, "openshift-multus", "app=multus-admission-controller",
-		[]string{"6443", "8443"}, "Multus", true, false)
+		[]string{"6443", "8443"}, "Multus", true)
 }
 
 func (t *TLSTestContext) verifyOVNKubernetesNodeTLSComplianceInPod(ctx context.Context, g Gomega) {
 	t.verifyTLSComplianceInPods(ctx, g, "openshift-ovn-kubernetes", "app=ovnkube-node",
-		[]string{"9103", "9105"}, "OVN-Kubernetes Node", false, false)
+		[]string{"9103", "9105"}, "OVN-Kubernetes Node", false)
 }
 
 func (t *TLSTestContext) verifyCNOTLSComplianceInPod(ctx context.Context, g Gomega) {
 	t.verifyTLSComplianceInPods(ctx, g, "openshift-network-operator", "name=network-operator",
-		[]string{"9104", "9103", "9105"}, "CNO", false, false)
+		[]string{"9104", "9103", "9105"}, "CNO", false)
 }
 
 func (t *TLSTestContext) verifyNetworkConsoleTLSComplianceInPod(ctx context.Context, g Gomega) {
 	t.verifyTLSComplianceInPods(ctx, g, "openshift-network-console", "app.kubernetes.io/name=networking-console-plugin",
-		[]string{"9443"}, "Network Console", false, false)
+		[]string{"9443"}, "Network Console", false)
 }
 
 // checkTLSConnection verifies that a TLS connection works with the expected config and fails with the other.
