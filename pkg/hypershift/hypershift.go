@@ -51,6 +51,8 @@ type RelatedObject struct {
 
 // HostedControlPlane represents a subset of HyperShift API definition for HostedControlPlane
 type HostedControlPlane struct {
+	Name                         string
+	UID                          types.UID
 	Namespace                    string
 	ClusterID                    string
 	ControllerAvailabilityPolicy AvailabilityPolicy
@@ -62,6 +64,18 @@ type HostedControlPlane struct {
 	PriorityClass                string
 	APIServerSpec                *configv1.APIServerSpec
 	RestartDate                  string
+}
+
+// OwnerReference returns an ownerReference to the HostedControlPlane, for setting on
+// objects rendered into the HCP namespace so they are garbage-collected in the same
+// wave as the HostedControlPlane instead of lingering until namespace deletion.
+func (hc *HostedControlPlane) OwnerReference() metav1.OwnerReference {
+	return metav1.OwnerReference{
+		APIVersion: HostedControlPlaneGVK.GroupVersion().String(),
+		Kind:       HostedControlPlaneGVK.Kind,
+		Name:       hc.Name,
+		UID:        hc.UID,
+	}
 }
 
 // AvailabilityPolicy specifies a high level availability policy for components.
@@ -275,6 +289,8 @@ func ParseHostedControlPlane(hcp *unstructured.Unstructured) (*HostedControlPlan
 	}
 
 	return &HostedControlPlane{
+		Name:                         hcp.GetName(),
+		UID:                          hcp.GetUID(),
 		Namespace:                    hcp.GetNamespace(),
 		ControllerAvailabilityPolicy: AvailabilityPolicy(controllerAvailabilityPolicy),
 		ClusterID:                    clusterID,
