@@ -1,4 +1,4 @@
-package ote
+package e2e
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
-var _ = Describe("[sig-network] CNO", func() {
+var _ = Describe("CNO", func() {
 	var oc *CLI
 
 	BeforeEach(func(ctx context.Context) {
