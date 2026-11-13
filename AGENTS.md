@@ -45,9 +45,13 @@ make check      # verify (incl. codegen diff) + test-unit + golangci-lint — ru
 
 # `check`'s pieces, for faster iteration on just one:
 make test-unit             # Unit tests only (./pkg/... ./cmd/...)
-make golangci-lint          # Lint only
+make golangci-lint          # Lint only (downloads pinned GOLANGCI_LINT_VERSION into _output/tools/)
 make verify-update-codegen  # Regenerate deepcopy/clientset code and diff-check
 ```
+
+`GOLANGCI_LINT_VERSION` in the Makefile is the source of truth for the linter (not the
+CI image `latest` tag). Bump it intentionally — typically alongside a Kubernetes/deps
+bump — and fix any new findings in the same PR.
 
 ## Key Conventions
 

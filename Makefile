@@ -23,13 +23,26 @@ $(call add-profile-manifests,manifests,./profile-patches,./manifests)
 check: | verify test-unit golangci-lint
 .PHONY: check
 
-golangci-lint:
-	golangci-lint run --verbose --print-resources-usage --modules-download-mode=vendor --timeout=5m0s
-	cd test && golangci-lint run --verbose --modules-download-mode=mod --timeout=5m0s ./...
+# Pin the linter in-repo so local and CI (`make golangci-lint`) stay aligned.
+# Bump this deliberately (e.g. with a kubernetes bump) and fix any new findings in the
+# same change — do not rely on the CI image's floating `latest` tag.
+GOLANGCI_LINT_VERSION ?= v2.10.1
+# GOTOOLCHAIN must match the Go version the pinned linter was built with (and
+# go.mod)
+GOLANGCI_LINT_GOTOOLCHAIN ?= go1.26.0
+GOLANGCI_LINT ?= $(abspath _output/tools/bin/golangci-lint-$(GOLANGCI_LINT_VERSION))
+
+$(GOLANGCI_LINT):
+	mkdir -p $(dir $@)
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_VERSION)/install.sh | sh -s -- -b $(dir $@) $(GOLANGCI_LINT_VERSION)
+	mv $(dir $@)/golangci-lint $@
+
+golangci-lint: $(GOLANGCI_LINT)
+	GOTOOLCHAIN=$(GOLANGCI_LINT_GOTOOLCHAIN) $(GOLANGCI_LINT) run --verbose --print-resources-usage --modules-download-mode=vendor --timeout=5m0s
+	cd test && GOTOOLCHAIN=$(GOLANGCI_LINT_GOTOOLCHAIN) $(GOLANGCI_LINT) run --verbose --modules-download-mode=mod --timeout=5m0s ./...
 .PHONY: golangci-lint
 
-install.tools:
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | bash -s -- -b ${GOPATH}/bin
+install.tools: $(GOLANGCI_LINT)
 .PHONY: install.tools
 
 .PHONY: update-codegen
