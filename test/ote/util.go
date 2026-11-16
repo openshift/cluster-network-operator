@@ -616,7 +616,22 @@ func createMachineSet(ctx context.Context, oc *CLI, machineSetName string) {
 	existingMS := oc.AsAdmin().WithoutNamespace().Run("get").
 		Args("machineset", "-n", "openshift-machine-api", "-o=jsonpath={.items[0].metadata.name}").MustOutput(ctx)
 	Expect(existingMS).NotTo(BeEmpty(), "No existing MachineSet found to clone")
+	cloneMachineSet(ctx, oc, existingMS, machineSetName)
+}
 
+func createLinuxMachineSet(ctx context.Context, oc *CLI, machineSetName string) {
+	// Linux Machines omit the OS label; Windows Machines set it to Windows.
+	const selector = "machine.openshift.io/cluster-api-machine-role=worker," +
+		"machine.openshift.io/os-id!=Windows," +
+		"machine.openshift.io/cluster-api-machineset"
+	existingMS := oc.AsAdmin().WithoutNamespace().Run("get").
+		Args("machines", "-n", "openshift-machine-api", "-l", selector,
+			"-o=jsonpath={.items[0].metadata.labels.machine\\.openshift\\.io/cluster-api-machineset}").MustOutput(ctx)
+	Expect(existingMS).NotTo(BeEmpty(), "No Linux worker MachineSet found to clone")
+	cloneMachineSet(ctx, oc, existingMS, machineSetName)
+}
+
+func cloneMachineSet(ctx context.Context, oc *CLI, existingMS, machineSetName string) {
 	msJSON := oc.AsAdmin().WithoutNamespace().Run("get").Args("machineset", existingMS, "-n", "openshift-machine-api", "-o=json").MustOutput(ctx)
 
 	msJSON = strings.ReplaceAll(msJSON, existingMS, machineSetName)
