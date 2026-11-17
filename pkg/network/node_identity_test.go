@@ -152,6 +152,27 @@ func TestRenderNetworkNodeIdentity(t *testing.T) {
 			g.Expect(deployment.Labels["hypershift.openshift.io/hosted-control-plane"]).To(Equal(hostedClusterNS))
 			g.Expect(ptr.Deref(deployment.Spec.Replicas, 0)).To(Equal(int32(3)))
 			g.Expect(deployment.Spec.Strategy.Type).To(Equal(appsv1.RollingUpdateDeploymentStrategyType))
+			podAntiAffinity := deployment.Spec.Template.Spec.Affinity.PodAntiAffinity
+			g.Expect(podAntiAffinity).NotTo(BeNil())
+			g.Expect(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).To(ConsistOf(
+				corev1.PodAffinityTerm{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "network-node-identity-v2"},
+					},
+					TopologyKey: corev1.LabelHostname,
+				},
+			))
+			g.Expect(podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).To(ConsistOf(
+				corev1.WeightedPodAffinityTerm{
+					Weight: 100,
+					PodAffinityTerm: corev1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "network-node-identity-v2"},
+						},
+						TopologyKey: corev1.LabelTopologyZone,
+					},
+				},
+			))
 			g.Expect(deployment.Spec.Template.Spec.PriorityClassName).To(Equal(bootstrapResult.Infra.HostedControlPlane.PriorityClass))
 			g.Expect(deployment.Spec.Template.Spec.NodeSelector).To(Equal(bootstrapResult.Infra.HostedControlPlane.NodeSelector))
 
