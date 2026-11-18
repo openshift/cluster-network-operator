@@ -160,3 +160,5 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 )
+
+replace github.com/openshift/api => github.com/dasanind/api v0.0.0-20261104203743-59d25cdc3f6b
