@@ -28,7 +28,7 @@ Edit the MY_CLUSTER/install-config.yaml and change first value under `serviceNet
 
 After that go on with the install.
 
-When you want to change the default networing parameters,
+When you want to change the default networking parameters,
 for example, you want to use a different MTU, then you will need to create the manifest files.
 
 ```
