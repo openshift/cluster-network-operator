@@ -1488,6 +1488,7 @@ func bootstrapOVN(ctx context.Context, conf *operv1.Network, kubeClient cnoclien
 		nodeStatus.ClusterNetworkCIDRs = nodeDaemonSet.GetAnnotations()[names.ClusterNetworkCIDRsAnnotation]
 		nodeStatus.Version = nodeDaemonSet.GetAnnotations()["release.openshift.io/version"]
 		nodeStatus.Progressing = daemonSetProgressing(nodeDaemonSet, true)
+		nodeStatus.Available = NodeDaemonSetAvailable(nodeDaemonSet)
 		// Retrieve OVN IPsec status from ovnkube-node daemonset as this is being used to rollout IPsec
 		// config.
 		ovnIPsecStatus.IsOVNIPsecActiveOrRollingOut = !isOVNIPsecNotActiveInDaemonSet(nodeDaemonSet)
@@ -1513,6 +1514,7 @@ func bootstrapOVN(ctx context.Context, conf *operv1.Network, kubeClient cnoclien
 		prepullerStatus.IPFamilyMode = prePullerDaemonSet.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
 		prepullerStatus.Version = prePullerDaemonSet.GetAnnotations()["release.openshift.io/version"]
 		prepullerStatus.Progressing = daemonSetProgressing(prePullerDaemonSet, true)
+		prepullerStatus.Available = PrepullerAvailable(prePullerDaemonSet)
 	}
 
 	res := bootstrap.OVNBootstrapResult{
@@ -1693,6 +1695,34 @@ func shouldUpdateOVNKonIPFamilyChange(ovn bootstrap.OVNBootstrapResult, controlP
 	return true, true
 }
 
+// PrepullerAvailable reports whether a pre-puller DaemonSet has finished
+// pulling images.  It returns true when:
+//   - all desired pods are available (normal completion), OR
+//   - there are zero desired pods (zero-node cluster), OR
+//   - the rollout is acceptably hung (90%+ updated with the hung annotation)
+//     AND at least one pod is available.
+func PrepullerAvailable(ds *appsv1.DaemonSet) bool {
+	status := ds.Status
+	if status.NumberAvailable == status.DesiredNumberScheduled {
+		return true
+	}
+	if status.DesiredNumberScheduled == 0 {
+		return true
+	}
+	_, isHung := ds.GetAnnotations()[names.RolloutHungAnnotation]
+	maxBehind := int(math.Max(1, math.Floor(float64(status.DesiredNumberScheduled)*0.1)))
+	numBehind := int(status.DesiredNumberScheduled - status.UpdatedNumberScheduled)
+	return isHung && numBehind <= maxBehind && status.NumberAvailable > 0
+}
+
+// NodeDaemonSetAvailable reports whether the node DaemonSet has at least one
+// available pod or has zero desired pods (zero-node cluster). Used as a gate
+// in shouldUpdateOVNKonUpgrade to avoid promoting the control-plane update
+// before any node pods are serving.
+func NodeDaemonSetAvailable(ds *appsv1.DaemonSet) bool {
+	return ds.Status.NumberAvailable > 0 || ds.Status.DesiredNumberScheduled == 0
+}
+
 // shouldUpdateOVNKonPrepull implements a simple pre-pulling daemonset. It ensures the ovn-k
 // container image is (probably) already pulled by every node.
 // If the existing node daemonset has a different version then what we would like to apply, we first
@@ -1729,6 +1759,11 @@ func shouldUpdateOVNKonPrepull(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 
 	if ovn.PrePullerUpdateStatus.Progressing {
 		klog.Infof("Waiting for ovnkube-upgrades-prepuller daemonset to finish pulling the image before updating node")
+		return false, true
+	}
+
+	if !ovn.PrePullerUpdateStatus.Available {
+		klog.Infof("Waiting for ovnkube-upgrades-prepuller daemonset pods to become available before updating node")
 		return false, true
 	}
 
@@ -1853,6 +1888,10 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 			klog.V(2).Infof("Waiting for OVN-Kubernetes node update to roll out before updating control-plane")
 			return true, false
 		}
+		if !ovn.NodeUpdateStatus.Available {
+			klog.V(2).Infof("Waiting for OVN-Kubernetes node pods to become available before updating control-plane")
+			return true, false
+		}
 		klog.V(2).Infof("OVN-Kubernetes node update rolled out; now updating control-plane")
 		return true, true
 	}
@@ -1889,13 +1928,24 @@ func shouldUpdateOVNKonUpgrade(ovn bootstrap.OVNBootstrapResult, releaseVersion 
 // A DaemonSet with no desired pods is complete, because there are no pods to
 // roll out. This can occur in zero-node clusters.
 // If allowHung is true, then treat a daemonset hung at 90% as "done" for our purposes.
+//
+// This checks only whether a spec change is still being applied (pods not yet
+// at the latest template, or the controller hasn't observed the latest
+// generation).  Temporary pod unavailability (e.g. during MCO node reboots) is
+// NOT treated as rollout progress: once every scheduled pod runs the latest
+// template, the rollout is complete regardless of NumberUnavailable.
 func daemonSetProgressing(ds *appsv1.DaemonSet, allowHung bool) bool {
 	status := ds.Status
 
-	// Copy-pasted from status_manager: Determine if a DaemonSet is progressing
+	// A rollout is in progress when pods have not all been updated to the
+	// latest template or the controller has not yet observed the current
+	// generation.  NumberUnavailable is intentionally excluded: pod
+	// unavailability after the template rollout completes (e.g. MCO node
+	// reboots) is transient churn, not rollout progress.  Including it
+	// here caused shouldUpdateOVNKonUpgrade to block the control-plane
+	// update during reboots, preventing installComplete and triggering
+	// false Progressing=True (OCPBUGS-142042).
 	progressing := (status.UpdatedNumberScheduled < status.DesiredNumberScheduled ||
-		status.NumberUnavailable > 0 ||
-		(status.NumberAvailable == 0 && status.DesiredNumberScheduled > 0) ||
 		ds.Generation > status.ObservedGeneration)
 
 	s := "progressing"

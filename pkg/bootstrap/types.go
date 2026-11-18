@@ -53,7 +53,7 @@ type OVNConfigBoostrapResult struct {
 }
 
 // OVNUpdateStatus contains the status of existing daemonset
-// or deployment that are maily used by the upgrade logic
+// or deployment that are mainly used by the upgrade logic
 type OVNUpdateStatus struct {
 	Kind                string
 	Namespace           string
@@ -62,6 +62,10 @@ type OVNUpdateStatus struct {
 	IPFamilyMode        string
 	ClusterNetworkCIDRs string
 	Progressing         bool
+	// Available is true when the pre-puller has finished pulling images
+	// on all nodes, or is acceptably hung (90%+ updated with the
+	// RolloutHungAnnotation), or has zero desired pods.
+	Available bool
 }
 
 // OVNIPsecStatus contains status of current IPsec configuration
