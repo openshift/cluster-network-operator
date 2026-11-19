@@ -17,6 +17,9 @@ data:
 {{- if .NginxTLSCiphers }}
         ssl_ciphers         {{.NginxTLSCiphers}};
 {{- end }}
+{{- if .NginxTLSCurves }}
+        ssl_ecdh_curve      {{.NginxTLSCurves}};
+{{- end }}
         ssl_prefer_server_ciphers on;
 {{- end }}
         root                /opt/app-root/src;

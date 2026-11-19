@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operatorv1alpha1 "github.com/openshift/api/operator/v1alpha1"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
 	"github.com/openshift/cluster-network-operator/pkg/hypershift"
@@ -205,8 +206,15 @@ func applyClusterTLSProfile(ctx context.Context, config *operatorv1alpha1.Generi
 	config.ServingInfo.MinTLSVersion = string(tlsProfile.Spec.MinTLSVersion)
 	config.ServingInfo.CipherSuites = crypto.OpenSSLToIANACipherSuites(tlsProfile.Spec.Ciphers)
 
-	klog.Infof("Applied cluster TLS profile: minTLSVersion=%s, ciphers=%v",
-		tlsProfile.Spec.MinTLSVersion, tlsProfile.Spec.Ciphers)
+	var unsupportedGroups []configv1.TLSGroup
+	config.ServingInfo.CurvePreferences, unsupportedGroups = crypto.TLSGroupsToCurvePreferences(tlsProfile.Spec.Groups)
+
+	if len(unsupportedGroups) > 0 {
+		klog.Warningf("Unsupported TLS groups filtered out: %v", unsupportedGroups)
+	}
+
+	klog.Infof("Applied cluster TLS profile: minTLSVersion=%s, cipherSuites=%v, curvePreferences=%v",
+		config.ServingInfo.MinTLSVersion, config.ServingInfo.CipherSuites, config.ServingInfo.CurvePreferences)
 
 	return nil
 }

@@ -1,8 +1,10 @@
 package network
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -19,8 +21,9 @@ import (
 )
 
 const (
-	tlsMinVersionArg   = "--tls-min-version"
-	tlsCipherSuitesArg = "--tls-cipher-suites"
+	tlsMinVersionArg       = "--tls-min-version"
+	tlsCipherSuitesArg     = "--tls-cipher-suites"
+	tlsCurvePreferencesArg = "--tls-curve-preferences"
 )
 
 func TestRenderNetworkNodeIdentity(t *testing.T) {
@@ -185,6 +188,7 @@ func testTLSArgRendering(t *testing.T, name string, defaultMinVersion string, de
 				Spec: configv1.TLSProfileSpec{
 					MinTLSVersion: configv1.VersionTLS12,
 					Ciphers:       []string{"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384"},
+					Groups:        []configv1.TLSGroup{configv1.TLSGroupSecP256r1},
 				},
 				Adherence: configv1.TLSAdherencePolicyLegacyAdheringComponentsOnly,
 			}
@@ -195,11 +199,14 @@ func testTLSArgRendering(t *testing.T, name string, defaultMinVersion string, de
 			} else {
 				g.Expect(commandStr).NotTo(ContainSubstring(tlsMinVersionArg))
 			}
+
 			if defaultCiphers != "" {
 				g.Expect(commandStr).To(ContainSubstring(tlsCipherSuitesArg + "=" + defaultCiphers))
 			} else {
 				g.Expect(commandStr).NotTo(ContainSubstring(tlsCipherSuitesArg))
 			}
+
+			g.Expect(commandStr).NotTo(ContainSubstring(tlsCurvePreferencesArg))
 		})
 	})
 
@@ -210,15 +217,15 @@ func testTLSArgRendering(t *testing.T, name string, defaultMinVersion string, de
 				Spec: configv1.TLSProfileSpec{
 					MinTLSVersion: configv1.VersionTLS12,
 					Ciphers:       []string{"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384"},
+					Groups:        []configv1.TLSGroup{configv1.TLSGroupSecP256r1, configv1.TLSGroupX25519},
 				},
 				Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
 			}
 
 			commandStr := getCommandStr(t, tlsProfile)
-			expectedMinVersion := tlsMinVersionArg + "=" + string(tlsProfile.Spec.MinTLSVersion)
-			expectedCiphers := tlsCipherSuitesArg + "=" + strings.Join(tlsProfile.Spec.Ciphers, ",")
-			g.Expect(commandStr).To(ContainSubstring(expectedMinVersion))
-			g.Expect(commandStr).To(ContainSubstring(expectedCiphers))
+			g.Expect(commandStr).To(ContainSubstring(tlsMinVersionArg + "=" + string(tlsProfile.Spec.MinTLSVersion)))
+			g.Expect(commandStr).To(ContainSubstring(tlsCipherSuitesArg + "=" + strings.Join(tlsProfile.Spec.Ciphers, ",")))
+			g.Expect(commandStr).To(ContainSubstring(tlsCurvePreferencesArg + "=" + fmt.Sprintf("%d,%d", tls.CurveP256, tls.X25519)))
 		})
 
 		t.Run("with empty cipher list", func(t *testing.T) {
@@ -227,15 +234,33 @@ func testTLSArgRendering(t *testing.T, name string, defaultMinVersion string, de
 				tlsProfile := bootstrap.TLSProfile{
 					Spec: configv1.TLSProfileSpec{
 						MinTLSVersion: configv1.VersionTLS13,
-						Ciphers:       nil,
+						Groups:        []configv1.TLSGroup{configv1.TLSGroupX25519},
 					},
 					Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
 				}
 
 				commandStr := getCommandStr(t, tlsProfile)
-				expectedMinVersion := tlsMinVersionArg + "=" + string(tlsProfile.Spec.MinTLSVersion)
-				g.Expect(commandStr).To(ContainSubstring(expectedMinVersion))
+				g.Expect(commandStr).To(ContainSubstring(tlsMinVersionArg + "=" + string(tlsProfile.Spec.MinTLSVersion)))
 				g.Expect(commandStr).NotTo(ContainSubstring(tlsCipherSuitesArg))
+				g.Expect(commandStr).To(ContainSubstring(tlsCurvePreferencesArg + "=" + strconv.Itoa(int(tls.X25519))))
+			})
+		})
+
+		t.Run("with empty curve preferences list", func(t *testing.T) {
+			t.Run(fmt.Sprintf("should not render the --tls-curve-preferences arg for the %s command", name), func(t *testing.T) {
+				g := NewWithT(t)
+				tlsProfile := bootstrap.TLSProfile{
+					Spec: configv1.TLSProfileSpec{
+						MinTLSVersion: configv1.VersionTLS13,
+						Ciphers:       []string{"TLS_AES_128_GCM_SHA256"},
+					},
+					Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
+				}
+
+				commandStr := getCommandStr(t, tlsProfile)
+				g.Expect(commandStr).To(ContainSubstring(tlsMinVersionArg + "=" + string(tlsProfile.Spec.MinTLSVersion)))
+				g.Expect(commandStr).To(ContainSubstring(tlsCipherSuitesArg + "=TLS_AES_128_GCM_SHA256"))
+				g.Expect(commandStr).NotTo(ContainSubstring(tlsCurvePreferencesArg))
 			})
 		})
 	})

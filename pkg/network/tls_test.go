@@ -1,9 +1,13 @@
 package network
 
 import (
+	"crypto/tls"
+	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
+	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 )
@@ -20,12 +24,14 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
+				g := NewWithT(t)
 				data := make(map[string]any)
 				bootstrapResult := &bootstrap.BootstrapResult{
 					TLSProfile: bootstrap.TLSProfile{
 						Spec: configv1.TLSProfileSpec{
 							MinTLSVersion: configv1.VersionTLS12,
 							Ciphers:       []string{"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384"},
+							Groups:        []configv1.TLSGroup{configv1.TLSGroupSecP256r1, configv1.TLSGroupX25519},
 						},
 						Adherence: configv1.TLSAdherencePolicyStrictAllComponents,
 					},
@@ -34,26 +40,16 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 				addTLSInfoToRenderData(data, bootstrapResult, tc.respectAdherence)
 
 				// Should always use TLS profile when adherence is StrictAllComponents
-				if v, ok := data[UseTLSProfileKey]; !ok || v != true {
-					t.Errorf("Expected %s to be true, got %v", UseTLSProfileKey, v)
-				}
-				if v, ok := data[TLSMinVersionKey]; !ok || v != configv1.VersionTLS12 {
-					t.Errorf("Expected %s to be %v, got %v", TLSMinVersionKey, configv1.VersionTLS12, v)
-				}
-				expectedCiphers := "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384"
-				if v, ok := data[TLSCipherSuitesKey]; !ok || v != expectedCiphers {
-					t.Errorf("Expected %s to be %v, got %v", TLSCipherSuitesKey, expectedCiphers, v)
-				}
+				g.Expect(data).To(HaveKeyWithValue(UseTLSProfileKey, true))
+				g.Expect(data).To(HaveKeyWithValue(TLSMinVersionKey, configv1.VersionTLS12))
+				g.Expect(data).To(HaveKeyWithValue(TLSCipherSuitesKey, "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384"))
+				g.Expect(data).To(HaveKeyWithValue(TLSCurvePreferencesKey, fmt.Sprintf("%d,%d", tls.CurveP256, tls.X25519)))
 
 				// Check NGINX parameters
-				expectedNginxProtocols := "TLSv1.2 TLSv1.3"
-				if v, ok := data[NginxTLSProtocolsKey]; !ok || v != expectedNginxProtocols {
-					t.Errorf("Expected %s to be %q, got %v", NginxTLSProtocolsKey, expectedNginxProtocols, v)
-				}
-				expectedNginxCiphers := "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384"
-				if v, ok := data[NginxTLSCiphersKey]; !ok || v != expectedNginxCiphers {
-					t.Errorf("Expected %s to be %q, got %v", NginxTLSCiphersKey, expectedNginxCiphers, v)
-				}
+				g.Expect(data).To(HaveKeyWithValue(NginxTLSProtocolsKey, "TLSv1.2 TLSv1.3"))
+				g.Expect(data).To(HaveKeyWithValue(NginxTLSCiphersKey, "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384"))
+				g.Expect(data).To(HaveKeyWithValue(NginxTLSCurvesKey, fmt.Sprintf("%s:%s", configv1.TLSGroupSecP256r1,
+					configv1.TLSGroupX25519)))
 			})
 		}
 	})
@@ -70,12 +66,14 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 		for _, policy := range adherencePolicies {
 			t.Run(policy.name, func(t *testing.T) {
 				t.Run("and respecting adherence", func(t *testing.T) {
+					g := NewWithT(t)
 					data := make(map[string]any)
 					bootstrapResult := &bootstrap.BootstrapResult{
 						TLSProfile: bootstrap.TLSProfile{
 							Spec: configv1.TLSProfileSpec{
 								MinTLSVersion: configv1.VersionTLS13,
 								Ciphers:       []string{"TLS_AES_128_GCM_SHA256"},
+								Groups:        []configv1.TLSGroup{configv1.TLSGroupSecP256r1},
 							},
 							Adherence: policy.adherence,
 						},
@@ -84,31 +82,26 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 					addTLSInfoToRenderData(data, bootstrapResult, true)
 
 					// Should NOT use TLS profile when respecting adherence for these policies
-					if v, ok := data[UseTLSProfileKey]; !ok || v != false {
-						t.Errorf("Expected %s to be false, got %v", UseTLSProfileKey, v)
-					}
-					if _, ok := data[TLSMinVersionKey]; ok {
-						t.Errorf("Expected %s to not be present, but it was: %v", TLSMinVersionKey, data[TLSMinVersionKey])
-					}
-					if _, ok := data[TLSCipherSuitesKey]; ok {
-						t.Errorf("Expected %s to not be present, but it was: %v", TLSCipherSuitesKey, data[TLSCipherSuitesKey])
-					}
+					g.Expect(data).To(HaveKeyWithValue(UseTLSProfileKey, false))
+					g.Expect(data).NotTo(HaveKey(TLSMinVersionKey))
+					g.Expect(data).NotTo(HaveKey(TLSCipherSuitesKey))
+					g.Expect(data).NotTo(HaveKey(TLSCurvePreferencesKey))
+
 					// NGINX parameters should also not be set
-					if _, ok := data[NginxTLSProtocolsKey]; ok {
-						t.Errorf("Expected %s to not be present, but it was: %v", NginxTLSProtocolsKey, data[NginxTLSProtocolsKey])
-					}
-					if _, ok := data[NginxTLSCiphersKey]; ok {
-						t.Errorf("Expected %s to not be present, but it was: %v", NginxTLSCiphersKey, data[NginxTLSCiphersKey])
-					}
+					g.Expect(data).NotTo(HaveKey(NginxTLSProtocolsKey))
+					g.Expect(data).NotTo(HaveKey(NginxTLSCiphersKey))
+					g.Expect(data).NotTo(HaveKey(NginxTLSCurvesKey))
 				})
 
 				t.Run("and not respecting adherence", func(t *testing.T) {
+					g := NewWithT(t)
 					data := make(map[string]any)
 					bootstrapResult := &bootstrap.BootstrapResult{
 						TLSProfile: bootstrap.TLSProfile{
 							Spec: configv1.TLSProfileSpec{
 								MinTLSVersion: configv1.VersionTLS13,
 								Ciphers:       []string{"TLS_AES_128_GCM_SHA256"},
+								Groups:        []configv1.TLSGroup{configv1.TLSGroupSecP256r1},
 							},
 							Adherence: policy.adherence,
 						},
@@ -117,67 +110,45 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 					addTLSInfoToRenderData(data, bootstrapResult, false)
 
 					// Should use TLS profile when not respecting adherence
-					if v, ok := data[UseTLSProfileKey]; !ok || v != true {
-						t.Errorf("Expected %s to be true, got %v", UseTLSProfileKey, v)
-					}
-					if v, ok := data[TLSMinVersionKey]; !ok || v != configv1.VersionTLS13 {
-						t.Errorf("Expected %s to be %v, got %v", TLSMinVersionKey, configv1.VersionTLS13, v)
-					}
-					expectedCiphers := "TLS_AES_128_GCM_SHA256"
-					if v, ok := data[TLSCipherSuitesKey]; !ok || v != expectedCiphers {
-						t.Errorf("Expected %s to be %v, got %v", TLSCipherSuitesKey, expectedCiphers, v)
-					}
+					g.Expect(data).To(HaveKeyWithValue(UseTLSProfileKey, true))
+					g.Expect(data).To(HaveKeyWithValue(TLSMinVersionKey, configv1.VersionTLS13))
+					g.Expect(data).To(HaveKeyWithValue(TLSCipherSuitesKey, "TLS_AES_128_GCM_SHA256"))
+					g.Expect(data).To(HaveKeyWithValue(TLSCurvePreferencesKey, strconv.Itoa(int(tls.CurveP256))))
 
-					// Check NGINX parameters for TLS 1.3
-					expectedNginxProtocols := "TLSv1.3"
-					if v, ok := data[NginxTLSProtocolsKey]; !ok || v != expectedNginxProtocols {
-						t.Errorf("Expected %s to be %q, got %v", NginxTLSProtocolsKey, expectedNginxProtocols, v)
-					}
-					// TLS 1.3 ciphers should be empty (not configurable)
-					expectedNginxCiphers := "TLS_AES_128_GCM_SHA256"
-					if v, ok := data[NginxTLSCiphersKey]; !ok || v != expectedNginxCiphers {
-						t.Errorf("Expected %s to be %q, got %v", NginxTLSCiphersKey, expectedNginxCiphers, v)
-					}
+					// Check NGINX parameters
+					g.Expect(data).To(HaveKeyWithValue(NginxTLSProtocolsKey, "TLSv1.3"))
+					g.Expect(data).To(HaveKeyWithValue(NginxTLSCiphersKey, "TLS_AES_128_GCM_SHA256"))
+					g.Expect(data).To(HaveKeyWithValue(NginxTLSCurvesKey, string(configv1.TLSGroupSecP256r1)))
 				})
 			})
 		}
 	})
 
-	t.Run("with nil cipher list", func(t *testing.T) {
+	t.Run("with nil cipher and groups lists", func(t *testing.T) {
+		g := NewWithT(t)
 		data := make(map[string]any)
 		bootstrapResult := &bootstrap.BootstrapResult{
 			TLSProfile: bootstrap.TLSProfile{
 				Spec: configv1.TLSProfileSpec{
 					MinTLSVersion: configv1.VersionTLS12,
-					// Ciphers is nil
 				},
 			},
 		}
 
 		addTLSInfoToRenderData(data, bootstrapResult, false)
+		g.Expect(data).To(HaveKeyWithValue(UseTLSProfileKey, true))
+		g.Expect(data).To(HaveKeyWithValue(TLSMinVersionKey, configv1.VersionTLS12))
+		g.Expect(data).To(HaveKeyWithValue(TLSCipherSuitesKey, BeEmpty()))
+		g.Expect(data).To(HaveKeyWithValue(TLSCurvePreferencesKey, BeEmpty()))
 
-		if v, ok := data[UseTLSProfileKey]; !ok || v != true {
-			t.Errorf("Expected %s to be true, got %v", UseTLSProfileKey, v)
-		}
-		if v, ok := data[TLSMinVersionKey]; !ok || v != configv1.VersionTLS12 {
-			t.Errorf("Expected %s to be %v, got %v", TLSMinVersionKey, configv1.VersionTLS12, v)
-		}
-		if v, ok := data[TLSCipherSuitesKey]; !ok || v != "" {
-			t.Errorf("Expected %s to be empty string, got %v", TLSCipherSuitesKey, v)
-		}
-
-		// Check NGINX parameters with nil ciphers
-		expectedNginxProtocols := "TLSv1.2 TLSv1.3"
-		if v, ok := data[NginxTLSProtocolsKey]; !ok || v != expectedNginxProtocols {
-			t.Errorf("Expected %s to be %q, got %v", NginxTLSProtocolsKey, expectedNginxProtocols, v)
-		}
-		expectedNginxCiphers := ""
-		if v, ok := data[NginxTLSCiphersKey]; !ok || v != expectedNginxCiphers {
-			t.Errorf("Expected %s to be %q, got %v", NginxTLSCiphersKey, expectedNginxCiphers, v)
-		}
+		// Check NGINX parameters
+		g.Expect(data).To(HaveKeyWithValue(NginxTLSProtocolsKey, "TLSv1.2 TLSv1.3"))
+		g.Expect(data).To(HaveKeyWithValue(NginxTLSCiphersKey, BeEmpty()))
+		g.Expect(data).To(HaveKeyWithValue(NginxTLSCurvesKey, BeEmpty()))
 	})
 
 	t.Run("should filter out ciphers unsupported by Go crypto/tls", func(t *testing.T) {
+		g := NewWithT(t)
 		data := make(map[string]any)
 		bootstrapResult := &bootstrap.BootstrapResult{
 			TLSProfile: bootstrap.TLSProfile{
@@ -202,20 +173,13 @@ func TestAddTLSInfoToRenderData(t *testing.T) {
 		addTLSInfoToRenderData(data, bootstrapResult, true)
 
 		// Should use TLS profile
-		if v, ok := data[UseTLSProfileKey]; !ok || v != true {
-			t.Errorf("Expected %s to be true, got %v", UseTLSProfileKey, v)
-		}
+		g.Expect(data).To(HaveKeyWithValue(UseTLSProfileKey, true))
 
 		// Only supported ciphers should be in the IANA list (unsupported ones filtered out)
-		expectedCiphers := "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
-		if v, ok := data[TLSCipherSuitesKey]; !ok || v != expectedCiphers {
-			t.Errorf("Expected %s to be %q, got %q", TLSCipherSuitesKey, expectedCiphers, v)
-		}
+		g.Expect(data).To(HaveKeyWithValue(TLSCipherSuitesKey,
+			"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"))
 
 		// NGINX should keep all ciphers (original OpenSSL names)
-		expectedNginxCiphers := strings.Join(bootstrapResult.TLSProfile.Spec.Ciphers, ":")
-		if v, ok := data[NginxTLSCiphersKey]; !ok || v != expectedNginxCiphers {
-			t.Errorf("Expected %s to be %q, got %q", NginxTLSCiphersKey, expectedNginxCiphers, v)
-		}
+		g.Expect(data).To(HaveKeyWithValue(NginxTLSCiphersKey, strings.Join(bootstrapResult.TLSProfile.Spec.Ciphers, ":")))
 	})
 }
