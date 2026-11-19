@@ -26,6 +26,7 @@ func init() {
 		ingressconfig.Add,
 		infrastructureconfig.Add,
 		allowlist.Add,
+		allowlist.AddNodeReconciler,
 		dashboards.Add,
 		pkictrl.Add,
 		observability.Add,
