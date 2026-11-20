@@ -2387,6 +2387,49 @@ status:
   observedGeneration: 1
 `,
 		},
+
+		// zero-desired pre-puller at target version: node update proceeds
+		// because PrepullerAvailable returns true for DesiredNumberScheduled==0
+		{
+			expectNode:         true,
+			expectControlPlane: false,
+			expectPrePull:      false,
+			rv:                 "2.0.0",
+			controlPlane: `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-control-plane
+`,
+			node: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 1.9.9
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-node
+`,
+			prepull: `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    release.openshift.io/version: 2.0.0
+  namespace: openshift-ovn-kubernetes
+  name: ovnkube-upgrades-prepuller
+  generation: 1
+status:
+  desiredNumberScheduled: 0
+  numberAvailable: 0
+  numberUnavailable: 0
+  updatedNumberScheduled: 0
+  observedGeneration: 1
+`,
+		},
 	} {
 		t.Run(strconv.Itoa(idx), func(t *testing.T) {
 			g := NewGomegaWithT(t)
@@ -2416,6 +2459,7 @@ status:
 			nodeStatus.IPFamilyMode = node.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
 			nodeStatus.Version = node.GetAnnotations()["release.openshift.io/version"]
 			nodeStatus.Progressing = daemonSetProgressing(node, true)
+			nodeStatus.Available = NodeDaemonSetAvailable(node)
 
 			controlPlane = &appsv1.Deployment{}
 			err = yaml.Unmarshal([]byte(tc.controlPlane), controlPlane)
@@ -2441,6 +2485,7 @@ status:
 				prepullerStatus.IPFamilyMode = prepuller.GetAnnotations()[names.NetworkIPFamilyModeAnnotation]
 				prepullerStatus.Version = prepuller.GetAnnotations()["release.openshift.io/version"]
 				prepullerStatus.Progressing = daemonSetProgressing(prepuller, false)
+				prepullerStatus.Available = PrepullerAvailable(prepuller)
 			} else {
 				prepullerStatus = nil
 			}
@@ -4965,10 +5010,11 @@ func TestDaemonSetProgressing(t *testing.T) {
 			expectResult: false,
 		},
 		{
-			// Isolates the NumberAvailable==0 && DesiredNumberScheduled>0 branch:
-			// all other predicates are false (no unavailable pods, all updated,
-			// generation matches), so only this condition drives the result.
-			name: "zero available with desired pods should be progressing",
+			// All pods are at the latest template but none are available.
+			// This is NOT a rollout — the template change has been applied
+			// to every pod.  Unavailability is a separate concern (e.g. all
+			// nodes rebooting at once).
+			name: "zero available with desired pods but all updated is not progressing",
 			status: appsv1.DaemonSetStatus{
 				DesiredNumberScheduled: 3,
 				NumberAvailable:        0,
@@ -4978,7 +5024,7 @@ func TestDaemonSetProgressing(t *testing.T) {
 			},
 			generation:   1,
 			allowHung:    true,
-			expectResult: true,
+			expectResult: false,
 		},
 		{
 			name: "rollout complete should not be progressing",
@@ -4994,7 +5040,9 @@ func TestDaemonSetProgressing(t *testing.T) {
 			expectResult: false,
 		},
 		{
-			name: "pods unavailable should be progressing",
+			// All pods are at the latest template, but one is temporarily
+			// unavailable (e.g. MCO node reboot).  This is not a rollout.
+			name: "pods unavailable but all updated is not progressing",
 			status: appsv1.DaemonSetStatus{
 				DesiredNumberScheduled: 3,
 				NumberAvailable:        2,
@@ -5004,7 +5052,7 @@ func TestDaemonSetProgressing(t *testing.T) {
 			},
 			generation:   1,
 			allowHung:    true,
-			expectResult: true,
+			expectResult: false,
 		},
 		{
 			name: "not all pods updated should be progressing",
@@ -5042,6 +5090,426 @@ func TestDaemonSetProgressing(t *testing.T) {
 			result := daemonSetProgressing(ds, tc.allowHung)
 			g.Expect(result).To(Equal(tc.expectResult),
 				"test case %q: daemonSetProgressing() = %v, want %v", tc.name, result, tc.expectResult)
+		})
+	}
+}
+
+// TestShouldUpdateOVNKonPrepullAvailabilityGate verifies that
+// shouldUpdateOVNKonPrepull blocks until the pre-puller is both
+// not-progressing and available, covering normal completion, the
+// allowHung recovery path, and the zero-desired case.
+func TestShouldUpdateOVNKonPrepullAvailabilityGate(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		status     bootstrap.OVNUpdateStatus
+		expectNode bool
+	}{
+		{
+			name: "normal complete: all available → proceeds",
+			status: bootstrap.OVNUpdateStatus{
+				Version:     "2.0.0",
+				Progressing: false,
+				Available:   true,
+			},
+			expectNode: true,
+		},
+		{
+			name: "partial: some available, not hung → blocks",
+			status: bootstrap.OVNUpdateStatus{
+				Version:     "2.0.0",
+				Progressing: false,
+				Available:   false,
+			},
+			expectNode: false,
+		},
+		{
+			name: "hung at 90%: annotation + 90% updated → proceeds",
+			status: bootstrap.OVNUpdateStatus{
+				Version:     "2.0.0",
+				Progressing: false, // allowHung made daemonSetProgressing return false
+				Available:   true,  // isHung && numBehind <= maxBehind
+			},
+			expectNode: true,
+		},
+		{
+			name: "zero desired pods → proceeds",
+			status: bootstrap.OVNUpdateStatus{
+				Version:     "2.0.0",
+				Progressing: false,
+				Available:   true, // DesiredNumberScheduled==0 → true
+			},
+			expectNode: true,
+		},
+		{
+			name: "still progressing blocks even if available",
+			status: bootstrap.OVNUpdateStatus{
+				Version:     "2.0.0",
+				Progressing: true,
+				Available:   true,
+			},
+			expectNode: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+			ovn := bootstrap.OVNBootstrapResult{
+				NodeUpdateStatus:      &bootstrap.OVNUpdateStatus{Version: "1.0.0"},
+				PrePullerUpdateStatus: &tc.status,
+			}
+			updateNode, _ := shouldUpdateOVNKonPrepull(ovn, "2.0.0")
+			g.Expect(updateNode).To(Equal(tc.expectNode),
+				"shouldUpdateOVNKonPrepull updateNode = %v, want %v", updateNode, tc.expectNode)
+		})
+	}
+}
+
+// TestPrepullerAvailableDerivation verifies PrepullerAvailable against the
+// full set of edge cases: all-available, partial, zero-desired, hung-at-90%
+// with available pods, hung-at-90% with zero available, and hung-below-threshold.
+func TestPrepullerAvailableDerivation(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		ds              *appsv1.DaemonSet
+		expectAvailable bool
+	}{
+		{
+			name: "all available",
+			ds: &appsv1.DaemonSet{
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 6,
+					UpdatedNumberScheduled: 6,
+					NumberAvailable:        6,
+				},
+			},
+			expectAvailable: true,
+		},
+		{
+			name: "partial availability without hung annotation",
+			ds: &appsv1.DaemonSet{
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 6,
+					UpdatedNumberScheduled: 6,
+					NumberAvailable:        4,
+				},
+			},
+			expectAvailable: false,
+		},
+		{
+			name: "zero desired pods → available",
+			ds: &appsv1.DaemonSet{
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 0,
+					UpdatedNumberScheduled: 0,
+					NumberAvailable:        0,
+				},
+			},
+			expectAvailable: true,
+		},
+		{
+			name: "hung at 90% with available pods → available",
+			ds: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.RolloutHungAnnotation: ""},
+				},
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 10,
+					UpdatedNumberScheduled: 9, // 1 behind, maxBehind=1
+					NumberAvailable:        9,
+				},
+			},
+			expectAvailable: true,
+		},
+		{
+			name: "hung at 90% with zero available → not available",
+			ds: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.RolloutHungAnnotation: ""},
+				},
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 10,
+					UpdatedNumberScheduled: 9, // 1 behind, maxBehind=1
+					NumberAvailable:        0,
+				},
+			},
+			expectAvailable: false,
+		},
+		{
+			name: "hung but too many behind → not available",
+			ds: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{names.RolloutHungAnnotation: ""},
+				},
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 10,
+					UpdatedNumberScheduled: 7, // 3 behind, maxBehind=1
+					NumberAvailable:        7,
+				},
+			},
+			expectAvailable: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+			g.Expect(PrepullerAvailable(tc.ds)).To(Equal(tc.expectAvailable),
+				"PrepullerAvailable = %v, want %v", PrepullerAvailable(tc.ds), tc.expectAvailable)
+		})
+	}
+}
+
+// TestPrepullerHungRolloutGate verifies the full Progressing+Available gate
+// for a hung pre-puller DaemonSet, deriving both fields from the DS the same
+// way bootstrapOVN does.
+func TestPrepullerHungRolloutGate(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		ds         *appsv1.DaemonSet
+		expectNode bool
+	}{
+		{
+			name: "hung at 90% with available pods → gate proceeds",
+			ds: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"release.openshift.io/version": "2.0.0",
+						names.RolloutHungAnnotation:    "",
+					},
+				},
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 10,
+					UpdatedNumberScheduled: 9,
+					NumberAvailable:        9,
+					ObservedGeneration:     1,
+				},
+			},
+			expectNode: true,
+		},
+		{
+			name: "hung at 90% with zero available pods → gate blocks",
+			ds: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"release.openshift.io/version": "2.0.0",
+						names.RolloutHungAnnotation:    "",
+					},
+				},
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 10,
+					UpdatedNumberScheduled: 9,
+					NumberAvailable:        0,
+					ObservedGeneration:     1,
+				},
+			},
+			expectNode: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+			status := bootstrap.OVNUpdateStatus{
+				Version:     tc.ds.GetAnnotations()["release.openshift.io/version"],
+				Progressing: daemonSetProgressing(tc.ds, true),
+				Available:   PrepullerAvailable(tc.ds),
+			}
+			ovn := bootstrap.OVNBootstrapResult{
+				NodeUpdateStatus:      &bootstrap.OVNUpdateStatus{Version: "1.0.0"},
+				PrePullerUpdateStatus: &status,
+			}
+			updateNode, _ := shouldUpdateOVNKonPrepull(ovn, "2.0.0")
+			g.Expect(updateNode).To(Equal(tc.expectNode),
+				"shouldUpdateOVNKonPrepull updateNode = %v, want %v", updateNode, tc.expectNode)
+		})
+	}
+}
+
+// TestNodeAvailabilityGateForCPUpdate verifies that shouldUpdateOVNKonUpgrade
+// blocks the CP update until node pods are available. Available is derived
+// through the production NodeDaemonSetAvailable function.
+func TestNodeAvailabilityGateForCPUpdate(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		nodeDS         *appsv1.DaemonSet
+		expectCPUpdate bool
+	}{
+		{
+			name: "SNO first rollout: 0 available → CP blocked",
+			nodeDS: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"release.openshift.io/version": "2.0.0"},
+					Generation:  1,
+				},
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 1,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        0,
+					ObservedGeneration:     1,
+				},
+			},
+			expectCPUpdate: false,
+		},
+		{
+			name: "SNO after pod ready: 1 available → CP proceeds",
+			nodeDS: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"release.openshift.io/version": "2.0.0"},
+					Generation:  1,
+				},
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 1,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					ObservedGeneration:     1,
+				},
+			},
+			expectCPUpdate: true,
+		},
+		{
+			name: "multi-node partial reboot: 2 of 3 available → CP proceeds",
+			nodeDS: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"release.openshift.io/version": "2.0.0"},
+					Generation:  1,
+				},
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 3,
+					UpdatedNumberScheduled: 3,
+					NumberAvailable:        2,
+					ObservedGeneration:     1,
+				},
+			},
+			expectCPUpdate: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+			nodeStatus := bootstrap.OVNUpdateStatus{
+				Version:     tc.nodeDS.GetAnnotations()["release.openshift.io/version"],
+				Progressing: daemonSetProgressing(tc.nodeDS, true),
+				Available:   NodeDaemonSetAvailable(tc.nodeDS),
+			}
+			ovn := bootstrap.OVNBootstrapResult{
+				NodeUpdateStatus:         &nodeStatus,
+				ControlPlaneUpdateStatus: &bootstrap.OVNUpdateStatus{Version: "1.0.0"},
+			}
+			_, updateCP := shouldUpdateOVNKonUpgrade(ovn, "2.0.0")
+			g.Expect(updateCP).To(Equal(tc.expectCPUpdate),
+				"shouldUpdateOVNKonUpgrade updateCP = %v, want %v", updateCP, tc.expectCPUpdate)
+		})
+	}
+}
+
+// TestWebhookGateThroughRenderer exercises the production webhook gate in
+// renderNetworkNodeIdentity by pre-loading a DaemonSet into the fake client
+// and checking whether the ValidatingWebhookConfiguration gets the
+// CreateWaitAnnotation (blocked) or not (ready).
+func TestWebhookGateThroughRenderer(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		ds            *appsv1.DaemonSet
+		expectBlocked bool
+	}{
+		{
+			name: "all available → webhook rendered without create-wait",
+			ds: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:  NetworkNodeIdentityNamespace,
+					Name:       "network-node-identity",
+					Generation: 1,
+				},
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 3,
+					UpdatedNumberScheduled: 3,
+					NumberAvailable:        3,
+					ObservedGeneration:     1,
+				},
+			},
+			expectBlocked: false,
+		},
+		{
+			name: "zero available → webhook blocked with create-wait",
+			ds: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:  NetworkNodeIdentityNamespace,
+					Name:       "network-node-identity",
+					Generation: 1,
+				},
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 3,
+					UpdatedNumberScheduled: 3,
+					NumberAvailable:        0,
+					ObservedGeneration:     1,
+				},
+			},
+			expectBlocked: true,
+		},
+		{
+			name: "partial available → webhook blocked with create-wait",
+			ds: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:  NetworkNodeIdentityNamespace,
+					Name:       "network-node-identity",
+					Generation: 1,
+				},
+				Status: appsv1.DaemonSetStatus{
+					DesiredNumberScheduled: 3,
+					UpdatedNumberScheduled: 3,
+					NumberAvailable:        2,
+					ObservedGeneration:     1,
+				},
+			},
+			expectBlocked: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+			t.Setenv("RELEASE_VERSION", "5.0.0")
+			t.Setenv("OVN_IMAGE", "test-image")
+
+			networkConfig := &operv1.NetworkSpec{
+				ServiceNetwork: []string{"172.30.0.0/16"},
+				DefaultNetwork: operv1.DefaultNetworkDefinition{
+					Type:                operv1.NetworkTypeOVNKubernetes,
+					OVNKubernetesConfig: &operv1.OVNKubernetesConfig{},
+				},
+			}
+			bootstrapResult := fakeBootstrapResult()
+			bootstrapResult.Infra.NetworkNodeIdentityEnabled = true
+			bootstrapResult.TLSProfile = bootstrap.TLSProfile{
+				Spec: configv1.TLSProfileSpec{
+					MinTLSVersion: configv1.VersionTLS12,
+					Ciphers:       []string{"TLS_AES_128_GCM_SHA256"},
+				},
+			}
+
+			bootstrapCM := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "bootstrap", Namespace: ClusterConfigNamespace},
+				Data:       map[string]string{"status": "complete"},
+			}
+			webhookCA := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "network-node-identity-ca", Namespace: NetworkNodeIdentityNamespace},
+				Data: map[string]string{"ca-bundle.crt": "-----BEGIN CERTIFICATE-----\n" +
+					"MIIBdDCCARmgAwIBAgIUdtvpDuTPpv2FDtV3J5TRbNdHgFYwCgYIKoZIzj0EAwIw\n" +
+					"DzENMAsGA1UEAwwEdGVzdDAeFw0yNjExMjAwMTU5MjhaFw0yNjExMjEwMTU5Mjha\n" +
+					"MA8xDTALBgNVBAMMBHRlc3QwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARIBNPw\n" +
+					"Azmjc5yL8jSFvPhUU3VAJFpZjxQFr5e8VYBI2vz+706eM4ZVaXjBVp+y87S24TAE\n" +
+					"QcMtntnhBckrBzcxo1MwUTAdBgNVHQ4EFgQU/xaDpISYul12X4Uj4wYf1WUmg34w\n" +
+					"HwYDVR0jBBgwFoAU/xaDpISYul12X4Uj4wYf1WUmg34wDwYDVR0TAQH/BAUwAwEB\n" +
+					"/zAKBggqhkjOPQQDAgNJADBGAiEA7Wa7KkDXpI7d21MyY1MPLmm0uaPE1huLQAqm\n" +
+					"z103mLsCIQDzH5L0OhspXbg+PFR2QUk+R5DRXH3ezsawljsdYUYe1A==\n" +
+					"-----END CERTIFICATE-----\n"},
+			}
+			client := cnofake.NewFakeClient(tc.ds, bootstrapCM, webhookCA)
+			objs, err := renderNetworkNodeIdentity(t.Context(), networkConfig, bootstrapResult, manifestDir, client)
+			g.Expect(err).NotTo(HaveOccurred())
+
+			webhook := findInObjs("admissionregistration.k8s.io", "ValidatingWebhookConfiguration",
+				"network-node-identity.openshift.io", "", objs)
+			if webhook == nil {
+				// webhook not in rendered list at all — treated as blocked
+				g.Expect(tc.expectBlocked).To(BeTrue(), "webhook not rendered but expected unblocked")
+				return
+			}
+			_, hasCreateWait := webhook.GetAnnotations()[names.CreateWaitAnnotation]
+			g.Expect(hasCreateWait).To(Equal(tc.expectBlocked),
+				"CreateWaitAnnotation present = %v, expectBlocked = %v", hasCreateWait, tc.expectBlocked)
 		})
 	}
 }
