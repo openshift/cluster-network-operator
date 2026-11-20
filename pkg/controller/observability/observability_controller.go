@@ -39,7 +39,11 @@ var OperatorYAML = "bindata/observability/07-observability-operator.yaml"
 
 const (
 	FlowCollectorYAML    = "bindata/observability/08-flowcollector.yaml"
-	OperatorNamespace    = "netobserv-operator"
+	OperatorNamespace    = "openshift-netobserv-operator"
+	// SubscriptionName is the name of the Subscription created in
+	// 07-observability-operator.yaml. It differs from OperatorNamespace, which
+	// also names the Namespace and OperatorGroup.
+	SubscriptionName     = "netobserv-operator"
 	FlowCollectorVersion = "v1beta2"
 	FlowCollectorName    = "cluster"
 	NetworkCRName        = "cluster"
@@ -437,7 +441,7 @@ func (r *ReconcileObservability) teardownNetObservOperator(ctx context.Context) 
 		Version: "v1alpha1",
 		Kind:    "Subscription",
 	})
-	subscription.SetName(OperatorNamespace)
+	subscription.SetName(SubscriptionName)
 	subscription.SetNamespace(OperatorNamespace)
 	if err := r.client.Delete(ctx, subscription); err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("failed to delete Subscription: %w", err)
