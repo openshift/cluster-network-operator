@@ -117,6 +117,10 @@ func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 			} else {
 				set.Insert(fmt.Sprintf(".%s.compute.internal", region))
 			}
+			// Add AWS Route 53 resolver IP needs to be added to the no_proxy list for ClusterHostedDNS.
+			// Good to have it even during regular installs.
+			// https://docs.aws.amazon.com/vpc/latest/userguide/AmazonDNS-concepts.html
+			set.Insert("169.254.169.253")
 		case configv1.AzurePlatformType:
 			if cloudName := infra.Status.PlatformStatus.Azure.CloudName; cloudName != configv1.AzurePublicCloud {
 				// https://learn.microsoft.com/en-us/azure/virtual-network/what-is-ip-address-168-63-129-16
