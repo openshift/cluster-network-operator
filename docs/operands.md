@@ -108,6 +108,26 @@ CNI plugin binaries onto each node. Currently this is:
 The daemonset does not do anything after init time, but needs to keep
 running because there is no concept of an "`initContainer`-only" pod.
 
+The allowlist controller distributes user changes to the
+`cni-sysctl-allowlist` ConfigMap through the temporary
+`cni-sysctl-allowlist-ds` DaemonSet. The controller is not triggered when a
+new node joins.
+
+The `multus-additional-cni-plugins` DaemonSet mounts the user-modified
+`cni-sysctl-allowlist` ConfigMap. Its init container copies `allowlist.conf`
+to the host's `/etc/cni/tuning/allowlist.conf`. The mount is optional, so a
+missing ConfigMap does not block Pod startup. If the ConfigMap or its
+`allowlist.conf` key is absent, the init container copies the default from
+`default-cni-sysctl-allowlist`.
+
+If a ConfigMap edit overlaps Pod initialization, the temporary DaemonSet
+might write the new allowlist before the init container overwrites it with
+an older mounted copy. This race is unlikely when configuration edits are
+infrequent. To recover after initialization finishes, update an annotation
+on `cni-sysctl-allowlist` without changing its data. This changes the
+ConfigMap's `resourceVersion` and triggers the allowlist controller to
+distribute the current allowlist again.
+
 Multus-admission-controller is a simple admission controller that
 checks the Multus-related annotations on Pods, to provide better error
 messages when they are wrong. (The cluster will operate fine without
