@@ -207,6 +207,10 @@ func (r *ReconcileConfigMapInjector) Reconcile(ctx context.Context, request reco
 
 			err = apply.ApplyObject(ctx, r.client, configMapToUpdate, "configmap_ca")
 			if err != nil {
+				if apierrors.IsNotFound(err) {
+					log.Printf("ConfigMap '%s/%s' or its namespace no longer exists; skipping update", configMap.Namespace, configMap.Name)
+					return nil
+				}
 				log.Println(err)
 				return err
 			}
