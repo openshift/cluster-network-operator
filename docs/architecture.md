@@ -142,6 +142,14 @@ controller's ignored-namespace list. A Namespace enters this set when it has
 attribute enqueue a reconciliation. The existing periodic resync remains as a
 fallback.
 
+During a staged OVN-Kubernetes rollout the controller also watches the
+`ovnkube-upgrades-prepuller` and `ovnkube-node` DaemonSets in
+`openshift-ovn-kubernetes`. When one of them goes from rolling out to done, it
+enqueues a reconciliation so the next stage starts without waiting for the
+periodic resync. The watch is active only while `ovnkube-node` or an existing
+`ovnkube-control-plane` is not at the release version, and the periodic resync
+remains the fallback for a missed event.
+
 ### Applied configuration
 
 The Network operator needs to make sure that the input configuration doesn't change unsafely, since we don't support rolling out most changes. To do that, it writes a ConfigMap with the applied changes. It then compares the existing configuration with the desired configuration, and sets a status of `Degraded` if it is asked to do something unsafe.
