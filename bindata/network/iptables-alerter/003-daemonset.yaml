@@ -48,6 +48,7 @@ spec:
             cpu: 10m
         securityContext:
           privileged: true
+          readOnlyRootFilesystem: true
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /iptables-alerter

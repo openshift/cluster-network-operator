@@ -718,6 +718,23 @@ func Test_renderFRRStatusCleanerStrategy(t *testing.T) {
 	})
 }
 
+func TestRenderIPTablesAlerterReadOnlyRootFilesystem(t *testing.T) {
+	g := NewWithT(t)
+	t.Setenv("CLI_IMAGE", "example.com/cli:latest")
+	t.Setenv("RELEASE_VERSION", "test")
+
+	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.IPTablesAlerter.Enabled = true
+	objs, err := renderIPTablesAlerter(bootstrapResult, manifestDir)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	daemonSet := mustFindRenderedObj[*appsv1.DaemonSet](t, objs, "DaemonSet", "iptables-alerter")
+	container := mustFindContainer(t, daemonSet.Spec.Template.Spec.Containers, "iptables-alerter")
+	g.Expect(container.SecurityContext).NotTo(BeNil())
+	g.Expect(container.SecurityContext.ReadOnlyRootFilesystem).NotTo(BeNil())
+	g.Expect(*container.SecurityContext.ReadOnlyRootFilesystem).To(BeTrue())
+}
+
 func Test_renderNetworkingConsolePlugin(t *testing.T) {
 	renderAndFindNginxConfig := func(t *testing.T, tlsProfile bootstrap.TLSProfile) string {
 		g := NewWithT(t)
