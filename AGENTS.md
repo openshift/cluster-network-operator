@@ -33,7 +33,6 @@ bindata/                # Go-template manifests, one dir per component; rendered
 manifests/              # CVO-applied manifests for the operator itself (namespace, CRDs, RBAC, deployment)
 profile-patches/        # Patches layered on manifests/ per install profile (see Makefile)
 docs/                   # architecture.md, operands.md, IPsec/DPU docs — kept in sync with behavior changes
-test/e2e/               # Ginkgo e2e suites
 hack/                   # Dev scripts: update-codegen.sh, test-go.sh, verify-style.sh, kind.yaml, ...
 ```
 
@@ -62,8 +61,11 @@ make verify-update-codegen  # Regenerate deepcopy/clientset code and diff-check
   count. Bug fixes need root cause + fix explanation. Keep PRs under ~7000 lines diff
   (excl. vendor); split large features.
 - **Tests are expected alongside changes**: modified `pkg/`/`cmd/` Go code or `bindata/`
-  templates need corresponding `*_test.go` changes. User-facing behavior changes/bug fixes
-  need `test/e2e/` coverage. If genuinely infeasible, justify in the PR description.
+  templates need corresponding `*_test.go` changes. There are no in-tree e2e tests; e2e
+  coverage comes from the OpenShift CI lanes run on each PR (`openshift-tests` conformance
+  and upgrade suites on AWS, GCP, Azure, bare-metal, HyperShift, ...). User-facing behavior
+  changes/bug fixes must say in the PR description which lanes exercise the change and
+  whether they passed. If no lane can cover it, justify that in the PR description.
 - **Docs**: new features / behavior changes / architecture changes need `docs/` updates
   (new feature → new doc file). DPU/DPF changes need docs on data-path impact, config
   keys, failure modes. IPsec changes update `docs/enabling_ns_ipsec.md`. Operand/component
