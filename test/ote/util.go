@@ -16,10 +16,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	configv1client "github.com/openshift/client-go/config/clientset/versioned"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	netutils "k8s.io/utils/net"
@@ -766,4 +768,31 @@ func isOpenShiftCluster(ctx context.Context, oc *CLI) (bool, error) {
 		return false, nil
 	}
 	return err == nil, err
+}
+
+// getReadyPodWithLabel returns the name of a ready pod matching the label selector.
+func getReadyPodWithLabel(ctx context.Context, client kubernetes.Interface, namespace, labelSelector string) (string, error) {
+	podList, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if len(podList.Items) == 0 {
+		return "", fmt.Errorf("no pods found with selector %s in namespace %s", labelSelector, namespace)
+	}
+
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if pod.DeletionTimestamp == nil &&
+			pod.Status.Phase == corev1.PodRunning &&
+			slices.ContainsFunc(pod.Status.Conditions, func(condition corev1.PodCondition) bool {
+				return condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue
+			}) {
+			return pod.Name, nil
+		}
+	}
+
+	return "", fmt.Errorf("no ready pods found with selector %s in namespace %s", labelSelector, namespace)
 }
