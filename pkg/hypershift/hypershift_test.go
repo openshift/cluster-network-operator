@@ -4,8 +4,10 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
@@ -126,6 +128,42 @@ spec:
 	result, err := ParseHostedControlPlane(hcpUnstructured)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(result.RestartDate).To(Equal("2024-01-15T10:30:00Z"))
+}
+
+// TestParseHostedControlPlaneMetadata verifies that ParseHostedControlPlane
+// captures the HostedControlPlane name, UID and namespace, and that
+// OwnerReference builds the expected raw ownerReference from them.
+func TestParseHostedControlPlaneMetadata(t *testing.T) {
+	g := NewGomegaWithT(t)
+	input := `
+apiVersion: hypershift.openshift.io/v1beta1
+kind: HostedControlPlane
+metadata:
+  name: test-hc
+  namespace: clusters-test-hc
+  uid: 8f56b0b6-1a36-4c12-9d5c-3f58e1a2b7c9
+spec:
+  clusterID: test-cluster-id
+`
+	rawHCP, err := yaml.ToJSON([]byte(input))
+	g.Expect(err).NotTo(HaveOccurred(), "failed to convert HostedControlPlane YAML to JSON")
+	object, err := runtime.Decode(unstructured.UnstructuredJSONScheme, rawHCP)
+	g.Expect(err).NotTo(HaveOccurred(), "failed to decode HostedControlPlane JSON")
+	hcpUnstructured, ok := object.(*unstructured.Unstructured)
+	g.Expect(ok).To(BeTrue(), "decoded object is not an unstructured HostedControlPlane")
+	result, err := ParseHostedControlPlane(hcpUnstructured)
+	g.Expect(err).NotTo(HaveOccurred(), "failed to parse HostedControlPlane")
+	g.Expect(result.Name).To(Equal("test-hc"), "parsed HostedControlPlane name mismatch")
+	g.Expect(result.UID).To(Equal(types.UID("8f56b0b6-1a36-4c12-9d5c-3f58e1a2b7c9")), "parsed HostedControlPlane UID mismatch")
+	g.Expect(result.Namespace).To(Equal("clusters-test-hc"), "parsed HostedControlPlane namespace mismatch")
+
+	ownerRef := result.OwnerReference()
+	g.Expect(ownerRef).To(Equal(metav1.OwnerReference{
+		APIVersion: "hypershift.openshift.io/v1beta1",
+		Kind:       "HostedControlPlane",
+		Name:       "test-hc",
+		UID:        "8f56b0b6-1a36-4c12-9d5c-3f58e1a2b7c9",
+	}), "generated ownerReference mismatch")
 }
 
 func TestSetRestartDateAnnotation(t *testing.T) {
