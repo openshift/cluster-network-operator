@@ -1,7 +1,7 @@
 package k8s
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 
@@ -25,13 +25,13 @@ func ToUnstructured(obj interface{}) (*uns.Unstructured, error) {
 	return u, nil
 }
 
-// CalculateHash computes MD5 sum of the JSONfied object passed as obj.
+// CalculateHash computes SHA256 sum of the JSONfied object passed as obj.
 func CalculateHash(obj interface{}) (string, error) {
 	configStr, err := json.Marshal(obj)
 	if err != nil {
 		return "", err
 	}
-	configSum := md5.Sum(configStr)
+	configSum := sha256.Sum256(configStr)
 	return fmt.Sprintf("%x", configSum), nil
 }
 
