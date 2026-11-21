@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"os/exec"
 	"regexp"
 	"slices"
 	"strconv"
@@ -14,6 +15,10 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	configv1client "github.com/openshift/client-go/config/clientset/versioned"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -686,4 +691,79 @@ func waitForMachinesDisappear(ctx context.Context, oc *CLI, machineSetName strin
 	if err != nil {
 		e2e.Logf("Warning: machines from machineset %s did not fully disappear: %v", machineSetName, err)
 	}
+}
+
+// forwardPortAndExecute forwards a port to a pod or service and executes a function with the local port.
+// This is a TLS-specific utility function for testing TLS endpoints.
+func forwardPortAndExecute(ctx context.Context, resourceName, namespace, remotePort string, toExecute func(localPort int) error) error {
+	var err error
+	for i := range 3 {
+		if err = func() error {
+			portFwdCtx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			localPort := rand.Intn(65534-1025) + 1025 //nolint:gosec // G404: test-only random port, not security-sensitive
+			args := []string{"port-forward", resourceName, fmt.Sprintf("%d:%s", localPort, remotePort), "-n", namespace}
+
+			e2e.Logf("Starting port-forward: oc %s", strings.Join(args, " "))
+			cmd := exec.CommandContext(portFwdCtx, "oc", args...)
+			if err := cmd.Start(); err != nil {
+				return fmt.Errorf("failed to start port-forward: %w", err)
+			}
+			defer func() {
+				if cmd.Process != nil {
+					_ = cmd.Process.Kill()
+					_ = cmd.Wait()
+				}
+			}()
+
+			if err := waitForLocalPort(portFwdCtx, localPort, 5*time.Second); err != nil {
+				return fmt.Errorf("port-forward failed to become ready: %w", err)
+			}
+
+			return toExecute(localPort)
+		}(); err == nil {
+			return nil
+		}
+		e2e.Logf("Port-forward attempt %d failed: %v, retrying...", i+1, err)
+		time.Sleep(2 * time.Second)
+	}
+	return fmt.Errorf("port-forward failed after 3 attempts: %w", err)
+}
+
+// waitForLocalPort waits until the forwarded local port accepts TCP connections.
+func waitForLocalPort(ctx context.Context, localPort int, timeout time.Duration) error {
+	addr := net.JoinHostPort("localhost", strconv.Itoa(localPort))
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, timeout, true,
+		func(ctx context.Context) (bool, error) {
+			conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
+			if err != nil {
+				//nolint:nilerr // Standard wait.Poll pattern: return false,nil to retry
+				return false, nil
+			}
+			conn.Close()
+			return true, nil
+		})
+}
+
+func isOpenShiftCluster(ctx context.Context, oc *CLI) (bool, error) {
+	config, err := oc.getConfig()
+	if err != nil {
+		return false, err
+	}
+
+	configClient, err := configv1client.NewForConfig(config)
+	if err != nil {
+		return false, err
+	}
+
+	_, err = configClient.ConfigV1().FeatureGates().Get(
+		ctx,
+		"cluster",
+		metav1.GetOptions{},
+	)
+	if apierrors.IsNotFound(err) || meta.IsNoMatchError(err) {
+		return false, nil
+	}
+	return err == nil, err
 }
