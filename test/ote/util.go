@@ -616,7 +616,30 @@ func createMachineSet(ctx context.Context, oc *CLI, machineSetName string) {
 	existingMS := oc.AsAdmin().WithoutNamespace().Run("get").
 		Args("machineset", "-n", "openshift-machine-api", "-o=jsonpath={.items[0].metadata.name}").MustOutput(ctx)
 	Expect(existingMS).NotTo(BeEmpty(), "No existing MachineSet found to clone")
+	cloneMachineSet(ctx, oc, existingMS, machineSetName)
+}
 
+func linuxWorkerMachineSet(ctx context.Context, oc *CLI) string {
+	// Linux Machines omit the OS label; Windows Machines set it to Windows.
+	const selector = "machine.openshift.io/cluster-api-machine-role=worker," +
+		"machine.openshift.io/os-id!=Windows," +
+		"machine.openshift.io/cluster-api-machineset"
+	get := oc.AsAdmin().WithoutNamespace().Run("get")
+	sources := get.
+		Args("machines", "-n", "openshift-machine-api", "-l", selector,
+			`-o=jsonpath={range .items[*]}{.metadata.labels.machine\.openshift\.io/cluster-api-machineset}{"\n"}{end}`).MustOutput(ctx)
+	activeSets := get.Args("machinesets", "-n", "openshift-machine-api",
+		`-o=go-template={{range .items}}{{if not .metadata.deletionTimestamp}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}`).MustOutput(ctx)
+	names := strings.Fields(activeSets)
+	for source := range strings.FieldsSeq(sources) {
+		if slices.Contains(names, source) {
+			return source
+		}
+	}
+	return ""
+}
+
+func cloneMachineSet(ctx context.Context, oc *CLI, existingMS, machineSetName string) {
 	msJSON := oc.AsAdmin().WithoutNamespace().Run("get").Args("machineset", existingMS, "-n", "openshift-machine-api", "-o=json").MustOutput(ctx)
 
 	msJSON = strings.ReplaceAll(msJSON, existingMS, machineSetName)
@@ -629,13 +652,20 @@ func createMachineSet(ctx context.Context, oc *CLI, machineSetName string) {
 	e2e.Logf("MachineSet %s created successfully", machineSetName)
 }
 
-func deleteMachineSet(ctx context.Context, oc *CLI, machineSetName string) {
-	e2e.Logf("Deleting MachineSet %s", machineSetName)
-	err := oc.AsAdmin().WithoutNamespace().Run("delete").
-		Args("machineset", machineSetName, "-n", "openshift-machine-api", "--wait=true").Execute(ctx)
+func deleteMachineSet(ctx context.Context, oc *CLI, machineSetName string) error {
+	admin := oc.AsAdmin().WithoutNamespace()
+	err := e2e.Gomega().Eventually(ctx, func(ctx context.Context) (string, error) {
+		if err := admin.Run("delete").Args("machineset", machineSetName, "-n", "openshift-machine-api",
+			"--ignore-not-found", "--wait=true").Execute(ctx); err != nil {
+			return "", err
+		}
+		return admin.Run("get").Args("machines", "-n", "openshift-machine-api",
+			"-l", "machine.openshift.io/cluster-api-machineset="+machineSetName, "-o", "name").Output(ctx)
+	}).WithTimeout(10 * time.Minute).WithPolling(10 * time.Second).Should(BeEmpty())
 	if err != nil {
-		e2e.Logf("Warning: failed to delete machineset %s: %v", machineSetName, err)
+		return fmt.Errorf("wait for MachineSet %s and its Machines to be deleted: %w", machineSetName, err)
 	}
+	return nil
 }
 
 func waitForMachineSetRunning(ctx context.Context, oc *CLI, machineSetName string, replicas int) {
@@ -666,24 +696,4 @@ func getNodeNameFromMachineSet(ctx context.Context, oc *CLI, machineSetName stri
 	Expect(nodeName).NotTo(BeEmpty(), fmt.Sprintf("Machine %s has no nodeRef", machineName))
 	e2e.Logf("Got node name %s from machineset %s", nodeName, machineSetName)
 	return nodeName
-}
-
-func waitForMachinesDisappear(ctx context.Context, oc *CLI, machineSetName string) {
-	err := wait.PollUntilContextTimeout(ctx, 10*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
-		output, cmdErr := oc.AsAdmin().WithoutNamespace().Run("get").Args("machine", "-n", "openshift-machine-api",
-			"-l", "machine.openshift.io/cluster-api-machineset="+machineSetName, "-o=jsonpath={.items}").Output(ctx)
-		if cmdErr != nil {
-			e2e.Logf("Error getting machines: %v", cmdErr)
-			return false, nil
-		}
-		if output == "[]" || output == "" {
-			e2e.Logf("All machines from machineset %s have been removed", machineSetName)
-			return true, nil
-		}
-		e2e.Logf("Waiting for machines from machineset %s to disappear...", machineSetName)
-		return false, nil
-	})
-	if err != nil {
-		e2e.Logf("Warning: machines from machineset %s did not fully disappear: %v", machineSetName, err)
-	}
 }
