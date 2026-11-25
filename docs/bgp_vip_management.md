@@ -45,7 +45,8 @@ re-renders the FRRConfiguration without a restart.
   not in the FRRConfiguration. Peers sharing a Secret reuse the same copy.
   If the destination name is already in use by a Secret other than CNO's
   copy for that source, reconciliation fails: CNO leaves the destination
-  untouched and does not apply the dependent FRRConfiguration. Choose a
+  untouched and does not apply the dependent FRRConfiguration. Other peer
+  password copies and independent objects still reconcile. Choose a
   different source name or resolve the collision before retrying.
   When a peer switches Secrets, CNO retains the old copy while the applied
   `bgp-vip` FRRConfiguration still references it. A failed switch therefore
