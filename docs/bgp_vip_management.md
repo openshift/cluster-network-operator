@@ -39,7 +39,11 @@ re-renders the FRRConfiguration without a restart.
   the BGP table (the redistribution route-maps), so every peer receives them.
 - A peer's `passwordSecret` names a `kubernetes.io/basic-auth` Secret in
   `openshift-config` (`password` key, at most 80 bytes — the TCP MD5 limit);
-  CNO resolves it at render time. Errors name the Secret, never its contents.
+  CNO validates it and renders a same-name Secret containing just the
+  `password` key in `openshift-frr-k8s`, where frr-k8s reads Secrets.
+  Neighbors reference that copy via `passwordSecret`; the password itself is
+  not in the FRRConfiguration. Peers sharing a Secret reuse the same copy.
+  Errors name the Secret, never its contents.
 - The render outcome is reported on the CR's `SessionsConfigured` condition
   through server-side apply (field manager `cluster-network-operator`,
   owning only that condition; `Rendered` belongs to the
@@ -55,14 +59,9 @@ re-renders the FRRConfiguration without a restart.
   carries only `defaultPeers`: expressing per-host sessions as per-node CRs
   would require hostname/label semantics shared across installer, runtimecfg
   and node selectors. CNO logs a warning when overrides are present.
-- Peer passwords are rendered **inline** into `FRRConfiguration.spec`, as
-  MetalLB does, instead of as `passwordSecret` references: the frr-k8s
-  validation webhook treated a reference as an empty password and rejected a
-  neighbor shared with an inline-password producer (metallb/frr-k8s#484, fixed
-  by metallb/frr-k8s#511). Once that fix ships in the frr-k8s image CNO
-  deploys, `renderInlinePassword` in `pkg/network/bgp_vip.go` flips to
-  references plus a Secret copy into `openshift-frr-k8s`; that path is
-  already implemented and tested.
+- Sharing an authenticated neighbor with a producer that sets the password
+  inline (such as MetalLB) requires the webhook fix in
+  [metallb/frr-k8s#511](https://github.com/metallb/frr-k8s/pull/511).
 - `SessionsConfigured` has render-level semantics (the FRRConfiguration was
   produced), not session-level ones; the sessions themselves are observable
   through frr-k8s's `BGPSessionState` objects.

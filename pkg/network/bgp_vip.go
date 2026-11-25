@@ -46,17 +46,6 @@ const (
 	bgpVIPFieldManager = "cluster-network-operator"
 )
 
-// renderInlinePassword is an INTERIM for metallb/frr-k8s#484: the frr-k8s
-// validation webhook compared a neighbor's passwordSecret reference as an
-// empty password, so a secret-backed neighbor merged with another producer's
-// inline-password neighbor (MetalLB always inlines) was rejected, wedging
-// every FRRConfiguration write for the shared neighbor. Until the fix
-// (metallb/frr-k8s#511) ships in the frr-k8s image this operator deploys,
-// render the resolved password inline, exactly like MetalLB. Flipping this to
-// false switches to passwordSecret references plus a Secret copy into
-// openshift-frr-k8s; both paths are tested.
-const renderInlinePassword = true
-
 // apiCallTimeout bounds direct API calls made while rendering.
 const apiCallTimeout = 30 * time.Second
 
@@ -258,8 +247,7 @@ func setBGPVIPSessionsCondition(ctx context.Context, client cnoclient.Client, bg
 }
 
 // buildFRRConfigurationObjects renders the cluster-wide (no node selector)
-// FRRConfiguration, plus the password Secret copies when passwords are
-// rendered as references. The CR spec carries only the BGP sessions;
+// FRRConfiguration and the password Secrets it references. The CR spec carries only the BGP sessions;
 // advertisement is in rawConfig because the CRD cannot express health-gated
 // redistribution: declared prefixes render as unconditional `network`
 // statements and toAdvertise only permits declared prefixes
@@ -267,13 +255,6 @@ func setBGPVIPSessionsCondition(ctx context.Context, client cnoclient.Client, bg
 // kube-vip installs a table-198 route only where the VIP's backend is
 // healthy.
 func buildFRRConfigurationObjects(spec mcfgv1alpha1.BGPVIPConfigSpec, apiVIPs, ingressVIPs []string, getSecret bgpVIPSecretGetter) ([]*uns.Unstructured, error) {
-	return buildFRRConfigurationObjectsWithPasswords(spec, apiVIPs, ingressVIPs, getSecret, renderInlinePassword)
-}
-
-// buildFRRConfigurationObjectsWithPasswords takes the password rendering
-// mode as a parameter so the passwordSecret path stays tested while
-// renderInlinePassword selects the inline one.
-func buildFRRConfigurationObjectsWithPasswords(spec mcfgv1alpha1.BGPVIPConfigSpec, apiVIPs, ingressVIPs []string, getSecret bgpVIPSecretGetter, inlinePassword bool) ([]*uns.Unstructured, error) {
 	neighbors := []any{}
 	secretCopies := []*uns.Unstructured{}
 	copied := map[string]bool{}
@@ -283,27 +264,21 @@ func buildFRRConfigurationObjectsWithPasswords(spec mcfgv1alpha1.BGPVIPConfigSpe
 			"asn":     peer.PeerASN,
 		}
 		if name := peer.PasswordSecret.Name; name != "" {
-			source, err := bgpVIPPasswordSecret(name, getSecret)
-			if err != nil {
-				return nil, err
+			neighbor["passwordSecret"] = map[string]any{
+				"name":      name,
+				"namespace": bgpVIPTargetSecretNamespace,
 			}
-			if inlinePassword {
-				neighbor["password"] = string(source.Data[corev1.BasicAuthPasswordKey])
-			} else {
-				// frr-k8s resolves the reference from its own namespace, so
-				// point it at the copy rendered alongside.
-				neighbor["passwordSecret"] = map[string]any{
-					"name":      name,
-					"namespace": bgpVIPTargetSecretNamespace,
+			if !copied[name] {
+				source, err := bgpVIPPasswordSecret(name, getSecret)
+				if err != nil {
+					return nil, err
 				}
-				if !copied[name] {
-					secretCopy, err := bgpVIPSecretCopy(source)
-					if err != nil {
-						return nil, err
-					}
-					secretCopies = append(secretCopies, secretCopy)
-					copied[name] = true
+				secretCopy, err := bgpVIPSecretCopy(source)
+				if err != nil {
+					return nil, err
 				}
+				secretCopies = append(secretCopies, secretCopy)
+				copied[name] = true
 			}
 		}
 		if peer.FailureDetection == mcfgv1alpha1.FailureDetectionBFD {
@@ -404,7 +379,7 @@ func bgpVIPSecretCopy(source *corev1.Secret) (*uns.Unstructured, error) {
 			},
 		},
 		Type: source.Type,
-		Data: source.Data,
+		Data: map[string][]byte{corev1.BasicAuthPasswordKey: source.Data[corev1.BasicAuthPasswordKey]},
 	}
 	out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(secretCopy)
 	if err != nil {

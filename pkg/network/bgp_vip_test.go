@@ -129,8 +129,7 @@ func TestBuildFRRConfigurationObjects(t *testing.T) {
 }
 
 // TestBuildFRRConfigurationObjectsAllOptionalFields locks the mapping of
-// every optional CR field, with the password rendered inline (the interim
-// for metallb/frr-k8s#484) and hostOverrides left to the static pods.
+// every optional CR field, with hostOverrides left to the static pods.
 func TestBuildFRRConfigurationObjectsAllOptionalFields(t *testing.T) {
 	g := NewGomegaWithT(t)
 	spec := mcfgv1alpha1.BGPVIPConfigSpec{
@@ -160,15 +159,15 @@ func TestBuildFRRConfigurationObjectsAllOptionalFields(t *testing.T) {
 
 	objs, err := buildFRRConfigurationObjects(spec, []string{"192.168.111.5"}, []string{"192.168.111.4"}, getSecret)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(objs).To(HaveLen(1), "inline rendering emits no Secret copy")
+	g.Expect(objs).To(HaveLen(2))
 	g.Expect(lookups).To(Equal(1))
 	frr := frrConfiguration(g, objs)
 
 	neighbors := neighborsOf(g, frr)
 	g.Expect(neighbors).To(HaveLen(1), "hostOverrides are not part of the cluster-wide CR")
 	neighbor := neighbors[0].(map[string]any)
-	g.Expect(neighbor["password"]).To(Equal("s3cret"))
-	g.Expect(neighbor).NotTo(HaveKey("passwordSecret"))
+	g.Expect(neighbor).NotTo(HaveKey("password"))
+	g.Expect(neighbor["passwordSecret"]).To(Equal(map[string]any{"name": "tor-password", "namespace": bgpVIPTargetSecretNamespace}))
 	g.Expect(neighbor["ebgpMultiHop"]).To(BeTrue())
 	g.Expect(neighbor["bfdProfile"]).To(Equal("vip-bfd"))
 	g.Expect(neighbor["port"]).To(Equal(int64(1790)))
@@ -235,9 +234,7 @@ func TestBuildFRRConfigurationObjectsDualStack(t *testing.T) {
 	g.Expect(rawConfig).To(ContainSubstring("route-map 192.168.111.1-out permit 4001\n match ipv6 address prefix-list BGP-VIP-PREFIXES-V6"))
 }
 
-// With passwordSecret references (renderInlinePassword = false, the state
-// after metallb/frr-k8s#511 ships) the neighbor points at a copy of the
-// Secret in openshift-frr-k8s, rendered once per Secret.
+// Both families reference the same password-only copy in openshift-frr-k8s.
 func TestBuildFRRConfigurationObjectsPasswordSecretReferences(t *testing.T) {
 	g := NewGomegaWithT(t)
 	spec := mcfgv1alpha1.BGPVIPConfigSpec{
@@ -247,9 +244,11 @@ func TestBuildFRRConfigurationObjectsPasswordSecretReferences(t *testing.T) {
 			{PeerAddress: "fd2e:6f44:5dd8::1", PeerASN: 64513, PasswordSecret: mcfgv1alpha1.BGPVIPPasswordSecret{Name: "tor-password"}},
 		},
 	}
-	getSecret := func(name string) (*corev1.Secret, error) { return basicAuthSecret(name, "s3cret"), nil }
+	source := basicAuthSecret("tor-password", "s3cret")
+	source.Data["unrelated"] = []byte("not for frr")
+	getSecret := func(string) (*corev1.Secret, error) { return source, nil }
 
-	objs, err := buildFRRConfigurationObjectsWithPasswords(spec, []string{"192.168.111.5"}, []string{"192.168.111.4"}, getSecret, false)
+	objs, err := buildFRRConfigurationObjects(spec, []string{"192.168.111.5"}, []string{"192.168.111.4"}, getSecret)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(objs).To(HaveLen(2), "one Secret copy for the two references, plus the FRRConfiguration")
 
@@ -261,6 +260,9 @@ func TestBuildFRRConfigurationObjectsPasswordSecretReferences(t *testing.T) {
 	secretType, _, err := uns.NestedString(secretCopy.Object, "type")
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(secretType).To(Equal(string(corev1.SecretTypeBasicAuth)))
+	var target corev1.Secret
+	g.Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(secretCopy.Object, &target)).To(Succeed())
+	g.Expect(target.Data).To(Equal(map[string][]byte{corev1.BasicAuthPasswordKey: source.Data[corev1.BasicAuthPasswordKey]}))
 
 	for _, n := range neighborsOf(g, frrConfiguration(g, objs)) {
 		neighbor := n.(map[string]any)
@@ -290,12 +292,10 @@ func TestBuildFRRConfigurationObjectsPasswordSecretErrors(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			g := NewGomegaWithT(t)
 			getSecret := func(string) (*corev1.Secret, error) { return tc.secret, tc.err }
-			for _, inline := range []bool{true, false} {
-				objs, err := buildFRRConfigurationObjectsWithPasswords(spec, []string{"192.168.111.5"}, []string{"192.168.111.4"}, getSecret, inline)
-				g.Expect(err).To(MatchError(ContainSubstring(tc.want)))
-				g.Expect(err.Error()).NotTo(ContainSubstring("xxxx"), "the password must not leak into the error")
-				g.Expect(objs).To(BeNil())
-			}
+			objs, err := buildFRRConfigurationObjects(spec, []string{"192.168.111.5"}, []string{"192.168.111.4"}, getSecret)
+			g.Expect(err).To(MatchError(ContainSubstring(tc.want)))
+			g.Expect(err.Error()).NotTo(ContainSubstring("xxxx"), "the password must not leak into the error")
+			g.Expect(objs).To(BeNil())
 		})
 	}
 }
@@ -423,9 +423,10 @@ func TestRenderBGPVIPFRRConfigurationFromCR(t *testing.T) {
 	objs, err := renderBGPVIPFRRConfiguration(t.Context(), bgpVIPOperConf, client,
 		bgpVIPBootstrapResult([]string{"192.168.111.5"}, []string{"192.168.111.4"}), true)
 	g.Expect(err).NotTo(HaveOccurred())
-	g.Expect(objs).To(HaveLen(1))
+	g.Expect(objs).To(HaveLen(2))
 	neighbor := neighborsOf(g, frrConfiguration(g, objs))[0].(map[string]any)
-	g.Expect(neighbor["password"]).To(Equal("s3cret"))
+	g.Expect(neighbor).NotTo(HaveKey("password"))
+	g.Expect(neighbor["passwordSecret"]).To(Equal(map[string]any{"name": "tor-password", "namespace": bgpVIPTargetSecretNamespace}))
 	g.Expect(rawConfigOf(g, frrConfiguration(g, objs))).To(ContainSubstring("ip prefix-list BGP-VIP-PREFIXES-V4 seq 10 permit 192.168.111.5/32"))
 
 	cond := applied()
