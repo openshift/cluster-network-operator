@@ -48,6 +48,79 @@ func getCO(client cnoclient.Client, name string) (*configv1.ClusterOperator, err
 	return co, err
 }
 
+func TestPruneBGPPasswordAfterAppliedConfigChanges(t *testing.T) {
+	owner := &operv1.Network{ObjectMeta: metav1.ObjectMeta{Name: names.OperatorConfig, UID: "network-uid"}}
+	old := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "old-peer", Namespace: names.FRRK8sNamespace, UID: "secret-uid",
+			Labels:          map[string]string{"app.kubernetes.io/managed-by": "cluster-network-operator"},
+			Annotations:     map[string]string{names.BGPVIPPasswordSource: "openshift-config/old-peer"},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(owner, operv1.GroupVersion.WithKind("Network"))},
+		},
+		Type: v1.SecretTypeBasicAuth,
+	}
+	client := fake.NewFakeClient(owner, old)
+	c := client.Default().CRClient()
+	config := &uns.Unstructured{Object: map[string]any{
+		"apiVersion": "frrk8s.metallb.io/v1beta1", "kind": "FRRConfiguration",
+		"metadata": map[string]any{"name": "bgp-vip", "namespace": names.FRRK8sNamespace},
+	}}
+	setPeer := func(name string) {
+		t.Helper()
+		err := uns.SetNestedSlice(config.Object, []any{map[string]any{"neighbors": []any{
+			map[string]any{"address": "192.0.2.1"},
+			map[string]any{"passwordSecret": map[string]any{"name": name, "namespace": names.FRRK8sNamespace}},
+		}}}, "spec", "bgp", "routers")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	setPeer(old.Name)
+	if err := c.Create(t.Context(), config); err != nil {
+		t.Fatal(err)
+	}
+	oldRef := configv1.ObjectReference{Resource: "secrets", Namespace: old.Namespace, Name: old.Name}
+	newRef := oldRef
+	newRef.Name = "new-peer"
+	co := &configv1.ClusterOperator{}
+	co.Status.RelatedObjects = []configv1.ObjectReference{oldRef}
+	status := New(client, "network", names.StandAloneClusterName)
+	// Rendering selected the new Secret, but applying the configuration failed.
+	status.SetRelatedObjects([]configv1.ObjectReference{newRef})
+	status.deleteRelatedObjectsNotRendered(t.Context(), co)
+	if err := c.Get(t.Context(), crclient.ObjectKeyFromObject(old), &v1.Secret{}); err != nil {
+		t.Fatalf("lost the Secret used by the applied configuration: %v", err)
+	}
+	if !reflect.DeepEqual(status.relatedObjects, []configv1.ObjectReference{newRef, oldRef}) {
+		t.Fatalf("old copy not retained for a later prune: %v", status.relatedObjects)
+	}
+	co.Status.RelatedObjects = status.relatedObjects
+	// If the applied state cannot be decoded, keep the copy tracked too.
+	if err := uns.SetNestedField(config.Object, "unreadable", "spec", "bgp", "routers"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Update(t.Context(), config); err != nil {
+		t.Fatal(err)
+	}
+	status.SetRelatedObjects([]configv1.ObjectReference{newRef})
+	status.deleteRelatedObjectsNotRendered(t.Context(), co)
+	if !reflect.DeepEqual(status.relatedObjects, co.Status.RelatedObjects) {
+		t.Fatalf("lost track of old copy after read failure: %v", status.relatedObjects)
+	}
+	if err := c.Get(t.Context(), crclient.ObjectKeyFromObject(old), &v1.Secret{}); err != nil {
+		t.Fatalf("lost old copy after read failure: %v", err)
+	}
+	setPeer(newRef.Name)
+	if err := c.Update(t.Context(), config); err != nil {
+		t.Fatal(err)
+	}
+	status.SetRelatedObjects([]configv1.ObjectReference{newRef})
+	status.deleteRelatedObjectsNotRendered(t.Context(), co)
+	if err := c.Get(t.Context(), crclient.ObjectKeyFromObject(old), &v1.Secret{}); !apierrors.IsNotFound(err) {
+		t.Fatalf("expected the unreferenced owned copy to be pruned, got %v", err)
+	}
+}
+
 func setCO(t *testing.T, client cnoclient.Client, name string) {
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	err := client.ClientFor("").CRClient().Update(t.Context(), co)

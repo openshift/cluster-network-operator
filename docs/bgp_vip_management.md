@@ -47,6 +47,9 @@ re-renders the FRRConfiguration without a restart.
   copy for that source, reconciliation fails: CNO leaves the destination
   untouched and does not apply the dependent FRRConfiguration. Choose a
   different source name or resolve the collision before retrying.
+  When a peer switches Secrets, CNO retains the old copy while the applied
+  `bgp-vip` FRRConfiguration still references it. A failed switch therefore
+  does not prune the credential from the last applied configuration.
   Errors name the Secret, never its contents.
 - The render outcome is reported on the CR's `SessionsConfigured` condition
   through server-side apply (field manager `cluster-network-operator`,
