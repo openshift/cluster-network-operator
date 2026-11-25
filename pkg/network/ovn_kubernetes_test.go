@@ -1387,6 +1387,7 @@ func TestFillOVNKubernetesDefaults(t *testing.T) {
 				PolicyAuditConfig: &operv1.PolicyAuditConfig{
 					RateLimit:      new(uint32(20)),
 					MaxFileSize:    new(uint32(50)),
+					MaxLogFiles:    new(int32(5)),
 					Destination:    "null",
 					SyslogFacility: "local0",
 				},
@@ -1428,6 +1429,7 @@ func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
 				PolicyAuditConfig: &operv1.PolicyAuditConfig{
 					RateLimit:      new(uint32(20)),
 					MaxFileSize:    new(uint32(50)),
+					MaxLogFiles:    new(int32(5)),
 					Destination:    "null",
 					SyslogFacility: "local0",
 				},
@@ -1438,6 +1440,131 @@ func TestFillOVNKubernetesDefaultsIPsec(t *testing.T) {
 	fillOVNKubernetesDefaults(conf, conf, 9000)
 
 	g.Expect(conf).To(Equal(&expected))
+}
+
+func TestFillOVNKubernetesDefaultsPolicyAuditMaxLogFiles(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		input    *operv1.PolicyAuditConfig
+		expected *operv1.PolicyAuditConfig
+	}{
+		{
+			name:  "nil policyAuditConfig gets all defaults including maxLogFiles",
+			input: nil,
+			expected: &operv1.PolicyAuditConfig{
+				RateLimit:      new(uint32(20)),
+				MaxFileSize:    new(uint32(50)),
+				MaxLogFiles:    new(int32(5)),
+				Destination:    "null",
+				SyslogFacility: "local0",
+			},
+		},
+		{
+			name:  "existing policyAuditConfig with nil maxLogFiles is defaulted without touching set fields",
+			input: &operv1.PolicyAuditConfig{RateLimit: new(uint32(30)), Destination: "libc"},
+			expected: &operv1.PolicyAuditConfig{
+				RateLimit:      new(uint32(30)),
+				MaxFileSize:    new(uint32(50)),
+				MaxLogFiles:    new(int32(5)),
+				Destination:    "libc",
+				SyslogFacility: "local0",
+			},
+		},
+		{
+			name:  "explicit maxLogFiles is preserved",
+			input: &operv1.PolicyAuditConfig{MaxLogFiles: new(int32(7))},
+			expected: &operv1.PolicyAuditConfig{
+				RateLimit:      new(uint32(20)),
+				MaxFileSize:    new(uint32(50)),
+				MaxLogFiles:    new(int32(7)),
+				Destination:    "null",
+				SyslogFacility: "local0",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+
+			conf := OVNKubernetesConfig.Spec.DeepCopy()
+			conf.DefaultNetwork.OVNKubernetesConfig.PolicyAuditConfig = tc.input
+
+			fillOVNKubernetesDefaults(conf, nil, 9000)
+			g.Expect(conf.DefaultNetwork.OVNKubernetesConfig.PolicyAuditConfig).To(Equal(tc.expected),
+				"unexpected policyAuditConfig after filling defaults")
+
+			once := conf.DeepCopy()
+			fillOVNKubernetesDefaults(conf, once, 9000)
+			g.Expect(conf).To(Equal(once), "filling defaults on an already-defaulted spec must not change it")
+		})
+	}
+}
+
+// TestOVNKubeScriptLibHashStableAcrossCRDDefaulting reproduces the install-time
+// sequence from OCPBUGS-87818: the first reconcile sees an operator CR without
+// policyAuditConfig (CRD defaults only apply once the parent object exists),
+// the CR is written back, and the second reconcile sees the API-server-defaulted
+// values. Both renders must produce the same ovnkube-script-lib hash, otherwise
+// the ovnkube-node DaemonSet pod template changes and a rollout is triggered.
+func TestOVNKubeScriptLibHashStableAcrossCRDDefaulting(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	bootstrapResult := fakeBootstrapResult()
+	bootstrapResult.OVN = bootstrap.OVNBootstrapResult{
+		ControlPlaneReplicaCount: 3,
+		OVNKubernetesConfig: &bootstrap.OVNConfigBoostrapResult{
+			DpuHostModeLabel:          OVNNodeSelectorDefaultDPUHost,
+			DpuModeLabel:              OVNNodeSelectorDefaultDPU,
+			SmartNicModeLabel:         OVNNodeSelectorDefaultSmartNIC,
+			DpuNodeLeaseRenewInterval: DPUNodeLeaseRenewIntervalDefault,
+			DpuNodeLeaseDuration:      DPUNodeLeaseDurationDefault,
+			HyperShiftConfig:          &bootstrap.OVNHyperShiftBootstrapResult{Enabled: false},
+		},
+	}
+	featureGatesCNO := getDefaultFeatureGates()
+
+	scriptLibHash := func(conf *operv1.NetworkSpec) string {
+		objs, _, err := renderOVNKubernetes(conf, bootstrapResult, manifestDirOvn, featureGatesCNO)
+		g.Expect(err).NotTo(HaveOccurred(), "renderOVNKubernetes should succeed")
+		for _, obj := range objs {
+			if obj.GetKind() != "DaemonSet" || obj.GetName() != "ovnkube-node" {
+				continue
+			}
+			ann, found, annErr := uns.NestedStringMap(obj.Object, "spec", "template", "metadata", "annotations")
+			g.Expect(annErr).NotTo(HaveOccurred(), "reading ovnkube-node pod template annotations")
+			g.Expect(found).To(BeTrue(), "ovnkube-node pod template should have annotations")
+			hash := ann["network.operator.openshift.io/ovnkube-script-lib-hash"]
+			g.Expect(hash).NotTo(BeEmpty(), "ovnkube-node pod template should carry the ovnkube-script-lib hash")
+			return hash
+		}
+		t.Fatalf("ovnkube-node DaemonSet not found in %d rendered objects", len(objs))
+		return ""
+	}
+
+	// First pass: installer-created CR, no policyAuditConfig at all.
+	firstPass := OVNKubernetesConfig.DeepCopy().Spec
+	firstPass.DefaultNetwork.OVNKubernetesConfig.PolicyAuditConfig = nil
+	fillDefaults(&firstPass, nil)
+
+	// Second pass: the CR as read back after the API server applied CRD defaults.
+	secondPass := OVNKubernetesConfig.DeepCopy().Spec
+	secondPass.DefaultNetwork.OVNKubernetesConfig.PolicyAuditConfig = &operv1.PolicyAuditConfig{
+		RateLimit:      new(uint32(20)),
+		MaxFileSize:    new(uint32(50)),
+		MaxLogFiles:    new(int32(5)),
+		Destination:    "null",
+		SyslogFacility: "local0",
+	}
+	fillDefaults(&secondPass, &firstPass)
+
+	secondPassHash := scriptLibHash(&secondPass)
+	g.Expect(scriptLibHash(&firstPass)).To(Equal(secondPassHash),
+		"ovnkube-script-lib hash must not change between the pre- and post-CRD-defaulting reconciles")
+
+	// A real script library change must still produce a different hash.
+	changed := secondPass.DeepCopy()
+	changed.DefaultNetwork.OVNKubernetesConfig.PolicyAuditConfig.MaxLogFiles = new(int32(7))
+	g.Expect(scriptLibHash(changed)).NotTo(Equal(secondPassHash),
+		"ovnkube-script-lib hash must change when the rendered script content changes")
 }
 
 func TestValidateOVNKubernetes(t *testing.T) {
