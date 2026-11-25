@@ -544,6 +544,16 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 			}
 		}
 
+		if apply.IsBGPVIPPasswordCopy(obj) {
+			if err := apply.ReconcileBGPVIPPasswordCopy(ctx, r.client.Default().CRClient(), obj, operConfig.UID); err != nil {
+				// The following FRRConfiguration must not reference a colliding or stale Secret.
+				err = fmt.Errorf("could not reconcile BGP peer password Secret %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+				r.status.SetDegraded(ctx, statusmanager.OperatorConfig, "ApplyOperatorConfig", err.Error())
+				return reconcile.Result{}, err
+			}
+			continue
+		}
+
 		// Open question: should an error here indicate we will never retry?
 		if err := apply.ApplyObject(ctx, r.client, obj, ControllerName); err != nil {
 			err = fmt.Errorf("could not apply (%s) %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)

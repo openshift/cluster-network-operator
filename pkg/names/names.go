@@ -48,6 +48,12 @@ const CreateOnlyAnnotation = "networkoperator.openshift.io/create-only"
 // tells the CNO reconciliation engine to ignore creating this object until conditions are met.
 const CreateWaitAnnotation = "networkoperator.openshift.io/create-wait"
 
+// BGPVIPPasswordSource identifies a managed BGP peer password copy by its source namespace/name.
+const BGPVIPPasswordSource = "networkoperator.openshift.io/bgp-vip-password-source"
+
+// FRRK8sNamespace is the namespace of the frr-k8s operand.
+const FRRK8sNamespace = "openshift-frr-k8s"
+
 // PrePatchAnnotation is an annotation whose value is a JSON object applied as a
 // strategic-merge-patch to the live object before the SSA apply. This is needed
 // when SSA cannot remove a field it does not own (e.g. removing defaulted

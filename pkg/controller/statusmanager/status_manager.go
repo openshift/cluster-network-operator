@@ -266,7 +266,11 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(ctx context.Context
 			objToDelete.SetName(currentObj.Name)
 			objToDelete.SetNamespace(currentObj.Namespace)
 			objToDelete.SetGroupVersionKind(gvk)
-			err = status.client.ClientFor("").CRClient().Delete(ctx, objToDelete, crclient.PropagationPolicy("Background"))
+			if gvk.Group == "" && gvk.Kind == "Secret" && currentObj.Namespace == names.FRRK8sNamespace {
+				err = apply.PruneBGPVIPPasswordCopy(ctx, status.client.Default().CRClient(), crclient.ObjectKeyFromObject(objToDelete))
+			} else {
+				err = status.client.ClientFor("").CRClient().Delete(ctx, objToDelete, crclient.PropagationPolicy("Background"))
+			}
 			if err != nil {
 				log.Printf("Error deleting related object: %v", err)
 				if !errors.IsNotFound(err) {

@@ -256,6 +256,7 @@ func TestBuildFRRConfigurationObjectsPasswordSecretReferences(t *testing.T) {
 	g.Expect(secretCopy.GetKind()).To(Equal("Secret"))
 	g.Expect(secretCopy.GetName()).To(Equal("tor-password"))
 	g.Expect(secretCopy.GetNamespace()).To(Equal(bgpVIPTargetSecretNamespace))
+	g.Expect(secretCopy.GetAnnotations()).To(HaveKeyWithValue("networkoperator.openshift.io/bgp-vip-password-source", "openshift-config/tor-password"))
 	g.Expect(secretCopy.GetLabels()).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "cluster-network-operator"))
 	secretType, _, err := uns.NestedString(secretCopy.Object, "type")
 	g.Expect(err).NotTo(HaveOccurred())

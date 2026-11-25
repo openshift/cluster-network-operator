@@ -43,6 +43,10 @@ re-renders the FRRConfiguration without a restart.
   `password` key in `openshift-frr-k8s`, where frr-k8s reads Secrets.
   Neighbors reference that copy via `passwordSecret`; the password itself is
   not in the FRRConfiguration. Peers sharing a Secret reuse the same copy.
+  If the destination name is already in use by a Secret other than CNO's
+  copy for that source, reconciliation fails: CNO leaves the destination
+  untouched and does not apply the dependent FRRConfiguration. Choose a
+  different source name or resolve the collision before retrying.
   Errors name the Secret, never its contents.
 - The render outcome is reported on the CR's `SessionsConfigured` condition
   through server-side apply (field manager `cluster-network-operator`,

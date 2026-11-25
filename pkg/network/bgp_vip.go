@@ -16,6 +16,7 @@ import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-network-operator/pkg/bootstrap"
 	cnoclient "github.com/openshift/cluster-network-operator/pkg/client"
+	"github.com/openshift/cluster-network-operator/pkg/names"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,8 +38,8 @@ const (
 	// bgpVIPSourceSecretNamespace is where the BGPVIPConfig API contract
 	// places the peer password Secrets; frr-k8s can only resolve
 	// passwordSecret references from its own namespace, hence the copy.
-	bgpVIPSourceSecretNamespace = "openshift-config"  //nolint:gosec // G101: a namespace name, not a credential
-	bgpVIPTargetSecretNamespace = "openshift-frr-k8s" //nolint:gosec // G101: a namespace name, not a credential
+	bgpVIPSourceSecretNamespace = "openshift-config" //nolint:gosec // G101: a namespace name, not a credential
+	bgpVIPTargetSecretNamespace = names.FRRK8sNamespace
 	// bgpVIPPasswordMaxBytes is the kernel's TCP MD5 key limit (RFC 2385).
 	bgpVIPPasswordMaxBytes = 80
 	// bgpVIPFieldManager owns the SessionsConfigured condition on the
@@ -374,6 +375,9 @@ func bgpVIPSecretCopy(source *corev1.Secret) (*uns.Unstructured, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      source.Name,
 			Namespace: bgpVIPTargetSecretNamespace,
+			Annotations: map[string]string{
+				names.BGPVIPPasswordSource: bgpVIPSourceSecretNamespace + "/" + source.Name,
+			},
 			Labels: map[string]string{
 				"app.kubernetes.io/managed-by": bgpVIPFieldManager,
 			},
