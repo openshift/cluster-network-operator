@@ -345,7 +345,15 @@ spec:
           value: "/usr/src/egress-router-cni/bin/"
       - name: cni-plugins
         image: {{.CNIPluginsImage}}
-        command: ["/bin/bash", "-c", "/entrypoint/cnibincopy.sh && cp -n /sysctls/allowlist.conf /host/etc/cni/tuning/"]
+        command: ["/bin/bash", "-ec"]
+        args:
+        - |
+          /entrypoint/cnibincopy.sh
+          allowlist=/sysctls/allowlist.conf
+          if [ -f /allowlist-config/allowlist.conf ]; then
+            allowlist=/allowlist-config/allowlist.conf
+          fi
+          cp "$allowlist" /host/etc/cni/tuning/
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /entrypoint
@@ -357,6 +365,9 @@ spec:
           readOnly: false
         - mountPath: /sysctls
           name: cni-sysctl-allowlist
+        - mountPath: /allowlist-config
+          name: allowlist-config
+          readOnly: true
         env:
         - name: SOURCE_DIRECTORY
           value: "/usr/src/plugins/bin/"
@@ -615,6 +626,11 @@ spec:
           configMap:
             name: {{.CniSysctlAllowlist}}
             defaultMode: 0744
+        - name: allowlist-config
+          configMap:
+            name: {{.AllowlistConfigMap}}
+            defaultMode: 0744
+            optional: true
         - name: whereabouts-flatfile-configmap
           configMap:
             name: whereabouts-flatfile-config

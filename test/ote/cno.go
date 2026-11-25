@@ -193,8 +193,11 @@ var _ = Describe("[sig-network] CNO", func() {
 		By("Create a new machineset, get the new node")
 		infrastructureName := getInfrastructureName(ctx, oc)
 		machineSetName := infrastructureName + "-72028"
-		DeferCleanup(waitForMachinesDisappear, oc, machineSetName)
-		DeferCleanup(deleteMachineSet, oc, machineSetName)
+		DeferCleanup(func(ctx context.Context) {
+			if err := deleteMachineSet(ctx, oc, machineSetName); err != nil {
+				e2e.Logf("Warning: %v", err)
+			}
+		})
 		createMachineSet(ctx, oc, machineSetName)
 
 		waitForMachineSetRunning(ctx, oc, machineSetName, 1)
