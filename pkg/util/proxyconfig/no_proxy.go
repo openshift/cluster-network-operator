@@ -55,10 +55,6 @@ func mergeUserSystemNoProxy(proxy *configv1.Proxy, infra *configv1.Infrastructur
 		"localhost",
 		".svc",
 		".cluster.local",
-		// Fully-qualified forms: Go's httpproxy matcher suffix-matches literally and
-		// does not strip the root label, so ".cluster.local" never matches
-		// "foo.ns.svc.cluster.local." (e.g. as emitted by console-operator for plugins).
-		".cluster.local.",
 	)
 	if hcpCfg := hypershift.NewHyperShiftConfig(); hcpCfg.Enabled {
 		set.Insert(".hypershift.local")
