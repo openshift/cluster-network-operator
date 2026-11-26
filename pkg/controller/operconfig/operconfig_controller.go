@@ -2,6 +2,7 @@ package operconfig
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"reflect"
@@ -528,50 +529,8 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	// Apply the objects to the cluster
-	setDegraded := false
-	var degradedErr error
-	for _, obj := range objs {
-		// TODO: OwnerRef for non default clusters. For HyperShift this should probably be HostedControlPlane CR
-		if apply.GetClusterName(obj) == "" {
-			// Mark the object to be GC'd if the owner is deleted.
-			if err := controllerutil.SetControllerReference(operConfig, obj, r.client.ClientFor(apply.GetClusterName(obj)).Scheme()); err != nil {
-				err = fmt.Errorf("could not set reference for (%s) %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
-				log.Println(err)
-				r.status.SetDegraded(ctx, statusmanager.OperatorConfig, "InternalError",
-					fmt.Sprintf("Internal error while updating operator configuration: %v", err))
-				return reconcile.Result{}, err
-			}
-		}
-
-		// Open question: should an error here indicate we will never retry?
-		if err := apply.ApplyObject(ctx, r.client, obj, ControllerName); err != nil {
-			err = fmt.Errorf("could not apply (%s) %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
-
-			// If error comes from nonexistent namespace print out a help message.
-			if obj.GroupVersionKind().Kind == "NetworkAttachmentDefinition" && strings.Contains(err.Error(), "namespaces") {
-				err = fmt.Errorf("could not apply (%s) %s/%s: %w; Namespace error for networkattachment definition, consider possible solutions: (1) Edit config files to include existing namespace (2) Create non-existent namespace (3) Delete erroneous network-attachment-definition", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
-			}
-
-			log.Println(err)
-
-			// Ignore errors if we've asked to do so.
-			anno := obj.GetAnnotations()
-			if anno != nil {
-				if _, ok := anno[names.IgnoreObjectErrorAnnotation]; ok {
-					log.Println("Object has ignore-errors annotation set, continuing")
-					continue
-				}
-			}
-			setDegraded = true
-			degradedErr = err
-		}
-	}
-
-	if setDegraded {
-		r.status.MaybeSetDegraded(ctx, statusmanager.OperatorConfig, "ApplyOperatorConfig",
-			fmt.Sprintf("Error while updating operator configuration: %v", degradedErr))
-		return reconcile.Result{}, degradedErr
+	if err := r.applyRenderedObjects(ctx, operConfig, objs); err != nil {
+		return reconcile.Result{}, err
 	}
 
 	// Update Network.config.openshift.io.Status
@@ -600,6 +559,70 @@ func (r *ReconcileOperConfig) Reconcile(ctx context.Context, request reconcile.R
 	// so we can reconcile state again.
 	log.Printf("Operconfig Controller complete")
 	return reconcile.Result{RequeueAfter: ResyncPeriod}, nil
+}
+
+func (r *ReconcileOperConfig) applyRenderedObjects(ctx context.Context, operConfig *operv1.Network, objs []*uns.Unstructured) error {
+	var copyErr, applyErr error
+	for _, obj := range objs {
+		// TODO: OwnerRef for non default clusters. For HyperShift this should probably be HostedControlPlane CR
+		if apply.GetClusterName(obj) == "" {
+			// Mark the object to be GC'd if the owner is deleted.
+			if err := controllerutil.SetControllerReference(operConfig, obj, r.client.ClientFor(apply.GetClusterName(obj)).Scheme()); err != nil {
+				err = fmt.Errorf("could not set reference for (%s) %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
+				log.Println(err)
+				r.status.SetDegraded(ctx, statusmanager.OperatorConfig, "InternalError",
+					fmt.Sprintf("Internal error while updating operator configuration: %v", err))
+				return err
+			}
+		}
+
+		if apply.IsBGPVIPPasswordCopy(obj) {
+			if err := apply.ReconcileBGPVIPPasswordCopy(ctx, r.client.Default().CRClient(), obj, operConfig.UID); err != nil {
+				copyErr = errors.Join(copyErr, fmt.Errorf("could not reconcile BGP peer password Secret %s/%s: %w", obj.GetNamespace(), obj.GetName(), err))
+			}
+			continue
+		}
+		// The renderer emits all password copies before the single bgp-vip
+		// configuration. Keep its last applied version if any copy failed.
+		if copyErr != nil && obj.GetKind() == "FRRConfiguration" && obj.GroupVersionKind().Group == "frrk8s.metallb.io" &&
+			obj.GetNamespace() == names.FRRK8sNamespace && obj.GetName() == "bgp-vip" && apply.GetClusterName(obj) == "" {
+			continue
+		}
+
+		// Open question: should an error here indicate we will never retry?
+		if err := apply.ApplyObject(ctx, r.client, obj, ControllerName); err != nil {
+			err = fmt.Errorf("could not apply (%s) %s/%s: %w", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
+
+			// If error comes from nonexistent namespace print out a help message.
+			if obj.GroupVersionKind().Kind == "NetworkAttachmentDefinition" && strings.Contains(err.Error(), "namespaces") {
+				err = fmt.Errorf("could not apply (%s) %s/%s: %w; Namespace error for networkattachment definition, consider possible solutions: (1) Edit config files to include existing namespace (2) Create non-existent namespace (3) Delete erroneous network-attachment-definition", obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), err)
+			}
+
+			log.Println(err)
+
+			// Ignore errors if we've asked to do so.
+			anno := obj.GetAnnotations()
+			if anno != nil {
+				if _, ok := anno[names.IgnoreObjectErrorAnnotation]; ok {
+					log.Println("Object has ignore-errors annotation set, continuing")
+					continue
+				}
+			}
+			applyErr = errors.Join(applyErr, err)
+		}
+	}
+
+	if copyErr != nil {
+		err := errors.Join(copyErr, applyErr)
+		r.status.SetDegraded(ctx, statusmanager.OperatorConfig, "ApplyOperatorConfig", err.Error())
+		return err
+	}
+	if applyErr != nil {
+		r.status.MaybeSetDegraded(ctx, statusmanager.OperatorConfig, "ApplyOperatorConfig",
+			fmt.Sprintf("Error while updating operator configuration: %v", applyErr))
+		return applyErr
+	}
+	return nil
 }
 
 func updateIPsecMetric(newOperConfigSpec *operv1.NetworkSpec) {

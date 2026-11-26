@@ -23,11 +23,13 @@ import (
 	operstatus "github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uns "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -209,6 +211,42 @@ func (status *StatusManager) getClusterOperAnnotation(obj *configv1.ClusterOpera
 	return objs, nil
 }
 
+// bgpVIPPasswordInUse checks the applied configuration, which can still be
+// using the old Secret if applying its replacement failed.
+func bgpVIPPasswordInUse(ctx context.Context, client crclient.Reader, key crclient.ObjectKey) (bool, error) {
+	frr := &uns.Unstructured{}
+	frr.SetGroupVersionKind(schema.GroupVersionKind{Group: "frrk8s.metallb.io", Version: "v1beta1", Kind: "FRRConfiguration"})
+	if err := client.Get(ctx, crclient.ObjectKey{Namespace: key.Namespace, Name: "bgp-vip"}, frr); err != nil {
+		return false, crclient.IgnoreNotFound(err)
+	}
+	var bgp struct {
+		Routers []struct {
+			Neighbors []struct {
+				PasswordSecret corev1.LocalObjectReference `json:"passwordSecret"`
+			} `json:"neighbors"`
+		} `json:"routers"`
+	}
+	value, found, err := uns.NestedMap(frr.Object, "spec", "bgp")
+	if err != nil {
+		return false, fmt.Errorf("cannot read BGP configuration of %s/%s", frr.GetNamespace(), frr.GetName())
+	}
+	if !found {
+		return false, nil
+	}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(value, &bgp); err != nil {
+		return false, fmt.Errorf("cannot read neighbor Secret references in %s/%s", frr.GetNamespace(), frr.GetName())
+	}
+	for _, router := range bgp.Routers {
+		for _, neighbor := range router.Neighbors {
+			// frr-k8s resolves the name against Secrets in its own namespace.
+			if neighbor.PasswordSecret.Name == key.Name {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 // deleteRelatedObjects checks for related objects attached to ClusterOperator and deletes
 // whatever is not being rendered from manifests. This is a mechanism to cleanup objects
 // that are no longer needed and are probably present from a previous version
@@ -261,12 +299,26 @@ func (status *StatusManager) deleteRelatedObjectsNotRendered(ctx context.Context
 				continue
 			}
 
-			log.Printf("Detected related object with GVK %+v, namespace %v and name %v not rendered by manifests, deleting...", gvk, currentObj.Namespace, currentObj.Name)
 			objToDelete := &uns.Unstructured{}
 			objToDelete.SetName(currentObj.Name)
 			objToDelete.SetNamespace(currentObj.Namespace)
 			objToDelete.SetGroupVersionKind(gvk)
-			err = status.client.ClientFor("").CRClient().Delete(ctx, objToDelete, crclient.PropagationPolicy("Background"))
+			if gvk.Group == "" && gvk.Kind == "Secret" && currentObj.Namespace == names.FRRK8sNamespace {
+				client := status.client.Default().CRClient()
+				key := crclient.ObjectKeyFromObject(objToDelete)
+				inUse, readErr := bgpVIPPasswordInUse(ctx, client, key)
+				if readErr != nil || inUse {
+					if readErr != nil {
+						log.Printf("Retaining Secret %s: could not check the applied BGP VIP configuration: %v", key, readErr)
+					}
+					status.relatedObjects = append(status.relatedObjects, currentObj)
+					continue
+				}
+				err = apply.PruneBGPVIPPasswordCopy(ctx, client, key)
+			} else {
+				log.Printf("Detected related object with GVK %+v, namespace %v and name %v not rendered by manifests, deleting...", gvk, currentObj.Namespace, currentObj.Name)
+				err = status.client.ClientFor("").CRClient().Delete(ctx, objToDelete, crclient.PropagationPolicy("Background"))
+			}
 			if err != nil {
 				log.Printf("Error deleting related object: %v", err)
 				if !errors.IsNotFound(err) {

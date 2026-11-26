@@ -73,7 +73,7 @@ const DPUNodeLeaseDurationDefault = 40
 // OVNEgressIPHealthCheckPort is the gRPC healthcheck port. See: https://github.com/openshift/enhancements/pull/1209
 const OVNEgressIPHealthCheckPort = "9107"
 
-const frrK8sNamespace = "openshift-frr-k8s"
+const frrK8sNamespace = names.FRRK8sNamespace
 
 const (
 	OVSFlowsConfigMapName              = "ovs-flows-config"
