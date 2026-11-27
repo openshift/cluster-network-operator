@@ -61,7 +61,6 @@ spec:
         command: ["/etc/frr_metrics/frr-metrics"]
         args:
         - --metrics-port=9141
-        - "--metrics-bind-address=[::]"
         - --tls-cert-file=/etc/metrics/tls.crt
         - --tls-private-key-file=/etc/metrics/tls.key
         ports:
