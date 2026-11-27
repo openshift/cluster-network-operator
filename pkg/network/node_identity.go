@@ -171,7 +171,9 @@ func renderNetworkNodeIdentity(ctx context.Context, conf *operv1.NetworkSpec, bo
 				klog.Infof("network-node-identity daemonset does not exist")
 			}
 		} else {
-			webhookReady = !daemonSetProgressing(webhookDaemonSet, false)
+			webhookReady = !daemonSetProgressing(webhookDaemonSet, false) &&
+				webhookDaemonSet.Status.NumberAvailable > 0 &&
+				webhookDaemonSet.Status.NumberAvailable == webhookDaemonSet.Status.DesiredNumberScheduled
 		}
 
 		manifestDirs = append(manifestDirs, filepath.Join(manifestDir, "network/node-identity/self-hosted"))
