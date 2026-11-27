@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -35,7 +34,7 @@ const (
 var _ = Describe("[sig-network] TLS Profile Compliance", func() {
 	t := newTLSTestContext()
 
-	It("should verify TLS compliance across Modern and Intermediate profiles with different adherence policies [Disruptive][Timeout:300m]",
+	It("should verify TLS compliance across Modern and Intermediate profiles with different adherence policies [Timeout:300m]",
 		Label("Disruptive"), func(ctx context.Context) {
 			By("Configuring and verifying Modern TLS Profile with LegacyAdheringComponentsOnly")
 			t.configureTLSProfileWithAdherence(ctx, configv1.TLSProfileModernType, configv1.TLSAdherencePolicyLegacyAdheringComponentsOnly)
@@ -48,6 +47,39 @@ var _ = Describe("[sig-network] TLS Profile Compliance", func() {
 			By("Configuring and verifying Intermediate TLS Profile with StrictAllComponents")
 			t.configureTLSProfileWithAdherence(ctx, configv1.TLSProfileIntermediateType, configv1.TLSAdherencePolicyStrictAllComponents)
 			t.verifyAllComponentsCompliance(ctx)
+		})
+
+	It("should verify TLS group preferences compliance with restricted groups (secp521r1, secp256r1) across networking components [Timeout:300m]",
+		Label("Disruptive"), func(ctx context.Context) {
+			groups := []configv1.TLSGroup{configv1.TLSGroupSecP521r1, configv1.TLSGroupSecP256r1}
+			rejectedGroup := configv1.TLSGroupSecP384r1
+
+			// Setup: Enable feature gate and configure APIServer (done once for all scenarios)
+			By("Enabling TLSGroupPreferences feature gate")
+			err := t.enableTLSGroupPreferencesFeatureGate(ctx)
+			Expect(err).NotTo(HaveOccurred(), "Failed to enable TLSGroupPreferences feature gate")
+
+			By("Configuring APIServer with custom TLS profile and groups")
+			err = t.configureAPIServerWithTLSGroups(ctx, groups)
+			Expect(err).NotTo(HaveOccurred(), "Failed to configure APIServer with TLS groups")
+
+			// Verify Multus TLS group compliance
+			By("Verifying Multus TLS group compliance")
+			t.verifyMultusTLSGroups(ctx, groups, rejectedGroup)
+
+			// Verify OVN-Kubernetes TLS group compliance
+			By("Verifying OVN-Kubernetes TLS group compliance")
+			t.verifyOVNKubernetesTLSGroups(ctx, groups, rejectedGroup)
+
+			// Verify CNO TLS group compliance
+			By("Verifying CNO TLS group compliance")
+			t.verifyCNOTLSGroups(ctx, groups, rejectedGroup)
+
+			// Verify Network Console TLS group compliance
+			By("Verifying Network Console TLS group compliance")
+			t.verifyNetworkConsoleTLSGroups(ctx, groups, rejectedGroup)
+
+			e2e.Logf("All TLS group preferences compliance tests passed")
 		})
 })
 
@@ -351,26 +383,8 @@ func (t *TLSTestContext) verifyTLSComplianceInPods(
 		e2e.Logf("%s", testDescription)
 	}
 
-	pods, err := t.k8sClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
-	g.Expect(err).NotTo(HaveOccurred(), "failed to list pods with selector %s", labelSelector)
-	g.Expect(pods.Items).NotTo(BeEmpty(), "no pods found with selector %s in namespace %s", labelSelector, namespace)
-
-	var testPod string
-	for _, pod := range pods.Items {
-		if pod.Status.Phase != corev1.PodRunning {
-			continue
-		}
-		if slices.ContainsFunc(pod.Status.Conditions, func(condition corev1.PodCondition) bool {
-			return condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue
-		}) {
-			testPod = pod.Name
-			break
-		}
-	}
-
-	g.Expect(testPod).NotTo(BeEmpty(), "no ready pods found with selector %s in namespace %s", labelSelector, namespace)
+	testPod, err := getReadyPodWithLabel(ctx, t.k8sClient, namespace, labelSelector)
+	g.Expect(err).NotTo(HaveOccurred(), "failed to get ready pod with selector %s in namespace %s", labelSelector, namespace)
 
 	for _, port := range ports {
 		resourceName := fmt.Sprintf("pod/%s", testPod)
