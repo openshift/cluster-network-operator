@@ -173,14 +173,29 @@ subjects:
   namespace: openshift-frr-k8s
 ---
 apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: frr-k8s-scc
+  namespace: openshift-frr-k8s
+rules:
+  - apiGroups:
+      - security.openshift.io
+    resourceNames:
+      - frr-k8s
+    resources:
+      - securitycontextconstraints
+    verbs:
+      - use
+---
+apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: system:openshift:scc:privileged
+  name: frr-k8s-scc
   namespace: openshift-frr-k8s
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system:openshift:scc:privileged
+  kind: Role
+  name: frr-k8s-scc
 subjects:
 - kind: ServiceAccount
   name: frr-k8s-daemon
