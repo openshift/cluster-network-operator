@@ -51,12 +51,15 @@ If the `networkObservability` section does not exist, it defaults to install unl
 When an install proceeds, CNO applies, in order:
 
 1. The OLM resources in `bindata/observability/07-observability-operator.yaml`:
-   a `netobserv-operator` `Namespace`, an `OperatorGroup`, and a `Subscription`
-   (`installPlanApproval: Automatic`, channel `stable`, from `redhat-operators`).
-   The namespace CNO creates is tagged with the
+   an `openshift-netobserv-operator` `Namespace`, an `OperatorGroup`, and a
+   `Subscription` (`installPlanApproval: Automatic`, channel `stable`, from
+   `redhat-operators`). The namespace CNO creates is tagged with the
    `network.operator.openshift.io/created-by-cno` annotation.
 2. Once the operator has installed the `FlowCollector` CRD, the default
    `FlowCollector` named `cluster` is created from `bindata/observability/08-flowcollector.yaml`.
+   CNO creates a minimal CR that only sets `spec.profile: Low`; the detailed
+   collector configuration is decoupled from CNO and owned by Network Observability,
+   which derives the concrete settings from the selected profile.
 
 After a successful install, whether by default or with `InstallAndEnable`, CNO is
 **hands off**. The condition latches terminal (`Installed`) and CNO stops managing
@@ -173,9 +176,9 @@ re-evaluates from scratch on its next reconcile, exactly as if this were day 0.
 > CRD still present CNO will just record `PreExisting` again.
 
 1. **Uninstall what CNO installed.** Delete the `FlowCollector` CR, uninstall NOO
-   (its `Subscription`, `OperatorGroup`, and CSV in the `netobserv-operator`
+   (its `Subscription`, `OperatorGroup`, and CSV in the `openshift-netobserv-operator`
    namespace), and delete the `FlowCollector` CRD. Optionally delete the
-   `netobserv-operator` namespace. This step matters. If the `FlowCollector` CRD is
+   `openshift-netobserv-operator` namespace. This step matters. If the `FlowCollector` CRD is
    left in place, clearing the condition in step 2 makes CNO record `PreExisting`
    rather than reinstall. To be completely clean, delete the service accounts, roles,
    and role bindings that NOO creates. See the documentation on how to "Uninstall the

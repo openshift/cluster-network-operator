@@ -1992,7 +1992,7 @@ func TestReconcile_ReappliesManifestWhileInstalling(t *testing.T) {
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: netobserv-operator
+  name: openshift-netobserv-operator
 `)
 	defer func() { OperatorYAML = origOperatorYAML }()
 
@@ -2015,7 +2015,7 @@ metadata:
 
 	// The manifest was (re)applied even though the condition was already InstallingOperator.
 	ns := &corev1.Namespace{}
-	g.Expect(r.client.Get(t.Context(), types.NamespacedName{Name: "netobserv-operator"}, ns)).To(Succeed())
+	g.Expect(r.client.Get(t.Context(), types.NamespacedName{Name: "openshift-netobserv-operator"}, ns)).To(Succeed())
 
 	// Condition stays InstallingOperator with the operator-install message.
 	updated := &operatorv1.Network{}
@@ -2262,7 +2262,7 @@ func TestIsFeatureGateEnabled_FeatureGateDisabled(t *testing.T) {
 func createTestSubscription() *unstructured.Unstructured {
 	sub := &unstructured.Unstructured{}
 	sub.SetGroupVersionKind(schema.GroupVersionKind{Group: "operators.coreos.com", Version: "v1alpha1", Kind: "Subscription"})
-	sub.SetName(OperatorNamespace)
+	sub.SetName(SubscriptionName)
 	sub.SetNamespace(OperatorNamespace)
 	return sub
 }
@@ -2424,7 +2424,7 @@ func TestReconcile_TimeoutRollsBackWhenOperatorNotInstalled(t *testing.T) {
 
 	// The doomed OLM resources and CNO-created namespace should have been rolled back.
 	gotSub := createTestSubscription()
-	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace, Namespace: OperatorNamespace}, gotSub))).To(BeTrue())
+	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: SubscriptionName, Namespace: OperatorNamespace}, gotSub))).To(BeTrue())
 	gotNS := &corev1.Namespace{}
 	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace}, gotNS))).To(BeTrue())
 }
@@ -2509,7 +2509,7 @@ func TestReconcile_TimeoutDoesNotDeleteUnownedNamespace(t *testing.T) {
 
 	// The OLM resources should be gone.
 	gotSub := createTestSubscription()
-	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace, Namespace: OperatorNamespace}, gotSub))).To(BeTrue())
+	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: SubscriptionName, Namespace: OperatorNamespace}, gotSub))).To(BeTrue())
 	// The pre-existing namespace must be left in place.
 	gotNS := &corev1.Namespace{}
 	g.Expect(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace}, gotNS)).To(Succeed())
@@ -2562,7 +2562,7 @@ func TestReconcile_TimeoutRollsBackEvenWhenOperatorInstalled(t *testing.T) {
 
 	// The CNO-created OLM resources, CSV and namespace should all be gone.
 	gotSub := createTestSubscription()
-	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace, Namespace: OperatorNamespace}, gotSub))).To(BeTrue())
+	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: SubscriptionName, Namespace: OperatorNamespace}, gotSub))).To(BeTrue())
 	gotOG := createTestOperatorGroup()
 	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace, Namespace: OperatorNamespace}, gotOG))).To(BeTrue())
 	gotCSV := createTestCSV("network-observability-operator.v1.12.2", "")
@@ -2596,7 +2596,7 @@ func TestHandleInstallTimeout_SkipsWhenAlreadyTimedOut(t *testing.T) {
 
 	// Subscription must still be present.
 	gotSub := createTestSubscription()
-	g.Expect(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace, Namespace: OperatorNamespace}, gotSub)).To(Succeed())
+	g.Expect(client.Get(t.Context(), types.NamespacedName{Name: SubscriptionName, Namespace: OperatorNamespace}, gotSub)).To(Succeed())
 }
 
 // TestReconcile_TimeoutRetriesRollbackAfterFailure verifies that a teardown that
@@ -2655,7 +2655,7 @@ func TestReconcile_TimeoutRetriesRollbackAfterFailure(t *testing.T) {
 
 	// The Subscription must survive the failed teardown.
 	gotSub := createTestSubscription()
-	g.Expect(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace, Namespace: OperatorNamespace}, gotSub)).To(Succeed())
+	g.Expect(client.Get(t.Context(), types.NamespacedName{Name: SubscriptionName, Namespace: OperatorNamespace}, gotSub)).To(Succeed())
 
 	// Second reconcile: teardown succeeds, so it latches terminal and removes resources.
 	_, err = r.Reconcile(t.Context(), req)
@@ -2667,7 +2667,7 @@ func TestReconcile_TimeoutRetriesRollbackAfterFailure(t *testing.T) {
 	g.Expect(cond.Reason).To(Equal("OperatorInstallFailed"))
 
 	gotSub = createTestSubscription()
-	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace, Namespace: OperatorNamespace}, gotSub))).To(BeTrue())
+	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: SubscriptionName, Namespace: OperatorNamespace}, gotSub))).To(BeTrue())
 	gotOG := createTestOperatorGroup()
 	g.Expect(errors.IsNotFound(client.Get(t.Context(), types.NamespacedName{Name: OperatorNamespace, Namespace: OperatorNamespace}, gotOG))).To(BeTrue())
 	gotNS := &corev1.Namespace{}

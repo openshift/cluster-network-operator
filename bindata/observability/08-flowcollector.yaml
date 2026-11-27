@@ -3,22 +3,4 @@ kind: FlowCollector
 metadata:
   name: cluster
 spec:
-  agent:
-    ebpf:
-      features:
-        - DNSTracking
-      sampling: 400
-      metrics:
-        server:
-          tls:
-            type: Auto
-    type: eBPF
-  processor:
-    metrics:
-      server:
-        tls:
-          type: Auto
-
-  deploymentModel: Service
-  loki:
-    enable: false
+  profile: Low
