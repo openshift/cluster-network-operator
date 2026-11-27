@@ -33,7 +33,8 @@ bindata/                # Go-template manifests, one dir per component; rendered
 manifests/              # CVO-applied manifests for the operator itself (namespace, CRDs, RBAC, deployment)
 profile-patches/        # Patches layered on manifests/ per install profile (see Makefile)
 docs/                   # architecture.md, operands.md, IPsec/DPU docs — kept in sync with behavior changes
-test/e2e/               # Ginkgo e2e suites
+test/e2e/               # Ginkgo e2e specs (blank-imported; run via openshift-tests-ext OTE)
+openshift-tests-ext/    # OpenShift Tests Extension binary; enables specs via InformingTests/BlockingTests
 hack/                   # Dev scripts: update-codegen.sh, test-go.sh, verify-style.sh, kind.yaml, ...
 ```
 
@@ -47,6 +48,9 @@ make check      # verify (incl. codegen diff) + test-unit + golangci-lint — ru
 make test-unit             # Unit tests only (./pkg/... ./cmd/...)
 make golangci-lint          # Lint only
 make verify-update-codegen  # Regenerate deepcopy/clientset code and diff-check
+make -C openshift-tests-ext build      # Build OTE binary (also built into the operator image)
+make -C openshift-tests-ext test-e2e NAMES='…'  # Run enabled specs via OTE (local or CI-parity)
+make verify-e2e-go-mod                 # Keep test/e2e and openshift-tests-ext kube deps aligned
 ```
 
 ## Key Conventions
