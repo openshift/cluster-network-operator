@@ -1,4 +1,4 @@
-# CNO Architecture
+# CNO Architecture 
 
 - [CNO Architecture](#cno-architecture)
   - [CNO as SLO](#cno-as-slo)
