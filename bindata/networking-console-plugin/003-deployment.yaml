@@ -87,11 +87,20 @@ spec:
             memory: 50Mi
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           capabilities:
             drop:
             - ALL
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
+        - mountPath: /tmp
+          name: tmp
+        - mountPath: /run
+          name: run
+        - mountPath: /var/lib/nginx
+          name: var-lib-nginx
+        - mountPath: /var/log/nginx
+          name: var-log-nginx
         - mountPath: /var/cert
           name: networking-console-plugin-cert
           readOnly: true
@@ -109,6 +118,14 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       volumes:
+      - emptyDir: {}
+        name: tmp
+      - emptyDir: {}
+        name: run
+      - emptyDir: {}
+        name: var-lib-nginx
+      - emptyDir: {}
+        name: var-log-nginx
       - configMap:
           defaultMode: 420
           name: networking-console-plugin
