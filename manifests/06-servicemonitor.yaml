@@ -20,3 +20,4 @@ spec:
   selector:
     matchLabels:
       name: network-operator
+  serviceDiscoveryRole: EndpointSlice
